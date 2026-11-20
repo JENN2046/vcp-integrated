@@ -317,7 +317,14 @@ class SharedRuntime {
    }
    await this.verifyHistory(mapping);
   }
-  if(!a.state.cursor&&this.mappings().length&&this.mappings().every(m=>this.state.baselines[m.sharedId]?.complete)){const watermark=this.mappings().reduce((n,m)=>Math.min(n,this.state.baselines[m.sharedId].remote.watermark),Number.MAX_SAFE_INTEGER);await a.transaction(next=>{next.cursor=watermark;});}
+  if (a.state.cursor) return;
+  const mappings = this.mappings();
+  if (!mappings.length || !mappings.every(m => this.state.baselines[m.sharedId]?.complete)) return;
+  const watermark = mappings.reduce((min, m) => Math.min(min, this.state.baselines[m.sharedId].remote.watermark), Number.MAX_SAFE_INTEGER);
+  // An empty baseline at cursor zero is already durable. Repeated background
+  // ticks need no state transaction until there is a new baseline watermark.
+  if (a.state.cursor === watermark) return;
+  await a.transaction(next => { if (!next.cursor) next.cursor = watermark; });
  }
  // Directory/configuration/message state has one serial owner. Binary network
  // transfer runs outside it; its eventual native history write rejoins this owner.
