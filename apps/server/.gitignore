@@ -10,3 +10,16 @@
 /ip_blacklist.json
 /multimodal-config.json
 /rust-vexus-lite/*.node
+/config/*.sqlite3*
+/VectorStoreTDB/
+/VCPTimedContacts/
+/Plugin/DailyNoteSearcher/src/target/
+/Plugin/DailyNoteSearcher/DailyNoteSearcher
+/Plugin/DailyNoteSearcher/DailyNoteSearcher-*
+/Plugin/EmojiListGenerator/generated_lists/
+/Plugin/ImageProcessor/*_cache.json
+/Plugin/OneRing/OneRingConfig.json
+/Plugin/PlaceholderExplorer/backups/
+/Plugin/VCPBridgeServer/bridge-config.json
+/Plugin/VCPBridgeServer/profiles/
+/Plugin/WeatherReporter/weather_cache.json

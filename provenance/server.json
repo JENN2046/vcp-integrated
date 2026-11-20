@@ -26,7 +26,18 @@
     },
     "mobileBuildSource": "apps/mobile",
     "mobileBuildMount": "Plugin/NativeSync/mobile-dist",
-    "mobileBuildEnv": "NativeMobilePwaDir"
+    "mobileBuildEnv": "NativeMobilePwaDir",
+    "adminPanel": {
+      "dependencyLock": "AdminPanel-Vue/package-lock.json",
+      "build": "npm --prefix AdminPanel-Vue run build",
+      "generatedBundle": "AdminPanel-Vue/dist",
+      "listener": "Same loopback address as main, port PORT + 1"
+    },
+    "dailyNoteSearcher": {
+      "cargoLock": "Plugin/DailyNoteSearcher/src/Cargo.lock",
+      "optional": true,
+      "generatedBinary": "Plugin/DailyNoteSearcher/DailyNoteSearcher"
+    }
   },
   "pluginDiscovery": {
     "activeManifests": [
@@ -34,13 +45,1542 @@
     ],
     "helperDirectories": [
       "Plugin/AgentAssistant",
-      "Plugin/VCPSleep"
+      "Plugin/VCPSleep",
+      "Plugin/ImageProcessor",
+      "Plugin/WeatherReporter",
+      "Plugin/OneRing",
+      "Plugin/VCPBridgeServer",
+      "Plugin/PlaceholderExplorer",
+      "Plugin/PlaceholderExplorerCommand",
+      "Plugin/EmojiListGenerator",
+      "Plugin/DailyNoteSearcher"
     ]
   },
   "files": {
     ".gitignore": {
       "source": "monorepo",
-      "sha256": "b0a205cda74d03c95129220a972c9d81e9b83585f86feaac10707aabaa033f95"
+      "sha256": "9727d2d167cf3bbf2831c790928bd581aac08893d05bd33755d33847d54e2d48"
+    },
+    "AdminPanel-Vue/.gitignore": {
+      "source": "monorepo-adapted-upstream",
+      "upstreamSha256": "0b1b1ceb88b419e94ea1000bd3e3ddea4183e00b483ab5a2b65800ee790ab4ad",
+      "sha256": "387b569e03879b7dfd4d516e44c372830345cd22ff0105ae3385846917b0bd22"
+    },
+    "AdminPanel-Vue/README.md": {
+      "source": "upstream",
+      "sha256": "90ace21fc5699edd8c9922f38dc3b83b2e96d36cd9b2f7b543b8a7e9a6963c9f"
+    },
+    "AdminPanel-Vue/eslint.config.js": {
+      "source": "upstream",
+      "sha256": "8ce1dd4c30a1d02e7925850e9c522ed4af1658a17f97ad427b60e3358b86f684"
+    },
+    "AdminPanel-Vue/index.html": {
+      "source": "upstream",
+      "sha256": "e2a5c9768096bc6b3707a5f5c813437dac1b95ef8a0e521e8918483b93329cc1"
+    },
+    "AdminPanel-Vue/package-lock.json": {
+      "source": "upstream",
+      "sha256": "a0e52c11a1cfe2830936881604c1670dce8a76e705dbda43d30b2994a69cc270"
+    },
+    "AdminPanel-Vue/package.json": {
+      "source": "upstream",
+      "sha256": "6939bba113032b843aa4b3387788a5a4d66b327632db666f57651223de327372"
+    },
+    "AdminPanel-Vue/public/Google Orbitron.ttf": {
+      "source": "upstream",
+      "sha256": "27cd313045d12280384256b4fba922366a4883e32ffb866b9acd62c5a859de61"
+    },
+    "AdminPanel-Vue/public/VCPLogo2.png": {
+      "source": "upstream",
+      "sha256": "2ac305c6efca389104fadca4b22eb79a404a32f41e1c4be4fd19c49577aa1841"
+    },
+    "AdminPanel-Vue/public/easymde.min.css": {
+      "source": "upstream",
+      "sha256": "e7a7feebd8e4a193c03f87dea9f782d40c0e50baa8b8b93cc552f92aa51a61c0"
+    },
+    "AdminPanel-Vue/public/easymde.min.js": {
+      "source": "upstream",
+      "sha256": "7071820328c0f7203408a9811471d624e4fb2ee6d8ecfa8916102194f4f088c5"
+    },
+    "AdminPanel-Vue/public/favicon.ico": {
+      "source": "upstream",
+      "sha256": "5a2119268cc7d6d8b8b6b6a77183194d6d888384501f3221618731270353c1f5"
+    },
+    "AdminPanel-Vue/public/favicon.svg": {
+      "source": "upstream",
+      "sha256": "61bc9a161de58248288e6905425d7180f0624c2865007b97d763fdac12043a66"
+    },
+    "AdminPanel-Vue/public/font.woff2": {
+      "source": "upstream",
+      "sha256": "fb0270b11453fa64bca88171382cebf7e48bd0df8be94d252c948b97505f6e6f"
+    },
+    "AdminPanel-Vue/public/fontcss2.css": {
+      "source": "upstream",
+      "sha256": "f9700399bdda74a3a604c9780f58c364b7eb218999e05fc7e82703c3d8b0e520"
+    },
+    "AdminPanel-Vue/public/icons.svg": {
+      "source": "upstream",
+      "sha256": "b45fa506195cfcdef406ba9f0c77b36ddc1a7c224040926ec70abc2fdea7b93a"
+    },
+    "AdminPanel-Vue/public/image_cache_editor.css": {
+      "source": "upstream",
+      "sha256": "698fd975a94aaf4b0fbbd0b83be2abe604446ca97866acc4c0d63cd2d8c2e3df"
+    },
+    "AdminPanel-Vue/public/image_cache_editor.html": {
+      "source": "upstream",
+      "sha256": "9363a3ec833b56e3595ac7cfd3035fa4282ee00b61e2c854ab848a98615c269d"
+    },
+    "AdminPanel-Vue/public/index.html": {
+      "source": "upstream",
+      "sha256": "d45228692d7c6803c2ec3ffd1a40ebf6fe890f72bfb97c903d1b99841fb9f31c"
+    },
+    "AdminPanel-Vue/public/login.html": {
+      "source": "upstream",
+      "sha256": "ad8825ac700f5baa2f979ea42f70d57bf5152adcdbad7e6de842c5b4f94f6e93"
+    },
+    "AdminPanel-Vue/public/marked.min.js": {
+      "source": "upstream",
+      "sha256": "208441f787f1f3df20ecd6879c3bd4c8f0ef99014cdd7de3b15185529995336b"
+    },
+    "AdminPanel-Vue/public/rag_tags_editor.css": {
+      "source": "upstream",
+      "sha256": "2ec9d22ab6e709240d5e6341599cb431d7ab9d23bf4da5ce820b7282acf8ba36"
+    },
+    "AdminPanel-Vue/public/rag_tags_editor.html": {
+      "source": "upstream",
+      "sha256": "8621d12f31acf3e6b3922c862d4a979785fea3d9d71b9b1b1ed173f4c1d21326"
+    },
+    "AdminPanel-Vue/public/script.js": {
+      "source": "upstream",
+      "sha256": "986f1966918f7a34b8e5afae4f1a15f43700a7f1515ecbd2ca631688edea033c"
+    },
+    "AdminPanel-Vue/public/style.css": {
+      "source": "upstream",
+      "sha256": "c361ab7e0f23ae277cf0af42b0f9856eb5eb310f9ea020b5c357c7811b08bfcc"
+    },
+    "AdminPanel-Vue/public/tagmemo-simulation.html": {
+      "source": "upstream",
+      "sha256": "26fa65a4641e652f08d099da3a00bfd3464b616192500a62e2cdd11aa0d3ea5d"
+    },
+    "AdminPanel-Vue/public/tool_list_editor.html": {
+      "source": "upstream",
+      "sha256": "f4f5eaffe4ef9cc5dbc9db10252796d4dc0b8bedbc5ac3a6e05dd00ab61818d3"
+    },
+    "AdminPanel-Vue/public/tool_list_editor.js": {
+      "source": "upstream",
+      "sha256": "d33094d80c2ee5caf5d6b5d535265ddb65be00491d18066108c018fe019d81a2"
+    },
+    "AdminPanel-Vue/public/tool_list_editor_new.css": {
+      "source": "upstream",
+      "sha256": "e0ea9f1fea76f42b2597b38ea51991643996bbf41e7b109fad2912a6b102194d"
+    },
+    "AdminPanel-Vue/public/vcptavern_editor.css": {
+      "source": "upstream",
+      "sha256": "e283d0198bbcbf2a1a7ee2cea1c67a71d8194465ec12165caa8641553fff37a1"
+    },
+    "AdminPanel-Vue/public/vcptavern_editor.html": {
+      "source": "upstream",
+      "sha256": "d7ad6acc56bc5ff842a38dc7fe698b8fb05358558c32b6d8a61e462adbef5e4e"
+    },
+    "AdminPanel-Vue/public/vcptavern_editor.js": {
+      "source": "upstream",
+      "sha256": "c14359de90316d1f539177c706ed5aa267075d98d0e04168decdbe3f9ec64df4"
+    },
+    "AdminPanel-Vue/public/vendor/tagmemo-simulation/OrbitControls.js": {
+      "source": "upstream",
+      "sha256": "02bb4ade710f3e607329e37a21f098bc3ac70eb6e33daf8a65e79f4db785e7b2"
+    },
+    "AdminPanel-Vue/public/vendor/tagmemo-simulation/anime.min.js": {
+      "source": "upstream",
+      "sha256": "bceef94f964481f7680d95e7fbbe5a8c20d3945a926a754874898a578db7c7ab"
+    },
+    "AdminPanel-Vue/public/vendor/tagmemo-simulation/three.min.js": {
+      "source": "upstream",
+      "sha256": "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2"
+    },
+    "AdminPanel-Vue/public/woff.css": {
+      "source": "upstream",
+      "sha256": "fabb68b66ae5982a535edd32ccba34e44a7e216fa11113a0afe1891ca5fe3701"
+    },
+    "AdminPanel-Vue/scripts/check-typography-guard.mjs": {
+      "source": "upstream",
+      "sha256": "144a3f77cd738b9c8214bfc0ddafcf9180ad00ff271a33fbaecf4cf37c2d2cfb"
+    },
+    "AdminPanel-Vue/src/App.vue": {
+      "source": "upstream",
+      "sha256": "3b1dee3a5e4baf6ecc710661960f358386e47152cd64007dda38f37a8fdac9cc"
+    },
+    "AdminPanel-Vue/src/api/admin-config.ts": {
+      "source": "upstream",
+      "sha256": "0496fc23b616c3d9362e0b0c69b02d79439dcc3b70c060cc993817e6c6af25c2"
+    },
+    "AdminPanel-Vue/src/api/agent.ts": {
+      "source": "upstream",
+      "sha256": "b2c7a0df008d393dc26731dfa37f87386ff1ce08adfacc2c0feb8c39363f486f"
+    },
+    "AdminPanel-Vue/src/api/auth.ts": {
+      "source": "upstream",
+      "sha256": "2e1bac1b34181831bd26f58491b072d91c5c7def34ce779f65c5762a1c7cfa15"
+    },
+    "AdminPanel-Vue/src/api/clawMail.ts": {
+      "source": "upstream",
+      "sha256": "346bbecc6d3dc8c8d8effa75d9c6177f6f688221ca969c91c381438499d21068"
+    },
+    "AdminPanel-Vue/src/api/diary.ts": {
+      "source": "upstream",
+      "sha256": "8600db8d39d9233ad9b36ffea9e39706e7f0f506776579c8dec86a7b1f56efd8"
+    },
+    "AdminPanel-Vue/src/api/dream.ts": {
+      "source": "upstream",
+      "sha256": "742a7e826962b8255146ed58a35e7d9683578656d11f16f91b98895ad480f7c0"
+    },
+    "AdminPanel-Vue/src/api/dynamicTools.ts": {
+      "source": "upstream",
+      "sha256": "6a01933f03c335c6bbabb18e7be0b3cc4f1f00924fe2feb0746ad39cbf7eabbe"
+    },
+    "AdminPanel-Vue/src/api/emojis.ts": {
+      "source": "upstream",
+      "sha256": "6967ca025e4c1c3fbcf55f106603ef40af3103e721b76743e7b4f8edcb178fb9"
+    },
+    "AdminPanel-Vue/src/api/forum-assistant.ts": {
+      "source": "upstream",
+      "sha256": "7443cbc0093074f0f0cecede76d4c2961757ab0acf366995497114a451ff99e6"
+    },
+    "AdminPanel-Vue/src/api/forum.ts": {
+      "source": "upstream",
+      "sha256": "f0a7bc67fd5ff3d9df58f72a4207ae5683dc51cb8f396f80d5c9ea5a65556870"
+    },
+    "AdminPanel-Vue/src/api/index.ts": {
+      "source": "upstream",
+      "sha256": "1d788ed62c04d6e114635ae72928ac5c50dafe93db23f64a3e4837906743ab99"
+    },
+    "AdminPanel-Vue/src/api/jevRegistry.ts": {
+      "source": "upstream",
+      "sha256": "c10e13f34bfacb3fd63da1dc338668ace610ff9f592ca2e348462119ec9b599a"
+    },
+    "AdminPanel-Vue/src/api/media-cache.ts": {
+      "source": "upstream",
+      "sha256": "e5caf8dc25565ffd480c73f48d90ec652eb2a827698feb21133a8575edc85d69"
+    },
+    "AdminPanel-Vue/src/api/newapi-monitor.ts": {
+      "source": "upstream",
+      "sha256": "893ad1cff193ee0ae6478cefe0a77270e416e39f06e93bdcb291ea1dc87180d2"
+    },
+    "AdminPanel-Vue/src/api/news.ts": {
+      "source": "upstream",
+      "sha256": "73082c227bc08a07c971865621cccfbccc10c65bfa9af99683dfb8db9541c9c3"
+    },
+    "AdminPanel-Vue/src/api/openHerPersona.ts": {
+      "source": "upstream",
+      "sha256": "cb32fa8532d8bb57350c444ab128dd3680084ca7df5d1e705ef44fb407965299"
+    },
+    "AdminPanel-Vue/src/api/placeholder.ts": {
+      "source": "upstream",
+      "sha256": "8cf52fa44a8d276a58b0dd6521f41d4906d4801741260f05092c3d00b940e240"
+    },
+    "AdminPanel-Vue/src/api/placeholderExplorer.ts": {
+      "source": "upstream",
+      "sha256": "77e7ce181f81de94584e7200957eb2495e06b664f21733292fb87722027f742f"
+    },
+    "AdminPanel-Vue/src/api/plugin.ts": {
+      "source": "upstream",
+      "sha256": "74f01a75b6885c2ed7c2f7570fa342f6d042201f3266ab4bfea37cdbd28a2e13"
+    },
+    "AdminPanel-Vue/src/api/pluginStore.ts": {
+      "source": "upstream",
+      "sha256": "14205f4a79684c192078e6ceedf56871f48954a0c8a780981a43f2f965b70c19"
+    },
+    "AdminPanel-Vue/src/api/rag.ts": {
+      "source": "upstream",
+      "sha256": "1e6543644fc39aa1a993e498641b4d7c4bebba2b9ae0f08b25d117f0ced2870c"
+    },
+    "AdminPanel-Vue/src/api/requestWithUi.ts": {
+      "source": "upstream",
+      "sha256": "a9c7820684883dbf1617c6a02bb2f86bfcb4ea571c1186eb7b21610fd6493859"
+    },
+    "AdminPanel-Vue/src/api/sarPrompt.ts": {
+      "source": "upstream",
+      "sha256": "b9c9d2c4639ef0faddf63021d55dd2ea43266249c2f352a2dffdfea98bb4fd3a"
+    },
+    "AdminPanel-Vue/src/api/schedule.ts": {
+      "source": "upstream",
+      "sha256": "39d10745ac40e0370cdc53db6fc1a9beb30095444f3c703f42901b24a96da64c"
+    },
+    "AdminPanel-Vue/src/api/semanticRouter.ts": {
+      "source": "upstream",
+      "sha256": "aeaca1e36cfb27c9f982df103a68c0a9fdc5228f545ba599961319d5c5552b01"
+    },
+    "AdminPanel-Vue/src/api/system.ts": {
+      "source": "upstream",
+      "sha256": "77e6fbf8446c28422ddfea85a763defa68245344856e5021353ad095fa1e0bc6"
+    },
+    "AdminPanel-Vue/src/api/tarotDivination.ts": {
+      "source": "upstream",
+      "sha256": "1dd3b9b96424374b9bbf52d5b6c954804ce5e0d738bc3a4afd31389a482c1fa1"
+    },
+    "AdminPanel-Vue/src/api/toolCallRecords.ts": {
+      "source": "upstream",
+      "sha256": "a59b575f961ef9d3a02124895d79d945a0ef9a6a934884e7454ea14d2bdb57a9"
+    },
+    "AdminPanel-Vue/src/api/toolList.ts": {
+      "source": "upstream",
+      "sha256": "700a3c08798a429eecaca7db15ac1e22d0a76b14c4ce3a6468f1b6a91115e840"
+    },
+    "AdminPanel-Vue/src/api/toolbox.ts": {
+      "source": "upstream",
+      "sha256": "d41fdf3643acc70651bc46df453af71c9080eda94eccb77d1144cb938dbf3545"
+    },
+    "AdminPanel-Vue/src/api/tvs.ts": {
+      "source": "upstream",
+      "sha256": "a969bc989c6816fcb851df277ec9d21f09db960e806554f0eddd7dfc759a6c00"
+    },
+    "AdminPanel-Vue/src/api/vcpTimeline.ts": {
+      "source": "upstream",
+      "sha256": "729048b66803c3abcbadeb2f1b43a6387d1b8a33f1f55bb8956153184c8deb05"
+    },
+    "AdminPanel-Vue/src/api/vcptavern.ts": {
+      "source": "upstream",
+      "sha256": "aa1e4a8258c38490c497b53b63af9bc19897842011c2eb3a07e90dbe3df62f19"
+    },
+    "AdminPanel-Vue/src/api/weather.ts": {
+      "source": "upstream",
+      "sha256": "ad6157c9eec40c5bde8bedd268285dad28d723fd005279fd09bc359133ca352e"
+    },
+    "AdminPanel-Vue/src/app/routes/base.ts": {
+      "source": "upstream",
+      "sha256": "66c9677295f264e2bf74d2af149d865b09ffb56f4ebf3c68772b8fa37751a626"
+    },
+    "AdminPanel-Vue/src/app/routes/components.ts": {
+      "source": "upstream",
+      "sha256": "f6666ea346d08ed1801c8d6d6eafa14ceb7960a9d2001edb088eb3300d478ce3"
+    },
+    "AdminPanel-Vue/src/app/routes/manifest.ts": {
+      "source": "upstream",
+      "sha256": "e889ef940d3a92c8d5cc24e86e8b89f7cd62546cfb2af2d70ced4074f2d1239b"
+    },
+    "AdminPanel-Vue/src/app/routes/redirect.ts": {
+      "source": "upstream",
+      "sha256": "c0185825888473fc9f5b6355840446405fbf07b9fcfbeeb990563da7c32e20b9"
+    },
+    "AdminPanel-Vue/src/assets/hero.png": {
+      "source": "upstream",
+      "sha256": "72a860570eddf1dd9988f26c7106c67be286bc9f2fd3303c465ce87edb1ae6cd"
+    },
+    "AdminPanel-Vue/src/assets/nova-logo-original.png": {
+      "source": "upstream",
+      "sha256": "ac2ad72e51a9d4c3342b181c72a0335e15a190352e3f4333667145e7ab6fda41"
+    },
+    "AdminPanel-Vue/src/assets/nova-logo.png": {
+      "source": "upstream",
+      "sha256": "26eb83dc7843f4e4dd802c057c254b7a20377096caf16e04b6f743d841223b56"
+    },
+    "AdminPanel-Vue/src/assets/topbar-logo.png": {
+      "source": "upstream",
+      "sha256": "c715312b566cff51a1c4c3d8d2a6c5ce00bb7756c40557629e26fdf1290164c0"
+    },
+    "AdminPanel-Vue/src/assets/typescript.svg": {
+      "source": "upstream",
+      "sha256": "e45b2f008f0a40c1011b0fd460081f8bb00df063a41240449159da164724d96c"
+    },
+    "AdminPanel-Vue/src/assets/vite.svg": {
+      "source": "upstream",
+      "sha256": "5be21acd42eb7b896e517f4e0f0f11eb5c5d9e54fbbcebe9453f033008fcca6f"
+    },
+    "AdminPanel-Vue/src/components/DualPaneEditor.vue": {
+      "source": "upstream",
+      "sha256": "1b340db30273b947ae793fac61d2da1bdf2ed13f37ebbb42dcd53001c40c9ca6"
+    },
+    "AdminPanel-Vue/src/components/SolarSystemBg.vue": {
+      "source": "upstream",
+      "sha256": "f350a887b4b1b71ddebe03d4f6b351e01a5544669e8862cf697a16bc84856802"
+    },
+    "AdminPanel-Vue/src/components/dashboard/ActivityChartCard.vue": {
+      "source": "upstream",
+      "sha256": "558eef65ac9490df09285e5e1e4e0de7fa6b5f91af0fd6ba83a72a9529517bb8"
+    },
+    "AdminPanel-Vue/src/components/dashboard/CalendarCard.vue": {
+      "source": "upstream",
+      "sha256": "ca4732530326b02770760edcf1cc67bcdae3cdde7ad97e490cfad1061d7b04bc"
+    },
+    "AdminPanel-Vue/src/components/dashboard/CardManager.vue": {
+      "source": "upstream",
+      "sha256": "b9c949e3f3fe800fa79e003b875585e0ec63f3e3f94c996ec8782d43aef72d48"
+    },
+    "AdminPanel-Vue/src/components/dashboard/CpuCard.vue": {
+      "source": "upstream",
+      "sha256": "2910aa75d10a95a778e5053e9e533a3807227152c0d13f8c314eb1ea01cf8e9a"
+    },
+    "AdminPanel-Vue/src/components/dashboard/DreamReviewCard.vue": {
+      "source": "upstream",
+      "sha256": "c148f5b5d8619e3ab8bdb2cc0d08b34af02cdc43e7f5290cd8d9782785db3153"
+    },
+    "AdminPanel-Vue/src/components/dashboard/MemoryCard.vue": {
+      "source": "upstream",
+      "sha256": "7b02624fedf5cdc79a27e1513d1971fc640e75253e865ed8011acc270636365e"
+    },
+    "AdminPanel-Vue/src/components/dashboard/MemoryProfileCard.vue": {
+      "source": "upstream",
+      "sha256": "d8cb988c238b147cd7110e511a00d1d97deddc3aa9e4c2b87cd2472acfa212c5"
+    },
+    "AdminPanel-Vue/src/components/dashboard/NewApiMonitorCard.vue": {
+      "source": "upstream",
+      "sha256": "e2d0a6d97f84c8f86c0950a90f7738a624cc3f8aa2ceb66a424be5deb5da82da"
+    },
+    "AdminPanel-Vue/src/components/dashboard/NewsCard.vue": {
+      "source": "upstream",
+      "sha256": "6e5ba180e2003aabcc31266c0b2616f7847a50d2db13480362e33dd4a7567caa"
+    },
+    "AdminPanel-Vue/src/components/dashboard/NodeInfoCard.vue": {
+      "source": "upstream",
+      "sha256": "71e0be7b5111ca7867bd3727e4c4621db49ed29bab8ee507fcbaea6c3ce07aa6"
+    },
+    "AdminPanel-Vue/src/components/dashboard/ProcessCard.vue": {
+      "source": "upstream",
+      "sha256": "9380c5e6afef322eb6b15186c598862f4a1aa6269a01ddf2ef9b527e289a590b"
+    },
+    "AdminPanel-Vue/src/components/dashboard/VcpAnimation.vue": {
+      "source": "upstream",
+      "sha256": "da9b3a310b7ca836b49572f0d74387f3ff06e1a37dc6969d1de4fea45d2fa572"
+    },
+    "AdminPanel-Vue/src/components/dashboard/VcpForumCard.vue": {
+      "source": "upstream",
+      "sha256": "1e9e07f9f63ede8a5d57b1de302037c9577650fdcc7b663709b5b7a6f2f6e281"
+    },
+    "AdminPanel-Vue/src/components/dashboard/WeatherCard.vue": {
+      "source": "upstream",
+      "sha256": "d20c77ea93fc61b500873bbd3d2ae6c4e3681debc1f1f0c0d469141ea9cc736b"
+    },
+    "AdminPanel-Vue/src/components/dashboard/contrib/ExampleCard.vue": {
+      "source": "upstream",
+      "sha256": "abdc57f3e6ac4644ed1c0430d3f93e9f6ba0736a949fe06d6aab676ca34c7707"
+    },
+    "AdminPanel-Vue/src/components/dashboard/contrib/FileTreeCard.vue": {
+      "source": "upstream",
+      "sha256": "e448b71bb59acd05287fbe707645d49a91c5f896487d0ef2de376ceba2728147"
+    },
+    "AdminPanel-Vue/src/components/dashboard/contrib/README.md": {
+      "source": "upstream",
+      "sha256": "70f5162b9eeaf2051009d50585fdd10518a7f7cfe18ab3d900be4f27ca5faed8"
+    },
+    "AdminPanel-Vue/src/components/dashboard/contrib/_sdk.ts": {
+      "source": "upstream",
+      "sha256": "8c279eb4dfe664bc1de5801a9641d565d024cafdb43d307faa6d3c807e8d389b"
+    },
+    "AdminPanel-Vue/src/components/dashboard/contrib/_types.ts": {
+      "source": "upstream",
+      "sha256": "e7223e15bb470299517cfaac92361f27751022a430dcdb559e22aa6b42d60521"
+    },
+    "AdminPanel-Vue/src/components/dashboard/dashboard-card.css": {
+      "source": "upstream",
+      "sha256": "2d8135a62a519874394a244573f10d6ca9f4c3c413b1feb834757a0d4d20ee8a"
+    },
+    "AdminPanel-Vue/src/components/feedback/ConfirmDialog.vue": {
+      "source": "upstream",
+      "sha256": "9747f7d8c443459fbde812dac6f1dd674ee35b292cc9197da594a3707ba664f0"
+    },
+    "AdminPanel-Vue/src/components/feedback/FeedbackHost.vue": {
+      "source": "upstream",
+      "sha256": "846be1e48d2510e6ee269f746f6b64da8063f91cd3d05da5a3a0546dc768bfb6"
+    },
+    "AdminPanel-Vue/src/components/feedback/InputDialog.vue": {
+      "source": "upstream",
+      "sha256": "f34308d44f130f3f31e8382c445a5688299cbe53cf39078bd841b958ddb60db0"
+    },
+    "AdminPanel-Vue/src/components/immersive/ImmersiveCelestialPanel.vue": {
+      "source": "upstream",
+      "sha256": "44c86a2218b57a677be54280f920224587437bd7699edb7538af11b449fbdd9e"
+    },
+    "AdminPanel-Vue/src/components/layout/Breadcrumb.vue": {
+      "source": "upstream",
+      "sha256": "4e538a8405db2057f2a2776203feb506ab08b21a8b6d6b1b03deb7d2d87c630f"
+    },
+    "AdminPanel-Vue/src/components/layout/GlobalCommandPalette.vue": {
+      "source": "upstream",
+      "sha256": "ddcfcdb4f5797b37012b9058e2663d2bb83f7661f8e508e7c353bd6f6bf1de81"
+    },
+    "AdminPanel-Vue/src/components/layout/NotificationsDrawer.vue": {
+      "source": "upstream",
+      "sha256": "38f35401287902b85409cdfc7265e303639207d25327cceca798446d2898d132"
+    },
+    "AdminPanel-Vue/src/components/layout/Sidebar.vue": {
+      "source": "upstream",
+      "sha256": "7c99592e2d95edf3eeeb204aca93364371fde453e8522f47fb26a15982172076"
+    },
+    "AdminPanel-Vue/src/components/layout/ThemeQuickDrawer.vue": {
+      "source": "upstream",
+      "sha256": "6a6a111376b53b2daec9de491a73d3a4b36dfb9c44efb750a10bbd9712087487"
+    },
+    "AdminPanel-Vue/src/components/layout/TopBar.vue": {
+      "source": "upstream",
+      "sha256": "f86e537dbd1feb5f672ff499e8c0098767c8f47dd591e57ca08f10a4066457a5"
+    },
+    "AdminPanel-Vue/src/components/layout/TopBarSearch.vue": {
+      "source": "upstream",
+      "sha256": "c57e3f9315a6788972d8c6c9ae5d44911f3a8f9187154156e41a131da3dbff21"
+    },
+    "AdminPanel-Vue/src/components/layout/sidebar/SidebarNavList.vue": {
+      "source": "upstream",
+      "sha256": "ee8380d0a51eaa02ad48b793f5d27f0fc7c5a4c4e8990b758d4995935c6ab9dd"
+    },
+    "AdminPanel-Vue/src/components/layout/sidebar/SidebarRecentVisits.vue": {
+      "source": "upstream",
+      "sha256": "8e375d2c7db49f246e38607b2732ca49bd527418aa7797af4f4fe677f8874870"
+    },
+    "AdminPanel-Vue/src/components/plugins/JevThirdPartyManager.vue": {
+      "source": "upstream",
+      "sha256": "86de0d86e1f6de52ec3ceb38e585c28296f3ff3374d8c6c46719489944e1669c"
+    },
+    "AdminPanel-Vue/src/components/plugins/PluginCommandSearch.vue": {
+      "source": "upstream",
+      "sha256": "ecb5ce775efaae895815379d208639efdf566b92d84f7de087a39a0e72f59d75"
+    },
+    "AdminPanel-Vue/src/components/plugins/PluginJevDeclaration.vue": {
+      "source": "upstream",
+      "sha256": "88c9d56f3581f8df41ad35d23985f0705fdc139816439f67a7c7c06414dca7f9"
+    },
+    "AdminPanel-Vue/src/components/ui/AppCheckbox.vue": {
+      "source": "upstream",
+      "sha256": "7e38398afbb6207d0281e1e4d912c27a225b21e46f170d268304a9898d344ff5"
+    },
+    "AdminPanel-Vue/src/components/ui/AppSwitch.vue": {
+      "source": "upstream",
+      "sha256": "ccbd34efe90c5f6e0075ea20b29cf5325e2461b1cd5658bc06ed85d08d499f18"
+    },
+    "AdminPanel-Vue/src/components/ui/BaseModal.vue": {
+      "source": "upstream",
+      "sha256": "73cc31bbb9a57840eace63f6df8ef60a3cb6525934ff0f2e5468e7710865d2b5"
+    },
+    "AdminPanel-Vue/src/components/ui/DragHandle.vue": {
+      "source": "upstream",
+      "sha256": "f64a17f18c65774042a1abdb333495c1c3f9af6a336897fe2f444b56a3acf655"
+    },
+    "AdminPanel-Vue/src/components/ui/UiAlert.vue": {
+      "source": "upstream",
+      "sha256": "6f96d8f9e87ce6ccc2ddb4e2fc6d6a94afbbb8647090a59a24b3f0b3eb980272"
+    },
+    "AdminPanel-Vue/src/components/ui/UiBadge.vue": {
+      "source": "upstream",
+      "sha256": "68984fccb5b0a168e26dfb559fb32ea80b200531b976d28bd111e28ea79f113e"
+    },
+    "AdminPanel-Vue/src/components/ui/UiButton.vue": {
+      "source": "upstream",
+      "sha256": "e785a137495e5c0b645447b09ba01e751828c6bfdaff26b4a3243463225aba94"
+    },
+    "AdminPanel-Vue/src/components/ui/UiCard.vue": {
+      "source": "upstream",
+      "sha256": "335706d2597e48cacec90a7395b8dd2198f0b8b3266a531dcabd6f101ce5bc22"
+    },
+    "AdminPanel-Vue/src/components/ui/UiDirtyIndicator.vue": {
+      "source": "upstream",
+      "sha256": "e3277869f448cfbbf37c13fce7de0cbc4b816c138a7b6da8b5b630016064f8aa"
+    },
+    "AdminPanel-Vue/src/components/ui/UiEmptyState.vue": {
+      "source": "upstream",
+      "sha256": "10a4cecc5e556b51517e3314592ae2f8373736724a5416f5eeb6cfdfbcd1dc89"
+    },
+    "AdminPanel-Vue/src/components/ui/UiField.vue": {
+      "source": "upstream",
+      "sha256": "d31860060510f5c7f809609cf870ff87005933dd9c12328c4924281da1118024"
+    },
+    "AdminPanel-Vue/src/components/ui/UiIconButton.vue": {
+      "source": "upstream",
+      "sha256": "ee514491f7ad216798c66a9ec7ccfaad958d0fd9ffc442c775e64fc667a9247e"
+    },
+    "AdminPanel-Vue/src/components/ui/UiInput.vue": {
+      "source": "upstream",
+      "sha256": "dc5b05ddd08969c2e335885d415f942556d3f4220f0b4a0ca4a051c3e4ad9402"
+    },
+    "AdminPanel-Vue/src/components/ui/UiList.vue": {
+      "source": "upstream",
+      "sha256": "80047350923cbefbeb95e21c018a574eff971a2c98bfa5436349a29900923409"
+    },
+    "AdminPanel-Vue/src/components/ui/UiListItem.vue": {
+      "source": "upstream",
+      "sha256": "929d22a9da7c050a805118603e1ef906e4a7c319417f3467d6e6e404d450202b"
+    },
+    "AdminPanel-Vue/src/components/ui/UiPageActions.vue": {
+      "source": "upstream",
+      "sha256": "38f4149fd802590b7b1ad44a08954ad2b17df5dc4ef9b2ce5d5f855b70d020df"
+    },
+    "AdminPanel-Vue/src/components/ui/UiSection.vue": {
+      "source": "upstream",
+      "sha256": "43e44ce95fa707e3acf90ccca79a284736ce653659c4210c60feca6e4e2f4907"
+    },
+    "AdminPanel-Vue/src/components/ui/UiSelect.vue": {
+      "source": "upstream",
+      "sha256": "283bd808552133c24ae42575a288ea0964a8265f0c6fee8cc1d052c9fc304739"
+    },
+    "AdminPanel-Vue/src/components/ui/UiSettingsCard.vue": {
+      "source": "upstream",
+      "sha256": "9ced8ca5e11506df885ae0b8a6b51d0e04f8beeecd9df5838269419bd9fcdc4c"
+    },
+    "AdminPanel-Vue/src/components/ui/UiSettingsForm.vue": {
+      "source": "upstream",
+      "sha256": "728fde852b5a3510e231a93039720bb707b57c1431fb45344fce855edd820b40"
+    },
+    "AdminPanel-Vue/src/components/ui/UiSettingsGroup.vue": {
+      "source": "upstream",
+      "sha256": "208b5854092e620aec757771e12adc2119c7bd9f711b6e05a5071fd948757511"
+    },
+    "AdminPanel-Vue/src/components/ui/UiSettingsSwitchRow.vue": {
+      "source": "upstream",
+      "sha256": "c830f4f92956d8a337bf4e141471141c7ba57c6041db0659868c2fcdd83d2169"
+    },
+    "AdminPanel-Vue/src/components/ui/UiSideConsoleNav.vue": {
+      "source": "upstream",
+      "sha256": "40e83013b63666536894ce70a4e119443b1851924949dc840dfe73d03464ca32"
+    },
+    "AdminPanel-Vue/src/components/ui/UiTableFrame.vue": {
+      "source": "upstream",
+      "sha256": "b424d2ee51f728320ab9de60ee3162b3e24b81ca7fe2d9794fd8feb6d6d555fa"
+    },
+    "AdminPanel-Vue/src/components/ui/UiTextarea.vue": {
+      "source": "upstream",
+      "sha256": "193b8014f548c5a30b65a4d5044929bafdcc0bfe6c58f7dd1e9d990dd14257d2"
+    },
+    "AdminPanel-Vue/src/components/ui/UiToolbar.vue": {
+      "source": "upstream",
+      "sha256": "374453b4d26cc76fcd3ac6b113ddbe16fd8d3d98f65d69c278ced6e0783a5d2e"
+    },
+    "AdminPanel-Vue/src/composables/README.md": {
+      "source": "upstream",
+      "sha256": "34e0bc32cb1e38fdea37e6393e46270e34eec51fd45a7b1fb2b8027e46518e66"
+    },
+    "AdminPanel-Vue/src/composables/main-layout/useMainLayoutControls.ts": {
+      "source": "upstream",
+      "sha256": "accbee13b8e060a6fc5435492b626b622f3062ee8408ad6f91b98fa71e16ac0d"
+    },
+    "AdminPanel-Vue/src/composables/main-layout/useMainLayoutDomEffects.ts": {
+      "source": "upstream",
+      "sha256": "a9e0ed5bd6375c9433ee13807602c911a614db284c246a7ff9a37c06982dd36a"
+    },
+    "AdminPanel-Vue/src/composables/main-layout/useMainLayoutNavigation.ts": {
+      "source": "upstream",
+      "sha256": "4c03c3c13f01ffbd644e6654bb348be8bdce106865c5b86d7ceab3914e1c78ce"
+    },
+    "AdminPanel-Vue/src/composables/useActiveGroupTracker.ts": {
+      "source": "upstream",
+      "sha256": "82a9e4765a92ec62ecd533c5c69f1ad22a179fd680edd239c1b8f58561a87817"
+    },
+    "AdminPanel-Vue/src/composables/useConsoleCollapse.ts": {
+      "source": "upstream",
+      "sha256": "fe09bcc9e7f62202b30940fb5b2c543e9230b96973b0beef7152ec0ee9f1b27b"
+    },
+    "AdminPanel-Vue/src/composables/useDashboardState.ts": {
+      "source": "upstream",
+      "sha256": "920909f64cc151740219ca38815ce33f1765b8d6fd099f6ad6e7b75ec11848ca"
+    },
+    "AdminPanel-Vue/src/composables/useDebounceFn.ts": {
+      "source": "upstream",
+      "sha256": "ae214c738d1521e928a4f3073c253e0c4a8cc5bf92e691a58bda980650196027"
+    },
+    "AdminPanel-Vue/src/composables/useEventListener.ts": {
+      "source": "upstream",
+      "sha256": "2093c250b645fbc80eaab1bea4e255855833ec2e36880cf71c4e1f6a4f8d2474"
+    },
+    "AdminPanel-Vue/src/composables/useLocalStorage.ts": {
+      "source": "upstream",
+      "sha256": "865cfec198ded8a640413e9272e675dcf84407d0492ffdd00187c2114a7687c5"
+    },
+    "AdminPanel-Vue/src/composables/useMainLayoutState.ts": {
+      "source": "upstream",
+      "sha256": "fa6873aab71b23b7c322c2907a19917fbc85009a933fef152773d46b044f7e7b"
+    },
+    "AdminPanel-Vue/src/composables/useMarkdownRenderer.ts": {
+      "source": "upstream",
+      "sha256": "17a7d4b4bdc474e668df3fde490744ad3ce28ecbda94643712326c35d562e735"
+    },
+    "AdminPanel-Vue/src/composables/usePagination.ts": {
+      "source": "upstream",
+      "sha256": "8b57e01bbe746421229fb3db0442eb566ad5a783e5e884ad9a3d382c1fc1e47d"
+    },
+    "AdminPanel-Vue/src/composables/usePointerDragSession.ts": {
+      "source": "upstream",
+      "sha256": "7a5ecc4de19c3cd82743e3bcd963c536718409a3057c9b8eee94d178ca28a84d"
+    },
+    "AdminPanel-Vue/src/composables/usePolling.ts": {
+      "source": "upstream",
+      "sha256": "f9d9080c5b31e5327601b1fbbe5229aa2fc0101fd991c6d2b1c4be9c33181008"
+    },
+    "AdminPanel-Vue/src/composables/useRecentVisits.ts": {
+      "source": "upstream",
+      "sha256": "26a4f6aae710928c1ff92f08a55c32026cd3de21761ba9f27c7c70ec40efcf8e"
+    },
+    "AdminPanel-Vue/src/composables/useRequest.ts": {
+      "source": "upstream",
+      "sha256": "557cd9f78f6b085c8b291654330d1459be3148615e2b44e92a12beb9f1bd8edb"
+    },
+    "AdminPanel-Vue/src/composables/useVirtualScroll.ts": {
+      "source": "upstream",
+      "sha256": "ef3d17dd9ffeca96aa5a9f1d64202f8967ab4b4e7338e330221ecf67f26b096c"
+    },
+    "AdminPanel-Vue/src/constants/assets.ts": {
+      "source": "upstream",
+      "sha256": "f8415d84763597d6124d796be5c19f2836dea67229419b8aebee29699ffcc3cb"
+    },
+    "AdminPanel-Vue/src/constants/dateFormats.ts": {
+      "source": "upstream",
+      "sha256": "770ffd676643c84433a0b57b481b42be5223950069bd09f8d924a51c63fc573c"
+    },
+    "AdminPanel-Vue/src/dashboard/core/builtinCards.ts": {
+      "source": "upstream",
+      "sha256": "670d1b0fbf24ae9910aa64f329d9f1034ff90278a2a21c73d7ed816af8cc2b61"
+    },
+    "AdminPanel-Vue/src/dashboard/core/builtinComponentMap.ts": {
+      "source": "upstream",
+      "sha256": "e99412f2c129d2f2b558dadc3686b91441034af6d2a11997e491388f69bae673"
+    },
+    "AdminPanel-Vue/src/dashboard/core/cardRegistry.ts": {
+      "source": "upstream",
+      "sha256": "34a5cbc00f968db7afc530eb0c178550869728c724787dbe28f46579081cb57d"
+    },
+    "AdminPanel-Vue/src/dashboard/core/pluginAssetLoader.ts": {
+      "source": "upstream",
+      "sha256": "5d268c3573decf627379324e83773a162415d80fb153ed22ba3bcae5475dcb47"
+    },
+    "AdminPanel-Vue/src/dashboard/core/types.ts": {
+      "source": "upstream",
+      "sha256": "bbb8f6a999c0aa1ebaa4238afa6c4d9955d72aa590edaf995c34f58d5e0cf035"
+    },
+    "AdminPanel-Vue/src/dashboard/core/useDashboardCatalog.ts": {
+      "source": "upstream",
+      "sha256": "e2cb09c45389eaba2a737772b8bfb6742662720834cca9f443a46a0f3b4a7365"
+    },
+    "AdminPanel-Vue/src/dashboard/core/useDashboardLayoutV2.ts": {
+      "source": "upstream",
+      "sha256": "846ce9020994b93ee3c8f242d6e400812cf946cd8068a0915efacc2b824ea677"
+    },
+    "AdminPanel-Vue/src/dashboard/hosts/BuiltinCardHost.vue": {
+      "source": "upstream",
+      "sha256": "2bed6dfc0caf4f8fb7b5feb4d8db3363523dfd861166d972131a7008d7697d68"
+    },
+    "AdminPanel-Vue/src/dashboard/hosts/MissingCardHost.vue": {
+      "source": "upstream",
+      "sha256": "b9b9a6d865d0b858ebb317abbf86d22650d74d918ef7a7f865911160e12d476e"
+    },
+    "AdminPanel-Vue/src/dashboard/hosts/WebComponentCardHost.vue": {
+      "source": "upstream",
+      "sha256": "f1648588bcfd6bc336e0d34e58348f4836981d885b10f6bb92163202412716d9"
+    },
+    "AdminPanel-Vue/src/dashboard/types.ts": {
+      "source": "upstream",
+      "sha256": "4b1c01741a1ea278031670ce7a0c51c626bd302056655ad5fc98447b37839bc2"
+    },
+    "AdminPanel-Vue/src/dev/media-cache-fixtures.ts": {
+      "source": "upstream",
+      "sha256": "eb24018208dce20264c93641e0fccb5146dd98fcd0e09bb714db2022b8b888b4"
+    },
+    "AdminPanel-Vue/src/directives/lazy.ts": {
+      "source": "upstream",
+      "sha256": "96d4bcaafbde674558ac44ce85cc2ab46386233636cf064247f4c6c618a1dc70"
+    },
+    "AdminPanel-Vue/src/env.d.ts": {
+      "source": "upstream",
+      "sha256": "bfda8afa84283910bd19db05ce9df8278bdad862728446ef361631964bf152b1"
+    },
+    "AdminPanel-Vue/src/features/agent-assistant-config/useAgentAssistantConfig.ts": {
+      "source": "upstream",
+      "sha256": "83cfafd290a5a65d69c9d25df895267329d6a121f95e8c0b881f2dc5d8b9e548"
+    },
+    "AdminPanel-Vue/src/features/agent-files-editor/types.ts": {
+      "source": "upstream",
+      "sha256": "3fffadff46cf88eed414be72c27b4870d6848f0ebc84b0de40c78a97a39222b4"
+    },
+    "AdminPanel-Vue/src/features/dynamic-tools/config.ts": {
+      "source": "upstream",
+      "sha256": "5c857f590c0d0a1be4f8623f15c857cbe386012be5a671d16b8bd87d55231e35"
+    },
+    "AdminPanel-Vue/src/features/emoji-gallery/routeState.ts": {
+      "source": "upstream",
+      "sha256": "57b8a3622858df2271c6cc4d72dd7a524108b973230724ffd8419b296b0d6269"
+    },
+    "AdminPanel-Vue/src/features/emoji-gallery/uploadSelection.ts": {
+      "source": "upstream",
+      "sha256": "e2640349481552d9602d79aa003494a74e719434d1d9d2f215602b067481bddc"
+    },
+    "AdminPanel-Vue/src/features/placeholder-viewer/placeholderTypeLabel.ts": {
+      "source": "upstream",
+      "sha256": "efb62308ef2b549dfba0f6639bde81f8e5f24635c0e73c841663f1b8ad3e02a0"
+    },
+    "AdminPanel-Vue/src/features/placeholder-viewer/types.ts": {
+      "source": "upstream",
+      "sha256": "8537f98be6c44b907bb522b8dd096274de2bf027cf51200ad1556a3886cbb701"
+    },
+    "AdminPanel-Vue/src/features/plugins-hub/derivePluginHubState.ts": {
+      "source": "upstream",
+      "sha256": "15fc8b343009f7b16a16d7d7b16946c00f8971da9cdfa238781945a2a27d3353"
+    },
+    "AdminPanel-Vue/src/features/preprocessor-order-manager/types.ts": {
+      "source": "upstream",
+      "sha256": "f920b39c0322d9f0b63744fec4f1594556056873e78eb92b2d1fbe2f9c478286"
+    },
+    "AdminPanel-Vue/src/features/preprocessor-order-manager/usePreprocessorOrderManager.ts": {
+      "source": "upstream",
+      "sha256": "a24552fbaf47dfbb9e1a728993b5bb6ef1f5cbbd9f1fd14ac8b398c98edb8863"
+    },
+    "AdminPanel-Vue/src/features/rag-tuning/OrderedCooccurrenceModal.vue": {
+      "source": "upstream",
+      "sha256": "b13cb933ece37099aa97aeb61a5c9a868164bd92c1ffa7ffed7b7c66cb7f2301"
+    },
+    "AdminPanel-Vue/src/features/rag-tuning/RiverMemoV3ControlPanel.vue": {
+      "source": "upstream",
+      "sha256": "a3a20eda09cda2e0ff8f05fa4cf2ba003de3e42c45d9734d2c9cf1ac58e5081c"
+    },
+    "AdminPanel-Vue/src/features/rag-tuning/TagMemoV9ControlPanel.vue": {
+      "source": "upstream",
+      "sha256": "c0928befb9b42524ee21535f7ba3950cab37a3cff79d4a1d5cdedd26d7d20b0e"
+    },
+    "AdminPanel-Vue/src/features/rag-tuning/TagMemoV9NumericField.vue": {
+      "source": "upstream",
+      "sha256": "a718f2f8fbacd979a78b410641b2b9e6fe3303da62c31c8f7d55a8ee62069030"
+    },
+    "AdminPanel-Vue/src/features/rag-tuning/WormholeRoutingModal.vue": {
+      "source": "upstream",
+      "sha256": "3f85564af96f9e1d56f53d7aa6a2e63d37371997af5b8df622e66e93056a3066"
+    },
+    "AdminPanel-Vue/src/features/rag-tuning/metadata.ts": {
+      "source": "upstream",
+      "sha256": "56924a8e7d88bd0effaff7f962ae03f6dddb8858d73544e7a634dd793fbd5bc7"
+    },
+    "AdminPanel-Vue/src/features/server-log-viewer/useServerLogViewer.ts": {
+      "source": "upstream",
+      "sha256": "29562f5837bfbcd302089c8a80a174f55ba2f51771d45a625d7c4a58b3b32dc8"
+    },
+    "AdminPanel-Vue/src/features/theme-editor/themeEngine.ts": {
+      "source": "upstream",
+      "sha256": "ff2a8654a1fc8a766aa1e2edf4e2e564a9f445a68e1f50c7df952328cdae8432"
+    },
+    "AdminPanel-Vue/src/features/thinking-chains-editor/reorderClusters.ts": {
+      "source": "upstream",
+      "sha256": "b700c405d9bc0e3b795e7487d8bb44190469b6644f868f69ef88c38fdf2b665e"
+    },
+    "AdminPanel-Vue/src/features/thinking-chains-editor/useThinkingChainsEditor.ts": {
+      "source": "upstream",
+      "sha256": "144faa3b7edaace8629baed9eb33a26c0ac19afe285a18f559694b5b7b721fba"
+    },
+    "AdminPanel-Vue/src/features/tool-list/types.ts": {
+      "source": "upstream",
+      "sha256": "4ff1705a525bd38ad7000d3e156388473bad8b2a5c36d7eeeb8f96e7563f6152"
+    },
+    "AdminPanel-Vue/src/features/vcp-forum/types.ts": {
+      "source": "upstream",
+      "sha256": "47679469cde8f73bb9300e9e6778089df46269113a23ed0e54246003ac3abf04"
+    },
+    "AdminPanel-Vue/src/features/vcp-forum/useVcpForum.ts": {
+      "source": "upstream",
+      "sha256": "b4dc1210a17cd7ba7b326d9bb1d1707de60453ba3ce334c941fc96e295752a67"
+    },
+    "AdminPanel-Vue/src/features/vcptavern-editor/useVcptavernEditor.ts": {
+      "source": "upstream",
+      "sha256": "d7c87e5af9bc2468af15b02c8d73d7e9671db779862f5813403ae425d2afb5af"
+    },
+    "AdminPanel-Vue/src/layouts/MainLayout.vue": {
+      "source": "upstream",
+      "sha256": "93dc411e1740e7df75d4213f13d9a70ea87cc3aa1302dc36a56fbf4d126443fe"
+    },
+    "AdminPanel-Vue/src/main.ts": {
+      "source": "upstream",
+      "sha256": "2f2c6940a6a63d287344d603881d9b7a9a8269900be573a497efd86f543db27c"
+    },
+    "AdminPanel-Vue/src/platform/auth/session.ts": {
+      "source": "upstream",
+      "sha256": "505a7a924e07e045dcb0d011481904dadc04209f4da0a2b7d15d7d75397728a6"
+    },
+    "AdminPanel-Vue/src/platform/feedback/feedbackBus.ts": {
+      "source": "upstream",
+      "sha256": "d6b11d36e7fa7bfa540c370eb6ebbf758417a44e2586f2b177d5c4ca25f1b792"
+    },
+    "AdminPanel-Vue/src/platform/feedback/feedbackState.ts": {
+      "source": "upstream",
+      "sha256": "7d641d76a23bff71015e90360f7d4b90e2ea4c7c2c7e73f20d7f628491f86590"
+    },
+    "AdminPanel-Vue/src/platform/http/errors.ts": {
+      "source": "upstream",
+      "sha256": "91e979ebb26403f293270b19cb6d2fdfefe115ebb603951ab59d95c94bc9476b"
+    },
+    "AdminPanel-Vue/src/platform/http/httpClient.ts": {
+      "source": "upstream",
+      "sha256": "7ffadcd834339604c1515b3751da3decb9fe08563b39d0c2ba75268d8332c79b"
+    },
+    "AdminPanel-Vue/src/platform/http/request.ts": {
+      "source": "upstream",
+      "sha256": "52c5f7958473f16fed858191533b95a3b59b490b363701d900fbc7ec504a1cf9"
+    },
+    "AdminPanel-Vue/src/router/index.ts": {
+      "source": "upstream",
+      "sha256": "ec2c48078781b2d9ded1cfbf2df5e7e322bf4428df6e7e0653b5a65a9948a060"
+    },
+    "AdminPanel-Vue/src/stores/app.ts": {
+      "source": "upstream",
+      "sha256": "7b91b5ab21fa5622a2f89650440d69c45c9cd0722b08b5baea274b420d1b0499"
+    },
+    "AdminPanel-Vue/src/stores/auth.ts": {
+      "source": "upstream",
+      "sha256": "c0e7e99cf90921476c648b20a385ca7c3cb747b3c6cd37c3c6455ae2a59e4b0d"
+    },
+    "AdminPanel-Vue/src/stores/diary.ts": {
+      "source": "upstream",
+      "sha256": "8d59565333ee63772900e2b40849723259f8a5ac6c8efca4ed1062487f402e48"
+    },
+    "AdminPanel-Vue/src/stores/diary/helpers.ts": {
+      "source": "upstream",
+      "sha256": "3fbee1ed2324fd0bbc11dcaba3e678fa176f9dbe0eac1024641fe063363068ca"
+    },
+    "AdminPanel-Vue/src/stores/loading.ts": {
+      "source": "upstream",
+      "sha256": "fad33a576eaa997841a716453879b51654a9ffbe77724e4be289503a96643970"
+    },
+    "AdminPanel-Vue/src/stores/notifications.ts": {
+      "source": "upstream",
+      "sha256": "31f1c02556022aacb02085708fe17ad90877ea6b5b031a81c7e6edb4a4f5e482"
+    },
+    "AdminPanel-Vue/src/stores/pluginConfig.ts": {
+      "source": "upstream",
+      "sha256": "9f4412af6ea54a7c46cbadfc37dbaa85e482bd0f39913148c934a0c09fbc7d0d"
+    },
+    "AdminPanel-Vue/src/style/fonts.css": {
+      "source": "upstream",
+      "sha256": "bf31be82cb930b639a38404822f10ba44f8b3923fcbf84f3914f519432aefe7d"
+    },
+    "AdminPanel-Vue/src/style/index.css": {
+      "source": "upstream",
+      "sha256": "042bf487de59180d365c000adb63243228e8c9f8aca02f61e107ab9245b3c6fa"
+    },
+    "AdminPanel-Vue/src/style/layout.css": {
+      "source": "upstream",
+      "sha256": "ef3d8c205790aba25d55761a5fc9f36756d0f0fd35b257dd431f74b064ccc618"
+    },
+    "AdminPanel-Vue/src/style/legacy-solar-system.css": {
+      "source": "upstream",
+      "sha256": "09b182428966628f3e6ac26af36551608ca4dea423dabf7dd4ef80f3cfdbfb74"
+    },
+    "AdminPanel-Vue/src/style/legacy-tools.css": {
+      "source": "upstream",
+      "sha256": "34b33527e52246768b00161bcdc7384f814b5449a2ff530a89c56977128529e4"
+    },
+    "AdminPanel-Vue/src/style/materialSymbols.css": {
+      "source": "upstream",
+      "sha256": "09b86f48b617e750f8f79356bc8497da6f06683aafbaa9b0f341cbdb8c996f8a"
+    },
+    "AdminPanel-Vue/src/style/theme-presets.css": {
+      "source": "upstream",
+      "sha256": "e6a2008fb3a1130b91b0edd7a64542f037382969170eabccf898dd9d82d3cfb4"
+    },
+    "AdminPanel-Vue/src/types/api.admin-config.ts": {
+      "source": "upstream",
+      "sha256": "78b0eaa9199ed31571c0801f7d548d70b7d131dd52dcea270a8b57d8e0bb04e7"
+    },
+    "AdminPanel-Vue/src/types/api.agent.ts": {
+      "source": "upstream",
+      "sha256": "b977935847ab5e2cc054f3140e3b8d1fce1cdcbba84195f29843586748cc7c57"
+    },
+    "AdminPanel-Vue/src/types/api.auth.ts": {
+      "source": "upstream",
+      "sha256": "a8644210d7c9a9427c5347fbc60f6ac0f936a2ae898a3a1c8b4046017d7cc6cd"
+    },
+    "AdminPanel-Vue/src/types/api.common.ts": {
+      "source": "upstream",
+      "sha256": "3eb4859133ce95abe6a1d9a5d12eb851070caa2749dfad915edc4eb091c965bf"
+    },
+    "AdminPanel-Vue/src/types/api.error.ts": {
+      "source": "upstream",
+      "sha256": "7afb6d64c24389578542157ab466cf691cc096b1c03c1eeafcce7dc6dc3bad4c"
+    },
+    "AdminPanel-Vue/src/types/api.log.ts": {
+      "source": "upstream",
+      "sha256": "e1c74c954ac49316c9fd8e7a92d72ac2cf93df8c20af7bf3c8592b5e070b594b"
+    },
+    "AdminPanel-Vue/src/types/api.news.ts": {
+      "source": "upstream",
+      "sha256": "446fefd331c13394649aa9126a44c63c3ac146288f4ec40e43d983abfca8f728"
+    },
+    "AdminPanel-Vue/src/types/api.plugin.ts": {
+      "source": "upstream",
+      "sha256": "6e9bfc68c422be3483dfe0eebd2e6ed890e5b89ad0fd1b8d0b29cc50a43d9dfc"
+    },
+    "AdminPanel-Vue/src/types/api.system.ts": {
+      "source": "upstream",
+      "sha256": "7ddcc060a320347a56c6a9954c58d0114fa96b4fffeebb94050ff0b724d98819"
+    },
+    "AdminPanel-Vue/src/types/api.ts": {
+      "source": "upstream",
+      "sha256": "a0a124a6275c6710cfc1579e6d791f9565d44b5ab5b83c83a4ded770a5530369"
+    },
+    "AdminPanel-Vue/src/types/api.weather.ts": {
+      "source": "upstream",
+      "sha256": "7152570be2858f2503897aed14b4810832e20b075efef1312faf5f98dc4a5907"
+    },
+    "AdminPanel-Vue/src/types/diary.ts": {
+      "source": "upstream",
+      "sha256": "c09d5425d11f513a7ab5061cd11c7d36b4158c6f372eaa908395a54600c56763"
+    },
+    "AdminPanel-Vue/src/types/easymde.d.ts": {
+      "source": "upstream",
+      "sha256": "c1946c26b0e8dd12f327f214e2d689c099a2cc193d14ed15a086468b57c63628"
+    },
+    "AdminPanel-Vue/src/utils/auth.ts": {
+      "source": "upstream",
+      "sha256": "184c9d196536594c48e8029fefd2a3ede94e0dbe6b216685ea75b840c79dde60"
+    },
+    "AdminPanel-Vue/src/utils/commandPalette.ts": {
+      "source": "upstream",
+      "sha256": "09c3671dcda062363be730cf14b794053ebba8a5c70db484edfcb172bb75b8a8"
+    },
+    "AdminPanel-Vue/src/utils/configDocumentationParser.ts": {
+      "source": "upstream",
+      "sha256": "f48bb23fa8b41f91fc9bdadc1d80abdf8f4d68ce4b5215286c122cc28e0a6e2d"
+    },
+    "AdminPanel-Vue/src/utils/env.ts": {
+      "source": "upstream",
+      "sha256": "9fe76e07732871894652006a5bfeabcbba213d5bc153893ef0e44d4dd8778bf0"
+    },
+    "AdminPanel-Vue/src/utils/format.ts": {
+      "source": "upstream",
+      "sha256": "577db0d62f8e7ffba732728cf345a8f4f6dbfc5323173dee1e4c7d3fe38bc58d"
+    },
+    "AdminPanel-Vue/src/utils/index.ts": {
+      "source": "upstream",
+      "sha256": "1fde108b0d1d230e64412aa0898e45c2f7b87c8a4569d277505eecfe186ab82a"
+    },
+    "AdminPanel-Vue/src/utils/logger.ts": {
+      "source": "upstream",
+      "sha256": "ecc4ea3b5be1d371ca889f461509249aaab05856f185268f8c84a2509c3ce650"
+    },
+    "AdminPanel-Vue/src/utils/moonlight.ts": {
+      "source": "upstream",
+      "sha256": "868d9202c1644181d4874a5299ca59b79a3a5e4ab98cafde117a53ac694e2077"
+    },
+    "AdminPanel-Vue/src/utils/performance.ts": {
+      "source": "upstream",
+      "sha256": "6e477c3b1187261d4f7228babf4eb867f10d1fcf18352b0c09ccefd0bee741ef"
+    },
+    "AdminPanel-Vue/src/utils/pointerReorder.ts": {
+      "source": "upstream",
+      "sha256": "b7268253dd18141f38ccc767f3cafa05f161390d2cb47ecc986bafc08ff873ab"
+    },
+    "AdminPanel-Vue/src/utils/reorderByDragIndex.ts": {
+      "source": "upstream",
+      "sha256": "67e3e9034d3c7b4d1ef3641ab11128451f35bad4a051a399d9fbe6a7c760694e"
+    },
+    "AdminPanel-Vue/src/utils/storage.ts": {
+      "source": "upstream",
+      "sha256": "3225a3749d79bf615df36be4221635c8eda3925c89cfe2d7a2e2eb6351123879"
+    },
+    "AdminPanel-Vue/src/utils/ui.ts": {
+      "source": "upstream",
+      "sha256": "764b8e09ab399bc3a6d4effbbef3f9431f68d6645e9911a5e8a8ce7c949dc1e7"
+    },
+    "AdminPanel-Vue/src/utils/url.ts": {
+      "source": "upstream",
+      "sha256": "2afe56dd0f969382060670d204f44181ed8941a6d262d8ddc990ec634bf6db3c"
+    },
+    "AdminPanel-Vue/src/views/AgentAssistantConfig.vue": {
+      "source": "upstream",
+      "sha256": "20bb81d3cfcd806cbc01ef89e6a37ece27d80e2fdf59000a9b2c01b12cd1a0d8"
+    },
+    "AdminPanel-Vue/src/views/AgentEmotionManager.vue": {
+      "source": "upstream",
+      "sha256": "fae30353b5bb57a1bed71c1f876559369c1da065fa30d95a35c9caf04182a325"
+    },
+    "AdminPanel-Vue/src/views/AgentFilesEditor.vue": {
+      "source": "upstream",
+      "sha256": "bcba806f6d5d087c59333bbbf4de67a40c1ffbbbce3a59dbb824faf9c58f1130"
+    },
+    "AdminPanel-Vue/src/views/AgentFilesEditor/DiarySyntaxEditorModal.vue": {
+      "source": "upstream",
+      "sha256": "f76829a7a7b0d4c25054419dda9b80e479603e4ac132e309b09b2c0b6f5ae29d"
+    },
+    "AdminPanel-Vue/src/views/AgentFilesEditor/diarySyntaxParser.ts": {
+      "source": "upstream",
+      "sha256": "8f9ac9e27fec93ba8846afb44b8ac17e107290df25006942d8aee9e61854ef0c"
+    },
+    "AdminPanel-Vue/src/views/AgentScores.vue": {
+      "source": "upstream",
+      "sha256": "5fce3b888effdc5b3f6e61575942f7d6c3461fb9d9bcdb97b5b0d6ea070d2738"
+    },
+    "AdminPanel-Vue/src/views/AgentTimeLineManager.vue": {
+      "source": "upstream",
+      "sha256": "3107c0f8d7a2c283ff47f5adc40a67c467e9d5e57550ad27d7671747dfa6172b"
+    },
+    "AdminPanel-Vue/src/views/BaseConfig.vue": {
+      "source": "upstream",
+      "sha256": "06b90ff5990dfbde0be61e6a9045c9829aa2b19f01634515de08660b80638940"
+    },
+    "AdminPanel-Vue/src/views/BridgeHijackConfig.vue": {
+      "source": "upstream",
+      "sha256": "360dd791a976c4b9c2788a33dfe1d217fa77e0fdb48a011f86bf4479c3d75ce2"
+    },
+    "AdminPanel-Vue/src/views/ClawMailManager.vue": {
+      "source": "upstream",
+      "sha256": "b61c05a53ea967da0d436307bd4a42db7e046b3b4e05859adcb84e63ff0fe77a"
+    },
+    "AdminPanel-Vue/src/views/DailyNotesManager.vue": {
+      "source": "upstream",
+      "sha256": "7bad0b8ac1f44b06192c5a96cdd89f7c9ad587a5ad92a7deaca66e2c583f85cc"
+    },
+    "AdminPanel-Vue/src/views/DailyNotesManager/DiaryEditor.vue": {
+      "source": "upstream",
+      "sha256": "c24f9513a13311f7aeb3517ddfd6ee56a17c35fdc380fd0d6dfd624b044fbd41"
+    },
+    "AdminPanel-Vue/src/views/DailyNotesManager/DiscoveryModal.vue": {
+      "source": "upstream",
+      "sha256": "b588b83ef84eee66a61768da9bd16c3c4ddc2ee7ffe05226472f817caa5570cf"
+    },
+    "AdminPanel-Vue/src/views/DailyNotesManager/FolderList.vue": {
+      "source": "upstream",
+      "sha256": "878b51cba025cac08c8294011d3b56675b464e30f3562bd4fcb6dab4a2301124"
+    },
+    "AdminPanel-Vue/src/views/DailyNotesManager/NoteList.vue": {
+      "source": "upstream",
+      "sha256": "3b42fb6fd246393d6a98e31638a4748e4936114322e0fc48b204c3f20cb903ef"
+    },
+    "AdminPanel-Vue/src/views/DailyNotesManager/RagTagsConfig.vue": {
+      "source": "upstream",
+      "sha256": "ceef3edc7cadec5aa54f7bcceee97b1e9ef5a88f701cd2549956706572f2ebc5"
+    },
+    "AdminPanel-Vue/src/views/Dashboard.vue": {
+      "source": "upstream",
+      "sha256": "df48727ab82e33af4a6cc31d6a5ec7cc1afdd833fce749d516c25c555026aad9"
+    },
+    "AdminPanel-Vue/src/views/DreamManager.vue": {
+      "source": "upstream",
+      "sha256": "02090ac537ed69bfa42557120ff939188db7abe5b415bc9ac274aa5f99c559bc"
+    },
+    "AdminPanel-Vue/src/views/DynamicToolsManager.vue": {
+      "source": "upstream",
+      "sha256": "f525f431299e5b0b4c9b9b0a70f1e206dbb957f9de25a098be45ea8fe084027e"
+    },
+    "AdminPanel-Vue/src/views/EmojiGallery.vue": {
+      "source": "upstream",
+      "sha256": "3fa904414c58012492dc02b33ddc41abb2e21025656065e01c8d4019cd88d200"
+    },
+    "AdminPanel-Vue/src/views/FinalContextViewer.vue": {
+      "source": "upstream",
+      "sha256": "16d55ee5f1289217a0b5c26733d4cc28919ef3739f064eaf707e2bfbedef3f0d"
+    },
+    "AdminPanel-Vue/src/views/ForumAssistantConfig.vue": {
+      "source": "upstream",
+      "sha256": "e6046b9f372288c60c55c0941b27ef51736703a63c1de20c15ba13201d7b2794"
+    },
+    "AdminPanel-Vue/src/views/ImageCacheEditor.vue": {
+      "source": "upstream",
+      "sha256": "a49a88cd3ccdea7baf406f0d7d1c68cc462dc732a4acf1e2d8f202475108d996"
+    },
+    "AdminPanel-Vue/src/views/Login.vue": {
+      "source": "upstream",
+      "sha256": "c400abcfe8c872d59570d925dc1fbe63cc32dbbec53873eccbc4b4ba86f5f4ea"
+    },
+    "AdminPanel-Vue/src/views/OneRingManager.vue": {
+      "source": "upstream",
+      "sha256": "343ee1e10b6b178ddf2f19383a1a9448d151051c4468fa2003109969b5d8f12a"
+    },
+    "AdminPanel-Vue/src/views/PlaceholderExplorerManager.vue": {
+      "source": "upstream",
+      "sha256": "2c114c856317b67bbd573dd03a344cf5168fabf5ca38c3e034079897369239b0"
+    },
+    "AdminPanel-Vue/src/views/PlaceholderViewer.vue": {
+      "source": "upstream",
+      "sha256": "44eaddbbfc65b835c012cca49ccec3df3578e1e86294c1b064bf7b9c993cd1a5"
+    },
+    "AdminPanel-Vue/src/views/PlaceholderViewer/PlaceholderCard.vue": {
+      "source": "upstream",
+      "sha256": "0306c9125c8e0e206bd5283d787bb1b47872af8cc94e415cbd6027e3549ff1ce"
+    },
+    "AdminPanel-Vue/src/views/PlaceholderViewer/PlaceholderDetailModal.vue": {
+      "source": "upstream",
+      "sha256": "4fa8e79368c8799602f9fadd012e6be549a71b8603b866e73d820e988889f18b"
+    },
+    "AdminPanel-Vue/src/views/PlaceholderViewer/PlaceholderFilterBar.vue": {
+      "source": "upstream",
+      "sha256": "b5daf0b31535410d47ae6668d420d380463c3e3e97de994dace3b07da4ba5d9c"
+    },
+    "AdminPanel-Vue/src/views/PluginConfig.vue": {
+      "source": "upstream",
+      "sha256": "e4e3aeffe075dc16d8f9eba4c28cd98eecab7194d43e4e5717e63005facc9815"
+    },
+    "AdminPanel-Vue/src/views/PluginStore.vue": {
+      "source": "upstream",
+      "sha256": "883bb7c4b3e9b8e301d47c0c456ec111659573a369f8920a47807c22adaf2306"
+    },
+    "AdminPanel-Vue/src/views/PluginsHub.vue": {
+      "source": "upstream",
+      "sha256": "5053bd823fc14b5bb62f5dfc0f8e1ff158aa9adff7b3ad6879683f272451d3ad"
+    },
+    "AdminPanel-Vue/src/views/PreprocessorOrderManager.vue": {
+      "source": "upstream",
+      "sha256": "638a413cb9c647aa958074fc4f38be02baeab61684d33833ed9bbcadee0f7c2f"
+    },
+    "AdminPanel-Vue/src/views/RagTuning.vue": {
+      "source": "upstream",
+      "sha256": "93bf352bdb02d3fb7c0d75dea3fe872440c2ba12115a3829604fc073787c7ce9"
+    },
+    "AdminPanel-Vue/src/views/SarPromptEditor.vue": {
+      "source": "upstream",
+      "sha256": "a8f242c26d9722ab6070c25fb5ad495344b4a8ed1936197857dd9c7bf279db92"
+    },
+    "AdminPanel-Vue/src/views/ScheduleManager.vue": {
+      "source": "upstream",
+      "sha256": "4e2071224e16342f87cf02cb03adbc74cfeccddb0a802e087db3fd8543525648"
+    },
+    "AdminPanel-Vue/src/views/SemanticGroupsEditor.vue": {
+      "source": "upstream",
+      "sha256": "7cd8dd3bccc9a4c42c026ab30737ce3680a3064cd9c9484776a40e4853dedece"
+    },
+    "AdminPanel-Vue/src/views/SemanticModelRouterEditor.vue": {
+      "source": "upstream",
+      "sha256": "a30204bb141a34901700cdd0d5d8360094fd5572b3b3f11d6c133e24faab91db"
+    },
+    "AdminPanel-Vue/src/views/ServerLogViewer.vue": {
+      "source": "upstream",
+      "sha256": "203d581ee4187d376a1103093c5c0603d75dde2f3073e78170103baaae4411b2"
+    },
+    "AdminPanel-Vue/src/views/ThemeEditor.vue": {
+      "source": "upstream",
+      "sha256": "6888a02fc2adb867bbd34a90fba4d744d70cf6a8ca20bde4604072ba1257eefe"
+    },
+    "AdminPanel-Vue/src/views/ThinkingChainsEditor.vue": {
+      "source": "upstream",
+      "sha256": "b483472cd1e5df93fd172f8e060bbc681f86db491cb27d5338ecff8d592a8f1d"
+    },
+    "AdminPanel-Vue/src/views/ToolApprovalManager.vue": {
+      "source": "upstream",
+      "sha256": "4ff866d9afba2d0a0d04891432f56f7df2a848be656ecf6e842792c2d9d9f04d"
+    },
+    "AdminPanel-Vue/src/views/ToolCallRecordsManager.vue": {
+      "source": "upstream",
+      "sha256": "2bdf3790c200f5c5ee276aaa84f9d6e592461d2c0f90100f87639c9d0a4b75ae"
+    },
+    "AdminPanel-Vue/src/views/ToolListEditor.vue": {
+      "source": "upstream",
+      "sha256": "59e2627657bf99fc85f1344b02e40b74a6810fa13a0243c10cf5966da906e9d1"
+    },
+    "AdminPanel-Vue/src/views/ToolListEditor/ToolConfigPreviewPanel.vue": {
+      "source": "upstream",
+      "sha256": "345c8a3053392509b0a429bc52f86b059212b0f0c593dc5a8bacfc92c35dfa85"
+    },
+    "AdminPanel-Vue/src/views/ToolListEditor/ToolSelectionPanel.vue": {
+      "source": "upstream",
+      "sha256": "d364d5359def05b44ca5f54b339722259431fb32f87622d39ed51ab2dd9c1ee7"
+    },
+    "AdminPanel-Vue/src/views/ToolListEditor/composables/useToolListData.ts": {
+      "source": "upstream",
+      "sha256": "ae2ee834408b5383e49b81006f4b838b4476650a63b480971d28abb8ff375517"
+    },
+    "AdminPanel-Vue/src/views/ToolListEditor/composables/useToolListPreview.ts": {
+      "source": "upstream",
+      "sha256": "1759101927cdf76e27926e48241fdf4b65618aa318f37370728112d0c7096cec"
+    },
+    "AdminPanel-Vue/src/views/ToolboxManager.vue": {
+      "source": "upstream",
+      "sha256": "437a6577eb64dd928edc2253f0b4ecb309380668443ab8a00b1026da699ddadb"
+    },
+    "AdminPanel-Vue/src/views/TvsFilesEditor.vue": {
+      "source": "upstream",
+      "sha256": "666bf434545d0ae15bef8661b2021c9457e5485b9685cf456d226da7d543631b"
+    },
+    "AdminPanel-Vue/src/views/VcpForum.vue": {
+      "source": "upstream",
+      "sha256": "3b79eba81387d3c1386bcdce2884210c4e88ed6890cd6fc7256233f9fa73830b"
+    },
+    "AdminPanel-Vue/src/views/VcpForum/ForumFilterBar.vue": {
+      "source": "upstream",
+      "sha256": "cb4944134c5363e91a6fbc9ba6fee9ab3f40888d0a076f1e02226ca7edc787a9"
+    },
+    "AdminPanel-Vue/src/views/VcpForum/ForumPostDetail.vue": {
+      "source": "upstream",
+      "sha256": "7d0127e0ade135c7752b8090afa82752d9e1d46a8eb2faec7da107d21e9aff5d"
+    },
+    "AdminPanel-Vue/src/views/VcpForum/ForumPostList.vue": {
+      "source": "upstream",
+      "sha256": "051d4e8a9b7ca17fb502f99ef31e45371431f74c6c80060cd4e4e83ee5953092"
+    },
+    "AdminPanel-Vue/src/views/VcptavernEditor.vue": {
+      "source": "upstream",
+      "sha256": "8796817e8ba106f43770392c82b59473641e2e47654cedb0101391718c887333"
+    },
+    "AdminPanel-Vue/tests/composables/reorderClusters.test.ts": {
+      "source": "upstream",
+      "sha256": "840b4de3456e9aa0cfc3b07ac601703ed632033c2352dfd8dcbe7e276d32c3ad"
+    },
+    "AdminPanel-Vue/tests/composables/useAgentAssistantConfig.test.ts": {
+      "source": "upstream",
+      "sha256": "8760af35e5815b83da484d9bce311cec7707e920dc01bbe67d24b4eefcc35849"
+    },
+    "AdminPanel-Vue/tests/composables/useDashboardLayout.test.ts": {
+      "source": "upstream",
+      "sha256": "39cd759b40af84f87815d0e085f52983a2315e2f7a556d1bf3fd66fb1e0b4cb1"
+    },
+    "AdminPanel-Vue/tests/composables/useDashboardState.test.ts": {
+      "source": "upstream",
+      "sha256": "f076b53a718b49a97017419e1880c079fdd07b08ba994d3b1bf6884250f667db"
+    },
+    "AdminPanel-Vue/tests/composables/useMainLayoutState.test.ts": {
+      "source": "upstream",
+      "sha256": "e97aebc4a24a43740b8f4322e90aa1e1e52e99adde1f017ad7513db0730942f5"
+    },
+    "AdminPanel-Vue/tests/composables/usePreprocessorOrderManager.test.ts": {
+      "source": "upstream",
+      "sha256": "858841cda14ad4c448eecb3bdf75800d6c31b752207af661b78f6581dc172a23"
+    },
+    "AdminPanel-Vue/tests/composables/useRequest.test.ts": {
+      "source": "upstream",
+      "sha256": "9d31ee133ecd693d2b0a57824c55783c655ab57da2b15a2b57e5eec5406615d6"
+    },
+    "AdminPanel-Vue/tests/composables/useServerLogViewer.test.ts": {
+      "source": "upstream",
+      "sha256": "f5df8e063bf98e72e95639a4b3dacd86fccbfeb5d53141b2e594c09e3a91a0cb"
+    },
+    "AdminPanel-Vue/tests/composables/useThinkingChainsEditor.test.ts": {
+      "source": "upstream",
+      "sha256": "48d334f32b1e0c12cbab0221f31c1f5d79af9ab157c524709c3f3da553ed7e83"
+    },
+    "AdminPanel-Vue/tests/composables/useVcpForum.test.ts": {
+      "source": "upstream",
+      "sha256": "435d9a2a8bd0cb8f25c42b5731fd2068d05bb065263e603f933b6151d7ccc500"
+    },
+    "AdminPanel-Vue/tests/composables/useVcptavernEditor.test.ts": {
+      "source": "upstream",
+      "sha256": "37bd3e84adb60225e906dec4252ac61ebf73edd006e531ca774e80d8bc407e92"
+    },
+    "AdminPanel-Vue/tests/diarySyntaxRetirement.test.ts": {
+      "source": "upstream",
+      "sha256": "d563fc3934d317b55a1e5022d050b888355f1907226b65cb970e650d385fed5d"
+    },
+    "AdminPanel-Vue/tests/dynamicToolsConfig.test.ts": {
+      "source": "upstream",
+      "sha256": "92ecdb8192f4a86eef877fed90868466cfcd7292b02152ae3d649e137cfd8952"
+    },
+    "AdminPanel-Vue/tests/stores/auth.test.ts": {
+      "source": "upstream",
+      "sha256": "0bd99b6d2169884996cab415bca5d20f22716a20db37d55eaa2a4f1e2847f40d"
+    },
+    "AdminPanel-Vue/tests/stores/diary.test.ts": {
+      "source": "upstream",
+      "sha256": "e10bea8a97eb0474795c544640b1c2831b2b93355aea0bc72b4a7f38ab85aa92"
+    },
+    "AdminPanel-Vue/tests/stores/loading.test.ts": {
+      "source": "upstream",
+      "sha256": "5116bbb0ea228d6277abe43bc77a5cc40060408255176bb2226d5b82f7fd8090"
+    },
+    "AdminPanel-Vue/tests/stores/pluginConfig.test.ts": {
+      "source": "upstream",
+      "sha256": "b274a72e59c0c5478e3d44068368cdde23dade8d45e8e7986ac8b88a78885efe"
+    },
+    "AdminPanel-Vue/tests/utils/env.test.ts": {
+      "source": "upstream",
+      "sha256": "05cc086e545819d514ac19b68dc50a86a98317e5df8a760a78ac69dee5a9cbef"
+    },
+    "AdminPanel-Vue/tests/utils/ui.test.ts": {
+      "source": "upstream",
+      "sha256": "945117882e3e9c003ee48908d6314e3f4e5c901471d8687f1a97d30dad75a586"
+    },
+    "AdminPanel-Vue/tests/utils/url.test.ts": {
+      "source": "upstream",
+      "sha256": "b03fedd55d6c731cadf6837608b2152c7cfaa0ba4ad816c55c058cecfba92183"
+    },
+    "AdminPanel-Vue/tsconfig.json": {
+      "source": "upstream",
+      "sha256": "7816c5cdd2aa7a9686c753511a98730baed103a1d9b3b67a7f4365c6b00c4c89"
+    },
+    "AdminPanel-Vue/tsconfig.node.json": {
+      "source": "upstream",
+      "sha256": "bb9fd8592a9e364641441219f10d84daae9ba2ca5cc85db798efad6913bb8257"
+    },
+    "AdminPanel-Vue/vendor/LibreHardwareMonitor/README.md": {
+      "source": "upstream",
+      "sha256": "c8c9d6bc30d3090a0e7d9375c514d8efa1d66fc5155e33f14a4c90a58003a725"
+    },
+    "AdminPanel-Vue/vendor/Sortable.min.js": {
+      "source": "upstream",
+      "sha256": "6d0a831fc19b4bae851797ad3393157e861afb7862459c11226359b27e2c4337"
+    },
+    "AdminPanel-Vue/vendor/anime.min.js": {
+      "source": "upstream",
+      "sha256": "bceef94f964481f7680d95e7fbbe5a8c20d3945a926a754874898a578db7c7ab"
+    },
+    "AdminPanel-Vue/vendor/atom-one-dark.min.css": {
+      "source": "upstream",
+      "sha256": "4237ffca7ce6aadb438c457e0a675b125c534bbdda5b87f41f3a1495603bcc9b"
+    },
+    "AdminPanel-Vue/vendor/atom-one-light.min.css": {
+      "source": "upstream",
+      "sha256": "593ee2475d42ac9ae701a177a353825bd661b6249fa1ad4bad232540825e9e83"
+    },
+    "AdminPanel-Vue/vendor/auto-render.min.js": {
+      "source": "upstream",
+      "sha256": "9cb8dacfc086c2966c9ec4ba54f4a2dc43b7cbe2b33cec1a2743d886c7fb47a7"
+    },
+    "AdminPanel-Vue/vendor/fontawesome-v6/LICENSE.txt": {
+      "source": "upstream",
+      "sha256": "9b914eae88817d63b576eab5aafde7068c7a1abae125d7cdfb034f1da43a9afc"
+    },
+    "AdminPanel-Vue/vendor/fontawesome-v6/fa-brands-400.woff2": {
+      "source": "upstream",
+      "sha256": "232c6f6a7678304f9efaa26f30b1610debc2ba9f4cd636b5e6751c8d73761b92"
+    },
+    "AdminPanel-Vue/vendor/fontawesome-v6/fa-regular-400.woff2": {
+      "source": "upstream",
+      "sha256": "c27da6f833431da5aa295c44540bfac0fd8270ba6a3c4346427006d8a7b34b76"
+    },
+    "AdminPanel-Vue/vendor/fontawesome-v6/fa-solid-900.woff2": {
+      "source": "upstream",
+      "sha256": "ae17c16afbea216707b2203ea1cf9bdb45b9bfe47d0f4ae3258ddbc6294dd02f"
+    },
+    "AdminPanel-Vue/vendor/fontawesome-v6/fa-v4compatibility.woff2": {
+      "source": "upstream",
+      "sha256": "c7a869faca299d15be10a01f19d0765a7c4d46d8922d9b9317235c1e4a6f0982"
+    },
+    "AdminPanel-Vue/vendor/fontawesome-v6/fontawesome-v6.css": {
+      "source": "upstream",
+      "sha256": "f64bbef6a51bdda26f300aba5f015799e2aa43a89dff13628789144b9e088bc7"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_AMS-Regular.woff2": {
+      "source": "upstream",
+      "sha256": "0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Caligraphic-Bold.woff2": {
+      "source": "upstream",
+      "sha256": "de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Caligraphic-Regular.woff2": {
+      "source": "upstream",
+      "sha256": "5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Fraktur-Bold.woff2": {
+      "source": "upstream",
+      "sha256": "74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Fraktur-Regular.woff2": {
+      "source": "upstream",
+      "sha256": "51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Main-Bold.woff2": {
+      "source": "upstream",
+      "sha256": "0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Main-BoldItalic.woff2": {
+      "source": "upstream",
+      "sha256": "99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Main-Italic.woff2": {
+      "source": "upstream",
+      "sha256": "97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Main-Regular.woff2": {
+      "source": "upstream",
+      "sha256": "c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Math-BoldItalic.woff2": {
+      "source": "upstream",
+      "sha256": "dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Math-Italic.woff2": {
+      "source": "upstream",
+      "sha256": "7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_SansSerif-Bold.woff2": {
+      "source": "upstream",
+      "sha256": "e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_SansSerif-Italic.woff2": {
+      "source": "upstream",
+      "sha256": "00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_SansSerif-Regular.woff2": {
+      "source": "upstream",
+      "sha256": "68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Script-Regular.woff2": {
+      "source": "upstream",
+      "sha256": "036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Size1-Regular.woff2": {
+      "source": "upstream",
+      "sha256": "6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Size2-Regular.woff2": {
+      "source": "upstream",
+      "sha256": "d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Size3-Regular.woff2": {
+      "source": "upstream",
+      "sha256": "73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Size4-Regular.woff2": {
+      "source": "upstream",
+      "sha256": "a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0"
+    },
+    "AdminPanel-Vue/vendor/fonts/KaTeX_Typewriter-Regular.woff2": {
+      "source": "upstream",
+      "sha256": "71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b"
+    },
+    "AdminPanel-Vue/vendor/highlight.min.js": {
+      "source": "upstream",
+      "sha256": "837a6fa5b0c736b52bbde2b2b6190f305da3fc9ed41681db5321507057b5c846"
+    },
+    "AdminPanel-Vue/vendor/html2canvas.min.js": {
+      "source": "upstream",
+      "sha256": "e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb"
+    },
+    "AdminPanel-Vue/vendor/katex.min.css": {
+      "source": "upstream",
+      "sha256": "505d5f829022bb7b4f24dfee0aa1141cd7bba67afe411d1240335f820960b5c3"
+    },
+    "AdminPanel-Vue/vendor/katex.min.js": {
+      "source": "upstream",
+      "sha256": "dc84b296ec3e884de093158f760fd9d45b6c7abe58b5381557f4e138f46a58ae"
+    },
+    "AdminPanel-Vue/vendor/marked.min.js": {
+      "source": "upstream",
+      "sha256": "99dd36ca6ca5120ce725724bce217f24369a2820cb5cadcdd8ee4aa50ead2289"
+    },
+    "AdminPanel-Vue/vendor/mermaid.min.js": {
+      "source": "upstream",
+      "sha256": "0b3ed4374117363815daefdadfcc20ff704d7dd4513b55ed803abddcbd86a898"
+    },
+    "AdminPanel-Vue/vendor/modern-screenshot.js": {
+      "source": "upstream",
+      "sha256": "d6ce0ad42851eb3c6a56b89ab15839f5eaee512df6b27845c42e58d3605dd945"
+    },
+    "AdminPanel-Vue/vendor/morphdom.min.js": {
+      "source": "upstream",
+      "sha256": "1bea1e3733860f75e851bf53e2cd97af8bd24d88e70f15cc643f4a737cd2fe2a"
+    },
+    "AdminPanel-Vue/vendor/pixi-unsafe-eval.min.js": {
+      "source": "upstream",
+      "sha256": "f21427afbf693c56a19a4314630de646f14ec09d5025a4d812b929a8de985c3d"
+    },
+    "AdminPanel-Vue/vendor/pixi.min.js": {
+      "source": "upstream",
+      "sha256": "9948591083793305468d73915a3ea85032dcf8e32eee7a1328585050d7a14d53"
+    },
+    "AdminPanel-Vue/vendor/purify.min.js": {
+      "source": "upstream",
+      "sha256": "ea4b09082ca4ba0ae71be6431a097678751d0453b9c52a4d2c7c39a2166ed9fc"
+    },
+    "AdminPanel-Vue/vendor/pyodide.asm.js": {
+      "source": "upstream",
+      "sha256": "b9cb64a73cc4127eef7cdc75f0cd8307db9e90e93b66b1b6a789319511e1937c"
+    },
+    "AdminPanel-Vue/vendor/pyodide.js": {
+      "source": "upstream",
+      "sha256": "b9cb64a73cc4127eef7cdc75f0cd8307db9e90e93b66b1b6a789319511e1937c"
+    },
+    "AdminPanel-Vue/vendor/tesseract.min.js": {
+      "source": "upstream",
+      "sha256": "a8e29918d098b2b06e1012bdaeffb4aec0445c5d5654709023e0bd1f442a80e8"
+    },
+    "AdminPanel-Vue/vendor/three.min.js": {
+      "source": "upstream",
+      "sha256": "170c6789f43217c96b3170f4b42fafe135de7f7cd48497a4218f9757ee1d49fa"
+    },
+    "AdminPanel-Vue/vendor/three.module.js": {
+      "source": "upstream",
+      "sha256": "7d8a8113afd346464aa1854c1f47aaa0aca4c9a07f0a709f8b417f16d0b6b5fd"
+    },
+    "AdminPanel-Vue/vite.config.ts": {
+      "source": "upstream",
+      "sha256": "8af90d500c26b125ae4133bee54519c0939b1981a31e6c0b10bf161a3dd61fbc"
     },
     "EmbeddingUtils.js": {
       "source": "candidate",
@@ -93,6 +1633,38 @@
     "Plugin/AgentAssistant/plugin-manifest.json.example": {
       "source": "candidate",
       "sha256": "7e4fe002269d67cf71d9b4545fc6aa208b26aca7b44b601bbc422ecaebfa2bca"
+    },
+    "Plugin/DailyNoteSearcher/DailyNoteSearcher.js": {
+      "source": "upstream",
+      "sha256": "b9f06bc1d9917e9b0c197491d8a2b188c10ad19b3c41fe877151282b6fbb8590"
+    },
+    "Plugin/DailyNoteSearcher/config.env.example": {
+      "source": "upstream",
+      "sha256": "69782dfe29f237ced47d9bf5859e75a6994bb731a3dd3bec359f3859a3d7b6fe"
+    },
+    "Plugin/DailyNoteSearcher/src/Cargo.lock": {
+      "source": "upstream",
+      "sha256": "93899ddf0a06ca022a9103e69c489f73ae486cd8e56153af71ce3c02eea1c73d"
+    },
+    "Plugin/DailyNoteSearcher/src/Cargo.toml": {
+      "source": "upstream",
+      "sha256": "31db2f8205b4135201c3744e725342c1473d0818107f43b600f7e8137a3a01b8"
+    },
+    "Plugin/DailyNoteSearcher/src/src/main.rs": {
+      "source": "upstream",
+      "sha256": "4632d844ea2964b1e73fd289cd69c6c7f2514741601dad9e1b85d632883f7a59"
+    },
+    "Plugin/EmojiListGenerator/README.md": {
+      "source": "upstream",
+      "sha256": "5e14efa9311cb3ba67efeadfd34f28da4f89907cb932c774117e78a6bd5a97db"
+    },
+    "Plugin/EmojiListGenerator/emoji-list-generator.js": {
+      "source": "upstream",
+      "sha256": "2f58b8012cfd24512e30d6efc8da253020e4dc02ad634566fa0af35c9f69d727"
+    },
+    "Plugin/ImageProcessor/reidentify_image.js": {
+      "source": "upstream",
+      "sha256": "7dea5fa50c4e783b2bcc8ada6c250e4a2c51c12868bb68cf995e583299b41e4c"
     },
     "Plugin/NativeSync/config.env.example": {
       "source": "candidate",
@@ -187,40 +1759,54 @@
       "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
     },
     "Plugin/NativeSync/nativeRules/Groupmodules/groupChatUrl.js": {
-      "source": "candidate",
-      "sha256": "b1fc3e79467705eef02da96710ebf9d9daadfa06ad57ed1957f2086e291b3855"
+      "source": "monorepo-adapted",
+      "sha256": "0bd82bbf78e8f0ae35124f14e401eaae915cc845b17fd7761ef32393b7022beb",
+      "integratedBaselineSha256": "b1fc3e79467705eef02da96710ebf9d9daadfa06ad57ed1957f2086e291b3855",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "Plugin/NativeSync/nativeRules/Groupmodules/groupContextWindow.js": {
-      "source": "candidate",
-      "sha256": "50348c483de22cbe2335cbdf66eea1e713d6504166ac47651990eb479e48ba32"
+      "source": "monorepo-adapted",
+      "sha256": "6d91dfd55861e2fbaae1d438a2b3c509b5b3c46ec604901d7c755e572b1aa067",
+      "integratedBaselineSha256": "50348c483de22cbe2335cbdf66eea1e713d6504166ac47651990eb479e48ba32",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "Plugin/NativeSync/nativeRules/Groupmodules/modelSelection.js": {
       "source": "candidate",
       "sha256": "1fc60600dacf29ec4601c45e9a167284db3de2a2c6df87cce0eae1fe8926298f"
     },
     "Plugin/NativeSync/nativeRules/Groupmodules/modes/baseChatMode.js": {
-      "source": "candidate",
-      "sha256": "e76f53930084405516709b5b6e8314202f29300a1e3e84017de5feb89a072fad"
+      "source": "monorepo-adapted",
+      "sha256": "8c95d5abc638182f78c9a85fe7862fe9299e731a7a4670e726d5bbbac0393803",
+      "integratedBaselineSha256": "e76f53930084405516709b5b6e8314202f29300a1e3e84017de5feb89a072fad",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "Plugin/NativeSync/nativeRules/Groupmodules/modes/inviteOnlyMode.js": {
-      "source": "candidate",
-      "sha256": "1e77da13df87a8d12bddd0b8d474bbc8b90dfaf4d7ae2934d2814f8b33ba553c"
+      "source": "monorepo-adapted",
+      "sha256": "c4f4a02903430980348e715c40c04ec1370d61d9cd7599c7040184bacc222350",
+      "integratedBaselineSha256": "1e77da13df87a8d12bddd0b8d474bbc8b90dfaf4d7ae2934d2814f8b33ba553c",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "Plugin/NativeSync/nativeRules/Groupmodules/modes/natureRandomMode.js": {
-      "source": "candidate",
-      "sha256": "eeea58c6e70acb435d38d906707aeb6e97118ede6f0f687715614de53aa9ac64"
+      "source": "monorepo-adapted",
+      "sha256": "31989e6ec4bdca6f2ab761f498d167a84a4d72d225b619b46a0b52d2dfc2a6ad",
+      "integratedBaselineSha256": "eeea58c6e70acb435d38d906707aeb6e97118ede6f0f687715614de53aa9ac64",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "Plugin/NativeSync/nativeRules/Groupmodules/modes/sequentialMode.js": {
-      "source": "candidate",
-      "sha256": "7d4a3a2e89aeb8e3dd7c13dbc6427c29f4d2b85d46f04a0ae0f233d662cb06c4"
+      "source": "monorepo-adapted",
+      "sha256": "33856965ca894f19d395a5bdc7e0fe134709482b8d8b03081c88cc2879ab8824",
+      "integratedBaselineSha256": "7d4a3a2e89aeb8e3dd7c13dbc6427c29f4d2b85d46f04a0ae0f233d662cb06c4",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "Plugin/NativeSync/nativeRules/Groupmodules/streamDelta.js": {
       "source": "candidate",
       "sha256": "e8984983e8b8938e32b411565c08481d3f66d02291598fdfb187af3d775d6e80"
     },
     "Plugin/NativeSync/nativeRules/Groupmodules/streamWatchdog.js": {
-      "source": "candidate",
-      "sha256": "139d1b568ba40264a740c636cf65bf7e2dc20f8ba2e6d85d8bf68c8092efec60"
+      "source": "monorepo-adapted",
+      "sha256": "428dff8b67021353b9688c0d3fc2cec01a129c321abfa6561c1a395253a09794",
+      "integratedBaselineSha256": "139d1b568ba40264a740c636cf65bf7e2dc20f8ba2e6d85d8bf68c8092efec60",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "Plugin/NativeSync/nativeRules/modules/chat/contextCompactionState.js": {
       "source": "candidate",
@@ -235,24 +1821,34 @@
       "sha256": "f1b7064e896fe05e22359d86a2a1a8305ae817f08ed3dfa0ab1186432931615b"
     },
     "Plugin/NativeSync/nativeRules/modules/contextSanitizer.js": {
-      "source": "candidate",
-      "sha256": "ddbef2472d52fb641b25d64690bde04bfc074294a8457561b5b1ed6eeacd057f"
+      "source": "monorepo-adapted",
+      "sha256": "1ed7a11776bf928a0cfb1a6068e3b06f26d692bec95b3637f7476cfb08546600",
+      "integratedBaselineSha256": "ddbef2472d52fb641b25d64690bde04bfc074294a8457561b5b1ed6eeacd057f",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "Plugin/NativeSync/nativeRules/modules/modelTrajectory.js": {
-      "source": "candidate",
-      "sha256": "9b5cb71765e2c561a65a1bbb6200f0ee513b16f3b47ed20d1eadecb37fd22470"
+      "source": "monorepo-adapted",
+      "sha256": "754f333cfe29831a7e8e14bc9902ae6b1370fd467741e98568ce3c209f97edc7",
+      "integratedBaselineSha256": "9b5cb71765e2c561a65a1bbb6200f0ee513b16f3b47ed20d1eadecb37fd22470",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "Plugin/NativeSync/nativeRules/modules/renderer/markdownCodeDomainScanner.js": {
-      "source": "candidate",
-      "sha256": "512b3b8364d7b2e6d53d80e5c86c57a51007cf270a5e43c3987be90aacb1ada7"
+      "source": "monorepo-adapted",
+      "sha256": "166b7ee3236276abbe15bb2d22989a475346c74b1a5541d50d76438860607e3e",
+      "integratedBaselineSha256": "512b3b8364d7b2e6d53d80e5c86c57a51007cf270a5e43c3987be90aacb1ada7",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "Plugin/NativeSync/nativeRules/modules/renderer/toolResultRegions.js": {
-      "source": "candidate",
-      "sha256": "f684a4be9a7ff2f76dc6e97e498883c088bbf618591d6cdc5fb8eec7a00888aa"
+      "source": "monorepo-adapted",
+      "sha256": "3a22e0893c38595f01e6ea7bf86c08589cab12236435f169aa60424810d39eab",
+      "integratedBaselineSha256": "f684a4be9a7ff2f76dc6e97e498883c088bbf618591d6cdc5fb8eec7a00888aa",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "Plugin/NativeSync/nativeRules/modules/tavernRulesEngine.js": {
-      "source": "candidate",
-      "sha256": "ede855fbe40b70cd7b13684671047d040180cef2b354a6e8677a1b1b5c1c51bb"
+      "source": "monorepo-adapted",
+      "sha256": "d527be11635e03be68a99599919be5b2fdcf5b3c10cc0c1ed9203742ce84e734",
+      "integratedBaselineSha256": "ede855fbe40b70cd7b13684671047d040180cef2b354a6e8677a1b1b5c1c51bb",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "Plugin/NativeSync/plugin-manifest.json": {
       "source": "candidate",
@@ -390,6 +1986,66 @@
       "source": "candidate",
       "sha256": "eed5202f6d228728a8ff67921192ef480b0f447e364f05477a39f5527385ca23"
     },
+    "Plugin/OneRing/OneRingDB.js": {
+      "source": "upstream",
+      "sha256": "0ad395a08a3f4434385a481a152bae0d3e83c5c666a89f4ae587f0534d48d39d"
+    },
+    "Plugin/OneRing/OneRingMemo.js": {
+      "source": "upstream",
+      "sha256": "31b84788eb2c7755ac22935461227e5e45cc2d58b9ccd1ee7ab7f2619ed9ff45"
+    },
+    "Plugin/PlaceholderExplorer/config.env.example": {
+      "source": "upstream",
+      "sha256": "a7cf0e3d00dd73bfc9f7749e6ac7461a03570ca78b1b3a71e7d322294213558d"
+    },
+    "Plugin/PlaceholderExplorer/modules/editor.js": {
+      "source": "upstream",
+      "sha256": "70bc24d89222d3571bf6294b579b17eed294fc28fa951659204f0e71f6157da0"
+    },
+    "Plugin/PlaceholderExplorer/modules/envScanner.js": {
+      "source": "upstream",
+      "sha256": "1dc724513d4add4beeed0f6cf88511ee077ec46426b7e8eb360efb3e50a6d636"
+    },
+    "Plugin/PlaceholderExplorer/modules/indexStore.js": {
+      "source": "upstream",
+      "sha256": "62b64d5b701d2dd17df9bf369001e33f5cc8d27e873e9b78173879806c5034ac"
+    },
+    "Plugin/PlaceholderExplorer/modules/manifestScanner.js": {
+      "source": "upstream",
+      "sha256": "a5eb3e87d009afe0901cf730e1e810e398bd13a2b7ba4740e472e9e4f2c74aa5"
+    },
+    "Plugin/PlaceholderExplorer/modules/pathUtils.js": {
+      "source": "upstream",
+      "sha256": "01fdcad07e940dbb15a710ba4bd2542dece28bfa6f5ac52391d055310c8c0593"
+    },
+    "Plugin/PlaceholderExplorer/modules/preview.js": {
+      "source": "upstream",
+      "sha256": "b839dcbfa0d24d4cd60379db6f1afca432beabb27c5e5e1604a2406624dac3b3"
+    },
+    "Plugin/PlaceholderExplorer/modules/reporter.js": {
+      "source": "upstream",
+      "sha256": "490ef1fc2511ee21b688477c06d07bfdb8afaafca248f991b118d7c839e53cda"
+    },
+    "Plugin/PlaceholderExplorer/modules/scanner.js": {
+      "source": "upstream",
+      "sha256": "bb9dc3ffec8e5c7f3e710626c958caf47f3fde0ca1fda2defee725d3d996b12d"
+    },
+    "Plugin/PlaceholderExplorer/modules/sourceScanner.js": {
+      "source": "upstream",
+      "sha256": "6aa213fbb8fa477c442bfe4eaa70a132f09f3987acf0c74635282dea431730a3"
+    },
+    "Plugin/PlaceholderExplorer/modules/usageScanner.js": {
+      "source": "upstream",
+      "sha256": "9653134a9f727ac908797a5b181271aea8ff0f6b8530c3b9f709e054b864883d"
+    },
+    "Plugin/PlaceholderExplorerCommand/config.env.example": {
+      "source": "upstream",
+      "sha256": "0bbd3c5923b5dbd573d3d5a40c7d9e3e27595372187616458197e6909bef50ad"
+    },
+    "Plugin/VCPBridgeServer/bridgeConfig.js": {
+      "source": "upstream",
+      "sha256": "6840a8c01c36d6f27e50ee0c0f1f4fabba2f5b9147af88e9e689c9d67ec86421"
+    },
     "Plugin/VCPSleep/VCPSleep.js": {
       "source": "candidate",
       "sha256": "57d1f2cae0e0186ae5600144e8dd71941dcfec2e1115d77460f40bda91148702"
@@ -402,9 +2058,13 @@
       "source": "candidate",
       "sha256": "20f89ae036a377a89db45349b9ec64fd42e6b810b26d8b5b082b9aae1ddbaf8a"
     },
+    "Plugin/WeatherReporter/weather-data.js": {
+      "source": "upstream",
+      "sha256": "f4da2f60889ff593281aad379ec8cdc6b5f32660d8d02e8f21233ca520ba7b34"
+    },
     "README.md": {
       "source": "monorepo",
-      "sha256": "2742ad70067a8e477b305736a3538eaebf7eea96072f8e3ae19d434e0214d5d7"
+      "sha256": "9df284016370e9d3d3dfe56c252199dbe7a6194c169e8a422dbbfe2ba9143bc5"
     },
     "ResultDeduplicator.js": {
       "source": "candidate",
@@ -547,8 +2207,10 @@
       "sha256": "89d99a6439c93ae81379bd540fd887da220fb180637dd4015b8387a9c443bf66"
     },
     "adminServer.js": {
-      "source": "candidate",
-      "sha256": "20744915f7b9d3f3d253c8fbeeb97f7a17525fa7ad73de786ae1744dc3952f68"
+      "source": "monorepo-adapted-candidate",
+      "candidateSha256": "20744915f7b9d3f3d253c8fbeeb97f7a17525fa7ad73de786ae1744dc3952f68",
+      "adaptation": "Bind independent AdminServer to the same explicit loopback interface as the main host.",
+      "sha256": "f19859bbeaa2844345f325e7496fca2a828c46efd2caef275177d7c0904f7997"
     },
     "agent_map.json.example": {
       "source": "upstream",
@@ -935,12 +2597,16 @@
       "sha256": "73882e88291ec2f62a57cb4fc06990e6027dc8e448f0e2f4f62b05c0c54d84c1"
     },
     "package-lock.json": {
-      "source": "monorepo-adapted-upstream",
-      "sha256": "bff93d5630e43b7013007dfc8f5ada2ef5f096e2e9be90c7ec9b64ebf57a2917"
+      "source": "monorepo-adapted",
+      "sha256": "d5ce127304035569c613c7fd401a2213757e2a51f6d66d00263fa9a4c52e5259",
+      "integratedBaselineSha256": "bff93d5630e43b7013007dfc8f5ada2ef5f096e2e9be90c7ec9b64ebf57a2917",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "package.json": {
-      "source": "candidate",
-      "sha256": "63831e161477b3c44a9db10703d53fefc7b3925129a7a3ce1315634c064a540d"
+      "source": "monorepo-adapted",
+      "sha256": "b67adf6ee8084bf26b5b6f43b6e89bf329b42d8c6f83c3d758d96d94506ab8d3",
+      "integratedBaselineSha256": "63831e161477b3c44a9db10703d53fefc7b3925129a7a3ce1315634c064a540d",
+      "adaptation": "Use the native hosts’ shared core-rules package."
     },
     "pluginStoreSources.json": {
       "source": "upstream",
@@ -1067,8 +2733,10 @@
       "sha256": "845154cc329f3a3d8f83bdf368d995306fe97560c2b4f4423dbedfd24c2f42ac"
     },
     "routes/admin/system.js": {
-      "source": "upstream",
-      "sha256": "3b4a8d7d7acc49d3c35a17cc30e566f90376bfd382dd36fbcf65308d4afaee0b"
+      "source": "monorepo-adapted-upstream",
+      "upstreamSha256": "3b4a8d7d7acc49d3c35a17cc30e566f90376bfd382dd36fbcf65308d4afaee0b",
+      "adaptation": "Load PM2 only when its specific administrative route is invoked.",
+      "sha256": "648098d6317a38d18ad3cbca6f9663b0e6ce8f064330c92456d458b65569e198"
     },
     "routes/admin/tarotDivination.js": {
       "source": "upstream",

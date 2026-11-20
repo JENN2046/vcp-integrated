@@ -1,0 +1,51 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+# dist 目录保留提交，让用户开箱即用（构建产物随仓库发布）
+# dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Backup files
+backups/
+*.bak
+backup_*.bat
+
+# Test files
+tests/*
+coverage/
+*.test.ts
+*.spec.ts
+# 单轨化 DSL 回归测试随源码保留，其他本地测试维持忽略策略
+!tests/diarySyntaxRetirement.test.ts
+
+# Documentation
+*.md
+!README.md
+!docs/**/*.md
+
+# Lint output
+lint-output.txt
+
+# Build the bundle locally from the lock in the integrated repository.
+/dist/
+!tests/**
+!tests/**/*.ts

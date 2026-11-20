@@ -5,7 +5,6 @@ const { exec } = require('child_process');
 const os = require('os');
 const util = require('util');
 const execAsync = util.promisify(exec);
-const pm2 = require('pm2');
 const { getAuthCode } = require('../../modules/captchaDecoder');
 const { getFreshWeather } = require('../../Plugin/WeatherReporter/weather-data');
 
@@ -109,6 +108,7 @@ module.exports = function(options) {
 
     // 获取PM2进程列表和资源使用情况
     router.get('/system-monitor/pm2/processes', (req, res) => {
+        const pm2 = require('pm2');
         pm2.list((err, list) => {
             if (err) {
                 console.error('[SystemMonitor] PM2 API Error:', err);

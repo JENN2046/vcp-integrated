@@ -31,6 +31,31 @@ The mobile PWA uses the real host's `/mobile` route backed by
 `Plugin/NativeSync/mobile-dist`. `NativeMobilePwaDir` can specify an absolute
 build directory.
 
-The development baseline covers the main server and the NativeSync
-integration. The separate admin UI bundle and optional upstream plugin
-collection fall outside the staged runtime.
+## Ordinary host administration
+
+Build the independent administrator UI from its checked-in lock.
+
+```sh
+npm --prefix AdminPanel-Vue ci --no-audit --no-fund
+npm --prefix AdminPanel-Vue run build
+```
+
+Run `node adminServer.js` from an isolated server staging directory for the
+separate AdminPanel. It listens on the same loopback address as the main
+service, on `PORT + 1`. The built UI is served at `/AdminPanel/`. The host's
+existing admin authentication requires private operator configuration to grant
+access to protected pages.
+
+The cache, weather, final-context and Bridge Profile routes load their fixed
+upstream modules. Image and weather caches, OneRing state, Bridge profiles,
+and provider settings are created or supplied by the operator when needed.
+Optional tools are activated through their own manifests and runtime
+configuration.
+
+The daily-note search route can use the bundled Rust source after an optional
+local build on Linux. The generic filename is the existing route fallback.
+
+```sh
+cargo +1.89.0 build --locked --release --manifest-path Plugin/DailyNoteSearcher/src/Cargo.toml
+install -m 0755 Plugin/DailyNoteSearcher/src/target/release/DailyNoteSearcher Plugin/DailyNoteSearcher/DailyNoteSearcher
+```

@@ -14,7 +14,9 @@ const cors = require("cors");
 
 const MAIN_PORT = parseInt(process.env.PORT) || 3000;
 const ADMIN_PORT = MAIN_PORT + 1;
-const MAIN_ORIGIN = require('./modules/localListenOptions').localMainOrigin(MAIN_PORT, process.env.VCP_LOCAL_LISTEN_HOST);
+const { localListenArguments, localMainOrigin } = require('./modules/localListenOptions');
+const listenHost = process.env.VCP_LOCAL_LISTEN_HOST || process.env.HOST || '127.0.0.1';
+const MAIN_ORIGIN = localMainOrigin(MAIN_PORT, listenHost);
 const DEBUG_MODE = (process.env.DebugMode || "False").toLowerCase() === "true";
 
 const ADMIN_USERNAME = process.env.AdminUsername;
@@ -1069,7 +1071,7 @@ app.post("/admin_api/config/main/reload-notify", async (req, res) => {
 // ============================================================
 // 启动服务器
 // ============================================================
-app.listen(ADMIN_PORT, () => {
+app.listen(...localListenArguments(ADMIN_PORT, listenHost), () => {
   console.log(`[AdminServer] 管理面板独立进程已启动，监听端口 ${ADMIN_PORT}`);
   console.log(
     `[AdminServer] 管理面板地址: http://localhost:${ADMIN_PORT}/AdminPanel/`
