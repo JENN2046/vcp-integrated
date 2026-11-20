@@ -1,6 +1,7 @@
 /** Same-process host capability. Never populated from HTTP, IPC, or plugin config. */
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { createSyncWriterBoundary } = require('../../../../modules/services/syncWriterBoundary');
 let hostQueue = null;
 let hostRoot = null;
 let nativeConfigServices = {};
@@ -13,10 +14,11 @@ function configureHistoryLifecycle(queue, appDataPath, configServices = {}) {
   hostRoot = path.resolve(appDataPath);
   nativeConfigServices = configServices;
 }
-function requireHistoryQueue(appDataPath) {
+function requireHistoryQueue(appDataPath, target) {
   if (!hostQueue || !hostRoot || (appDataPath && path.resolve(appDataPath) !== hostRoot)) {
     throw Object.assign(new Error('MobileSync requires the host HistoryMutationQueue'), { code: 'HISTORY_QUEUE_UNAVAILABLE' });
   }
+  if (target) createSyncWriterBoundary(hostQueue).assertWrite(target);
   return hostQueue;
 }
 async function descriptorForHistory(filePath) {
@@ -38,10 +40,10 @@ async function descriptorForHistory(filePath) {
   return { itemId: parts[0], itemType: ownerTypes[0], topicId: parts[2] };
 }
 async function initializeTopicHistory(appDataPath, ownerType, ownerId, topicId) {
-  return requireHistoryQueue(appDataPath).initializeIfMissing({ itemId: ownerId, itemType: ownerType, topicId }, []);
+  return requireHistoryQueue(appDataPath, { ownerType, ownerId, topicId }).initializeIfMissing({ itemId: ownerId, itemType: ownerType, topicId }, []);
 }
 async function mutateOwnerConfig(appDataPath, ownerType, ownerId, mutate) {
-  const queue = requireHistoryQueue(appDataPath);
+  const queue = requireHistoryQueue(appDataPath, { ownerType, ownerId });
   queue.getHistoryPath(ownerId, 'validate-owner-config');
   if (!['agent', 'group'].includes(ownerType)) throw new Error('Invalid native config owner type');
   const ownerPath = path.join(hostRoot, ownerType === 'group' ? 'AgentGroups' : 'Agents', ownerId);

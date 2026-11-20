@@ -568,7 +568,7 @@ function registerRoutes(app, {
         });
         res.json({ ownerType, ownerId, ok: true });
       } catch (e) {
-        sendHttpError(res, 500, e, {
+        sendHttpError(res, e?.code === "SYNC_WRITER_EXCLUDED" ? 409 : 500, e, {
           code: "SYNC_AVATAR_WRITE_FAILED",
           stage: "owner_metadata",
         });

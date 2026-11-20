@@ -9,37 +9,71 @@ export function createSidePaneLauncherWiring({ doc, win, chatAPI, chatManager, u
     let disposed = false;
     const subscriptions = { add: owner => owners.push(owner) };
     // 新标签页顶部显示当前助手：点头像去设置页换头像（群组只显示），点名字直接改名
-    const renameSelectedItem = async (item, name) => {
+    const beginRename = item => {
         const api = chatAPI || win.electronAPI;
-        const save = item.type === 'group' ? api?.saveAgentGroupConfig : api?.saveAgentConfig;
-        if (typeof save !== 'function') return { error: 'unsupported' };
-        const result = await save.call(api, item.id, { name });
-        if (!result?.success) {
-            uiHelper?.showToastNotification?.(`改名失败: ${result?.error || '未知错误'}`, 'error');
-            return { error: result?.error || 'save-failed' };
-        }
-        const latest = selectedItemRef.get();
-        if (latest?.id === item.id) {
-            const next = { ...latest, name };
-            if (latest.config) next.config = { ...latest.config, name };
-            selectedItemRef.set(next);
-            const header = doc.getElementById('currentChatAgentName');
-            if (header && item.name && !window.vcpChatHeader?.renameItem?.(item.name, name)
-                && header.textContent.includes(item.name)) {
-                header.textContent = header.textContent.replace(item.name, name);
+        const group = item.type === 'group';
+        const get = group ? api?.getAgentGroupConfig : api?.getAgentConfig;
+        const save = group ? api?.saveAgentGroupConfig : api?.saveAgentConfig;
+        // Capture the version when the user opens the edit, not when they submit.
+        const snapshot = Promise.resolve().then(async () => {
+            const current = await get?.call(api, item.id);
+            if (!current || current.error) return { error: current?.error || 'config-unavailable' };
+            const base = current.__nativeSyncSharedBase;
+            if (base && current.name !== item.name) return { error: 'SHARED_CONFIG_CONFLICT' };
+            return { base };
+        }).catch(error => ({ error: error.message || 'config-unavailable' }));
+
+        return async name => {
+            const { base, error } = await snapshot;
+            if (disposed || typeof save !== 'function') return { error: 'unsupported' };
+            const result = error ? { error } : await save.call(api, item.id, {
+                name, ...(base ? { __nativeSyncSharedBase: base } : {}),
+            });
+            if (!result?.success) {
+                const code = result?.error || 'save-failed';
+                const pending = code === 'SHARED_CONFIG_PENDING_CONFIRMATION';
+                const conflict = code === 'SHARED_CONFIG_CONFLICT';
+                const message = pending ? '名称保存结果待确认。请按 Enter 重试核对。'
+                    : conflict ? '共享名称或配置已更新。请在共享配置中核对草稿。' : `改名失败: ${code}`;
+                uiHelper?.showToastNotification?.(message, pending || conflict ? 'warning' : 'error');
+                return { error: code, keepDraft: pending || conflict };
             }
-        }
-        // 设置页正开着这一项时同步名称框，免得之后保存设置又把旧名字写回去
-        const [idField, nameField] = item.type === 'group'
-            ? ['editingGroupId', 'groupNameInput']
-            : ['editingAgentId', 'agentNameInput'];
-        if (doc.getElementById(idField)?.value === item.id) {
-            const input = doc.getElementById(nameField);
-            if (input) input.value = name;
-        }
-        await win.itemListManager?.loadItems?.();
-        controller.setLauncherProfileProvider(getLauncherProfile);
-        return result;
+            let current;
+            try {
+                current = await get.call(api, item.id);
+            } catch (error) {
+                console.warn('[SidePane] Failed to read saved name:', error);
+            }
+            if (!current || current.error || typeof current.name !== 'string' || result.refreshError) {
+                uiHelper?.showToastNotification?.('名称已保存，本机配置尚未刷新。', 'warning');
+            }
+            // An old receipt can be replayed after a peer's next accepted edit.
+            const displayName = current?.name || item.name;
+            const latest = selectedItemRef.get();
+            if (latest?.id === item.id && latest.type === item.type) {
+                const next = { ...latest, name: displayName };
+                if (latest.config) next.config = { ...latest.config, name: displayName };
+                selectedItemRef.set(next);
+                const header = doc.getElementById('currentChatAgentName');
+                if (header && item.name && !win.vcpChatHeader?.renameItem?.(item.name, displayName)
+                    && header.textContent.includes(item.name)) {
+                    header.textContent = header.textContent.replace(item.name, displayName);
+                }
+            }
+            const [idField, nameField] = group ? ['editingGroupId', 'groupNameInput'] : ['editingAgentId', 'agentNameInput'];
+            if (doc.getElementById(idField)?.value === item.id) {
+                const input = doc.getElementById(nameField);
+                // Preserve a different edit already present in the settings form.
+                if (input?.value === item.name) input.value = displayName;
+            }
+            try {
+                await win.itemListManager?.loadItems?.();
+                controller.setLauncherProfileProvider(getLauncherProfile);
+            } catch (error) {
+                console.warn('[SidePane] Failed to refresh agent list after rename:', error);
+            }
+            return { ...result, displayName };
+        };
     };
     // 立绘按助手现取：主进程只看 Agent 目录里有没有 portrait 图。查过的助手记住结果，切回来马上就是立绘、
     // 不先闪一下圆头像；每次选中或回到新标签页时后台再查一次（距上次查过 1 秒以上），换了或删了立绘文件也能跟上。
@@ -79,7 +113,8 @@ export function createSidePaneLauncherWiring({ doc, win, chatAPI, chatManager, u
                 win.uiManager?.switchToTab?.('settings');
                 doc.getElementById('agentAvatarInput')?.click();
             } : null,
-            onRename: item.type === 'agent' || item.type === 'group' ? (name) => renameSelectedItem(item, name) : null
+            ownerKey: item.type + ':' + item.id,
+            beginRename: item.type === 'agent' || item.type === 'group' ? () => beginRename(item) : null
         };
     };
     // 差分立绘：当前助手有情绪或状态立绘时，跟着它的回复换图。情绪源只看这个助手的流，

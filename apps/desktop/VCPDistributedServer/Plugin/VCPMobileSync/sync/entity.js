@@ -1350,6 +1350,7 @@ async function uploadAvatar({
   }
   const isGroup = type === "group";
   const isUser = type === "user";
+  if (!isUser) requireHistoryQueue(appDataPath, { ownerType: type, ownerId: safeId });
   if (!isUser && !centralSync) {
     const parent = getOwnerState({ ownerType: type, ownerId: safeId });
     if (!parent || parent.deleted_at != null) {
@@ -1573,6 +1574,7 @@ async function deleteEntity({
       if (!["agent", "group", "user"].includes(ownerType)) {
         throw new Error("Avatar deletion requires a valid ownerType");
       }
+      if (ownerType !== "user") requireHistoryQueue(appDataPath, { ownerType, ownerId: safeId });
       const indexedAvatar = persistAvatarIndex
         ? getAvatarIndex(safeId, ownerType)
         : null;
@@ -1630,7 +1632,7 @@ async function deleteEntity({
         "topics",
         safeId,
       );
-      return await requireHistoryQueue(appDataPath).deleteHistory({ itemId: safeOwnerId, itemType: ownerType, topicId: safeId }, async lifecycle => {
+      return await requireHistoryQueue(appDataPath, { ownerType, ownerId: safeOwnerId, topicId: safeId }).deleteHistory({ itemId: safeOwnerId, itemType: ownerType, topicId: safeId }, async lifecycle => {
         await lifecycle.beforeConfigUpdate();
         await mutateOwnerConfig(appDataPath, ownerType, safeOwnerId, config => ({
           ...config,
@@ -1688,7 +1690,7 @@ async function deleteEntity({
         );
     const userDataDir = path.join(appDataPath, "UserData", safeId);
 
-    return await requireHistoryQueue(appDataPath).deleteHistory({ itemId: safeId, itemType: type }, async lifecycle => {
+    return await requireHistoryQueue(appDataPath, { ownerType: type, ownerId: safeId }).deleteHistory({ itemId: safeId, itemType: type }, async lifecycle => {
     const configPath = row?.config_path || path.join(entityDir, 'config.json');
     const expectedConfigPath = path.join(appDataPath, type === 'group' ? 'AgentGroups' : 'Agents', safeId, 'config.json');
     if (path.resolve(configPath) !== path.resolve(expectedConfigPath)) throw new Error('Owner deletion identity conflict');

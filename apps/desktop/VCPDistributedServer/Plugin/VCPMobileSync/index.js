@@ -1540,6 +1540,7 @@ async function ingestConfigToDbUnlocked(configPath, type, appDataPath) {
 }
 
 module.exports = {
+  historyWriterContract: "host-history-queue-v1",
   registerRoutes,
   ingestConfigToDb,
 };

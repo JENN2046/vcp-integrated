@@ -338,6 +338,15 @@ class PluginManager {
             if (shouldStop()) return;
             try {
                 const serviceData = { manifest, module: require(path.join(manifest.basePath, manifest.entryPoint.script)) };
+                // An upstream MobileSync build with its own physical History writer
+                // cannot safely share this host's AppData, regardless of its wire version.
+                if (name === 'VCPMobileSync' &&
+                    (serviceData.module?.historyWriterContract !== 'host-history-queue-v1' ||
+                        !services.pluginAgentOperationService?.historyMutationQueue)) {
+                    throw Object.assign(new Error('MobileSync requires this host\'s History writer integration.'), {
+                        code: 'MOBILE_SYNC_HISTORY_WRITER_INCOMPATIBLE',
+                    });
+                }
                 this.serviceModules.set(name, serviceData);
                 const pluginConfig = this._getPluginConfig(manifest);
                 await new Promise(resolve => setImmediate(resolve));

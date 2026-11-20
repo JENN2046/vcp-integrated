@@ -107,8 +107,11 @@ async function saveShared(runtime, object, localId, raw, avatar, avatarOnly) {
     } else if (draft?.submitted && draft.nativeSave?.avatarIntent) {
         throw fail('SHARED_CONFIG_PENDING_CONFIRMATION');
     }
-    const projected = avatarOnly ? base : projectNativeConfig(runtime, kind, raw, base);
-    const value = sharedConfig(kind, avatarIntent?.value ? { ...projected, avatar: avatarIntent.value } : projected);
+    const nameOnly = !avatarOnly && avatar === undefined && typeof raw.name === 'string' &&
+        Object.keys(raw).every(key => ['name', '__nativeSyncSharedBase', '__nativeSyncSharedOpId'].includes(key));
+    const projected = avatarOnly ? base : nameOnly ? { ...base, name: raw.name } : projectNativeConfig(runtime, kind, raw, base);
+    let value = sharedConfig(kind, avatarIntent?.value ? { ...projected, avatar: avatarIntent.value } : projected);
+    let submittedBase = base;
 
     let confirmed, refreshError, extrasError;
     let sharedCommitted = false;
@@ -138,8 +141,14 @@ async function saveShared(runtime, object, localId, raw, avatar, avatarOnly) {
         if (latest.deleted) throw fail('SHARED_OBJECT_DELETED');
         runtime.configs.validate(latest);
         if (avatarOnly && marker.version !== latest.version) throw fail('SHARED_CONFIG_CONFLICT');
+        // The launcher changes one field. Preserve the server's remaining
+        // configuration while the observed version still governs the write.
+        if (nameOnly) {
+            submittedBase = latest.config;
+            value = sharedConfig(kind, { ...submittedBase, name: raw.name });
+        }
         const sameConfig = marker.version === accepted.version &&
-            (!avatarIntent || marker.version === latest.version) &&
+            (!avatarIntent && !nameOnly || marker.version === latest.version) &&
             stable(value) === stable(sharedConfig(kind, accepted.materialized || accepted.config));
         if (sameConfig && !draft && !raw.__nativeSyncSharedOpId) {
             confirmed = accepted;
@@ -148,7 +157,7 @@ async function saveShared(runtime, object, localId, raw, avatar, avatarOnly) {
                 'native_' + sha256(stable({ id, version: marker.version, value })).slice(0, 40);
             try {
                 await runtime.configs.submit(id, kind, value, {
-                    expectedVersion: marker.version, opId, nativeSave: { base, ...(avatarIntent ? { avatarIntent } : {}) }, onAccepted: remember,
+                    expectedVersion: marker.version, opId, nativeSave: { base: submittedBase, ...(avatarIntent ? { avatarIntent } : {}) }, onAccepted: remember,
                 });
             } catch (error) {
                 if (!confirmed) {
@@ -165,7 +174,7 @@ async function saveShared(runtime, object, localId, raw, avatar, avatarOnly) {
     if (runtime.configs.state.objects[id]?.version < confirmed.version) refreshError = 'SHARED_CONFIG_REFRESH_FAILED';
     try {
         if (runtime.directoryPaused || !runtime.isLocalVisible(id)) throw fail('SHARED_LOCAL_REMOVED');
-        if (!avatarOnly) await runtime.configs.serial(() => runtime.host.writeNativeExtras(kind, localId, raw));
+        if (!avatarOnly && !nameOnly) await runtime.configs.serial(() => runtime.host.writeNativeExtras(kind, localId, raw));
     } catch {
         extrasError = 'SHARED_CONFIG_EXTRAS_FAILED';
     }

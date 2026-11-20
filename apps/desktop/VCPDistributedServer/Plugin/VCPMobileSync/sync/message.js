@@ -152,7 +152,9 @@ async function committedHistorySnapshot(filePath, expectedHistory) {
 
 async function writeHistoryAtomic(filePath, history, expectedSourceHash) {
   const descriptor = await descriptorForHistory(filePath);
-  const queue = requireHistoryQueue();
+  const queue = requireHistoryQueue(undefined, {
+    ownerType: descriptor.itemType, ownerId: descriptor.itemId, topicId: descriptor.topicId,
+  });
   const result = await queue.mutate(descriptor, async () => {
     const current = await readHistoryStrict(filePath);
     if (current.sourceHash !== expectedSourceHash) {
@@ -442,7 +444,7 @@ async function doPushSingleTopic(
   const historyPath = path.join(historyDir, "history.json");
 
   let projected;
-  const committedResult = await requireHistoryQueue(appDataPath).mutate({
+  const committedResult = await requireHistoryQueue(appDataPath, { ownerType: row.owner_type, ownerId: parentId, topicId: safeTopicId }).mutate({
     itemId: parentId, itemType: row.owner_type, topicId: safeTopicId,
   }, async localHistory => {
     const persistedTombstones = loadMessageTombstoneIds(db, {
@@ -1089,7 +1091,7 @@ async function pruneMessageFromPhysicalHistory(
     ownerId,
   });
   try {
-    const result = await requireHistoryQueue(appDataPath).mutate({ itemId: parentId, itemType: ownerType, topicId: safeTopicId }, history => history.filter(message => message.id !== msgId));
+    const result = await requireHistoryQueue(appDataPath, { ownerType, ownerId: parentId, topicId: safeTopicId }).mutate({ itemId: parentId, itemType: ownerType, topicId: safeTopicId }, history => history.filter(message => message.id !== msgId));
     const committed = { unchanged: false, ...await committedHistorySnapshot(historyPath, result.history) };
     upsertMessageTombstone({
       ownerType,

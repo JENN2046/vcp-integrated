@@ -53,7 +53,9 @@ export function createSidePaneLauncher({
 
     let profileProvider = null;
     let profileEdit = null;
-    let profileRename = null;
+    let beginProfileRename = null;
+    let profileOwnerKey = null;
+    let retryEdit = null;
     let profileNameValue = '';
     let nameEdit = null;
     let appsProvider = null;
@@ -82,14 +84,21 @@ export function createSidePaneLauncher({
         const showPortrait = current?.portraitDisplay?.header !== 'avatar';
         renderPortrait(showPortrait ? current?.portraits || null : null, current?.portraitDisplay);
         profileEdit = typeof current?.onEditAvatar === 'function' ? current.onEditAvatar : null;
-        profileRename = typeof current?.onRename === 'function' ? current.onRename : null;
+        beginProfileRename = typeof current?.beginRename === 'function' ? current.beginRename
+            : typeof current?.onRename === 'function' ? () => current.onRename : null;
+        const ownerKey = current?.ownerKey ?? null;
+        if (profileOwnerKey !== ownerKey) {
+            retryEdit = null;
+            nameEdit = null;
+        }
+        profileOwnerKey = ownerKey;
         if (!current) return;
         profileNameValue = current.name || '';
         if (profileName) {
             // 正在改名时不覆盖输入框
-            if (!nameEdit) profileName.value = profileNameValue;
-            profileName.readOnly = !profileRename;
-            profileName.title = profileRename ? '编辑名称' : '';
+            if (!nameEdit) profileName.value = retryEdit?.draft ?? profileNameValue;
+            profileName.readOnly = !beginProfileRename;
+            profileName.title = beginProfileRename ? '编辑名称' : '';
         }
         if (profileImage) {
             const src = current.avatarUrl || 'assets/default_avatar.png';
@@ -119,8 +128,11 @@ export function createSidePaneLauncher({
     // 名字点一下就能改：回车或点别处保存，Esc 放弃；空名字不保存
     if (profileName) {
         const onNameFocus = () => {
-            if (profileName.readOnly || !profileRename) return;
-            nameEdit = { rename: profileRename, original: profileNameValue };
+            if (profileName.readOnly || !beginProfileRename) return;
+            nameEdit = retryEdit || {
+                rename: beginProfileRename(), original: profileNameValue, ownerKey: profileOwnerKey,
+            };
+            retryEdit = null;
         };
         const onNameKeydown = (e) => {
             if (!nameEdit) return;
@@ -130,14 +142,16 @@ export function createSidePaneLauncher({
             } else if (e.key === 'Escape') {
                 e.preventDefault();
                 e.stopPropagation();
-                profileName.value = nameEdit.original;
+                nameEdit = null;
+                retryEdit = null;
+                profileName.value = profileNameValue;
                 profileName.blur();
             }
         };
         const onNameBlur = async () => {
             const edit = nameEdit;
             nameEdit = null;
-            if (!edit) return;
+            if (!edit || edit.ownerKey !== profileOwnerKey) return;
             const next = profileName.value.trim();
             if (!next || next === edit.original) {
                 profileName.value = edit.original;
@@ -146,11 +160,20 @@ export function createSidePaneLauncher({
             profileName.value = next;
             try {
                 const result = await edit.rename(next);
+                if (result?.keepDraft && edit.ownerKey === profileOwnerKey && !nameEdit) {
+                    retryEdit = { ...edit, draft: next };
+                    profileName.value = next;
+                    return;
+                }
                 if (result === false || result?.error) throw new Error(result?.error || 'rename-failed');
-                if (profileNameValue === edit.original) profileNameValue = next;
+                if (edit.ownerKey === profileOwnerKey && !nameEdit) {
+                    const displayName = result?.displayName ?? next;
+                    if (profileNameValue === edit.original) profileNameValue = displayName;
+                    profileName.value = profileNameValue;
+                }
             } catch (error) {
                 console.warn('[SidePaneLauncher] Failed to rename:', error);
-                if (!nameEdit && profileName.value === next) profileName.value = edit.original;
+                if (!nameEdit && edit.ownerKey === profileOwnerKey && profileName.value === next) profileName.value = profileNameValue;
             }
         };
         profileName.addEventListener('focus', onNameFocus);
