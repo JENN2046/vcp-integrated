@@ -4,6 +4,15 @@ const endpoint='/api/v1/sync/shared/';
 const terminal=new Set(['completed','abandoned','failed','cancelled','review_required']);
 const pause=(ms,signal)=>new Promise(resolve=>{if(signal.aborted)return resolve();const finish=()=>{clearTimeout(timer);signal.removeEventListener('abort',finish);resolve();};const timer=setTimeout(finish,ms);signal.addEventListener('abort',finish,{once:true});});
 
+function projectsSameTerminal(record, request){
+ const saved=record?.accepted;
+ return Boolean(saved&&request&&terminal.has(request.state)&&record.serverProjectionPending===false&&
+  record.phase===request.state&&saved.state===request.state&&saved.id===request.id&&
+  saved.requestId===request.requestId&&saved.userMessageId===request.userMessageId&&
+  (saved.replyMessageId??null)===(request.replyMessageId??null)&&
+  saved.userSeq===request.userSeq&&(saved.replySeq??null)===(request.replySeq??null));
+}
+
 function createSharedEventRequest(connection){
  return async(query,{signal}={})=>{
   const {syncHeaders}=require('./runtime');
@@ -90,12 +99,20 @@ class SharedSessionClient{
   const rows=history||this.contexts.get(mapping.sharedId)?.history||await this.runtime.replica.queue.read(mapping.shared);
   return {handled:true,success:true,admissionId:record.accepted.id,replyId:'reply_'+record.accepted.id,userMessage:record.localMessage,history:rows.some(m=>m.id===record.localMessage.id)?rows:[...rows,record.localMessage],projectionPending:true,serverSession:{executionId:record.accepted.id}};
  }
- project(record,mapping,{minSeq=record?.accepted?.userSeq||0,completed=false,request=record?.accepted}={}){
+ project(record,mapping,{minSeq=record?.accepted?.userSeq||0,completed=false,request=record?.accepted,settledReplay=false}={}){
   const key=mapping.sharedId,previous=this.projections.get(key)||Promise.resolve();
   const task=previous.catch(()=>{}).then(async()=>{
    const r=this.runtime;if(this.closed||r.closed)return;
-   await r.syncExecutionTopic(mapping,{minSeq});
-   if(record){record.serverProjectionPending=true;if(completed)record.phase='completed';await this.persist(record);await r.execution.consumeInputs([record.body.requestId]);record.serverProjectionPending=false;await this.persist(record);}
+   // A replay of an already projected terminal still verifies physical History
+   // through the native queue. Only a failed verification reopens recovery.
+   const recheck=settledReplay&&projectsSameTerminal(record,request);
+   try{await r.syncExecutionTopic(mapping,{minSeq});
+    if(recheck){await r.execution.consumeInputs([record.body.requestId]);}
+    else if(record){record.serverProjectionPending=true;if(completed)record.phase='completed';await this.persist(record);await r.execution.consumeInputs([record.body.requestId]);record.serverProjectionPending=false;await this.persist(record);}
+   }catch(error){
+    if(recheck&&projectsSameTerminal(record,request)){record.serverProjectionPending=true;await this.persist(record);}
+    throw error;
+   }
    // Completion receipts do not prove the current topic context: a peer may
    // append or edit while projection yields. Refresh through the existing API.
    this.contexts.delete(key);
@@ -175,16 +192,15 @@ class SharedSessionClient{
       // snapshot is in flight; never overwrite its already accepted terminal.
       const settledRecord=this.byExecution.get(executionId);
       if(event.type==='snapshot'&&['completed','abandoned'].includes(settledRecord?.phase)&&event.request?.state!==settledRecord.phase){controller.abort();return;}
-      const state=p.request?.state;
-      if(event.type==='snapshot'){
-       const record=this.byExecution.get(executionId);
-       if(record){this.retainPartial(record,mapping,p.value());record.accepted={...record.accepted,...p.request};record.observedAt=Date.now();if(state!=='completed')record.phase=state;if(terminal.has(state))record.serverProjectionPending=true;await this.persist(record);}
+      const state=p.request?.state,record=this.byExecution.get(executionId);
+      const settledReplay=event.type==='snapshot'&&projectsSameTerminal(record,p.request);
+      if(event.type==='snapshot'&&record){
+       this.retainPartial(record,mapping,p.value());record.accepted={...record.accepted,...p.request};record.observedAt=Date.now();if(state!=='completed')record.phase=state;if(terminal.has(state)&&!settledReplay)record.serverProjectionPending=true;await this.persist(record);
       }
       this.notify(mapping,executionId);
       if(event.type==='snapshot'&&terminal.has(state)&&(state!=='review_required'||['completed','review_required','failed','cancelled'].includes(p.native?.state))){
-       const record=this.byExecution.get(executionId);
        entry.boundRecord=Boolean(record);
-       await this.project(record,mapping,{minSeq:p.request?.replySeq||p.request?.userSeq||0,completed:state==='completed',request:p.request});
+       await this.project(record,mapping,{minSeq:p.request?.replySeq||p.request?.userSeq||0,completed:state==='completed',request:p.request,settledReplay});
        this.notify(mapping,executionId,{projectionSynced:state==='completed'||state==='abandoned'});controller.abort();
       }else if(['completed','failed','cancelled','review_required'].includes(event.type)||event.type==='state'&&terminal.has(event.payload?.state)){
        // A terminal hint prompts a fresh authoritative snapshot. It never

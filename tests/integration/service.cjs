@@ -68,15 +68,16 @@ async function start({out, candidate, cert, key, trace, waitUntil, mode}) {
     const seed = path.join(out, 'seed');
     fs.mkdirSync(seed);
     fs.writeFileSync(path.join(seed, 'L4-SYNTHETIC-ONLY'), 'NativeSync L4 synthetic process fixture\n');
-    const f = await fixture({ diagnostic() {}, after: fn => cleanup.push(fn) }, { syntheticRoot: seed });
-    const source = f.topic;
-    const actor = f.actor('C');
-    const targetAgent = f.shared.create(actor, {sharedSpaceId:'sharedAB',opId:'sponsor-target-agent',kind:'agent',localId:'sponsor-target-agent',config:{...f.owner.config,name:'Synthetic lost receipt',systemPrompt:'SYNTHETIC_LOST_RECEIPT',model:'synthetic',streamOutput:false}}).object;
-    const target = f.shared.create(actor, {sharedSpaceId:'sharedAB',opId:'sponsor-target-topic',kind:'topic',parentId:targetAgent.id,localId:'sponsor-target-topic',localParent:'sponsor-target-agent',config:{name:'Sponsor target existing topic'}}).object;
-    const stopAgent = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-agent',kind:'agent',localId:'stop-agent',config:{...f.owner.config,name:'Synthetic interrupted single',systemPrompt:'SYNTHETIC_PARTIAL',streamOutput:true}}).object;
-    const stopTopic = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-topic',kind:'topic',parentId:stopAgent.id,localId:'stop-topic',localParent:'stop-agent',config:{name:'Partial single existing topic'}}).object;
+    let source, target, stopTopic;
     const descriptors = {};
     try {
+        const f = await fixture({ after: fn => cleanup.push(fn) }, { syntheticRoot: seed });
+        source = f.topic;
+        const actor = f.actor('C');
+        const targetAgent = f.shared.create(actor, {sharedSpaceId:'sharedAB',opId:'sponsor-target-agent',kind:'agent',localId:'sponsor-target-agent',config:{...f.owner.config,name:'Synthetic lost receipt',systemPrompt:'SYNTHETIC_LOST_RECEIPT',model:'synthetic',streamOutput:false}}).object;
+        target = f.shared.create(actor, {sharedSpaceId:'sharedAB',opId:'sponsor-target-topic',kind:'topic',parentId:targetAgent.id,localId:'sponsor-target-topic',localParent:'sponsor-target-agent',config:{name:'Sponsor target existing topic'}}).object;
+        const stopAgent = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-agent',kind:'agent',localId:'stop-agent',config:{...f.owner.config,name:'Synthetic interrupted single',systemPrompt:'SYNTHETIC_PARTIAL',streamOutput:true}}).object;
+        stopTopic = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-topic',kind:'topic',parentId:stopAgent.id,localId:'stop-topic',localParent:'stop-agent',config:{name:'Partial single existing topic'}}).object;
         for (const p of ['A','B']) {
             const desktop = await f.desktop(p);
             const boundTarget = desktop.runtime.localFor(target.id);
@@ -129,7 +130,7 @@ async function start({out, candidate, cert, key, trace, waitUntil, mode}) {
     const dummy = net.createServer();
     const backendPort = await listen(dummy);
     await closeServer(dummy);
-    let drop=true, lostRequestId=null;
+    let drop=true, lostRequestId=null, dropConfigName=null;
     const proxy = https.createServer({key:fs.readFileSync(key),cert:fs.readFileSync(cert)},async (req,res) => {
         const url=new URL(req.url,'https://127.0.0.1');
         const route=url.pathname;
@@ -138,7 +139,7 @@ async function start({out, candidate, cert, key, trace, waitUntil, mode}) {
             req.resume();
             return res.writeHead(500).end(JSON.stringify({error:{code:'UNEXPECTED_DESKTOP_LOCAL_EXECUTION'}}));
         }
-        const relevant = req.method==='POST' && /\/shared\/(session-send|session-cancel|admit|complete)$/.test(route);
+        const relevant = req.method==='POST' && /\/shared\/(session-send|session-cancel|admit|complete|config)$/.test(route);
         const row = {route,method:req.method,at:Date.now(),device:req.headers['x-nativesync-device'],capabilities:req.headers['x-nativesync-capabilities']};
         let body;
         if (relevant) {
@@ -176,6 +177,13 @@ async function start({out, candidate, cert, key, trace, waitUntil, mode}) {
                 try { row.response=JSON.parse(payload); } catch {}
                 if (drop && route.endsWith('/session-send') && row.body?.requestId===lostRequestId && lostRequestId && response.statusCode>=200 && response.statusCode<300) {
                     row.dropped=true;
+                    res.destroy();
+                    return;
+                }
+                if (dropConfigName && route.endsWith('/shared/config') &&
+                    row.body?.config?.name === dropConfigName && response.statusCode >= 200 && response.statusCode < 300) {
+                    dropConfigName = null;
+                    row.dropped = true;
                     res.destroy();
                     return;
                 }
@@ -228,7 +236,11 @@ async function start({out, candidate, cert, key, trace, waitUntil, mode}) {
         await waitUntil(() => {
             if (backendError) throw backendError;
             if (backend.exitCode!==null) throw Error('Backend exited '+backend.exitCode);
-            return fs.readFileSync(path.join(out,'backend.log'),'utf8').includes('中间层服务器正在监听端口 '+backendPort);
+            const startup = fs.readFileSync(path.join(out, 'backend.log'), 'utf8');
+            if (startup.includes('Error initializing module for NativeSync')) {
+                throw Error('ToolBox failed to initialize NativeSync. See backend.log in the run evidence directory.');
+            }
+            return startup.includes('中间层服务器正在监听端口 ' + backendPort);
         },'real backend listening',25000);
     } catch (error) { await close(); throw error; }
     const origin = 'https://127.0.0.1:' + proxyPort;
@@ -260,7 +272,7 @@ async function start({out, candidate, cert, key, trace, waitUntil, mode}) {
         return { htmlStatus: page.status, bundleStatus: bundle.status, connectionStatus: connection.status };
     }
     return { checkMobile, backendPid: backend.pid, origin:'https://127.0.0.1:'+proxyPort,wsOrigin:'http://127.0.0.1:'+backendPort,calls,requests,topics:{preSubmit:source,lostAck:target,interrupted:stopTopic},descriptors,data,gates,
-        disarmDrop(){drop=false;}, releaseLost,
+        disarmDrop(){drop=false;}, dropConfigOnce(name) { dropConfigName = name; }, releaseLost,
         cutPartial(){assert.ok(activePartial&&!activePartial.destroyed);gates.providerTransportCut=true;
             trace('actual-provider-socket-cut',{hadPrefix:true});activePartial.destroy();}, close};
 }

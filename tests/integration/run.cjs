@@ -2,12 +2,11 @@
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const { X509Certificate } = require('node:crypto');
-const { spawn } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const path = require('node:path');
 const readline = require('node:readline');
 const os = require('node:os');
 const { setTimeout: delay } = require('node:timers/promises');
-const { execFileSync } = require('node:child_process');
 
 const here = __dirname;
 const candidate = path.resolve(here, '../..');
@@ -15,8 +14,11 @@ const host = path.join(candidate, 'apps/desktop');
 const { createRequire } = require('node:module');
 const modes = ['lost-only', 'transport-only', 'pre-only', 'local-only'];
 const requested = process.argv[2] || 'all';
-if (![...modes, 'all', 'ready', '--dev', 'idle'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle]');
+if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
+    throw Error('Integration requires Linux x64 and Node 24');
+}
+if (![...modes, 'all', 'ready', '--dev', 'idle', 'config-only', 'shutdown-only'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -50,7 +52,7 @@ function launch(profile, role) {
         NS_HOST: host, VCPCHAT_APP_DATA_DIR: profile, VCPCHAT_E2E_TEST: '1',
         NODE_EXTRA_CA_CERTS: cert, NS_CERT_FINGERPRINT: fingerprint,
         ...(requested === 'idle' ? { NS_METER_PREFIX: path.join(out, role) } : {}) };
-    const args = ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost', '--disable-background-networking', '--ozone-platform=x11', '--disable-gpu', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', path.join(here, './electron.cjs')];
+    const args = ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1', '--disable-background-networking', '--ozone-platform=x11', '--disable-gpu', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', path.join(here, './electron.cjs')];
     const proc = spawn(executable, args, { cwd: host, env, detached: true, stdio: ['pipe','pipe','pipe'] });
     const log = fs.createWriteStream(path.join(out, role + '.log'));
     const calls = new Map();
@@ -84,7 +86,7 @@ function launch(profile, role) {
     return { events, proc, exit, get ended() { return ended; }, command(action, script) {
         return new Promise((resolve, reject) => {
             const id = ++sequence;
-            const timer = setTimeout(() => { calls.delete(id); reject(Error('Electron command timed out: ' + action)); }, ['picture','toast-picture'].includes(action) ? 20000 : 7000);
+            const timer = setTimeout(() => { calls.delete(id); reject(Error('Electron command timed out: ' + action)); }, action === 'picture' ? 20000 : 7000);
             calls.set(id, { resolve: value => { clearTimeout(timer); resolve(value); }, reject: error => { clearTimeout(timer); reject(error); } });
             proc.stdin.write(JSON.stringify({ id, action, script }) + '\n');
         });
@@ -131,7 +133,9 @@ async function runCase(root, mode) {
         '-subj', '/CN=NativeSync isolated fixture', '-addext', 'subjectAltName=IP:127.0.0.1',
         '-keyout', key, '-out', cert], { env: { PATH: '/usr/bin:/bin' }, stdio: 'ignore' });
     fingerprint = new X509Certificate(fs.readFileSync(cert)).fingerprint256;
-    const service = await require('./service.cjs').start({out, candidate, cert, key, trace, waitUntil, mode});
+    let service;
+    try { service = await require('./service.cjs').start({out, candidate, cert, key, trace, waitUntil, mode}); }
+    finally { fs.rmSync(key, { force: true }); }
     const clients = {};
     const profiles = {};
     const result = { candidate, mode, origin: service.origin, exits:{}, failures:[] };
@@ -154,6 +158,25 @@ async function runCase(root, mode) {
         await client.command('trace');
         return client;
     };
+    const groupMembers = pgid => execFileSync('ps', ['-e', '-o', 'pid=,pgid=,stat='], { encoding: 'utf8' })
+        .trim().split('\n').map(row => row.trim().split(/\s+/))
+        .filter(([, group, stat]) => Number(group) === pgid && !stat.startsWith('Z'));
+    const crash = async role => {
+        const client = clients[role];
+        const cdsPid = result[role].cds.pid;
+        client.proc.kill('SIGKILL');
+        result.exits[role] = await client.exit;
+        delete clients[role];
+        assert.deepEqual(result.exits[role], { code:null, signal:'SIGKILL' });
+        assert.equal(client.events.some(event => event.event === 'runtime-close-end'), false);
+        try {
+            await waitUntil(() => !groupMembers(client.proc.pid).length, 'crashed Electron group and CDS exit', 10000);
+            assert.equal(groupMembers(client.proc.pid).some(([pid]) => Number(pid) === cdsPid), false);
+        } finally {
+            if (groupMembers(client.proc.pid).length) process.kill(-client.proc.pid, 'SIGKILL');
+        }
+        return { electronPid:client.proc.pid, cdsPid, liveGroupMembers:groupMembers(client.proc.pid).length };
+    };
     const stop = async role => {
         const client = clients[role];
         if (!client.ended) await client.command('quit').catch(()=>{});
@@ -172,6 +195,9 @@ async function runCase(root, mode) {
         assert(client.events.some(event=>event.event==='electron-quit'),'Electron normal quit hook');
         if (result[role]?.cds) assert.equal(fs.existsSync(path.join('/proc',String(result[role].cds.pid))),false,'C1 CDS child exited');
         assert.deepEqual(result.exits[role],{code:0,signal:null});
+        if (mode === 'shutdown-only') {
+            await waitUntil(() => !groupMembers(client.proc.pid).length, role + ' process group drained', 10000);
+        }
     };
     try {
         for(const role of ['A','B']){
@@ -187,6 +213,7 @@ async function runCase(root, mode) {
         }
         const [A,B] = await Promise.all(['A','B'].map(role=>start(role)));
         result.mobile = await service.checkMobile();
+        if (mode !== 'idle') result.mobile.chromium = await A.command('mobile', service.origin + '/mobile/');
         if (mode === '--dev' || mode === 'ready') {
             console.log('Isolated VCP ready at ' + service.origin + '/mobile/');
         }
@@ -200,7 +227,8 @@ async function runCase(root, mode) {
         } else if (mode === 'idle') {
             result.idle = await require('./idle.cjs').measure({out, waitUntil, pids:{ A:A.proc.pid, B:B.proc.pid, backend:service.backendPid }});
         } else if (mode !== 'ready') {
-            await scenario({clients:{A,B},out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start});
+            const runScenario = mode === 'config-only' ? require('./configuration.cjs') : scenario;
+            await runScenario({clients:{A,B},out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash});
         }
     } catch(error) {
         result.failures.push(error.stack);
@@ -226,9 +254,16 @@ async function runCase(root, mode) {
             assert.ok(loaded.length >= 9, 'required loaded backend source files');
             result.backendSources=loaded;
         } catch(error) { result.failures.push(error.stack); }
+        try {
+            assert.equal(result.provider.filter(call => call.case === 'fixtureError' ||
+                call.phase === 'unexpected-desktop-local-provider').length, 0);
+        } catch (error) { result.failures.push(error.stack); }
         fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify(result,null,2)+'\n');
+        const disposable = mode === 'idle'
+            ? fs.readdirSync(out).filter(name => name !== 'evidence.json')
+            : ['runtime-box', 'node_modules'];
+        for (const name of disposable) fs.rmSync(path.join(out, name), { recursive: true, force: true });
         assert.deepEqual(result.failures,[]);
-        assert.equal(result.provider.filter(call => call.case === 'fixtureError' || call.phase === 'unexpected-desktop-local-provider').length, 0);
         console.log(mode + ' PASS ' + path.join(out, 'evidence.json'));
     }
 }

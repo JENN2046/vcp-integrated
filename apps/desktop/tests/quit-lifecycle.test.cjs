@@ -16,14 +16,14 @@ function server(gate,plugins,extra={}){
  const s=fs.readFileSync(path.join(root,'VCPDistributedServer/VCPDistributedServer.js'),'utf8');
  const method=s.slice(s.indexOf('    async stop('),s.lastIndexOf('\n}'));
  const stop=vm.runInNewContext('({'+method+'}).stop',{quitAdmission:gate,pluginManager:plugins,console:{log(){},warn(){}},clearTimeout,WebSocket:{OPEN:1,CONNECTING:0}});
- const events=[];return {events,stopped:false,stop,stopPromise:null,initializePromise:null,clearStaticPlaceholderUpdates:()=>events.push('timers'),closeMusicPlaylistWatcher:async()=>events.push('watcher'),...extra};
+ const events=[];return {events,stopped:false,stop,stopPromise:null,initializePromise:null,crownEvidenceService:{ revoke:()=>events.push('evidence') },clearStaticPlaceholderUpdates:()=>events.push('timers'),closeMusicPlaylistWatcher:async()=>events.push('watcher'),...extra};
 }
-function main(gate,distributed,gui={cleanupForQuit:async()=>{}}){
+function main(gate,distributed,gui={cleanupForQuit:async()=>{}},extra={}){
  const s=fs.readFileSync(path.join(root,'main.js'),'utf8');const events=[];
  const context={quitAdmission:gate,prepareProjectForgeQuit:async()=>true,cancelProjectForgeQuit:async()=>{},appQuitCleanupPromise:null,distributedServer:distributed,projectForgeHandlers:gui,
  historyWatcherLeases:{dispose:async()=>events.push('history')},localSttHandlers:{shutdown:()=>events.push('voice')},voiceHandlers:{shutdownVoiceInputEngine:async()=>{}},
  getAgentMoodStore:()=>null,appFeatures:{disposeAll:async()=>events.push('features')},chatDataService:null,loomManager:null,workspaceHandlers:{dispose:()=>events.push('workspace')},historyMutationQueue:null,historyAuthority:null,topicAdmissionHost:null,topicConversationResolver:null,nativeSyncLifecycle:null,startupTeardownStarted:false,pluginAgentOperationService:{},chartService:null,stopAudioEngine:async()=>events.push('audio'),
- mainWindow:null,console:{log(){},warn(){}},quitCleanupSettled:false,isFinalizingQuit:false,app:{on:(name,cb)=>context.beforeQuit=cb,quit:()=>events.push('quit')}};
+ mainWindow:null,console:{log(){},warn(){}},quitCleanupSettled:false,isFinalizingQuit:false,app:{on:(name,cb)=>context.beforeQuit=cb,quit:()=>events.push('quit')},...extra};
  vm.createContext(context);vm.runInContext(s.slice(s.indexOf('async function performQuitCleanup()'),s.indexOf('// --- Main Window Creation ---')),context);
  vm.runInContext(s.slice(s.indexOf("    app.on('before-quit'"),s.indexOf("    app.on('will-quit'")),context);
  return {context,events,quit:()=>context.beforeQuit({preventDefault:()=>events.push('prevent')})};
@@ -181,4 +181,32 @@ test('stop cancels remaining startup before waiting for initialization', async (
  await stopping;
  assert.equal(lateStartup, false, 'startup must observe the stop request before loading more services');
  assert.equal(d.stopped, true);
+});
+
+test('shutdown freezes admission and drains pending sync while the History authority and CDS are live', async () => {
+ const gate=createQuitAdmission(), started=deferred(), release=deferred(), order=[];
+ let historyAvailable=true;
+ const app=main(gate,null,undefined,{
+  nativeSyncLifecycle:{
+   beginShutdown(){order.push('freeze');},
+   async close(){
+    order.push('sync-drain-start');started.resolve();
+    await release.promise;
+    assert.equal(historyAvailable,true,'accepted projection can still use native History');
+    order.push('sync-drain-end');
+   },
+  },
+  topicAdmissionHost:{async dispose(){order.push('topic-admission-close');}},
+  historyAuthority:{async close(){historyAvailable=false;order.push('history-fence');}},
+  chatDataService:{async stop(){order.push('cds-stop');}},
+  historyMutationQueue:{async dispose(){order.push('queue-dispose');}},
+ });
+ const quitting=app.quit();
+ await started.promise;
+ await assert.rejects(gate.run(()=>assert.fail('late work ran')), { code:'APPLICATION_SHUTTING_DOWN' });
+ assert.deepEqual(order,['freeze','topic-admission-close','sync-drain-start']);
+ release.resolve();
+ await quitting;
+ assert.deepEqual(order,['freeze','topic-admission-close','sync-drain-start','sync-drain-end','history-fence','cds-stop','queue-dispose']);
+ assert.equal(app.events.at(-1),'quit');
 });

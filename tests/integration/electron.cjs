@@ -115,6 +115,45 @@ input.on('line', async line => {
         let result;
         const win = window();
         if (action === 'quit') app.quit();
+        if (action === 'quit-busy') {
+            const gate = require(path.join(process.env.NS_HOST, 'modules/services/quitAdmission.cjs'));
+            const hold = Promise.withResolvers();
+            const work = gate.run(() => hold.promise);
+            try {
+                app.quit();
+                await new Promise(resolve => setImmediate(resolve));
+                gate.assertOpen();
+                result = { alive: !win.isDestroyed(), admissionResumed: true };
+            } finally {
+                hold.resolve();
+                await work;
+            }
+        }
+        if (action === 'mobile') {
+            const target = new URL(script);
+            if (target.protocol !== 'https:' || target.hostname !== '127.0.0.1' || target.pathname !== '/mobile/') {
+                throw Error('Invalid mobile fixture URL');
+            }
+            const mobile = new BrowserWindow({ width: 390, height: 844, show: false,
+                webPreferences: { sandbox: true, contextIsolation: true, backgroundThrottling: false } });
+            try {
+                await mobile.loadURL(target.href);
+                result = await mobile.webContents.executeJavaScript(`new Promise((resolve, reject) => {
+                    const start = performance.now();
+                    function check() {
+                        if (window.isSecureContext && document.querySelector('#pair-code') &&
+                            document.querySelector('header .connection')?.textContent === '服务可达') {
+                            resolve({ title: document.title, secureContext: true, connectionReady: true });
+                        } else if (performance.now() - start > 4000) {
+                            reject(new Error('Mobile did not render the reachable pairing screen'));
+                        } else setTimeout(check, 50);
+                    }
+                    check();
+                })`);
+            } finally {
+                mobile.destroy();
+            }
+        }
         if (action === 'eval') {
             if (!win) throw Error('Main window unavailable');
             result = await win.webContents.executeJavaScript(script, true);

@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {DatabaseSync}=require('node:sqlite');
 const {contract}=require('./service.cjs');
 const names={preSubmit:'Synthetic shared',lostAck:'Synthetic lost receipt',interrupted:'Synthetic interrupted single'};
-module.exports=async ({clients:{A,B},out,result,service,picture,click,evalJs,waitUntil,start,stop,sha})=>{
+module.exports=async ({clients:{A,B},out,result,service,picture,click,evalJs,waitUntil,start,stop,sha,crash})=>{
  const db=new DatabaseSync(path.join(service.data,'central.sqlite'),{readOnly:true});
  const j=JSON.stringify, send='#sendMessageBtn';
  const history=(role,subject)=>{
@@ -98,7 +98,14 @@ module.exports=async ({clients:{A,B},out,result,service,picture,click,evalJs,wai
   assert.equal(calls('preSubmit').length,0);
   return;
   }
-  if(result.mode==='lost-only'){
+  if(result.mode==='lost-only'||result.mode==='shutdown-only'){
+  if(result.mode==='shutdown-only'){
+    const busy = await A.command('quit-busy');
+    assert.deepEqual(busy,{alive:true,admissionResumed:true});
+    assert.ok(A.events.some(event=>event.event==='before-quit'));
+    assert.equal(A.events.some(event=>event.event==='runtime-close-start'),false);
+    result.shutdown={busy};
+  }
   await select(A,'A','lostAck');
   await enter(A,contract.cases.lostAck);
   const lost=await waitUntil(()=>posts('lostAck').find(x=>x.dropped),'actual accepted response dropped');
@@ -109,7 +116,8 @@ module.exports=async ({clients:{A,B},out,result,service,picture,click,evalJs,wai
   assert.equal(pending.content,contract.cases.lostAck);
   const seenFailure=await waitUntil(()=>A.events.find(x=>x.event==='ipc-result'&&x.data.channel==='native-sync:prepare-send'&&x.data.error==='NETWORK_UNAVAILABLE'),'transport loss reached real composer',12000);
   await picture(A,'single-lost-ack');
-  await stop('A');
+  if(result.shutdown) result.shutdown.crash=await crash('A');
+  else await stop('A');
   service.disarmDrop();
   const A2=await start('A-reopened','A');
   assert.equal(result.A.profileDigest,result['A-reopened'].profileDigest);
@@ -158,46 +166,60 @@ module.exports=async ({clients:{A,B},out,result,service,picture,click,evalJs,wai
   assert.equal(calls('interrupted').length,1);
   await picture(A2,'single-partial-live');
   assert.equal(result.mode, 'transport-only');
-    service.cutPartial();
-    await waitUntil(()=>service.gates.partialClosed,'provider closed after nonempty prefix',12000);
-    const work=await waitUntil(()=>jobs('interrupted').find(w=>w.id===stopWork&&w.state === 'review_required'),'terminal state after provider TCP cut',25000);
-    const capture=async c=>({ui:{partialShown:(await messageArea(c)).includes(contract.partialText),
-        finalShown:(await messageArea(c)).includes(contract.completeText),reviewShown:/核对|中断/.test(await doc(c)),composer:await composer(c)},
-        ledger:localLedger(partialRequest.body.requestId),work:jobs('interrupted'),native:native(stopWork),journal:journal('interrupted'),history:history('A','interrupted')});
-    await waitUntil(async()=>/发送/.test((await composer(A2)).label||''),'native terminal composer after provider cut',15000);
-    const afterCut=await capture(A2);
-    await picture(A2,'single-socket-cut-terminal');
-    await stop('A');
-    const reopened=await start('A-final','A');
-    await select(reopened,'A','interrupted');
-    await waitUntil(async()=> (await messageArea(reopened)).includes(contract.cases.interrupted),'native input survives cut and reopen');
-    await new Promise(r=>setTimeout(r,1200));
-    const reopenedState=await capture(reopened);
-    await picture(reopened,'single-socket-cut-reopened');
-    const counts={sessionPosts:posts('interrupted').length,cancelPosts:service.requests.filter(x=>x.route.endsWith('/session-cancel')).length,providerAttempts:calls('interrupted').length};
-    result.transportInterrupt={workId:work.id,beforeCut:active,afterCut,reopened:reopenedState,gates:service.gates,
-       providerTranscript:calls('interrupted'),counts};
-    assert.ok(service.gates.providerTransportCut);
-    assert.equal(counts.sessionPosts,1);
-    assert.equal(counts.cancelPosts,0);
-    assert.ok(calls('interrupted').every(x=>x.providerFrames.length===1&&x.providerFrames[0].type==='delta'));
-    assert.deepEqual(afterCut.journal,reopenedState.journal);
-    assert.deepEqual(afterCut.work,reopenedState.work);
-    assert.deepEqual(afterCut.native,reopenedState.native);
-    assert.deepEqual(afterCut.history,reopenedState.history);
-    assert.equal(counts.providerAttempts, 1);
-    assert.equal(work.state, 'review_required');
-    assert.equal(work.error_code, 'MODEL_STREAM_ERROR_REVIEW_REQUIRED');
-    assert.equal(work.reply_message_id, null);
-    assert.equal(afterCut.ledger.phase, 'review_required');
-    assert.deepEqual(reopenedState.ledger, afterCut.ledger);
-    for (const state of [afterCut, reopenedState]) {
-        assert.equal(state.ui.partialShown, true);
-        assert.equal(state.ui.finalShown, false);
-        assert.equal(state.ui.reviewShown, true);
-        assert.equal(state.ui.composer.disabled, false);
-    }
-    assert.deepEqual(afterCut.journal.map(row => row.message.role), ['user']);
-    assert.deepEqual(afterCut.history.map(row => row.role), ['user']);
+  service.cutPartial();
+  await waitUntil(()=>service.gates.partialClosed,'provider closed after nonempty prefix',12000);
+  const work=await waitUntil(()=>jobs('interrupted').find(w=>w.id===stopWork&&w.state === 'review_required'),'terminal state after provider TCP cut',25000);
+  const capture=async c=>({ui:{partialShown:(await messageArea(c)).includes(contract.partialText),
+      finalShown:(await messageArea(c)).includes(contract.completeText),reviewShown:/核对|中断/.test(await doc(c)),composer:await composer(c)},
+      ledger:localLedger(partialRequest.body.requestId),work:jobs('interrupted'),native:native(stopWork),journal:journal('interrupted'),history:history('A','interrupted')});
+  await waitUntil(async()=>/发送/.test((await composer(A2)).label||''),'native terminal composer after provider cut',15000);
+  await waitUntil(() => {
+      const ledger = localLedger(partialRequest.body.requestId);
+      const rows = history('A', 'interrupted');
+      return ledger?.phase === 'review_required' && ledger.bodyId === partialRequest.body.requestId &&
+          ledger.acceptedId === stopWork && typeof ledger.projectionPending === 'boolean' &&
+          rows.length === 1 && rows[0].id === work.user_message_id;
+  }, 'interrupted request and original user History', 15000);
+  const afterCut=await capture(A2);
+  await picture(A2,'single-socket-cut-terminal');
+  await stop('A');
+  const reopened=await start('A-final','A');
+  await select(reopened,'A','interrupted');
+  await waitUntil(async()=> (await messageArea(reopened)).includes(contract.cases.interrupted),'native input survives cut and reopen');
+  await waitUntil(async () => (await messageArea(reopened)).includes(contract.partialText), 'reopened partial reply displayed');
+  const firstReopenedLedger = localLedger(partialRequest.body.requestId);
+  if (!afterCut.ledger.projectionPending) {
+      assert.equal(firstReopenedLedger?.projectionPending, false, 'settled projection does not regress on reopen');
+  }
+  await waitUntil(() => localLedger(partialRequest.body.requestId)?.projectionPending === false,
+      'reopened interrupted projection settles', 15000);
+  const reopenedState=await capture(reopened);
+  await picture(reopened,'single-socket-cut-reopened');
+  const counts={sessionPosts:posts('interrupted').length,cancelPosts:service.requests.filter(x=>x.route.endsWith('/session-cancel')).length,providerAttempts:calls('interrupted').length};
+  result.transportInterrupt={workId:work.id,beforeCut:active,afterCut,reopened:reopenedState,gates:service.gates,
+     providerTranscript:calls('interrupted'),counts};
+  assert.ok(service.gates.providerTransportCut);
+  assert.equal(counts.sessionPosts,1);
+  assert.equal(counts.cancelPosts,0);
+  assert.ok(calls('interrupted').every(x=>x.providerFrames.length===1&&x.providerFrames[0].type==='delta'));
+  assert.deepEqual(afterCut.journal,reopenedState.journal);
+  assert.deepEqual(afterCut.work,reopenedState.work);
+  assert.deepEqual(afterCut.native,reopenedState.native);
+  assert.deepEqual(afterCut.history,reopenedState.history);
+  assert.equal(counts.providerAttempts, 1);
+  assert.equal(work.state, 'review_required');
+  assert.equal(work.error_code, 'MODEL_STREAM_ERROR_REVIEW_REQUIRED');
+  assert.equal(work.reply_message_id, null);
+  assert.equal(afterCut.ledger.phase, 'review_required');
+  assert.equal(reopenedState.ledger.projectionPending, false);
+  assert.deepEqual(reopenedState.ledger, { ...afterCut.ledger, projectionPending: false });
+  for (const state of [afterCut, reopenedState]) {
+      assert.equal(state.ui.partialShown, true);
+      assert.equal(state.ui.finalShown, false);
+      assert.equal(state.ui.reviewShown, true);
+      assert.equal(state.ui.composer.disabled, false);
+  }
+  assert.deepEqual(afterCut.journal.map(row => row.message.role), ['user']);
+  assert.deepEqual(afterCut.history.map(row => row.role), ['user']);
  }finally{db.close();}
 };
