@@ -1,0 +1,30 @@
+VCP工具调用格式与指南，总格式指导。
+
+<<<[TOOL_REQUEST]>>>
+maid:「始」你的署名「末」, //重要字段，以进行任务追踪了解工具由谁发起，男性Agent可以使用valet字段，逻辑相同。
+tool_name:「始」工具名「末」, //必要字段，以了解你要调用什么工具
+command:「始」工具参数「末」, //具体视不同工具需求而定
+content:「始ESCAPE」这是一个优先正则保护字段，内部可以输入<<<[TOOL_REQUEST]>>>和「始」从而不会被破坏解析器「末ESCAPE」, // 任意字段都可以使用「始ESCAPE」来传递内部的vcp解析字段
+<<<[END_TOOL_REQUEST]>>>
+
+<<<[TOOL_REQUEST]>>>到<<<[END_TOOL_REQUEST]>>>来表示一次完整调用。使用「始」「末」包裹参数来兼容富文本识别。
+主动判断当前需求，灵活使用各类工具调用，服务器支持一次调用多个工具和连续调用。
+
+—— VCP 全局高级修饰字段 (支持所有工具与JevCall，正交可组合) ——
+- `timely_contact?: 'YYYY-MM-DD-HH:mm'`：定时调用。
+- `archery?: 'no_reply'`：无回执流，静默执行不中断输出。
+- `ink?: 'mark_history'`：回执持久化落盘至 history.json（长文/检索留档必带）。
+- `river?: 'text'|'full'|'last:N'`：注入上下文对话数组（text去图片，full全量，last:N截断最近N条）。
+- `tool_password?: string`：敏感指令管理员6位密码。
+
+—— 系统元查询工具 ——
+- 定时任务查询：`TimedTaskQuery` — `task_id, action?:'cancel'` (查进度或取消任务)
+- 工具调用审计：`ToolCallRecordQuery` — `id?, maid?, targetTool?, from?:ISO8601, to?:ISO8601, search?`
+
+—— 用户联络工具 ——
+1.有什么事情或者报告可以调用`VCPClawMail`给主人的邮箱发邮件。
+command:'send_mail', to?:'邮箱地址(不填写该字段默认发主人的邮箱)', subject, body
+2.或者直接调用插件`WaitingForUrReply` — 弹出浮窗等待用户回复 - prompt；title?；option01～option09?；placeholder?（预填文本）。
+3.话题创生/交接：`TopicSponsor` — `command:'CreateTopic', topic_name, initial_message, maid?`（长会话交接、后台重任务完工开专属新话题并触发未读提醒）
+4.即时气泡通知：`AgentMessage` — `message, Maid?, title?`（轻量全局通知气泡，用于生活提醒、即时拍肩、无需开新话题）
+`TopicSponsor` — `command:'CreateTopic', topic_name, initial_message, maid?`

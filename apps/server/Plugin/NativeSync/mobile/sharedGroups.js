@@ -1,0 +1,25 @@
+'use strict';
+const {sha256,stable}=require('../sync/protocol');
+const {acceptedActor}=require('./sharedSingle');
+const fail=code=>Object.assign(Error(code),{code,status:409});
+function admit(engine,sessionId,input,topic,config,message,invitation){
+ const shared=engine.store.shared;if(!shared?.native)throw fail('SHARED_NATIVE_UNAVAILABLE');
+ const session=engine.db.prepare('SELECT * FROM mobile_sessions WHERE id=? AND expires>?').get(sessionId,Date.now());
+ const actor=shared.mobile(session&&{id:sessionId,scopes:JSON.parse(session.scopes)},topic.sharedSpaceId,'execute');
+ const row=shared.topic(actor,topic.sharedSpaceId,topic.key,'execute');
+ return shared.admit(actor,{sharedSpaceId:topic.sharedSpaceId,sharedId:topic.key,requestId:input.requestId,expectedHead:shared.head(row),configHash:config.sharedTemplateHash,...(invitation?{kind:'invite',memberId:input.agentId}:{message})});
+}
+function register(engine,job,candidate,packet,member){
+ const shared=engine.store.shared,topic=engine.topics.get(job.topic_key),actor=acceptedActor(engine,job);
+ shared.prepareNative(actor,{sharedSpaceId:topic.sharedSpaceId,admissionId:job.id,requestId:candidate.id,memberId:member.id,bodyHash:sha256(stable(JSON.parse(JSON.stringify(packet))))});
+ return require('../../../modules/requestExecutionContext').register(candidate.id,member,engine.nativeTasks.hooks(job.id,candidate.id),{actor,admissionId:job.id});
+}
+function completeStep(engine,step,op){
+ const job=engine.get(step.job_id),shared=engine.store.shared,topic=engine.topics.get(job.topic_key);
+ return shared.complete(acceptedActor(engine,job),{sharedSpaceId:topic.sharedSpaceId,admissionId:job.id,opId:'mobile-step_'+step.id,nativeRequestId:step.id,message:op.message});
+}
+function finish(engine,job){
+ const shared=engine.store.shared,topic=engine.topics.get(job.topic_key);shared.native?.checkTerminal(job.id);
+ return shared.complete(acceptedActor(engine,job),{sharedSpaceId:topic.sharedSpaceId,admissionId:job.id,opId:'mobile-group-finish_'+job.id,finish:true});
+}
+module.exports={admit,register,completeStep,finish};

@@ -1,0 +1,183 @@
+const INTERRUPT_BUTTON_HTML = '<svg class="chat-stop-glyph" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="3" fill="currentColor"></rect></svg>';
+
+/** Owns main-chat send/interrupt policy and its button projection. */
+export function createMainChatSendOwner({
+    button,
+    messagesRoot,
+    historyRef,
+    selectedItemRef,
+    topicIdRef,
+    streamProjection,
+    chatAPI,
+    interruptHandler,
+    getAdapter,
+    getChatManager,
+    messageRenderer,
+    notify,
+    hasDraft = () => false,
+}) {
+    const defaultButtonHtml = button?.innerHTML || '';
+    let disposed = false;
+    let interruptTarget = null, displayedTarget = null;
+
+    const isContextCurrent = context => {
+        const selected = selectedItemRef.get();
+        const topicId = topicIdRef.get();
+        if (!context || !selected?.id || !topicId) return false;
+        return (context.groupId || context.agentId) === selected.id && context.topicId === topicId;
+    };
+
+    const isTargetCurrent = target => {
+        const selected = selectedItemRef.get();
+        return Boolean(selected?.id && selected.id === target.itemId &&
+            (selected.type || 'agent') === target.itemType && topicIdRef.get() === target.topicId);
+    };
+    const getInterruptibleMessage = () => {
+        if (interruptTarget && isTargetCurrent(interruptTarget)) return interruptTarget;
+        const history = historyRef.get();
+        for (let index = history.length - 1; index >= 0; index--) {
+            const message = history[index];
+            if (!message || message.role !== 'assistant') continue;
+            const item = messagesRoot?.querySelector(`.message-item[data-message-id="${message.id}"]`);
+            const isStreaming = Boolean(item?.classList.contains('streaming'));
+            if ((item?.isConnected && message.isThinking === true) || isStreaming) {
+                return { ...message, isStreaming };
+            }
+        }
+
+        const messageId = streamProjection?.getActiveStreamingMessageId?.();
+        const context = streamProjection?.getActiveStreamingContext?.();
+        if (!messageId || !isContextCurrent(context)) return null;
+        const existing = history.find(message => message?.id === messageId && message.role === 'assistant');
+        if (existing) return { ...existing, isStreaming: true };
+        const selected = selectedItemRef.get();
+        return {
+            id: messageId,
+            role: 'assistant',
+            name: context.agentName || selected?.name || selected?.id,
+            agentId: context.agentId,
+            groupId: context.groupId,
+            isGroupMessage: context.isGroupMessage === true,
+            avatarUrl: context.avatarUrl || selected?.avatarUrl,
+            avatarColor: context.avatarColor || selected?.config?.avatarCalculatedColor,
+            isStreaming: true,
+        };
+    };
+
+    const update = () => {
+        if (disposed || !button) return false;
+        const compacting = getChatManager()?.isContextCompacting?.() === true;
+        button.classList.toggle('context-compacting', compacting);
+        if (compacting) {
+            button.disabled = false;
+            button.classList.toggle('interrupt-mode', true);
+            button.dataset.mode = 'compacting';
+            button.setAttribute('aria-busy', 'true');
+            button.setAttribute('aria-label', '中止上下文压缩');
+            button.title = '上下文压缩中，点击中止压缩';
+            button.innerHTML = '<span class="vcp-compaction-spinner" aria-hidden="true"></span>';
+            return true;
+        }
+        if (button.dataset.mode === 'compacting') button.disabled = false;
+        const preparing=getChatManager()?.getPendingSendState?.();
+        if(preparing){
+            button.disabled=preparing.cancelling===true;button.dataset.mode=preparing.cancelling?'stopping':'preparing';
+            button.classList.toggle('interrupt-mode',true);button.setAttribute('aria-busy','true');
+            button.setAttribute('aria-label',preparing.cancelling?'正在确认停止提交':'停止本次发送');
+            button.title=preparing.cancelling?'正在确认停止，已接收内容会保留':'停止本次发送';button.innerHTML=INTERRUPT_BUTTON_HTML;return true;
+        }
+        if(['preparing','stopping'].includes(button.dataset.mode))button.disabled=false;
+        const active = getInterruptibleMessage();
+        const mode = active && !hasDraft() ? 'interrupt' : 'send';
+        displayedTarget = mode === 'interrupt' && active === interruptTarget ? active : null;
+        button.dataset.mode = mode;
+        button.classList.toggle('interrupt-mode', mode === 'interrupt');
+        // The send control is the main-chat composer status surface. Keep its
+        // busy state synchronized with the same interruptible-stream decision
+        // used for the command projection so assistive technology observes
+        // the operation without relying on CSS classes or button labels.
+        button.setAttribute('aria-busy', String(mode === 'interrupt'));
+        button.innerHTML = mode === 'interrupt' ? INTERRUPT_BUTTON_HTML : defaultButtonHtml;
+        button.title = mode === 'interrupt' ? '中止回复' : '发送消息/右键回复设置';
+        button.setAttribute('aria-label', mode === 'interrupt' ? '中止回复' : '发送消息');
+        return true;
+    };
+
+    const interrupt = async () => {
+        const activeMessage = getInterruptibleMessage();
+        if (!activeMessage || disposed) return false;
+        if (activeMessage === interruptTarget) {
+            return activeMessage.interrupt((text, type) => { if (!disposed && isTargetCurrent(activeMessage)) notify?.(text, type); });
+        }
+        const selected = selectedItemRef.get();
+        const isGroup = activeMessage.isGroupMessage === true || selected?.type === 'group';
+        if (!isGroup) getChatManager()?.cancelStreamAdmissionRelay?.(activeMessage.id);
+        let result = { success: false, error: '无法发送中止请求。' };
+        if (isGroup) {
+            result = typeof chatAPI?.interruptGroupRequest === 'function'
+                ? await chatAPI.interruptGroupRequest(activeMessage.id)
+                : { success: false, error: '群聊中止接口不可用。' };
+        } else if (typeof interruptHandler?.interrupt === 'function') {
+            result = await interruptHandler.interrupt(activeMessage.id);
+        }
+        if (disposed) return false;
+        if (result.success) {
+            notify?.('已发送中止信号。', 'success');
+            return true;
+        }
+
+        const localOutcome = await getAdapter()?.cancelStream?.(
+            activeMessage.id,
+            result.error || 'interrupt-request-failed'
+        );
+        if (disposed) return false;
+        // 中止请求可能要等好几秒，期间回答已经自己收尾；那时它不再是占位，不能删
+        if (!localOutcome && getInterruptibleMessage()?.id === activeMessage.id) {
+            streamProjection?.discardStreamingMessage?.(activeMessage.id);
+            historyRef.set(historyRef.get().filter(message => message?.id !== activeMessage.id));
+            messageRenderer?.removeMessageById?.(activeMessage.id, false);
+        }
+        update();
+        notify?.(`中止失败：${result.error || '未知错误'}，已在本地停止。`, 'error');
+        return true;
+    };
+
+    return Object.freeze({
+        setInterruptTarget(target) {
+            if (disposed) return;
+            interruptTarget = target;
+            update();
+        },
+        getInterruptibleMessage,
+        update,
+        interrupt,
+        async handleAction() {
+            if (disposed) return false;
+            const manager = getChatManager();
+            if (manager?.isContextCompacting?.()) {
+                const cancelled = await manager.cancelContextCompaction?.();
+                if (disposed) return false;
+                update();
+                if (cancelled) notify?.('已中止上下文压缩，原历史和草稿已保留；心流保持挂起。', 'info');
+                else notify?.('压缩结果正在保存，无法撤销已开始的写入。', 'info');
+                return cancelled === true;
+            }
+            if(manager?.getPendingSendState?.()){
+                const stopped=manager.cancelPendingSend?.()===true;update();
+                if(stopped)notify?.('正在停止后续派发；已接收内容会保留。','info');return stopped;
+            }
+            if (displayedTarget && button?.dataset.mode === 'interrupt' && !isTargetCurrent(displayedTarget)) {
+                update();
+                return false;
+            }
+            if (getInterruptibleMessage() && !hasDraft()) return interrupt();
+            await getChatManager()?.handleSendMessage?.();
+            return true;
+        },
+        dispose() {
+            if (disposed) return;
+            disposed = true;
+            interruptTarget = displayedTarget = null;
+        },
+    });
+}

@@ -1,0 +1,582 @@
+// Promptmodules/prompt-manager.js
+// 系统提示词管理器 - 负责三种模式的切换和数据管理
+
+class PromptManager {
+  constructor() {
+    this.currentMode = "original"; // 'original' | 'modular' | 'preset'
+    this.agentId = null;
+    this.config = null;
+    this.contextVersion = 0;
+    this.contextReady = false;
+
+    // 模块实例
+    this.originalModule = null;
+    this.modularModule = null;
+    this.presetModule = null;
+
+    // 默认模式名称
+    this.defaultModeNames = {
+      original: "文本",
+      modular: "模块",
+      preset: "预制",
+    };
+
+    // 自定义模式名称（从全局设置加载）
+    this.customModeNames = {};
+
+    // 右键长按计时器
+    this.rightClickTimer = null;
+    this.rightClickDelay = 1000; // 1秒
+    
+    this.isInitialized = false;
+    this.containerElement = null;
+    this.electronAPI = null;
+    this.boundContainerListeners = [];
+  }
+
+  /**
+   * 初始化提示词管理器（全局单次初始化）
+   * @param {Object} options - 初始化选项
+   */
+  async init(options) {
+    if (this.isInitialized) return;
+    
+    const { containerElement, electronAPI } = options;
+    this.containerElement = containerElement;
+    this.electronAPI = electronAPI;
+    this.bindContainerEvents();
+
+    // 初始化三个模块（仅实例化，不加载数据）
+    this.initModules();
+
+    this.isInitialized = true;
+    console.log('[PromptManager] Global initialization complete.');
+  }
+
+  bindContainerEvents() {
+    if (!this.containerElement || this.boundContainerListeners.length) return;
+    const listen = (type, handler) => {
+      this.containerElement.addEventListener(type, handler);
+      this.boundContainerListeners.push([type, handler]);
+    };
+    const modeButton = (event) => event.target.closest?.('.prompt-mode-button');
+    listen('click', (event) => {
+      const button = modeButton(event);
+      if (button) this.switchMode(button.dataset.mode);
+    });
+    listen('dblclick', (event) => {
+      const button = modeButton(event);
+      if (!button) return;
+      event.preventDefault();
+      this.enterEditMode(button, button.dataset.mode);
+    });
+    listen('contextmenu', (event) => {
+      const button = modeButton(event);
+      if (!button) return;
+      event.preventDefault();
+      this.startRightClickTimer(button.dataset.mode);
+    });
+    listen('mouseup', (event) => {
+      if (event.button === 2 && modeButton(event)) this.cancelRightClickTimer();
+    });
+    listen('mouseout', (event) => {
+      const button = modeButton(event);
+      if (button && !button.contains(event.relatedTarget)) this.cancelRightClickTimer();
+    });
+  }
+
+  /**
+   * 更新当前 Agent 上下文并切换显示
+   * @param {string} agentId 
+   * @param {Object} config 
+   */
+  async updateAgentContext(agentId, config) {
+    const contextVersion = ++this.contextVersion;
+    this.contextReady = false;
+    this.agentId = agentId;
+    this.config = config;
+    this.currentMode = config.promptMode || "original";
+
+    // 加载自定义模式名称 (这步可以异步)
+    await this.loadCustomModeNames();
+    if (contextVersion !== this.contextVersion || this.agentId !== agentId) return false;
+
+    // 更新各个子模块的上下文。调用方会串行执行上下文切换；版本检查仍用于
+    // 防止模式切换等并发操作在异步边界后继续刷新错误 Agent 的 UI。
+    if (this.originalModule) this.originalModule.updateContext(agentId, config);
+    if (this.modularModule) await this.modularModule.updateContext(agentId, config);
+    if (contextVersion !== this.contextVersion || this.agentId !== agentId) return false;
+    if (this.presetModule) await this.presetModule.updateContext(agentId, config);
+    if (contextVersion !== this.contextVersion || this.agentId !== agentId) return false;
+
+    // 三个子模块均已绑定目标 Agent 后，才允许编辑和收集保存快照。
+    this.contextReady = true;
+    this.render();
+    return true;
+  }
+
+  /**
+   * 初始化三个子模块
+   */
+  initModules() {
+    if (window.OriginalPromptModule) {
+      this.originalModule = new window.OriginalPromptModule({
+        electronAPI: this.electronAPI,
+      });
+    }
+
+    if (window.ModularPromptModule) {
+      this.modularModule = new window.ModularPromptModule({
+        electronAPI: this.electronAPI,
+      });
+    }
+
+    if (window.PresetPromptModule) {
+      this.presetModule = new window.PresetPromptModule({
+        electronAPI: this.electronAPI,
+      });
+    }
+  }
+
+  /**
+   * 渲染主界面
+   */
+  render() {
+    if (!this.containerElement) return;
+    let modeSelector = this.containerElement.querySelector(':scope > .prompt-mode-selector');
+    if (!modeSelector) {
+      modeSelector = this.createModeSelector();
+      this.containerElement.appendChild(modeSelector);
+    } else {
+      modeSelector.querySelectorAll('.prompt-mode-button').forEach((button) => {
+        const modeId = button.dataset.mode;
+        button.innerHTML = `
+          <span class="prompt-mode-button-icon" aria-hidden="true">${this.getModeIcon(modeId)}</span>
+          <span class="prompt-mode-button-label">${this.getModeName(modeId)}</span>
+        `;
+      });
+    }
+
+    let contentContainer = this.containerElement.querySelector(':scope > .prompt-content-container');
+    if (!contentContainer) {
+      contentContainer = document.createElement("div");
+      contentContainer.className = "prompt-content-container";
+      contentContainer.id = "promptContentContainer";
+      this.containerElement.appendChild(contentContainer);
+    }
+
+    // 渲染当前模式的内容
+    this.updateModeButtons();
+    this.renderCurrentMode();
+  }
+
+  /**
+   * 创建模式切换按钮
+   */
+  createModeSelector() {
+    const container = document.createElement("div");
+    container.className = "prompt-mode-selector";
+
+    const modes = [{ id: "original" }, { id: "modular" }, { id: "preset" }];
+
+    modes.forEach((mode) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "prompt-mode-button";
+      button.dataset.mode = mode.id;
+      button.innerHTML = `
+                <span class="prompt-mode-button-icon" aria-hidden="true">${this.getModeIcon(
+                  mode.id
+                )}</span>
+                <span class="prompt-mode-button-label">${this.getModeName(
+                  mode.id
+                )}</span>
+            `;
+
+      if (this.currentMode === mode.id) {
+        button.classList.add("active");
+      }
+
+      container.appendChild(button);
+    });
+
+    return container;
+  }
+
+  /**
+   * 获取模式名称（优先使用自定义名称）
+   */
+  getModeName(modeId) {
+    return this.customModeNames[modeId] || this.defaultModeNames[modeId];
+  }
+
+  getModeIcon(modeId) {
+    const icons = {
+      original: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/><path d="m8 13 4-7 4 7"/><path d="M9.1 11h5.7"/></svg>`,
+      modular: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 22V7a1 1 0 0 0-1-1H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5a1 1 0 0 0-1-1H2"/><rect x="14" y="2" width="8" height="8" rx="1"/></svg>`,
+      preset: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17h1.5"/><path d="M12 22h1.5"/><path d="M12 2h1.5"/><path d="M17.5 22H19a1 1 0 0 0 1-1"/><path d="M17.5 2H19a1 1 0 0 1 1 1v1.5"/><path d="M20 14v3h-2.5"/><path d="M20 8.5V10"/><path d="M4 10V8.5"/><path d="M4 19.5V14"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H8"/><path d="M8 22H6.5a1 1 0 0 1 0-5H8"/></svg>`,
+    };
+
+    return icons[modeId] || "";
+  }
+
+  /**
+   * 加载自定义模式名称
+   */
+  async loadCustomModeNames() {
+    try {
+      const settings = await this.electronAPI.loadSettings();
+      if (settings && settings.promptModeCustomNames) {
+        this.customModeNames = settings.promptModeCustomNames;
+      }
+    } catch (error) {
+      console.error("[PromptManager] 加载自定义模式名称失败:", error);
+    }
+  }
+
+  /**
+   * 保存自定义模式名称到全局设置
+   */
+  async saveCustomModeNames() {
+    try {
+      const settings = await this.electronAPI.loadSettings();
+      const newSettings = {
+        ...settings,
+        promptModeCustomNames: this.customModeNames,
+      };
+      await this.electronAPI.saveSettings(newSettings);
+    } catch (error) {
+      console.error("[PromptManager] 保存自定义模式名称失败:", error);
+    }
+  }
+
+  /**
+   * 进入编辑模式
+   */
+  enterEditMode(button, modeId) {
+    const currentName = button.textContent.trim();
+
+    // 创建输入框
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = currentName;
+    input.className = "prompt-mode-name-input";
+    input.style.cssText = `
+            width: 100%;
+            height: 100%;
+            border: 2px solid var(--accent-bg);
+            background: var(--button-bg);
+            color: var(--primary-text);
+            font-size: inherit;
+            font-family: inherit;
+            text-align: center;
+            padding: 0;
+            margin: 0;
+            box-sizing: border-box;
+        `;
+
+    // 替换按钮文本
+    button.textContent = "";
+    button.appendChild(input);
+    input.focus();
+    input.select();
+
+    // 保存函数
+    const saveName = async () => {
+      const newName = input.value.trim();
+      if (newName && newName !== currentName) {
+        // 保存新名称
+        this.customModeNames[modeId] = newName;
+        await this.saveCustomModeNames();
+        button.textContent = newName;
+      } else {
+        button.textContent = currentName;
+      }
+      input.remove();
+    };
+
+    // 取消函数
+    const cancel = () => {
+      button.textContent = currentName;
+      input.remove();
+    };
+
+    // 回车保存
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        saveName();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancel();
+      }
+    });
+
+    // 失去焦点保存
+    input.addEventListener("blur", saveName);
+  }
+
+  /**
+   * 开始右键长按计时器
+   */
+  startRightClickTimer(modeId) {
+    this.cancelRightClickTimer(); // 先取消之前的计时器
+
+    this.rightClickTimer = setTimeout(async () => {
+      // 恢复默认名称
+      delete this.customModeNames[modeId];
+      await this.saveCustomModeNames();
+
+      // 更新UI
+      const button = this.containerElement.querySelector(
+        `.prompt-mode-button[data-mode="${modeId}"]`
+      );
+      if (button) {
+        button.textContent = this.defaultModeNames[modeId];
+      }
+
+      // 显示提示
+      if (
+        window.uiHelperFunctions &&
+        window.uiHelperFunctions.showToastNotification
+      ) {
+        window.uiHelperFunctions.showToastNotification(
+          `已恢复模式名称为"${this.defaultModeNames[modeId]}"`,
+          "success"
+        );
+      }
+    }, this.rightClickDelay);
+  }
+
+  /**
+   * 取消右键长按计时器
+   */
+  cancelRightClickTimer() {
+    if (this.rightClickTimer) {
+      clearTimeout(this.rightClickTimer);
+      this.rightClickTimer = null;
+    }
+  }
+
+  /**
+   * 解绑容器事件监听（仅销毁时调用；正常运行期间解绑会导致模式按钮失效）
+   */
+  unbindContainerEvents() {
+    this.boundContainerListeners.forEach(([type, handler]) => {
+      this.containerElement?.removeEventListener(type, handler);
+    });
+    this.boundContainerListeners = [];
+  }
+
+  /**
+   * 切换模式
+   * @param {string} mode - 目标模式
+   */
+  async switchMode(mode) {
+    if (!["original", "modular", "preset"].includes(mode) ||
+        this.currentMode === mode || !this.agentId || !this.contextReady) return;
+
+    // 在移除编辑器 DOM 前捕获草稿，切回时不能恢复成旧的持久化内容。
+    this.captureCurrentModeDraft();
+    this.currentMode = mode;
+    this.updateModeButtons();
+    this.renderCurrentMode();
+    this.containerElement?.dispatchEvent(new CustomEvent('input', { bubbles: true }));
+  }
+
+  captureCurrentModeDraft() {
+    const module = this.currentMode === "original" ? this.originalModule
+      : this.currentMode === "preset" ? this.presetModule : null;
+    if (module?.textarea) module.cachedContent = module.textarea.value;
+    if (this.currentMode === "preset" && module?.presetSelect) {
+      module.cachedSelectedPreset = module.presetSelect.value;
+    }
+    if (this.currentMode === "preset" && module?.pathInput) {
+      module.presetPath = module.pathInput.value;
+    }
+  }
+
+  /**
+   * 更新模式按钮的激活状态
+   */
+  updateModeButtons() {
+    const buttons = this.containerElement.querySelectorAll(
+      ".prompt-mode-button"
+    );
+    buttons.forEach((button) => {
+      if (button.dataset.mode === this.currentMode) {
+        button.classList.add("active");
+      } else {
+        button.classList.remove("active");
+      }
+    });
+  }
+
+  /**
+   * 渲染当前模式的内容
+   */
+  renderCurrentMode() {
+    const contentContainer = this.containerElement?.querySelector("#promptContentContainer");
+    if (!contentContainer) return;
+
+    // 每次更换视图都撤销旧预制编辑器的异步渲染和内容加载。
+    if (this.presetModule) {
+      this.presetModule.renderVersion = (this.presetModule.renderVersion || 0) + 1;
+      this.presetModule.selectionVersion = (this.presetModule.selectionVersion || 0) + 1;
+      this.presetModule.textarea = null;
+      this.presetModule.presetSelect = null;
+      this.presetModule.pathInput = null;
+    }
+    if (this.originalModule) this.originalModule.textarea = null;
+    contentContainer.innerHTML = "";
+    contentContainer.className = `prompt-content-container ${this.currentMode}-mode`;
+
+    switch (this.currentMode) {
+      case "original":
+        if (this.originalModule) {
+          this.originalModule.render(contentContainer);
+        }
+        break;
+      case "modular":
+        if (this.modularModule) {
+          this.modularModule.render(contentContainer);
+        }
+        break;
+      case "preset":
+        if (this.presetModule) {
+          this.presetModule.render(contentContainer);
+        }
+        break;
+    }
+  }
+
+  /**
+   * 兼容旧调用方：只收集内存草稿，不执行持久化。
+   */
+  async saveCurrentModeData() {
+    this.captureCurrentModeDraft();
+  }
+
+  /**
+   * 保存按钮使用的同步快照；不得在异步等待后重新读取共享编辑器。
+   * 仅包含提示词配置，不包含话题、历史或其他数据库元数据。
+   */
+  collectDraft() {
+    if (!this.contextReady || !this.agentId) {
+      throw new Error('Agent 提示词尚未加载完成，请等待加载完成后保存。');
+    }
+    this.captureCurrentModeDraft();
+    const patch = { promptMode: this.currentMode };
+    if (this.originalModule) {
+      patch.originalSystemPrompt = this.originalModule.cachedContent;
+    }
+    if (this.presetModule) {
+      patch.presetSystemPrompt = this.presetModule.cachedContent;
+      patch.selectedPreset = this.presetModule.cachedSelectedPreset;
+      patch.presetPromptPath = this.presetModule.presetPath;
+    }
+    if (this.modularModule) {
+      const module = this.modularModule;
+      const hiddenBlocks = structuredClone(module.hiddenBlocks);
+      delete hiddenBlocks.global;
+      patch.advancedSystemPrompt = {
+        blocks: structuredClone(module.blocks),
+        hiddenBlocks,
+        warehouseOrder: [...module.warehouseOrder],
+        viewMode: module.viewMode,
+      };
+    }
+    patch.systemPrompt = this.currentMode === "original"
+      ? (patch.originalSystemPrompt ?? "")
+      : this.currentMode === "preset"
+        ? (patch.presetSystemPrompt ?? "")
+        : (this.modularModule?.getFormattedPrompt() ?? "");
+    return patch;
+  }
+
+  /**
+   * 获取当前激活的系统提示词
+   * @returns {string} 格式化后的系统提示词
+   */
+  async getCurrentSystemPrompt() {
+    switch (this.currentMode) {
+      case "original":
+        return this.originalModule ? await this.originalModule.getPrompt() : "";
+      case "modular":
+        return this.modularModule
+          ? await this.modularModule.getFormattedPrompt()
+          : "";
+      case "preset":
+        return this.presetModule ? await this.presetModule.getPrompt() : "";
+      default:
+        return "";
+    }
+  }
+
+  /**
+   * 外部接口：切换到指定模式（用于插件调用）
+   * @param {string} mode - 目标模式
+   */
+  async setMode(mode) {
+    if (["original", "modular", "preset"].includes(mode)) {
+      await this.switchMode(mode);
+    }
+  }
+
+  /**
+   * 外部接口：获取当前绑定的 Agent。
+   * @returns {string|null}
+   */
+  getAgentId() {
+    return this.agentId;
+  }
+
+  /**
+   * 外部接口：获取当前模式
+   * @returns {string} 当前模式
+   */
+  getMode() {
+    return this.currentMode;
+  }
+
+  /**
+   * 销毁管理器，清理子模块和定时器
+   */
+  destroy() {
+    this.contextReady = false;
+    ++this.contextVersion;
+    if (this.presetModule) {
+      ++this.presetModule.contextVersion;
+      this.presetModule.renderVersion = (this.presetModule.renderVersion || 0) + 1;
+    }
+    // 1. 清理子模块
+    if (this.originalModule && typeof this.originalModule.destroy === "function") {
+      this.originalModule.destroy();
+    }
+    if (this.modularModule && typeof this.modularModule.destroy === "function") {
+      this.modularModule.destroy();
+    }
+    if (this.presetModule && typeof this.presetModule.destroy === "function") {
+      this.presetModule.destroy();
+    }
+
+    // 2. 清理计时器
+    this.cancelRightClickTimer();
+
+    // 3. 解绑容器事件监听
+    this.unbindContainerEvents();
+
+    // 4. 清理 DOM 引用
+    this.containerElement = null;
+
+    // 5. 重置模块引用
+    this.originalModule = null;
+    this.modularModule = null;
+    this.presetModule = null;
+
+    console.debug(`[PromptManager] Destroyed for agent: ${this.agentId}`);
+  }
+}
+
+// 导出到全局
+window.PromptManager = PromptManager;

@@ -1,0 +1,11 @@
+{
+  "manifestVersion": "1.0.0",
+  "name": "NativeSyncDesktopRuntime",
+  "displayName": "NativeSync 桌面同步运行时",
+  "version": "1.0.0",
+  "description": "显示本机连接信息；在具备共享运行时接点的宿主上提供同步与恢复。启停在重启后生效。",
+  "pluginType": "feature",
+  "main": "index.js",
+  "defaultEnabled": true,
+  "renderer": "modules/nativeSyncDesktopRuntime/entry.js"
+}

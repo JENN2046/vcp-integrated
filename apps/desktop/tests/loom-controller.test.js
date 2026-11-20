@@ -1,0 +1,678 @@
+'use strict';
+
+const assert = require('assert');
+const loomController = require('../VCPDistributedServer/Plugin/LoomController/LoomControllerService');
+const loomManifest = require('../VCPDistributedServer/Plugin/LoomController/plugin-manifest.json');
+const webAgentProtocol = require('../modules/loom/webcore/web-agent-protocol');
+
+function createFakeManager() {
+    const calls = [];
+    const app = {
+        id: 'test-app',
+        name: '测试应用',
+        startUrl: 'https://example.com/',
+        enabled: true,
+        running: false,
+    };
+
+    return {
+        calls,
+        listApps() {
+            calls.push(['listApps']);
+            return [app];
+        },
+        listOpenApps() {
+            calls.push(['listOpenApps']);
+            return [{
+                appId: app.id,
+                name: app.name,
+                running: true,
+                url: app.startUrl,
+                loading: false,
+                error: null,
+            }];
+        },
+        async createApp(payload) {
+            calls.push(['createApp', payload]);
+            return { ...app, ...payload.manifest };
+        },
+        async openApp(appId) {
+            calls.push(['openApp', appId]);
+            return { ...app, id: appId, running: true };
+        },
+        async closeApp(appId) {
+            calls.push(['closeApp', appId]);
+            return { success: true };
+        },
+        async navigateApp(appId, action) {
+            calls.push(['navigateApp', appId, action]);
+            return {
+                appId,
+                name: app.name,
+                url: action === 'home' ? app.startUrl : `${app.startUrl}${action}`,
+                loading: false,
+                canGoBack: action !== 'back',
+                canGoForward: action !== 'forward',
+                error: null,
+                action,
+                dispatched: action !== 'forward',
+            };
+        },
+        async readSources(appId) {
+            calls.push(['readSources', appId]);
+            return {
+                manifest: { ...app, id: appId },
+                css: 'body { color: red; }',
+                js: 'console.log("ready");',
+            };
+        },
+        async readRuntimeSource(appId) {
+            calls.push(['readRuntimeSource', appId]);
+            return {
+                appId,
+                title: 'Runtime',
+                url: app.startUrl,
+                source: '<html><body>Runtime</body></html>',
+                originalByteLength: 33,
+                truncated: false,
+                capturedAt: '2026-08-01T00:00:00.000Z',
+            };
+        },
+        async readRenderedText(appId, options) {
+            calls.push(['readRenderedText', appId, options]);
+            return {
+                appId,
+                title: 'Rendered',
+                url: app.startUrl,
+                text: '已渲染文本',
+                originalByteLength: 18,
+                truncated: false,
+                capturedAt: '2026-08-01T00:00:00.000Z',
+            };
+        },
+        async getWebAgentPageInfo(appId, options) {
+            calls.push(['getWebAgentPageInfo', appId, options]);
+            return {
+                appId,
+                title: 'Agent Page',
+                url: app.startUrl,
+                markdown: '# Agent Page\n\n【搜索框 A1｜vcp-searchbox-1｜vcp-h-1-1-1-abcd1234】',
+                elementCount: 1,
+                runtimeInstanceId: 'loom-test-runtime',
+                documentGeneration: 1,
+                snapshotId: 1,
+                pageGraph: { elements: [{ handleId: 'vcp-searchbox-1' }] },
+            };
+        },
+        async executeWebAgentAction(appId, actionId, params, options) {
+            calls.push(['executeWebAgentAction', appId, actionId, params, options]);
+            if (['capture_screenshot', 'screenshot_capture', 'get_screenshot', 'screenshot'].includes(actionId)) {
+                return {
+                    appId,
+                    actionId: 'screenshot_capture',
+                    executedAt: '2026-08-06T00:00:00.000Z',
+                    response: {
+                        status: 'success',
+                        code: 'SCREENSHOT_CAPTURED',
+                        result: {
+                            code: 'SCREENSHOT_CAPTURED',
+                            result: {
+                                dataUrl: 'data:image/png;base64,c2NyZWVuc2hvdA==',
+                                mimeType: 'image/png',
+                                byteLength: 10,
+                            },
+                        },
+                    },
+                };
+            }
+            if (actionId === 'page_get_image') {
+                return {
+                    appId,
+                    actionId,
+                    executedAt: '2026-08-06T00:00:00.000Z',
+                    response: {
+                        status: 'success',
+                        code: 'COMMAND_COMPLETED',
+                        result: {
+                            code: 'PAGE_IMAGE_CAPTURED',
+                            result: {
+                                imageId: params.imageId,
+                                resolvedImageId: 'vcp-img-1-1-1-abcd1234',
+                                kind: 'content-image',
+                                caption: '测试正文图片',
+                                format: params.format || 'jpeg',
+                                outputSize: { width: 800, height: 450 },
+                                byteLength: 12,
+                                dataUrl: 'data:image/jpeg;base64,dGVzdC1pbWFnZQ==',
+                            },
+                        },
+                    },
+                };
+            }
+            return {
+                appId,
+                actionId: actionId.startsWith('page_') ? actionId : `page_${actionId}`,
+                executedAt: '2026-08-06T00:00:00.000Z',
+                response: {
+                    status: 'success',
+                    code: 'ACTION_VERIFIED',
+                    message: '输入动作已验证',
+                    result: { verified: true },
+                },
+            };
+        },
+        async editAppSources(appId, payload) {
+            calls.push(['editAppSources', appId, payload]);
+            return { ...app, id: appId, name: payload.manifest?.name || app.name, running: true };
+        },
+    };
+}
+
+function assertContentResult(result) {
+    assert(result && Array.isArray(result.content), 'result.content 应为数组');
+    assert.strictEqual(result.content[0].type, 'text');
+    assert.strictEqual(typeof result.content[0].text, 'string');
+    assert(result.details && typeof result.details === 'object');
+}
+
+async function run() {
+    const registeredCommands = loomManifest.capabilities.invocationCommands
+        .map((definition) => definition.command);
+    for (const command of [
+        'NavigateBack',
+        'NavigateForward',
+        'NavigateHome',
+        'ReloadPage',
+        'click',
+        'type',
+        'send_keys',
+        'scroll',
+        'set_value',
+        'select_option',
+        'hover',
+        'check',
+        'wait_for',
+    ]) {
+        assert(
+            registeredCommands.includes(command),
+            `LoomController 清单应注册一级命令 ${command}`
+        );
+    }
+    assert.strictEqual(
+        webAgentProtocol.resolveCommand('page_press').canonical,
+        'page_send_keys'
+    );
+    assert.strictEqual(
+        webAgentProtocol.resolveCommand('press').canonical,
+        'page_send_keys'
+    );
+
+    loomController._test.resetForTests();
+    const manager = createFakeManager();
+    loomController.initialize({
+        services: { loomManager: manager },
+        logger: console,
+    });
+
+    manager.sideBrowser = {
+        async open({ url }) {
+            return {
+                appId: 'vcpchat-browser', targetId: 'browser:1',
+                title: 'Google', url, ready: true,
+            };
+        },
+        async requestAssistance(targetId, message) {
+            return {
+                appId: 'vcpchat-browser', targetId,
+                url: 'https://www.google.com/',
+                assistance: { status: 'waiting', message },
+            };
+        },
+    };
+    const browserOpened = await loomController.processToolCall({
+        command: 'OpenVCPChatBrowser', url: 'https://www.google.com/',
+    });
+    assertContentResult(browserOpened);
+    assert(browserOpened.content[0].text.includes('\n\n- App ID：vcpchat-browser'));
+    assert(!browserOpened.content[0].text.includes('\\n'));
+    assert.strictEqual(browserOpened.details.targetId, 'browser:1');
+    assert.strictEqual(browserOpened.details.pageInfo.snapshotId, 1);
+    assert.strictEqual(browserOpened.details.pageInfoError, null);
+    assert(browserOpened.content.some(part => part.text.includes('vcp-h-1-1-1-abcd1234')));
+    const guide = browserOpened.content[1].text;
+    for (const command of ['GetPageInfo', 'click', 'type', 'RequestBrowserAssistance',
+        'target_navigate', 'execute_script', 'ExecuteAction', 'command1']) {
+        assert(guide.includes(command), `浏览器指南应包含 ${command}`);
+    }
+    for (const command of ['CreateApp', 'EditAppSources', 'CreateSkill', 'ExecuteSkill']) {
+        assert(!guide.includes(command), `浏览器指南不应包含管理命令 ${command}`);
+    }
+    assert(manager.calls.some(call => call[0] === 'getWebAgentPageInfo'
+        && call[1] === 'vcpchat-browser' && call[2].targetId === 'browser:1'));
+    for (const definition of loomManifest.capabilities.invocationCommands) {
+        assert(!definition.description.includes('<<<[TOOL_REQUEST]>>>'),
+            `${definition.command} 描述不应重复示例`);
+    }
+    const originalPageInfo = manager.getWebAgentPageInfo;
+    manager.getWebAgentPageInfo = async () => { throw new Error('模拟快照读取失败'); };
+    const snapshotFailed = await loomController.processToolCall({
+        command: 'OpenVCPChatBrowser', url: 'https://example.com/',
+    });
+    assert.strictEqual(snapshotFailed.details.targetId, 'browser:1');
+    assert.strictEqual(snapshotFailed.details.pageInfo, null);
+    assert.strictEqual(snapshotFailed.details.pageInfoError.message, '模拟快照读取失败');
+    assert(snapshotFailed.content[0].text.includes('不要重复'));
+    assert(snapshotFailed.content[1].text.includes('浏览器操作指南'));
+    manager.getWebAgentPageInfo = originalPageInfo;
+    const inheritedContext = loomController._test.extractSerialStepArgs({
+        appId: 'vcpchat-browser', targetId: 'browser:1', command1: 'click',
+        target1: 'element-handle', targetId2: 'browser:2',
+    }, 1);
+    assert.strictEqual(inheritedContext.targetId, 'browser:1');
+    assert.strictEqual(inheritedContext.target, 'element-handle');
+    assert.strictEqual(loomController._test.extractSerialStepArgs({
+        targetId: 'browser:1', targetId2: 'browser:2',
+    }, 2).targetId, 'browser:2');
+    const assistance = await loomController.processToolCall({
+        command: 'RequestBrowserAssistance', targetId: 'browser:1', message: '请手动登录',
+    });
+    assertContentResult(assistance);
+    assert(assistance.content[0].text.includes('\n\n- App ID：vcpchat-browser'));
+    assert(!assistance.content[0].text.includes('\\n'));
+
+    // 走真实分布式回包入口，确保通知之外的工具结果也保留给主服务器。
+    const DistributedServer = require('../VCPDistributedServer/VCPDistributedServer');
+    const pluginManager = require('../VCPDistributedServer/Plugin');
+    const originalProcessToolCall = pluginManager.processToolCall;
+    const originalGetPlugin = pluginManager.getPlugin;
+    const sent = [];
+    try {
+        pluginManager.processToolCall = (_name, args) => loomController.processToolCall(args);
+        pluginManager.getPlugin = () => loomManifest;
+        await DistributedServer.prototype.handleToolExecutionRequest.call({
+            handleAdmittedToolExecutionRequest: DistributedServer.prototype.handleAdmittedToolExecutionRequest,
+            serverName: 'test', debugMode: false,
+            sendMessage: payload => sent.push(JSON.parse(JSON.stringify(payload))),
+        }, {
+            requestId: 'browser-open-test', toolName: 'LoomController',
+            toolArgs: { command: 'OpenVCPChatBrowser', url: 'https://www.google.com/' },
+        });
+        assert.strictEqual(sent[0].type, 'tool_result');
+        assert.strictEqual(sent[0].data.status, 'success');
+        assert.deepStrictEqual(sent[0].data.result, browserOpened);
+        assertContentResult(sent[0].data.result);
+    } finally {
+        pluginManager.processToolCall = originalProcessToolCall;
+        pluginManager.getPlugin = originalGetPlugin;
+    }
+
+    const listed = await loomController.processToolCall({ command: 'ListApps' });
+    assertContentResult(listed);
+    assert.strictEqual(listed.details.count, 1);
+    assert(listed.content[0].text.includes('test-app'));
+
+    const openListed = await loomController.processToolCall({ action: 'ListOpenApps' });
+    assertContentResult(openListed);
+    assert.strictEqual(openListed.details.apps[0].running, true);
+
+    const created = await loomController.processToolCall({
+        command: 'CreateApp',
+        manifest: JSON.stringify({
+            id: 'created-app',
+            name: '创建应用',
+            startUrl: 'https://example.org/',
+        }),
+        css: 'body {}',
+        js: 'console.log("created");',
+    });
+    assertContentResult(created);
+    const createCall = manager.calls.find((call) => call[0] === 'createApp');
+    assert.strictEqual(createCall[1].manifest.id, 'created-app');
+    assert.strictEqual(createCall[1].css, 'body {}');
+
+    const opened = await loomController.processToolCall({
+        commandIdentifier: 'OpenApp',
+        app_id: 'test-app',
+    });
+    assertContentResult(opened);
+    assert(manager.calls.some((call) => call[0] === 'openApp' && call[1] === 'test-app'));
+
+    const closed = await loomController.processToolCall({
+        command: 'CloseApp',
+        id: 'test-app',
+    });
+    assertContentResult(closed);
+
+    const navigatedBack = await loomController.processToolCall({
+        command: 'NavigateBack',
+        appId: 'test-app',
+    });
+    assertContentResult(navigatedBack);
+    assert.strictEqual(navigatedBack.details.action, 'back');
+    assert.strictEqual(navigatedBack.details.dispatched, true);
+    assert(manager.calls.some((call) =>
+        call[0] === 'navigateApp' && call[1] === 'test-app' && call[2] === 'back'
+    ));
+
+    const navigatedForward = await loomController.processToolCall({
+        command: 'NavigateForward',
+        appId: 'test-app',
+    });
+    assertContentResult(navigatedForward);
+    assert.strictEqual(navigatedForward.details.action, 'forward');
+    assert.strictEqual(navigatedForward.details.dispatched, false);
+    assert(navigatedForward.content[0].text.includes('当前无可用历史记录'));
+
+    const navigatedHome = await loomController.processToolCall({
+        command: 'NavigateHome',
+        appId: 'test-app',
+    });
+    assertContentResult(navigatedHome);
+    assert.strictEqual(navigatedHome.details.state.url, 'https://example.com/');
+
+    const reloaded = await loomController.processToolCall({
+        command: 'ReloadPage',
+        appId: 'test-app',
+    });
+    assertContentResult(reloaded);
+    assert.strictEqual(reloaded.details.action, 'reload');
+
+    const sources = await loomController.processToolCall({
+        command: 'GetAppSources',
+        appId: 'test-app',
+    });
+    assertContentResult(sources);
+    assert(sources.content[0].text.includes('inject.css'));
+    assert(sources.content[0].text.includes('console.log'));
+
+    const runtimeSource = await loomController.processToolCall({
+        command: 'GetRuntimeSource',
+        appId: 'test-app',
+    });
+    assertContentResult(runtimeSource);
+    assert(runtimeSource.content[0].text.includes('<html>'));
+
+    const rendered = await loomController.processToolCall({
+        command: 'GetRenderedText',
+        appId: 'test-app',
+        refresh: 'false',
+    });
+    assertContentResult(rendered);
+    const renderCall = manager.calls.find((call) => call[0] === 'readRenderedText');
+    assert.deepStrictEqual(renderCall[2], { refresh: false });
+    assert(rendered.content[0].text.includes('已渲染文本'));
+
+    const pageInfo = await loomController.processToolCall({
+        command: 'GetPageInfo',
+        appId: 'test-app',
+    });
+    assertContentResult(pageInfo);
+    assert(pageInfo.content[0].text.includes('vcp-searchbox-1'));
+    assert.strictEqual(pageInfo.details.pageInfo.snapshotId, 1);
+    assert(manager.calls.some((call) =>
+        call[0] === 'getWebAgentPageInfo' && call[1] === 'test-app'
+    ));
+
+    const pageImage = await loomController.processToolCall({
+        command: 'GetPageImage',
+        appId: 'test-app',
+        imageId: 'IMG1',
+        format: 'jpeg',
+        quality: '85',
+        maxWidth: '1600',
+        snapshotId: '1',
+        documentGeneration: '1',
+        runtimeInstanceId: 'loom-test-runtime',
+        strict: 'true',
+    });
+    assert.strictEqual(pageImage.content.length, 2);
+    assert.strictEqual(pageImage.content[0].type, 'text');
+    assert(pageImage.content[0].text.includes('测试正文图片'));
+    assert.strictEqual(pageImage.content[1].type, 'image_url');
+    assert(pageImage.content[1].image_url.url.startsWith('data:image/jpeg;base64,'));
+    assert.strictEqual(pageImage.details.appId, 'test-app');
+    assert.strictEqual(pageImage.details.image.dataUrl, undefined);
+    const imageCall = manager.calls.find((call) =>
+        call[0] === 'executeWebAgentAction' && call[2] === 'page_get_image'
+    );
+    assert.strictEqual(imageCall[1], 'test-app');
+    assert.strictEqual(imageCall[3].imageId, 'IMG1');
+    assert.strictEqual(imageCall[3].snapshotId, '1');
+    assert.strictEqual(imageCall[3].quality, '85');
+    assert.deepStrictEqual(imageCall[4], { strict: true });
+
+    function assertScreenshotReceipt(receipt) {
+        const images = receipt.content.filter(part => part.type === 'image_url');
+        assert.strictEqual(images.length, 1);
+        assert.strictEqual(images[0].image_url.url, 'data:image/png;base64,c2NyZWVuc2hvdA==');
+        const text = receipt.content.filter(part => part.type === 'text').map(part => part.text).join('\n');
+        assert(!text.includes('data:image/'), '正文不能含图片载荷');
+        assert(!JSON.stringify(receipt.details).includes('c2NyZWVuc2hvdA=='), 'details不能重复携带图片');
+        assert(text.includes('image/png'), '正文应保留截图元数据');
+    }
+    assertScreenshotReceipt(await loomController.processToolCall({
+        command: 'capture_screenshot', appId: 'test-app',
+    }));
+    for (const actionId of ['capture_screenshot', 'screenshot_capture', 'get_screenshot', 'screenshot']) {
+        assertScreenshotReceipt(await loomController.processToolCall({
+            command: 'ExecuteAction', appId: 'test-app', actionId,
+        }));
+    }
+    assertScreenshotReceipt(await loomController.processToolCall({
+        appId: 'test-app', command1: 'capture_screenshot', command2: 'GetPageInfo',
+    }));
+
+    const action = await loomController.processToolCall({
+        command: 'ExecuteAction',
+        app_id: 'test-app',
+        action_id: 'type',
+        params: '{"target":"vcp-searchbox-1","text":"VCP Agent"}',
+        options: '{"strict":true}',
+    });
+    assertContentResult(action);
+    assert.strictEqual(action.details.actionId, 'page_type');
+    assert.strictEqual(action.details.response.result.verified, true);
+    const actionCall = manager.calls.find((call) =>
+        call[0] === 'executeWebAgentAction' && call[2] === 'type'
+    );
+    assert.strictEqual(actionCall[1], 'test-app');
+    assert.strictEqual(actionCall[2], 'type');
+    assert.strictEqual(actionCall[3].target, 'vcp-searchbox-1');
+    assert.deepStrictEqual(actionCall[4], { strict: true });
+
+    const legacyPress = await loomController.processToolCall({
+        command: 'ExecuteAction',
+        appId: 'test-app',
+        actionId: 'page_press',
+        params: {
+            target: 'vcp-h-1-3-9-7o6foz',
+            key: 'Enter',
+            documentGeneration: 1,
+            snapshotId: 3,
+        },
+        options: {
+            strict: true,
+            verification: true,
+        },
+    });
+    assertContentResult(legacyPress);
+    const legacyPressCall = manager.calls.filter((call) =>
+        call[0] === 'executeWebAgentAction'
+    ).at(-1);
+    assert.strictEqual(legacyPressCall[2], 'send_keys');
+    assert.strictEqual(legacyPressCall[3].keys, 'Enter');
+    assert.strictEqual(legacyPressCall[3].key, undefined);
+    assert.strictEqual(legacyPressCall[3].target, 'vcp-h-1-3-9-7o6foz');
+    assert.deepStrictEqual(legacyPressCall[4], {
+        strict: true,
+        verification: true,
+    });
+
+    const directKeys = await loomController.processToolCall({
+        command: 'send_keys',
+        appId: 'test-app',
+        target: 'vcp-searchbox-1',
+        keys: 'Enter',
+        snapshotId: '3',
+        strict: 'true',
+        verification: 'auto',
+    });
+    assertContentResult(directKeys);
+    const directKeysCall = manager.calls.filter((call) =>
+        call[0] === 'executeWebAgentAction'
+    ).at(-1);
+    assert.strictEqual(directKeysCall[2], 'send_keys');
+    assert.deepStrictEqual(directKeysCall[3], {
+        target: 'vcp-searchbox-1',
+        keys: 'Enter',
+        snapshotId: '3',
+    });
+    assert.deepStrictEqual(directKeysCall[4], {
+        strict: true,
+        verification: 'auto',
+    });
+
+    const directClick = await loomController.processToolCall({
+        command: 'click',
+        appId: 'test-app',
+        target: '登录',
+        allowFallback: 'false',
+    });
+    assertContentResult(directClick);
+    const directClickCall = manager.calls.filter((call) =>
+        call[0] === 'executeWebAgentAction'
+    ).at(-1);
+    assert.strictEqual(directClickCall[2], 'click');
+    assert.deepStrictEqual(directClickCall[3], { target: '登录' });
+    assert.deepStrictEqual(directClickCall[4], { allowFallback: false });
+
+    const serialNavigation = await loomController.processToolCall({
+        appId: 'test-app',
+        command1: 'NavigateHome',
+        command2: 'ReloadPage',
+    });
+    assertContentResult(serialNavigation);
+    assert.strictEqual(serialNavigation.details.status, 'success');
+    assert.strictEqual(serialNavigation.details.steps[0].details.action, 'home');
+    assert.strictEqual(serialNavigation.details.steps[1].details.action, 'reload');
+
+    const serialStartedAt = Date.now();
+    const serial = await loomController.processToolCall({
+        appId: 'test-app',
+        command1: 'click',
+        target1: 'vcp-h-1-12-187-1pia4ka',
+        snapshotId1: '12',
+        strict1: 'true',
+        command2: 'wait',
+        waitMs2: '5',
+        command3: 'get_page_info',
+    });
+    assertContentResult(serial);
+    assert.strictEqual(serial.details.command, 'SerialExecute');
+    assert.strictEqual(serial.details.count, 3);
+    assert.strictEqual(serial.details.steps[1].waitMs, 5);
+    assert(Date.now() - serialStartedAt >= 4);
+    assert(serial.content.some((part) => part.text.includes('vcp-searchbox-1')));
+    const serialActionCall = manager.calls.filter((call) =>
+        call[0] === 'executeWebAgentAction'
+    ).at(-1);
+    assert.strictEqual(serialActionCall[1], 'test-app');
+    assert.strictEqual(serialActionCall[2], 'click');
+    assert.strictEqual(serialActionCall[3].target, 'vcp-h-1-12-187-1pia4ka');
+    assert.strictEqual(serialActionCall[3].snapshotId, '12');
+    assert.deepStrictEqual(serialActionCall[4], { strict: true });
+
+    const callsBeforeFailure = manager.calls.length;
+    const originalExecuteAction = manager.executeWebAgentAction;
+    manager.executeWebAgentAction = async () => {
+        throw new Error('模拟动作失败');
+    };
+    const serialFailure = await loomController.processToolCall({
+        appId: 'test-app',
+        command1: 'click',
+        target1: 'vcp-button-1',
+        command2: 'get_page_info',
+    });
+    assert.strictEqual(serialFailure.details.status, 'partial_failure');
+    assert.strictEqual(serialFailure.details.failedStep.index, 1);
+    assert.strictEqual(serialFailure.details.stopped, true);
+    manager.executeWebAgentAction = originalExecuteAction;
+    assert.strictEqual(
+        manager.calls.slice(callsBeforeFailure).some((call) =>
+            call[0] === 'getWebAgentPageInfo'
+        ),
+        false
+    );
+
+    const edited = await loomController.processToolCall({
+        command: 'EditAppSources',
+        appId: 'test-app',
+        manifest: '{"name":"新名称","viewport":{"width":430}}',
+        js: '',
+    });
+    assertContentResult(edited);
+    const editCall = manager.calls.find((call) => call[0] === 'editAppSources');
+    assert.strictEqual(editCall[2].manifest.viewport.width, 430);
+    assert.strictEqual(editCall[2].css, undefined);
+    assert.strictEqual(editCall[2].js, '');
+
+    await assert.rejects(
+        () => loomController.processToolCall({ command: 'OpenApp' }),
+        /缺少必需参数 appId/
+    );
+    await assert.rejects(
+        () => loomController.processToolCall({
+            command: 'CreateApp',
+            manifest: '[]',
+        }),
+        /manifest 不是有效的 JSON 对象/
+    );
+    await assert.rejects(
+        () => loomController.processToolCall({ command: 'Unknown' }),
+        /不支持的 command/
+    );
+    await assert.rejects(
+        () => loomController.processToolCall({
+            command: 'GetPageImage',
+            appId: 'test-app',
+        }),
+        /缺少必需参数 imageId/
+    );
+    await assert.rejects(
+        () => loomController.processToolCall({
+            command: 'ExecuteAction',
+            appId: 'test-app',
+        }),
+        /缺少必需参数 actionId/
+    );
+    await assert.rejects(
+        () => loomController.processToolCall({
+            command: 'ExecuteAction',
+            appId: 'test-app',
+            actionId: 'click',
+            params: '[]',
+        }),
+        /params 不是有效的 JSON 对象/
+    );
+    const invalidWait = await loomController.processToolCall({
+        appId: 'test-app',
+        command1: 'wait',
+        waitMs1: '-1',
+    });
+    assert.strictEqual(invalidWait.details.status, 'partial_failure');
+    assert.match(invalidWait.details.failedStep.error, /wait 时长必须是非负数/);
+    await assert.rejects(
+        () => loomController.processToolCall({
+            command: 'EditAppSources',
+            appId: 'test-app',
+        }),
+        /至少需要 manifest、css 或 js/
+    );
+
+    console.log('loom-controller.test.js: all assertions passed');
+}
+
+run().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+});

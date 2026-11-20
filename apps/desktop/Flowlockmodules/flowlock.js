@@ -1,0 +1,976 @@
+// Flowlockmodules/flowlock.js
+// 心流锁模块 - 多 Agent 并发自动续写状态机
+// 每个 Agent 最多持有一个活动 Session，绑定到一个 Topic。
+// 多个 Agent 可并行运行，互不阻塞主界面导航。
+
+console.log('[Flowlock] Module loaded (multi-session architecture).');
+
+class FlowlockManager {
+    constructor() {
+        /** @type {Map<string, FlowlockSession>} agentId -> Session */
+        this.sessions = new Map();
+        this.electronAPI = null;
+        this.uiHelper = null;
+        this.globalSettingsRef = null;
+        this.continueWritingForContext = null;
+        this.claimedRequestIds = new Set();
+    }
+
+    /**
+     * 初始化心流锁管理器
+     * @param {Object} refs - 依赖引用
+     */
+    initialize(refs) {
+        if (!refs.electronAPI || !refs.uiHelper) {
+            console.error('[Flowlock] Initialization failed: Missing required references.');
+            return;
+        }
+
+        this.electronAPI = refs.electronAPI;
+        this.uiHelper = refs.uiHelper;
+        this.globalSettingsRef = refs.globalSettingsRef || null;
+        this.continueWritingForContext = refs.continueWritingForContext || null;
+
+        console.log('[Flowlock] Initialized successfully (multi-session).');
+    }
+
+    /**
+     * 获取用于界面提示的 Agent 名称。
+     * Session 缓存优先，避免后台 Agent 停止时依赖当前可见聊天；
+     * 配置读取失败时保留 ID 作为安全回退。
+     * @param {string} agentId
+     * @param {string|null} preferredName
+     * @returns {Promise<string>}
+     */
+    async resolveAgentDisplayName(agentId, preferredName = null) {
+        const normalize = value => typeof value === 'string' && value.trim() ? value.trim() : null;
+        const preferred = normalize(preferredName);
+        if (preferred) return preferred;
+
+        const sessionName = normalize(this.sessions.get(agentId)?.agentName);
+        if (sessionName) return sessionName;
+
+        const currentItem = window.VCPMainChatState?.snapshot?.()?.selectedItem;
+        if (currentItem?.id === agentId) {
+            const currentName = normalize(currentItem.name);
+            if (currentName) return currentName;
+        }
+
+        try {
+            const config = await this.electronAPI?.getAgentConfig?.(agentId);
+            const configName = normalize(config?.name);
+            if (configName) return configName;
+        } catch (error) {
+            console.warn(`[Flowlock] Failed to resolve display name for agent ${agentId}:`, error);
+        }
+
+        return agentId;
+    }
+
+    /**
+     * 启动心流锁
+     * @param {string} agentId - Agent ID
+     * @param {string} topicId - Topic ID
+     * @param {Object} options - { startImmediately, prompt, delaySeconds }
+     */
+    async start(agentId, topicId, options = {}) {
+        // 兼容旧接口 start(agentId, topicId, startImmediately)。
+        if (typeof options === 'boolean') {
+            options = { startImmediately: options };
+        }
+
+        if (!agentId || !topicId) {
+            console.error('[Flowlock] start() requires agentId and topicId.');
+            return { success: false, message: '缺少 agentId 或 topicId' };
+        }
+
+        // 如果该 Agent 已有活动 Session，先停止旧的
+        if (this.sessions.has(agentId)) {
+            console.log(`[Flowlock] Agent ${agentId} already has an active session, stopping old one.`);
+            await this.stop(agentId);
+        }
+
+        const {
+            startImmediately = false,
+            prompt = null,
+            delaySeconds = null,
+            agentName: preferredAgentName = null
+        } = options;
+
+        const agentName = await this.resolveAgentDisplayName(agentId, preferredAgentName);
+        const globalSettings = this.globalSettingsRef?.get?.() || {};
+        const defaultDelay = delaySeconds ?? globalSettings.flowlockContinueDelay ?? 5;
+
+        const session = {
+            agentId,
+            agentName,
+            topicId,
+            status: 'active',
+            generation: 0,
+            activeMessageId: null,
+            pendingTimer: null,
+            round: 0,
+            retryCount: 0,
+            maxRetries: 3,
+            defaultDelaySeconds: defaultDelay,
+            nextDelaySeconds: null,
+            defaultPrompt: prompt,
+            nextPrompt: null,
+            startedAt: Date.now(),
+            lastTriggeredAt: null,
+            lastCompletedAt: null,
+            nextHeartbeatAt: null,
+            lastControlMessageId: null,
+            lastError: null,
+            completionReason: null
+        };
+
+        this.sessions.set(agentId, session);
+
+        console.log(`[Flowlock] Started for agent: ${agentId}, topic: ${topicId}`);
+
+        // 更新侧栏与当前聊天标题状态动画
+        this.updateSidebarIndicator(agentId, true);
+        this.updateCurrentHeaderIndicator(agentId, true);
+
+        // 显示通知
+        if (this.uiHelper?.showToastNotification) {
+            this.uiHelper.showToastNotification(`Agent "${agentName}" 心流锁已启动`, 'success');
+        }
+
+        // 如果需要立即开始续写
+        if (startImmediately) {
+            this.scheduleNextRound(agentId, 500);
+        }
+
+        return { success: true, message: '心流锁已启动' };
+    }
+
+    /**
+     * 停止指定 Agent 的心流锁
+     * @param {string} [agentId]
+     * @param {Object} [options] - { silent?: boolean }
+     */
+    async stop(agentId, options = {}) {
+        if (typeof agentId === 'object' && agentId !== null) {
+            options = agentId;
+            agentId = null;
+        }
+
+        // 兼容旧插件 stop()：优先停止当前可见 Agent，不再错误地停止其他并发 Session。
+        const resolvedAgentId = agentId || window.VCPMainChatState?.snapshot?.()?.selectedItem?.id;
+        const session = this.sessions.get(resolvedAgentId);
+        agentId = resolvedAgentId;
+        if (!session) {
+            console.log(`[Flowlock] No active session for agent: ${agentId}`);
+            return { success: false, message: '心流锁未运行' };
+        }
+
+        // 取消待执行的定时器
+        if (session.pendingTimer) {
+            clearTimeout(session.pendingTimer);
+            session.pendingTimer = null;
+        }
+
+        // 增加 generation 防止旧 timer 复活
+        session.generation++;
+        session.status = 'stopped';
+        session.completionReason = session.completionReason || 'manual_stop';
+
+        console.log(`[Flowlock] Stopped for agent: ${agentId}`);
+
+        // 更新侧栏与当前聊天标题状态动画
+        this.updateSidebarIndicator(agentId, false);
+        this.updateCurrentHeaderIndicator(agentId, false);
+
+        // 显示通知。优先使用 Session 启动时缓存的名称，确保后台 Agent
+        // 不会因当前界面已切换而退化成 UUID。
+        const agentName = await this.resolveAgentDisplayName(agentId, session.agentName);
+        if (!options.silent && this.uiHelper?.showToastNotification) {
+            this.uiHelper.showToastNotification(`Agent "${agentName}" 心流锁已停止`, 'info');
+        }
+
+        // Name lookup may yield while a replacement Session is installed.
+        if (this.sessions.get(agentId) === session) this.sessions.delete(agentId);
+        return { success: true, message: '心流锁已停止' };
+    }
+
+    /**
+     * 停止所有心流锁
+     */
+    async stopAll() {
+        const agentIds = Array.from(this.sessions.keys());
+        for (const agentId of agentIds) {
+            await this.stop(agentId);
+        }
+    }
+
+    /**
+     * 在最终回复边界认领 TopicSponsor 创建的请求，并原子交接唯一 Session。
+     * 主进程是请求状态真源；前端只消费主进程返回的可信 claim。
+     */
+    async claimAndHandoffPendingTopic(agentId, constraints = {}) {
+        if (!agentId || !this.electronAPI?.claimPendingFlowlockTopic) {
+            return { success: false, code: 'UNAVAILABLE' };
+        }
+
+        const result = await this.electronAPI.claimPendingFlowlockTopic(agentId, constraints);
+        if (!result?.success) {
+            if (result?.code === 'CONFLICT') {
+                console.error(`[Flowlock] Multiple pending requests for ${agentId}; handoff rejected.`, result.conflicts);
+                this.uiHelper?.showToastNotification?.(
+                    `Agent "${agentId}" 存在多个待认领 Flowlock 话题，已拒绝自动交接`,
+                    'warning'
+                );
+            }
+            return result || { success: false, code: 'CLAIM_FAILED' };
+        }
+
+        const claim = result.claim;
+        if (!claim?.requestId || this.claimedRequestIds.has(claim.requestId)) {
+            return { success: false, code: 'DUPLICATE_CLAIM' };
+        }
+        this.claimedRequestIds.add(claim.requestId);
+
+        try {
+            await this.handoffToClaim(claim);
+            return { success: true, claim };
+        } catch (error) {
+            this.claimedRequestIds.delete(claim.requestId);
+            console.error(`[Flowlock] Failed to create session for claimed request ${claim.requestId}:`, error);
+            await this.electronAPI.restoreFlowlockClaim?.(
+                agentId,
+                claim.requestId,
+                `session_creation_failed:${error.message}`
+            );
+            return { success: false, code: 'HANDOFF_FAILED', error: error.message };
+        }
+    }
+
+    async handoffToClaim(claim) {
+        const { agentId, topicId, heartbeatSeconds, prompt, requestId } = claim;
+        if (!agentId || !topicId) {
+            throw new Error('认领结果缺少 agentId 或 topicId');
+        }
+
+        const existing = this.sessions.get(agentId);
+        if (!existing) {
+            const started = await this.start(agentId, topicId, {
+                startImmediately: false,
+                delaySeconds: heartbeatSeconds,
+                prompt
+            });
+            if (!started?.success) throw new Error(started?.message || 'Session 创建失败');
+            const created = this.sessions.get(agentId);
+            created.claimRequestId = requestId;
+            created.nextPrompt = prompt || null;
+            created.nextDelaySeconds = heartbeatSeconds;
+            this.scheduleNextRound(agentId, heartbeatSeconds * 1000);
+            return;
+        }
+
+        // 最终消息已经落盘后才调用本方法，因此可以安全结束本轮并迁移。
+        if (existing.pendingTimer) {
+            clearTimeout(existing.pendingTimer);
+            existing.pendingTimer = null;
+        }
+        existing.generation++;
+        existing.contextCompactionLease = null;
+        existing.relayAdmissionToken = null;
+        existing.topicId = topicId;
+        existing.status = 'active';
+        existing.activeMessageId = null;
+        existing.round = 0;
+        existing.retryCount = 0;
+        existing.lastError = null;
+        existing.completionReason = null;
+        existing.claimRequestId = requestId;
+        existing.defaultDelaySeconds = heartbeatSeconds;
+        existing.nextDelaySeconds = heartbeatSeconds;
+        existing.defaultPrompt = prompt || null;
+        existing.nextPrompt = prompt || null;
+        existing.nextHeartbeatAt = null;
+        this.updateSidebarIndicator(agentId, true);
+        this.updateCurrentHeaderIndicator(agentId, true);
+        this.scheduleNextRound(agentId, heartbeatSeconds * 1000);
+
+        console.log(`[Flowlock] Agent ${agentId} handed off to topic ${topicId}, request ${requestId}.`);
+        this.uiHelper?.showToastNotification?.(
+            `Agent "${agentId}" 心流锁已交接到新话题`,
+            'success'
+        );
+    }
+
+    /**
+     * 页面重载后显式恢复 pending 请求。每个 Agent 仍由主进程执行唯一候选校验。
+     */
+    async recoverPendingRequests() {
+        if (!this.electronAPI?.listPendingFlowlockTopics) return;
+        const result = await this.electronAPI.listPendingFlowlockTopics();
+        if (!result?.success || !Array.isArray(result.requests)) return;
+
+        const byAgent = new Map();
+        for (const request of result.requests) {
+            const list = byAgent.get(request.agentId) || [];
+            list.push(request);
+            byAgent.set(request.agentId, list);
+        }
+
+        for (const [agentId, requests] of byAgent) {
+            if (requests.length !== 1) {
+                console.warn(`[Flowlock] Recovery conflict for ${agentId}: ${requests.length} pending requests.`);
+                continue;
+            }
+            await this.claimAndHandoffPendingTopic(agentId, { requestId: requests[0].requestId });
+        }
+    }
+
+    /**
+     * 处理消息完成事件 - 核心入口
+     * 由 renderer.js 的流结束事件调用
+     * @param {Object} event - { type, messageId, context, content, finishReason, error }
+     */
+    async handleFinalizedMessage(event) {
+        const { type, messageId, context, content, finishReason, error } = event;
+
+        if (!context || !context.agentId || !context.topicId || context.isGroupMessage) {
+            return;
+        }
+
+        const suspendedSession = this.sessions.get(context.agentId);
+        if (suspendedSession?.contextCompactionLease && suspendedSession.topicId === context.topicId) {
+            if (!suspendedSession.activeMessageId || suspendedSession.activeMessageId === messageId) {
+                suspendedSession.lastCompletedAt = Date.now();
+                suspendedSession.activeMessageId = null;
+            }
+            return;
+        }
+
+        // A truncated reply is durable partial content, never a task-complete
+        // boundary. Leave Sponsor requests pending and stop this native session
+        // without parsing control commands or scheduling an automatic retry.
+        const nativeReviewRequired = typeof context.admissionToken === 'string' && context.admissionToken
+            && (type === 'error' || finishReason === 'error' || finishReason === 'failed');
+        if (finishReason === 'length' || nativeReviewRequired) {
+            const session = this.sessions.get(context.agentId);
+            if (session?.status === 'active' && session.topicId === context.topicId
+                && typeof messageId === 'string' && messageId
+                && session.activeMessageId === messageId) {
+                session.activeMessageId = null;
+                session.completionReason = nativeReviewRequired ? 'native_review_required' : 'model_length';
+                session.lastError = nativeReviewRequired
+                    ? (error?.code || error?.message || error || 'NATIVE_EXECUTION_REVIEW_REQUIRED')
+                    : 'MODEL_RESPONSE_TRUNCATED';
+                await this.stop(context.agentId, { silent: true });
+            }
+            return;
+        }
+
+        const isUpstreamError = typeof content === 'string' && /^\s*\[ERROR\]/i.test(content);
+
+        // TopicSponsor 请求只能在当前 assistant 最终回复完整落盘后认领。
+        // 错误完成不消费请求，保留为 pending 供后续明确恢复。
+        if (type !== 'error' && finishReason !== 'error' && !isUpstreamError) {
+            const handoff = await this.claimAndHandoffPendingTopic(context.agentId);
+            if (handoff?.success) {
+                return;
+            }
+        }
+
+        const protocol = type !== 'error' && finishReason !== 'error' && !isUpstreamError && typeof content === 'string'
+            ? window.flowlockProtocol?.parse(content)
+            : null;
+
+        let session = this.sessions.get(context.agentId);
+
+        // AI 可在普通回复末尾自主进入心流锁；消息 context 是唯一可信身份来源。
+        // 若为上游报错则绝不启动心流锁。
+        if (!isUpstreamError && (!session || session.status !== 'active') && protocol?.shouldStart) {
+            await this.start(context.agentId, context.topicId, { startImmediately: false });
+            session = this.sessions.get(context.agentId);
+        }
+
+        if (!session || session.status !== 'active') {
+            return;
+        }
+
+        // 只处理属于当前 Session 绑定 Topic 的消息
+        if (context.topicId !== session.topicId) {
+            return;
+        }
+
+        // 只处理由本 Session 触发的活动消息
+        // （避免普通用户消息或其他来源的消息误触发下一轮）
+        if (session.activeMessageId && messageId !== session.activeMessageId) {
+            return;
+        }
+
+        session.lastCompletedAt = Date.now();
+        session.activeMessageId = null;
+
+        // 如果收到类似 [ERROR] 开头的上游回复报错（如代理服务器连接上游API失败、达到重试上限等）
+        // 自动中断心流锁，避免无休止重试刷屏
+        if (isUpstreamError) {
+            const errorSummary = content.trim();
+            console.error(`[Flowlock] Agent ${context.agentId} received upstream error reply, aborting flowlock:`, errorSummary.substring(0, 100));
+            session.completionReason = 'upstream_error';
+            session.lastError = errorSummary;
+
+            const agentName = await this.resolveAgentDisplayName(context.agentId, session.agentName);
+            if (this.uiHelper?.showToastNotification) {
+                this.uiHelper.showToastNotification(
+                    `Agent "${agentName}" 收到上游回复报错，心流锁已自动中断`,
+                    'error'
+                );
+            }
+            await this.stop(context.agentId, { silent: true });
+            return;
+        }
+
+        // 如果是错误完成
+        if (type === 'error' || finishReason === 'error') {
+            session.lastError = error || 'Unknown error';
+            session.retryCount++;
+
+            if (session.retryCount >= session.maxRetries) {
+                console.error(`[Flowlock] Agent ${context.agentId} max retries reached (${session.retryCount}/${session.maxRetries}), stopping.`);
+                if (this.uiHelper?.showToastNotification) {
+                    this.uiHelper.showToastNotification(
+                        `Agent "${context.agentId}" 心流锁续写失败次数过多，已自动停止`,
+                        'error'
+                    );
+                }
+                session.completionReason = 'max_retries_exceeded';
+                await this.stop(context.agentId);
+                return;
+            }
+
+            console.log(`[Flowlock] Agent ${context.agentId} error, retry ${session.retryCount}/${session.maxRetries}`);
+            if (this.uiHelper?.showToastNotification) {
+                this.uiHelper.showToastNotification(
+                    `Agent "${context.agentId}" 续写失败，正在重试 (${session.retryCount}/${session.maxRetries})`,
+                    'warning'
+                );
+            }
+
+            // 错误重试使用默认延迟
+            this.scheduleNextRound(context.agentId, session.defaultDelaySeconds * 1000);
+            return;
+        }
+
+        // 正常完成 - 解析 AI 输出中的控制协议
+        session.retryCount = 0; // 重置重试计数
+
+        if (protocol && protocol.hasCommands) {
+                // 处理终端命令（优先级：Fail > Complete > Stop）
+                if (protocol.terminalType === 'fail') {
+                    console.log(`[Flowlock] Agent ${context.agentId} reported failure: ${protocol.failReason || '(no reason)'}`);
+                    session.completionReason = 'agent_fail';
+                    session.lastError = protocol.failReason || null;
+                    await this.stop(context.agentId);
+                    return;
+                }
+
+                if (protocol.terminalType === 'complete') {
+                    console.log(`[Flowlock] Agent ${context.agentId} reported task complete.`);
+                    session.completionReason = 'agent_complete';
+                    await this.stop(context.agentId);
+                    return;
+                }
+
+                if (protocol.terminalType === 'stop') {
+                    console.log(`[Flowlock] Agent ${context.agentId} requested stop.`);
+                    session.completionReason = 'agent_stop';
+                    await this.stop(context.agentId);
+                    return;
+                }
+
+                // 处理 NextHeartbeat
+                if (protocol.nextHeartbeatSeconds !== null) {
+                    session.nextDelaySeconds = protocol.nextHeartbeatSeconds;
+                    console.log(`[Flowlock] Agent ${context.agentId} next heartbeat in ${protocol.nextHeartbeatSeconds}s`);
+                }
+
+                // 处理 NextPrompt
+                if (protocol.nextPrompt !== null) {
+                    session.nextPrompt = protocol.nextPrompt;
+                    console.log(`[Flowlock] Agent ${context.agentId} next prompt set (${protocol.nextPrompt.length} chars)`);
+                }
+
+                // 如果有 Start 命令但没有终端命令，维持运行
+                if (protocol.shouldStart) {
+                    // AI 明确要求启动心流锁，确保 Session 保持活动
+                    console.log(`[Flowlock] Agent ${context.agentId} requested start, maintaining session.`);
+                }
+            }
+
+        // 安排下一轮
+        const delayMs = (session.nextDelaySeconds ?? session.defaultDelaySeconds) * 1000;
+        this.scheduleNextRound(context.agentId, delayMs);
+    }
+
+    /**
+     * Compression owns scheduling priority without releasing the Agent/topic lock.
+     * A lease is tied to session identity and generation, so stop/restart/handoff
+     * cannot be undone by a late compression response.
+     */
+    suspendForContextCompaction(agentId, topicId) {
+        const session = this.sessions.get(agentId);
+        if (!session || session.status !== 'active' || session.topicId !== topicId) return null;
+        if (session.contextCompactionLease) return session.contextCompactionLease;
+        if (session.pendingTimer) clearTimeout(session.pendingTimer);
+        session.pendingTimer = null;
+        session.nextHeartbeatAt = null;
+        session.generation++;
+        const lease = Object.freeze({ session, agentId, topicId, generation: session.generation });
+        session.contextCompactionLease = lease;
+        session.relayAdmissionToken = null;
+        return lease;
+    }
+
+    markRelaySuspension(lease, token) {
+        const session = lease && this.sessions.get(lease.agentId);
+        if (!session || session.contextCompactionLease !== lease
+            || session.generation !== lease.generation || session.status !== 'active') return false;
+        session.relayAdmissionToken = token;
+        return true;
+    }
+
+    adoptRelayMessage(agentId, topicId, messageId, relayFrom) {
+        const session = this.sessions.get(agentId);
+        const lease = session?.contextCompactionLease;
+        if (!relayFrom || session?.relayAdmissionToken !== relayFrom
+            || !lease || session.status !== 'active' || session.topicId !== topicId
+            || lease.session !== session || lease.generation !== session.generation) return false;
+        if (typeof messageId !== 'string' || !messageId) return false;
+        session.activeMessageId = messageId;
+        session.relayAdmissionToken = null;
+        session.contextCompactionLease = null;
+        session.lastError = null;
+        return true;
+    }
+
+    resumeAfterContextCompaction(lease) {
+        if (!lease) return false;
+        const session = this.sessions.get(lease.agentId);
+        if (session !== lease.session || session.status !== 'active'
+            || session.topicId !== lease.topicId || session.generation !== lease.generation
+            || session.contextCompactionLease !== lease) return false;
+        session.contextCompactionLease = null;
+        session.relayAdmissionToken = null;
+        session.lastError = null;
+        if (!session.activeMessageId) {
+            this.scheduleNextRound(session.agentId,
+                (session.nextDelaySeconds ?? session.defaultDelaySeconds) * 1000);
+        }
+        return true;
+    }
+
+    /**
+     * 安排下一轮续写
+     * @param {string} agentId
+     * @param {number} delayMs - 延迟毫秒
+     */
+    scheduleNextRound(agentId, delayMs) {
+        const session = this.sessions.get(agentId);
+        if (!session || session.status !== 'active' || session.contextCompactionLease) return;
+
+        // 取消已有的定时器
+        if (session.pendingTimer) {
+            clearTimeout(session.pendingTimer);
+        }
+
+        const currentGeneration = session.generation;
+        session.nextHeartbeatAt = Date.now() + delayMs;
+
+        session.pendingTimer = setTimeout(async () => {
+            // 检查 generation 防止旧 timer 复活
+            if (session.generation !== currentGeneration) {
+                console.log(`[Flowlock] Agent ${agentId} timer expired but generation changed, skipping.`);
+                return;
+            }
+
+            await this.triggerRound(agentId);
+        }, delayMs);
+
+        console.log(`[Flowlock] Agent ${agentId} next round scheduled in ${delayMs}ms`);
+    }
+
+    /**
+     * 触发一轮续写
+     * @param {string} agentId
+     */
+    async triggerRound(agentId) {
+        const session = this.sessions.get(agentId);
+        if (!session || session.status !== 'active' || session.contextCompactionLease) return;
+
+        // 检查续写函数是否可用
+        if (!this.continueWritingForContext) {
+            console.error('[Flowlock] continueWritingForContext function not available.');
+            session.completionReason = 'no_continue_function';
+            await this.stop(agentId);
+            return;
+        }
+
+        session.round++;
+        session.lastTriggeredAt = Date.now();
+
+        // 确定提示词：优先使用 nextPrompt，其次 defaultPrompt
+        let prompt = session.nextPrompt;
+        if (prompt === null || prompt === undefined) {
+            prompt = session.defaultPrompt;
+        }
+
+        // 生成消息 ID
+        const messageId = `flowlock_${agentId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        session.activeMessageId = messageId;
+        session.lastControlMessageId = messageId;
+
+        // 消费一次性的 nextPrompt 和 nextDelaySeconds
+        session.nextPrompt = null;
+        session.nextDelaySeconds = null;
+
+        console.log(`[Flowlock] Agent ${agentId} triggering round ${session.round}, messageId: ${messageId}`);
+
+        // 更新侧栏与当前聊天标题心跳动画
+        this.triggerSidebarHeartbeat(agentId);
+        this.triggerCurrentHeaderHeartbeat(agentId);
+
+        try {
+            await this.continueWritingForContext({
+                agentId: session.agentId,
+                topicId: session.topicId,
+                prompt: prompt || '',
+                messageId: messageId,
+                isCurrent: () => this.sessions.get(agentId) === session
+                    && session.status === 'active' && session.activeMessageId === messageId
+                    && !session.contextCompactionLease
+            });
+        } catch (error) {
+            if (this.sessions.get(agentId) !== session || session.status !== 'active') return;
+            if (['TOPIC_BUSY', 'MESSAGES_PENDING'].includes(error?.code)) {
+                session.activeMessageId = null;
+                session.nextPrompt = prompt;
+                session.round = Math.max(0, session.round - 1);
+                this.scheduleNextRound(agentId, session.defaultDelaySeconds * 1000);
+                return;
+            }
+            if (error?.flowlockReviewRequired || error?.code === 'MODEL_RESPONSE_INCOMPLETE_REVIEW_REQUIRED') {
+                session.lastError = error?.code || error?.message || 'NATIVE_EXECUTION_REVIEW_REQUIRED';
+                session.completionReason = 'native_review_required';
+                await this.stop(agentId, { silent: true });
+                return;
+            }
+            console.error(`[Flowlock] Agent ${agentId} continue writing failed (topic=${session.topicId}, round=${session.round}, messageId=${messageId}):`, error);
+            session.lastError = error?.message || String(error);
+            session.activeMessageId = null;
+
+            if (session.contextCompactionLease) {
+                session.nextPrompt = prompt;
+                this.uiHelper?.showToastNotification?.('上下文压缩未完成，心流心跳保持挂起，请重试压缩后恢复', 'warning');
+                return;
+            }
+
+            // 走错误重试逻辑
+            session.retryCount++;
+            if (session.retryCount >= session.maxRetries) {
+                session.completionReason = 'max_retries_exceeded';
+                console.error(`[Flowlock] Agent ${agentId} max retries reached (${session.retryCount}/${session.maxRetries}), stopping:`, session.lastError);
+                this.uiHelper?.showToastNotification?.(
+                    `Agent "${session.agentName || agentId}" 心流锁续写失败次数过多，已自动停止，请查看控制台错误`,
+                    'error'
+                );
+                await this.stop(agentId, { silent: true });
+                return;
+            }
+
+            // 重试：保留原始异常，并记录重试次数，避免心跳失败无迹可查。
+            console.warn(`[Flowlock] Agent ${agentId} heartbeat retry ${session.retryCount}/${session.maxRetries} in ${session.defaultDelaySeconds}s:`, error);
+            this.scheduleNextRound(agentId, session.defaultDelaySeconds * 1000);
+        }
+    }
+
+    /**
+     * 设置自定义提示词
+     * @param {string} agentId
+     * @param {string} prompt
+     */
+    setCustomPrompt(agentId, prompt) {
+        const session = this.sessions.get(agentId);
+        if (!session) {
+            console.warn(`[Flowlock] Cannot set prompt: no active session for ${agentId}`);
+            return;
+        }
+        session.nextPrompt = prompt;
+        console.log(`[Flowlock] Agent ${agentId} next prompt set: ${prompt?.substring(0, 50)}...`);
+    }
+
+    /**
+     * 设置下一轮心跳延迟
+     * @param {string} agentId
+     * @param {number} seconds
+     */
+    setNextHeartbeat(agentId, seconds) {
+        const session = this.sessions.get(agentId);
+        if (!session) return;
+        session.nextDelaySeconds = Math.max(1, Math.min(86400, parseInt(seconds, 10) || session.defaultDelaySeconds));
+        console.log(`[Flowlock] Agent ${agentId} next heartbeat set to ${session.nextDelaySeconds}s`);
+    }
+
+    /**
+     * 检查 Agent 是否处于锁状态
+     */
+    isAgentLocked(agentId) {
+        const session = this.sessions.get(agentId);
+        return !!(session && session.status === 'active');
+    }
+
+    /**
+     * 检查指定 Topic 是否是某个 Agent 的锁定 Topic
+     */
+    isTopicLocked(agentId, topicId) {
+        const session = this.sessions.get(agentId);
+        return !!(session && session.status === 'active' && session.topicId === topicId);
+    }
+
+    /**
+     * 获取 Agent 的锁定 Topic ID
+     */
+    getLockedTopicId(agentId) {
+        const session = this.sessions.get(agentId);
+        return (session && session.status === 'active') ? session.topicId : null;
+    }
+
+    /**
+     * 获取所有活动 Agent 的列表
+     */
+    getActiveAgents() {
+        const result = [];
+        for (const [agentId, session] of this.sessions) {
+            if (session.status === 'active') {
+                result.push({
+                    agentId,
+                    topicId: session.topicId,
+                    round: session.round,
+                    startedAt: session.startedAt,
+                    nextHeartbeatAt: session.nextHeartbeatAt
+                });
+            }
+        }
+        return result;
+    }
+
+    // Local object identity never crosses IPC. Reopened previews cannot bind a
+    // new Session to an old Work, and a late receipt cannot replace a Session.
+    captureSharedSession(agentId, topicId) {
+        const session=this.sessions.get(agentId);
+        if(session?.status!=='active'||session.topicId!==topicId)return null;
+        session.sharedCaptureOrdinal=(session.sharedCaptureOrdinal||0)+1;
+        return {session,agentId,topicId,ordinal:session.sharedCaptureOrdinal};
+    }
+
+    bindSharedExecution(capture, {executionId,requestId,messageId}={}) {
+        const session=capture&&this.sessions.get(capture.agentId);
+        if(!session||session!==capture.session||session.status!=='active'||session.topicId!==capture.topicId
+            ||typeof executionId!=='string'||!executionId||typeof requestId!=='string'||!requestId
+            ||!Number.isSafeInteger(capture.ordinal)||capture.ordinal<(session.sharedAcceptedOrdinal||0)
+            ||messageId!=='reply_'+executionId||(session.activeMessageId&&session.activeMessageId!==messageId))return false;
+        session.sharedAcceptedOrdinal=capture.ordinal;
+        session.sharedExecution={executionId,requestId,messageId};return true;
+    }
+
+    async handleSharedSessionStatus(change) {
+        const topic=change?.topic;
+        if(topic?.ownerType!=='agent')return;
+        const session=this.sessions.get(topic.ownerId),binding=session?.sharedExecution;
+        if(!session||session.status!=='active'||session.topicId!==topic.topicId||!binding)return;
+        for(const value of change.serverSession?[change.serverSession]:change.serverSessions||[]){
+            const p=value.partialResult;
+            if(value.executionId!==binding.executionId||p?.executionId!==binding.executionId||p.version!==1||p.kind!=='length'
+                ||p.finishReason!=='length'||p.committed!==false||p.source!=='pending_operation'
+                ||p.sharedId!==value.sharedId||p.sharedSpaceId!==value.sharedSpaceId
+                ||p.requestId!==binding.requestId||p.userMessageId!==binding.requestId||p.messageId!==binding.messageId
+                ||value.request?.id!==binding.executionId||value.native?.id!==binding.executionId
+                ||value.request.state!=='review_required'||value.native.state!=='review_required'
+                ||session.activeMessageId&&session.activeMessageId!==binding.messageId
+                ||this.sessions.get(topic.ownerId)!==session)continue;
+            session.activeMessageId=null;session.completionReason='model_length';session.lastError='MODEL_RESPONSE_TRUNCATED';
+            await this.stop(topic.ownerId,{silent:true});return;
+        }
+    }
+
+    /**
+     * 获取指定 Agent 的 Session 状态
+     */
+    getSession(agentId) {
+        const session = this.sessions.get(agentId);
+        if (!session) return null;
+        return {
+            agentId: session.agentId,
+            agentName: session.agentName || session.agentId,
+            claimRequestId: session.claimRequestId || null,
+            topicId: session.topicId,
+            status: session.status,
+            round: session.round,
+            retryCount: session.retryCount,
+            maxRetries: session.maxRetries,
+            activeMessageId: session.activeMessageId,
+            startedAt: session.startedAt,
+            lastTriggeredAt: session.lastTriggeredAt,
+            lastCompletedAt: session.lastCompletedAt,
+            nextHeartbeatAt: session.nextHeartbeatAt,
+            lastError: session.lastError,
+            completionReason: session.completionReason,
+            contextCompactionSuspended: Boolean(session.contextCompactionLease),
+            hasCustomPrompt: session.nextPrompt !== null,
+            nextDelaySeconds: session.nextDelaySeconds
+        };
+    }
+
+    /**
+     * 兼容旧接口：返回全局状态
+     * 如果有任何活动 Session，返回第一个；否则返回非活动状态。
+     */
+    getState() {
+        for (const [, session] of this.sessions) {
+            if (session.status === 'active') {
+                return {
+                    isActive: true,
+                    isProcessing: !!session.activeMessageId,
+                    currentAgentId: session.agentId,
+                    currentTopicId: session.topicId,
+                    retryCount: session.retryCount,
+                    maxRetries: session.maxRetries,
+                    round: session.round
+                };
+            }
+        }
+        return {
+            isActive: false,
+            isProcessing: false,
+            currentAgentId: null,
+            currentTopicId: null,
+            retryCount: 0,
+            maxRetries: 3,
+            round: 0
+        };
+    }
+
+    /**
+     * 同步当前可见聊天标题的 Flowlock 状态。
+     * 切换 Agent 后也可无参数调用，以当前可见 Agent 的真实 Session 为准。
+     */
+    syncCurrentHeaderIndicator() {
+        const currentItem = window.VCPMainChatState?.snapshot?.()?.selectedItem;
+        const header = document.getElementById('currentChatAgentName');
+        if (!header) return;
+
+        const shouldActivate = currentItem?.type === 'agent'
+            && this.isAgentLocked(currentItem.id);
+        header.classList.toggle('flowlock-active', shouldActivate);
+
+        if (!shouldActivate) {
+            header.classList.remove('flowlock-heartbeat');
+            header.style.removeProperty('--flowlock-rotate-direction');
+            header.style.removeProperty('--flowlock-heartbeat-rotate');
+        }
+    }
+
+    updateCurrentHeaderIndicator(agentId, active) {
+        const currentItem = window.VCPMainChatState?.snapshot?.()?.selectedItem;
+        if (currentItem?.type !== 'agent' || currentItem.id !== agentId) return;
+
+        const header = document.getElementById('currentChatAgentName');
+        if (!header) return;
+
+        header.classList.toggle('flowlock-active', active);
+        header.style.setProperty('--flowlock-rotate-direction', Math.random() < 0.5 ? '-1' : '1');
+
+        if (!active) {
+            header.classList.remove('flowlock-heartbeat');
+            header.style.removeProperty('--flowlock-heartbeat-rotate');
+        }
+    }
+
+    triggerCurrentHeaderHeartbeat(agentId) {
+        const currentItem = window.VCPMainChatState?.snapshot?.()?.selectedItem;
+        if (currentItem?.type !== 'agent' || currentItem.id !== agentId) return;
+
+        const header = document.getElementById('currentChatAgentName');
+        if (!header) return;
+
+        header.style.setProperty('--flowlock-heartbeat-rotate', Math.random() < 0.5 ? '-1' : '1');
+        // 重置类以保证连续两次心跳均可重新触发动画。
+        header.classList.remove('flowlock-heartbeat');
+        void header.offsetWidth;
+        header.classList.add('flowlock-heartbeat');
+        setTimeout(() => header.classList.remove('flowlock-heartbeat'), 800);
+    }
+
+    /**
+     * 更新侧栏 Agent 状态指示器
+     * @param {string} agentId
+     * @param {boolean} active
+     */
+    updateSidebarIndicator(agentId, active) {
+        const escapedAgentId = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+            ? CSS.escape(agentId)
+            : String(agentId).replace(/["\\]/g, '\\$&');
+        const itemElement = document.querySelector(`#agentList li[data-item-id="${escapedAgentId}"][data-item-type="agent"]`);
+        if (!itemElement) return;
+
+        const avatarWrapper = itemElement.querySelector('.avatar-wrapper');
+        if (!avatarWrapper) return;
+
+        if (active) {
+            avatarWrapper.classList.add('flowlock-active-ring');
+        } else {
+            avatarWrapper.classList.remove('flowlock-active-ring');
+            avatarWrapper.classList.remove('flowlock-heartbeat-ring');
+        }
+    }
+
+    /**
+     * 触发侧栏心跳动画
+     * @param {string} agentId
+     */
+    triggerSidebarHeartbeat(agentId) {
+        const escapedAgentId = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+            ? CSS.escape(agentId)
+            : String(agentId).replace(/["\\]/g, '\\$&');
+        const itemElement = document.querySelector(`#agentList li[data-item-id="${escapedAgentId}"][data-item-type="agent"]`);
+        if (!itemElement) return;
+
+        const avatarWrapper = itemElement.querySelector('.avatar-wrapper');
+        if (!avatarWrapper) return;
+
+        avatarWrapper.classList.add('flowlock-heartbeat-ring');
+        setTimeout(() => {
+            avatarWrapper.classList.remove('flowlock-heartbeat-ring');
+        }, 800);
+    }
+
+    /**
+     * 清理所有状态（页面卸载时调用）
+     */
+    cleanup() {
+        const header = document.getElementById('currentChatAgentName');
+        header?.classList.remove('flowlock-active', 'flowlock-heartbeat');
+
+        for (const [, session] of this.sessions) {
+            if (session.pendingTimer) {
+                clearTimeout(session.pendingTimer);
+            }
+        }
+        this.sessions.clear();
+        this.claimedRequestIds.clear();
+    }
+}
+
+// 创建全局单例
+const flowlockManager = new FlowlockManager();
+
+// 导出到window对象供其他模块使用
+window.flowlockManager = flowlockManager;
+
+console.log('[Flowlock] Manager instance created and exposed globally (multi-session).');

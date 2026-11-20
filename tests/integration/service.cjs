@@ -1,0 +1,267 @@
+'use strict';
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const http = require('node:http');
+const https = require('node:https');
+const net = require('node:net');
+const { spawn, execFileSync } = require('node:child_process');
+const { fixture } = require('./seedFixture.cjs');
+
+const contract=require('./seed-contract.json');
+const auth='synthetic-only';
+
+function listen(server) {
+    return new Promise((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', () => resolve(server.address().port)));
+}
+function closeServer(server) {
+    return new Promise(resolve => { server.closeAllConnections?.(); server.close(resolve); });
+}
+async function jsonBody(req) {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+async function start({out, candidate, cert, key, trace, waitUntil, mode}) {
+    const sourceApp = path.join(candidate, 'apps/server');
+    const box = path.join(out, 'runtime-box');
+    fs.mkdirSync(box);
+    fs.mkdirSync(path.join(box, 'Plugin'));
+    fs.mkdirSync(path.join(out, 'empty-diaries'));
+
+    // Stage only versioned server files. The synthetic DB and plugin config live in this run.
+    const tracked = execFileSync('git', ['ls-files', '-z', '--', 'apps/server/'], { cwd: candidate });
+    const excluded = /(?:^|\/)(?:node_modules|DebugLog|logs|TVDaily|dailynote|file|image|Agent|VectorStore|\.file_cache)(?:\/|$)|(?:^|\/)(?:config\.env|\.env(?:\..*)?)(?:$|\/)|\.(?:pem|key|p12|pfx)$/i;
+    for (const entry of tracked.toString().split('\0').filter(Boolean)) {
+        const rel = entry.slice('apps/server/'.length);
+        if (excluded.test(rel)) continue;
+        if (rel.startsWith('Plugin/') && !rel.startsWith('Plugin/NativeSync/') &&
+            !/^Plugin\/(?:VCPSleep|AgentAssistant)\/(?!plugin-manifest)/.test(rel)) continue;
+        const file = path.join(sourceApp, rel);
+        if (!fs.existsSync(file) || !fs.lstatSync(file).isFile()) continue;
+        const staged = path.join(box, rel);
+        fs.mkdirSync(path.dirname(staged), { recursive: true });
+        fs.copyFileSync(file, staged);
+    }
+    const nativeAddon = 'rust-vexus-lite/vexus-lite.linux-x64-gnu.node';
+    const builtAddon = path.join(sourceApp, nativeAddon);
+    if (!fs.existsSync(builtAddon)) {
+        throw Error('Vexus addon missing. Build the server native addon before integration.');
+    }
+    fs.copyFileSync(builtAddon, path.join(box, nativeAddon));
+    const pluginPath = 'Plugin/NativeSync';
+    const builtMobile = path.join(sourceApp, pluginPath, 'mobile-dist');
+    if (!fs.existsSync(path.join(builtMobile, 'index.html'))) {
+        throw Error('Mobile build missing. Run the repository build before integration.');
+    }
+    fs.cpSync(builtMobile, path.join(box, pluginPath, 'mobile-dist'), { recursive: true });
+    for (const [from, to] of [[path.join(sourceApp, 'node_modules'), path.join(box, 'node_modules')],
+        [path.join(candidate, 'node_modules'), path.join(out, 'node_modules')]]) {
+        if (fs.existsSync(from)) fs.symlinkSync(from, to, 'dir');
+    }
+    fs.mkdirSync(path.join(box, 'config'), { recursive: true });
+    fs.writeFileSync(path.join(box, 'config/tool-call-records.config.json'), JSON.stringify({
+        enabled: true, captureMultimodal: false, autoCleanupEnabled: false
+    }));
+
+    const cleanup = [];
+    const seed = path.join(out, 'seed');
+    fs.mkdirSync(seed);
+    fs.writeFileSync(path.join(seed, 'L4-SYNTHETIC-ONLY'), 'NativeSync L4 synthetic process fixture\n');
+    const f = await fixture({ diagnostic() {}, after: fn => cleanup.push(fn) }, { syntheticRoot: seed });
+    const source = f.topic;
+    const actor = f.actor('C');
+    const targetAgent = f.shared.create(actor, {sharedSpaceId:'sharedAB',opId:'sponsor-target-agent',kind:'agent',localId:'sponsor-target-agent',config:{...f.owner.config,name:'Synthetic lost receipt',systemPrompt:'SYNTHETIC_LOST_RECEIPT',model:'synthetic',streamOutput:false}}).object;
+    const target = f.shared.create(actor, {sharedSpaceId:'sharedAB',opId:'sponsor-target-topic',kind:'topic',parentId:targetAgent.id,localId:'sponsor-target-topic',localParent:'sponsor-target-agent',config:{name:'Sponsor target existing topic'}}).object;
+    const stopAgent = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-agent',kind:'agent',localId:'stop-agent',config:{...f.owner.config,name:'Synthetic interrupted single',systemPrompt:'SYNTHETIC_PARTIAL',streamOutput:true}}).object;
+    const stopTopic = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-topic',kind:'topic',parentId:stopAgent.id,localId:'stop-topic',localParent:'stop-agent',config:{name:'Partial single existing topic'}}).object;
+    const descriptors = {};
+    try {
+        for (const p of ['A','B']) {
+            const desktop = await f.desktop(p);
+            const boundTarget = desktop.runtime.localFor(target.id);
+            const boundTargetAgent = desktop.runtime.localFor(targetAgent.id);
+            descriptors[p] = {preSubmit:desktop.descriptor,
+                lostAck:{itemType:'agent',itemId:boundTargetAgent.localId,topicId:boundTarget.localId},
+                interrupted:{itemType:'agent',itemId:desktop.runtime.localFor(stopAgent.id).localId,topicId:desktop.runtime.localFor(stopTopic.id).localId}};
+            for (const descriptor of Object.values(descriptors[p])) {
+                await desktop.queue.initializeIfMissing(descriptor, []);
+                const seeded=await desktop.queue.read(descriptor);
+                if (!Array.isArray(seeded)||seeded.length) throw Error('Empty synthetic History expected');
+            }
+        }
+    } finally {
+        for (const fn of cleanup.reverse()) await fn();
+    }
+    fs.writeFileSync(path.join(out,'fixture-descriptors.json'), JSON.stringify({source,target,stopTopic,descriptors},null,2));
+    const data = path.join(out, 'data');
+    fs.mkdirSync(data);
+    fs.copyFileSync(path.join(seed,'central.sqlite'), path.join(data,'central.sqlite'));
+    const calls=[], requests=[];
+    const gates={partialClosed:false};
+    let releaseLost,activePartial;
+    const lostGate=new Promise(r=>{releaseLost=r;});
+    const provider=http.createServer(async(req,res)=>{
+        try {
+            if(req.url==='/v1/models')return res.end(JSON.stringify({data:[{id:'synthetic'}]}));
+            if(req.method!=='POST'||req.url!=='/v1/chat/completions')throw Error('Unexpected fixture provider route '+req.url);
+            const body=await jsonBody(req);
+            const last=body.messages.findLast(row=>row.role==='user')?.content;
+            const input=Array.isArray(last)?last.filter(x=>x.type==='text').map(x=>x.text).join(''):last;
+            const which=Object.entries(contract.cases).find(([,content])=>input===content)?.[0];
+            const row={case:which,id:body.requestId,stream:Boolean(body.stream),at:Date.now()};
+            calls.push(row);trace('provider',row);
+            if(which==='lostAck')await lostGate;
+            if(which==='interrupted'){
+                if(!body.stream)throw Error('Partial fixture expected streaming provider input');
+                res.writeHead(200,{'content-type':'text/event-stream'});
+                res.once('close',()=>{gates.partialClosed=true;trace('partial-provider-closed',{});});
+                row.providerFrames=[{type:'delta',content:contract.partialText}];
+                activePartial=res;
+                res.write('data: '+JSON.stringify({choices:[{index:0,delta:{role:'assistant',content:contract.partialText},finish_reason:null}]})+'\n\n');
+                return;
+            }
+            const payload={id:'fixture-'+calls.length,object:'chat.completion',created:1,model:'synthetic',choices:[{index:0,message:{role:'assistant',content:contract.completeText},finish_reason:'stop'}],usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2}};
+            res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify(payload));
+        } catch(e) { calls.push({case:'fixtureError',error:e.message}); if(!res.headersSent)res.writeHead(500);res.end(); }
+    });
+    const providerPort = await listen(provider);
+    const dummy = net.createServer();
+    const backendPort = await listen(dummy);
+    await closeServer(dummy);
+    let drop=true, lostRequestId=null;
+    const proxy = https.createServer({key:fs.readFileSync(key),cert:fs.readFileSync(cert)},async (req,res) => {
+        const url=new URL(req.url,'https://127.0.0.1');
+        const route=url.pathname;
+        if (mode!=='local-only' && req.method==='POST' && route==='/v1/local-chat/completions') {
+            calls.push({phase:'unexpected-desktop-local-provider'});
+            req.resume();
+            return res.writeHead(500).end(JSON.stringify({error:{code:'UNEXPECTED_DESKTOP_LOCAL_EXECUTION'}}));
+        }
+        const relevant = req.method==='POST' && /\/shared\/(session-send|session-cancel|admit|complete)$/.test(route);
+        const row = {route,method:req.method,at:Date.now(),device:req.headers['x-nativesync-device'],capabilities:req.headers['x-nativesync-capabilities']};
+        let body;
+        if (relevant) {
+            const chunks=[];
+            for await (const chunk of req) chunks.push(chunk);
+            body=Buffer.concat(chunks);
+            row.bodySha256=require('node:crypto').createHash('sha256').update(body).digest('hex');
+            row.body=JSON.parse(body);
+            for (const key of ['proof','authorization','capability','ticket']) if (typeof row.body[key]==='string') {
+                row.body[key+'Sha256']=require('node:crypto').createHash('sha256').update(row.body[key]).digest('hex');
+                delete row.body[key];
+            }
+            requests.push(row);
+            if(route.endsWith('/session-send') && row.body.message?.content===contract.cases.preSubmit) {
+                row.status=409;row.injected=true;row.response={error:{code:'SHARED_CONTEXT_CHANGED'}};
+                return res.writeHead(409,{'content-type':'application/json'}).end(JSON.stringify(row.response));
+            }
+            if(route.endsWith('/session-send') && row.body.message?.content===contract.cases.lostAck) lostRequestId=row.body.requestId;
+        }
+        if(req.method==='GET'&&route.endsWith('/shared/request')){
+            row.query=Object.fromEntries(url.searchParams);requests.push(row);
+            if(drop&&lostRequestId&&url.searchParams.get('requestId')===lostRequestId){
+                row.status=503;row.injected=true;
+                return res.writeHead(503,{'content-type':'application/json'}).end(JSON.stringify({error:{code:'FIXTURE_RECONCILE_HELD'}}));
+            }
+        }
+        if(mode==='local-only' && route==='/v1/local-chat/completions') requests.push(row);
+        const isLocalChat = route === '/v1/local-chat/completions';
+        const upstream = http.request({host:'127.0.0.1',port:backendPort,path:isLocalChat?'/v1/chat/completions':req.url,method:req.method,headers:{...req.headers, 'x-forwarded-proto':'https'}},async response => {
+            if (relevant) {
+                const chunks=[];
+                for await (const chunk of response) chunks.push(chunk);
+                const payload=Buffer.concat(chunks);
+                row.status=response.statusCode;
+                try { row.response=JSON.parse(payload); } catch {}
+                if (drop && route.endsWith('/session-send') && row.body?.requestId===lostRequestId && lostRequestId && response.statusCode>=200 && response.statusCode<300) {
+                    row.dropped=true;
+                    res.destroy();
+                    return;
+                }
+                return res.writeHead(response.statusCode,response.headers).end(payload);
+            }
+            row.status=response.statusCode;
+            res.writeHead(response.statusCode,response.headers);
+            response.pipe(res);
+        });
+        upstream.on('error',() => { if (!res.headersSent) res.writeHead(502); res.end(); });
+        res.on('close',() => upstream.destroy());
+        if (body) upstream.end(body); else req.pipe(upstream);
+    });
+    const proxyPort = await listen(proxy);
+    const node = process.execPath;
+    const log=fs.openSync(path.join(out,'backend.log'),'wx');
+    const backend = spawn(node, ['--require',path.join(__dirname,'loopback.cjs'),'server.js'], {
+        cwd:box,stdio:['ignore',log,log],env:{
+            PATH:'/usr/bin:/bin',HOME:out,LANG:'C.UTF-8',TZ:'UTC',NS_LOADED_REPORT:path.join(out,'backend-loaded.json'),
+            ...(mode === 'idle' ? { NS_METER_BACKEND:'1', NS_METER_PREFIX:path.join(out,'backend') } : {}),
+            PORT:String(backendPort),VCP_LOCAL_LISTEN_HOST:'127.0.0.1',Key:auth,API_Key:'synthetic-provider',VCP_Key:'synthetic-sponsor-ws',
+            API_URL:'http://127.0.0.1:'+providerPort,...(mode==='transport-only'?{}:{ApiRetries:'1'}),MaxVCPLoopNonStream:'4',MaxVCPLoopStream:'4',
+            KNOWLEDGEBASE_ROOT_PATH:path.join(out,'empty-diaries'),KNOWLEDGEBASE_STORE_PATH:path.join(data,'vectors'),
+            KNOWLEDGEBASE_FULL_SCAN_ON_STARTUP:'false',TDB_KNOWLEDGE_ENABLED:'false',
+            NativeSyncEnabled:'true',NativeSyncDataDir:data,NativeMobileEnabled:'true',
+            NativeMobileOrigin:'https://127.0.0.1:'+proxyPort,NativeMobileStartDelayMs:'0',
+            NativeSyncFullSources:JSON.stringify(['A','B','C','D'].map(x=>({sourceId:'source'+x,deviceId:'device'+x,executionMode:'all-supported'}))),
+            NativeSyncSharedSpaces:JSON.stringify([{id:'sharedAB',sources:['sourceA','sourceB','sourceC']},{id:'foreignSpace',sources:['sourceD']}])
+        }
+    });
+    fs.closeSync(log);
+    let backendError;
+    const exit = new Promise(resolve => {
+        backend.once('exit', (code, signal) => resolve({ code, signal }));
+        backend.once('error', error => { backendError = error; resolve({ error: error.message }); });
+    });
+    async function close() {
+        releaseLost();
+        if (activePartial && !activePartial.destroyed) activePartial.destroy();
+        backend.kill('SIGTERM');
+        const outcome = await Promise.race([exit,new Promise(r=>setTimeout(r,4500))]);
+        if (!outcome) backend.kill('SIGKILL');
+        const stopped = outcome || await exit;
+        trace('backend-exit',stopped);
+        await closeServer(proxy);
+        await closeServer(provider);
+        return stopped;
+    }
+    try {
+        await waitUntil(() => {
+            if (backendError) throw backendError;
+            if (backend.exitCode!==null) throw Error('Backend exited '+backend.exitCode);
+            return fs.readFileSync(path.join(out,'backend.log'),'utf8').includes('中间层服务器正在监听端口 '+backendPort);
+        },'real backend listening',25000);
+    } catch (error) { await close(); throw error; }
+    const origin = 'https://127.0.0.1:' + proxyPort;
+    const requestMobile = route => new Promise((resolve, reject) => {
+        const request = https.get(origin + route, { ca: fs.readFileSync(cert), timeout: 2000 }, response => {
+            const chunks = [];
+            response.on('data', chunk => chunks.push(chunk));
+            response.on('error', reject);
+            response.on('end', () => resolve({ status: response.statusCode, body: Buffer.concat(chunks).toString() }));
+        });
+        request.on('timeout', () => request.destroy(Error('Mobile request timed out')));
+        request.on('error', reject);
+    });
+    async function checkMobile() {
+        const page = await waitUntil(async () => {
+            const value = await requestMobile('/mobile/');
+            return value.status === 200 && value;
+        }, 'HTTPS mobile page', 15000);
+        const script = page.body.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
+        assert.ok(script, 'mobile HTML loads its built frontend');
+        const scriptUrl = new URL(script, origin + '/mobile/');
+        assert.equal(scriptUrl.origin, origin);
+        const bundle = await requestMobile(scriptUrl.pathname);
+        assert.equal(bundle.status, 200);
+        assert.ok(bundle.body.length > 1000, 'mobile JavaScript bundle is served');
+        const connection = await requestMobile('/mobile/api/connection');
+        assert.equal(connection.status, 200);
+        assert.equal(typeof JSON.parse(connection.body), 'object');
+        return { htmlStatus: page.status, bundleStatus: bundle.status, connectionStatus: connection.status };
+    }
+    return { checkMobile, backendPid: backend.pid, origin:'https://127.0.0.1:'+proxyPort,wsOrigin:'http://127.0.0.1:'+backendPort,calls,requests,topics:{preSubmit:source,lostAck:target,interrupted:stopTopic},descriptors,data,gates,
+        disarmDrop(){drop=false;}, releaseLost,
+        cutPartial(){assert.ok(activePartial&&!activePartial.destroyed);gates.providerTransportCut=true;
+            trace('actual-provider-socket-cut',{hadPrefix:true});activePartial.destroy();}, close};
+}
+module.exports={start,contract};

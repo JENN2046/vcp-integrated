@@ -1,0 +1,321 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { EventEmitter } = require('node:events');
+const { installProjectForgeCloseGuard } = require('../modules/ipc/projectForgeCloseGuard');
+const { minimatch } = require('minimatch');
+const build = require('../package.json').build;
+
+test('numbered edit normalization retains replacements and rejects ambiguous destructive input', () => {
+    const args = require('../VCPDistributedServer/Plugin/ProjectForge/args');
+    const parse = input => args.parseEditSteps(args.lowerKeys(input));
+    const folded = parse({ target: 'old', replace: 'new', target2: 'later', replace2: 'updated' });
+    assert.deepEqual(folded.map(({ step, target, replace }) => ({ step, target, replace })), [
+        { step: 1, target: 'old', replace: 'new' },
+        { step: 2, target: 'later', replace: 'updated' },
+    ]);
+    assert.equal(folded.notes.length, 1);
+    assert.equal(Object.prototype.propertyIsEnumerable.call(folded, 'notes'), false);
+    assert.throws(() => parse({ target1: 'old', replace: 'new' }), /编号串中混入/);
+    assert.throws(() => parse({ target: 'old', replacement: 'new', target2: 'later' }), /不认识参数/);
+    const explicit = parse({ target1: 'old', replace1: 'new', reason: 'batch reason', todo: '2,3' });
+    assert.equal(explicit.length, 1);
+    assert.equal(explicit[0].replace, 'new');
+    assert.equal(args.hasNumberedSteps(args.lowerKeys({ Target1: 'old' })), true);
+    assert.equal(args.hasNumberedSteps({ target: 'old' }), false);
+});
+
+test('Trace statically reads declarations without executing registry, helpers or API side effects', async t => {
+    const os = require('node:os');
+    const { loadPreloadDecls } = require('../VCPDistributedServer/Plugin/ProjectForge/linkGraph');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-static-security-'));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    fs.mkdirSync(path.join(root, 'preloads/core'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'preloads/api'));
+    const sentinel = path.join(root, 'executed');
+    const attack = `require('node:fs').writeFileSync(${JSON.stringify(sentinel)}, 'executed');`;
+    fs.writeFileSync(path.join(root, 'preloads/core/registry.js'), `${attack}\nconst ROLE_GLOBALS = Object.freeze({chat: 'chatAPI'});`);
+    fs.writeFileSync(path.join(root, 'preloads/core/define.js'), attack);
+    const api = path.join(root, 'preloads/api/demo.js');
+    fs.writeFileSync(api, `${attack}\nconst {invoke,on,custom}=require('../core/define');
+module.exports={roles:['chat'],api:{save:invoke('save').mapResult(()=>{${attack}}),tick:on('tick').roles('chat'),local:custom('query',null,()=>{${attack}})}};`);
+    const result = await loadPreloadDecls(root);
+    assert.equal(result.status, 'ok', result.error);
+    assert.equal(result.source, 'static');
+    assert.deepEqual(result.apis.map(({ name, kind, channel, roles }) => ({ name, kind, channel, roles })), [
+        {name: 'save', kind: 'query', channel: 'save', roles: ['chat']},
+        {name: 'tick', kind: 'subscription', channel: 'tick', roles: ['chat']},
+        {name: 'local', kind: 'query', channel: null, roles: ['chat']},
+    ]);
+    assert.equal(fs.existsSync(sentinel), false);
+    const featureDir = path.join(root, 'modules/synthetic-feature');
+    fs.mkdirSync(featureDir, { recursive: true });
+    const feature = path.join(featureDir, 'preloadApi.js');
+    fs.writeFileSync(feature, `${attack}\nconst {invoke}=require('../../preloads/core/define');module.exports={roles:['chat'],api:{featureRead:invoke('feature:read')}};`);
+    const withFeature = await loadPreloadDecls(root);
+    assert.equal(withFeature.status, 'ok', withFeature.error);
+    assert.deepEqual(withFeature.apis.find(api => api.name === 'featureRead'), { name: 'featureRead', domain: 'synthetic-feature', kind: 'query', channel: 'feature:read', roles: ['chat'] });
+    assert.equal(fs.existsSync(sentinel), false, 'feature declaration side effects must never execute');
+    fs.writeFileSync(feature, `const {invoke}=require('../../preloads/core/define');module.exports={roles:['chat'],api:{featureRead:invoke(makeChannel())}};`);
+    const invalidFeature = await loadPreloadDecls(root);
+    assert.equal(invalidFeature.status, 'failed');
+    assert.deepEqual(invalidFeature.apis, []);
+    fs.unlinkSync(feature);
+    if (process.platform !== 'win32') {
+        fs.symlinkSync(api, feature);
+        assert.equal((await loadPreloadDecls(root)).status, 'failed', 'linked feature declarations are rejected before content reads');
+        fs.unlinkSync(feature);
+    }
+    for (const source of [
+        `${attack}\nmodule.exports = makeDeclaration();`,
+        `const {invoke}=require('../core/define');module.exports={roles:['chat'],api:{save:invoke(getChannel())}};`,
+        'not valid JavaScript {{{',
+        'x'.repeat(1024 * 1024 + 1),
+    ]) {
+        fs.writeFileSync(api, source);
+        const failed = await loadPreloadDecls(root);
+        assert.equal(failed.status, 'failed');
+        assert.deepEqual(failed.apis, []);
+        assert.equal(fs.existsSync(sentinel), false);
+    }
+});
+
+test('Trace extracts the shipped preload metadata without requiring workspace modules', async () => {
+    const { loadPreloadDecls } = require('../VCPDistributedServer/Plugin/ProjectForge/linkGraph');
+    const result = await loadPreloadDecls(path.join(__dirname, '..'));
+    assert.equal(result.status, 'ok', result.error);
+    // Compare static output with the reviewed shipped registry, including
+    // optional feature-owned declarations, rather than a stale API count.
+    const { describeApis } = require('../preloads/core/registry');
+    const normalized = rows => rows.map(({ name, domain, kind, channel, roles }) => ({ name, domain, kind, channel, roles }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'en'));
+    assert.deepEqual(normalized(result.apis), normalized(describeApis()));
+    for (const [name, channel] of [
+        ['prepareNativeConversation', 'native-conversation:prepare'],
+        ['executeNativeConversation', 'native-conversation:execute'],
+        ['proposeNativeConversation', 'native-conversation:propose'],
+        ['presentNativeConversation', 'native-conversation:presented'],
+        ['invalidateNativeConversation', 'native-conversation:invalidate'],
+    ]) {
+        const matches = result.apis.filter(api => api.name === name);
+        assert.equal(matches.length, 1, `${name} must be declared exactly once`);
+        assert.equal(matches[0].channel, channel);
+        assert.deepEqual(matches[0].roles, ['chat']);
+    }
+    assert.ok(result.apis.some(api => api.name === 'projectForgeDeleteProject' && api.channel === 'project-forge:delete-project'));
+    for (const [name, channel] of [
+        ['getSuveiHumanAuthorizationStatus', 'suvei-human-authorization:status'],
+        ['loginSuveiHumanOwner', 'suvei-human-authorization:login'],
+        ['logoutSuveiHumanOwner', 'suvei-human-authorization:logout'],
+        ['prepareSuveiHumanAuthorization', 'suvei-human-authorization:prepare'],
+        ['decideSuveiHumanAuthorization', 'suvei-human-authorization:decide'],
+        ['sendVCPLogMessageConfirmed', 'send-vcplog-message-confirmed'],
+    ]) {
+        assert.ok(result.apis.some(api => api.name === name && api.channel === channel), `${name} missing`);
+    }
+});
+
+test('Trace refuses a linked declaration directory and does not return stale metadata', async t => {
+    const os = require('node:os');
+    const { loadPreloadDecls } = require('../VCPDistributedServer/Plugin/ProjectForge/linkGraph');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-static-link-'));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    fs.mkdirSync(path.join(root, 'preloads/core'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'external'));
+    fs.writeFileSync(path.join(root, 'preloads/core/registry.js'), "const ROLE_GLOBALS={chat:'chatAPI'};");
+    fs.symlinkSync(path.join(root, 'external'), path.join(root, 'preloads/api'), process.platform === 'win32' ? 'junction' : 'dir');
+    assert.equal((await loadPreloadDecls(root)).status, 'failed');
+});
+
+test('ProjectForge package includes only required runtime source and verified sidecars', () => {
+    const files = new Set(build.files);
+    for (const pattern of [
+        'VCPDistributedServer/Plugin/ProjectForge/*.js',
+        'VCPDistributedServer/Plugin/ProjectForge/plugin-manifest.json',
+        'VCPDistributedServer/Plugin/ProjectForge/bin/win32-x64/projectforge_indexer.exe',
+        'VCPDistributedServer/shared/fileKit/*.js',
+        'ProjectForgemodules/**/*',
+    ]) assert.ok(files.has(pattern), pattern);
+    assert.ok(build.asarUnpack.includes('VCPDistributedServer/Plugin/ProjectForge/bin/win32-x64/projectforge_indexer.exe'));
+    assert.ok(!files.has('VCPDistributedServer/Plugin/ProjectForge/**/*'), 'do not package config.env');
+    const packaged = relative => [...files].some(pattern => !pattern.startsWith('!') && minimatch(relative, pattern));
+    for (const relative of [
+        'VCPDistributedServer/Plugin/ProjectForge/ProjectForgeService.js',
+        'VCPDistributedServer/shared/fileKit/paths.js',
+        'VCPDistributedServer/Plugin/ProjectForge/bin/win32-x64/projectforge_indexer.exe',
+        'ProjectForgemodules/projectforge.html',
+    ]) {
+        assert.ok(fs.existsSync(path.join(__dirname, '..', relative)), relative);
+        assert.ok(packaged(relative), `not packaged: ${relative}`);
+    }
+    assert.equal(packaged('VCPDistributedServer/Plugin/ProjectForge/config.env'), false);
+});
+
+test('ProjectForge unload guard stays by default and allows explicit discard', () => {
+    for (const choice of [0, 1, -1]) {
+        const webContents = new EventEmitter();
+        const win = { webContents };
+        const dialog = { showMessageBoxSync: () => choice };
+        let allowed = false;
+        installProjectForgeCloseGuard(win, dialog);
+        webContents.emit('will-prevent-unload', { preventDefault: () => { allowed = true; } });
+        assert.equal(allowed, choice === 1);
+    }
+});
+
+test('source editor registers a native beforeunload guard for dirty buffers', () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'ProjectForgemodules/projectforge-source.js'), 'utf8');
+    assert.match(source, /window\.addEventListener\('beforeunload', event => \{/);
+    assert.match(source, /if \(!isDirty\(\)\) return;/);
+});
+
+
+test('workspace refresh preserves dirty buffers unless discard is confirmed', async () => {
+    const vm = require('node:vm');
+    const source = fs.readFileSync(path.join(__dirname, '..', 'ProjectForgemodules/projectforge-source.js'), 'utf8');
+    const fn = source.slice(source.indexOf('    async function loadWorkspaces()'), source.indexOf('    async function loadFiles()'));
+    for (const allow of [false, true]) for (const workspaces of [[], [{ id: 'new' }]]) {
+        const src = { workspaceId: 'old', workspaces: [{ id: 'old' }], file: { content: 'unsaved' } };
+        let confirmations = 0;
+        const context = {
+            src, WS_KEY: 'test', api: { gitListWorkspaces: async () => ({ workspaces }) },
+            srcCall: value => value, setLoading() {}, isDirty: () => true,
+            confirmDiscard: async () => { confirmations++; return allow; },
+            localStorage: { getItem: () => null, setItem() {} }, loadExpanded: () => [],
+            closeFile: () => { src.file = null; }, renderWorkspaceSelect() {}, loadFiles: async () => {},
+            $: () => ({}), escapeHtml: value => value,
+        };
+        await vm.runInNewContext(`${fn}\nloadWorkspaces()`, context);
+        assert.equal(confirmations, 1);
+        assert.equal(src.workspaceId, allow ? (workspaces[0]?.id || null) : 'old');
+        assert.equal(src.file?.content, allow ? undefined : 'unsaved');
+        if (!allow) assert.deepEqual(src.workspaces, [{ id: 'old' }]);
+    }
+});
+
+test('main voice configures every newly started process before creating a session', async () => {
+    const vm = require('node:vm');
+    const context = { module: { exports: {} }, require: name => {
+        assert.equal(name, 'electron');
+        return { ipcMain: {} };
+    } };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'modules/ipc/mainChatVoiceCoordinator.js'), 'utf8'), context);
+    const { MainChatVoiceCoordinator } = context.module.exports;
+    let generation = 0;
+    const configured = [];
+    const stop = new Error('stop synthetic session after configuration');
+    const engine = { start: async () => { generation++; }, configureHotkey: async value => configured.push({ generation, ...value }) };
+    const coordinator = new MainChatVoiceCoordinator({
+        getMainWindow: () => ({ isDestroyed: () => false, webContents: { isDestroyed: () => false } }),
+        ensureVoiceCaptureWindowReady: async () => {}, getVoiceInputEngine: () => engine,
+        getConfiguredShortcut: () => 'F7',
+    });
+    // Fail immediately after configuration: no real windows, timers or native process.
+    const options = { get idleTimeoutMs() { throw stop; } };
+    for (let i = 0; i < 2; i++) await assert.rejects(coordinator.startSession(options), error => error === stop);
+    assert.deepEqual(configured.map(value => value.generation), [1, 2]);
+    assert.ok(configured.every(value => value.shortcut === 'F7'));
+});
+
+test('Flowlock ignores payload marker literals but honors real nesting', () => {
+    const vm = require('node:vm');
+    const context = { window: {}, console: { log() {} } };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'Flowlockmodules/flowlock-protocol.js'), 'utf8'), context);
+    const scan = context.window.flowlockProtocol.createSafeScanText;
+    const start = '[[VCP调用结果信息汇总:', end = 'VCP调用结果结束]]';
+    for (const newline of ['\n', '\r\n']) {
+        const body = `${start}\nconst start = '${start}';\n[[Flowlock::Stop]]\n${end}\n[[Flowlock::Complete]]`.replaceAll('\n', newline);
+        const masked = scan(body);
+        assert.ok(!masked.includes('[[Flowlock::Stop]]'));
+        assert.ok(masked.includes('[[Flowlock::Complete]]'));
+    }
+    assert.ok(!scan(`${start}\n${start}\n${end}\n[[Flowlock::Complete]]`).includes('[[Flowlock::Complete]]'));
+});
+
+test('desktop tracker resumes after payload-only markers across every split', async () => {
+    const { createDesktopPushConsumer } = await import('../modules/renderer/desktopPushConsumer.js');
+    const start = '[[VCP调用结果信息汇总:', end = 'VCP调用结果结束]]';
+    for (const newline of ['\n', '\r\n']) {
+        const data = `${start}\nconst start = '${start}';\n<<<[DESKTOP_PUSH]>>><div>untrusted</div><<<[DESKTOP_PUSH_END]>>>\n${end}\n`.replaceAll('\n', newline);
+        const text = data + '<<<[DESKTOP_PUSH]>>><div>trusted</div><<<[DESKTOP_PUSH_END]>>>';
+        for (let split = 0; split <= text.length; split++) {
+            const pushed = [];
+            const consumer = createDesktopPushConsumer({ electronAPI: { desktopPush: value => pushed.push(value) }, logger: {} });
+            try {
+                const output = consumer.processToken('m', text.slice(0, split)) + consumer.processToken('m', text.slice(split));
+                assert.equal(output, data, `split ${split}`);
+                assert.ok(pushed.some(value => value.content === '<div>trusted</div>'));
+                assert.ok(!pushed.some(value => value.content?.includes('untrusted')));
+            } finally { consumer.dispose(); }
+        }
+    }
+});
+
+test('all supported ProjectForge runtime targets are packaged and unpacked', () => {
+    const { resolveRuntimeTarget, SUPPORTED_PLATFORMS, SUPPORTED_ARCHITECTURES } = require('../rust_projectforge_indexer/build-runtime.js');
+    let count = 0;
+    for (const platform of SUPPORTED_PLATFORMS) for (const arch of SUPPORTED_ARCHITECTURES) {
+        const target = resolveRuntimeTarget(platform, arch);
+        const relative = `VCPDistributedServer/Plugin/ProjectForge/bin/${target.runtimeDirectoryName}/${target.executableName}`;
+        assert.ok(build.files.includes(relative), relative);
+        assert.ok(build.asarUnpack.includes(relative), relative);
+        count++;
+    }
+    assert.equal(count, 6);
+    for (const worker of ['evalWorker.cjs', 'evalWorker.py']) {
+        const relative = `VCPDistributedServer/Plugin/ProjectForge/${worker}`;
+        assert.ok(build.files.includes(relative), relative);
+        assert.ok(build.asarUnpack.includes(relative), relative);
+    }
+    const packaged = relative => build.files.some(pattern => !pattern.startsWith('!') && minimatch(relative, pattern));
+    for (const relative of ['config.env', 'bin/linux-x64/scratch', 'bin/linux-ia32/projectforge_indexer', 'bin/linux-x64/projectforge_indexer.tmp']) {
+        assert.equal(packaged(`VCPDistributedServer/Plugin/ProjectForge/${relative}`), false, relative);
+    }
+});
+
+test('delete and accept reject unrelated windows and frames before runtime/config access', async () => {
+    const vm = require('node:vm');
+    const { pathToFileURL } = require('node:url');
+    const handlers = new Map();
+    const counts = { config: 0, runtime: 0, deleted: 0, accepted: 0 };
+    const service = { events: new EventEmitter(), ensureRuntime() { counts.runtime++; }, gui: {
+        deleteProject(id, signature) { counts.deleted++; return { id, signature }; },
+        acceptProject(id, signature) { counts.accepted++; return { id, signature }; },
+    } };
+    const handlerDirectory = path.resolve(__dirname, '../modules/ipc');
+    const context = { module: { exports: {} }, __dirname: handlerDirectory, URL, process: { platform: process.platform }, console,
+        require(name) {
+            if (name === 'electron') return { ipcMain: { handle: (key, fn) => handlers.set(key, fn), removeHandler: key => handlers.delete(key) }, webContents: {} };
+            if (name === 'path') return path;
+            if (name === 'url') return require('node:url');
+            if (name === 'fs') return { existsSync() { counts.config++; return false; }, readFileSync() { throw new Error('real config reads forbidden'); } };
+            if (name === path.resolve(handlerDirectory, '../../VCPDistributedServer/Plugin/ProjectForge/ProjectForgeService.js')) return service;
+            throw new Error(`unexpected require: ${name}`);
+        },
+    };
+    vm.runInNewContext(fs.readFileSync(path.join(handlerDirectory, 'projectForgeHandlers.js'), 'utf8'), context);
+    context.module.exports.initialize();
+    const mutations = ['project-forge:delete-project', 'project-forge:accept-project'].map(name => handlers.get(name));
+    const trusted = pathToFileURL(path.resolve(__dirname, '../ProjectForgemodules/projectforge.html')).href;
+    const other = pathToFileURL(path.resolve(__dirname, '../Notepadmodules/notepad.html')).href;
+    const event = (windowUrl, frameUrl) => ({ sender: { getURL: () => windowUrl }, senderFrame: { url: frameUrl } });
+    for (const value of [undefined, {}, event(other, other), event(trusted, other), event(other, trusted),
+        event('https://example.test/projectforge.html', trusted), event(`${trusted}.evil`, trusted),
+        event('file:///other-app/ProjectForgemodules/projectforge.html', trusted), event('not a URL', trusted),
+        event(trusted, ''), { sender: { getURL() { throw new Error('destroyed'); } } }]) {
+        for (const mutate of mutations) assert.equal((await mutate(value, 'synthetic-project', 'test')).success, false);
+        assert.deepEqual(counts, { config: 0, runtime: 0, deleted: 0, accepted: 0 });
+    }
+    for (const value of [event(trusted, trusted), { sender: { getURL: () => trusted } }]) {
+        for (const mutate of mutations) {
+            const result = await mutate(value, 'synthetic-project', 'test');
+            assert.equal(result.success, true);
+            assert.equal(result.data.id, 'synthetic-project');
+            assert.equal(result.data.signature, 'test');
+        }
+    }
+    assert.deepEqual(counts, { config: 4, runtime: 4, deleted: 2, accepted: 2 });
+});

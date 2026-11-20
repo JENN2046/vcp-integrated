@@ -1,0 +1,84 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { JSDOM } = require('jsdom');
+
+test('main terminal diagnostics observe either platform executor without loading it', () => {
+    const path = require('node:path');
+    const vm = require('node:vm');
+    const source = fs.readFileSync('main.js', 'utf8');
+    const declaration = source.match(/const TERMINAL_EXECUTOR_PATHS = [\s\S]*?;\r?\n/)[0];
+    const expression = source.match(/loaded: (TERMINAL_EXECUTOR_PATHS\.some\([^\n]+\)),/)[1];
+    const cache = {};
+    const root = path.resolve('/synthetic-vcp');
+    const inspect = () => vm.runInNewContext(declaration + '\n' + expression, { path, PROJECT_ROOT: root, originalRequire: { cache } });
+    assert.equal(inspect(), false);
+    for (const name of ['PowerShellExecutor', 'PTYShellExecutor']) {
+        const file = path.join(root, 'VCPDistributedServer', 'Plugin', name, name + '.js');
+        cache[file] = {};
+        assert.equal(inspect(), true, name);
+        delete cache[file];
+        assert.equal(inspect(), false);
+    }
+});
+
+test('lifecycle inspector reports ownership metadata without payload content', async () => {
+    const dom = new JSDOM('<!doctype html><html data-ui-mode="next"><body></body></html>', { runScripts: 'outside-only' });
+    const { window } = dom;
+    window.VCPLifecycle = { diagnostics: { snapshot: () => [{ id: 1, label: 'next:test' }], summary: () => ({ activeScopes: 1 }) } };
+    window.VCPTasks = { diagnostics: { snapshot: () => [{ id: 'safe-id', owner: 'next:test' }] } };
+    window.VCPContributions = { diagnostics: { snapshot: () => ({ apps: [{ id: 'safe-app', ownerId: 'test' }] }) } };
+    window.VCPStateChannels = { diagnostics: () => [{ name: 'theme', revision: 1, subscribers: 1 }] };
+    window.VCPNextShellController = { getDiagnostics: () => ({ mounted: true, openViews: ['app:safe'] }) };
+    window.VCPPerformance = { snapshot: () => [{ name: 'next.mount', durationMs: 12, metadata: { mode: 'next' } }] };
+    window.chatAPI = { getMainLifecycleSnapshot: async () => ({
+        embeddedSessions: [{ action: 'open-notes-window' }], activeEmbeddedAction: null,
+        tasks: [{ requestId: 'request-1', operation: 'embedded:create', state: 'running', ageMs: 2 }],
+        chatTasks: [{ requestId: 'message-1', operation: 'chat:stream', state: 'running', ageMs: 1 }],
+        domains: [{ name: 'terminal', state: 'declared', channels: 11, calls: 0 }],
+        terminalExecutor: { loaded: true, distributedServer: false },
+    }) };
+    window.eval(fs.readFileSync('modules/ui-system/lifecycle-inspector.js', 'utf8'));
+    const streamProvider = () => ({ activeMessageId: 'safe-stream', activeMessageIds: ['safe-stream'] });
+    window.VCPLifecycleInspector.setStreamDiagnosticsProvider(streamProvider);
+    window.VCPLifecycleInspector.setStreamDiagnosticsProvider(streamProvider);
+    assert.throws(
+        () => window.VCPLifecycleInspector.setStreamDiagnosticsProvider(() => null),
+        /already registered/
+    );
+    window.dispatchEvent(new window.CustomEvent('ui-mode-transition-state', { detail: { phase: 'settled', mode: 'next', generation: 3 } }));
+    const renderer = window.VCPLifecycleInspector.snapshot();
+    const main = await window.VCPLifecycleInspector.snapshotMain();
+    assert.equal(renderer.mode, 'next');
+    assert.equal(renderer.transitions[0].generation, 3);
+    assert.equal(renderer.performance[0].name, 'next.mount');
+    assert.equal(renderer.streams.activeMessageId, 'safe-stream');
+    assert.equal(main.tasks[0].operation, 'embedded:create');
+    assert.equal(main.chatTasks[0].operation, 'chat:stream');
+    assert.equal(main.domains[0].state, 'declared');
+    assert.deepEqual({ ...main.terminalExecutor }, { loaded: true, distributedServer: false });
+    const serialized = JSON.stringify({ renderer, main });
+    assert.doesNotMatch(serialized, /apiKey|chatHistory|fileContent|secret/i);
+    const originalSnapshot = window.VCPLifecycleInspector.snapshot;
+    window.VCPLifecycleInspector.snapshot = () => null;
+    assert.equal(window.VCPLifecycleInspector.snapshot, originalSnapshot);
+    dom.window.close();
+});
+
+test('the side pane reports its views to the inspector until it is torn down', () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', { runScripts: 'outside-only' });
+    const { window } = dom;
+    window.eval(fs.readFileSync('modules/ui-system/lifecycle-inspector.js', 'utf8'));
+    assert.equal(window.VCPLifecycleInspector.snapshot().sidePane, null);
+    const tabs = [{ id: 'terminal:main', kind: 'terminal', view: 'dormant', visible: false, hiddenMs: 400000, dormantReason: 'hidden' }];
+    const release = window.VCPLifecycleInspector.setSidePaneDiagnosticsProvider(() => ({ visible: true, tabs }));
+    assert.deepEqual(window.VCPLifecycleInspector.snapshot().sidePane.tabs, tabs);
+    // 界面重建：新的控制器接上，旧的注销不会把新的拿掉
+    const releaseNext = window.VCPLifecycleInspector.setSidePaneDiagnosticsProvider(() => ({ visible: false, tabs: [] }));
+    release();
+    assert.equal(window.VCPLifecycleInspector.snapshot().sidePane.visible, false);
+    releaseNext();
+    assert.equal(window.VCPLifecycleInspector.snapshot().sidePane, null);
+    assert.throws(() => window.VCPLifecycleInspector.setSidePaneDiagnosticsProvider(null), /must be a function/);
+    dom.window.close();
+});

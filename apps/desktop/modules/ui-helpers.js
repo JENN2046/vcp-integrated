@@ -1,0 +1,1366 @@
+// modules/ui-helpers.js
+(function() {
+    'use strict';
+
+    // --- State for helper functions ---
+    let croppedAgentAvatarFile = null;
+    let croppedUserAvatarFile = null;
+    let croppedGroupAvatarFile = null;
+    const modalGenerations = new Map();
+
+    const uiHelperFunctions = {};
+    const textareaResizeStates = new WeakMap();
+    const chatScrollStates = new WeakMap();
+    const CHAT_BOTTOM_THRESHOLD_PX = 50;
+    const CHAT_FOLLOW_CHANGE_EVENT = 'vcp-chat-follow-change';
+    const REGEX_CACHE_MAX_ENTRIES = 512;
+    const regexCompileCache = new Map();
+    const filePreviewIconMarkup = `
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path>
+    <path d="M14 2v5a1 1 0 0 0 1 1h5"></path>
+</svg>`;
+    const audioFilePreviewIconMarkup = `
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4 6.835V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-.343"></path>
+    <path d="M14 2v5a1 1 0 0 0 1 1h5"></path>
+    <path d="M2 19a2 2 0 0 1 4 0v1a2 2 0 0 1-4 0v-4a6 6 0 0 1 12 0v4a2 2 0 0 1-4 0v-1a2 2 0 0 1 4 0"></path>
+</svg>`;
+    const videoFilePreviewIconMarkup = `
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+    <path d="M7 3v18"></path>
+    <path d="M3 7.5h4"></path>
+    <path d="M3 12h18"></path>
+    <path d="M3 16.5h4"></path>
+    <path d="M17 3v18"></path>
+    <path d="M17 7.5h4"></path>
+    <path d="M17 16.5h4"></path>
+</svg>`;
+    const textFilePreviewIconMarkup = `
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path>
+    <path d="M14 2v5a1 1 0 0 0 1 1h5"></path>
+    <path d="M10 9H8"></path>
+    <path d="M16 13H8"></path>
+    <path d="M16 17H8"></path>
+</svg>`;
+    const pdfFilePreviewIconMarkup = `
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path>
+    <path d="M14 2v5a1 1 0 0 0 1 1h5"></path>
+    <path d="M8 17v-4h2a1.5 1.5 0 0 1 0 3H8"></path>
+    <path d="M13 17v-4h1.5a2 2 0 0 1 0 4H13"></path>
+    <path d="M18 13h-2v4"></path>
+</svg>`;
+    const documentFilePreviewIconMarkup = `
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path>
+    <path d="M14 2v5a1 1 0 0 0 1 1h5"></path>
+    <path d="M8 11h8"></path>
+    <path d="M8 15h8"></path>
+    <path d="M8 19h5"></path>
+</svg>`;
+    const spreadsheetFilePreviewIconMarkup = `
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path>
+    <path d="M14 2v5a1 1 0 0 0 1 1h5"></path>
+    <rect x="8" y="11" width="8" height="8" rx="1"></rect>
+    <path d="M12 11v8"></path>
+    <path d="M8 15h8"></path>
+</svg>`;
+    const presentationFilePreviewIconMarkup = `
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path>
+    <path d="M14 2v5a1 1 0 0 0 1 1h5"></path>
+    <rect x="8" y="11" width="8" height="5" rx="1"></rect>
+    <path d="M12 16v3"></path>
+    <path d="M10 19h4"></path>
+</svg>`;
+    const archiveFilePreviewIconMarkup = `
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path>
+    <path d="M14 2v5a1 1 0 0 0 1 1h5"></path>
+    <path d="M12 10v2"></path>
+    <path d="M12 14v2"></path>
+    <path d="M12 18v1"></path>
+    <rect x="10" y="9" width="4" height="2" rx="0.5"></rect>
+    <rect x="10" y="13" width="4" height="2" rx="0.5"></rect>
+    <path d="M10 17h4"></path>
+</svg>`;
+    const TEXT_FILE_EXTENSIONS = new Set([
+        'txt', 'md', 'markdown', 'rtf', 'odt', 'csv', 'log', 'json', 'xml', 'yml', 'yaml',
+        'html', 'css', 'js', 'ts', 'py', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'go', 'php',
+        'sh', 'bat', 'ps1', 'sql', 'vue', 'tsx', 'jsx'
+    ]);
+    const DOCUMENT_FILE_EXTENSIONS = new Set(['doc', 'docx']);
+    const SPREADSHEET_FILE_EXTENSIONS = new Set(['xls', 'xlsx', 'ods']);
+    const PRESENTATION_FILE_EXTENSIONS = new Set(['ppt', 'pptx', 'odp']);
+    const ARCHIVE_FILE_EXTENSIONS = new Set(['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz']);
+    const TEXT_MIME_TYPES = new Set([
+        'application/json',
+        'application/xml',
+        'application/javascript',
+        'application/x-javascript',
+        'application/sql',
+        'application/x-sh',
+        'application/x-httpd-php',
+        'text/markdown',
+        'text/x-python',
+        'text/x-java-source',
+        'text/x-c',
+        'text/x-c++src',
+        'text/x-typescript'
+    ]);
+    const DOCUMENT_MIME_TYPES = new Set([
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ]);
+    const SPREADSHEET_MIME_TYPES = new Set([
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.oasis.opendocument.spreadsheet'
+    ]);
+    const PRESENTATION_MIME_TYPES = new Set([
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/vnd.oasis.opendocument.presentation'
+    ]);
+    const ARCHIVE_MIME_TYPES = new Set([
+        'application/zip',
+        'application/x-zip-compressed',
+        'application/x-rar-compressed',
+        'application/x-7z-compressed',
+        'application/gzip',
+        'application/x-tar',
+        'application/x-bzip2',
+        'application/x-xz',
+        'application/vnd.rar'
+    ]);
+
+    function getFileExtension(fileName) {
+        if (!fileName || typeof fileName !== 'string') return '';
+        const trimmedName = fileName.trim().toLowerCase();
+        const lastDotIndex = trimmedName.lastIndexOf('.');
+        if (lastDotIndex === -1 || lastDotIndex === trimmedName.length - 1) return '';
+        return trimmedName.substring(lastDotIndex + 1);
+    }
+
+    uiHelperFunctions.resolveAttachmentFileVisual = function(fileName = '', fileType = '') {
+        const normalizedType = typeof fileType === 'string' ? fileType.toLowerCase() : '';
+        const extension = getFileExtension(fileName);
+
+        if (normalizedType.startsWith('audio/')) {
+            return { kind: 'audio', iconMarkup: audioFilePreviewIconMarkup };
+        }
+        if (normalizedType.startsWith('video/')) {
+            return { kind: 'video', iconMarkup: videoFilePreviewIconMarkup };
+        }
+        if (normalizedType.includes('pdf') || extension === 'pdf') {
+            return { kind: 'pdf', iconMarkup: pdfFilePreviewIconMarkup };
+        }
+        if (DOCUMENT_MIME_TYPES.has(normalizedType) || DOCUMENT_FILE_EXTENSIONS.has(extension)) {
+            return { kind: 'document', iconMarkup: documentFilePreviewIconMarkup };
+        }
+        if (SPREADSHEET_MIME_TYPES.has(normalizedType) || SPREADSHEET_FILE_EXTENSIONS.has(extension)) {
+            return { kind: 'spreadsheet', iconMarkup: spreadsheetFilePreviewIconMarkup };
+        }
+        if (PRESENTATION_MIME_TYPES.has(normalizedType) || PRESENTATION_FILE_EXTENSIONS.has(extension)) {
+            return { kind: 'presentation', iconMarkup: presentationFilePreviewIconMarkup };
+        }
+        if (ARCHIVE_MIME_TYPES.has(normalizedType) || ARCHIVE_FILE_EXTENSIONS.has(extension)) {
+            return { kind: 'archive', iconMarkup: archiveFilePreviewIconMarkup };
+        }
+        if (normalizedType.startsWith('text/') || TEXT_MIME_TYPES.has(normalizedType) || normalizedType === 'application/rtf' || normalizedType === 'application/vnd.oasis.opendocument.text' || TEXT_FILE_EXTENSIONS.has(extension)) {
+            return { kind: 'text', iconMarkup: textFilePreviewIconMarkup };
+        }
+        return { kind: 'file', iconMarkup: filePreviewIconMarkup };
+    };
+
+    function parseRegexParts(input) {
+        if (!input || typeof input !== 'string') {
+            return null;
+        }
+
+        // 终极修复：废除使用正则表达式解析正则表达式的脆弱方法。
+        // 改为使用明确的、手动字符串分割，这能从根本上避免转义地狱。
+        if (input.length < 2 || !input.startsWith('/') || input.lastIndexOf('/') === 0) {
+            console.error(`[regexFromString] 无效的格式: "${input}"。规则必须采用 /pattern/flags 的格式。`);
+            return null;
+        }
+
+        const lastSlashIndex = input.lastIndexOf('/');
+        return {
+            pattern: input.substring(1, lastSlashIndex),
+            flags: input.substring(lastSlashIndex + 1)
+        };
+    }
+
+    function touchRegexCacheEntry(cacheKey, entry) {
+        regexCompileCache.delete(cacheKey);
+        regexCompileCache.set(cacheKey, entry);
+        return entry;
+    }
+
+    function trimRegexCompileCache() {
+        while (regexCompileCache.size > REGEX_CACHE_MAX_ENTRIES) {
+            const oldestKey = regexCompileCache.keys().next().value;
+            if (oldestKey === undefined) break;
+            regexCompileCache.delete(oldestKey);
+        }
+    }
+
+    /**
+     * 从字符串中解析正则表达式（支持 /pattern/flags 格式）
+     * @param {string} input - 正则表达式字符串，如 "/test/gi" 或普通字符串 "test"
+     * @returns {RegExp|null} - 返回RegExp对象，如果解析失败则返回null
+     */
+    uiHelperFunctions.regexFromString = function(input) {
+        const compiled = uiHelperFunctions.getCompiledRegex(input);
+        return compiled ? compiled.regex : null;
+    };
+
+    /**
+     * 带缓存地编译正则表达式，避免历史载入/上下文组装时重复 new RegExp。
+     * @param {string} input - 正则表达式字符串，如 "/test/gi"
+     * @returns {{regex: RegExp, error: null}|{regex: null, error: Error}|null}
+     */
+    uiHelperFunctions.getCompiledRegex = function(input) {
+        const parts = parseRegexParts(input);
+        if (!parts) {
+            return null;
+        }
+
+        const cacheKey = `${parts.pattern}/${parts.flags}`;
+        const cached = regexCompileCache.get(cacheKey);
+        if (cached) {
+            return touchRegexCacheEntry(cacheKey, cached);
+        }
+
+        let entry;
+        try {
+            entry = {
+                regex: new RegExp(parts.pattern, parts.flags),
+                error: null
+            };
+        } catch (e) {
+            console.error(`[regexFromString] 解析正则表达式 "${input}" 失败:`, e);
+            entry = {
+                regex: null,
+                error: e
+            };
+        }
+
+        regexCompileCache.set(cacheKey, entry);
+        trimRegexCompileCache();
+        return entry;
+    };
+
+    uiHelperFunctions.clearRegexCompileCache = function() {
+        regexCompileCache.clear();
+    };
+
+    function getChatScrollContainer() {
+        return document.querySelector('.chat-messages-container');
+    }
+
+    function getDistanceFromChatBottom(container) {
+        return Math.max(0, container.scrollHeight - container.clientHeight - container.scrollTop);
+    }
+
+    function isChatNearBottom(container, threshold = CHAT_BOTTOM_THRESHOLD_PX) {
+        return getDistanceFromChatBottom(container) <= threshold;
+    }
+
+    // 跟随状态每次真正翻转都在滚动容器上派发 CHAT_FOLLOW_CHANGE_EVENT；
+    // 「回到底部」按钮这类界面只订阅事件，不直接读写内部状态。
+    function setChatFollowBottom(container, state, followBottom) {
+        if (state.followBottom === followBottom) return;
+        state.followBottom = followBottom;
+        const EventCtor = container.ownerDocument?.defaultView?.CustomEvent;
+        if (typeof EventCtor === 'function') {
+            container.dispatchEvent(new EventCtor(CHAT_FOLLOW_CHANGE_EVENT, { detail: { followBottom } }));
+        }
+    }
+
+    function getChatScrollState(container) {
+        let state = chatScrollStates.get(container);
+        if (state) return state;
+
+        state = {
+            // 这是用户授予的“持续跟随底部”意图，不是瞬时几何测量结果。
+            // 图片、图表等异步增高可能暂时令滚动条远离底部，但不能据此关闭跟随。
+            followBottom: true,
+            generation: 0,
+            programmatic: false,
+            userScrollActive: false,
+            frameId: 0,
+            layoutFrameId: 0,
+            requestedGeneration: null,
+            resizeObserver: null
+        };
+        chatScrollStates.set(container, state);
+
+        const cancelPendingScroll = () => {
+            if (state.frameId) {
+                cancelAnimationFrame(state.frameId);
+                state.frameId = 0;
+            }
+            state.requestedGeneration = null;
+        };
+
+        const markUserIntent = () => {
+            state.programmatic = false;
+            state.userScrollActive = true;
+            state.generation += 1;
+            cancelPendingScroll();
+        };
+
+        const settleUserScrollIntent = () => {
+            const expectedGeneration = state.generation;
+            requestAnimationFrame(() => {
+                // 结算必须仍属于发起它的那次用户操作。比如一次向下滚动排队后，
+                // 用户立刻改为向上滚动，旧结算不得在下一帧重新开启跟随。
+                if (!container.isConnected || state.generation !== expectedGeneration) return;
+                const nearBottom = isChatNearBottom(container);
+                // 用户主动回到底部时重新授权持续跟随；离开底部则保持关闭。
+                setChatFollowBottom(container, state, nearBottom);
+                state.userScrollActive = false;
+            });
+        };
+
+        container.addEventListener('wheel', (event) => {
+            markUserIntent();
+            if (event.deltaY < 0) {
+                // 向上滚轮是明确的解锁意图。保持 userScrollActive，直到后续
+                // 向下滚动结算；这样该滚轮默认行为产生的近底部 scroll 事件
+                // 不会在同一轮事件中立刻把 followBottom 改回 true。
+                setChatFollowBottom(container, state, false);
+            } else {
+                settleUserScrollIntent();
+            }
+        }, { passive: true });
+
+        container.addEventListener('touchstart', markUserIntent, { passive: true });
+        container.addEventListener('touchend', settleUserScrollIntent, { passive: true });
+        container.addEventListener('touchcancel', settleUserScrollIntent, { passive: true });
+        container.addEventListener('pointerdown', (event) => {
+            // 普通内容点击不改变跟随状态；只把滚动条槽附近的按下视为滚动意图。
+            const scrollbarWidth = Math.max(0, container.offsetWidth - container.clientWidth);
+            const rect = container.getBoundingClientRect();
+            if (scrollbarWidth > 0 && event.clientX >= rect.right - scrollbarWidth - 2) {
+                markUserIntent();
+            }
+        }, { passive: true });
+        container.addEventListener('pointerup', () => {
+            if (state.userScrollActive) settleUserScrollIntent();
+        }, { passive: true });
+        container.addEventListener('pointercancel', () => {
+            if (state.userScrollActive) settleUserScrollIntent();
+        }, { passive: true });
+
+        let lastScrollTop = container.scrollTop;
+        container.addEventListener('scroll', () => {
+            const top = container.scrollTop;
+            const movedUp = top < lastScrollTop - 1;
+            const movedDown = top > lastScrollTop + 1;
+            lastScrollTop = top;
+            // Keyboard and native scrollbar scrolling can arrive without a
+            // wheel event. Content growing below the reader doesn't move top.
+            if (movedUp && getDistanceFromChatBottom(container) > 1 && state.followBottom) {
+                markUserIntent();
+                setChatFollowBottom(container, state, false);
+                return;
+            }
+            if (state.programmatic) return;
+            if (movedDown && getDistanceFromChatBottom(container) <= 1) {
+                state.userScrollActive = false;
+                setChatFollowBottom(container, state, true);
+                return;
+            }
+
+            if (state.userScrollActive) {
+                // 用户操作期间，scroll 几何只能证明“已经离开底部”，不能覆盖
+                // 更早到达的向上滚轮解锁意图。重新开启统一交给向下滚轮、
+                // touchend 或滚动条 pointerup 的代际保护结算。
+                if (!isChatNearBottom(container)) {
+                    setChatFollowBottom(container, state, false);
+                }
+                return;
+            }
+
+            // 兼容键盘 End、无障碍工具等未被上述输入事件标记的原生滚动：
+            // 只有真正到达底部（而非落入 50px 追踪阈值）才重新开启跟随。
+            // 这同时防止小幅向上滚轮产生的 scroll 事件发生近底部竞态。
+            if (getDistanceFromChatBottom(container) <= 1) {
+                setChatFollowBottom(container, state, true);
+            }
+        }, { passive: true });
+
+        // 统一处理图片、Mermaid、公式、附件及字体加载造成的异步内容增高。
+        // ResizeObserver 观察内容根而非滚动视口；仅在用户的跟随授权仍有效、
+        // 且滚动代际未变化时补滚到底部。
+        const ResizeObserverCtor = window.ResizeObserver;
+        if (typeof ResizeObserverCtor === 'function') {
+            const contentRoot = container.querySelector('#chatMessages') || container.firstElementChild || container;
+            state.resizeObserver = new ResizeObserverCtor(() => {
+                if (!state.followBottom || state.layoutFrameId || !container.isConnected) return;
+                const expectedGeneration = state.generation;
+                state.layoutFrameId = requestAnimationFrame(() => {
+                    state.layoutFrameId = 0;
+                    if (
+                        !container.isConnected
+                        || !state.followBottom
+                        || state.generation !== expectedGeneration
+                    ) {
+                        return;
+                    }
+                    uiHelperFunctions.scrollToBottom({
+                        force: true,
+                        immediate: true,
+                        expectedGeneration
+                    });
+                });
+            });
+            state.resizeObserver.observe(contentRoot);
+        }
+
+        return state;
+    }
+
+    /**
+     * Captures the Surface-level bottom-follow intent before a DOM mutation.
+     * The generation prevents a deferred programmatic scroll from overriding
+     * user input that occurs between the mutation and the next animation frame.
+     */
+    uiHelperFunctions.captureChatScrollFollow = function() {
+        const container = getChatScrollContainer();
+        if (!container) return { followBottom: false, generation: -1 };
+        const state = getChatScrollState(container);
+        return {
+            followBottom: state.followBottom,
+            generation: state.generation
+        };
+    };
+
+    uiHelperFunctions.observeChatScrollContent = function(element) {
+        const container = getChatScrollContainer();
+        if (!container?.contains(element)) return;
+        const observer = getChatScrollState(container).resizeObserver;
+        if (!observer) return;
+        observer.observe(element);
+        return () => observer.unobserve(element);
+    };
+
+    uiHelperFunctions.isNearChatBottom = function(threshold = CHAT_BOTTOM_THRESHOLD_PX) {
+        const container = getChatScrollContainer();
+        return !!container && isChatNearBottom(container, threshold);
+    };
+
+    uiHelperFunctions.resetChatScrollFollow = function() {
+        const container = getChatScrollContainer();
+        if (!container) return;
+        const state = getChatScrollState(container);
+        state.generation += 1;
+        setChatFollowBottom(container, state, true);
+        state.programmatic = false;
+        state.userScrollActive = false;
+        state.requestedGeneration = null;
+        if (state.frameId) {
+            cancelAnimationFrame(state.frameId);
+            state.frameId = 0;
+        }
+        if (state.layoutFrameId) {
+            cancelAnimationFrame(state.layoutFrameId);
+            state.layoutFrameId = 0;
+        }
+    };
+
+    /**
+     * Releases bottom-follow before a programmatic jump (search result, turn
+     * navigator). The jump itself is not user input, so follow would stay on and
+     * content-visibility messages that grow while the jump passes them would let
+     * the ResizeObserver pull the view back to the bottom. Reaching the bottom
+     * again re-enables follow as usual.
+     */
+    uiHelperFunctions.releaseChatScrollFollow = function() {
+        const container = getChatScrollContainer();
+        if (!container) return;
+        const state = getChatScrollState(container);
+        state.generation += 1;
+        state.programmatic = false;
+        state.userScrollActive = false;
+        state.requestedGeneration = null;
+        if (state.frameId) {
+            cancelAnimationFrame(state.frameId);
+            state.frameId = 0;
+        }
+        if (state.layoutFrameId) {
+            cancelAnimationFrame(state.layoutFrameId);
+            state.layoutFrameId = 0;
+        }
+        setChatFollowBottom(container, state, false);
+    };
+
+    uiHelperFunctions.CHAT_FOLLOW_CHANGE_EVENT = CHAT_FOLLOW_CHANGE_EVENT;
+
+    /**
+     * Scrolls the chat Surface to the bottom when bottom-follow is active.
+     * Calls in one paint frame are normally coalesced. `force` bypasses the
+     * current geometry check, while `expectedGeneration` still protects user
+     * intent. `immediate` is reserved for callers already executing inside an
+     * animation frame: it commits the post-mutation scroll position before
+     * that frame is painted instead of introducing one extra visible frame.
+     */
+    uiHelperFunctions.scrollToBottom = function(options = {}) {
+        const container = getChatScrollContainer();
+        if (!container) return false;
+
+        const state = getChatScrollState(container);
+        const force = options?.force === true;
+        const immediate = options?.immediate === true;
+        const expectedGeneration = Number.isInteger(options?.expectedGeneration)
+            ? options.expectedGeneration
+            : null;
+
+        if (expectedGeneration !== null && state.generation !== expectedGeneration) {
+            return false;
+        }
+        // Once detached, passive appends cannot reacquire follow from geometry.
+        if (!force && !state.followBottom) {
+            return false;
+        }
+
+        setChatFollowBottom(container, state, true);
+        state.requestedGeneration = expectedGeneration ?? state.generation;
+
+        const commitScroll = () => {
+            const requestedGeneration = state.requestedGeneration;
+            state.requestedGeneration = null;
+            if (
+                !container.isConnected
+                || requestedGeneration !== state.generation
+                || !state.followBottom
+            ) {
+                return;
+            }
+
+            state.programmatic = true;
+            container.scrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+            requestAnimationFrame(() => {
+                if (state.generation === requestedGeneration) state.programmatic = false;
+            });
+        };
+
+        if (immediate) {
+            // A deferred request from an earlier mutation is now superseded by
+            // this frame's newer geometry. Commit synchronously so Chromium
+            // cannot paint the grown stream tail at the old scroll position.
+            if (state.frameId) {
+                cancelAnimationFrame(state.frameId);
+                state.frameId = 0;
+            }
+            commitScroll();
+            return true;
+        }
+
+        if (state.frameId) return true;
+
+        state.frameId = requestAnimationFrame(() => {
+            state.frameId = 0;
+            commitScroll();
+        });
+        return true;
+    };
+
+    /**
+     * Automatically resizes a textarea to fit its content.
+     * Repeated calls in the same frame are coalesced to avoid write-read-write layout thrashing.
+     * @param {HTMLTextAreaElement} textarea The textarea element.
+     */
+    uiHelperFunctions.autoResizeTextarea = function(textarea) {
+        if (!textarea) return;
+
+        let state = textareaResizeStates.get(textarea);
+        if (!state) {
+            state = { frameId: 0, lastHeight: null };
+            textareaResizeStates.set(textarea, state);
+        }
+        if (state.frameId) return;
+
+        state.frameId = requestAnimationFrame(() => {
+            state.frameId = 0;
+            if (!textarea.isConnected) return;
+
+            // 🟢 视口锚定守护：找到向上最近的滚动容器，记录当前的 scrollTop
+            const scrollContainer = textarea.closest?.('.chat-messages-container')
+                || textarea.closest?.('.sidebar-list-scroll')
+                || (textarea.parentElement && getComputedStyle(textarea.parentElement).overflowY !== 'visible' ? textarea.parentElement : null);
+            const savedScrollTop = scrollContainer ? scrollContainer.scrollTop : null;
+
+            // 避免父级发生高度瞬间崩塌（利用父级临时 minHeight 或当前 clientHeight 撑住）
+            const currentHeight = textarea.clientHeight;
+            const parent = textarea.parentElement;
+            let originalParentMinHeight = '';
+            if (parent && currentHeight > 0) {
+                originalParentMinHeight = parent.style.minHeight;
+                parent.style.minHeight = `${parent.clientHeight}px`;
+            }
+
+            textarea.style.height = 'auto';
+            const computed = getComputedStyle(textarea);
+            const maxHeight = parseFloat(computed.maxHeight);
+            const minHeight = parseFloat(computed.minHeight) || 0;
+            const measuredHeight = textarea.scrollHeight;
+            const nextHeight = Math.max(
+                minHeight,
+                Number.isFinite(maxHeight) ? Math.min(measuredHeight, maxHeight) : measuredHeight
+            );
+
+            if (state.lastHeight !== nextHeight) {
+                textarea.style.height = `${nextHeight}px`;
+                state.lastHeight = nextHeight;
+            } else {
+                textarea.style.height = `${state.lastHeight}px`;
+            }
+
+            // 恢复父级 minHeight
+            if (parent && currentHeight > 0) {
+                parent.style.minHeight = originalParentMinHeight;
+            }
+
+            // 🟢 恢复被截断的 scrollTop，保证视口绝对纹丝不动
+            if (scrollContainer && savedScrollTop !== null && scrollContainer.scrollTop !== savedScrollTop) {
+                scrollContainer.scrollTop = savedScrollTop;
+            }
+        });
+    };
+
+    /**
+     * Opens a modal dialog by its ID.
+     * @param {string} modalId The ID of the modal element.
+     */
+    uiHelperFunctions.openModal = function(modalId) {
+        let modalElement = document.getElementById(modalId);
+        
+        // 如果元素不存在，尝试从模板加载
+        if (!modalElement) {
+            const template = document.getElementById(modalId + 'Template');
+            if (template) {
+                const container = document.getElementById('modal-container');
+                if (container) {
+                    const clone = template.content.cloneNode(true);
+                    container.appendChild(clone);
+                    modalElement = document.getElementById(modalId);
+                    console.log(`[UI Helper] Modal "${modalId}" instantiated from template.`);
+                    
+                    // 🟢 关键：触发一个自定义事件，通知其他模块该模态框已就绪
+                    // 这样可以延迟绑定事件监听器
+                    document.dispatchEvent(new CustomEvent('modal-ready', { detail: { modalId } }));
+                }
+            }
+        }
+
+        if (modalElement) {
+            const generation = (modalGenerations.get(modalId) || 0) + 1;
+            modalGenerations.set(modalId, generation);
+            modalElement.classList.add('active');
+            document.dispatchEvent(new CustomEvent('modal-visibility-changed', {
+                detail: { modalId, active: true, root: modalElement, generation }
+            }));
+            // 确保新打开的模态框获得焦点
+            modalElement.focus();
+        } else {
+            console.warn(`[UI Helper] Modal "${modalId}" not found and no template available.`);
+        }
+    };
+
+    /**
+     * Closes a modal dialog by its ID.
+     * @param {string} modalId The ID of the modal element.
+     */
+    uiHelperFunctions.closeModal = function(modalId) {
+        const modalElement = document.getElementById(modalId);
+        if (!modalElement) return Promise.resolve(false);
+        const finishClose = () => {
+            if (!modalElement.isConnected) return false;
+            modalElement.classList.remove('active');
+            document.dispatchEvent(new CustomEvent('modal-visibility-changed', {
+                detail: { modalId, active: false, root: modalElement, generation: modalGenerations.get(modalId) || 0 }
+            }));
+            return true;
+        };
+        if (modalId === 'globalSettingsModal' && modalElement.classList.contains('active')) {
+            // Hiding the connected surface keeps its draft owners alive. Only owner teardown awaits durability.
+            const coordinator = window.VCPUISettingsBridge?.flush;
+            if (typeof coordinator === 'function') {
+                Promise.resolve().then(() => coordinator()).catch(error => {
+                    console.warn('[UI Helper] Settings close flush failed:', error);
+                });
+            }
+        }
+        return finishClose();
+    };
+
+    /**
+     * Shows a toast notification.
+     * @param {string} message The message to display.
+     * @param {number} [duration=3000] The duration in milliseconds.
+     */
+    uiHelperFunctions.showToastNotification = function(message, type = 'info', duration = 3000) {
+        if (window.VCPUI?.feedback?.toast) {
+            const variant = type === 'error' ? 'error' : ['info', 'success', 'warning'].includes(type) ? type : 'info';
+            return window.VCPUI.feedback.toast(String(message), { variant, duration });
+        }
+
+        const container = document.getElementById('floating-toast-notifications-container');
+        if (!container) {
+            console.warn("Toast notification container not found.");
+            alert(message); // Fallback
+            return;
+        }
+
+        const toast = document.createElement('div');
+        toast.className = `floating-toast-notification ${type}`; // e.g., 'info', 'success', 'error'
+        toast.textContent = message;
+
+        container.appendChild(toast);
+
+        // Animate in
+        requestAnimationFrame(() => {
+            toast.classList.add('visible');
+        });
+
+        const removeToast = () => {
+            if (!toast.parentNode) return; // Already removed
+            toast.classList.remove('visible');
+            toast.classList.add('exiting');
+            
+            const onTransitionEnd = (event) => {
+                if (event.propertyName === 'transform' && toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                    toast.removeEventListener('transitionend', onTransitionEnd);
+                }
+            };
+            toast.addEventListener('transitionend', onTransitionEnd);
+
+            // Fallback removal
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 500); // Should match animation duration
+        };
+
+        // Set timer to animate out and remove
+        const removalTimeout = setTimeout(removeToast, duration);
+
+        // Add click listener to remove early
+        toast.addEventListener('click', () => {
+            clearTimeout(removalTimeout); // Cancel the scheduled removal
+            removeToast();
+        });
+    };
+
+    /**
+     * Shows temporary feedback on a button after an action.
+     * @param {HTMLButtonElement} buttonElement The button element.
+     * @param {boolean} success Whether the action was successful.
+     * @param {string} tempText The temporary text to show.
+     * @param {string} originalText The original text of the button.
+     */
+    uiHelperFunctions.showSaveFeedback = function(buttonElement, success, tempText, originalText) {
+        if (!buttonElement) return;
+        buttonElement.textContent = tempText;
+        buttonElement.disabled = true;
+        if (!success) buttonElement.classList.add('error-feedback');
+
+        setTimeout(() => {
+            buttonElement.textContent = originalText;
+            buttonElement.disabled = false;
+            if (!success) buttonElement.classList.remove('error-feedback');
+        }, success ? 2000 : 3000);
+    };
+
+    /**
+     * Shows a topic context menu (delegated to topicListManager).
+     * @param {Event} event The context menu event.
+     * @param {HTMLElement} topicItemElement The topic list item element.
+     * @param {Object} itemFullConfig The full item configuration.
+     * @param {Object} topic The topic object.
+     * @param {string} itemType The item type ('agent' or 'group').
+     */
+    uiHelperFunctions.showTopicContextMenu = function(event, topicItemElement, itemFullConfig, topic, itemType) {
+        // Delegate to topicListManager if available
+        if (window.topicListManager && window.topicListManager.showTopicContextMenu) {
+            window.topicListManager.showTopicContextMenu(event, topicItemElement, itemFullConfig, topic, itemType);
+        } else {
+            console.warn('[UI Helper] topicListManager.showTopicContextMenu not available');
+        }
+    };
+
+    /**
+     * Opens an avatar cropping modal.
+     * @param {File} file The image file to crop.
+     * @param {function(File): void} onCropConfirmedCallback Callback with the cropped file.
+     * @param {string} [cropType='agent'] The type of avatar ('agent', 'group', 'user').
+     */
+    uiHelperFunctions.openAvatarCropper = async function(file, onCropConfirmedCallback, cropType = 'agent') {
+        // 🟢 修复：先调用 openModal 确保从模板实例化 DOM 元素
+        uiHelperFunctions.openModal('avatarCropperModal');
+
+        const cropperContainer = document.getElementById('avatarCropperContainer');
+        const canvas = document.getElementById('avatarCanvas');
+        const confirmCropBtn = document.getElementById('confirmCropBtn');
+        const cancelCropBtn = document.getElementById('cancelCropBtn');
+        const cropCircleSVG = document.getElementById('cropCircle');
+        const cropCircleBorderSVG = document.getElementById('cropCircleBorder');
+
+        if (!cropperContainer || !canvas || !confirmCropBtn || !cancelCropBtn || !cropCircleSVG || !cropCircleBorderSVG) {
+            console.error("Avatar cropper elements not found even after modal open!");
+            return;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        canvas.style.display = 'block';
+        cropperContainer.style.cursor = 'grab';
+
+        let img = new Image();
+        let currentEventListeners = {};
+
+        img.onload = () => {
+            canvas.width = 360;
+            canvas.height = 360;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+            let scaledWidth = img.width * scale;
+            let scaledHeight = img.height * scale;
+            let offsetX = (canvas.width - scaledWidth) / 2;
+            let offsetY = (canvas.height - scaledHeight) / 2;
+            ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
+
+            let circle = { x: canvas.width / 2, y: canvas.height / 2, r: Math.min(canvas.width / 2, canvas.height / 2, 100) };
+            updateCircleSVG();
+
+            let isDragging = false;
+            let dragStartX, dragStartY, circleStartX, circleStartY;
+
+            function updateCircleSVG() {
+                cropCircleSVG.setAttribute('cx', circle.x);
+                cropCircleSVG.setAttribute('cy', circle.y);
+                cropCircleSVG.setAttribute('r', circle.r);
+                cropCircleBorderSVG.setAttribute('cx', circle.x);
+                cropCircleBorderSVG.setAttribute('cy', circle.y);
+                cropCircleBorderSVG.setAttribute('r', circle.r);
+            }
+
+            currentEventListeners.onMouseDown = (e) => {
+                const rect = cropperContainer.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                if (Math.sqrt((mouseX - circle.x)**2 + (mouseY - circle.y)**2) < circle.r + 10) {
+                    isDragging = true;
+                    dragStartX = mouseX;
+                    dragStartY = mouseY;
+                    circleStartX = circle.x;
+                    circleStartY = circle.y;
+                    cropperContainer.style.cursor = 'grabbing';
+                }
+            };
+
+            currentEventListeners.onMouseMove = (e) => {
+                if (!isDragging) return;
+                const rect = cropperContainer.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                circle.x = circleStartX + (mouseX - dragStartX);
+                circle.y = circleStartY + (mouseY - dragStartY);
+                circle.x = Math.max(circle.r, Math.min(canvas.width - circle.r, circle.x));
+                circle.y = Math.max(circle.r, Math.min(canvas.height - circle.r, circle.y));
+                updateCircleSVG();
+            };
+
+            currentEventListeners.onMouseUpOrLeave = () => {
+                isDragging = false;
+                cropperContainer.style.cursor = 'grab';
+            };
+
+            currentEventListeners.onWheel = (e) => {
+                e.preventDefault();
+                const zoomFactor = e.deltaY < 0 ? 1.05 : 0.95;
+                const newRadius = Math.max(30, Math.min(Math.min(canvas.width, canvas.height) / 2, circle.r * zoomFactor));
+                if (newRadius === circle.r) return;
+                circle.r = newRadius;
+                circle.x = Math.max(circle.r, Math.min(canvas.width - circle.r, circle.x));
+                circle.y = Math.max(circle.r, Math.min(canvas.height - circle.r, circle.y));
+                updateCircleSVG();
+            };
+
+            currentEventListeners.onConfirmCrop = () => {
+                const finalCropCanvas = document.createElement('canvas');
+                const finalSize = circle.r * 2;
+                finalCropCanvas.width = finalSize;
+                finalCropCanvas.height = finalSize;
+                const finalCtx = finalCropCanvas.getContext('2d');
+
+                finalCtx.drawImage(canvas,
+                    circle.x - circle.r, circle.y - circle.r,
+                    finalSize, finalSize,
+                    0, 0,
+                    finalSize, finalSize
+                );
+
+                finalCtx.globalCompositeOperation = 'destination-in';
+                finalCtx.beginPath();
+                finalCtx.arc(circle.r, circle.r, circle.r, 0, Math.PI * 2);
+                finalCtx.fill();
+                finalCtx.globalCompositeOperation = 'source-over';
+
+                finalCropCanvas.toBlob((blob) => {
+                    if (!blob) {
+                        console.error("[AvatarCropper] Failed to create blob from final canvas.");
+                        uiHelperFunctions.showToastNotification("裁剪失败，无法生成图片数据。", 'error');
+                        return;
+                    }
+                    const croppedFile = new File([blob], `${cropType}_avatar.png`, { type: "image/png" });
+                    if (typeof onCropConfirmedCallback === 'function') {
+                        onCropConfirmedCallback(croppedFile);
+                    }
+                    cleanupAndClose();
+                }, 'image/png');
+            };
+
+            currentEventListeners.onCancelCrop = () => {
+                cleanupAndClose();
+                const agentAvatarInput = document.getElementById('agentAvatarInput');
+                const userAvatarInput = document.getElementById('userAvatarInput');
+                if (cropType === 'agent' && agentAvatarInput) agentAvatarInput.value = '';
+                else if (cropType === 'user' && userAvatarInput) userAvatarInput.value = '';
+                else if (cropType === 'group' && window.GroupRenderer) {
+                    const groupAvatarInputElement = document.getElementById('groupAvatarInput');
+                    if (groupAvatarInputElement) groupAvatarInputElement.value = '';
+                }
+            };
+
+            function cleanupAndClose() {
+                cropperContainer.removeEventListener('mousedown', currentEventListeners.onMouseDown);
+                document.removeEventListener('mousemove', currentEventListeners.onMouseMove);
+                document.removeEventListener('mouseup', currentEventListeners.onMouseUpOrLeave);
+                cropperContainer.removeEventListener('mouseleave', currentEventListeners.onMouseUpOrLeave);
+                cropperContainer.removeEventListener('wheel', currentEventListeners.onWheel);
+                confirmCropBtn.removeEventListener('click', currentEventListeners.onConfirmCrop);
+                cancelCropBtn.removeEventListener('click', currentEventListeners.onCancelCrop);
+                uiHelperFunctions.closeModal('avatarCropperModal');
+            }
+
+            cropperContainer.addEventListener('mousedown', currentEventListeners.onMouseDown);
+            document.addEventListener('mousemove', currentEventListeners.onMouseMove);
+            document.addEventListener('mouseup', currentEventListeners.onMouseUpOrLeave);
+            cropperContainer.addEventListener('mouseleave', currentEventListeners.onMouseUpOrLeave);
+            cropperContainer.addEventListener('wheel', currentEventListeners.onWheel);
+            confirmCropBtn.addEventListener('click', currentEventListeners.onConfirmCrop);
+            cancelCropBtn.addEventListener('click', currentEventListeners.onCancelCrop);
+        };
+
+        img.onerror = () => {
+            console.error("[AvatarCropper] Image failed to load from blob URL.");
+            uiHelperFunctions.showToastNotification("无法加载选择的图片，请尝试其他图片。", 'error');
+            uiHelperFunctions.closeModal('avatarCropperModal');
+        };
+        img.src = URL.createObjectURL(file);
+    };
+
+    /**
+     * Updates the attachment preview area with current attached files.
+     * @param {Array} attachedFiles Array of attached file objects.
+     * @param {HTMLElement} attachmentPreviewArea The preview area element.
+     * @param {function(number): boolean} [removeAttachmentAt] Owner command for immutable attachment state.
+     */
+    uiHelperFunctions.updateAttachmentPreview = function(attachedFiles, attachmentPreviewArea, removeAttachmentAt = null) {
+        if (!attachmentPreviewArea) {
+            console.error('[UI Helper] updateAttachmentPreview: attachmentPreviewArea is null or undefined!');
+            return;
+        }
+    
+        attachmentPreviewArea.innerHTML = ''; // Clear previous previews
+        if (attachedFiles.length === 0) {
+            attachmentPreviewArea.style.display = 'none';
+            return;
+        }
+        attachmentPreviewArea.style.display = 'flex'; // Show the area
+    
+        attachedFiles.forEach((af, index) => {
+            const prevDiv = document.createElement('div');
+            prevDiv.className = 'attachment-preview-item';
+    
+            const fileType = af.file.type;
+            const fileName = af.originalName || af.file.name || '';
+            const fileVisual = uiHelperFunctions.resolveAttachmentFileVisual(fileName, fileType);
+            const isPdf = fileVisual.kind === 'pdf' || /\.pdf$/i.test(fileName);
+            const pdfMeta = af._fileManagerData?.pdfMeta || af.pdfMeta;
+            const hasImageFrames = (af._fileManagerData?.imageFrames?.length > 0) || (af.imageFrames?.length > 0);
+            const isScannedPdf = isPdf && (pdfMeta?.isScanned === true || hasImageFrames);
+
+            let previewTitle = af.originalName || af.file.name;
+            if (isScannedPdf) {
+                const pages = pdfMeta?.totalPages || af._fileManagerData?.imageFrames?.length || af.imageFrames?.length;
+                previewTitle += pages ? ` (扫描版PDF·共${pages}页已转图像)` : ` (扫描版PDF·已转图像)`;
+            } else if (isPdf && pdfMeta?.totalPages) {
+                previewTitle += ` (PDF·共${pdfMeta.totalPages}页)`;
+            }
+            prevDiv.title = previewTitle;
+    
+            if (fileType.startsWith('image/')) {
+                const thumbnailImg = document.createElement('img');
+                thumbnailImg.className = 'attachment-thumbnail-image';
+                thumbnailImg.src = af.localPath; // Assumes localPath is a usable URL (e.g., file://)
+                thumbnailImg.alt = af.originalName || af.file.name;
+                thumbnailImg.onerror = () => { // Fallback to icon if image fails to load
+                    thumbnailImg.remove(); // Remove broken image
+                    const iconSpanFallback = document.createElement('span');
+                    iconSpanFallback.className = 'file-preview-icon';
+                    iconSpanFallback.innerHTML = filePreviewIconMarkup;
+                    prevDiv.prepend(iconSpanFallback); // Add fallback icon at the beginning
+                };
+                prevDiv.appendChild(thumbnailImg);
+            } else {
+                const iconSpan = document.createElement('span');
+                iconSpan.className = 'file-preview-icon';
+                iconSpan.innerHTML = fileVisual.iconMarkup;
+                prevDiv.appendChild(iconSpan);
+            }
+    
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'file-preview-name';
+            let displayName = af.originalName || af.file.name;
+            if (isScannedPdf) {
+                const badge = pdfMeta?.totalPages ? ` [扫描件·${pdfMeta.totalPages}页]` : ` [扫描件]`;
+                displayName = (displayName.length > 15 ? displayName.substring(0, 12) + '...' : displayName) + badge;
+            } else {
+                displayName = displayName.length > 20 ? displayName.substring(0, 17) + '...' : displayName;
+            }
+            nameSpan.textContent = displayName;
+            prevDiv.appendChild(nameSpan);
+    
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'file-preview-remove-btn';
+            removeBtn.innerHTML = '×';
+            removeBtn.title = '移除此附件';
+            removeBtn.onclick = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (typeof removeAttachmentAt === 'function') {
+                    removeAttachmentAt(index);
+                    return;
+                }
+                attachedFiles.splice(index, 1);
+                uiHelperFunctions.updateAttachmentPreview(attachedFiles, attachmentPreviewArea);
+            };
+            prevDiv.appendChild(removeBtn);
+    
+            attachmentPreviewArea.appendChild(prevDiv);
+        });
+    };
+
+    /**
+     * Helper to get a centrally stored cropped file (agent, group, or user).
+     * @param {string} type The type of avatar ('agent', 'group', 'user').
+     * @returns {File|null} The cropped file or null.
+     */
+    uiHelperFunctions.getCroppedFile = function(type) {
+        if (type === 'agent') return croppedAgentAvatarFile;
+        if (type === 'group') return croppedGroupAvatarFile;
+        if (type === 'user') return croppedUserAvatarFile;
+        return null;
+    };
+
+    /**
+     * Helper to set a centrally stored cropped file.
+     * @param {string} type The type of avatar ('agent', 'group', 'user').
+     * @param {File|null} file The cropped file to store.
+     */
+    uiHelperFunctions.setCroppedFile = function(type, file) {
+        if (type === 'agent') croppedAgentAvatarFile = file;
+        else if (type === 'group') croppedGroupAvatarFile = file;
+        else if (type === 'user') croppedUserAvatarFile = file;
+    };
+
+    /**
+     * Function to extract average color from an avatar image.
+     * @param {string} imageUrl The URL of the image.
+     * @param {function(string): void} callback Callback with the average color.
+     */
+    uiHelperFunctions.getAverageColorFromAvatar = function(imageUrl, callback) {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+
+            try {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                let r = 0, g = 0, b = 0, count = 0;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    if (data[i + 3] > 0) { // Only count non-transparent pixels
+                        r += data[i];
+                        g += data[i + 1];
+                        b += data[i + 2];
+                        count++;
+                    }
+                }
+
+                if (count > 0) {
+                    r = Math.round(r / count);
+                    g = Math.round(g / count);
+                    b = Math.round(b / count);
+                    const avgColor = `rgb(${r}, ${g}, ${b})`;
+                    callback(avgColor);
+                } else {
+                    callback(null);
+                }
+            } catch (error) {
+                console.error('[UI Helper] Error extracting color from avatar:', error);
+                callback(null);
+            }
+        };
+        img.onerror = function() {
+            console.error('[UI Helper] Failed to load image for color extraction:', imageUrl);
+            callback(null);
+        };
+        img.src = imageUrl;
+    };
+
+    uiHelperFunctions.prepareGroupSettingsDOM = function() {
+        // The host is static in main.html so renderer bindings can capture it
+        // before DOMContentLoaded. Keep this fallback for embedded/legacy hosts.
+        if (!document.getElementById('groupSettingsContainer')) {
+            const settingsTab = document.getElementById('tabContentSettings');
+            if (settingsTab) {
+                const groupContainerHTML = '<div id="groupSettingsContainer" class="settings-sidebar-surface-view" data-settings-view="group"></div>';
+                settingsTab.insertAdjacentHTML('beforeend', groupContainerHTML);
+                console.log("[UI Helper] groupSettingsContainer placeholder created.");
+            } else {
+                console.error("[UI Helper] Could not find tabContentSettings to append group settings DOM placeholder.");
+            }
+        }
+    };
+
+    uiHelperFunctions.addNetworkPathInput = function(path = '') {
+        const container = document.getElementById('networkNotesPathsContainer');
+        const inputGroup = document.createElement('div');
+        inputGroup.className = 'network-path-input-group';
+    
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.name = 'networkNotesPath';
+        input.placeholder = '例如 \\\\NAS\\Shared\\Notes';
+        input.value = path;
+        input.style.flexGrow = '1';
+    
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = '删除';
+        removeBtn.className = 'sidebar-button small-button danger-button'; // Re-use existing styles
+        removeBtn.style.width = 'auto';
+        removeBtn.onclick = () => {
+            inputGroup.remove();
+        };
+    
+        inputGroup.appendChild(input);
+        inputGroup.appendChild(removeBtn);
+        container.appendChild(inputGroup);
+    };
+
+    uiHelperFunctions.filterAgentList = function(searchTerm) {
+        const lowerCaseSearchTerm = String(searchTerm ?? '').toLowerCase().trim();
+        const itemListUl = document.getElementById('agentList'); // Renamed from agentListUl to itemListUl
+        if (!itemListUl) return;
+        const items = itemListUl.querySelectorAll('li'); // Get all list items
+
+        if (!lowerCaseSearchTerm) {
+            items.forEach(item => { item.style.display = ''; });
+            return;
+        }
+
+        const terms = lowerCaseSearchTerm.split(/\s+/).filter(Boolean);
+        items.forEach(item => {
+            const nameElement = item.querySelector('.agent-name');
+            if (!nameElement) return;
+            const name = (nameElement.textContent || '').toLowerCase();
+
+            // Check if all search terms match the name (via substring or ordered-subsequence)
+            const allMatch = terms.every(term => {
+                if (name.includes(term)) return true;
+                // Ordered subsequence matching
+                let termIdx = 0;
+                for (let i = 0; i < name.length && termIdx < term.length; i++) {
+                    if (name[i] === term[termIdx]) termIdx++;
+                }
+                return termIdx === term.length;
+            });
+
+            item.style.display = allMatch ? '' : 'none';
+        });
+    };
+
+    /**
+     * Updates the speaking indicator animation on an avatar.
+     * @param {string} msgId The ID of the message item.
+     * @param {boolean} isSpeaking True to show the indicator, false to hide it.
+     */
+    uiHelperFunctions.updateSpeakingIndicator = function(msgId, isSpeaking) {
+        const messageItem = document.querySelector(`.message-item[data-message-id="${msgId}"]`);
+        if (messageItem) {
+            const avatarElement = messageItem.querySelector('.chat-avatar');
+            if (isSpeaking) {
+                messageItem.classList.add('speaking-active');
+                if (avatarElement) avatarElement.classList.add('speaking');
+            } else {
+                messageItem.classList.remove('speaking-active');
+                if (avatarElement) avatarElement.classList.remove('speaking');
+            }
+        }
+    };
+
+    /**
+     * 显示确认对话框（替代原生 confirm()，避免 Electron 焦点问题）
+     * @param {string} message - 确认消息
+     * @param {string} [title='确认'] - 对话框标题
+     * @param {string} [confirmText='确定'] - 确认按钮文字
+     * @param {string} [cancelText='取消'] - 取消按钮文字
+     * @param {boolean} [isDanger=false] - 是否为危险操作（红色确认按钮）
+     * @returns {Promise<boolean>} - 用户点击确认返回 true，取消返回 false
+     */
+    uiHelperFunctions.showConfirmDialog = function(message, title = '确认', confirmText = '确定', cancelText = '取消', isDanger = false) {
+        return new Promise((resolve) => {
+            const previousFocus = document.activeElement;
+            // 创建模态框容器
+            const overlay = document.createElement('div');
+            overlay.id = 'confirm-dialog-overlay';
+            overlay.className = 'confirm-dialog-overlay';
+            
+            // 创建对话框
+            const dialog = document.createElement('div');
+            dialog.className = 'confirm-dialog';
+            dialog.setAttribute('role', 'dialog');
+            dialog.setAttribute('aria-modal', 'true');
+            const titleId = `confirm-dialog-title-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            dialog.setAttribute('aria-labelledby', titleId);
+            
+            // 标题
+            const titleEl = document.createElement('div');
+            titleEl.className = 'confirm-dialog-title';
+            titleEl.id = titleId;
+            titleEl.textContent = title;
+            dialog.appendChild(titleEl);
+            
+            // 消息
+            const messageEl = document.createElement('div');
+            messageEl.className = 'confirm-dialog-message';
+            messageEl.textContent = message;
+            dialog.appendChild(messageEl);
+            
+            // 按钮容器
+            const buttonsEl = document.createElement('div');
+            buttonsEl.className = 'confirm-dialog-buttons';
+            
+            // 取消按钮
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'confirm-dialog-btn confirm-dialog-cancel';
+            cancelBtn.textContent = cancelText;
+            cancelBtn.onclick = () => {
+                cleanup();
+                resolve(false);
+            };
+            buttonsEl.appendChild(cancelBtn);
+            
+            // 确认按钮
+            const confirmBtn = document.createElement('button');
+            confirmBtn.className = `confirm-dialog-btn confirm-dialog-confirm ${isDanger ? 'danger' : ''}`;
+            confirmBtn.textContent = confirmText;
+            confirmBtn.onclick = () => {
+                cleanup();
+                resolve(true);
+            };
+            buttonsEl.appendChild(confirmBtn);
+            
+            dialog.appendChild(buttonsEl);
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+            // Publish the active state synchronously so a same-frame Escape
+            // cannot close the owning settings modal underneath this dialog.
+            overlay.classList.add('visible');
+            confirmBtn.focus();
+            
+            // 键盘事件
+            const handleKeydown = (e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cleanup();
+                    resolve(false);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    cleanup();
+                    resolve(true);
+                } else if (e.key === 'Tab') {
+                    const focusables = [cancelBtn, confirmBtn];
+                    const current = focusables.indexOf(document.activeElement);
+                    if (current < 0) return;
+                    e.preventDefault();
+                    focusables[(current + (e.shiftKey ? -1 : 1) + focusables.length) % focusables.length].focus();
+                }
+            };
+            document.addEventListener('keydown', handleKeydown, true);
+            
+            // 点击遮罩关闭
+            overlay.onclick = (e) => {
+                if (e.target === overlay) {
+                    cleanup();
+                    resolve(false);
+                }
+            };
+            
+            // 清理函数
+            function cleanup() {
+                document.removeEventListener('keydown', handleKeydown, true);
+                overlay.classList.remove('visible');
+                setTimeout(() => {
+                    if (overlay.parentNode) {
+                        overlay.parentNode.removeChild(overlay);
+                    }
+                    if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+                }, 200);
+            }
+        });
+    };
+
+    // Global capture-phase close delegation for modal close buttons.
+    // Ensures clicking any close button (or inner SVG) immediately closes the modal,
+    // unaffected by DOM transformations, event bubbling stops, or late bindings.
+    if (typeof document !== 'undefined') {
+        document.addEventListener('click', (e) => {
+            const closeBtn = e.target?.closest?.('.close-button, .vcp-uiux-settings-close');
+            if (closeBtn) {
+                const modal = closeBtn.closest('.modal, [role="dialog"], .vcp-uiux-settings-root');
+                const modalId = modal?.id || (modal?.classList?.contains('vcp-uiux-settings-root') ? 'globalSettingsModal' : null);
+                if (modalId) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    uiHelperFunctions.closeModal(modalId);
+                }
+            }
+        }, true);
+    }
+
+    window.uiHelperFunctions = uiHelperFunctions;
+
+})();

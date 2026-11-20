@@ -1,0 +1,4 @@
+vendor/webawesome-runtime/** -text -whitespace
+
+# Preserve exact webpack output, including generated comment whitespace.
+preloads/bundled/dist/*.cjs -whitespace

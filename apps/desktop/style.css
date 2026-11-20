@@ -1,0 +1,23 @@
+/* style.css - Main Entry Point */
+@layer vcp-ui.legacy, vcp-ui.next-shell, vcp-ui.tokens, vcp-ui.base, vcp-ui.components, vcp-ui.utilities, vcp-ui.showcase, vcp-ui.appearance;
+
+@import url('./vendor/atom-one-dark.min.css') layer(vcp-ui.legacy);
+@import url('./vendor/atom-one-light.min.css') layer(vcp-ui.legacy);
+@import url('./styles/base.css') layer(vcp-ui.legacy);
+@import url('./styles/layout.css') layer(vcp-ui.legacy);
+@import url('./styles/components.css') layer(vcp-ui.legacy);
+@import url('./styles/chat.css') layer(vcp-ui.legacy);
+@import url('./styles/projectforge-topic.css');
+@import url('./styles/notifications.css') layer(vcp-ui.legacy);
+@import url('./styles/settings.css') layer(vcp-ui.legacy);
+@import url('./styles/animations.css') layer(vcp-ui.legacy);
+@import url('./styles/search.css') layer(vcp-ui.legacy);
+@import url('./styles/messageRenderer.css') layer(vcp-ui.legacy);
+@import url('./styles/themes.css'); /* 移动到末尾以获得最高优先级 */
+@import url('./styles/ui-next.css') layer(vcp-ui.next-shell);
+@import url('./styles/ui-system/index.css');
+@import url('./styles/appearance.css');
+@import url('./styles/chat-messenger.css'); /* 对话模式：只在 body.chat-presentation-messenger 下生效 */
+@import url('./styles/side-chat-bubbles.css'); /* 辅助对话（侧栏）始终用对话模式的气泡 */
+
+@import url('./styles/ui-system/tool-presentation.css') layer(vcp-ui.appearance);

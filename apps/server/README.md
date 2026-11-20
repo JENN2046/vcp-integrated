@@ -1,0 +1,36 @@
+# VCPToolBox integrated server
+
+The integrated development service uses the upstream VCPToolBox host, the
+NativeSync service extension and the host integration files from the verified
+candidate. The source mapping is in `../../provenance/server.json`. The host's
+license is in `LICENSE`.
+
+## Build for the isolated integration runtime
+
+Use Node 24.22.3, npm 10.9.8, and Linux x64 with glibc. The native build uses
+Rust 1.89.0, Cargo, a C toolchain and the checked-in Cargo lockfile.
+
+```sh
+PUPPETEER_SKIP_DOWNLOAD=1 npm ci --no-audit --no-fund
+bash scripts/build-vexus.sh
+```
+
+The isolated integration runtime doesn't need Puppeteer's browser download.
+The Vexus build places the checked N-API module at
+`rust-vexus-lite/vexus-lite.linux-x64-gnu.node`. The source build provides the
+ABI required by this host version.
+
+Run the monorepo build and isolated smoke flow from the repository root.
+The harness stages this host in a disposable directory before starting
+`server.js`, provisions database and diary directories, and provides an
+explicit loopback listener, a synthetic provider and a loopback HTTPS proxy.
+
+`Plugin/NativeSync/plugin-manifest.json` is the active manifest. The
+`AgentAssistant` and `VCPSleep` directories supply implementation helpers.
+The mobile PWA uses the real host's `/mobile` route backed by
+`Plugin/NativeSync/mobile-dist`. `NativeMobilePwaDir` can specify an absolute
+build directory.
+
+The development baseline covers the main server and the NativeSync
+integration. The separate admin UI bundle and optional upstream plugin
+collection fall outside the staged runtime.

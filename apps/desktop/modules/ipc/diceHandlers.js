@@ -1,0 +1,255 @@
+// modules/ipc/diceHandlers.js
+
+const { ipcMain, BrowserWindow, dialog } = require('electron');
+const path = require('path');
+const windowService = require('../services/windowService');
+const WINDOW_APP_IDS = require('../services/windowAppIds');
+const { PRELOAD_ROLES, resolveProjectPreload } = require('../services/preloadPaths');
+const { protectApplicationNavigation } = require('./applicationSender');
+// express is now lazy-loaded
+
+let diceWindow = null;
+let diceServer = null;
+
+// AI 可选择的主题和“骰子魔法”必须在主进程边界校验，避免任意资源路径或
+// 极端物理参数进入渲染进程。
+const ALLOWED_DICE_THEMES = new Set([
+    'default',
+    'gemstone',
+    'rock',
+    'rust',
+    'smooth',
+    'blueGreenMetal',
+    'diceOfRolling',
+    'gemstoneMarble',
+    'wooden',
+]);
+
+const ALLOWED_DICE_MAGIC = new Set([
+    'normal',
+    'moon',
+    'storm',
+    'lead',
+    'bounce',
+]);
+
+const DICE_PHYSICS_LIMITS = Object.freeze({
+    gravity: [0.15, 2.5],
+    mass: [0.25, 6],
+    friction: [0.05, 1],
+    restitution: [0, 0.95],
+    linearDamping: [0.05, 0.9],
+    angularDamping: [0.05, 0.9],
+    spinForce: [1, 18],
+    throwForce: [1, 10],
+    startingHeight: [3, 14],
+    settleTimeout: [2500, 10000],
+});
+
+function sanitizeDicePhysics(physics) {
+    if (!physics || typeof physics !== 'object' || Array.isArray(physics)) {
+        return {};
+    }
+
+    return Object.entries(DICE_PHYSICS_LIMITS).reduce((safePhysics, [key, [min, max]]) => {
+        const value = Number(physics[key]);
+        if (Number.isFinite(value)) {
+            safePhysics[key] = Math.min(max, Math.max(min, value));
+        }
+        return safePhysics;
+    }, {});
+}
+
+function sanitizeDiceColor(color) {
+    return typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color.trim())
+        ? color.trim()
+        : undefined;
+}
+
+// --- Dice Server and Window Creation ---
+function startDiceServer(projectRoot) {
+    return new Promise((resolve, reject) => {
+        if (diceServer && diceServer.listening) {
+            console.log('Dice server is already running on port 6677.');
+            return resolve();
+        }
+
+        const express = require('express'); // Lazy load
+        const app = express();
+        const port = 6677;
+
+        // Serve static files from the project root
+        app.use('/', express.static(path.join(projectRoot, 'Dicemodules')));
+        app.use('/node_modules', express.static(path.join(projectRoot, 'node_modules')));
+        app.use('/styles', express.static(path.join(projectRoot, 'styles')));
+        app.use('/assets', express.static(path.join(projectRoot, 'assets')));
+
+        diceServer = app.listen(port, '127.0.0.1', () => {
+            console.log(`Dice server started on http://localhost:${port}`);
+            resolve();
+        }).on('error', (err) => {
+            console.error('Failed to start dice server:', err);
+            reject(err);
+        });
+    });
+}
+
+async function createOrFocusDiceWindow(projectRoot) {
+    try {
+        await startDiceServer(projectRoot); // Ensure the server is running
+    } catch (error) {
+        console.error("Cannot create dice window because server failed to start.", error);
+        dialog.showErrorBox("骰子服务启动失败", "无法启动后台Web服务器，请检查端口6677是否被占用。");
+        return; // Stop if server fails
+    }
+
+    if (diceWindow && !diceWindow.isDestroyed()) {
+        console.log('[Dice] Dice window already exists. Focusing it.');
+        diceWindow.focus();
+        return;
+    }
+
+    console.log('[Dice] Creating new dice window instance.');
+    diceWindow = new BrowserWindow({
+        width: 400,
+        height: 600,
+        minWidth: 300,
+        minHeight: 400,
+        title: '超级骰子',
+        frame: false,
+        backgroundColor: '#100c1c',
+        modal: false,
+        webPreferences: {
+            preload: resolveProjectPreload(projectRoot, PRELOAD_ROLES.UTILITY),
+            sandbox: true, // Static role bundle has no local require at runtime.
+            contextIsolation: true,
+            nodeIntegration: false,
+            devTools: true
+        },
+        icon: path.join(projectRoot, 'assets', 'icon.png'),
+        show: false
+    });
+
+    // Load the dice page from our local web server
+    const dicePage = 'http://127.0.0.1:6677/dice.html';
+    protectApplicationNavigation(diceWindow.webContents, projectRoot, dicePage);
+    diceWindow.loadURL(dicePage);
+    windowService.attachWindow(WINDOW_APP_IDS.DICE, diceWindow);
+    
+    diceWindow.setMenu(null);
+
+    diceWindow.once('ready-to-show', () => {
+        diceWindow.show();
+    });
+
+    diceWindow.on('closed', () => {
+        diceWindow = null;
+    });
+
+    diceWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error(`[Dice] Dice window failed to load: ${errorDescription} (code: ${errorCode})`);
+    });
+}
+
+// --- Dice Control Handler ---
+async function handleDiceControl(args = {}) {
+    const {
+        notation,
+        themecolor,
+        theme,
+        magic,
+        physics,
+    } = args;
+
+    const safeThemeColor = sanitizeDiceColor(themecolor);
+    const safeTheme = ALLOWED_DICE_THEMES.has(theme) ? theme : undefined;
+    const safeMagic = ALLOWED_DICE_MAGIC.has(magic) ? magic : 'normal';
+    const safePhysics = sanitizeDicePhysics(physics);
+
+    console.log(
+        `[DiceControl] Received roll: notation=${notation}, theme=${safeTheme || 'current'}, `
+        + `magic=${safeMagic}, color=${safeThemeColor || 'default'}`,
+    );
+
+    const options = {
+        magic: safeMagic,
+        physics: safePhysics,
+    };
+    if (safeThemeColor) options.themeColor = safeThemeColor;
+    if (safeTheme) options.theme = safeTheme;
+
+    try {
+        // We need projectRoot to create the window if it doesn't exist.
+        // This assumes initialize has been called.
+        const projectRoot = path.join(__dirname, '..', '..');
+        await createOrFocusDiceWindow(projectRoot);
+
+        if (diceWindow && !diceWindow.isDestroyed()) {
+            await windowService.ensureReady(WINDOW_APP_IDS.DICE, {
+                focus: false,
+                timeoutMs: 10000,
+            }).catch(() => diceWindow);
+            diceWindow.webContents.send('roll-dice', notation, options);
+
+            return new Promise((resolve) => {
+                ipcMain.once('dice-roll-complete', (event, results) => {
+                    if (event.sender === diceWindow.webContents) {
+                        let readableResult = '';
+                        try {
+                            const totalValue = results.reduce((sum, group) => sum + group.value, 0);
+                            const parts = results.map(group => {
+                                const rollValues = group.rolls.map(r => r.value);
+                                let resultString = `[${rollValues.join(', ')}]`;
+                                if (group.modifier > 0) resultString += ` + ${group.modifier}`;
+                                else if (group.modifier < 0) resultString += ` - ${Math.abs(group.modifier)}`;
+                                return resultString;
+                            });
+                            readableResult = `AI为你投掷了 ${notation}，结果为: ${parts.join(' + ')}，总计 ${totalValue}。`;
+                        } catch (e) {
+                            console.error("Failed to parse dice results:", e);
+                            readableResult = `投掷完成，但无法解析结果: ${JSON.stringify(results)}`;
+                        }
+                        
+                        console.log(`[DiceControl] Formatted result: ${readableResult}`);
+                        resolve({ status: 'success', message: readableResult, data: readableResult });
+                    }
+                });
+            });
+        } else {
+            throw new Error("Dice window could not be created or focused.");
+        }
+
+    } catch (error) {
+        const errorMsg = `处理骰子指令失败: ${error.message}`;
+        console.error(`[DiceControl] ${errorMsg}`, error);
+        return { status: 'error', message: errorMsg };
+    }
+}
+
+function initialize(options) {
+    const projectRoot = options.projectRoot;
+
+    ipcMain.handle('open-dice-window', async () => {
+        try {
+            await createOrFocusDiceWindow(projectRoot);
+        } catch (error) {
+            console.error("[Dice] Failed to open or focus dice window from IPC:", error);
+        }
+    });
+}
+
+function stopDiceServer() {
+    if (diceServer) {
+        console.log('[Dice] Stopping dice server...');
+        diceServer.close();
+        diceServer = null;
+    }
+}
+
+module.exports = {
+    initialize,
+    handleDiceControl,
+    createOrFocusDiceWindow,
+    stopDiceServer,
+    getDiceWindow: () => diceWindow
+};

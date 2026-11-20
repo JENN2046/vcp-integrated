@@ -1,0 +1,173 @@
+/* --- Model Selection Modal Styles --- */
+
+.model-search-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.model-search-input {
+    flex-grow: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--input-bg);
+    color: var(--primary-text);
+    box-sizing: border-box;
+    height: 36px;
+}
+
+#refreshModelsBtn {
+    flex-shrink: 0;
+    padding: 0;
+    background-color: var(--button-bg);
+    border: 1px solid var(--button-bg);
+    color: var(--text-on-accent);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color var(--vcp-motion-duration-normal) var(--vcp-motion-ease-standard), border-color var(--vcp-motion-duration-normal) var(--vcp-motion-ease-standard);
+    box-sizing: border-box;
+    height: 36px;
+    width: 36px;
+}
+
+#refreshModelsBtn:hover {
+    background-color: var(--button-hover-bg);
+    border-color: var(--button-hover-bg);
+}
+
+#refreshModelsBtn svg {
+    stroke: currentColor;
+    transition: transform var(--vcp-motion-duration-slow) var(--vcp-motion-ease-standard);
+}
+
+#refreshModelsBtn:active svg {
+    transform: rotate(360deg);
+}
+
+.model-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 40vh;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.model-list li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) 24px;
+    align-items: center;
+    column-gap: 8px;
+    min-width: 0;
+    padding: 10px 15px;
+    box-sizing: border-box;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color var(--vcp-motion-duration-normal) var(--vcp-motion-ease-standard);
+}
+
+.model-list li:last-child {
+    border-bottom: none;
+}
+
+.model-list li:hover {
+    background-color: var(--accent-bg);
+    color: var(--highlight-text);
+}
+
+/* --- Hot Model Styles --- */
+.model-list li.model-section-title {
+    padding: 8px 15px;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--secondary-text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: default;
+    user-select: none;
+    background-color: transparent;
+    border-bottom: 1px solid var(--border-color);
+    pointer-events: none;
+    display: block;
+}
+
+.model-list li.model-section-title:hover {
+    background-color: transparent;
+    color: var(--secondary-text);
+}
+
+.model-list li.hot-model {
+    border-left: 3px solid #ff6b35;
+}
+
+.hot-model-badge {
+    grid-column: 1;
+    justify-self: center;
+    font-size: 0.85em;
+    line-height: 1;
+    animation: flame-pulse 1.5s var(--vcp-motion-ease-standard) infinite;
+}
+
+.model-name-text {
+    grid-column: 2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 20px;
+}
+
+@keyframes flame-pulse {
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.15);
+    }
+}
+
+/* --- Favorite Star Styles --- */
+.model-favorite-star {
+    grid-column: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    color: var(--secondary-text);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: opacity var(--vcp-motion-duration-normal) var(--vcp-motion-ease-standard),
+                color var(--vcp-motion-duration-normal) var(--vcp-motion-ease-standard),
+                background-color var(--vcp-motion-duration-normal) var(--vcp-motion-ease-standard);
+    opacity: 0.6;
+}
+
+.model-favorite-star:hover {
+    color: #ffd700;
+    background-color: rgba(255, 215, 0, 0.1);
+    opacity: 1;
+}
+
+.model-favorite-star.favorited {
+    color: #ffd700;
+    opacity: 1;
+}
+
+.model-favorite-star.favorited:hover {
+    color: #ffc107;
+    background-color: rgba(255, 193, 7, 0.1);
+}

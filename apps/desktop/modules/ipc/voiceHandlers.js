@@ -1,0 +1,779 @@
+// modules/ipc/voiceHandlers.js
+
+const { BrowserWindow, ipcMain, nativeTheme, screen } = require('electron');
+const path = require('path');
+const { PRELOAD_ROLES, resolveProjectPreload } = require('../services/preloadPaths');
+const { VoiceInputEngineAdapter } = require('../voice/voice-input-engine-adapter');
+const { MainChatVoiceCoordinator } = require('./mainChatVoiceCoordinator');
+
+const { voiceChatSessions } = require('../voice/voiceChatSessions');
+
+let mainWindow = null;
+let openChildWindows = [];
+let settingsManager = null;
+let PROJECT_ROOT = null;
+let isInitialized = false;
+let mainChatVoiceCoordinator = null;
+let voiceInputEngine = null;
+let nativeVoiceInputOwnerId = null;
+let configuredVoiceInputShortcut = null;
+let configuredVoiceInputMode = null;
+let settingsUpdatedListener = null;
+let voiceCaptureWindow = null;
+let voiceCaptureReady = false;
+let voiceCaptureReadyPromise = null;
+let voiceCaptureSession = null;
+let voiceCaptureSequence = 0;
+let releaseVoiceEngineEvents = null;
+// 本地推理按住说话：记录按下时的目标小窗，保证松开事件发回同一窗口
+let localHoldTarget = null;
+
+const CAPTURE_QUIET_MS = 700;
+const CAPTURE_MAX_SETTLE_MS = 7000;
+
+// 设置里的 voiceInputMode → Rust 引擎模式。本地 SenseVoice 走按住说话，无需输入法捕获窗
+function resolveEngineMode(voiceInputMode) {
+    if (voiceInputMode === 'right_alt_hold') return 'right_alt_hold';
+    if (voiceInputMode === 'local_sensevoice') return 'local_hold';
+    return 'windows_voice_typing';
+}
+
+function getNativeWindowHandleString(win) {
+    if (!win || win.isDestroyed() || typeof win.getNativeWindowHandle !== 'function') {
+        return null;
+    }
+
+    const buffer = win.getNativeWindowHandle();
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) return null;
+    if (buffer.length >= 8) return buffer.readBigUInt64LE(0).toString();
+    if (buffer.length >= 4) return String(buffer.readUInt32LE(0));
+    return null;
+}
+
+function findVoiceChatWindowBySender(sender) {
+    return openChildWindows.find(win => (
+        win
+        && !win.isDestroyed()
+        && win.webContents === sender
+        && win.webContents.getURL().replace(/\\/g, '/').includes('/Voicechatmodules/voicechat.html')
+    )) || null;
+}
+
+function getOpenVoiceChatWindows() {
+    return openChildWindows.filter(win => (
+        win
+        && !win.isDestroyed()
+        && !win.webContents.isDestroyed()
+        && win.webContents.getURL().replace(/\\/g, '/').includes('/Voicechatmodules/voicechat.html')
+    ));
+}
+
+function getVoiceCaptureWindowHandle() {
+    return getNativeWindowHandleString(voiceCaptureWindow);
+}
+
+function createVoiceCaptureWindow() {
+    if (voiceCaptureWindow && !voiceCaptureWindow.isDestroyed()) {
+        return voiceCaptureWindow;
+    }
+
+    voiceCaptureReady = false;
+    voiceCaptureReadyPromise = new Promise((resolve, reject) => {
+        voiceCaptureWindow = new BrowserWindow({
+            width: 320,
+            height: 42,
+            frame: false,
+            transparent: true,
+            show: false,
+            skipTaskbar: true,
+            alwaysOnTop: true,
+            focusable: true,
+            resizable: false,
+            movable: false,
+            minimizable: false,
+            maximizable: false,
+            fullscreenable: false,
+            hasShadow: false,
+            backgroundColor: '#00000000',
+            webPreferences: {
+                preload: path.join(PROJECT_ROOT, 'preloads', 'voice-input-capture.js'),
+                sandbox: true,
+                contextIsolation: true,
+                nodeIntegration: false,
+            },
+        });
+
+        voiceCaptureWindow.setAlwaysOnTop(true, 'screen-saver');
+        voiceCaptureWindow.webContents.once('did-finish-load', () => {
+            voiceCaptureReady = true;
+            resolve(voiceCaptureWindow);
+        });
+        voiceCaptureWindow.webContents.once('did-fail-load', (_event, code, description) => {
+            reject(new Error(`语音捕获窗加载失败 (${code}): ${description}`));
+        });
+        voiceCaptureWindow.on('closed', () => {
+            voiceCaptureWindow = null;
+            voiceCaptureReady = false;
+            voiceCaptureReadyPromise = null;
+        });
+        voiceCaptureWindow.loadFile(
+            path.join(PROJECT_ROOT, 'Voicechatmodules', 'voice-input-capture.html')
+        );
+    });
+
+    return voiceCaptureWindow;
+}
+
+async function ensureVoiceCaptureWindowReady() {
+    createVoiceCaptureWindow();
+    if (voiceCaptureReady) return voiceCaptureWindow;
+    return voiceCaptureReadyPromise;
+}
+
+function positionVoiceCaptureWindow() {
+    if (!voiceCaptureWindow || voiceCaptureWindow.isDestroyed()) return;
+    const cursor = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursor);
+    const bounds = display.workArea;
+    const windowBounds = voiceCaptureWindow.getBounds();
+    voiceCaptureWindow.setPosition(
+        Math.round(bounds.x + bounds.width - windowBounds.width - 18),
+        Math.round(bounds.y + bounds.height - windowBounds.height - 18),
+        false
+    );
+}
+
+function getVoiceCaptureTarget() {
+    const candidates = getOpenVoiceChatWindows();
+    return candidates.find(win => win.isFocused()) || candidates.at(-1) || null;
+}
+
+async function beginVoiceCaptureFromHotkey(eventData = {}) {
+    if (voiceCaptureSession) return;
+    const target = getVoiceCaptureTarget();
+    if (!target || target.isDestroyed() || target.webContents.isDestroyed()) {
+        await voiceInputEngine?.releaseAll().catch(() => {});
+        return;
+    }
+
+    await ensureVoiceCaptureWindowReady();
+    const sessionId = `voice-capture-${Date.now()}-${++voiceCaptureSequence}`;
+    voiceCaptureSession = {
+        id: sessionId,
+        targetWebContentsId: target.webContents.id,
+        target,
+        text: '',
+        composing: false,
+        updatedAt: Date.now(),
+        stopping: false,
+        autoFinishTimer: null,
+        settleTimer: null,
+        settleDeadlineTimer: null,
+        settleResolve: null,
+        focusReadySent: false,
+        hotkey: configuredVoiceInputShortcut,
+        mode: configuredVoiceInputMode,
+        originalWindowHandle: eventData?.detail?.originalWindowHandle || null,
+    };
+
+    const onTargetDestroyed = () => {
+        if (voiceCaptureSession?.id === sessionId) {
+            cancelVoiceCaptureFromHotkey().catch(() => {});
+        }
+    };
+    voiceCaptureSession.cleanupTarget = onTargetDestroyed;
+    target.webContents.once('destroyed', onTargetDestroyed);
+
+    positionVoiceCaptureWindow();
+    // The native window must be visible and foreground before the renderer
+    // focuses its editable control. A hidden Chromium document can report
+    // document.activeElement correctly while Windows TSF still has no input
+    // target, which makes Win+H report that no text field is available.
+    voiceCaptureWindow.show();
+    voiceCaptureWindow.focus();
+    voiceCaptureWindow.webContents.focus();
+    setImmediate(() => {
+        if (
+            voiceCaptureSession?.id === sessionId
+            && voiceCaptureWindow
+            && !voiceCaptureWindow.isDestroyed()
+        ) {
+            voiceCaptureWindow.webContents.send('voice-input-capture:prepare', { sessionId });
+        }
+    });
+    broadcastVoiceInputShortcutStatus({
+        success: true,
+        registered: true,
+        active: true,
+        shortcut: configuredVoiceInputShortcut,
+        mode: configuredVoiceInputMode,
+    });
+}
+
+function clearCaptureSettleTimers(session) {
+    clearTimeout(session.autoFinishTimer);
+    clearTimeout(session.settleTimer);
+    clearTimeout(session.settleDeadlineTimer);
+    session.autoFinishTimer = null;
+    session.settleTimer = null;
+    session.settleDeadlineTimer = null;
+}
+
+function resolveCaptureText(session) {
+    if (!session.settleResolve) return;
+    const resolve = session.settleResolve;
+    session.settleResolve = null;
+    clearCaptureSettleTimers(session);
+    resolve(session.text.trim());
+}
+
+function resetCaptureSettleTimer(session) {
+    if (!session.stopping || !session.settleResolve) return;
+
+    clearTimeout(session.settleTimer);
+    session.settleTimer = null;
+
+    // compositionend/input can arrive after the stop key. Every update resets
+    // this trailing-edge timer, so there is only one short wait after the last
+    // actual Windows recognition commit.
+    if (!session.composing) {
+        session.settleTimer = setTimeout(() => {
+            if (voiceCaptureSession === session) {
+                resolveCaptureText(session);
+            }
+        }, CAPTURE_QUIET_MS);
+    }
+}
+
+function scheduleCaptureAutoFinish(session) {
+    clearTimeout(session.autoFinishTimer);
+    session.autoFinishTimer = null;
+
+    if (
+        session.mode !== 'windows_voice_typing'
+        || session.stopping
+        || session.composing
+        || !session.text.trim()
+    ) {
+        return;
+    }
+
+    // Windows has solidified a non-composing value. Any subsequent recognition
+    // update clears and restarts this timer; only the trailing edge completes
+    // the session, so there is no fixed minimum delay added to every capture.
+    session.autoFinishTimer = setTimeout(() => {
+        session.autoFinishTimer = null;
+        if (voiceCaptureSession === session && !session.stopping) {
+            finishVoiceCaptureFromHotkey().catch(error => {
+                console.error('[VoiceHandlers] Failed to auto-finish settled dictation:', error);
+            });
+        }
+    }, CAPTURE_QUIET_MS);
+}
+
+function waitForCaptureTextToSettle(session) {
+    return new Promise(resolve => {
+        session.settleResolve = resolve;
+        session.settleDeadlineTimer = setTimeout(() => {
+            if (voiceCaptureSession === session) {
+                resolveCaptureText(session);
+            }
+        }, CAPTURE_MAX_SETTLE_MS);
+        resetCaptureSettleTimer(session);
+    });
+}
+
+async function finishVoiceCaptureFromHotkey() {
+    const session = voiceCaptureSession;
+    if (!session || session.stopping) return;
+    session.stopping = true;
+
+    // Rust has already released Right Alt synchronously before emitting
+    // hotkey_up. stopSession is still needed to close Win+H mode.
+    await voiceInputEngine?.stopSession().catch(error => {
+        console.warn('[VoiceHandlers] Failed to stop dictation:', error.message);
+    });
+    if (voiceCaptureWindow && !voiceCaptureWindow.isDestroyed()) {
+        voiceCaptureWindow.webContents.send('voice-input-capture:stop', { sessionId: session.id });
+    }
+
+    const text = await waitForCaptureTextToSettle(session);
+    await voiceInputEngine?.restoreFocus().catch(error => {
+        console.warn('[VoiceHandlers] Failed to restore pre-capture focus:', error.message);
+    });
+
+    if (voiceCaptureWindow && !voiceCaptureWindow.isDestroyed()) {
+        voiceCaptureWindow.hide();
+    }
+    if (session.cleanupTarget && session.target && !session.target.isDestroyed() && !session.target.webContents.isDestroyed()) {
+        session.target.webContents.removeListener('destroyed', session.cleanupTarget);
+        session.cleanupTarget = null;
+    }
+    voiceCaptureSession = null;
+
+    if (text && session.target && !session.target.isDestroyed() && !session.target.webContents.isDestroyed()) {
+        session.target.webContents.send('voice-input-captured-text', {
+            text,
+            sessionId: session.id,
+            source: session.mode,
+        });
+    }
+    broadcastVoiceInputShortcutStatus({
+        success: true,
+        registered: true,
+        active: false,
+        shortcut: configuredVoiceInputShortcut,
+        mode: configuredVoiceInputMode,
+    });
+}
+
+async function cancelVoiceCaptureFromHotkey() {
+    const session = voiceCaptureSession;
+    if (!session) return;
+    session.stopping = true;
+    clearCaptureSettleTimers(session);
+    if (session.cleanupTarget && session.target && !session.target.isDestroyed() && !session.target.webContents.isDestroyed()) {
+        session.target.webContents.removeListener('destroyed', session.cleanupTarget);
+        session.cleanupTarget = null;
+    }
+    voiceCaptureSession = null;
+    await voiceInputEngine?.stopSession().catch(() => {});
+    await voiceInputEngine?.releaseAll().catch(() => {});
+    await voiceInputEngine?.restoreFocus().catch(() => {});
+    if (voiceCaptureWindow && !voiceCaptureWindow.isDestroyed()) {
+        voiceCaptureWindow.hide();
+    }
+    broadcastVoiceInputShortcutStatus({
+        success: true,
+        registered: true,
+        active: false,
+        shortcut: configuredVoiceInputShortcut,
+        mode: configuredVoiceInputMode,
+    });
+}
+
+function isWindowAlive(win) {
+    return Boolean(win && !win.isDestroyed() && !win.webContents.isDestroyed());
+}
+
+// 本地推理模式：按下开始录音、松开结束，由小窗自行录音并调用本地识别
+function handleLocalHoldEvent(eventData) {
+    if (eventData.event === 'hotkey_down') {
+        if (mainChatVoiceCoordinator?.isSessionActive()) {
+            mainChatVoiceCoordinator.cancelSession({ reason: 'hotkey_preempted' }).catch(() => {});
+        }
+        const target = getVoiceCaptureTarget();
+        if (!isWindowAlive(target)) return;
+        localHoldTarget = target;
+        target.webContents.send('voice-input-local-hold', {
+            phase: 'down',
+            shortcut: configuredVoiceInputShortcut,
+        });
+        return;
+    }
+    if (eventData.event === 'hotkey_up') {
+        const target = localHoldTarget;
+        localHoldTarget = null;
+        if (isWindowAlive(target)) {
+            target.webContents.send('voice-input-local-hold', {
+                phase: 'up',
+                shortcut: configuredVoiceInputShortcut,
+            });
+        }
+    }
+}
+
+function handleVoiceEngineEvent(eventData) {
+    if (!eventData?.event) return;
+    if (eventData.mode === 'local_hold') {
+        handleLocalHoldEvent(eventData);
+        return;
+    }
+    if (eventData.event === 'hotkey_down') {
+        if (mainChatVoiceCoordinator?.isSessionActive()) {
+            mainChatVoiceCoordinator.cancelSession({ reason: 'hotkey_preempted' }).catch(() => {});
+        }
+        beginVoiceCaptureFromHotkey(eventData).catch(async error => {
+            console.error('[VoiceHandlers] Failed to begin voice capture:', error);
+            await voiceInputEngine?.releaseAll().catch(() => {});
+            broadcastVoiceInputShortcutStatus({
+                success: false,
+                registered: true,
+                shortcut: configuredVoiceInputShortcut,
+                error: error.message || String(error),
+            });
+        });
+        return;
+    }
+    if (eventData.event === 'hotkey_up') {
+        finishVoiceCaptureFromHotkey().catch(error => {
+            console.error('[VoiceHandlers] Failed to finish voice capture:', error);
+        });
+        return;
+    }
+    if (eventData.event === 'watchdog_release') {
+        if (mainChatVoiceCoordinator?.isSessionActive()) {
+            mainChatVoiceCoordinator.stopSession().catch(() => {});
+        }
+        finishVoiceCaptureFromHotkey().catch(() => {});
+    }
+}
+
+function broadcastVoiceInputShortcutStatus(status) {
+    getOpenVoiceChatWindows().forEach(win => {
+        if (!win.webContents.isDestroyed()) {
+            win.webContents.send('voice-input-shortcut-status', status);
+        }
+    });
+}
+
+async function configureNativeVoiceHotkey() {
+    if (!getOpenVoiceChatWindows().length) {
+        return { success: true, registered: false, reason: 'no-voice-window' };
+    }
+
+    const settings = settingsManager ? await settingsManager.readSettings() : {};
+    const shortcut = String(settings?.voiceInputShortcut || 'F7').trim();
+    const mode = resolveEngineMode(settings?.voiceInputMode);
+
+    try {
+        if (mode !== 'local_hold') {
+            await ensureVoiceCaptureWindowReady();
+        }
+        const engine = getVoiceInputEngine();
+        await engine.start();
+        if (!releaseVoiceEngineEvents) {
+            releaseVoiceEngineEvents = engine.onEvent(handleVoiceEngineEvent);
+        }
+        const result = await engine.configureHotkey({ shortcut, mode });
+        configuredVoiceInputShortcut = shortcut;
+        configuredVoiceInputMode = mode;
+        // 引擎模式已被改写，同步主聊天协调器的配置缓存，避免它误以为引擎仍处于旧模式
+        if (mainChatVoiceCoordinator) {
+            mainChatVoiceCoordinator.configuredHotkeyCache = `${shortcut}:${mode}`;
+        }
+        const status = {
+            success: true,
+            registered: true,
+            shortcut,
+            mode,
+            engine: 'rust-native',
+            detail: result.detail || null,
+        };
+        broadcastVoiceInputShortcutStatus(status);
+        return status;
+    } catch (error) {
+        configuredVoiceInputShortcut = null;
+        configuredVoiceInputMode = null;
+        const status = {
+            success: false,
+            registered: false,
+            shortcut,
+            mode,
+            error: error.message || String(error),
+        };
+        broadcastVoiceInputShortcutStatus(status);
+        return status;
+    }
+}
+
+function getVoiceInputEngine() {
+    if (!voiceInputEngine) {
+        voiceInputEngine = new VoiceInputEngineAdapter({
+            projectRoot: PROJECT_ROOT,
+            logger: console,
+        });
+    }
+    return voiceInputEngine;
+}
+
+async function releaseNativeVoiceInput({ restoreFocus = true, shutdown = true } = {}) {
+    if (!voiceInputEngine) {
+        nativeVoiceInputOwnerId = null;
+        return;
+    }
+
+    try {
+        await voiceInputEngine.stopSession();
+    } catch (error) {
+        console.warn('[VoiceHandlers] Failed to stop native voice input:', error.message);
+        try {
+            await voiceInputEngine.releaseAll();
+        } catch (releaseError) {
+            console.warn('[VoiceHandlers] Failed to release native input keys:', releaseError.message);
+        }
+    }
+
+    if (restoreFocus) {
+        try {
+            await voiceInputEngine.restoreFocus();
+        } catch (error) {
+            console.warn('[VoiceHandlers] Failed to restore native voice input focus:', error.message);
+        }
+    }
+
+    if (restoreFocus || shutdown) {
+        nativeVoiceInputOwnerId = null;
+    }
+    if (shutdown) {
+        await voiceInputEngine.shutdown();
+        voiceInputEngine = null;
+    }
+}
+
+function createVoiceChatWindow(agentId) {
+    const voiceChatWindow = new BrowserWindow({
+        width: 500,
+        height: 700,
+        minWidth: 400,
+        minHeight: 500,
+        frame: false,
+        ...(process.platform === 'darwin' ? {} : { titleBarStyle: 'hidden' }),
+        title: '语音聊天',
+        webPreferences: {
+            preload: resolveProjectPreload(PROJECT_ROOT, PRELOAD_ROLES.AUXILIARY_CHAT),
+            sandbox: true, // Static role bundle has no local require at runtime.
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
+        show: false,
+    });
+
+    voiceChatSessions.register(agentId, voiceChatWindow);
+    const voiceWebContentsId = voiceChatWindow.webContents.id;
+    const theme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+    voiceChatWindow.webContents.once('did-finish-load', async () => {
+        if (voiceChatWindow.isDestroyed() || voiceChatWindow.webContents.isDestroyed()) return;
+        voiceChatWindow.webContents.send('voice-chat-data', { agentId, theme });
+
+        try {
+            const shortcutStatus = await configureNativeVoiceHotkey();
+            if (!voiceChatWindow.isDestroyed() && !voiceChatWindow.webContents.isDestroyed()) {
+                voiceChatWindow.webContents.send('voice-input-shortcut-status', shortcutStatus);
+            }
+        } catch (error) {
+            console.warn('[VoiceHandlers] Failed to register voice input shortcut:', error.message);
+            if (!voiceChatWindow.isDestroyed() && !voiceChatWindow.webContents.isDestroyed()) {
+                voiceChatWindow.webContents.send('voice-input-shortcut-status', {
+                    success: false,
+                    registered: false,
+                    error: error.message,
+                });
+            }
+        }
+    });
+
+    voiceChatWindow.loadFile(path.join(PROJECT_ROOT, 'Voicechatmodules', 'voicechat.html'));
+
+    voiceChatWindow.once('ready-to-show', () => {
+        voiceChatWindow.show();
+    });
+
+    openChildWindows.push(voiceChatWindow);
+
+    voiceChatWindow.webContents.on('render-process-gone', (_event, details) => {
+        console.warn('[VoiceHandlers] voice renderer exited; releasing window owner:', details?.reason || 'unknown');
+        const index = openChildWindows.indexOf(voiceChatWindow);
+        if (index > -1) openChildWindows.splice(index, 1);
+        if (!voiceChatWindow.isDestroyed()) voiceChatWindow.destroy();
+    });
+
+    voiceChatWindow.on('closed', () => {
+        const index = openChildWindows.indexOf(voiceChatWindow);
+        if (index > -1) {
+            openChildWindows.splice(index, 1);
+        }
+
+        if (voiceCaptureSession?.target === voiceChatWindow) {
+            cancelVoiceCaptureFromHotkey().catch(() => {});
+        }
+        if (localHoldTarget === voiceChatWindow) {
+            localHoldTarget = null;
+        }
+
+        if (nativeVoiceInputOwnerId === voiceWebContentsId) {
+            releaseNativeVoiceInput({ restoreFocus: true, shutdown: true }).catch(error => {
+                console.warn('[VoiceHandlers] Native voice input close cleanup failed:', error.message);
+            });
+        }
+
+        if (!getOpenVoiceChatWindows().length) {
+            configuredVoiceInputShortcut = null;
+            configuredVoiceInputMode = null;
+            voiceInputEngine?.releaseAll().catch(() => {});
+        }
+    });
+
+    return voiceChatWindow;
+}
+
+function handleOpenVoiceChatWindow(_event, { agentId } = {}) {
+    if (typeof agentId !== 'string' || !agentId) return;
+    if (voiceChatSessions.focus(agentId)) return;
+    return createVoiceChatWindow(agentId);
+}
+
+function initialize(options) {
+    mainWindow = options.mainWindow;
+    openChildWindows = options.openChildWindows;
+    settingsManager = options.settingsManager;
+    PROJECT_ROOT = options.projectRoot;
+
+    if (isInitialized) {
+        return;
+    }
+
+    ipcMain.on('open-voice-chat-window', handleOpenVoiceChatWindow);
+    ipcMain.on('voice-chat:session-ready', (event, ready) => {
+        if (findVoiceChatWindowBySender(event.sender)) voiceChatSessions.setReady(event.sender, ready);
+    });
+    ipcMain.on('voice-chat:deskpet-result', (event, payload) => {
+        if (findVoiceChatWindowBySender(event.sender)) voiceChatSessions.acknowledge(event.sender, payload);
+    });
+    ipcMain.on('voice-input-capture:ready', event => {
+        if (voiceCaptureWindow?.webContents === event.sender) {
+            voiceCaptureReady = true;
+        }
+    });
+    ipcMain.on('voice-input-capture:update', (event, payload = {}) => {
+        if (voiceCaptureWindow?.webContents !== event.sender) return;
+        if (mainChatVoiceCoordinator?.getActiveSession()) {
+            mainChatVoiceCoordinator.handleCaptureUpdate(payload);
+            return;
+        }
+        if (!voiceCaptureSession) return;
+        const session = voiceCaptureSession;
+        session.text = String(payload.text || '');
+        session.composing = payload.composing === true;
+        session.updatedAt = Number(payload.updatedAt) || Date.now();
+        if (session.stopping) {
+            resetCaptureSettleTimer(session);
+        } else {
+            scheduleCaptureAutoFinish(session);
+        }
+    });
+    ipcMain.on('voice-input-capture:focus-ready', async (event, payload = {}) => {
+        const activeSession = mainChatVoiceCoordinator?.getActiveSession() || voiceCaptureSession;
+        if (
+            voiceCaptureWindow?.webContents !== event.sender
+            || !activeSession
+            || activeSession.focusReadySent
+            || !voiceInputEngine
+            || payload.sessionId !== activeSession.id
+            || payload.editable !== true
+            || !Number.isInteger(payload.selectionStart)
+            || !Number.isInteger(payload.selectionEnd)
+        ) return;
+
+        // DOM focus alone is insufficient: Windows voice typing requires the
+        // containing native BrowserWindow to be the foreground input target.
+        if (!voiceCaptureWindow.isFocused()) {
+            voiceCaptureWindow.show();
+            voiceCaptureWindow.focus();
+            voiceCaptureWindow.webContents.focus();
+            voiceCaptureWindow.webContents.send('voice-input-capture:prepare', {
+                sessionId: activeSession.id,
+            });
+            return;
+        }
+
+        const targetWindowHandle = getVoiceCaptureWindowHandle();
+        if (!targetWindowHandle) {
+            await voiceInputEngine.releaseAll().catch(() => {});
+            return;
+        }
+        activeSession.focusReadySent = true;
+        try {
+            await voiceInputEngine.focusReady({
+                targetWindowHandle,
+                programmatic: Boolean(activeSession.isMainChat),
+            });
+        } catch (error) {
+            activeSession.focusReadySent = false;
+            await voiceInputEngine.releaseAll().catch(() => {});
+            if (!activeSession.isMainChat) {
+                broadcastVoiceInputShortcutStatus({
+                    success: false,
+                    registered: true,
+                    shortcut: configuredVoiceInputShortcut,
+                    error: error.message || String(error),
+                });
+            }
+        }
+    });
+    ipcMain.handle('voice-input-native:status', event => {
+        const voiceChatWindow = findVoiceChatWindowBySender(event.sender);
+        if (!voiceChatWindow) return { success: false, error: '调用者不是语音聊天子窗口' };
+        return {
+            success: true,
+            owner: nativeVoiceInputOwnerId === voiceChatWindow.webContents.id,
+            shortcut: {
+                value: configuredVoiceInputShortcut,
+                registered: Boolean(
+                    configuredVoiceInputShortcut
+                    && voiceInputEngine?.getStatus().ready
+                    && voiceInputEngine?.getStatus().processAlive
+                ),
+                mode: configuredVoiceInputMode,
+            },
+            engine: voiceInputEngine?.getStatus() || {
+                lifecycleState: 'stopped',
+                ready: false,
+                processAlive: false,
+            },
+        };
+    });
+
+    mainChatVoiceCoordinator = new MainChatVoiceCoordinator({
+        getMainWindow: () => mainWindow,
+        getVoiceCaptureWindow: () => voiceCaptureWindow,
+        ensureVoiceCaptureWindowReady,
+        positionVoiceCaptureWindow,
+        getVoiceInputEngine,
+        ensureEngineEvents: () => {
+            if (!releaseVoiceEngineEvents && voiceInputEngine) {
+                releaseVoiceEngineEvents = voiceInputEngine.onEvent(handleVoiceEngineEvent);
+            }
+        },
+        getConfiguredShortcut: () => configuredVoiceInputShortcut,
+        getSettingsManager: () => settingsManager,
+        isSubwindowHotkeyActive: () => Boolean(
+            (voiceCaptureSession && !voiceCaptureSession.stopping) || localHoldTarget
+        ),
+    });
+    mainChatVoiceCoordinator.registerIpcHandlers();
+
+    if (settingsManager?.on && !settingsUpdatedListener) {
+        settingsUpdatedListener = () => {
+            if (!getOpenVoiceChatWindows().length) return;
+            configureNativeVoiceHotkey().then(result => {
+                getOpenVoiceChatWindows().forEach(win => {
+                    win.webContents.send('voice-input-shortcut-status', result);
+                });
+            }).catch(error => {
+                console.warn('[VoiceHandlers] Failed to refresh voice input shortcut:', error.message);
+            });
+        };
+        settingsManager.on('settings-updated', settingsUpdatedListener);
+    }
+
+    isInitialized = true;
+}
+
+module.exports = {
+    initialize,
+    createVoiceChatWindow,
+    shutdownVoiceInputEngine: async () => {
+        configuredVoiceInputShortcut = null;
+        configuredVoiceInputMode = null;
+        releaseVoiceEngineEvents?.();
+        releaseVoiceEngineEvents = null;
+        await releaseNativeVoiceInput({
+            restoreFocus: true,
+            shutdown: true,
+        });
+    },
+    __test: {
+        getNativeWindowHandleString,
+    },
+};

@@ -1,0 +1,2490 @@
+require('./modules/services/trustedConversation/credentialVault.cjs').captureFromEnvironment();
+const quitAdmission = require('./modules/services/quitAdmission.cjs');
+const { prepareProjectForgeQuit, cancelProjectForgeQuit } = require('./modules/ipc/projectForgeCloseGuard');
+// main.js - Electron 主窗口
+
+// Bootstrap-only fatal evidence. The monitor does not consume the exception,
+// so Electron keeps its existing crash behavior while managed/packed launches
+// receive a machine-readable cause instead of a silent ready timeout.
+if (process.env.VCPCHAT_BOOTSTRAP_OPERATION_ID && process.env.VCPCHAT_STATE_DIR) {
+    process.on('uncaughtExceptionMonitor', (error, origin) => {
+        try {
+            const bootstrapFs = require('fs');
+            const bootstrapPath = require('path');
+            const diagnostics = bootstrapPath.join(process.env.VCPCHAT_STATE_DIR, 'diagnostics');
+            bootstrapFs.mkdirSync(diagnostics, { recursive: true });
+            const safeOperationId = process.env.VCPCHAT_BOOTSTRAP_OPERATION_ID.replace(/[^a-z0-9_-]/gi, '-');
+            bootstrapFs.writeFileSync(bootstrapPath.join(diagnostics, `fatal-${safeOperationId}.json`), `${JSON.stringify({
+                schemaVersion: 1,
+                operationId: process.env.VCPCHAT_BOOTSTRAP_OPERATION_ID,
+                origin,
+                name: error?.name || 'Error',
+                message: error?.message || String(error),
+                stack: error?.stack || null,
+                at: new Date().toISOString(),
+            }, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+        } catch { /* the original fatal error remains authoritative */ }
+    });
+}
+// --- 核心流式守卫：挂载 stdout 与 stderr 的 EPIPE 错误静默吸收守卫 ---
+['stdout', 'stderr'].forEach((streamName) => {
+    if (process[streamName] && typeof process[streamName].on === 'function') {
+        process[streamName].on('error', (err) => {
+            if (err.code === 'EPIPE') return;
+        });
+    }
+});
+
+// 启动标记：每个启动阶段相对进程启动的毫秒时刻，不管有没有外部启动器都记；lifecycle:get-main-snapshot.launch 带出
+const { createLaunchMarks } = require('./modules/launchMarks');
+const launchMarks = createLaunchMarks({ processStartedAt: Date.now() - Math.round(process.uptime() * 1000) });
+
+function reportLauncherProgress(stage, progress, message) {
+    launchMarks.mark(stage);
+    if (process.env.VCP_LAUNCHER_PROTOCOL !== '1') return;
+    const payload = JSON.stringify({ stage, progress, message });
+    process.stdout.write(`VCP_STARTUP:${payload}\n`);
+}
+
+reportLauncherProgress('process-started', 0.08, 'VChat 进程已启动');
+
+// --- 模块加载性能诊断 ---
+const originalRequire = require;
+require = function (id) {
+    const start = Date.now();
+    const result = originalRequire(id);
+    const duration = Date.now() - start;
+    if (duration > 50) { // 只显示超过 50ms 的模块
+        console.log(`⏱️ require('${id}') took ${duration}ms`);
+    }
+    return result;
+};
+
+const { app, BrowserWindow, webContents, ipcMain, nativeTheme, globalShortcut, screen, clipboard, shell, dialog, protocol, Tray, Menu, powerMonitor } = require('electron'); // Added screen, clipboard, and shell
+const { registerChartEmbedScheme, installChartEmbedProtocol } = require('./modules/services/chartEmbedProtocol');
+registerChartEmbedScheme(protocol);
+// 文坊中原位打开的网页（scriptorium-page:// 协议），须在 app ready 之前登记。
+const scriptoriumPages = require('./modules/scriptorium/webPages');
+protocol.registerSchemesAsPrivileged([scriptoriumPages.PRIVILEGE]);
+
+// 不再对整个应用关闭 Chromium 的后台节流（background-timer-throttling / renderer-backgrounding /
+// backgrounding-occluded-windows）和挂起监视器：那组开关让所有窗口、所有 <webview> 和 GPU 进程在后台
+// 也全速运转，并且让卡死的渲染进程再也不会被发现。流式回复在隐藏页面里的推进由
+// modules/renderer/streamManager.js 自己处理（隐藏时走定时器并整段排空，重新可见时切回 rAF）。
+const path = require('path');
+const crypto = require('crypto');
+const fs = require('fs-extra'); // Using fs-extra for convenience
+const os = require('os');
+const { spawn } = require('child_process'); // For executing local python
+const { Worker } = require('worker_threads');
+const bootstrapLaunchProtocol = require('./modules/bootstrap/launch-protocol');
+const fileManager = require('./modules/fileManager'); // Import the new file manager
+const groupChat = require('./Groupmodules/groupchat'); // Import the group chat module
+const windowHandlers = require('./modules/ipc/windowHandlers'); // Import window IPC handlers
+const settingsHandlers = require('./modules/ipc/settingsHandlers'); // Import settings IPC handlers
+const suveiHumanAuthorizationHandlers = require('./modules/ipc/suveiHumanAuthorizationHandlers'); // SUVEI Human Owner authority
+const fileDialogHandlers = require('./modules/ipc/fileDialogHandlers'); // Import file dialog handlers
+const deepWikiHandlers = require('./modules/ipc/deepWikiHandlers'); // Ask Nova DeepWiki MCP handlers
+const { getAgentConfigById, ...agentHandlers } = require('./modules/ipc/agentHandlers'); // Import agent handlers
+const regexHandlers = require('./modules/ipc/regexHandlers'); // Import regex handlers
+const chatHandlers = require('./modules/ipc/chatHandlers'); // Import chat handlers
+const { createDiagnosticsExporter } = require('./modules/diagnosticsSnapshot'); // 一次性诊断导出（进程指标 + 窗口状态 + 生命周期快照）
+const groupChatHandlers = require('./modules/ipc/groupChatHandlers'); // Import group chat handlers
+const sovitsHandlers = require('./modules/ipc/sovitsHandlers'); // Import SovitsTTS IPC handlers
+const promptHandlers = require('./modules/ipc/promptHandlers'); // Import prompt handlers
+const notesHandlers = require('./modules/ipc/notesHandlers'); // Import notes handlers
+const workspaceHandlers = require('./modules/ipc/workspaceHandlers'); // 工作区索引与实时引用
+const projectForgeHandlers = require('./modules/ipc/projectForgeHandlers'); // ProjectForge 施工图 GUI（只读 + 署名回退）
+const { createSidePaneSenderGuard, guardIpcMain } = require('./modules/ipc/sidePaneIpcPolicy'); // 侧栏相关 IPC 的调用方窗口策略
+const gitHandlers = require('./modules/ipc/gitHandlers'); // ProjectForge Git 源代码管理侧栏
+const sourceHandlers = require('./modules/ipc/sourceHandlers'); // ProjectForge 源码浏览 / 轻量编辑侧栏
+// 侧栏终端、调用轨迹、旁聊的 IPC 由领域激活器按需加载（见下方 domainActivator.register），这里不预先 require
+const browserHandlers = require('./modules/ipc/browserHandlers'); // 侧栏浏览器（<webview> 的安全围栏）
+const { createApplicationSenderGuard, protectApplicationNavigation } = require('./modules/ipc/applicationSender');
+const { createDomainActivator, channelsForDomain } = require('./modules/ipc/domainActivator');
+const { describeApis } = require('./preloads/core/registry');
+const { configureSharedRecorder } = require('./modules/modelTrajectory');
+const { configureAgentMood, getAgentMoodStore } = require('./modules/agentMood');
+const domainActivator = createDomainActivator({ ipcMain });
+// 主进程推送按窗口订阅：只发给订阅了某个主题的窗口（V工程窗口、主窗口的状态面板和侧栏）
+const { createStateSubscriptions } = require('./modules/ipc/stateSubscriptions');
+const stateSubscriptions = createStateSubscriptions();
+const assistantHandlers = require('./modules/ipc/assistantHandlers'); // Import assistant handlers
+const musicHandlers = require('./modules/ipc/musicHandlers'); // Import music handlers
+const diceHandlers = require('./modules/ipc/diceHandlers'); // Import dice handlers
+const themeHandlers = require('./modules/ipc/themeHandlers'); // Import theme handlers
+const emoticonHandlers = require('./modules/ipc/emoticonHandlers'); // Import emoticon handlers
+const forumHandlers = require('./modules/ipc/forumHandlers'); // Import forum handlers
+const memoHandlers = require('./modules/ipc/memoHandlers'); // Import memo handlers
+const ragHandlers = require('./modules/ipc/ragHandlers'); // Import RAG handlers
+const translatorHandlers = require('./modules/ipc/translatorHandlers'); // Import translator handlers
+const voiceHandlers = require('./modules/ipc/voiceHandlers'); // Import voice chat handlers
+const localSttHandlers = require('./modules/ipc/localSttHandlers'); // 本地 SenseVoice 语音识别
+const { hostHooks } = require('./modules/hostHooks'); // 可选功能的挂钩点
+const { createAppFeatures } = require('./modules/appFeatures'); // 应用功能模块（modules/*/feature.json）
+// speechRecognizer is now lazy-loaded
+const canvasHandlers = require('./modules/ipc/canvasHandlers'); // Import canvas handlers
+const chartHandlers = require('./modules/ipc/chartHandlers'); // Agent 图表工作台与持久化服务
+const desktopHandlers = require('./modules/ipc/desktopHandlers'); // Import VCPdesktop handlers
+const desktopRemoteHandlers = require('./modules/ipc/desktopRemoteHandlers'); // Import desktop remote control handlers
+const tavernHandlers = require('./modules/ipc/tavernHandlers'); // Import VCPChatTarven (advanced reply) handlers
+const { ScriptoriumAgentControlService } = require('./modules/services/scriptoriumAgentControlService');
+const { GlobalJevService } = require('./modules/services/globalJevService');
+// docxHandlers 依赖链较重（mammoth/cheerio/marked/jszip 等），冷启动不加载。
+// 仅在首次真正使用文坊时（IPC 打开、V 桌面图标、Agent 调用）按需加载。
+const windowService = require('./modules/services/windowService');
+const WINDOW_APP_IDS = require('./modules/services/windowAppIds');
+let docxHandlersModule = null;
+let docxHandlersLoadPromise = null;
+let docxHandlersInitializeOptions = null;
+let docxOpenBootstrapRegistered = false;
+
+function loadDocxHandlers() {
+    if (docxHandlersModule) return Promise.resolve(docxHandlersModule);
+    if (docxHandlersLoadPromise) return docxHandlersLoadPromise;
+    if (!docxHandlersInitializeOptions) {
+        return Promise.reject(new Error('[Main] docxHandlers 尚未配置。'));
+    }
+
+    docxHandlersLoadPromise = new Promise((resolve, reject) => {
+        // 将同步 CommonJS 模块解析移出当前初始化调用栈，避免阻塞主窗口创建。
+        setImmediate(() => {
+            try {
+                // 初始化真实模块前移除临时打开桥接，避免重复注册同名 IPC。
+                if (docxOpenBootstrapRegistered) {
+                    ipcMain.removeHandler('open-docx-window');
+                    docxOpenBootstrapRegistered = false;
+                }
+                const handlers = require('./modules/ipc/docxHandlers');
+                handlers.initialize(docxHandlersInitializeOptions);
+                docxHandlersModule = handlers;
+                console.log('[Main] docxHandlers loaded asynchronously.');
+                resolve(handlers);
+            } catch (error) {
+                // 允许后续按需调用重试，同时恢复临时打开入口。
+                docxHandlersLoadPromise = null;
+                registerDocxOpenBootstrap();
+                console.error('[Main] Failed to load docxHandlers:', error);
+                reject(error);
+            }
+        });
+    });
+    return docxHandlersLoadPromise;
+}
+
+function registerDocxOpenBootstrap() {
+    if (docxOpenBootstrapRegistered || docxHandlersModule) return;
+    ipcMain.handle('open-docx-window', async (_event, options = {}) => {
+        const handlers = await loadDocxHandlers();
+        const win = await handlers.openDocxWindow(options);
+        return { success: true, windowId: win.id };
+    });
+    docxOpenBootstrapRegistered = true;
+}
+
+function configureDocxHandlers(options) {
+    docxHandlersInitializeOptions = options;
+    registerDocxOpenBootstrap();
+    // V 桌面等入口通过 windowService 打开文坊，不经过 open-docx-window IPC。
+    // 预先登记轻量占位；真实模块 initialize() 时会以同一 appId 覆盖 open/getWindow。
+    windowService.register(WINDOW_APP_IDS.DOCX, {
+        owner: 'main:docx-lazy',
+        getWindow: () => docxHandlersModule?.getDocxWindow() || null,
+        open: async (openOptions = {}) => {
+            const handlers = await loadDocxHandlers();
+            return handlers.openDocxWindow(openOptions);
+        },
+        readyTimeoutMs: 20000,
+    });
+}
+
+// 提供稳定对象给控制服务；异步方法在真实模块就绪前自动等待。
+const docxHandlers = {
+    openDocxWindow: (...args) =>
+        loadDocxHandlers().then((handlers) => handlers.openDocxWindow(...args)),
+    requestAgentOperation: (...args) =>
+        loadDocxHandlers().then((handlers) => handlers.requestAgentOperation(...args)),
+    writeProjectArtifact: (...args) =>
+        loadDocxHandlers().then((handlers) => handlers.writeProjectArtifact(...args)),
+    getSystemFonts: (...args) =>
+        loadDocxHandlers().then((handlers) => handlers.getSystemFonts(...args)),
+    getDocxWindow: () => docxHandlersModule?.getDocxWindow() || null,
+};
+const loomManagerModule = require('./modules/loom/VCPLoomManager');
+const { PRELOAD_ROLES, resolveProjectPreload } = require('./modules/services/preloadPaths');
+const { createEmbeddedAppSessionManager } = require('./modules/services/embeddedAppSessionManager');
+const { SenderTaskRegistry } = require('./modules/services/senderTaskRegistry');
+const { ChatDataServiceFacade } = require('./modules/services/chatDataService');
+const { createHistoryWatcherLeaseManager } = require('./modules/services/historyWatcherLeaseManager');
+const { HistoryMutationQueue } = require('./modules/services/historyMutationQueue');
+const { PluginAgentOperationService } = require('./modules/services/pluginAgentOperationService');
+// chokidar is now lazy-loaded
+
+// --- Selected History notification owner ---
+let embeddedAppSessions = null;
+let embeddedAppTasks = null;
+const { createHistoryFileWatcher } = require('./modules/services/historyFileWatcher');
+const fileWatcher = createHistoryFileWatcher();
+
+const historyWatcherLeases = createHistoryWatcherLeaseManager({
+    startWatching: ({ filePath, callback }) => fileWatcher.watchFile(filePath, callback),
+    stopWatching: () => fileWatcher.stopWatching()
+});
+const historyWatcherSenderOwners = new WeakMap();
+let historyWatcherSenderSequence = 0;
+
+function getHistoryWatcherOwner(sender) {
+    const existing = historyWatcherSenderOwners.get(sender);
+    if (existing) return existing;
+    // Electron may reuse numeric WebContents IDs. Include a main-process
+    // generation so a late destroyed event cannot revoke a newer renderer.
+    const ownerId = `${sender.id}:${++historyWatcherSenderSequence}`;
+    historyWatcherSenderOwners.set(sender, ownerId);
+    sender.once('destroyed', () => {
+        void historyWatcherLeases.revoke(ownerId).catch((error) => {
+            console.warn('[FileWatcher] Failed to release destroyed renderer lease:', error);
+        });
+    });
+    return ownerId;
+}
+// --- Configuration Paths ---
+// Data storage will be within the project's 'AppData' directory
+const PROJECT_ROOT = __dirname; // __dirname is the directory of main.js
+const isolatedAppDataRoot = process.env.VCPCHAT_APP_DATA_DIR?.trim();
+if (isolatedAppDataRoot) app.setPath('userData', path.resolve(isolatedAppDataRoot));
+const APP_DATA_ROOT_IN_PROJECT = isolatedAppDataRoot
+    ? path.resolve(isolatedAppDataRoot)
+    : path.join(PROJECT_ROOT, 'AppData');
+// Keep the native draft scope; attest its profile binding before the bundled preload exposes APIs.
+const composerScopeBinding = Object.freeze({
+    scope: process.env.VCPCHAT_COMPOSER_SCOPE_ID || 'profile',
+    profile: crypto.createHash('sha256').update(APP_DATA_ROOT_IN_PROJECT).digest('hex'),
+});
+ipcMain.on('native-sync:composer-scope', event => {
+    const contents = mainWindow?.webContents;
+    event.returnValue = contents && event.sender === contents && event.senderFrame === contents.mainFrame
+        ? composerScopeBinding : null;
+});
+// 应用功能模块：停用的不加载；它们声明的自定义协议必须在 app ready 之前登记
+const appFeatures = createAppFeatures({
+    projectRoot: PROJECT_ROOT, appDataRoot: APP_DATA_ROOT_IN_PROJECT,
+    bundledFeatureFolders: ['nativeSyncDesktopRuntime', 'nativeSyncSettings'],
+});
+appFeatures.registerSchemes(protocol);
+appFeatures.installIpc(ipcMain);
+const NATIVE_SPLASH_READY_FILE = app.isPackaged
+    ? path.join(APP_DATA_ROOT_IN_PROJECT, '.vcp_ready')
+    : path.join(__dirname, '.vcp_ready');
+
+const AGENT_DIR = path.join(APP_DATA_ROOT_IN_PROJECT, 'Agents');
+const USER_DATA_DIR = path.join(APP_DATA_ROOT_IN_PROJECT, 'UserData'); // For chat histories and attachments
+const SETTINGS_FILE = path.join(APP_DATA_ROOT_IN_PROJECT, 'settings.json');
+const TERMINAL_EXECUTOR_PATHS = ['PowerShellExecutor', 'PTYShellExecutor'].map(name =>
+    path.join(PROJECT_ROOT, 'VCPDistributedServer', 'Plugin', name, `${name}.js`));
+const USER_AVATAR_FILE = path.join(USER_DATA_DIR, 'user_avatar.png'); // Standardized user avatar file
+const MUSIC_PLAYLIST_FILE = path.join(APP_DATA_ROOT_IN_PROJECT, 'songlist.json');
+const MUSIC_COVER_CACHE_DIR = path.join(APP_DATA_ROOT_IN_PROJECT, 'MusicCoverCache');
+const NETWORK_NOTES_CACHE_FILE = path.join(APP_DATA_ROOT_IN_PROJECT, 'network-notes-cache.json'); // Cache for network notes
+const WALLPAPER_THUMBNAIL_CACHE_DIR = path.join(APP_DATA_ROOT_IN_PROJECT, 'WallpaperThumbnailCache');
+const RESAMPLE_CACHE_DIR = path.join(APP_DATA_ROOT_IN_PROJECT, 'ResampleCache');
+const CANVAS_CACHE_DIR = path.join(APP_DATA_ROOT_IN_PROJECT, 'canvas'); // Canvas cache directory
+
+// Define a specific agent ID for notes attachments
+const NOTES_AGENT_ID = 'notes_attachments_agent';
+
+let audioEngineProcess = null; // To hold the python audio engine process
+let mainWindow;
+let tray = null;
+let vcpLogWebSocket;
+let vcpLogReconnectInterval;
+let openChildWindows = [];
+let distributedServer = null; // To hold the distributed server instance
+let distributedServerStartPromise = null;
+let chatDataService = null; // Optional VCP-CDS shadow service.
+let chatDataServiceStartPromise = null;
+let historyMutationQueue = null;
+let nativeSyncLifecycle = null;
+let startupTeardownStarted = false;
+let topicAdmissionHost = null;
+let topicConversationResolver = null;
+let historyAuthority = null;
+let localHistoryAuthority = null;
+let pluginAgentOperationService = null;
+let chartService = null;
+let gameService = null;
+let appSettingsManager = null;
+let globalJevService = null;
+let loomManager = null;
+let scriptoriumAgentControl = null;
+let networkNotesTreeCache = null; // In-memory cache for the network notes
+let cachedModels = []; // Cache for models fetched from VCP server
+const NOTES_MODULE_DIR = path.join(APP_DATA_ROOT_IN_PROJECT, 'Notemodules');
+const isRagObserverOnlyMode = process.argv.includes('--rag-observer-only');
+const isAutoOpenDesktop = process.argv.includes('--desktop-only');
+let audioEngineStopPromise = null;
+let isAudioEngineStopping = false;
+let appQuitCleanupPromise = null;
+let isFinalizingQuit = false;
+let quitCleanupSettled = false;
+const MAIN_RENDERER_CRASH_WINDOW_MS = 60_000;
+const MAIN_RENDERER_STABLE_RESET_MS = 30_000;
+const MAIN_RENDERER_MAX_RECOVERIES = 3;
+let mainRendererCrashTimes = [];
+let mainRendererRecoveryTimer = null;
+let mainRendererStableTimer = null;
+let mainRendererFailurePromptOpen = false;
+const managedBootstrapOperationId = process.env.VCPCHAT_BOOTSTRAP_OPERATION_ID?.trim() || null;
+const managedBootstrapStateRoot = process.env.VCPCHAT_STATE_DIR?.trim() || null;
+const nativeLauncherProgressEnabled = process.env.VCP_LAUNCHER_PROTOCOL === '1';
+let managedBootstrapReadyPublished = false;
+let nativeLauncherReadyReported = false;
+
+function publishManagedBootstrapReady(checks) {
+    if (!managedBootstrapOperationId || !managedBootstrapStateRoot || managedBootstrapReadyPublished) return false;
+    try {
+        bootstrapLaunchProtocol.writeReadyRecord({
+            stateRoot: managedBootstrapStateRoot,
+            operationId: managedBootstrapOperationId,
+            buildId: process.env.VCPCHAT_BUILD_ID?.trim() || null,
+            checks,
+        });
+        managedBootstrapReadyPublished = true;
+        console.log(`[Main] Published managed bootstrap ready for ${managedBootstrapOperationId}.`);
+        return true;
+    } catch (error) {
+        console.warn('[Main] Failed to publish managed bootstrap ready:', error.message);
+        return false;
+    }
+}
+
+async function publishManagedBootstrapReadyAfterRenderer() {
+    const managedReadyPending =
+        Boolean(managedBootstrapOperationId && managedBootstrapStateRoot) &&
+        !managedBootstrapReadyPublished;
+    const nativeLauncherReadyPending =
+        nativeLauncherProgressEnabled && !nativeLauncherReadyReported;
+    const distributedServerReadyPending =
+        !distributedServerStartPromise && !distributedServer;
+    if (
+        (!managedReadyPending && !nativeLauncherReadyPending && !distributedServerReadyPending) ||
+        !mainWindow ||
+        mainWindow.isDestroyed()
+    ) return;
+
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline && mainWindow && !mainWindow.isDestroyed()) {
+        try {
+            const ready = await mainWindow.webContents.executeJavaScript(
+                "document.documentElement.dataset.vcpRendererReady === 'true'",
+                true
+            );
+            if (ready) {
+                if (mainWindow.isMinimized()) mainWindow.restore();
+                if (!mainWindow.isVisible()) mainWindow.show();
+                mainWindow.focus();
+                mainWindow.moveTop();
+                if (!mainWindow.isVisible()) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    continue;
+                }
+                if (managedReadyPending) {
+                    publishManagedBootstrapReady({
+                        mainWindow: 'visible',
+                        preload: 'ready',
+                        renderer: 'ready',
+                    });
+                }
+                if (nativeLauncherReadyPending) {
+                    nativeLauncherReadyReported = true;
+                    reportLauncherProgress('renderer-ready', 1, '准备完成');
+                }
+                // MobileSync 的首次索引可能包含大量同步 SQLite/哈希工作。
+                // 必须在真实渲染就绪和 Splash 完成信号之后再启动，避免与首屏争抢
+                // Electron 主线程；后续启动由 history_source_state 差异化跳过。
+                setImmediate(() => {
+                    void startDistributedServerAfterRenderer();
+                });
+                return;
+            }
+        } catch (error) {
+            if (mainWindow?.webContents?.isDestroyed()) return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    console.warn('[Main] Renderer did not reach launcher readiness before the publication deadline.');
+}
+
+function clearMainRendererRecoveryTimers() {
+    if (mainRendererRecoveryTimer) clearTimeout(mainRendererRecoveryTimer);
+    if (mainRendererStableTimer) clearTimeout(mainRendererStableTimer);
+    mainRendererRecoveryTimer = null;
+    mainRendererStableTimer = null;
+}
+
+function markMainRendererStable() {
+    void publishManagedBootstrapReadyAfterRenderer();
+    if (mainRendererStableTimer) clearTimeout(mainRendererStableTimer);
+    mainRendererStableTimer = setTimeout(() => {
+        mainRendererCrashTimes = [];
+        mainRendererStableTimer = null;
+    }, MAIN_RENDERER_STABLE_RESET_MS);
+}
+
+async function showMainRendererFailurePrompt(details) {
+    if (mainRendererFailurePromptOpen || isFinalizingQuit || app.isQuitting) return;
+    mainRendererFailurePromptOpen = true;
+    try {
+        const options = {
+            type: 'error',
+            title: 'VCPChat 界面连续崩溃',
+            message: '主界面在短时间内多次异常退出，已停止自动恢复以避免崩溃循环。',
+            detail: details?.reason ? `最后一次退出原因：${details.reason}` : '',
+            buttons: ['重试一次', '退出应用'],
+            defaultId: 0,
+            cancelId: 1,
+            noLink: true,
+        };
+        const result = mainWindow && !mainWindow.isDestroyed()
+            ? await dialog.showMessageBox(mainWindow, options)
+            : await dialog.showMessageBox(options);
+        if (result.response === 0 && mainWindow && !mainWindow.isDestroyed()) {
+            mainRendererCrashTimes = [];
+            scheduleMainRendererRecovery({ reason: 'manual-retry' });
+        } else {
+            app.quit();
+        }
+    } finally {
+        mainRendererFailurePromptOpen = false;
+    }
+}
+
+function scheduleMainRendererRecovery(details = {}) {
+    if (isFinalizingQuit || app.isQuitting || !mainWindow || mainWindow.isDestroyed()) return;
+    if (mainRendererRecoveryTimer) return;
+    const now = Date.now();
+    mainRendererCrashTimes = mainRendererCrashTimes.filter(timestamp => now - timestamp < MAIN_RENDERER_CRASH_WINDOW_MS);
+    if (mainRendererCrashTimes.length >= MAIN_RENDERER_MAX_RECOVERIES) {
+        void showMainRendererFailurePrompt(details);
+        return;
+    }
+    mainRendererCrashTimes.push(now);
+    mainRendererRecoveryTimer = setTimeout(() => {
+        mainRendererRecoveryTimer = null;
+        if (isFinalizingQuit || app.isQuitting || !mainWindow || mainWindow.isDestroyed()) return;
+        console.warn(`[Main] Recovering main renderer (${mainRendererCrashTimes.length}/${MAIN_RENDERER_MAX_RECOVERIES}) after ${details.reason || 'unknown failure'}.`);
+        mainWindow.loadFile('main.html').catch(error => {
+            console.error('[Main] Failed to recover main renderer:', error);
+            scheduleMainRendererRecovery({ reason: 'reload-failed' });
+        });
+    }, 250);
+}
+
+function startDistributedServerAfterRenderer() {
+    if (distributedServerStartPromise || distributedServer || isFinalizingQuit || app.isQuitting) {
+        return distributedServerStartPromise;
+    }
+
+    distributedServerStartPromise = (async () => {
+        let server = null;
+        try {
+            const settings = await appSettingsManager?.readSettings();
+            if (!settings?.enableDistributedServer) {
+                console.log('[Main] Distributed server is disabled in settings.');
+                return null;
+            }
+            if (isFinalizingQuit || app.isQuitting || !mainWindow || mainWindow.isDestroyed()) {
+                return null;
+            }
+
+            console.log('[Main] Renderer is ready. Initializing distributed server in the background...');
+            const DistributedServer = require('./VCPDistributedServer/VCPDistributedServer.js');
+            let nativeConversationWebSocket = false;
+            try {
+                const binding = require('./modules/ipc/nativeConversationHandlers').bindingFromEnvironment();
+                nativeConversationWebSocket = !!binding && require('./modules/services/trustedConversation/transport.cjs').validateNativeBinding({binding}).websocket;
+            } catch {
+                // Optional native configuration must not block ordinary distributed tools.
+                console.warn('[Main] Native conversation configuration unavailable; native WS disabled.');
+            }
+            server = new DistributedServer({
+                configPath: app.isPackaged ? path.join(app.getPath('userData'), 'VCPDistributedServer', 'config.env') : undefined,
+                mainServerUrl: settings.vcpLogUrl,
+                nativeConversationWebSocket,
+                nativeSyncRouteId: require('./modules/services/nativeSync/sharedTopicSponsor').nativeSyncRouteId,
+                vcpKey: settings.vcpLogKey,
+                serverName: 'VCPChat-Desktop-Client-Distributed-Server',
+                debugMode: true,
+                rendererProcess: mainWindow.webContents,
+                handleMusicControl: musicHandlers.handleMusicControl,
+                handleDiceControl: diceHandlers.handleDiceControl,
+                handleCanvasControl: desktopRemoteHandlers.handleCanvasControl,
+                handleFlowlockControl: desktopRemoteHandlers.handleFlowlockControl,
+                handleDesktopRemoteControl: desktopRemoteHandlers.handleDesktopRemoteControl,
+                chatDataService,
+                loomManager,
+                scriptoriumAgentControl,
+                pluginAgentOperationService,
+                chartService,
+                gameService,
+                // 工作区只读门面：direct 插件据此动态获取写入白名单
+                workspaceService: workspaceHandlers.workspaceService,
+                // 工具调用成功后通知挂钩的功能（例如播报闹钟、新话题）
+                onToolResult: (...args) => hostHooks.emit('tools:result', ...args)
+            });
+            distributedServer = server;
+            await server.initialize();
+            return isFinalizingQuit || app.isQuitting ? null : server;
+        } catch (error) {
+            // 启动失败也需清理已加载的插件和可能创建的监听器。
+            if (server) {
+                await server.stop().catch(cleanupError => {
+                    console.warn('[Main] Failed to clean up distributed server startup:', cleanupError);
+                });
+            }
+            if (distributedServer === server) distributedServer = null;
+            console.error('[Main] Failed to initialize distributed server after renderer readiness:', error);
+            return null;
+        }
+    })();
+
+    return distributedServerStartPromise;
+}
+
+function toggleDevToolsForWindow(focusedWindow) {
+    if (!focusedWindow || focusedWindow.isDestroyed()) return;
+    if (loomManager?.toggleDevToolsForWindow(focusedWindow)) return;
+    const contents = focusedWindow.webContents;
+    if (contents && !contents.isDestroyed()) contents.toggleDevTools();
+}
+
+// --- Audio Engine Management ---
+// Now uses the Rust native audio engine instead of Python
+function startAudioEngine() {
+    return new Promise((resolve, reject) => {
+        // --- Uniqueness Check ---
+        if (audioEngineProcess && !audioEngineProcess.killed) {
+            console.log('[Main] Audio Engine process is already running.');
+            resolve(); // Already running, so we can consider it "ready"
+            return;
+        }
+
+        // Use the Rust audio server binary (moved to audio_engine directory)
+        const binaryName = process.platform === 'win32' ? 'audio_server.exe' : 'audio_server';
+        const platformDirectory = `${process.platform}-${process.arch}`;
+        const audioRoot = app.isPackaged
+            ? path.join(process.resourcesPath, 'app.asar.unpacked', 'audio_engine')
+            : path.join(__dirname, 'audio_engine');
+        const platformBinaryPath = path.join(audioRoot, 'bin', platformDirectory, binaryName);
+        const legacyBinaryPath = path.join(audioRoot, binaryName);
+        const legacyMatchesPlatform = process.platform === 'win32' || (process.platform === 'linux' && process.arch === 'x64');
+        const rustBinaryPath = fs.existsSync(platformBinaryPath)
+            ? platformBinaryPath
+            : legacyMatchesPlatform ? legacyBinaryPath : platformBinaryPath;
+        console.log(`[Main] Starting Rust Audio Engine from: ${rustBinaryPath}`);
+
+        // Check if the binary exists
+        if (!fs.existsSync(rustBinaryPath)) {
+            const errorMsg = `Rust audio engine binary not found at: ${rustBinaryPath}. Please run 'cargo build --release' in rust_audio_engine directory.`;
+            console.error(`[Main] ${errorMsg}`);
+            reject(new Error(errorMsg));
+            return;
+        }
+
+        audioEngineStopPromise = null;
+        isAudioEngineStopping = false;
+
+        const args = ['--port', '63789'];
+        audioEngineProcess = spawn(rustBinaryPath, args);
+
+        const readyTimeout = setTimeout(() => {
+            console.error('[Main] Audio Engine failed to start within 10 seconds.');
+            reject(new Error('Audio Engine timed out.'));
+        }, 10000); // 10-second timeout (Rust starts faster)
+
+        audioEngineProcess.stdout.on('data', (data) => {
+            const output = data.toString().trim();
+            console.log(`[AudioEngine STDOUT]: ${output}`);
+            // Check for our ready signal from Rust server
+            if (output.includes('RUST_AUDIO_ENGINE_READY')) {
+                console.log('[Main] Rust Audio Engine is ready.');
+                clearTimeout(readyTimeout);
+                resolve();
+            }
+        });
+
+        audioEngineProcess.stderr.on('data', (data) => {
+            const logLine = data.toString().trim();
+            if (logLine && !logLine.includes('GET /state HTTP/1.1')) {
+                const logMethod = isAudioEngineStopping ? console.warn : console.error;
+                logMethod(`[AudioEngine STDERR]: ${logLine}`);
+            }
+        });
+
+        audioEngineProcess.on('close', (code) => {
+            console.log(`[Main] Audio Engine process exited with code ${code}`);
+            clearTimeout(readyTimeout);
+            audioEngineProcess = null;
+            audioEngineStopPromise = null;
+            isAudioEngineStopping = false;
+        });
+
+        audioEngineProcess.on('error', (err) => {
+            console.error('[Main] Failed to start Audio Engine process.', err);
+            clearTimeout(readyTimeout);
+            reject(err);
+        });
+    });
+}
+
+async function stopAudioEngine() {
+    if (!audioEngineProcess || audioEngineProcess.killed) {
+        return;
+    }
+
+    if (audioEngineStopPromise) {
+        return audioEngineStopPromise;
+    }
+
+    console.log('[Main] Stopping Rust Audio Engine...');
+    isAudioEngineStopping = true;
+    const processRef = audioEngineProcess;
+    const exitPromise = new Promise((resolve) => {
+        processRef.once('close', () => resolve());
+    });
+
+    audioEngineStopPromise = (async () => {
+        try {
+            const controller = new AbortController();
+            const shutdownTimer = setTimeout(() => controller.abort(), 2000);
+            try {
+                await fetch('http://127.0.0.1:63789/shutdown', {
+                    method: 'POST',
+                    signal: controller.signal
+                });
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    console.warn(`[Main] Audio Engine shutdown request failed: ${error.message}`);
+                }
+            } finally {
+                clearTimeout(shutdownTimer);
+            }
+
+            await Promise.race([
+                exitPromise,
+                new Promise((resolve) => setTimeout(resolve, 2500))
+            ]);
+
+            if (audioEngineProcess === processRef && !processRef.killed) {
+                console.warn('[Main] Audio Engine did not exit after graceful shutdown request. Force killing process.');
+                processRef.kill();
+                await Promise.race([
+                    exitPromise,
+                    new Promise((resolve) => setTimeout(resolve, 2000))
+                ]);
+            }
+        } finally {
+            if (audioEngineProcess !== processRef || processRef.killed) {
+                audioEngineStopPromise = null;
+            }
+        }
+    })();
+
+    return audioEngineStopPromise;
+}
+
+async function performQuitCleanup() {
+    if (appQuitCleanupPromise) {
+        return appQuitCleanupPromise;
+    }
+
+    appQuitCleanupPromise = (async () => {
+        quitAdmission.begin();
+        // Busy PF must refuse before history, voice, sockets or other services stop.
+        if (distributedServer) {
+            await distributedServer.stop({ beforePluginCleanup: () => projectForgeHandlers.cleanupForQuit() });
+            distributedServer = null;
+        } else {
+            await projectForgeHandlers.cleanupForQuit();
+        }
+        startupTeardownStarted = true;
+        nativeSyncLifecycle?.beginShutdown();
+        await historyWatcherLeases.dispose();
+        await getAgentMoodStore()?.flush().catch(() => {});
+        await appFeatures.disposeAll();
+
+        try {
+            localSttHandlers.shutdown();
+            await voiceHandlers.shutdownVoiceInputEngine();
+        } catch (error) {
+            console.warn('[Main] Failed to shut down native voice input engine:', error.message || error);
+        }
+
+        await historyAuthority?.close();
+        if (chatDataService) {
+            console.log('[Main] Stopping VCP-CDS...');
+            await chatDataService.stop();
+            chatDataService = null;
+        }
+
+        if (loomManager) {
+            console.log('[Main] Stopping VCP Loom...');
+            await loomManager.shutdown();
+            loomManager = null;
+        }
+
+        workspaceHandlers.dispose();
+        await topicAdmissionHost?.dispose?.();
+        topicAdmissionHost = null;
+        topicConversationResolver = null;
+        await nativeSyncLifecycle?.close();
+        await historyMutationQueue?.dispose?.();
+        historyMutationQueue = null;
+        pluginAgentOperationService = null;
+        if (chartService) {
+            await chartHandlers.shutdown();
+            chartService = null;
+        }
+        await stopAudioEngine();
+    })();
+
+    try { return await appQuitCleanupPromise; }
+    catch (error) {
+        appQuitCleanupPromise = null;
+        if (!error.shutdownUnchanged) {
+            startupTeardownStarted = true;
+            nativeSyncLifecycle?.beginShutdown();
+        }
+        throw error;
+    }
+}
+
+
+// --- Main Window Creation ---
+
+// 一次性诊断导出。exporter 在生命周期快照通道注册时创建（它复用同一份快照），菜单项和 IPC 都走这里。
+let diagnosticsExporter = null;
+async function exportDiagnosticsSnapshot() {
+    if (!diagnosticsExporter) return { success: false, error: '诊断导出尚未就绪。' };
+    try {
+        return await diagnosticsExporter.exportToFile();
+    } catch (error) {
+        console.error('[Main] Diagnostics export failed:', error);
+        return { success: false, error: error?.message || String(error) };
+    }
+}
+
+// 主窗口响应性记录：只记状态与时间，不保存任何聊天内容。
+const mainWindowResponsiveness = {
+    unresponsive: false,
+    unresponsiveCount: 0,
+    lastUnresponsiveAt: null,
+    lastResponsiveAt: null,
+    lastSource: null,
+};
+
+// 稳定性日志：无响应 / 恢复（按停滞时长分级）、渲染进程退出、子进程退出，写到 userData/diagnostics/stability.log，
+// 最近条目随 lifecycle:get-main-snapshot.stability 与诊断导出带出。目录在第一次写入时才解析，不受 userData 改路径顺序影响。
+const { createStabilityLog } = require('./modules/stabilityLog');
+const stabilityLog = createStabilityLog({
+    resolveDirectory: () => path.join(app.getPath('userData'), 'diagnostics'),
+});
+stabilityLog.note('session-start', { pid: process.pid, version: app.getVersion(), electron: process.versions.electron });
+app.on('child-process-gone', (event, details) => {
+    stabilityLog.recordChildProcessGone(details);
+    if (details?.reason !== 'clean-exit') console.warn('[Main] child-process-gone', details?.type, details?.serviceName || '', details?.reason, details?.exitCode);
+});
+
+function recordMainWindowResponsiveness(responsive, source) {
+    const at = Date.now();
+    mainWindowResponsiveness.lastSource = source;
+    if (responsive) {
+        if (mainWindowResponsiveness.unresponsive) {
+            const stalledMs = mainWindowResponsiveness.lastUnresponsiveAt ? at - mainWindowResponsiveness.lastUnresponsiveAt : null;
+            console.warn('[Main] Main window responsive again after ' + (stalledMs ?? '?') + ' ms (' + source + ').');
+            stabilityLog.recordResponsive(source);
+        }
+        mainWindowResponsiveness.unresponsive = false;
+        mainWindowResponsiveness.lastResponsiveAt = at;
+        return;
+    }
+    if (!mainWindowResponsiveness.unresponsive) {
+        mainWindowResponsiveness.unresponsiveCount += 1;
+        mainWindowResponsiveness.lastUnresponsiveAt = at;
+        console.warn('[Main] Main window unresponsive (' + source + '); keeping it alive, see lifecycle:get-main-snapshot.mainWindowResponsiveness.');
+        stabilityLog.recordUnresponsive(source);
+    }
+    mainWindowResponsiveness.unresponsive = true;
+}
+
+function createWindow({ deferLoad = false } = {}) {
+    mainWindow = new BrowserWindow({
+        width: 1300,
+        height: 800,
+        minWidth: 900,
+        minHeight: 600,
+        frame: false, // 移除原生窗口框架
+        ...(process.platform === 'darwin' ? {} : { titleBarStyle: 'hidden' }),
+        webPreferences: {
+            preload: path.join(__dirname, 'preloads/bundled/dist/chat.cjs'),
+            additionalArguments: ['--nativesync-composer-scope=' + encodeURIComponent(JSON.stringify(composerScopeBinding))],
+            sandbox: true,
+            contextIsolation: true,    // 恢复: 开启上下文隔离
+            nodeIntegration: false,  // 恢复: 关闭Node.js集成在渲染进程
+            webviewTag: true, // 仅供侧栏浏览器的 <webview>；其创建参数由 browserHandlers.attachToWindow 强制收紧
+            // 主窗口沿用 Chromium 默认的后台节流：ipcRenderer 收流式事件不受节流影响，
+            // 渲染端的流式帧循环在隐藏时自行改走定时器（见 streamManager.js）。
+            spellcheck: true, // Enable spellcheck for input fields
+        },
+        icon: path.join(__dirname, 'assets', 'icon.png'), // Add an icon
+        title: 'VCP AI 聊天客户端',
+        show: false, // Don't show until ready
+    });
+    browserHandlers.attachToWindow(mainWindow);
+
+    if (!deferLoad) {
+        loadMainWindow();
+    }
+
+    // 拦截主窗口内的直接导航（防止在应用内打开外部网页）
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        if (url !== mainWindow.webContents.getURL() && (url.startsWith('http:') || url.startsWith('https:'))) {
+            event.preventDefault();
+            shell.openExternal(url);
+        }
+    });
+
+    // 当主窗口关闭时的处理逻辑：
+    // 1. macOS 上始终隐藏而非关闭
+    // 2. 当桌面窗口存在时，隐藏到托盘而非退出（偷天换日！）
+    // 3. 其他情况正常退出
+    mainWindow.on('close', (event) => {
+        if (quitCleanupSettled) return;
+        // Keep the Linux main window until the guarded application quit succeeds.
+        // Auxiliary windows must not turn a close request into an invisible app.
+        if (process.platform === 'linux') {
+            event.preventDefault();
+            app.isQuitting = true;
+            app.quit();
+            return;
+        }
+        if (app.isQuitting) {
+            // 应用正在退出，允许关闭
+            return;
+        }
+
+        // macOS 始终隐藏
+        if (process.platform === 'darwin') {
+            event.preventDefault();
+            mainWindow.hide();
+            return;
+        }
+
+        // Windows/Linux：如果桌面窗口存在，隐藏到托盘
+        const dw = desktopHandlers.getDesktopWindow();
+        if (dw && !dw.isDestroyed()) {
+            event.preventDefault();
+            mainWindow.hide();
+            console.log('[Main] Desktop window active — main window hidden to tray instead of closing.');
+        }
+        // 否则允许正常关闭（触发 closed 事件）
+    });
+
+    // This will be triggered when the app is quitting, after the window is closed.
+    mainWindow.on('closed', () => {
+        // When the main window is closed, we should only quit on non-macOS
+        // when there are no remaining windows (e.g. RAG Observer may still be open).
+        clearMainRendererRecoveryTimers();
+        mainRendererCrashTimes = [];
+        mainWindow = null;
+        if (process.platform !== 'darwin' && BrowserWindow.getAllWindows().length === 0) {
+            app.quit();
+        }
+    });
+
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+        console.error('[Main] Main window did-fail-load', errorCode, errorDescription, validatedURL);
+    });
+
+    mainWindow.webContents.on('did-start-loading', () => {
+        embeddedAppSessions?.suspend?.();
+    });
+
+    mainWindow.webContents.on('render-process-gone', (event, details) => {
+        embeddedAppSessions?.suspend?.();
+        if (mainRendererStableTimer) {
+            clearTimeout(mainRendererStableTimer);
+            mainRendererStableTimer = null;
+        }
+        console.error('[Main] Main window render-process-gone', details);
+        stabilityLog.recordRenderProcessGone('main-window', details);
+        if (details?.reason !== 'clean-exit') scheduleMainRendererRecovery(details);
+    });
+
+    mainWindow.webContents.on('did-finish-load', markMainRendererStable);
+
+    // 渲染进程被 Chromium 判定无响应时不弹窗、不杀进程，但要记下来：lifecycle:get-main-snapshot 会带出
+    // 这份记录，用户反馈"卡住"时可以对照时间点。以前这里连同挂起监视器一起被静默掉了。
+    mainWindow.on('unresponsive', () => recordMainWindowResponsiveness(false, 'window'));
+    mainWindow.on('responsive', () => recordMainWindowResponsiveness(true, 'window'));
+    mainWindow.webContents.on('unresponsive', () => recordMainWindowResponsiveness(false, 'webContents'));
+    mainWindow.webContents.on('responsive', () => recordMainWindowResponsiveness(true, 'webContents'));
+
+    // mainWindow.setMenu(null); // 移除应用程序菜单栏 - 注释掉以启用macOS的标准菜单
+
+    // Set theme source to 'system' by default. The renderer will send the saved preference on launch.
+    nativeTheme.themeSource = 'system';
+
+    // Listen for window events to notify renderer
+    mainWindow.on('maximize', () => {
+        if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+            mainWindow.webContents.send('window-maximized');
+        }
+    });
+    mainWindow.on('unmaximize', () => {
+        if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+            mainWindow.webContents.send('window-unmaximized');
+        }
+    });
+
+    // Listen for theme changes and notify all relevant windows
+}
+
+function loadMainWindow() {
+    mainWindow.webContents.once('did-finish-load', () => {
+        launchMarks.mark('main-window-loaded');
+        const readyFile = NATIVE_SPLASH_READY_FILE;
+        fs.ensureFileSync(readyFile);
+
+        setTimeout(() => {
+            if (fs.existsSync(readyFile)) {
+                fs.unlinkSync(readyFile);
+            }
+        }, 3000);
+
+        mainWindow.show();
+    });
+
+    return mainWindow.loadFile('main.html');
+}
+
+function createTray() {
+    const iconPath = path.join(__dirname, 'assets', 'icon.png');
+
+    // 修复图标体积问题：在 macOS 上，使用 nativeImage 调整图标大小
+    const { nativeImage } = require('electron');
+    let icon = nativeImage.createFromPath(iconPath);
+
+    // 假设 macOS 菜单栏图标的理想尺寸是 16x16 或 20x20
+    if (process.platform === 'darwin') {
+        // 尝试使用模板图像，并调整大小以适应菜单栏
+        icon = icon.resize({ width: 16, height: 16 });
+        icon.setTemplateImage(true); // 告诉 macOS 这是一个模板图像，用于深色/浅色模式切换
+    }
+
+    tray = new Tray(icon);
+
+    const toggleMainWindowVisibility = () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            if (mainWindow.isVisible()) {
+                mainWindow.hide();
+            } else {
+                if (mainWindow.isMinimized()) mainWindow.restore();
+                mainWindow.show();
+                mainWindow.focus();
+            }
+            return true;
+        }
+        return false;
+    };
+
+    const toggleRagObserverVisibility = async () => {
+        const ragObserverWindow = ragHandlers.getRagObserverWindow();
+        const ragOverlayWindow = ragHandlers.getRagOverlayWindow();
+        if (ragObserverWindow && !ragObserverWindow.isDestroyed()) {
+            if (ragObserverWindow.isVisible()) {
+                ragObserverWindow.hide();
+                if (ragOverlayWindow && !ragOverlayWindow.isDestroyed()) {
+                    ragOverlayWindow.hide();
+                }
+            } else {
+                if (ragObserverWindow.isMinimized()) ragObserverWindow.restore();
+                ragObserverWindow.show();
+                ragObserverWindow.focus();
+            }
+            return true;
+        }
+
+        await ragHandlers.openRagObserverWindow();
+        return true;
+    };
+
+    const handleTrayPrimaryAction = async () => {
+        if (toggleMainWindowVisibility()) return;
+        await toggleRagObserverVisibility();
+    };
+
+    // 挂钩的菜单项会随功能状态变化：收到 tray:refresh 时刷新（见下面）
+    const buildContextMenu = () => Menu.buildFromTemplate([
+        {
+            label: '显示/隐藏主窗口',
+            click: () => {
+                toggleMainWindowVisibility();
+            }
+        },
+        {
+            label: '显示/隐藏信息流监听器',
+            click: () => {
+                void toggleRagObserverVisibility();
+            }
+        },
+        {
+            label: '打开 VCP 桌面',
+            click: () => {
+                desktopHandlers.openDesktopWindow();
+            }
+        },
+        ...hostHooks.collect('tray:menu-items'),
+        { type: 'separator' },
+        {
+            label: '退出',
+            click: () => {
+                app.isQuitting = true;
+                app.quit();
+            }
+        }
+    ]);
+
+    tray.setToolTip('VCP AI 聊天客户端');
+    // 平台特定行为调整：macOS 左键点击只显示/隐藏，右键点击才显示菜单
+    if (process.platform === 'darwin') {
+        // macOS: 左键点击 (tray.on('click')) 负责显示/隐藏窗口
+        tray.on('click', () => {
+            void handleTrayPrimaryAction();
+        });
+
+        // macOS: 右键点击 (tray.on('right-click')) 负责显示菜单
+        tray.on('right-click', () => {
+            tray.popUpContextMenu(buildContextMenu());
+        });
+
+        // 注意：在 macOS 上，不调用 tray.setContextMenu()，以确保左键点击不弹出菜单。
+    } else {
+        // Windows/Linux: 默认行为。
+        let trayMenu = buildContextMenu();
+        tray.setContextMenu(trayMenu);
+        // 换下来的旧菜单 Electron 不释放：挂钩的菜单项只是勾选、显示变了就改现有菜单再设回去（Linux 要重设才刷新），
+        // 文字或快捷键变了才建新的
+        hostHooks.on('tray:refresh', (structureChanged) => {
+            if (!tray || tray.isDestroyed()) return;
+            if (structureChanged || !hostHooks.every('tray:update-menu', trayMenu)) trayMenu = buildContextMenu();
+            tray.setContextMenu(trayMenu);
+        });
+        tray.on('click', () => {
+            void handleTrayPrimaryAction();
+        });
+    }
+}
+
+
+// --- App Lifecycle ---
+const gotTheLock = process.argv.includes('--allow-multiple-instances') || app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    // Tell the managed bootstrapper why this child exits before publishing
+    // ready. This is an expected single-instance handoff, not a crash.
+    if (process.env.VCPCHAT_BOOTSTRAP_OPERATION_ID && process.env.VCPCHAT_STATE_DIR) {
+        try {
+            const bootstrapFs = require('fs');
+            const bootstrapPath = require('path');
+            const markerPath = bootstrapPath.join(process.env.VCPCHAT_STATE_DIR, `already-running-${process.env.VCPCHAT_BOOTSTRAP_OPERATION_ID}.json`);
+            bootstrapFs.mkdirSync(process.env.VCPCHAT_STATE_DIR, { recursive: true });
+            bootstrapFs.writeFileSync(markerPath, JSON.stringify({
+                operationId: process.env.VCPCHAT_BOOTSTRAP_OPERATION_ID,
+                at: new Date().toISOString(),
+            }), { encoding: 'utf8', flag: 'wx' });
+        } catch { /* single-instance exit remains authoritative */ }
+    }
+    // 排除内部静默调用（内部调用时闪屏早已关闭，无需重复创建，防止破坏冷启动状态）
+    const isInternalLaunch = process.argv.includes('--desktop-only') || process.argv.includes('--rag-observer-only');
+
+    if (!isInternalLaunch) {
+        const readyFile = NATIVE_SPLASH_READY_FILE;
+        try {
+            fs.ensureFileSync(readyFile);
+            console.log('[Main] Second instance signaled NativeSplash to close.');
+        } catch (err) {
+            // 异常安全：只读/Docker 环境下静默降级，不影响单例聚焦
+            console.warn('[Main] Failed to create .vcp_ready in second instance:', err.message);
+        }
+    }
+    // Another primary instance cannot prove that this operation's project
+    // window rendered. Let the managed launcher observe this child exit rather
+    // than publishing a false ready record and closing the setup UI.
+    app.quit();
+} else {
+    app.on('second-instance', async (event, commandLine, workingDirectory) => {
+        // 当第一实例被第二实例唤醒时，延迟 1.5 秒清理可能由第二实例创建的信号文件。
+        // 1.5 秒足够 Rust 闪屏端（200ms轮询）检测并退出，且能 100% 避免冷启动信号残留。
+        const readyFile = NATIVE_SPLASH_READY_FILE;
+        setTimeout(() => {
+            try {
+                if (fs.existsSync(readyFile)) {
+                    fs.unlinkSync(readyFile);
+                    console.log('[Main] Cleaned up .vcp_ready signal created by second instance.');
+                }
+            } catch (err) {
+                console.warn('[Main] Failed to clean up second-instance .vcp_ready:', err.message);
+            }
+        }, 1500);
+
+        const wantsRagOnly = commandLine.includes('--rag-observer-only');
+        const wantsDesktop = commandLine.includes('--desktop-only');
+
+        // 如果第二实例请求的是 RAG 独立模式，则直接打开/聚焦 RAG 窗口
+        if (wantsRagOnly) {
+            await ragHandlers.openRagObserverWindow();
+            return;
+        }
+
+        // 如果第二实例带 --desktop-only 参数，打开/聚焦桌面窗口
+        if (wantsDesktop) {
+            await desktopHandlers.openDesktopWindow();
+            // 同时确保主窗口也显示出来
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                if (!mainWindow.isVisible()) mainWindow.show();
+                mainWindow.focus();
+            }
+            return;
+        }
+
+        // 默认聚焦主窗口
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            // macOS deliberately hides the main window when it is closed. A
+            // managed launcher handoff must make that existing instance
+            // visible again, otherwise Recovery exits while the app remains
+            // running invisibly in the background.
+            if (!mainWindow.isVisible()) mainWindow.show();
+            mainWindow.focus();
+            return;
+        }
+
+        const ragObserverWindow = ragHandlers.getRagObserverWindow();
+        if (ragObserverWindow && !ragObserverWindow.isDestroyed()) {
+            if (ragObserverWindow.isMinimized()) ragObserverWindow.restore();
+            if (!ragObserverWindow.isVisible()) ragObserverWindow.show();
+            ragObserverWindow.focus();
+        }
+    });
+
+
+
+
+
+    app.whenReady().then(async () => { // Make the function async
+        reportLauncherProgress('electron-ready', 0.16, 'Electron 核心已就绪');
+        // 全局处理普通 VChat 窗口的新窗口请求。VCP Loom 的远程 WebContentsView
+        // 会由 VCPLoomManager 设置自己的隔离导航策略，因此不在这里提前覆盖。
+        app.on('web-contents-created', (event, contents) => {
+            setImmediate(() => {
+                // WebContentsView 不由 BrowserWindow.fromWebContents() 解析，
+                // 因此可与普通 VChat 壳窗口可靠区分。
+                if (contents.isDestroyed() || !BrowserWindow.fromWebContents(contents)) return;
+                // <webview> guests (side-pane browser) route their popups through modules/ipc/browserHandlers.js
+                if (contents.getType() === 'webview') return;
+                protectApplicationNavigation(contents);
+                contents.setWindowOpenHandler(({ url }) => {
+                    if (url.startsWith('http:') || url.startsWith('https:')) {
+                        shell.openExternal(url);
+                        return { action: 'deny' };
+                    }
+                    return { action: 'deny' };
+                });
+            });
+        });
+
+        // Handle the emergency close request from the splash screen
+        ipcMain.on('close-app', () => {
+            console.log('[Main] Received close-app request from splash screen. Quitting.');
+            app.quit();
+        });
+
+        // The native splash screen is started by the batch file, so no action is needed here.
+
+        // Pre-warm the audio engine in the background. This doesn't block the main window.
+        if (process.env.VCPCHAT_E2E_TEST !== '1') startAudioEngine().catch(err => {
+            console.error('[Main] Failed to pre-warm audio engine on startup:', err);
+            // We don't need to show a dialog here, as it will be handled when the
+            // music window is actually opened.
+        });
+        // Register a custom protocol to handle loading local app files securely.
+        fs.ensureDirSync(APP_DATA_ROOT_IN_PROJECT); // Ensure the main AppData directory in project exists
+        fs.ensureDirSync(AGENT_DIR);
+        fs.ensureDirSync(USER_DATA_DIR);
+        fs.ensureDirSync(MUSIC_COVER_CACHE_DIR);
+        fs.ensureDirSync(WALLPAPER_THUMBNAIL_CACHE_DIR); // Ensure the thumbnail cache directory exists
+        fs.ensureDirSync(RESAMPLE_CACHE_DIR); // Ensure the resample cache directory exists
+        fs.ensureDirSync(CANVAS_CACHE_DIR); // Ensure the canvas cache directory exists
+        reportLauncherProgress('storage-ready', 0.27, '配置与数据目录已就绪');
+        fileManager.initializeFileManager(USER_DATA_DIR, AGENT_DIR); // Initialize FileManager
+        groupChat.initializePaths({ APP_DATA_ROOT_IN_PROJECT, AGENT_DIR, USER_DATA_DIR, SETTINGS_FILE }); // Initialize GroupChat paths
+
+        const AppSettingsManager = require('./modules/utils/appSettingsManager');
+        const AgentConfigManager = require('./modules/utils/agentConfigManager');
+        appSettingsManager = new AppSettingsManager(SETTINGS_FILE);
+        globalJevService = new GlobalJevService({
+            settingsManager: appSettingsManager,
+            logger: console
+        });
+        // 主进程内的升级功能可直接复用此单例；实际配置在每次调用时从
+        // settings.json 读取，因此全局设置保存后无需重启应用。
+        globalThis.vcpJev = globalJevService;
+        const agentConfigManager = new AgentConfigManager(AGENT_DIR);
+        historyMutationQueue = new HistoryMutationQueue({
+            userDataDir: USER_DATA_DIR,
+            agentDir: AGENT_DIR,
+            fileWatcher,
+            logger: console
+        });
+        const authorityModule = require('./modules/services/nativeSync/historyAuthority');
+        localHistoryAuthority = await authorityModule.prepareLocalHistoryAuthority({ queue: historyMutationQueue, appDataRoot: APP_DATA_ROOT_IN_PROJECT });
+        historyAuthority = new (require('./modules/services/historyAuthority').HistoryAuthority)({
+            queue: historyMutationQueue,
+            singleInstance: gotTheLock && !process.argv.includes('--allow-multiple-instances'),
+            deriveProtection: () => authorityModule.deriveHistoryProtection({ appDataRoot: APP_DATA_ROOT_IN_PROJECT })
+        });
+        historyAuthority.fault(); // No native admission until any old CDS has been fenced or replaced.
+        require('./modules/ipc/nativeHistoryHandlers').initialize({ ipcMain, historyMutationQueue });
+        const { createTopicConversationResolver } = require('./modules/services/topicConversationResolver');
+        const { createTopicMessageAdmissionHost } = require('./modules/services/topicMessageAdmissionHost');
+        topicConversationResolver = createTopicConversationResolver({
+            agentDir: AGENT_DIR,
+            groupDir: path.join(APP_DATA_ROOT_IN_PROJECT, 'AgentGroups'),
+            userDataDir: USER_DATA_DIR,
+        });
+        const topicAuthority = require('./modules/services/topicExecutionAuthority').createTopicExecutionAuthority({appDataRoot:APP_DATA_ROOT_IN_PROJECT,getQueue:()=>historyMutationQueue});
+        ipcMain.handle('topic-execution:authority',async(event,scope)=>{if(event.sender!==mainWindow?.webContents)return {success:false,kind:'unknown',code:'FORBIDDEN',error:'FORBIDDEN'};return topicAuthority.classify(scope);});
+        topicAdmissionHost = await createTopicMessageAdmissionHost({
+            appDataRoot: APP_DATA_ROOT_IN_PROJECT,
+            historyQueue: historyMutationQueue,
+            validate: async scope => { await topicAuthority.assertLocal(scope); return topicConversationResolver.validate(scope); },
+            getMainWindow: () => mainWindow,
+            advanceGroup: request => groupChatHandlers.advanceTopicAdmission(request),
+            ipcMain,
+        });
+        const { createTopicSponsorDelivery } = require('./modules/services/topicSponsorDelivery');
+        const topicDelivery = createTopicSponsorDelivery({
+            admission: topicAdmissionHost.service,
+            resolver: {resolve:async value=>{const target=await topicConversationResolver.resolve(value);await topicAuthority.assertLocal(target.scope);return target;}},
+            findAgent: query => pluginAgentOperationService.findAgent(query),
+        });
+        const { createSharedTopicSponsorDelivery } = require('./modules/services/nativeSync/sharedTopicSponsor');
+        const sharedTopicDelivery = createSharedTopicSponsorDelivery({
+            authority: topicAuthority,
+            getRuntime: () => require('./modules/services/nativeSync/sharedHost').runtimeForRoot(APP_DATA_ROOT_IN_PROJECT),
+        });
+        pluginAgentOperationService = new PluginAgentOperationService({
+            topicDelivery,
+            sharedTopicDelivery,
+            assertLocalOwner: scope => topicAuthority.assertLocal(scope, { ownerOnly: true }),
+            agentDir: AGENT_DIR,
+            userDataDir: USER_DATA_DIR,
+            agentConfigManager,
+            historyMutationQueue,
+            groupConfigMutator: (groupId, mutate) => groupChat.mutateGroupConfig(groupId, mutate),
+            appDataRoot: APP_DATA_ROOT_IN_PROJECT,
+            logger: console
+        });
+
+        // Phase 1: VCP-CDS runs only as an optional shadow mirror. Start it in
+        // the background so database reconciliation can never delay the window
+        // or the existing history.json chat path.
+        try {
+            const cdsSettings = await appSettingsManager.readSettings();
+            if (cdsSettings.ChatDataServiceEnabled !== false) {
+                chatDataService = new ChatDataServiceFacade({
+                    appDataPath: APP_DATA_ROOT_IN_PROJECT,
+                    onAuthorityReady: async lifecycle => { historyAuthority.lifecycle = lifecycle; await historyAuthority.refresh(); },
+                    onAuthorityFault: () => historyAuthority.fault(),
+                    enabled: true,
+                    notifyEnabled: cdsSettings.ChatDataServiceNotifyEnabled !== false,
+                    tantivyEnabled: cdsSettings.ChatDataServiceTantivyEnabled !== false,
+                    mobileSyncUseCentralIndex: cdsSettings.MobileSyncUseCentralIndex !== false,
+                    logger: console
+                });
+                // CDS health must never delay the normal Chat window. The
+                // MobileSync plugin awaits this same idempotent start promise
+                // only when a new central-sync session is opened.
+                chatDataServiceStartPromise = chatDataService.startShadowMode();
+            } else {
+                await require('./modules/services/chatDataService/lifecycle').verifyStoppedHistoryAuthority({ appDataPath: APP_DATA_ROOT_IN_PROJECT });
+                historyAuthority.noChildConfirmed = true;
+                await historyAuthority.refresh();
+            }
+        } catch (error) {
+            chatDataService = null;
+            console.error('[Main] VCP-CDS shadow initialization failed; continuing without it:', error);
+        }
+
+        appSettingsManager.startCleanupTimer();
+        appSettingsManager.startAutoBackup(USER_DATA_DIR); // Start auto backup
+        agentConfigManager.startCleanupTimer(); // Start agent config cleanup
+
+        settingsHandlers.initialize({ SETTINGS_FILE, USER_AVATAR_FILE, AGENT_DIR, settingsManager: appSettingsManager, agentConfigManager, mainWindow }); // Initialize settings handlers
+        for (const channel of ['jev:get-status', 'jev:decide']) {
+            ipcMain.removeHandler(channel);
+        }
+        ipcMain.handle('jev:get-status', async () => {
+            try {
+                return { success: true, status: await globalJevService.getStatus() };
+            } catch (error) {
+                console.error('[Jev] Failed to resolve global status:', error);
+                return {
+                    success: false,
+                    error: error?.message || String(error),
+                    code: error?.code || 'JEV_STATUS_FAILED'
+                };
+            }
+        });
+        ipcMain.handle('jev:decide', async (_event, payload = {}) => {
+            try {
+                const result = await globalJevService.decide(
+                    payload.state,
+                    payload.questions
+                );
+                return { success: true, result };
+            } catch (error) {
+                console.error('[Jev] Global decision failed:', error);
+                return {
+                    success: false,
+                    error: error?.message || String(error),
+                    code: error?.code || 'JEV_REQUEST_FAILED',
+                    status: error?.status ?? null,
+                    retryable: error?.retryable === true,
+                    provider: error?.provider || null
+                };
+            }
+        });
+        ragHandlers.initialize({ mainWindow, openChildWindows, settingsManager: appSettingsManager, SETTINGS_FILE });
+
+        // RAG 独立模式：不创建主窗口，仅初始化 RAG 所需 IPC 并直接打开 RAG 窗口
+        if (isRagObserverOnlyMode) {
+            console.log('[Main] Starting in RAG observer only mode.');
+            windowHandlers.initialize(mainWindow, openChildWindows);
+            themeHandlers.initialize({ mainWindow, openChildWindows, projectRoot: PROJECT_ROOT, APP_DATA_ROOT_IN_PROJECT, settingsManager: appSettingsManager });
+            ipcMain.handle('get-platform', () => process.platform);
+
+            // 关键：独立模式也必须创建系统托盘，否则"最小化到托盘"后无法召回窗口。
+            createTray();
+
+            await ragHandlers.openRagObserverWindow();
+            publishManagedBootstrapReady({ mainWindow: 'ready', preload: 'ready', renderer: 'ready', surface: 'rag-observer' });
+            return;
+        }
+
+        // 注意：原 desktop-only 模式已移除。--desktop-only 参数现在仅作为
+        // "启动后自动打开桌面窗口"的标志，所有 IPC 始终完整初始化。
+
+        // Function to fetch and cache models from the VCP server
+        async function fetchAndCacheModels() {
+            console.log('[Main] fetchAndCacheModels called');
+            try {
+                const settings = await appSettingsManager.readSettings();
+                const vcpServerUrl = settings.vcpServerUrl;
+                const vcpApiKey = settings.vcpApiKey; // Get the API key
+
+                if (!vcpServerUrl) {
+                    console.warn('[Main] VCP Server URL is not configured. Cannot fetch models.');
+                    cachedModels = []; // Clear cache if URL is not set
+                    return;
+                }
+                // Correctly construct the base URL by removing known API paths.
+                const urlObject = new URL(vcpServerUrl);
+                const baseUrl = `${urlObject.protocol}//${urlObject.host}`;
+                const modelsUrl = new URL('/v1/models', baseUrl).toString();
+
+                console.log(`[Main] Fetching models from: ${modelsUrl}`);
+                const response = await fetch(modelsUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${vcpApiKey}` // Add the Authorization header
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                cachedModels = data.data || []; // Assuming the response has a 'data' field containing the models array
+                console.log('[Main] Models fetched and cached successfully:', cachedModels.map(m => m.id));
+            } catch (error) {
+                console.error('[Main] Failed to fetch and cache models:', error);
+                cachedModels = []; // Clear cache on error
+            }
+        }
+
+        // Create the native window first, but load the renderer only after IPC registration.
+        createWindow({ deferLoad: true });
+        suveiHumanAuthorizationHandlers.initialize({
+            getMainWindow: () => mainWindow,
+            settingsManager: appSettingsManager
+        });
+        createTray();
+        reportLauncherProgress('window-created', 0.38, '主窗口骨架已创建');
+        // --- Application Menu ---
+        const isMac = process.platform === 'darwin';
+        const menuTemplate = [
+            ...(isMac ? [{
+                label: app.name,
+                submenu: [
+                    { role: 'about' },
+                    { type: 'separator' },
+                    { role: 'services' },
+                    { type: 'separator' },
+                    { role: 'hide' },
+                    { role: 'hideothers' },
+                    { role: 'unhide' },
+                    { type: 'separator' },
+                    {
+                        label: '退出 VCPChat',
+                        accelerator: 'Command+Q',
+                        click: () => {
+                            app.isQuitting = true;
+                            app.quit();
+                        }
+                    }
+                ]
+            }] : []),
+            {
+                label: '文件',
+                submenu: [
+                    {
+                        label: '新建无锁话题',
+                        accelerator: 'CommandOrControl+Shift+N',
+                        click: () => {
+                            if (mainWindow && !mainWindow.isDestroyed()) {
+                                mainWindow.webContents.send('create-unlocked-topic');
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                label: '编辑',
+                submenu: [
+                    { role: 'undo' },
+                    { role: 'redo' },
+                    { type: 'separator' },
+                    { role: 'cut' },
+                    { role: 'copy' },
+                    { role: 'paste' },
+                    ...(isMac ? [
+                        { role: 'pasteAndMatchStyle' },
+                        { role: 'delete' },
+                        { role: 'selectAll' },
+                        { type: 'separator' },
+                        {
+                            label: '语音',
+                            submenu: [
+                                { role: 'startSpeaking' },
+                                { role: 'stopSpeaking' }
+                            ]
+                        }
+                    ] : [
+                        { role: 'delete' },
+                        { type: 'separator' },
+                        { role: 'selectAll' }
+                    ])
+                ]
+            },
+            {
+                label: '视图',
+                submenu: [
+                    { role: 'reload' },
+                    { role: 'forceReload' },
+                    { type: 'separator' },
+                    { role: 'resetZoom' },
+                    { role: 'zoomIn' },
+                    { role: 'zoomOut' },
+                    { type: 'separator' },
+                    { role: 'togglefullscreen' }
+                ]
+            },
+            {
+                label: '窗口',
+                submenu: [
+                    { role: 'minimize' },
+                    { role: 'zoom' },
+                    ...(isMac ? [
+                        { role: 'close' },
+                        { type: 'separator' },
+                        { role: 'front' },
+                        { type: 'separator' },
+                        { role: 'window' }
+                    ] : [
+                        { role: 'close' }
+                    ])
+                ]
+            },
+            {
+                label: '开发者',
+                submenu: [
+                    {
+                        label: '切换开发者工具',
+                        accelerator: 'Ctrl+Shift+I',
+                        click: (_item, focusedWindow) => {
+                            toggleDevToolsForWindow(focusedWindow);
+                        }
+                    },
+                    {
+                        // 进程 CPU / 内存、窗口与 WebContents 状态、生命周期快照写成一份 JSON（不含聊天内容），用于反馈卡顿
+                        label: '导出诊断快照',
+                        click: async () => {
+                            const result = await exportDiagnosticsSnapshot();
+                            if (result.success) {
+                                shell.showItemInFolder(result.filePath);
+                                return;
+                            }
+                            dialog.showErrorBox('导出诊断快照失败', result.error || '未知错误');
+                        }
+                    }
+                ]
+            }
+        ];
+        const menu = Menu.buildFromTemplate(menuTemplate);
+        Menu.setApplicationMenu(menu);
+
+        // Fetch models in the background and notify the renderer when done.
+        console.log('[Main] Fetching models in the background...');
+        fetchAndCacheModels().then(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                console.log('[Main] Background model fetch complete. Notifying renderer.');
+                mainWindow.webContents.send('models-updated', cachedModels);
+            }
+        }).catch(error => {
+            console.error('[Main] Background model fetch failed:', error);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('models-update-failed', error.message);
+            }
+        });
+
+        // IPC handler to provide cached models to the renderer process
+        ipcMain.handle('get-cached-models', () => {
+            return cachedModels;
+        });
+
+        // IPC handler to get hot models (top N most used models)
+        ipcMain.handle('get-hot-models', async () => {
+            try {
+                const modelUsageTracker = require('./modules/modelUsageTracker');
+                return await modelUsageTracker.getHotModels(10);
+            } catch (error) {
+                console.error('[Main] Failed to get hot models:', error);
+                return [];
+            }
+        });
+
+        // IPC handler to get favorite models
+        ipcMain.handle('get-favorite-models', async () => {
+            try {
+                const modelUsageTracker = require('./modules/modelUsageTracker');
+                return await modelUsageTracker.getFavoriteModels();
+            } catch (error) {
+                console.error('[Main] Failed to get favorite models:', error);
+                return [];
+            }
+        });
+
+        // IPC handler to toggle a model's favorite status
+        ipcMain.handle('toggle-favorite-model', async (event, modelId) => {
+            try {
+                const modelUsageTracker = require('./modules/modelUsageTracker');
+                return await modelUsageTracker.toggleFavoriteModel(modelId);
+            } catch (error) {
+                console.error('[Main] Failed to toggle favorite model:', error);
+                return { favorited: false };
+            }
+        });
+
+        // IPC handler to trigger a refresh of the model list
+        ipcMain.handle('refresh-models', async (event) => {
+            console.log('[Main] Received refresh-models request. Re-fetching models...');
+            await fetchAndCacheModels();
+
+            const result = {
+                success: Array.isArray(cachedModels) && cachedModels.length > 0,
+                models: cachedModels,
+                count: Array.isArray(cachedModels) ? cachedModels.length : 0
+            };
+
+            if (event?.sender && !event.sender.isDestroyed()) {
+                event.sender.send('models-updated', cachedModels);
+            }
+
+            if (mainWindow && !mainWindow.isDestroyed() && event?.sender !== mainWindow.webContents) {
+                mainWindow.webContents.send('models-updated', cachedModels);
+            }
+
+            return result;
+        });
+
+
+        // Add IPC handler for path operations
+        ipcMain.handle('path:dirname', (event, p) => {
+            return path.dirname(p);
+        });
+        // Add IPC handler for getting the extension name of a path
+        ipcMain.handle('path:extname', (event, p) => {
+            return path.extname(p);
+        });
+        ipcMain.handle('path:basename', (event, p) => {
+            return path.basename(p);
+        });
+
+
+        // Group Chat IPC Handlers are now in modules/ipc/groupChatHandlers.js
+        notesHandlers.initialize({
+            openChildWindows,
+            APP_DATA_ROOT_IN_PROJECT,
+            SETTINGS_FILE
+        });
+        // 工作区索引在后台预热，不阻塞首屏。
+        // 侧栏相关通道统一在注册层检查调用方窗口，策略表见 modules/ipc/sidePaneIpcPolicy.js
+        const sidePaneGuard = domain => createSidePaneSenderGuard(domain, () => mainWindow);
+        workspaceHandlers.initialize({ settingsManager: appSettingsManager, logger: console, ipcMain: guardIpcMain(ipcMain, sidePaneGuard('workspaces')) });
+        stateSubscriptions.registerIpc(ipcMain, sidePaneGuard('state'));
+        projectForgeHandlers.initialize({ workspaceService: workspaceHandlers.workspaceService, subscriptions: stateSubscriptions, ipcMain: quitAdmission.guardIpcMain(guardIpcMain(ipcMain, sidePaneGuard('projectForge'))) });
+        // Git 也进领域表，但登记时就激活：模块只有 execFile 调用，没什么可省的，
+        // 而状态面板首帧就会读工作区列表；仓库监听仍然等到第一个窗口订阅才开始
+        domainActivator.register('git', {
+            allowSender: sidePaneGuard('projectForge'),
+            channels: gitHandlers.CHANNELS,
+            load: () => gitHandlers,
+            init: (mod, { ipcMain: domainIpc }) => mod.initialize({ ipcMain: quitAdmission.guardIpcMain(domainIpc), workspaceService: workspaceHandlers.workspaceService, getMainWindow: () => mainWindow, subscriptions: stateSubscriptions }),
+            dispose: mod => mod.dispose(),
+            eager: true,
+        });
+        sourceHandlers.initialize({ workspaceService: workspaceHandlers.workspaceService, ipcMain: quitAdmission.guardIpcMain(guardIpcMain(ipcMain, sidePaneGuard('projectForge'))) });
+        const preloadApis = describeApis();
+        // 侧栏几个领域启动时只登记通道，第一次调用才 require 并 initialize（状态见 lifecycle:get-main-snapshot 的 domains）
+        domainActivator.register('terminal', {
+            allowSender: sidePaneGuard('terminal'),
+            channels: channelsForDomain(preloadApis, 'terminal'),
+            load: () => require('./modules/ipc/terminalHandlers'), // 侧栏终端（镜像自带终端会话）
+            init: (mod, { ipcMain: domainIpc }) => mod.initialize({ ipcMain: domainIpc, workspaceService: workspaceHandlers.workspaceService, getMainWindow: () => mainWindow }),
+            dispose: mod => mod.disposeAll(),
+        });
+        // 记录器必须早于 chatHandlers.initialize：聊天请求一发出就要有记录器；查看轨迹的 IPC 才按需激活
+        configureSharedRecorder({ rootDir: path.join(APP_DATA_ROOT_IN_PROJECT, 'ModelTrajectory') });
+        // 助手的长期心情（Agents/<id>/mood.json）：聊天请求经 chatHandlers 喂进来，变化广播给所有窗口（侧栏立绘和其他显示助手形象的界面）
+        configureAgentMood({
+            agentDir: AGENT_DIR,
+            broadcast: payload => BrowserWindow.getAllWindows().forEach((win) => {
+                if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('agent-mood-changed', payload);
+            }),
+        });
+        domainActivator.register('modelTrajectory', {
+            allowSender: sidePaneGuard('modelTrajectory'),
+            channels: channelsForDomain(preloadApis, 'modelTrajectory'),
+            load: () => require('./modules/ipc/modelTrajectoryHandlers'), // 侧栏调用轨迹（模型请求 / 响应记录）
+            init: (mod, { ipcMain: domainIpc }) => mod.initialize({ ipcMain: domainIpc, getMainWindow: () => mainWindow, getTrajectorySource: () => nativeSyncLifecycle?.getRuntime()?.trajectorySource }),
+            dispose: mod => mod.disposeAll(),
+        });
+        // 浏览器访客会话的权限和协议限制要在任何 <webview> 出现之前就位，所以登记时就激活
+        domainActivator.register('browser', {
+            allowSender: sidePaneGuard('browser'),
+            channels: channelsForDomain(preloadApis, 'browser'),
+            load: () => browserHandlers,
+            init: (mod, { ipcMain: domainIpc }) => mod.initialize({ ipcMain: domainIpc, getMainWindow: () => mainWindow }),
+            dispose: mod => mod.dispose(),
+            eager: true,
+        });
+
+        translatorHandlers.initialize({
+            mainWindow,
+            openChildWindows,
+            projectRoot: PROJECT_ROOT,
+            APP_DATA_ROOT_IN_PROJECT,
+            SETTINGS_FILE
+        });
+
+        // open-rag-observer-window handler is registered once above and reuses openRagObserverWindow()
+
+        windowHandlers.initialize(mainWindow, openChildWindows);
+        forumHandlers.initialize({ USER_DATA_DIR }); // Initialize forum handlers
+        memoHandlers.initialize({ USER_DATA_DIR }); // Initialize memo handlers
+
+        // ⚠️ agentHandlers 必须在 assistantHandlers 之前初始化
+        // 因为 assistantHandlers 依赖 getAgentConfigById 函数，该函数需要 AGENT_DIR_CACHE 已被初始化
+        const { saveNativeOwnerConfig, saveNativeOwnerAvatar } = require('./modules/services/nativeSync/nativeConfigSave');
+        const beforeOwnerDelete = require('./modules/services/nativeSync/nativeOwnerDeletion').createOwnerDeletion({ root: APP_DATA_ROOT_IN_PROJECT });
+        const saveOwnerConfig = request => saveNativeOwnerConfig({ root: APP_DATA_ROOT_IN_PROJECT, ...request });
+        const saveOwnerAvatar = request => saveNativeOwnerAvatar({ root: APP_DATA_ROOT_IN_PROJECT, ...request });
+        agentHandlers.initialize({
+            beforeOwnerDelete,
+            saveOwnerConfig,
+            saveOwnerAvatar,
+            AGENT_DIR,
+            USER_DATA_DIR,
+            SETTINGS_FILE,
+            USER_AVATAR_FILE,
+            getSelectionListenerStatus: assistantHandlers.getSelectionListenerStatus,
+            stopSelectionListener: assistantHandlers.stopSelectionListener,
+            startSelectionListener: assistantHandlers.startSelectionListener,
+            settingsManager: appSettingsManager,
+            historyMutationQueue,
+            agentConfigManager
+        });
+
+        await assistantHandlers.initialize({ SETTINGS_FILE });
+        reportLauncherProgress('assistant-ready', 0.56, '小助手已经醒来');
+        fileDialogHandlers.initialize(mainWindow, {
+            getSelectionListenerStatus: assistantHandlers.getSelectionListenerStatus,
+            stopSelectionListener: assistantHandlers.stopSelectionListener,
+            startSelectionListener: assistantHandlers.startSelectionListener,
+            openChildWindows
+        });
+        deepWikiHandlers.initialize({ mainWindow });
+        if (!gameService) {
+            const { GameService } = require('./modules/services/gameService');
+            gameService = new GameService({ appDataRoot: APP_DATA_ROOT_IN_PROJECT });
+            await gameService.initialize();
+        }
+        groupChatHandlers.initialize(mainWindow, {
+            beforeOwnerDelete,
+            saveOwnerConfig,
+            saveOwnerAvatar,
+            AGENT_DIR,
+            USER_DATA_DIR,
+            getSelectionListenerStatus: assistantHandlers.getSelectionListenerStatus,
+            stopSelectionListener: assistantHandlers.stopSelectionListener,
+            startSelectionListener: assistantHandlers.startSelectionListener,
+            fileWatcher, // Inject fileWatcher here as well
+            historyMutationQueue,
+            topicAdmission: topicAdmissionHost.service,
+            jevService: globalJevService,
+            gameService
+        });
+        regexHandlers.initialize({ AGENT_DIR });
+        chatHandlers.initialize(mainWindow, {
+            beforeOwnerDelete,
+            topicExecutionAuthority: topicAuthority,
+            AGENT_DIR,
+            USER_DATA_DIR,
+            APP_DATA_ROOT_IN_PROJECT,
+            NOTES_AGENT_ID,
+            getSelectionListenerStatus: assistantHandlers.getSelectionListenerStatus,
+            stopSelectionListener: assistantHandlers.stopSelectionListener,
+            startSelectionListener: assistantHandlers.startSelectionListener,
+            getMusicState: musicHandlers.getMusicState,
+            fileWatcher, // 注入文件监控器
+            agentConfigManager,
+            settingsManager: appSettingsManager,
+            historyMutationQueue
+        });
+        domainActivator.register('sideChat', {
+            allowSender: sidePaneGuard('sideChat'),
+            channels: channelsForDomain(preloadApis, 'sideChat'),
+            load: () => require('./modules/ipc/sideChatHandlers'), // Workspace Side Chat handlers
+            init: (mod, { ipcMain: domainIpc }) => mod.initialize({ ipcMain: domainIpc, USER_DATA_DIR, AGENT_DIR, historyMutationQueue, getMainWindow: () => mainWindow }),
+        });
+
+        // A renderer claims a lease before beginning asynchronous selection.
+        // Late start/stop completions from older selections are rejected in
+        // the main process, where the single chokidar watcher is actually
+        // owned.
+        ipcMain.handle('watcher:begin', async (event) => {
+            const ownerId = getHistoryWatcherOwner(event.sender);
+            const lease = historyWatcherLeases.claim(ownerId);
+            const stopped = await lease.stopped;
+            return { success: stopped.success, stale: stopped.stale === true, token: lease.token };
+        });
+
+        ipcMain.handle('watcher:start', async (event, filePath, agentId, topicId, leaseToken = null) => {
+            const ownerId = getHistoryWatcherOwner(event.sender);
+            let token = leaseToken;
+            if (!token) {
+                const lease = historyWatcherLeases.claim(ownerId);
+                token = lease.token;
+                await lease.stopped;
+            }
+            const sender = event.sender;
+            const result = await historyWatcherLeases.start(ownerId, token, {
+                filePath,
+                callback: (changedPath) => {
+                    if (!sender.isDestroyed()) {
+                        sender.send('history-file-updated', { path: changedPath, agentId, topicId });
+                    }
+                }
+            });
+            return { ...result, token, watching: result.success ? filePath : null };
+        });
+
+        ipcMain.handle('watcher:stop', async (event, leaseToken = null) => {
+            const ownerId = getHistoryWatcherOwner(event.sender);
+            if (!leaseToken) {
+                const lease = historyWatcherLeases.claim(ownerId);
+                const result = await lease.stopped;
+                return { ...result, token: lease.token };
+            }
+            return historyWatcherLeases.stop(ownerId, leaseToken);
+        });
+        ipcMain.handle('chat-data-service-status', async () => {
+            if (!chatDataService) {
+                return { status: 'disabled', searchAvailable: false, degraded: true };
+            }
+            return chatDataService.status();
+        });
+
+        ipcMain.handle('chat-data-service-reconcile', async () => {
+            if (!chatDataService?.client) {
+                return { success: false, error: 'VCP-CDS is unavailable.' };
+            }
+            try {
+                return await chatDataService.client.reconcile();
+            } catch (error) {
+                return { success: false, error: error.message, code: error.code };
+            }
+        });
+
+        sovitsHandlers.initialize(mainWindow, appSettingsManager); // Initialize SovitsTTS handlers
+        musicHandlers.initialize({ mainWindow, openChildWindows, APP_DATA_ROOT_IN_PROJECT, startAudioEngine, stopAudioEngine, settingsManager: appSettingsManager });
+        diceHandlers.initialize({ projectRoot: PROJECT_ROOT });
+        themeHandlers.initialize({ mainWindow, openChildWindows, projectRoot: PROJECT_ROOT, APP_DATA_ROOT_IN_PROJECT, settingsManager: appSettingsManager });
+        emoticonHandlers.initialize({ SETTINGS_FILE, APP_DATA_ROOT_IN_PROJECT });
+        emoticonHandlers.setupEmoticonHandlers();
+        canvasHandlers.initialize({ mainWindow, openChildWindows, CANVAS_CACHE_DIR });
+        await installChartEmbedProtocol({ protocol, net: require('electron').net, projectRoot: PROJECT_ROOT });
+        scriptoriumPages.installProtocol();
+        chartService = await chartHandlers.initialize({
+            projectRoot: PROJECT_ROOT,
+            appDataRoot: APP_DATA_ROOT_IN_PROJECT,
+            mainWindow,
+            getMainWindow: () => mainWindow,
+            openChildWindows,
+            logger: console,
+        });
+        const nativeConversation = require('./modules/ipc/nativeConversationHandlers');
+        await nativeConversation.initialize({mainWindow,chartService,nativeEpoch:()=>distributedServer?.nativeConversationClient?.epoch()??0,nativeRequest:request=>{const client=distributedServer?.nativeConversationClient;if(!client)throw Error('NATIVE_TRANSPORT_UNAVAILABLE');return client.request(request);}});
+        configureDocxHandlers({
+            mainWindow,
+            openChildWindows,
+            projectRoot: PROJECT_ROOT,
+            appDataRoot: APP_DATA_ROOT_IN_PROJECT
+        });
+        scriptoriumAgentControl = new ScriptoriumAgentControlService().initialize({
+            appDataRoot: APP_DATA_ROOT_IN_PROJECT,
+            documentHandlers: docxHandlers,
+            logger: console,
+        });
+        desktopHandlers.initialize({
+            mainWindow,
+            openChildWindows,
+            settingsManager: appSettingsManager,
+            APP_DATA_ROOT_IN_PROJECT,
+            appFeatures,
+            getEmbeddedAppSessions: () => embeddedAppSessions,
+        });
+        await embeddedAppSessions?.closeAll();
+        embeddedAppTasks?.dispose('main-window-reinitialized');
+        embeddedAppTasks = new SenderTaskRegistry({ label: 'embedded-app-tasks' });
+        embeddedAppSessions = createEmbeddedAppSessionManager({
+            mainWindow,
+            powerMonitor,
+            launchStandalone: desktopHandlers.launchVchatApp,
+        });
+        [
+            'embedded-vchat-app:create',
+            'embedded-vchat-app:list',
+            'embedded-vchat-app:activate',
+            'embedded-vchat-app:set-bounds',
+            'embedded-vchat-app:close',
+            'embedded-vchat-app:detach',
+            'embedded-vchat-app:close-all',
+            'embedded-vchat-app:cancel',
+            'lifecycle:get-main-snapshot',
+        ].forEach(channel => ipcMain.removeHandler(channel));
+        const normalizeEmbeddedRequest = (payload, fallbackPoint = undefined) => (
+            payload && typeof payload === 'object' && !Array.isArray(payload)
+                ? { requestId: String(payload.requestId || ''), action: payload.action, point: payload.point }
+                : { requestId: '', action: payload, point: fallbackPoint }
+        );
+        const runEmbeddedTask = async (event, request, operation, execute) => {
+            if (!request.requestId) return execute(null);
+            try {
+                return await embeddedAppTasks.run(event.sender, request.requestId, operation, execute);
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        };
+        ipcMain.handle('embedded-vchat-app:create', (event, payload) => {
+            embeddedAppSessions.assertMainRenderer(event);
+            const request = normalizeEmbeddedRequest(payload);
+            return runEmbeddedTask(event, request, 'embedded:create', signal => (
+                embeddedAppSessions.create(request.action, { signal })
+            ));
+        });
+        ipcMain.handle('embedded-vchat-app:list', event => {
+            embeddedAppSessions.assertMainRenderer(event);
+            return embeddedAppSessions.list();
+        });
+        ipcMain.handle('embedded-vchat-app:activate', (event, appAction) => {
+            embeddedAppSessions.assertMainRenderer(event);
+            return embeddedAppSessions.activate(appAction || null);
+        });
+        ipcMain.handle('embedded-vchat-app:set-bounds', (event, appAction, bounds) => {
+            embeddedAppSessions.assertMainRenderer(event);
+            return embeddedAppSessions.setBounds(appAction, bounds);
+        });
+        ipcMain.handle('embedded-vchat-app:close', (event, payload) => {
+            embeddedAppSessions.assertMainRenderer(event);
+            const request = normalizeEmbeddedRequest(payload);
+            return runEmbeddedTask(event, request, 'embedded:close', () => embeddedAppSessions.close(request.action));
+        });
+        ipcMain.handle('embedded-vchat-app:detach', (event, payload, legacyPoint) => {
+            embeddedAppSessions.assertMainRenderer(event);
+            const request = normalizeEmbeddedRequest(payload, legacyPoint);
+            return runEmbeddedTask(event, request, 'embedded:detach', signal => (
+                embeddedAppSessions.detach(request.action, request.point, { signal })
+            ));
+        });
+        ipcMain.handle('embedded-vchat-app:cancel', (event, requestId) => {
+            embeddedAppSessions.assertMainRenderer(event);
+            return { success: true, cancelled: embeddedAppTasks.cancel(event.sender, requestId, 'renderer-cancelled') };
+        });
+        const buildMainLifecycleSnapshot = () => {
+            const embedded = embeddedAppSessions.list();
+            return {
+                embeddedSessions: embedded.sessions,
+                activeEmbeddedAction: embedded.activeAction,
+                tasks: embeddedAppTasks.snapshot(),
+                chatTasks: chatHandlers.getVcpStreamTaskSnapshot(),
+                domains: domainActivator.snapshot(),
+                subscriptions: stateSubscriptions.snapshot(),
+                gitWatchers: gitHandlers.watchSnapshot(),
+                historyWatcher: fileWatcher.getStatus(),
+                mainWindowResponsiveness: { ...mainWindowResponsiveness },
+                // 稳定性日志摘要（计数 + 最近条目）与启动标记，见 modules/stabilityLog.js / modules/launchMarks.js
+                stability: stabilityLog.snapshot(),
+                launch: launchMarks.snapshot(),
+                // 终端执行器是否已在主进程加载：侧栏终端第一次用到才 require；分布式服务器开着时它的插件加载也会拉起它
+                terminalExecutor: {
+                    loaded: TERMINAL_EXECUTOR_PATHS.some(file => Boolean(originalRequire.cache[file])),
+                    distributedServer: Boolean(distributedServer),
+                },
+            };
+        };
+        ipcMain.handle('lifecycle:get-main-snapshot', event => {
+            embeddedAppSessions.assertMainRenderer(event);
+            return buildMainLifecycleSnapshot();
+        });
+        // 渲染器把监听器都挂好后发一次就绪信号：记为 renderer-ready 启动标记，并把整条启动时间线写进稳定性日志。
+        // 只认主窗口；渲染进程恢复后的第二次就绪不改时间（标记只记第一次）。
+        ipcMain.on('lifecycle:renderer-ready', event => {
+            if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return;
+            if (launchMarks.mark('renderer-ready')) stabilityLog.note('launch', launchMarks.summary());
+        });
+        // 诊断导出复用同一份生命周期快照；侧栏终端处理器是懒加载的，没加载就只记 loaded:false
+        const TERMINAL_HANDLERS_PATH = path.join(__dirname, 'modules', 'ipc', 'terminalHandlers.js');
+        diagnosticsExporter = createDiagnosticsExporter({
+            app,
+            BrowserWindow,
+            webContents,
+            getLifecycleSnapshot: buildMainLifecycleSnapshot,
+            getTerminalSnapshot: () => {
+                const loaded = originalRequire.cache[TERMINAL_HANDLERS_PATH];
+                if (!loaded) return { loaded: false };
+                const state = typeof loaded.exports?.snapshot === 'function' ? loaded.exports.snapshot() : {};
+                return { loaded: true, ...state };
+            },
+        });
+        ipcMain.handle('diagnostics:export-snapshot', async event => {
+            embeddedAppSessions.assertMainRenderer(event);
+            return exportDiagnosticsSnapshot();
+        });
+        ipcMain.handle('embedded-vchat-app:close-all', async event => {
+            embeddedAppSessions.assertMainRenderer(event);
+            await embeddedAppSessions.closeAll();
+            return { success: true };
+        });
+        ipcMain.removeAllListeners('embedded-vchat-app:request-close');
+        ipcMain.on('embedded-vchat-app:request-close', async event => {
+            const result = await embeddedAppSessions?.closeBySender(event.sender);
+            if (!result?.success) {
+                console.warn('[EmbeddedApps] Rejected child close request:', result?.error || 'unknown sender');
+            }
+        });
+        loomManager = await loomManagerModule.initialize({
+            getMainWindow: () => mainWindow,
+            projectRoot: PROJECT_ROOT,
+            appDataRoot: APP_DATA_ROOT_IN_PROJECT,
+            mainWindow,
+            openChildWindows
+        });
+        desktopRemoteHandlers.initialize({ mainWindow });
+        reportLauncherProgress('workspace-ready', 0.76, '工作空间与功能模块已连接');
+        promptHandlers.initialize({ AGENT_DIR, APP_DATA_ROOT_IN_PROJECT });
+        require('./modules/services/conversationContext').initialize({
+            load: owner => owner.type === 'agent'
+                ? agentConfigManager.readAgentConfig(owner.id)
+                : groupChat.getAgentGroupConfig(owner.id),
+            update: (owner, mutate) => owner.type === 'agent'
+                ? agentConfigManager.updateAgentConfig(owner.id, mutate)
+                : groupChat.mutateGroupConfig(owner.id, mutate),
+            workspace: () => ({
+                workspaces: workspaceHandlers.workspaceService.list(),
+                activeWorkspaceId: workspaceHandlers.getActiveWorkspaceId(),
+                promptSettings: workspaceHandlers.getPromptSettings(),
+            }),
+            rules: () => tavernHandlers.readStore(),
+        });
+        tavernHandlers.initialize({ APP_DATA_ROOT_IN_PROJECT });
+        if (startupTeardownStarted) return;
+        voiceHandlers.initialize({ mainWindow, openChildWindows, settingsManager: appSettingsManager, projectRoot: PROJECT_ROOT });
+        localSttHandlers.initialize({ appDataRoot: APP_DATA_ROOT_IN_PROJECT });
+        // 应用功能模块拿到的宿主能力（modules/appFeatures.js 的 register(host)）
+        appFeatures.registerAll({
+            hooks: hostHooks,
+            tts: sovitsHandlers,
+            stt: localSttHandlers,
+            mainWindow,
+            projectRoot: PROJECT_ROOT,
+            appDataRoot: APP_DATA_ROOT_IN_PROJECT,
+            agentDir: AGENT_DIR,
+            // 读服务器设置；写话题时与其他写入串行、用插件建话题的同一套助手操作
+            readSettings: () => appSettingsManager.readSettings(),
+            historyQueue: () => historyMutationQueue,
+            agentOps: () => pluginAgentOperationService,
+            nativeSync: {
+                ipcMain, getMainWindow: () => mainWindow, BrowserWindow, nativeImage: require('electron').nativeImage,
+                agentConfigManager, groupChat, tavernHandlers, fileManager, settingsManager: appSettingsManager,
+                historyAuthority, localHistoryAuthority, waitForHistory: () => chatDataServiceStartPromise,
+                isolated: Boolean(isolatedAppDataRoot),
+                invalidateAgentCaches: () => require('./modules/ipc/agentHandlers').invalidateCaches(),
+            },
+        });
+        nativeSyncLifecycle = appFeatures.getHandle('NativeSyncDesktopRuntime');
+
+        ipcMain.on('minimize-to-tray', () => {
+            if (mainWindow) {
+                // A Tray object does not prove a visible Linux tray host exists.
+                if (process.platform === 'linux') mainWindow.minimize();
+                else mainWindow.hide();
+            }
+        });
+
+        // 分布式服务由渲染器正式就绪点触发；不要在首屏关键路径中启动
+        // VCPMobileSync 索引、插件发现和网络监听。
+
+        app.on('activate', () => {
+            // On macOS, re-show the main window when the dock icon is clicked.
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                if (!mainWindow.isVisible()) {
+                    mainWindow.show();
+                }
+                mainWindow.focus();
+            }
+            // If the main window has been closed (mainWindow is null), create a new one.
+            else if (BrowserWindow.getAllWindows().length === 0) {
+                createWindow();
+            }
+        });
+
+        globalShortcut.register('Control+Shift+I', () => {
+            toggleDevToolsForWindow(BrowserWindow.getFocusedWindow());
+        });
+
+        const noteMiniShortcutRegistered = globalShortcut.register('Super+Alt+Z', () => {
+            notesHandlers.createOrFocusNoteMiniWindow();
+        });
+        if (!noteMiniShortcutRegistered) {
+            console.warn('[Main] Failed to register global shortcut: Super+Alt+Z');
+        }
+
+        // 移除全局 Command+Q 快捷键，改用标准的应用程序菜单
+
+        // 全局快捷键 'CommandOrControl+Shift+N' 已通过菜单栏实现
+
+        // --- Music Player IPC Handlers are now in modules/ipc/musicHandlers.js ---
+
+
+        // --- Assistant IPC Handlers are now in modules/ipc/assistantHandlers.js ---
+
+        // --- Theme IPC Handlers are now in modules/ipc/themeHandlers.js ---
+
+        // --- Platform Info IPC Handler ---
+        ipcMain.handle('get-platform', () => {
+            return process.platform;
+        });
+
+        // Scriptorium 不再预热，由 loadDocxHandlers() 在首次使用时按需加载。
+        reportLauncherProgress('renderer-loading', 0.9, '正在绘制聊天界面');
+        void loadMainWindow().catch((error) => {
+            console.error('[Main] Main window load failed:', error);
+        });
+
+        // --- 自动打开桌面窗口 ---
+
+        // --- 自动打开桌面窗口 ---
+        // 当使用 --desktop-only 参数启动时，在所有 IPC 初始化完成后自动打开桌面窗口
+        if (isAutoOpenDesktop) {
+            console.log('[Main] --desktop-only flag detected. Auto-opening desktop window after full initialization.');
+            // 延迟打开，确保主窗口已完全就绪
+            setTimeout(async () => {
+                await desktopHandlers.openDesktopWindow();
+                console.log('[Main] Desktop window auto-opened.');
+            }, 1000);
+        }
+    });
+
+    // --- Python Execution IPC Handler ---
+    const isPythonViewer = createApplicationSenderGuard({ pages: ['modules/text-viewer.html', 'Canvasmodules/canvas.html'] });
+    ipcMain.handle('execute-python-code', (event, code) => {
+        if (!isPythonViewer(event)) throw Object.assign(new Error('PYTHON_VIEWER_REQUIRED'), { code: 'PYTHON_VIEWER_REQUIRED' });
+        if (typeof code !== 'string' || Buffer.byteLength(code, 'utf8') > 1024 * 1024) throw Object.assign(new Error('INVALID_PYTHON_CODE'), { code: 'INVALID_PYTHON_CODE' });
+        return new Promise((resolve) => {
+            // Use '-u' for unbuffered output and set PYTHONIOENCODING for proper UTF-8 handling
+            const pythonProcess = spawn('python', ['-u'], {
+                env: { ...process.env, PYTHONIOENCODING: 'UTF-8' },
+                maxBuffer: 10 * 1024 * 1024 // Increase buffer to 10MB
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            pythonProcess.stdout.on('data', (data) => {
+                stdout += data.toString();
+            });
+
+            pythonProcess.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+
+            pythonProcess.on('close', (exitCode) => {
+                console.log(`Python process exited with code ${exitCode}`);
+                console.log('Python stdout:', stdout); // Log full stdout
+                console.log('Python stderr:', stderr); // Log full stderr
+                resolve({ stdout, stderr });
+            });
+
+            pythonProcess.on('error', (err) => {
+                console.error('Failed to start Python process:', err);
+                // Resolve with an error message in stderr, so the frontend can display it
+                resolve({ stdout: '', stderr: `Failed to start python process. Please ensure Python is installed and accessible in your system's PATH. Error: ${err.message}` });
+            });
+
+            // Write the code to the process's standard input and close it
+            pythonProcess.stdin.write(code);
+            pythonProcess.stdin.end();
+        });
+    });
+
+    app.on('window-all-closed', () => {
+        if (process.platform !== 'darwin') {
+            app.quit();
+        }
+    });
+
+    app.on('before-quit', async (event) => {
+        if (quitCleanupSettled) {
+            return;
+        }
+
+        // Every quit request must wait for the one shared cleanup attempt.
+        event.preventDefault();
+        if (isFinalizingQuit) {
+            return;
+        }
+        isFinalizingQuit = true;
+
+        let wasAlreadyClosing = false;
+        try {
+            wasAlreadyClosing = quitAdmission.begin();
+            if (!await prepareProjectForgeQuit()) {
+                if (!wasAlreadyClosing) quitAdmission.resume();
+                app.isQuitting = false;
+                isFinalizingQuit = false;
+                return;
+            }
+            await performQuitCleanup();
+            quitCleanupSettled = true;
+            app.quit();
+        } catch (error) {
+            // Keep every window and the original instance. A proven pre-teardown
+            // busy refusal reopens admission; partial cleanup failures remain closed.
+            isFinalizingQuit = false;
+            app.isQuitting = false;
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                if (mainWindow.isMinimized()) mainWindow.restore();
+                mainWindow.show();
+                mainWindow.focus();
+            }
+            if (error.shutdownUnchanged && !wasAlreadyClosing) {
+                await cancelProjectForgeQuit();
+                quitAdmission.resume();
+            }
+            console.warn('[Main] Quit cancelled because cleanup did not complete:', error);
+        }
+    });
+
+    app.on('will-quit', () => {
+        // 0. Clean up the ready signal file for the native splash screen
+        const readyFile = NATIVE_SPLASH_READY_FILE;
+        if (fs.existsSync(readyFile)) {
+            fs.unlinkSync(readyFile);
+        }
+
+        // 只释放用过的侧栏领域，没激活过的不会为了退出而加载
+        domainActivator.disposeAll({ final: true });
+        stateSubscriptions.dispose();
+
+        // 1. 停止所有底层监听器
+        console.log('[Main] App is quitting. Stopping all listeners...');
+        assistantHandlers.stopSelectionListener();
+        assistantHandlers.stopMouseListener();
+
+        // 2. 注销所有全局快捷键
+        globalShortcut.unregisterAll();
+        console.log('[Main] All global shortcuts unregistered.');
+
+        // 3. Stop the speech recognizer
+        const speechRecognizer = require('./modules/speechRecognizer');
+        speechRecognizer.shutdown(); // Use the new shutdown function to close the browser
+
+        // 4. 关闭WebSocket连接
+        if (vcpLogWebSocket) {
+            vcpLogWebSocket.close();
+        }
+        if (vcpLogReconnectInterval) {
+            clearTimeout(vcpLogReconnectInterval);
+        }
+
+        // 5. Distributed server cleanup is handled in before-quit.
+
+        // 6. Stop the dice server
+        diceHandlers.stopDiceServer();
+
+        // 7. Audio engine cleanup is handled in before-quit.
+
+        // 8. 强制销毁所有窗口
+        console.log('[Main] Destroying all open windows...');
+        BrowserWindow.getAllWindows().forEach(win => {
+            if (win && !win.isDestroyed()) {
+                win.destroy();
+            }
+        });
+    });
+
+    // --- Helper Functions ---
+
+    function formatTimestampForFilename(timestamp) {
+        const date = new Date(timestamp);
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const seconds = date.getSeconds().toString().padStart(2, '0');
+        return `${year}${month}${day}_${hours}${minutes}${seconds}`;
+    }
+
+    // --- IPC Handlers ---
+    // open-external-link handler is now in modules/ipc/fileDialogHandlers.js
+
+    // The getAgentConfigById helper function has been moved to agentHandlers.js
+
+    // VCP Server Communication is now handled in modules/ipc/chatHandlers.js
+
+    // VCPLog WebSocket Connection
+    function connectVcpLog(wsUrl, wsKey) {
+        const WebSocket = require('ws'); // Lazy load
+        if (!wsUrl || !wsKey) {
+            if (mainWindow) mainWindow.webContents.send('vcp-log-status', { source: 'VCPLog', status: 'error', message: 'URL或KEY未配置。' });
+            return;
+        }
+
+        const vcpLogDeviceName = 'VCPChat-Desktop';
+        const fullWsUrl = `${wsUrl}/VCPlog/VCP_Key=${wsKey}?deviceName=${encodeURIComponent(vcpLogDeviceName)}`;
+
+        if (vcpLogWebSocket && (vcpLogWebSocket.readyState === WebSocket.OPEN || vcpLogWebSocket.readyState === WebSocket.CONNECTING)) {
+            console.log('VCPLog WebSocket 已连接或正在连接。');
+            return;
+        }
+
+        console.log(`尝试连接 VCPLog WebSocket: ${fullWsUrl}`);
+        if (mainWindow) mainWindow.webContents.send('vcp-log-status', { source: 'VCPLog', status: 'connecting', message: '连接中...' });
+
+        vcpLogWebSocket = new WebSocket(fullWsUrl);
+
+        vcpLogWebSocket.onopen = () => {
+            console.log('[MAIN_VCP_LOG] WebSocket onopen event triggered.');
+            if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+                console.log('[MAIN_VCP_LOG] Attempting to send vcp-log-status "open" to renderer.');
+                mainWindow.webContents.send('vcp-log-status', { source: 'VCPLog', status: 'open', message: '已连接' });
+                console.log('[MAIN_VCP_LOG] vcp-log-status "open" sent.');
+                mainWindow.webContents.send('vcp-log-message', { type: 'connection_ack', message: 'VCPLog 连接成功！' });
+            } else {
+                console.error('[MAIN_VCP_LOG] mainWindow or webContents not available in onopen. Cannot send status.');
+            }
+            if (vcpLogReconnectInterval) {
+                clearTimeout(vcpLogReconnectInterval); // Corrected: Use clearTimeout for setTimeout
+                vcpLogReconnectInterval = null;
+            }
+        };
+
+        vcpLogWebSocket.onmessage = (event) => {
+            console.log('VCPLog 收到消息:', event.data);
+            try {
+                const data = JSON.parse(event.data.toString());
+                groupChat.noteToolApprovalMessage?.(data); // 群聊看门狗在审批挂着时不熔断
+                if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('vcp-log-message', data);
+            } catch (e) {
+                console.error('VCPLog 解析消息失败:', e);
+                if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('vcp-log-message', { type: 'error', data: `收到无法解析的消息: ${event.data.toString().substring(0, 100)}...` });
+            }
+        };
+
+        vcpLogWebSocket.onclose = (event) => {
+            console.log('VCPLog WebSocket 连接已关闭:', event.code, event.reason);
+            if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('vcp-log-status', { source: 'VCPLog', status: 'closed', message: `连接已断开 (${event.code})` });
+            if (!vcpLogReconnectInterval && wsUrl && wsKey) {
+                console.log('将在5秒后尝试重连 VCPLog...');
+                vcpLogReconnectInterval = setTimeout(() => {
+                    vcpLogReconnectInterval = null;
+                    connectVcpLog(wsUrl, wsKey);
+                }, 5000);
+            }
+        };
+
+        vcpLogWebSocket.onerror = (error) => {
+            console.error('[MAIN_VCP_LOG] WebSocket onerror event:', error.message);
+            if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+                mainWindow.webContents.send('vcp-log-status', { source: 'VCPLog', status: 'error', message: '连接错误' });
+            } else {
+                console.error('[MAIN_VCP_LOG] mainWindow or webContents not available in onerror.');
+            }
+        };
+    }
+
+    ipcMain.on('connect-vcplog', (event, { url, key }) => {
+        if (vcpLogWebSocket) {
+            vcpLogWebSocket.close();
+        }
+        if (vcpLogReconnectInterval) {
+            clearTimeout(vcpLogReconnectInterval);
+            vcpLogReconnectInterval = null;
+        }
+        connectVcpLog(url, key);
+    });
+
+    ipcMain.on('disconnect-vcplog', () => {
+        if (vcpLogWebSocket) {
+            vcpLogWebSocket.close();
+        }
+        if (vcpLogReconnectInterval) {
+            clearTimeout(vcpLogReconnectInterval);
+            vcpLogReconnectInterval = null;
+        }
+        if (mainWindow) mainWindow.webContents.send('vcp-log-status', { source: 'VCPLog', status: 'closed', message: '已手动断开' });
+        console.log('VCPLog 已手动断开');
+    });
+
+    ipcMain.on('send-vcplog-message', (event, data) => {
+        if (vcpLogWebSocket && vcpLogWebSocket.readyState === 1) { // 1 is WebSocket.OPEN
+            console.log('VCPLog 发送消息:', data);
+            vcpLogWebSocket.send(JSON.stringify(data));
+            groupChat.noteToolApprovalMessage?.(data);
+        } else {
+            console.warn('VCPLog WebSocket 未连接或未就绪，无法发送消息:', data);
+        }
+    });
+
+    ipcMain.removeHandler('send-vcplog-message-confirmed');
+    ipcMain.handle('send-vcplog-message-confirmed', async (event, data) => {
+        if (!mainWindow || mainWindow.isDestroyed() || event?.sender !== mainWindow.webContents) {
+            return { success: false, code: 'VCPLOG_TRUSTED_CLIENT_REQUIRED' };
+        }
+        if (!vcpLogWebSocket || vcpLogWebSocket.readyState !== 1) {
+            return { success: false, code: 'VCPLOG_NOT_CONNECTED' };
+        }
+        let payload;
+        try {
+            payload = JSON.stringify(data);
+        } catch {
+            return { success: false, code: 'VCPLOG_MESSAGE_INVALID' };
+        }
+        return await new Promise(resolve => {
+            let settled = false;
+            const finish = result => {
+                if (settled) return;
+                settled = true;
+                resolve(result);
+            };
+            const timer = setTimeout(
+                () => finish({ success: false, code: 'VCPLOG_SEND_TIMEOUT' }),
+                5000
+            );
+            timer.unref?.();
+            try {
+                vcpLogWebSocket.send(payload, error => {
+                    clearTimeout(timer);
+                    if (error) {
+                        finish({ success: false, code: 'VCPLOG_SEND_FAILED' });
+                        return;
+                    }
+                    finish({ success: true, queued: true });
+                });
+            } catch {
+                clearTimeout(timer);
+                finish({ success: false, code: 'VCPLOG_SEND_FAILED' });
+            }
+        });
+    });
+
+}
+ipcMain.handle('export-topic-as-markdown', async (event, exportData) => {
+    const { topicName, markdownContent } = exportData;
+
+    if (!topicName || !markdownContent) {
+        return { success: false, error: '缺少导出所需的必要信息（话题名称或内容）。' };
+    }
+
+    // 1. Show Save Dialog
+    const safeTopicName = topicName.replace(/[/\\?%*:|"<>]/g, '-');
+    const defaultFileName = `${safeTopicName}-${formatTimestampForFilename(Date.now())}.md`;
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+        title: '导出话题为 Markdown',
+        defaultPath: defaultFileName,
+        filters: [
+            { name: 'Markdown 文件', extensions: ['md'] },
+            { name: '所有文件', extensions: ['*'] }
+        ]
+    });
+
+    if (canceled || !filePath) {
+        return { success: false, error: '用户取消了导出操作。' };
+    }
+
+    // 2. Write to File
+    try {
+        await fs.writeFile(filePath, markdownContent, 'utf8');
+        shell.showItemInFolder(filePath); // Open the folder containing the file
+        return { success: true, path: filePath };
+    } catch (e) {
+        console.error(`[Export] 写入Markdown文件失败:`, e);
+        return { success: false, error: `写入文件失败: ${e.message}` };
+    }
+});
+
+// --- Group Chat Interrupt Handler ---
+ipcMain.handle('interrupt-group-request', (event, messageId) => {
+    console.log(`[Main] Received interrupt-group-request for messageId: ${messageId}`);
+    if (groupChat && typeof groupChat.interruptGroupRequest === 'function') {
+        return groupChat.interruptGroupRequest(messageId);
+    } else {
+        console.error('[Main] groupChat module or interruptGroupRequest function is not available.');
+        return { success: false, error: 'Group chat module not initialized correctly.' };
+    }
+});
+
+// --- Desktop Remote Control, Canvas Control, and Flowlock Control handlers ---
+// These have been modularized into modules/ipc/desktopRemoteHandlers.js
+// They are injected into the DistributedServer via desktopRemoteHandlers.handleDesktopRemoteControl, etc.

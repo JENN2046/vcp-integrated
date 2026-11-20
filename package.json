@@ -1,0 +1,16 @@
+{
+  "name": "vcp-integrated",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:mobile": "node scripts/build.mjs --mobile",
+    "dev:isolated": "node tests/integration/run.cjs --dev",
+    "test:integration": "node tests/integration/run.cjs",
+    "test:native": "node --test --test-concurrency=1 tests/native/*.test.cjs",
+    "deps": "node scripts/dependencies.mjs"
+  }
+}

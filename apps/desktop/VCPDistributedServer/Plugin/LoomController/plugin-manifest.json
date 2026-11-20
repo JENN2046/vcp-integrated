@@ -1,0 +1,194 @@
+{
+  "name": "LoomController",
+  "displayName": "VCP Loom Agent 控制器",
+  "version": "1.11.0",
+  "description": "控制 VCPChat 共享侧栏浏览器与 LoomAPP。参数平铺，支持编号串行命令；OpenVCPChatBrowser 返回页面快照和浏览器操作指南，可单独常驻该入口描述。",
+  "pluginType": "hybridservice",
+  "communication": {
+    "protocol": "direct",
+    "timeout": 120000
+  },
+  "entryPoint": {
+    "type": "nodejs",
+    "script": "LoomControllerService.js"
+  },
+  "capabilities": {
+    "invocationCommands": [
+      {
+        "command": "OpenVCPChatBrowser",
+        "description": "打开用户可见的共享侧栏浏览器。url 为完整 HTTP/HTTPS 地址（可选；省略时支持传 engine=bing/google/baidu/duckduckgo 与可选搜索词 query，或跟随用户侧栏默认搜索引擎）；返回 appId、targetId、当前页面快照及网页/串行命令操作指南，无需先二次查询。后续按回执操作，不含应用或 Skill 管理。快照读取失败会保留已打开标签并提示仅重试读取。登录/验证码请求用户协助，不绕过验证。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」OpenVCPChatBrowser「末」,\nurl:「始」https://www.bing.com/search?q=VCP「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "list_tabs",
+        "description": "列出官方侧栏浏览器的已挂载页面目标，包括 targetId、标题、URL、活动状态和人工协作状态。appId 固定 vcpchat-browser。页面读取 GetPageInfo、点击、输入、截图等也使用同一 appId，并携带明确 targetId。标签最多 12 个。"
+      },
+      {
+        "command": "switch_tab",
+        "description": "显示并激活指定侧栏浏览器标签。appId=vcpchat-browser，target 或 targetId 必须为 list_tabs/OpenVCPChatBrowser 返回的精确标签标识，不进行模糊匹配。"
+      },
+      {
+        "command": "close_tab",
+        "description": "关闭指定侧栏浏览器标签。appId=vcpchat-browser，targetId 指定标签；省略时选择活动浏览器目标。关闭不清除持久化登录会话。"
+      },
+      {
+        "command": "open_url",
+        "description": "通过 WebCore target_open 在官方侧栏浏览器中新建标签并打开 URL。appId=vcpchat-browser，支持传 url，或传 engine（bing/google/baidu/duckduckgo）与 query。等价打开入口为 OpenVCPChatBrowser。"
+      },
+      {
+        "command": "RequestBrowserAssistance",
+        "description": "请求用户接管侧栏浏览器页面。targetId 必填，message 为面向用户的协助原因，例如需要手动完成验证码或登录。打开对应标签并显示协作提示，立即返回 waiting，不阻塞工具请求。等待期间禁止 AI 页面写操作；用户点击已完成后才能继续，取消协作也不会自动恢复写操作。用 list_tabs/GetPageInfo 查询状态。必须在聊天中说明求助原因，确认完成后重新读取页面，不重放旧的点击或提交。"
+      },
+      {
+        "command": "CreateSkill",
+        "description": "把 Agent 已经测试过的完整编号串语法直接编译为持久化 Skill，不使用录制器。顶层必填 skillId、appId、title；description 可选。后续沿用普通串语法：command1/target1/text1、command2/waitMs2、command3/keys3 等。输入内容可写 {{变量名}}，并须在 placeholders JSON 中声明；执行时由 inputs 提供，缺失会在任何页面动作前失败。validationMode 可选：current（默认）只读取当前 DOM，不实际操作；能解析的 vcp ID 会固化成来源、唯一选择器和元素签名，不能解析时仍保留原始目标并返回 validated=false、fallback=raw-vcp-id；trial 会使用占位符 example/default 顺序实际执行整链并验证，任何目标或动作失败则不创建；none 完全跳过 DOM 验证。返回 skillId、占位符配置结果、逐目标验证/兜底结果及是否实际试跑。重名拒绝覆盖。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」CreateSkill「末」,\nskillId:「始」deepseek-question「末」,\nappId:「始」deepseek-mobile「末」,\ntitle:「始」提问并读取回答「末」,\ndescription:「始」向 DeepSeek 输入任意问题并读取结果「末」,\nplaceholders:「始」{\"question\":{\"description\":\"本次问题\",\"required\":true,\"example\":\"什么是量子纠缠\"}}「末」,\nvalidationMode:「始」current「末」,\ncommand1:「始」type「末」,\ntarget1:「始」vcp-h-1-3-9-7o6foz「末」,\ntext1:「始」{{question}}「末」,\ncommand2:「始」wait「末」,\nwaitMs2:「始」1000「末」,\ncommand3:「始」send_keys「末」,\ntarget3:「始」vcp-h-1-3-9-7o6foz「末」,\nkeys3:「始」Enter「末」,\ncommand4:「始」wait「末」,\nwaitMs4:「始」20000「末」,\ncommand5:「始」getrenderedtext「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "ManageSkill",
+        "description": "管理持久化 Skill。operation 默认 list：列出标题、描述、应用、更新时间、步数、占位符和最近保存的验证状态；get：必须提供 skillId，返回完整结构化编号步骤、占位符定义及逐目标验证/兜底结果；delete：必须提供 skillId，删除技能文件但不取消已启动任务。无录制流程。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」ManageSkill「末」,\noperation:「始」get「末」,\nskillId:「始」deepseek-question「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "EditSkill",
+        "description": "编辑已有 Skill。skillId 必填；可单独修改 title、description、appId 或 placeholders。需要替换操作链时，继续提交完整 command1/target1/text1... 编号串语法，并可设置 validationMode=current/trial/none 重新验证和固化目标。未提交字段保持原值；编辑不影响已经启动任务所读取的版本。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」EditSkill「末」,\nskillId:「始」deepseek-question「末」,\ntitle:「始」DeepSeek 通用提问「末」,\ndescription:「始」输入本次 question 并读取回答「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "ExecuteSkill",
+        "description": "执行已保存 Skill。skillId 必填；inputs 为本次占位符值 JSON，必须与创建时 placeholders 声明一致。替换发生在结构化字段层，输入中的换行、逗号或工具语法不会变成新步骤。mode=sync（默认）等待完成并返回回执，受插件两分钟同步调用期限约束；mode=async 创建成功后立即只返回 taskId，由 GetSkillTask 查询，不设 Skill 总执行期限，适合包含长等待的操作链。单步 wait 不再限制为30秒，仅受 JavaScript 定时器安全范围约束。创建成功不等于执行成功。持久化目标会按来源、唯一选择器和签名重新验证；raw-vcp-id 兜底跨刷新/导航/重启可能过期，过期就在该步骤失败，不模糊匹配或重放。异步任务完成后才开始计算30分钟内存结果保留期。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」ExecuteSkill「末」,\nskillId:「始」deepseek-question「末」,\nmode:「始」async「末」,\ninputs:「始」{\"question\":\"请解释相对论\"}「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "GetSkillTask",
+        "description": "查询异步或同步 Skill 任务，taskId 必填。返回运行状态、当前步骤、完成步数、失败原因、完成前回执及过期时间；查询不会延长保留期。任务不存在、已过期或服务重启后返回明确错误，不自动重跑。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」GetSkillTask「末」,\ntaskId:「始」上次执行返回的任务ID「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "ListApps",
+        "description": "列出已注册 LoomAPP：ID、名称、启动 URL、启用与运行状态。无参数。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」ListApps「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "ListOpenApps",
+        "description": "列出运行中的 LoomAPP：ID、名称、URL、加载状态、错误、标题和最近快照时间。无参数。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」ListOpenApps「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "CreateApp",
+        "description": "创建一个完整 LoomAPP，并一次性提交配置清单、CSS 辅助样式和 JavaScript 注入脚本。\n参数:\n- manifest (JSON 对象或 JSON 字符串, 必需): 完整 LoomAPP 配置。核心字段包括 id、name、description、startUrl、enabled、exposeInAppDrawer、exposeManagerInAppDrawer、icon、iconSource、emoji、window、viewport、request、navigation。id 必须为 2-64 位小写字母/数字/短横线/下划线且以字母或数字开头；startUrl 仅支持 http/https。\n- iconSource (manifest 内可选对象): Agent 手绘图标，优先于 icon。支持 {\"type\":\"svg\",\"source\":\"完整 SVG\"}、{\"type\":\"css\",\"width\":64,\"height\":64,\"source\":\"CSS 声明/规则\"}、{\"type\":\"canvas\",\"width\":64,\"height\":64,\"background\":\"transparent\",\"commands\":[...]}。Canvas 是声明式绘图而非 JavaScript，指令支持 rect/fillRect/strokeRect、circle、ellipse、line、path、polygon、polyline、text；常用字段包括坐标、fill、stroke、strokeWidth、opacity。SVG/CSS 禁止脚本、事件、外部资源和 url()。源码上限 128 KB，Canvas 最多 256 条指令。\n- css (字符串, 可选): 完整 inject.css 内容；省略时为空。\n- js (字符串, 可选): 完整 inject.js 内容；省略时为空。\nmanifest 窗口示例: {\"width\":420,\"height\":780,\"minWidth\":320,\"minHeight\":480,\"maxWidth\":null,\"maxHeight\":null,\"resizable\":true}。\nmanifest 视口示例: {\"width\":390,\"height\":700,\"autoResize\":true}。\nmanifest 请求示例: {\"profile\":\"mobile\",\"userAgent\":\"\",\"headers\":{}}，profile 可选 desktop/mobile/iphone/custom，headers 不允许覆写 Cookie 和 Host。\nmanifest 导航示例: {\"allowPopups\":false,\"openExternalOriginsInBrowser\":false}。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」CreateApp「末」,\nmanifest:「始」{\"id\":\"example-app\",\"name\":\"示例应用\",\"description\":\"Agent 创建并手绘图标的 LoomAPP\",\"startUrl\":\"https://example.com/\",\"enabled\":true,\"exposeInAppDrawer\":true,\"emoji\":\"🕸️\",\"iconSource\":{\"type\":\"canvas\",\"width\":64,\"height\":64,\"background\":\"#10131a\",\"commands\":[{\"op\":\"circle\",\"cx\":32,\"cy\":32,\"r\":25,\"fill\":\"#7357ff\"},{\"op\":\"path\",\"d\":\"M18 33 L28 43 L47 21\",\"stroke\":\"#ffffff\",\"strokeWidth\":6}]},\"window\":{\"width\":420,\"height\":780,\"minWidth\":320,\"minHeight\":480,\"maxWidth\":null,\"maxHeight\":null,\"resizable\":true},\"viewport\":{\"width\":390,\"height\":700,\"autoResize\":true},\"request\":{\"profile\":\"mobile\",\"userAgent\":\"\",\"headers\":{\"X-VCP-Loom\":\"example-app\"}},\"navigation\":{\"allowPopups\":false,\"openExternalOriginsInBrowser\":false}}「末」,\ncss:「始」body { font-family: sans-serif; }「末」,\njs:「始」console.log('Loom injection loaded');「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "OpenApp",
+        "description": "打开或聚焦已有单例窗口。appId 必填，应用须存在且启用。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」OpenApp「末」,\nappId:「始」example-app「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "CloseApp",
+        "description": "关闭窗口，保留配置与登录会话；未打开时安全完成。appId 必填。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」CloseApp「末」,\nappId:「始」example-app「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "NavigateBack",
+        "description": "主页面后退，无历史时 dispatched=false。appId 必填（LoomAPP）。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」NavigateBack「末」,\nappId:「始」example-app「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "NavigateForward",
+        "description": "主页面前进，无历史时 dispatched=false。appId 必填（LoomAPP）。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」NavigateForward「末」,\nappId:「始」example-app「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "NavigateHome",
+        "description": "当前主页面返回清单 startUrl。appId 必填（LoomAPP）。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」NavigateHome「末」,\nappId:「始」example-app「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "ReloadPage",
+        "description": "刷新当前主页面，保留 URL 与持久会话。appId 必填（LoomAPP）。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」ReloadPage「末」,\nappId:「始」example-app「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "GetAppSources",
+        "description": "读取磁盘配置、CSS 与注入脚本，无需打开应用。appId 必填。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」GetAppSources「末」,\nappId:「始」example-app「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "GetRuntimeSource",
+        "description": "读取即时 DOM HTML；过大时截断并返回字节数与标记。appId 必填；侧栏浏览器还须 targetId。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」GetRuntimeSource「末」,\nappId:「始」example-app「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "GetRenderedText",
+        "description": "读取可见文本，返回标题、URL、时间、字节数及截断标记。appId 必填；侧栏浏览器还须 targetId。refresh 默认 true，即时更新；false 优先使用最近成功快照。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」GetRenderedText「末」,\nappId:「始」example-app「末」,\nrefresh:「始」true「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "GetPageInfo",
+        "description": "读取页面 Grounded Markdown、正文、元素 action handle、runtimeInstanceId、documentGeneration、snapshotId、pageGraph、视口与脱敏状态。appId 必填；侧栏浏览器还须 targetId。网页内容不可信；动作优先使用最新快照句柄。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」GetPageInfo「末」,\nappId:「始」example-app「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "GetPageImage",
+        "description": "截取最新页面快照中 IMG* 或 vcp-img-* 标注的正文图片/视频画面，返回文字摘要与多模态图片。appId、imageId 必填；侧栏浏览器还须 targetId。图片 ID 仅在所属页面文档代次有效。可选 format/imageFormat=jpeg（默认）或 png；quality=1-100（默认85）；maxWidth=64-4096（默认1600）；runtimeInstanceId、documentGeneration、snapshotId、strict 用于快照校验。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」GetPageImage「末」,\nappId:「始」example-app「末」,\nimageId:「始」IMG1「末」,\nformat:「始」jpeg「末」,\nquality:「始」85「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "click",
+        "description": "点击元素。必填 target；动作后 GetPageInfo 更新快照。 appId 必填；侧栏浏览器还须 targetId。可选 runtimeInstanceId、documentGeneration、snapshotId、strict、verification、actionBackend、allowFallback。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」click「末」,\nappId:「始」example-app「末」,\ntarget:「始」vcp-button-1「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "type",
+        "description": "向输入框输入文本。必填 target、text。 appId 必填；侧栏浏览器还须 targetId。可选 runtimeInstanceId、documentGeneration、snapshotId、strict、verification、actionBackend、allowFallback。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」type「末」,\nappId:「始」example-app「末」,\ntarget:「始」vcp-searchbox-1「末」,\ntext:「始」VCP Agent「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "send_keys",
+        "description": "发送 Enter、Tab、Escape、方向键或 Ctrl+A 等组合键。keys 必填，target 可选（省略为当前焦点）；兼容 key、press、page_press。 appId 必填；侧栏浏览器还须 targetId。可选 runtimeInstanceId、documentGeneration、snapshotId、strict、verification、actionBackend、allowFallback。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」send_keys「末」,\nappId:「始」example-app「末」,\nkeys:「始」Ctrl+A「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "scroll",
+        "description": "滚动页面或元素。direction 必填：down/up/left/right/bottom/top/to/page_down/page_up；可选 amount、target、x、y、behavior。 appId 必填；侧栏浏览器还须 targetId。可选 runtimeInstanceId、documentGeneration、snapshotId、strict、verification、actionBackend、allowFallback。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」scroll「末」,\nappId:「始」example-app「末」,\ndirection:「始」bottom「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "set_value",
+        "description": "原子设置输入值并验证。target、value 必填。 appId 必填；侧栏浏览器还须 targetId。可选 runtimeInstanceId、documentGeneration、snapshotId、strict、verification、actionBackend、allowFallback。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」set_value「末」,\nappId:「始」example-app「末」,\ntarget:「始」#volume「末」,\nvalue:「始」50「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "select_option",
+        "description": "选择原生下拉选项。target 必填；value/text/index 至少一项；exact 可选。 appId 必填；侧栏浏览器还须 targetId。可选 runtimeInstanceId、documentGeneration、snapshotId、strict、verification、actionBackend、allowFallback。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」select_option「末」,\nappId:「始」example-app「末」,\ntarget:「始」#city「末」,\ntext:「始」上海「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "hover",
+        "description": "悬停元素。target 必填。 appId 必填；侧栏浏览器还须 targetId。可选 runtimeInstanceId、documentGeneration、snapshotId、strict、verification、actionBackend、allowFallback。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」hover「末」,\nappId:「始」example-app「末」,\ntarget:「始」vcp-button-2「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "check",
+        "description": "幂等设置复选框、单选框或 ARIA switch。target 必填；checked 默认 true。 appId 必填；侧栏浏览器还须 targetId。可选 runtimeInstanceId、documentGeneration、snapshotId、strict、verification、actionBackend、allowFallback。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」check「末」,\nappId:「始」example-app「末」,\ntarget:「始」vcp-checkbox-1「末」,\nchecked:「始」true「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "wait_for",
+        "description": "等待页面条件。condition 必填：element/visible/hidden/text/url/value/dom_stable；可选 target、text、url、value、timeoutMs、pollMs、stableMs。 appId 必填；侧栏浏览器还须 targetId。可选 runtimeInstanceId、documentGeneration、snapshotId、strict、verification、actionBackend、allowFallback。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」wait_for「末」,\nappId:「始」example-app「末」,\ncondition:「始」dom_stable「末」,\nstableMs:「始」800「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "ExecuteAction",
+        "description": "通用 WebCore 动作入口。appId、actionId 必填；params、options 为 JSON。侧栏浏览器的 targetId 放入 params。支持 page_*、runtime_*、debugger_*、dom_*、accessibility_*、native_*、network_*、storage_*、emulation_*、screenshot_capture、target_*；权限与审批由后端处理。动作后 GetPageInfo 更新快照。脚本示例：actionId=runtime_execute_script，params={\"executionWorld\":\"ISOLATED\",\"code\":\"return document.title\"}。CDP 示例：actionId=debugger_send_command，params={\"method\":\"DOMSnapshot.captureSnapshot\",\"cdpParams\":{\"computedStyles\":[]}}。编号串行：command1/target1/text1...，公共 appId、targetId 继承；任一步失败停止，partial_failure 保留已完成回执与 failedStep。wait/sleep/delay 使用 waitMs，默认1000ms，受定时器安全范围与120秒调用期限约束；优先 wait_for。",
+        "example": "单步调用:\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」ExecuteAction「末」,\nappId:「始」example-app「末」,\nactionId:「始」page_type「末」,\nparams:「始」{\"target\":\"vcp-searchbox-1\",\"text\":\"VCP Agent\"}「末」\n<<<[END_TOOL_REQUEST]>>>\n\n编号串行示例：\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\nappId:「始」example-app「末」,\ncommand1:「始」click「末」,\ntarget1:「始」vcp-h-1-12-187-1pia4ka「末」,\nsnapshotId1:「始」12「末」,\nstrict1:「始」true「末」,\ncommand2:「始」wait「末」,\nwaitMs2:「始」700「末」,\ncommand3:「始」get_page_info「末」\n<<<[END_TOOL_REQUEST]>>>"
+      },
+      {
+        "command": "EditAppSources",
+        "description": "编辑指定 LoomAPP 的配置清单、CSS 辅助样式和 JavaScript 注入脚本。manifest、css、js 至少提交一项；未提交的部分保持原值。manifest 支持只提交需要修改的字段，window、viewport、request、navigation 等嵌套配置会与现有清单合并。可在 manifest.iconSource 中提交 svg/css/canvas 手绘图标，规则与 CreateApp 相同；提交 null 清除手绘图标并回退到 icon 或 emoji。css/js 一旦提交即视为完整文件内容，传空字符串可清空对应文件。若应用正在运行，配置、视口、图标和注入源码会立即热应用；请求头与部分页面启动参数可能需要刷新或重新打开应用后被目标网站完整采用。\n参数:\n- appId (字符串, 必需): 要编辑的 LoomAPP ID。\n- manifest (JSON 对象或 JSON 字符串, 可选): 要修改的清单字段，可包含 iconSource。\n- css (字符串, 可选): 完整 inject.css 新内容。\n- js (字符串, 可选): 完整 inject.js 新内容。",
+        "example": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」LoomController「末」,\ncommand:「始」EditAppSources「末」,\nappId:「始」example-app「末」,\nmanifest:「始」{\"name\":\"示例应用 Pro\",\"iconSource\":{\"type\":\"svg\",\"source\":\"<svg viewBox='0 0 64 64'><rect width='64' height='64' rx='16' fill='#7357ff'/><circle cx='32' cy='32' r='12' fill='#fff'/></svg>\"},\"viewport\":{\"width\":430,\"height\":760,\"autoResize\":false}}「末」,\ncss:「始」body { overflow-x: hidden; }「末」,\njs:「始」document.documentElement.dataset.loomReady = 'true';「末」\n<<<[END_TOOL_REQUEST]>>>"
+      }
+    ]
+  }
+}

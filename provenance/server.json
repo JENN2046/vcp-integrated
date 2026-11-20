@@ -1,0 +1,1546 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "repository": "https://github.com/lioensky/VCPToolBox",
+    "commit": "965afa8ab98c5afacb058d06dc1be3bb4d682f43"
+  },
+  "integration": {
+    "nativeSyncSourceHead": "7fb8bdbd494a7e5bee2a604b1025857b031f7d02",
+    "candidateId": "NS-NATIVE-OPS-d5a7f9b15f35",
+    "manifestSha256": "8a02e5f541872ae3777c26ef253e414de8d2c6072d685447f7a24ad8e09047db"
+  },
+  "runtime": {
+    "node": "24.22.3",
+    "npm": "10.9.8",
+    "dependencyLock": "apps/server/package-lock.json",
+    "upstreamDependencyLockSha256": "d9d47fe2b1f113ecfb2db18f1e44b9774f0d330846be58754be897d556f4d8ce",
+    "dependencyLockReproduction": "npm install --package-lock-only --ignore-scripts --no-audit --no-fund with candidate package.json and upstream package-lock.json",
+    "vexus": {
+      "platform": "linux-x64-gnu",
+      "rust": "1.89.0",
+      "cargoLock": "rust-vexus-lite/Cargo.lock",
+      "command": "bash scripts/build-vexus.sh",
+      "generatedAddon": "rust-vexus-lite/vexus-lite.linux-x64-gnu.node",
+      "abiVersion": 2,
+      "requiredCapability": "river.warped-production.v1"
+    },
+    "mobileBuildSource": "apps/mobile",
+    "mobileBuildMount": "Plugin/NativeSync/mobile-dist",
+    "mobileBuildEnv": "NativeMobilePwaDir"
+  },
+  "pluginDiscovery": {
+    "activeManifests": [
+      "Plugin/NativeSync/plugin-manifest.json"
+    ],
+    "helperDirectories": [
+      "Plugin/AgentAssistant",
+      "Plugin/VCPSleep"
+    ]
+  },
+  "files": {
+    ".gitignore": {
+      "source": "monorepo",
+      "sha256": "b0a205cda74d03c95129220a972c9d81e9b83585f86feaac10707aabaa033f95"
+    },
+    "EmbeddingUtils.js": {
+      "source": "candidate",
+      "sha256": "822f5d10c4c63ae20017519830aae48d86768bc310291057a75af666d498744c"
+    },
+    "FileFetcherServer.js": {
+      "source": "candidate",
+      "sha256": "9adc194baf1ca647d52197e5afd5775d1adcc73df59754a59bf968fa192db62c"
+    },
+    "KnowledgeBaseManager.js": {
+      "source": "candidate",
+      "sha256": "789002a8e6bb60452ba85d4f998d7406909e72affe67ab864b6fbf41f3b21c27"
+    },
+    "LICENSE": {
+      "source": "upstream",
+      "sha256": "5392a8b3f46108fa3494e8c15b57da9e14e9bbd93335590cb5b50364fcf770a8"
+    },
+    "ModelRedirect.json.example": {
+      "source": "upstream",
+      "sha256": "10f6e4d1473ce04cd583a901676544c94799dc47f03bb57eadc334bfd21dc0c8"
+    },
+    "Plugin.js": {
+      "source": "candidate",
+      "sha256": "1d6e821f640a78a4079dd9816d6051e3e3a80304f760491ab0d4a688a1348fff"
+    },
+    "Plugin/AgentAssistant/AgentAssistant.js": {
+      "source": "candidate",
+      "sha256": "0b99d2582eb94d33de10a196884055d84ad5277bd321a78b6f6f91c0ae2cd146"
+    },
+    "Plugin/AgentAssistant/README.md": {
+      "source": "candidate",
+      "sha256": "4fbc58aaeccabff92582d63b338fddee29168e2d840c11f3db9d694d411425c3"
+    },
+    "Plugin/AgentAssistant/config.env.example": {
+      "source": "candidate",
+      "sha256": "ca6a86c62f0137804ad3e72171be5253b828c9650d642c2f0f1deba2eede3cd9"
+    },
+    "Plugin/AgentAssistant/delegationContinuity.js": {
+      "source": "candidate",
+      "sha256": "b7ea27e0304d4da83d8c2f992321bd4f78d71ab5d284b775a3441c5848a241c5"
+    },
+    "Plugin/AgentAssistant/delegationControl.js": {
+      "source": "candidate",
+      "sha256": "871fa2d8176567ccfe031eef2e14fcfc7f8285bcde95d54b578ad6aae3d321c2"
+    },
+    "Plugin/AgentAssistant/flowlockProtocol.js": {
+      "source": "candidate",
+      "sha256": "f134ca4a5601a05043ceee68a4626485f5306dc57b0f3d324bd4326b53c7b422"
+    },
+    "Plugin/AgentAssistant/plugin-manifest.json.example": {
+      "source": "candidate",
+      "sha256": "7e4fe002269d67cf71d9b4545fc6aa208b26aca7b44b601bbc422ecaebfa2bca"
+    },
+    "Plugin/NativeSync/config.env.example": {
+      "source": "candidate",
+      "sha256": "f3d6450eebce3eed6375ff88f4ea86f18aaac172eec7caadb7c91b0de1b748b3"
+    },
+    "Plugin/NativeSync/mobile/attachmentPermission.js": {
+      "source": "candidate",
+      "sha256": "8d066335ac082e544658c3053fd6a0d207a94fe79f6d5bb92980f12b5b3ec782"
+    },
+    "Plugin/NativeSync/mobile/attachmentRoutes.js": {
+      "source": "candidate",
+      "sha256": "ead9427a6db47821e8aaa54aac25f3c28e5930db7823a33f621fc166266ac3b6"
+    },
+    "Plugin/NativeSync/mobile/attachments.js": {
+      "source": "candidate",
+      "sha256": "95a35b83671e2f850afe53771cc8425f20838a602d3d90fa70777533cd211f90"
+    },
+    "Plugin/NativeSync/mobile/connection.js": {
+      "source": "candidate",
+      "sha256": "409d96be650818ea92956c45832a1fc4ab1538c6b41f0c7cbe8174e1f10534b3"
+    },
+    "Plugin/NativeSync/mobile/effectiveContext.js": {
+      "source": "candidate",
+      "sha256": "4fa6da25971543a6a04e7838af0958f55fda91666717c98c04c56854b436fb9a"
+    },
+    "Plugin/NativeSync/mobile/execution.js": {
+      "source": "candidate",
+      "sha256": "1a78e164d79f50d823aa09dbf26b269d35a1d175ee53806f42d5b1aa0d44b25b"
+    },
+    "Plugin/NativeSync/mobile/executionConfigs.js": {
+      "source": "candidate",
+      "sha256": "c22a08b4e9d644e10d1e4cc57d749be54c5c36f9bba56b567ebe627055086ada"
+    },
+    "Plugin/NativeSync/mobile/executionPages.js": {
+      "source": "candidate",
+      "sha256": "5f8d7eee0f491e358866f134ddf569ff661585f7c74544debfa5ca4bbb73fbd4"
+    },
+    "Plugin/NativeSync/mobile/groupRequest.js": {
+      "source": "candidate",
+      "sha256": "57f81cf744991bcef44a2d002f05a2460fc98c3e4a1aaae016ba8dc994bb795a"
+    },
+    "Plugin/NativeSync/mobile/groupTurn.js": {
+      "source": "candidate",
+      "sha256": "c3957e48ed412f2bc055a16641c946861212edd230e249e9349b7e1f56cde4f6"
+    },
+    "Plugin/NativeSync/mobile/historyResponse.js": {
+      "source": "candidate",
+      "sha256": "da698236da627f3e0cc9dd1d845e7773830bb4aa768e58b1f9ba5dfdded77530"
+    },
+    "Plugin/NativeSync/mobile/nativePacket.js": {
+      "source": "candidate",
+      "sha256": "ad778a263041749c32b2037cd9212f8ff11b21e5ec42e4c920aa57ea0d49077c"
+    },
+    "Plugin/NativeSync/mobile/nativeResponse.js": {
+      "source": "candidate",
+      "sha256": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317"
+    },
+    "Plugin/NativeSync/mobile/nativeTasks.js": {
+      "source": "candidate",
+      "sha256": "ad1d2ccb9075f3c1955638a63a2ee41bd6d165a0dd7d7f2bb9ee9f98790737f5"
+    },
+    "Plugin/NativeSync/mobile/pdfText.js": {
+      "source": "candidate",
+      "sha256": "d0e4af4acddf651c635abf372177e19613d97ad64607bac8008bc25245b5c7fa"
+    },
+    "Plugin/NativeSync/mobile/portal.js": {
+      "source": "candidate",
+      "sha256": "64d716e1cb3abc71ca9d1cb63b3201369d63f2c923f58a60645dbe9f86d2c210"
+    },
+    "Plugin/NativeSync/mobile/sharedConfiguration.js": {
+      "source": "candidate",
+      "sha256": "8141b065df2e454f61a820942868c1d46bfa9c54a93c83b51c6f20750937bf49"
+    },
+    "Plugin/NativeSync/mobile/sharedGroups.js": {
+      "source": "candidate",
+      "sha256": "3cdee80d6e50663d82c23be5b17dae2dfe246f9121c583cb3d3b31b73c32e121"
+    },
+    "Plugin/NativeSync/mobile/sharedSingle.js": {
+      "source": "candidate",
+      "sha256": "81f8c66028b4e77697b588bc89073c65291202f9ab01977bb6507e0aa7f91c6b"
+    },
+    "Plugin/NativeSync/mobile/snapshotPrompt.js": {
+      "source": "candidate",
+      "sha256": "7d10c8ae439888c32ecba739fbee64f2f094f3e3fd3509c9ec68811aafd8a9af"
+    },
+    "Plugin/NativeSync/mobile/submissionRecovery.js": {
+      "source": "candidate",
+      "sha256": "0b718827b383e385f73bdec22140d55ef42ef41b513e710abf099ba8f0f193e2"
+    },
+    "Plugin/NativeSync/native-sync.js": {
+      "source": "candidate",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    "Plugin/NativeSync/nativeRules/Groupmodules/groupChatUrl.js": {
+      "source": "candidate",
+      "sha256": "b1fc3e79467705eef02da96710ebf9d9daadfa06ad57ed1957f2086e291b3855"
+    },
+    "Plugin/NativeSync/nativeRules/Groupmodules/groupContextWindow.js": {
+      "source": "candidate",
+      "sha256": "50348c483de22cbe2335cbdf66eea1e713d6504166ac47651990eb479e48ba32"
+    },
+    "Plugin/NativeSync/nativeRules/Groupmodules/modelSelection.js": {
+      "source": "candidate",
+      "sha256": "1fc60600dacf29ec4601c45e9a167284db3de2a2c6df87cce0eae1fe8926298f"
+    },
+    "Plugin/NativeSync/nativeRules/Groupmodules/modes/baseChatMode.js": {
+      "source": "candidate",
+      "sha256": "e76f53930084405516709b5b6e8314202f29300a1e3e84017de5feb89a072fad"
+    },
+    "Plugin/NativeSync/nativeRules/Groupmodules/modes/inviteOnlyMode.js": {
+      "source": "candidate",
+      "sha256": "1e77da13df87a8d12bddd0b8d474bbc8b90dfaf4d7ae2934d2814f8b33ba553c"
+    },
+    "Plugin/NativeSync/nativeRules/Groupmodules/modes/natureRandomMode.js": {
+      "source": "candidate",
+      "sha256": "eeea58c6e70acb435d38d906707aeb6e97118ede6f0f687715614de53aa9ac64"
+    },
+    "Plugin/NativeSync/nativeRules/Groupmodules/modes/sequentialMode.js": {
+      "source": "candidate",
+      "sha256": "7d4a3a2e89aeb8e3dd7c13dbc6427c29f4d2b85d46f04a0ae0f233d662cb06c4"
+    },
+    "Plugin/NativeSync/nativeRules/Groupmodules/streamDelta.js": {
+      "source": "candidate",
+      "sha256": "e8984983e8b8938e32b411565c08481d3f66d02291598fdfb187af3d775d6e80"
+    },
+    "Plugin/NativeSync/nativeRules/Groupmodules/streamWatchdog.js": {
+      "source": "candidate",
+      "sha256": "139d1b568ba40264a740c636cf65bf7e2dc20f8ba2e6d85d8bf68c8092efec60"
+    },
+    "Plugin/NativeSync/nativeRules/modules/chat/contextCompactionState.js": {
+      "source": "candidate",
+      "sha256": "ca2a2e8b9fd59445dd986a6cfcae47dafebdcb6bb4dc27fb616e3a5f3116906f"
+    },
+    "Plugin/NativeSync/nativeRules/modules/chat/requestEnvelope.js": {
+      "source": "candidate",
+      "sha256": "f311d0ce8e7becd4f97b4f1180a51e4051f3f66d7a7c1f1fd2df7403bc25ef96"
+    },
+    "Plugin/NativeSync/nativeRules/modules/chat/requestMetadata.js": {
+      "source": "candidate",
+      "sha256": "f1b7064e896fe05e22359d86a2a1a8305ae817f08ed3dfa0ab1186432931615b"
+    },
+    "Plugin/NativeSync/nativeRules/modules/contextSanitizer.js": {
+      "source": "candidate",
+      "sha256": "ddbef2472d52fb641b25d64690bde04bfc074294a8457561b5b1ed6eeacd057f"
+    },
+    "Plugin/NativeSync/nativeRules/modules/modelTrajectory.js": {
+      "source": "candidate",
+      "sha256": "9b5cb71765e2c561a65a1bbb6200f0ee513b16f3b47ed20d1eadecb37fd22470"
+    },
+    "Plugin/NativeSync/nativeRules/modules/renderer/markdownCodeDomainScanner.js": {
+      "source": "candidate",
+      "sha256": "512b3b8364d7b2e6d53d80e5c86c57a51007cf270a5e43c3987be90aacb1ada7"
+    },
+    "Plugin/NativeSync/nativeRules/modules/renderer/toolResultRegions.js": {
+      "source": "candidate",
+      "sha256": "f684a4be9a7ff2f76dc6e97e498883c088bbf618591d6cdc5fb8eec7a00888aa"
+    },
+    "Plugin/NativeSync/nativeRules/modules/tavernRulesEngine.js": {
+      "source": "candidate",
+      "sha256": "ede855fbe40b70cd7b13684671047d040180cef2b354a6e8677a1b1b5c1c51bb"
+    },
+    "Plugin/NativeSync/plugin-manifest.json": {
+      "source": "candidate",
+      "sha256": "318ce708b2c1d32b9989ee5e0cc661585dbf184b0fbbe024f0ff2c1a8990b685"
+    },
+    "Plugin/NativeSync/sync/canonical/canonical.js": {
+      "source": "candidate",
+      "sha256": "4421dc2c11f7211d22d5d8e9ee6fe32cc7a19b4c83068a66d8d3dfd95c405672"
+    },
+    "Plugin/NativeSync/sync/canonical/hash.js": {
+      "source": "candidate",
+      "sha256": "1d8accca65491332f2462cc8c735998444be782dfd59e7933195155a09489d37"
+    },
+    "Plugin/NativeSync/sync/capabilities.js": {
+      "source": "candidate",
+      "sha256": "40740c208543f289b3e1147e4da985be28a194df261eedfdab296663b17a2931"
+    },
+    "Plugin/NativeSync/sync/centralStore.js": {
+      "source": "candidate",
+      "sha256": "21388347de9cd87b88a303cb33052aee3125dddcf80d614dc24cb80675e3bd1b"
+    },
+    "Plugin/NativeSync/sync/contracts.generated.cjs": {
+      "source": "candidate",
+      "sha256": "7b8f8065858a8663fd682a5b134724f5ba58b0552ca89e939a825cc4662841ef"
+    },
+    "Plugin/NativeSync/sync/httpService.js": {
+      "source": "candidate",
+      "sha256": "fe6d298af52f0fb7c726ed853b55f8ddc45f9bc096d59f49e535285233aa9188"
+    },
+    "Plugin/NativeSync/sync/messageCausality.js": {
+      "source": "candidate",
+      "sha256": "9161e09d16f37c15fcca92ab9fd5c518ae6969d3c44f9359976ed9663e88e3b7"
+    },
+    "Plugin/NativeSync/sync/metadata.js": {
+      "source": "candidate",
+      "sha256": "d63f9549e47139cf3b01eb9686e1726d31ab52990d56eb7d9dc1a0ccefcbfdbd"
+    },
+    "Plugin/NativeSync/sync/nativeTrajectory.js": {
+      "source": "candidate",
+      "sha256": "6b859b7affcdc812c562f919286464f49f8a090ccd19c5c27f4bab0132d8cb9d"
+    },
+    "Plugin/NativeSync/sync/protocol.js": {
+      "source": "candidate",
+      "sha256": "d3af5e76cb85bcd6130674d6519684edaa2391e24e6fbf070ef15c2fde4b8126"
+    },
+    "Plugin/NativeSync/sync/releasePolicy.cjs": {
+      "source": "candidate",
+      "sha256": "f4fe9a792660564e335403b5527d7348062ce8a791e5e6671aaeb884a6b3031a"
+    },
+    "Plugin/NativeSync/sync/sharedAttachments.js": {
+      "source": "candidate",
+      "sha256": "f4780ab4cbd4adb5ba4a46dbe3faed4a84bf40f86beff4c8a21d44b8e5e00a44"
+    },
+    "Plugin/NativeSync/sync/sharedCompaction.js": {
+      "source": "candidate",
+      "sha256": "c6244b099f9c17ad1c9a6844f73b6f383a38ce86785f462864145a84448c47ef"
+    },
+    "Plugin/NativeSync/sync/sharedControlledText.js": {
+      "source": "candidate",
+      "sha256": "e3ca678524e50118db253fd63dae5274a60a3d77f4cc11e54428887362700ac8"
+    },
+    "Plugin/NativeSync/sync/sharedEventHttp.js": {
+      "source": "candidate",
+      "sha256": "cfe9679d31214c4d0acabf5d4be21710378008f1f9d99d2a70b537d6846f143b"
+    },
+    "Plugin/NativeSync/sync/sharedEvents.js": {
+      "source": "candidate",
+      "sha256": "b9d2ccccc3934cead5085b2b3a68e8150f809b486409bc4d4ab4c106f012fb45"
+    },
+    "Plugin/NativeSync/sync/sharedHttp.js": {
+      "source": "candidate",
+      "sha256": "e14c1ad41005fef3854a9c736dfd77445bbe13a860dce9a9ae1d6e1d07b66d63"
+    },
+    "Plugin/NativeSync/sync/sharedInline.cjs": {
+      "source": "candidate",
+      "sha256": "ebd152090117214ce51b98d02325fa351f4d73e726629fe391b028db88e86c1c"
+    },
+    "Plugin/NativeSync/sync/sharedMatching.js": {
+      "source": "candidate",
+      "sha256": "f05598699e8ef6331c1dd2d06a00c878cdf5ecd705f1c2505b33eb4b82bf645d"
+    },
+    "Plugin/NativeSync/sync/sharedNative.js": {
+      "source": "candidate",
+      "sha256": "5f463aede4ae58973d6b792c2d48458c83159ef80ff15ec87443b2bdeba8a4f0"
+    },
+    "Plugin/NativeSync/sync/sharedSession.js": {
+      "source": "candidate",
+      "sha256": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2"
+    },
+    "Plugin/NativeSync/sync/sharedSpace.js": {
+      "source": "candidate",
+      "sha256": "32829dfb13ffeaf1730b0b4eb85280dfa8d99d6c6974e12fe499749b77e0d19e"
+    },
+    "Plugin/NativeSync/sync/sharedSteering.js": {
+      "source": "candidate",
+      "sha256": "b301b5273c0a32ae476fd352eb68353abfc7b4c9a0376cfce2e2c540574dc89c"
+    },
+    "Plugin/NativeSync/sync/sharedTaskControls.js": {
+      "source": "candidate",
+      "sha256": "3ba8db1eedceaf83bcdca128c3ac22993e28c749f038a81f7ba39f97d33dc038"
+    },
+    "Plugin/NativeSync/sync/sharedTaskRequests.js": {
+      "source": "candidate",
+      "sha256": "68c623b429181833c1876c5541a2e3c00efa36a193767332cde53c48fc5c8e9e"
+    },
+    "Plugin/NativeSync/sync/sharedTopicSponsor.js": {
+      "source": "candidate",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    "Plugin/NativeSync/sync/sharedTurns.js": {
+      "source": "candidate",
+      "sha256": "552ea1580e137b932335ee7bf1f78fb856aa52dcb4325d4a1977b963981fdaff"
+    },
+    "Plugin/NativeSync/sync/sharedWait.js": {
+      "source": "candidate",
+      "sha256": "6c9d821fef2f1689d1ef95227e9a936a494f787ab0cad10517c23a4cdb3b83e8"
+    },
+    "Plugin/NativeSync/sync/sourceCatalog.js": {
+      "source": "candidate",
+      "sha256": "c5dbe076e460631b12e51bfcc02abff030de7517388c6daa1175ece764ec48de"
+    },
+    "Plugin/NativeSync/sync/sourceHttp.js": {
+      "source": "candidate",
+      "sha256": "5eac6b0fed20107958d561be584106329b8ce6a87ee42cb273761ef95fa3e528"
+    },
+    "Plugin/NativeSync/sync/sourceScope.js": {
+      "source": "candidate",
+      "sha256": "2632ec09959e689671373328092d7227fa4a4f0bcc99775a96455cad32e731b4"
+    },
+    "Plugin/NativeSync/sync/sponsorExecutionBridge.js": {
+      "source": "candidate",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    },
+    "Plugin/NativeSync/sync/topicRiverQuote.js": {
+      "source": "candidate",
+      "sha256": "eed5202f6d228728a8ff67921192ef480b0f447e364f05477a39f5527385ca23"
+    },
+    "Plugin/VCPSleep/VCPSleep.js": {
+      "source": "candidate",
+      "sha256": "57d1f2cae0e0186ae5600144e8dd71941dcfec2e1115d77460f40bda91148702"
+    },
+    "Plugin/VCPSleep/config.env.example": {
+      "source": "candidate",
+      "sha256": "2d01847894529cdb298e0d9f2002be5eae14aa4d639bbedfa6cc2a906a6a575c"
+    },
+    "Plugin/VCPSleep/sleepDuration.js": {
+      "source": "candidate",
+      "sha256": "20f89ae036a377a89db45349b9ec64fd42e6b810b26d8b5b082b9aae1ddbaf8a"
+    },
+    "README.md": {
+      "source": "monorepo",
+      "sha256": "2742ad70067a8e477b305736a3538eaebf7eea96072f8e3ae19d434e0214d5d7"
+    },
+    "ResultDeduplicator.js": {
+      "source": "candidate",
+      "sha256": "f409f8606d5eed26e0aba27b84f9aba01fc4cecfa3b014a90ed9112f8bd22391"
+    },
+    "RiverMemoEngine.js": {
+      "source": "candidate",
+      "sha256": "338b9f2417cdb9456f766c0ed7fdeff4a8ca488c8e3060f997e78591eacfb1ed"
+    },
+    "SemanticModelRouter.json": {
+      "source": "upstream",
+      "sha256": "f41cbbee6e0a0e9ee0992ea302109b4d0246f95bac1372fdac4e86e6cbfbbe3d"
+    },
+    "SemanticModelRouter.json.example": {
+      "source": "upstream",
+      "sha256": "ea2b5df689e8d23be9cefa33a104bb81a14dbcf5aba88e1930ceea43cf8251ff"
+    },
+    "TDBKnowledge.js": {
+      "source": "candidate",
+      "sha256": "33f641d709275c652dbce670d6d034e9e9481459e52ed51f9ca910138c74c942"
+    },
+    "TVStxt/ContactToolBox.txt": {
+      "source": "upstream",
+      "sha256": "66a877cf582d2d13608e0622872e86a4bb2a133359f92c004a658229ce54a9e3"
+    },
+    "TVStxt/DIVRendering.txt": {
+      "source": "upstream",
+      "sha256": "e2a355fbc6a07a3d79f8b6f075a2162866f3356883cc939158bd31ea9c793cbc"
+    },
+    "TVStxt/Dailynote.txt": {
+      "source": "upstream",
+      "sha256": "9887b71066e47819671a655dbc8fbf6dbf63331ffcfb58db8e9ab36e1965b623"
+    },
+    "TVStxt/DesktopCore.txt": {
+      "source": "upstream",
+      "sha256": "339576769f9b0309ddf5550c972f2a2a5c01de486f7d700c6efcfd02c5f89fe1"
+    },
+    "TVStxt/DiceTarot.txt": {
+      "source": "upstream",
+      "sha256": "9812aa4df3b872103bdd13f95c22217da2f00c92ec510de66a9a93cb9edc684b"
+    },
+    "TVStxt/FileToolBox.txt": {
+      "source": "upstream",
+      "sha256": "7117ff21fe2a8f28531fb7d47451c921ec4fad8715baeed0e7d6672c0419b033"
+    },
+    "TVStxt/JevToolCall.txt": {
+      "source": "upstream",
+      "sha256": "0b4ade8e0fb266829894e536f9e877d0386328bc451ed19165cc1e4b6a7a011c"
+    },
+    "TVStxt/JevToolCallDecision.txt": {
+      "source": "candidate",
+      "sha256": "dc70191a2ddfff00be939920262346faeeb39b9a82240926cd9174c60ec4af83"
+    },
+    "TVStxt/MIDITranslator.txt": {
+      "source": "upstream",
+      "sha256": "0bfceda41aa94aa4e168fd5808736cca96c7ea552b68849c3203bef7206afb4f"
+    },
+    "TVStxt/MediaToolBox.txt": {
+      "source": "upstream",
+      "sha256": "4c084997e707180479d5255cdd8526b4f90c51e8dc07f3a11842e2b6849935e2"
+    },
+    "TVStxt/MemoToolBox.txt": {
+      "source": "upstream",
+      "sha256": "892266111781e7595e9230a7c50f290e0ddc744f5a2ba40660687e7db2da5c8d"
+    },
+    "TVStxt/SearchToolBox.txt": {
+      "source": "upstream",
+      "sha256": "b0185b4d7a110a811fb4f48afc1f720b3d9d84f6a64f01178631c163623f4d8d"
+    },
+    "TVStxt/ToolForum.txt": {
+      "source": "upstream",
+      "sha256": "c812c282ac17737cfb16c2545e95ae1dfb8dda0c1506aa42d24db30d7a8fe50f"
+    },
+    "TVStxt/VchatRendering.txt": {
+      "source": "upstream",
+      "sha256": "69b796ee279086c1f1bc5d04f25ff8350613b81414f10d5667de196349b2336f"
+    },
+    "TVStxt/VibeTheme.txt": {
+      "source": "upstream",
+      "sha256": "ee99b65a054fe0ae7300c825155bb51787b01c72ac7051386a2e61d5e5ffe4de"
+    },
+    "TVStxt/dreamtool.txt": {
+      "source": "upstream",
+      "sha256": "544bb9d4ca57debbe4f14bb74901d73d9ccf60b226c937eb8d9e2886ca8164b7"
+    },
+    "TVStxt/dreamtool.txt.example": {
+      "source": "upstream",
+      "sha256": "c55266e13c10e9a917eafc61dd76e988d6730b9a9ffcee13f92b1a442bb32764"
+    },
+    "TVStxt/filetool.txt": {
+      "source": "upstream",
+      "sha256": "c248b6e8607ab66cbe1c7c170c8917ed581223aea719b23a0b12820905a45d3d"
+    },
+    "TVStxt/filetool.txt.example": {
+      "source": "upstream",
+      "sha256": "90c21e8a3d83ed676268cfa641bdc71ee22529f4ee5cac43730a7a2e619403fd"
+    },
+    "TVStxt/supertool.txt": {
+      "source": "upstream",
+      "sha256": "6595e8283c56725a73ec625a0a8c9274c7403472a47e9e67b142721685144f2e"
+    },
+    "TVStxt/supertool.txt.example": {
+      "source": "upstream",
+      "sha256": "709ccd9519393ffd9d17741f195d557b8163bbe681afd56f7925d22ffa84c8a8"
+    },
+    "TVStxt/toollite.txt": {
+      "source": "upstream",
+      "sha256": "29035a120988b01810b6ddcd4acc37fbcec410a36233e727242865cc748f05cc"
+    },
+    "TagMemoEngine.js": {
+      "source": "candidate",
+      "sha256": "3ca9f5e1d710a4929bb115736e83d364456ba851aff73118901ec617c4e955e5"
+    },
+    "TagMemoV10Engine.js": {
+      "source": "candidate",
+      "sha256": "ec8b9b308ac9b57e3a707167037feee52b5f4638c1ed5272c9827607adf5cf03"
+    },
+    "TextChunker.js": {
+      "source": "candidate",
+      "sha256": "6cf674a082cda3cbab3d9fb2ee4c641203371ea62ff1f2e428cf0677430da246"
+    },
+    "ToolConfigs/dynamic_tool_bridge.config.json": {
+      "source": "upstream",
+      "sha256": "d78c21de556c2724bf15b5df21bd0d2249331c3f0c0dffa9878f019f8a940e1c"
+    },
+    "ToolConfigs/jev_third_party_catalog.json": {
+      "source": "candidate",
+      "sha256": "f540be4044377bd5e01f71ce49af0e9da221ce121787bd45f0b8bb5db9680927"
+    },
+    "ToolConfigs/jev_tool_call_exp.json": {
+      "source": "candidate",
+      "sha256": "a584c3d753285c828197eccdf0adbae9f66f65e14e91476ca14eea78969c30a8"
+    },
+    "WebSocketServer.js": {
+      "source": "candidate",
+      "sha256": "208b07470ed449c14eecdbf91c97baa64a7461adb64338e80c60b56b82894532"
+    },
+    "WorkerPool.js": {
+      "source": "candidate",
+      "sha256": "89d99a6439c93ae81379bd540fd887da220fb180637dd4015b8387a9c443bf66"
+    },
+    "adminServer.js": {
+      "source": "candidate",
+      "sha256": "20744915f7b9d3f3d253c8fbeeb97f7a17525fa7ad73de786ae1744dc3952f68"
+    },
+    "agent_map.json.example": {
+      "source": "upstream",
+      "sha256": "66c13bfc613f1db94a162de852b297b329f722342d19c97db25d4c477f97672a"
+    },
+    "config.env.example": {
+      "source": "upstream",
+      "sha256": "0e80fc0f852e70794198150df0f518130cb01b2381d196b395f8fe1b4fb636bd"
+    },
+    "config/tool-call-records.config.json": {
+      "source": "upstream",
+      "sha256": "4c766060c720d75969a22873f362684250422a745a9049fc648b42568a6f0c3d"
+    },
+    "ecosystem.config.js": {
+      "source": "candidate",
+      "sha256": "646d0a41bf557097bbca541ed9c9985c86bb6e90dbc03020b9c3b60401a72d6a"
+    },
+    "modelRedirectHandler.js": {
+      "source": "candidate",
+      "sha256": "597d6bc2323a1f4023d1ff7a025fe4cf54ffb6df8a31eae495693202516850d6"
+    },
+    "modules/LogMonitor/index.js": {
+      "source": "candidate",
+      "sha256": "da03f9b8530d4e90a74ba4275d5aa5556426f5fe82a122198676e4b8f8148b29"
+    },
+    "modules/LogMonitor/proxy.js": {
+      "source": "candidate",
+      "sha256": "b99f1baa89525f30cabb9fa9ba02c80eb35e6d2d7821b1dff87b1bcff56a5de4"
+    },
+    "modules/SSHManager/SSHManager.js": {
+      "source": "candidate",
+      "sha256": "9af17639379b4040514faf2c81d6b4cec807324456923daa1821b61347c2b57c"
+    },
+    "modules/SSHManager/index.js": {
+      "source": "candidate",
+      "sha256": "3ae61fb2d120effecbe65bf964a9e89445888ccb60728d380172d55b16f74ccb"
+    },
+    "modules/SSHManager/proxy.js": {
+      "source": "candidate",
+      "sha256": "2c909480256db50c2c22b7ebc88af238fc8076773cb55b3a3435965e8751b5b3"
+    },
+    "modules/agentManager.js": {
+      "source": "candidate",
+      "sha256": "6a5ebd7d1eaa82b40a9f8c89c2784504bdd8bcd3fe79ff572ba4c78a21bec540"
+    },
+    "modules/approvalReceiptAuthority.js": {
+      "source": "candidate",
+      "sha256": "e8da0d28bd1cc8826148ec1c4bde1a2d77e1abf00a2bbf136c60f86b5d7ff06e"
+    },
+    "modules/associativeDiscovery.js": {
+      "source": "candidate",
+      "sha256": "48f6be3937aa69f03989edae9d19c73b82a05fd29258a563f67f55a062ccb3e3"
+    },
+    "modules/asyncResultStore.js": {
+      "source": "upstream",
+      "sha256": "2d6691474577b7c011c56f2b6fb4e894f0c06f811597a68156d873534c652ee9"
+    },
+    "modules/boundedResponseBody.cjs": {
+      "source": "candidate",
+      "sha256": "54e98b7e725b4befb22e0f7c65d400f013e27b0187c52b47203dd3ed96f9d81e"
+    },
+    "modules/browserRuntimeManager.js": {
+      "source": "candidate",
+      "sha256": "fb68540cd4e0e440813455c53df70f6085570698c750dd3f7d480bf06e0be406"
+    },
+    "modules/captchaDecoder.js": {
+      "source": "candidate",
+      "sha256": "a05a57a53de945f62aef0202af4337964d72d4c1554c4f2b7cf2eaf22ed1c769"
+    },
+    "modules/chatCompletionHandler.js": {
+      "source": "candidate",
+      "sha256": "430214198ce02ef2d395edcf5e6d79232b994a13516dffc8cece0d46d7ce5af6"
+    },
+    "modules/contextManager.js": {
+      "source": "candidate",
+      "sha256": "53cdc1ff522a03ea2f14c519bd91a7cf177b870aefe2b12b39ee801354db612e"
+    },
+    "modules/distributedMusicDiarySync.js": {
+      "source": "candidate",
+      "sha256": "81240749135b39827568b77f7a36d02768e3f36ef70e77947c03432cc735fd5a"
+    },
+    "modules/dotenvPatch.js": {
+      "source": "candidate",
+      "sha256": "92db1263130745cc974c0148f59d821516166ac4ff5d1453338c4294999efa82"
+    },
+    "modules/dynamicToolRegistry.js": {
+      "source": "candidate",
+      "sha256": "4513f5b7ff9c4294dfb2536043b3d64c140a9ce4ab6ead5a4ff924428c839272"
+    },
+    "modules/dynamicToolSemantics.js": {
+      "source": "upstream",
+      "sha256": "2ba12f6787cfc1e0a991794e703ad3c09b87e39c4bf8157fd4ffcdf964b48770"
+    },
+    "modules/externalPluginAllowPolicy.js": {
+      "source": "candidate",
+      "sha256": "e8d7dcef3387acb660c8a9401d17092c5cc6d2c1cd14dc3e71f51e9441e2d5d9"
+    },
+    "modules/externalPluginHostConfig.js": {
+      "source": "candidate",
+      "sha256": "bd183da88a1e814f7f0ab5711f66835810cd15777dd79a91575b347bbe7f64bb"
+    },
+    "modules/externalPluginSafetyGate.js": {
+      "source": "candidate",
+      "sha256": "1bf281b1bbe5c53a17693a88a626aace053145e5aedbe013d02cc4b6ec79ac85"
+    },
+    "modules/finalContextStore.js": {
+      "source": "candidate",
+      "sha256": "c398fe2801ddc9bee92adcdc85bd35140cccae1cf6a73b9234525ca4ff06eee2"
+    },
+    "modules/foldProtocol.js": {
+      "source": "candidate",
+      "sha256": "033e95fd8ef2a7141a440cee5bc7cd0f24931e253680784e7f0e3291d6a5fce6"
+    },
+    "modules/handlers/interactionCompletion.js": {
+      "source": "candidate",
+      "sha256": "cb92081200bda5ff77b1d33017b61cdb8fccd86bb85b80f03a03ce08fe493f63"
+    },
+    "modules/handlers/nonStreamHandler.js": {
+      "source": "candidate",
+      "sha256": "200540207a903bb0e7dc342eba36edb271619df7304eb5f433b7d62353a1cc56"
+    },
+    "modules/handlers/streamHandler.js": {
+      "source": "candidate",
+      "sha256": "3a599eeb82699bcfe7297cec547eeda442ebeac0a49c5bc3ff8765bc97f57692"
+    },
+    "modules/humanClientAdmission.js": {
+      "source": "candidate",
+      "sha256": "918b2f16dc2b4734378a93f1916d54f90cb29770294d68eac9b6fb40c1c0e9ec"
+    },
+    "modules/humanClientAdmissionCrypto.js": {
+      "source": "candidate",
+      "sha256": "b0bc6d5051a6c2184ceba1ec79b2df89aff3362ba2350d5202485d7fcfbfe2d4"
+    },
+    "modules/jevCallEnvelope.js": {
+      "source": "candidate",
+      "sha256": "a1e1fddb09c95ee33feb242b6908e65b4aa6481d1e5d4ce16e12446ff7ddf6e4"
+    },
+    "modules/jevClient.js": {
+      "source": "candidate",
+      "sha256": "95f957468c976bc305ba45488a93388655e822deb68c9c28a7f62803537133c9"
+    },
+    "modules/jevContextPruner.js": {
+      "source": "candidate",
+      "sha256": "6b82e289f7de08770e9ba71a93a84d8d8e0149de15bb4db93bf24b1ca4d535e0"
+    },
+    "modules/jevFoldFilter.js": {
+      "source": "candidate",
+      "sha256": "a89f99b8c8bf197937004e2e0483e1d4bf8143b2387c6e0c0030386e44cb84fa"
+    },
+    "modules/jevRiverReranker.js": {
+      "source": "candidate",
+      "sha256": "210b821c0f653edbdc9cb090629bc4fe2957c1d40cec99f42fd52d16e08c617c"
+    },
+    "modules/jevScorer.js": {
+      "source": "candidate",
+      "sha256": "3ea46a1ddaf21fb415704693c9e36f99b04d52b56fb3e647e929fe5ee9dbcee8"
+    },
+    "modules/jevThirdPartyDecision.js": {
+      "source": "candidate",
+      "sha256": "fb767d3298192975151501450156d823bdcc794bbb583cdcf979bba8c7e5821c"
+    },
+    "modules/jevThirdPartyRegistry.js": {
+      "source": "candidate",
+      "sha256": "437286ca82a3ca270861f1e3b55c22739f14ad766b4b368398821fbcd4c08de6"
+    },
+    "modules/jevToolCallExp.js": {
+      "source": "candidate",
+      "sha256": "5f18cd1d09627ad4cd2c5ed4f466458a20060a4573593b6b50671434a26bb237"
+    },
+    "modules/knowledgeBase/databaseCoordinator.js": {
+      "source": "candidate",
+      "sha256": "d0b9a694190ccc764586a60ca8a4c428c10f562cd3c43284e3bfdf076e1260b3"
+    },
+    "modules/knowledgeBase/diaryMetadataCache.js": {
+      "source": "candidate",
+      "sha256": "c4186cbd8c8f50935643d9c94c65a1df5b8d4a96440665f0f9f093d069b208c2"
+    },
+    "modules/knowledgeBase/fileWatcher.js": {
+      "source": "candidate",
+      "sha256": "1a5a7c23b34f700a10140cb112bbc4dc416999a5e5ebe68db14fdb87fe0a363e"
+    },
+    "modules/knowledgeBase/indexRepository.js": {
+      "source": "candidate",
+      "sha256": "a4565a754ce5b919ebb5c24a148b46aeeb9f72ec694f945e9a0b37200913273c"
+    },
+    "modules/knowledgeBase/ingestionPipeline.js": {
+      "source": "candidate",
+      "sha256": "d188374e90a73bf4fdef08a010b6bdb7636a7c541667e46d6762788186c6462f"
+    },
+    "modules/knowledgeBase/lightMemoAdmission.js": {
+      "source": "upstream",
+      "sha256": "441041de1b2a4a765049f614dae4efe229c8be3e608992d7b1f3d4d9a852867b"
+    },
+    "modules/knowledgeBase/memoConfig.js": {
+      "source": "candidate",
+      "sha256": "781932eaffedb49ebf5dcc77edbaeee27ac2d3ed79b060dc4bd04b48a13bae99"
+    },
+    "modules/knowledgeBase/memoryProfiler.js": {
+      "source": "candidate",
+      "sha256": "e4532b92c99eea137d8c65e5f4753dbab19fa0dd128af7787808a7e500a999e4"
+    },
+    "modules/knowledgeBase/searchService.js": {
+      "source": "candidate",
+      "sha256": "f8c8242f84f16b9886550e696eccfda6b2f2e1932e3e102ea2415c91b6f9f2d1"
+    },
+    "modules/knowledgeBase/tagConsistencyService.js": {
+      "source": "candidate",
+      "sha256": "c7d5ceed83754b090f3775b6c70486c9f0fd0d39e9bec05262e57431dd950045"
+    },
+    "modules/knowledgeBase/textPreprocessor.js": {
+      "source": "candidate",
+      "sha256": "636ec86f7da436cd93cbfc2dea8376f8674f1065b674ae5bd5b16fbc44e2ee98"
+    },
+    "modules/knowledgeBase/vectorCodec.js": {
+      "source": "candidate",
+      "sha256": "9863a8a2710d927bf0a159f95f67dec2406ff1999262a771d80eedc1c422b3a2"
+    },
+    "modules/lightMemoCompatibility.js": {
+      "source": "candidate",
+      "sha256": "919c1a008c9f3a5a94a61dae7792fe55b5e2f99ca585b2b70642a7310489f62b"
+    },
+    "modules/localListenOptions.js": {
+      "source": "candidate",
+      "sha256": "faf791aa04d6de4cd032854509dbbb2bc902c0a2417519551592735af7267814"
+    },
+    "modules/logger.js": {
+      "source": "candidate",
+      "sha256": "d03a706babd8bd09cf03128c14018c587ffe59fbb12693c829f581fb206992b8"
+    },
+    "modules/markdownDataImageGuard.js": {
+      "source": "upstream",
+      "sha256": "c2e071819d18e4de4ca8e2093ec592d8d11688f982c8b8ed2192c0289bfa2101"
+    },
+    "modules/messageProcessor.js": {
+      "source": "candidate",
+      "sha256": "f67e63c7ac24798b612bd5490531086e687d16d0a2998634bddd9ed3ddccf011"
+    },
+    "modules/multiModalConfigStore.js": {
+      "source": "candidate",
+      "sha256": "d18c77fb1c873f34c23b44f020517d7ce56449e58e0ddf8eb3e8fc84290731d0"
+    },
+    "modules/nativeContinuationStore.cjs": {
+      "source": "candidate",
+      "sha256": "7fc167f26565cf1c4e76caf3ad804042a7a3f0ad85959ead8ce3f091b725dbe0"
+    },
+    "modules/nativeConversationTransport.js": {
+      "source": "candidate",
+      "sha256": "39add96d9dfd6c7fece63ee953aeb2add6575060df003a4adb4abf840a98677d"
+    },
+    "modules/nativeConversationWebSocket.js": {
+      "source": "candidate",
+      "sha256": "17b4ee144adc793148fd4dd3eb33628c006616aded16202afa45e6e8e228972b"
+    },
+    "modules/nativeManifestAuthority.js": {
+      "source": "candidate",
+      "sha256": "8a718249fe364e3c1412cad0320fe42040b365e6c6a7335bde8ad05fbc421752"
+    },
+    "modules/nativeToolIsolation.js": {
+      "source": "upstream",
+      "sha256": "a0b921917f7f1fc835964cf8e35f38a5fda79348e2b0690c16d2bc143ad06ce1"
+    },
+    "modules/pluginBridgeRegistry.js": {
+      "source": "candidate",
+      "sha256": "c135a4ae59741a02cdf07653b7112f7932693f10600f6d4dac76e28a72d4d825"
+    },
+    "modules/pluginRootResolver.js": {
+      "source": "candidate",
+      "sha256": "5fd48e194b36b0fd4fa8876d164c3b99ae50a8c2cad70fad468ac74139258cdc"
+    },
+    "modules/pluginRuntimeEnvSandbox.js": {
+      "source": "candidate",
+      "sha256": "c0adf2c55c7bfa9c6d0fcbd9b0e68a7496d64073d815398ff434ab8a7313ef1c"
+    },
+    "modules/reasoningContentAdapter.js": {
+      "source": "candidate",
+      "sha256": "b6ce41d9762bbcea373028f7d83da2fcd6d0e230dad977c92b798f81f4dbb31e"
+    },
+    "modules/requestExecutionContext.js": {
+      "source": "candidate",
+      "sha256": "2a60d7ad51489741f4ceb3113a5d512afa0c6a527e8e482e49142c98962fe482"
+    },
+    "modules/roleDivider.js": {
+      "source": "candidate",
+      "sha256": "713e77de3cfc5e28a79f09326c9da200633909705cfd352ee7cf1899c4f7aafb"
+    },
+    "modules/safeFilePath.js": {
+      "source": "candidate",
+      "sha256": "5604eeb045184768129a65b2d6b6b665a49f00fcd8b94bdd466b3d5d3bf9c669"
+    },
+    "modules/safeZipExtractor.js": {
+      "source": "candidate",
+      "sha256": "47b5086156c351596d3f29934776ba3c5b862346f9fcf7897d787315f8ff8dca"
+    },
+    "modules/sarPromptManager.js": {
+      "source": "candidate",
+      "sha256": "204c2ff79d661de970b7f57637dedc28ed95005eedc8fa3a0684fe446c56b83d"
+    },
+    "modules/semanticModelRouter.js": {
+      "source": "candidate",
+      "sha256": "5e3b82b6e7e3fe6b8559b46db262265c495fc4987855917a7a994af941235c7a"
+    },
+    "modules/sensitiveEnv.js": {
+      "source": "candidate",
+      "sha256": "40f91ad2d2a88586596812c4e23b5daff9e88780ee135efa0bb39992d9a525e0"
+    },
+    "modules/tagmemoV10/immutable.js": {
+      "source": "candidate",
+      "sha256": "c487a0351ae3d745687d00d0101b905b206dc9bbd32957ce9f00d8d6b117dcdb"
+    },
+    "modules/tagmemoV10/riverObservability.js": {
+      "source": "candidate",
+      "sha256": "6a3f01b8adcf28782485e9f5f9231e92c5365be3a899033d4e36cc7337c9cc65"
+    },
+    "modules/toolApprovalManager.js": {
+      "source": "candidate",
+      "sha256": "7decbaea5fc8d981e74da50e59e7053fa7d7c22603fa2192d77e154271f05d53"
+    },
+    "modules/toolCallRecordInternalFilter.js": {
+      "source": "candidate",
+      "sha256": "8cd0d74e00ecd54e5830cce587576a71aa9e6d3776029e092450096a3e6bd7d0"
+    },
+    "modules/toolCallRecordStore.js": {
+      "source": "candidate",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    "modules/toolLifecycleVcpInfo.js": {
+      "source": "candidate",
+      "sha256": "78cd26167d9382893b7a1525fdb9c0a0e5a6d9928e652d173b1b5e937b198ca1"
+    },
+    "modules/toolResultBatch.js": {
+      "source": "candidate",
+      "sha256": "70fb62ee19d21e072ce4329e7970d695c27ec750e99c896b1199ee2f2534e35f"
+    },
+    "modules/toolResultPrivacyGuard.js": {
+      "source": "candidate",
+      "sha256": "0929a4b3c59176a2745efc16ca1bc408ed62bb1cf563dd242b086efcfeacd53a"
+    },
+    "modules/toolboxManager.js": {
+      "source": "candidate",
+      "sha256": "9f259f5ffeb5d8c2a50e2cf53c0e97fae3630c134e313982db67b40c5f0603a1"
+    },
+    "modules/trustedClientAuthorityStore.js": {
+      "source": "candidate",
+      "sha256": "c70ab89344a1577a3648a31dced343c68a985a1c30383887c3d3f83310ce4251"
+    },
+    "modules/trustedClientImplementationProfile.js": {
+      "source": "candidate",
+      "sha256": "0c4fcc660a8e5ca44e482dea9e44714f7545d19630342865b72b9dee8b797fb9"
+    },
+    "modules/tvsManager.js": {
+      "source": "candidate",
+      "sha256": "3102b326bc37699f2fda74e9179cde0d983a0bc8eb901a5ffada7cee19043cdf"
+    },
+    "modules/vcpLogReplayManager.js": {
+      "source": "candidate",
+      "sha256": "f26554542e8146888301aa43ed9f6ec92fb2981b3b6c9ceb69e905f6b673cf7a"
+    },
+    "modules/vcpLoop/handoffGate.js": {
+      "source": "upstream",
+      "sha256": "c4f84d119d2bfc4ffa1938a5dd14f2fca38a9d2b2d72efaf4f6f693dc15f1db1"
+    },
+    "modules/vcpLoop/residentPresentation.js": {
+      "source": "candidate",
+      "sha256": "9c70dfa0920fec49e031b4b9dbb338f4e6f2b590e88054ac4731ed7f27a80870"
+    },
+    "modules/vcpLoop/toolCallParser.js": {
+      "source": "candidate",
+      "sha256": "f2e827b2ca753355b8d1bb31ab81bd32016b06628a33c54b040086cdb4f4c945"
+    },
+    "modules/vcpLoop/toolExecutor.js": {
+      "source": "candidate",
+      "sha256": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f"
+    },
+    "modules/vcpLoop/toolMarkerFuzzyMatcher.js": {
+      "source": "candidate",
+      "sha256": "8244638b1c33ad57cc0272b615dc1ea3cdbe0b16f4ab3f32b644edcd80feacef"
+    },
+    "multimodal-config.json.example": {
+      "source": "upstream",
+      "sha256": "3c88821e2e22555d2c618cd591e46a168265c5c7c59922e35ab42b84f8079f5c"
+    },
+    "normalize-plugin-examples.js": {
+      "source": "candidate",
+      "sha256": "73882e88291ec2f62a57cb4fc06990e6027dc8e448f0e2f4f62b05c0c54d84c1"
+    },
+    "package-lock.json": {
+      "source": "monorepo-adapted-upstream",
+      "sha256": "bff93d5630e43b7013007dfc8f5ada2ef5f096e2e9be90c7ec9b64ebf57a2917"
+    },
+    "package.json": {
+      "source": "candidate",
+      "sha256": "63831e161477b3c44a9db10703d53fefc7b3925129a7a3ce1315634c064a540d"
+    },
+    "pluginStoreSources.json": {
+      "source": "upstream",
+      "sha256": "4a2d96daf96397e1598724d7efca814b71d6dfdd4c3d72ee690c99de9e13d4b8"
+    },
+    "preprocessor_order.json": {
+      "source": "upstream",
+      "sha256": "c446fca566d625a566af1fcf6f022522ef7e7510bcd0cefe19749942e485b981"
+    },
+    "rag_params.json": {
+      "source": "upstream",
+      "sha256": "90414d7d3ad38634b499d64814c9671c746e2f5d4615cb83833490802d3a30de"
+    },
+    "reset_vectordb.js": {
+      "source": "candidate",
+      "sha256": "e76085579b7598bcb5ca4e27b5edc85e69127da6cc3854c004bd50948cd68e6a"
+    },
+    "routes/admin/agentAssistant.js": {
+      "source": "upstream",
+      "sha256": "ed59f9ffbe9acfd637453bbb32db8998471997ad69d0412888ff7e3bd07d0bae"
+    },
+    "routes/admin/agents.js": {
+      "source": "upstream",
+      "sha256": "22ee4e658beb718e19bbafd44d4c240386ec4f3e102cd9c4952b866a9f833423"
+    },
+    "routes/admin/aiChat.js": {
+      "source": "upstream",
+      "sha256": "c3866f6fa374351f2df51471968eddc0e8a74c5f6a3afb92e4b3e2de6dd788a9"
+    },
+    "routes/admin/bridgeProfiles.js": {
+      "source": "upstream",
+      "sha256": "8f393d41d9ac4b44b10b64b11827f9e10d8c59c7ae0e907737855ab45a544e7d"
+    },
+    "routes/admin/cache.js": {
+      "source": "upstream",
+      "sha256": "d893df120322a420ec17a6040616aefb7d34f88a0142131a53169e70ea6b8472"
+    },
+    "routes/admin/clawMail.js": {
+      "source": "upstream",
+      "sha256": "f95bda11b46a4bb7aef52dbb3a7a37fa3c7403b35a35aa057ef212593749e380"
+    },
+    "routes/admin/config.js": {
+      "source": "upstream",
+      "sha256": "0a784d9c9f7edcceeb0c7d504bd2027b8dc5fffc2dd9d50e1d085a73f1e8b219"
+    },
+    "routes/admin/dailyNotes.js": {
+      "source": "upstream",
+      "sha256": "2c74e594ac2d1962ee3c7c3570bf4e895f08cac5ae632c2645fba78b8b3bbe39"
+    },
+    "routes/admin/dream.js": {
+      "source": "upstream",
+      "sha256": "e592602597f4b4808791fabe17e1bf30c66b0e8e377bd222182fd53bd64cd558"
+    },
+    "routes/admin/dynamicTools.js": {
+      "source": "upstream",
+      "sha256": "6e84f516baf44ab7fa817f58ca3e5466513af83f8c399aaa429a5dab3c5c2fe9"
+    },
+    "routes/admin/emojis.js": {
+      "source": "upstream",
+      "sha256": "a8b1dd9e08d6634f790f29d16b4797733373ed8891dc9f586160eae7de2af92f"
+    },
+    "routes/admin/finalContext.js": {
+      "source": "upstream",
+      "sha256": "b7c44e2f5eae7fd9ccbfc441843d816aaa3c51f4e96d32c35fc105bc787fada6"
+    },
+    "routes/admin/jevRegistry.js": {
+      "source": "upstream",
+      "sha256": "a298c12eb5f300e4f86040da8e24b79899fe945087fa03abbbbcc2df46bcd982"
+    },
+    "routes/admin/lib/dashboardCards.js": {
+      "source": "upstream",
+      "sha256": "905debcb0ee1a57668aa1a94c155acd7415e5c8f7c3dce42668bc0ba2b2ced8a"
+    },
+    "routes/admin/logs.js": {
+      "source": "upstream",
+      "sha256": "dea03fdbf07fcecef352596c2825faa1a729ea5d04317737de87bf5e9fcbf631"
+    },
+    "routes/admin/multimodalConfig.js": {
+      "source": "upstream",
+      "sha256": "7a080d5d2465f47b6f9610a53cf022ef1a8d891b2ba6e974e5ebcf3d53b59b3c"
+    },
+    "routes/admin/newapiMonitor.js": {
+      "source": "upstream",
+      "sha256": "552585835af103a06ac843ea4f01571cd1f42e7625d612242d238df56a5012f1"
+    },
+    "routes/admin/openHerPersona.js": {
+      "source": "upstream",
+      "sha256": "77175c6895e8bd1be9a51f756c12dffa7b00a43786e2feed584d5cd2a977d22e"
+    },
+    "routes/admin/placeholderExplorer.js": {
+      "source": "upstream",
+      "sha256": "9927e076181c2468e6ce1369c2f6df47b0f439e8c32397b887ca50673684fd08"
+    },
+    "routes/admin/placeholders.js": {
+      "source": "upstream",
+      "sha256": "d37674749996e09e213eef1bfbafc8f0f0dc7200377a65a187e85e70f75c17af"
+    },
+    "routes/admin/pluginStore.js": {
+      "source": "upstream",
+      "sha256": "0c2410b0feb7bb792d79a49fa9ca973d4d1228d7dff2f0725edd5dcda03115ae"
+    },
+    "routes/admin/plugins.js": {
+      "source": "upstream",
+      "sha256": "e71ea862b7e8a4f0ce221a5deb1d86351132bc953456a07efa0defb1dbae7c70"
+    },
+    "routes/admin/rag.js": {
+      "source": "upstream",
+      "sha256": "ec694dacdc6d6c97d0b618b45a9753e06540ad2e7149e5e56e5b308a3084d4f7"
+    },
+    "routes/admin/sarPrompts.js": {
+      "source": "upstream",
+      "sha256": "cf193c625def450adbb12edaaa86d4faa567e1d27ca3b641a3a450dc93a63083"
+    },
+    "routes/admin/schedules.js": {
+      "source": "upstream",
+      "sha256": "3d8dc34e09369c6b20fb5501aa8d94f90e9411d505f434bfec257d993828452a"
+    },
+    "routes/admin/semanticRouter.js": {
+      "source": "upstream",
+      "sha256": "24353a82261cfd703d12955ce57b7ade23cfc93d0418eea514c165b5294baa01"
+    },
+    "routes/admin/server.js": {
+      "source": "upstream",
+      "sha256": "845154cc329f3a3d8f83bdf368d995306fe97560c2b4f4423dbedfd24c2f42ac"
+    },
+    "routes/admin/system.js": {
+      "source": "upstream",
+      "sha256": "3b4a8d7d7acc49d3c35a17cc30e566f90376bfd382dd36fbcf65308d4afaee0b"
+    },
+    "routes/admin/tarotDivination.js": {
+      "source": "upstream",
+      "sha256": "8b47cee054c4c307c7fb7438ecff3924d38d3c1441db911b95a4552b7f2b6d96"
+    },
+    "routes/admin/taskAssistant.js": {
+      "source": "upstream",
+      "sha256": "168db585460687c8a95eb82a96657d7146fe8070909e8a4839a0b8cb1f1536a3"
+    },
+    "routes/admin/toolCallRecords.js": {
+      "source": "upstream",
+      "sha256": "8db87e8aea944fca94d043d0d683ebbddccc12d59a6e5ee86b2fe83931308748"
+    },
+    "routes/admin/toolListEditor.js": {
+      "source": "upstream",
+      "sha256": "cfa8bb77c87d66a3947265019e5ee988f921299f1d1bbe1eacc0cf539ec9d13c"
+    },
+    "routes/admin/toolbox.js": {
+      "source": "upstream",
+      "sha256": "1c8b886dade902597bf4e9697587db48b8614b4bcb0448a87a4c77086121cfb2"
+    },
+    "routes/admin/tvs.js": {
+      "source": "upstream",
+      "sha256": "484d28a9f1b6fd54f10fb88b6326c8b385e8f6cf506c4c266785d9fb523c3cc8"
+    },
+    "routes/adminPanelRoutes.js": {
+      "source": "upstream",
+      "sha256": "54df73af67d983a5aec71b0a14e85c502c262b62fae5ca71eee492a42a0b2929"
+    },
+    "routes/dailyNotesRoutes.js": {
+      "source": "upstream",
+      "sha256": "04c3ae9597ffb9d269fb2f6b1c08f0e4d638df5a57ffa9b8c4446cf0a5282474"
+    },
+    "routes/forumApi.js": {
+      "source": "upstream",
+      "sha256": "5937eafef64cd89e08098021d917e9f4a78a2a8c4e354d1544673a49c4672f17"
+    },
+    "routes/protocolBridge.js": {
+      "source": "upstream",
+      "sha256": "24751621e32bff1b9e10b10fec91ef0379b9ec0d2c57b82cf8402b8c97107141"
+    },
+    "routes/searchWorker.js": {
+      "source": "upstream",
+      "sha256": "9d89a3da637751c879821464d3292f85e2921c1bdd8b06da17e88419afb37c1e"
+    },
+    "routes/specialModelRouter.js": {
+      "source": "upstream",
+      "sha256": "a2e398f25ba6cc498054942fe9fa98bfbfdf7d820d3720624afbd74fff6f54d6"
+    },
+    "routes/taskScheduler.js": {
+      "source": "upstream",
+      "sha256": "b2be4e645bea70c09223cac109ae567fdd0796e1ec8321599131660374df34f2"
+    },
+    "rust-toolchain.toml": {
+      "source": "upstream",
+      "sha256": "5431b3fa486569248f3b82c80cc6a4a3750375a40fe87c68f0340650ac1e0aea"
+    },
+    "rust-vexus-lite/.gitignore": {
+      "source": "monorepo-adapted-upstream",
+      "sha256": "369d145f6ba7ecea7631797ace0d9610633a142938d6903fe31de0753508ea12"
+    },
+    "rust-vexus-lite/Cargo.lock": {
+      "source": "upstream",
+      "sha256": "fbff6f66207af64d658d3e63d712be9528d0ee4fc64b3a7fc9aebd8085f24987"
+    },
+    "rust-vexus-lite/Cargo.toml": {
+      "source": "upstream",
+      "sha256": "adabb9db5ea0eb954b9bd8370c06ff3e2a7d59a42ba4c662f14cf97e09300f81"
+    },
+    "rust-vexus-lite/README.md": {
+      "source": "upstream",
+      "sha256": "cce0c760122eca6d82cde8f761fdc778add104eb20af32685efd76b6e22cf6d2"
+    },
+    "rust-vexus-lite/benchmarks/sm-search/.gitignore": {
+      "source": "upstream",
+      "sha256": "306fd52e74fca6746e12acc750f232de15e71da917756a1270d74c91f5eb7368"
+    },
+    "rust-vexus-lite/benchmarks/sm-search/Cargo.toml": {
+      "source": "upstream",
+      "sha256": "47a9547bcfa536a67b8f0580b976accccc2b4fc3ea97756f39617145ea73ac7c"
+    },
+    "rust-vexus-lite/benchmarks/sm-search/results-summary.json": {
+      "source": "upstream",
+      "sha256": "c9fd09a8a09d2caf86c71e0057aa5de28fc3a4494d9868cdd674d1f943f5a1f3"
+    },
+    "rust-vexus-lite/benchmarks/sm-search/src/main.rs": {
+      "source": "upstream",
+      "sha256": "801e0f5bfce6338c182140cb24959662271c958d9aed1b48d2fdc4b34cbb0b20"
+    },
+    "rust-vexus-lite/build.rs": {
+      "source": "upstream",
+      "sha256": "aa7d2ac01ee024deb2df8891a498123bb7c15d9303fb767f6085a9aac92f0d4f"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/Cargo.toml": {
+      "source": "upstream",
+      "sha256": "e78c229e1fd60c9cbdbc03ffd1fef3debb132322625914ae59879e259ecd002e"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/LICENSE": {
+      "source": "upstream",
+      "sha256": "196938a3320db5dbcf16db4f3adbeedc804117afd77ef1647b971678f305e1ce"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/asset.rs": {
+      "source": "upstream",
+      "sha256": "b2ee434156ec1b1b5e9690435e7004dc7cae7920fa5f57881d93abf3c307f51e"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/asset_tests.rs": {
+      "source": "upstream",
+      "sha256": "017c74863db742ad01aa265b8764f48b30eed19f9eddf600f802563afdac72a9"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/engine.rs": {
+      "source": "upstream",
+      "sha256": "7920bcd5f2286015ff46e167555db565b5efed949bbed6bc80c1e8685afdf233"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/engine_tests.rs": {
+      "source": "upstream",
+      "sha256": "e6827a614a9e996ced278aa34878d0108c422bf87839927d0b4c1ee4ed8f21f6"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/bq.rs": {
+      "source": "upstream",
+      "sha256": "9fa69bf032c5c2948bfa2f8f6963c885f809a46c9cd12d825c12e2807a518b9a"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver.rs": {
+      "source": "upstream",
+      "sha256": "03cf894576341ee7ce73de8128658b33498a5b48a7fe51a84789ea18c8b001c3"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/asymmetric.rs": {
+      "source": "upstream",
+      "sha256": "24929185a08507456636601791e13080ff94ce84f1a15be8abd4b5655366d1a2"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/corrected_sm.rs": {
+      "source": "upstream",
+      "sha256": "2e03f43862cd26dc4b1e3a9db593839ca71703e450875b78333dac77cff896e5"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/corrected_sm/build.rs": {
+      "source": "upstream",
+      "sha256": "e4bd0a4975ed65a64c889582e8e772c75435260bf12e6e628e4ef0b235476161"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/corrected_sm/dynamic.rs": {
+      "source": "upstream",
+      "sha256": "8787dbc6ca4b7733414fc0b31f83c8d482973395b7559a59839372cfc3b2df98"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/corrected_sm/dynamic_search.rs": {
+      "source": "upstream",
+      "sha256": "05ab2b4c51e0cc352154e4dcac3301ebc97204ec7aba59cffdc92aecfdb23b18"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/corrected_sm/dynamic_tests.rs": {
+      "source": "upstream",
+      "sha256": "079812377693ab775b2f58c971cd24cd3e41b87733b42ebcfe7089fea63aa613"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/corrected_sm/filter_tests.rs": {
+      "source": "upstream",
+      "sha256": "f007283061874a74ff67d031376c6943302896de90b1bae6144fae04d6e45919"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/corrected_sm/flat.rs": {
+      "source": "upstream",
+      "sha256": "361f9089e046d68876da9ac07658aebdbd372552fa06608e682777e6423ee256"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/corrected_sm/l2_tests.rs": {
+      "source": "upstream",
+      "sha256": "9edca391ab02fdc8f1a3e1da258e481f482c3726d6efbb5101487bfbc8112b7e"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/corrected_sm/native_l2_tests.rs": {
+      "source": "upstream",
+      "sha256": "59b5d005a35bc5aabbceb0ef551db978b0496824cb3140326dc96685468db3d9"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/corrected_sm/production.rs": {
+      "source": "upstream",
+      "sha256": "546a36517dbf20b9f9fbef718634d86e60a6c576d2a1ef309d5e3d22e4650f23"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/corrected_sm/production_tests.rs": {
+      "source": "upstream",
+      "sha256": "e1b46d9fb1a7a9942babd39edd7c467d20687cac62e4b178de62b116a468bfa2"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/corrected_sm/routing_snapshot.rs": {
+      "source": "upstream",
+      "sha256": "739bd96db098a0130c5b3a07d2e92f432bd1f2c8e0560142b0cc956b682e9512"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/hyperbolic/beam.rs": {
+      "source": "upstream",
+      "sha256": "94cffed918f604d5d100713e8f84a6c28f161632fd4db2fb91a12132c8f76660"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/hyperbolic/beam_tests.rs": {
+      "source": "upstream",
+      "sha256": "a9dca86dfda188ff6010caa0bcf82f76ba9623f3272de9d55bfa5d1a65d51d8b"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/hyperbolic/connectivity.rs": {
+      "source": "upstream",
+      "sha256": "b435e114a399615952f10564d79b6a9efe95688adc0293ed7976a6b727798a68"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/hyperbolic/mod.rs": {
+      "source": "upstream",
+      "sha256": "5f204f2c0c86ad8f27d6db249e3da0ed84a2a2263205d04e2361bd60487261a3"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/hyperbolic/routing.rs": {
+      "source": "upstream",
+      "sha256": "a034e4ea5889ee49ac7a966c2f96b89b953ffe1168b7ee75dbae62a954f007bb"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/hyperbolic/search.rs": {
+      "source": "upstream",
+      "sha256": "94ab7e98d0d5771958784ecf214a7adf917875c978f729e2ea0bb25a60977804"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/hyperbolic/warped.rs": {
+      "source": "upstream",
+      "sha256": "0deb13874011cf7d8bbbf6041c1ab25a99603ae0ccb2a4b8b53fac530dfae210"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/hyperbolic/warped_convert_tests.rs": {
+      "source": "upstream",
+      "sha256": "edbb681d863acc4d44e2219dae42874c9e3261fb81bb46f10d6f9998c2b6ad2a"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/hyperbolic/warped_geometry.rs": {
+      "source": "upstream",
+      "sha256": "b14aab4a0c1492d6acab644d434ba5fa957a7c4a0972e973cd4e102a2e778aa3"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/hyperbolic/warped_graph.rs": {
+      "source": "upstream",
+      "sha256": "e517b645b4b6d3245f8afcca571dfa9cce98c01f9157f368a75a603465e8e909"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/hyperbolic/warped_snapshot.rs": {
+      "source": "upstream",
+      "sha256": "64e21f37701bd94555d008a077ff39dde7599d151eb767a58ea7b5339042af52"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/quiver/sketch.rs": {
+      "source": "upstream",
+      "sha256": "30fe9dddb77213ad1dc96ecb7957064a9ecdb5bc1c79dca9eb2f187ac8413c8a"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/index/sm_counts.rs": {
+      "source": "upstream",
+      "sha256": "7e67131106122e02e12f7d32ae628bce381d3837b6a9e1e977e7077a1e6a3c27"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/lib.rs": {
+      "source": "upstream",
+      "sha256": "3a0fa944616ab3cf80ea2d76056acca603131f691ff04b1024af8a1b9ac00630"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/metric_math.rs": {
+      "source": "upstream",
+      "sha256": "982332fb6b04249b9791bcaf0c0690bfc1921b8c1ed92745ad480bb338f3c7df"
+    },
+    "rust-vexus-lite/crates/vcp-tdb-index/src/vector.rs": {
+      "source": "upstream",
+      "sha256": "64e6b9b97d72cd9b15cb1937e94c6a3f1f6a9e56d08232e59b409117c7e1e3cc"
+    },
+    "rust-vexus-lite/index.d.ts": {
+      "source": "upstream",
+      "sha256": "5689241593ca6db9543dc11de75c3cade98082a5cc5e5a14aeacb74d693e72b3"
+    },
+    "rust-vexus-lite/index.js": {
+      "source": "upstream",
+      "sha256": "d64e198d672c839a9ee9e9a1a9c2207f34ffe99781c56435da2683385099cf0e"
+    },
+    "rust-vexus-lite/package.json": {
+      "source": "upstream",
+      "sha256": "c996185f59cc84208077f854077f2f5451368ea9cd05c775ba0b06028fed7f7c"
+    },
+    "rust-vexus-lite/rust-toolchain.toml": {
+      "source": "upstream",
+      "sha256": "5431b3fa486569248f3b82c80cc6a4a3750375a40fe87c68f0340650ac1e0aea"
+    },
+    "rust-vexus-lite/src/global_chunks.rs": {
+      "source": "upstream",
+      "sha256": "53bb37193ef7b10d886ee3e4611a2fe84c2fde3564ae60cbdfc909b7f480c2c4"
+    },
+    "rust-vexus-lite/src/index_handle.rs": {
+      "source": "upstream",
+      "sha256": "7cf5e6a84d648081305fdd6d77211404cc47533c1ea96ce4a56da95fcff8e49b"
+    },
+    "rust-vexus-lite/src/index_lifecycle.rs": {
+      "source": "upstream",
+      "sha256": "1d9780d682441eff93147405503906200ce04b5eeae11aca951a78cf77a710d1"
+    },
+    "rust-vexus-lite/src/index_maintenance.rs": {
+      "source": "upstream",
+      "sha256": "b12dd795412d91290736c4113faca1c556e552ef4ba4d5058f874559ced9f597"
+    },
+    "rust-vexus-lite/src/index_source.rs": {
+      "source": "upstream",
+      "sha256": "f2bded216b033b987c7d1ae43f002fbf134f48faf60ee1ea57322b54cb2da911"
+    },
+    "rust-vexus-lite/src/ingestion.rs": {
+      "source": "upstream",
+      "sha256": "6ac15822b2e5fa64a8e547d085dc0b2123296120e7fd35805360e514bac13f19"
+    },
+    "rust-vexus-lite/src/knowledge_runtime.rs": {
+      "source": "upstream",
+      "sha256": "5ca4b447eec417783406b26749c7e3c346774ec5bc4606f35f2235248a38711f"
+    },
+    "rust-vexus-lite/src/lib.rs": {
+      "source": "upstream",
+      "sha256": "6c1e0a0cdfa091311a104cf0730d6f998ab3ab4524d726de045bb7d5f42b4d2d"
+    },
+    "rust-vexus-lite/src/light_memo.rs": {
+      "source": "upstream",
+      "sha256": "5689ab0aaf7f9e046490666b872c9516140b6371e4c117bf06d44790fa345783"
+    },
+    "rust-vexus-lite/src/memo_artifact_builder.rs": {
+      "source": "upstream",
+      "sha256": "ba54db91920438e4e1f767bca59f1ffd3439becfeeb1e695e241833e1d80fcf1"
+    },
+    "rust-vexus-lite/src/memo_geometry.rs": {
+      "source": "upstream",
+      "sha256": "5a49d64a6bd1437cf01ab4d157ae0d182c9693f3b671ca5d696a43ccf6b7c168"
+    },
+    "rust-vexus-lite/src/memo_local_reuse.rs": {
+      "source": "upstream",
+      "sha256": "884678e33ad82587b04066c4498e09b89a8d29d23ede0dad3e6e0e728136c0f3"
+    },
+    "rust-vexus-lite/src/memo_local_reuse_tests.rs": {
+      "source": "upstream",
+      "sha256": "4306b16b2dd26ecc868dfec1b61af994f4f93f4a6ff50f1b182e939445bbe154"
+    },
+    "rust-vexus-lite/src/memo_nnls.rs": {
+      "source": "upstream",
+      "sha256": "58f38c2f75c963c650012d63962dd975e93fac292a39758b7a622788c2a1ff87"
+    },
+    "rust-vexus-lite/src/memo_pipeline.rs": {
+      "source": "upstream",
+      "sha256": "e223f22ce145090932ace1d3c6d3ae37e3d146d8c2ac683ba80e87f49a9ee78d"
+    },
+    "rust-vexus-lite/src/memo_projection.rs": {
+      "source": "upstream",
+      "sha256": "d2dac8e40f44cac7727e92c7b7d0c07a7abb79da3a576b13a6cec0d8d0a0649b"
+    },
+    "rust-vexus-lite/src/memo_sensing.rs": {
+      "source": "upstream",
+      "sha256": "265a5f1a346360e82ffb056cc41e1b0ce0926842a2ec87a7038ea95d63d15d0b"
+    },
+    "rust-vexus-lite/src/memo_thinking.rs": {
+      "source": "upstream",
+      "sha256": "6bc49b4b591cb23a99a6735ac8054de950d31082683f246f5d62d1c199a62220"
+    },
+    "rust-vexus-lite/src/memo_workspace.rs": {
+      "source": "upstream",
+      "sha256": "312ad2f81e98de76cbaf8367a12a25f40ae99fb55a6d9f6e0be345129b073284"
+    },
+    "rust-vexus-lite/src/memo_workspace_build_tests.rs": {
+      "source": "upstream",
+      "sha256": "3d0fba38e2b0ee6ef0332fea7ee43a9596cd5386d751d6566b6774e7fe00e374"
+    },
+    "rust-vexus-lite/src/native_rerank.rs": {
+      "source": "upstream",
+      "sha256": "3d98be1118693325dcff32d34e5c11b88e96d1969c0a425a65c9437d29f540e6"
+    },
+    "rust-vexus-lite/src/publication_gate.rs": {
+      "source": "upstream",
+      "sha256": "725a5b6ec7d025b75fa16a17293603ec5eabd19411c1af67b2cd0582903e4cdc"
+    },
+    "rust-vexus-lite/src/result_deduplicator.rs": {
+      "source": "upstream",
+      "sha256": "0b62a41126c029ca5ca075a53a1c3aa26b425ee13c3f3ef70643896f0c038893"
+    },
+    "rust-vexus-lite/src/retrieval_index.rs": {
+      "source": "upstream",
+      "sha256": "dd24f9ceb3864a4c12019d78bd6a92f12b5ce24ee610f74a4d6cf0661c3f7b20"
+    },
+    "rust-vexus-lite/src/rivermemo_topology_v3.rs": {
+      "source": "upstream",
+      "sha256": "f4754b515b02b51e21dc0df39c7968ca88be04bace9bf539b40d51cdbf4e6a76"
+    },
+    "rust-vexus-lite/src/rivermemo_wormhole.rs": {
+      "source": "upstream",
+      "sha256": "141f23405304916985343ec27f7af428e9cb654efd7cbe04594fe68445907ffe"
+    },
+    "rust-vexus-lite/src/schema.rs": {
+      "source": "upstream",
+      "sha256": "8da4aedea4c6eaa2ffb2be2cc1b82a4ec62f6939e5b93964f913187c892c6531"
+    },
+    "rust-vexus-lite/src/storage.rs": {
+      "source": "upstream",
+      "sha256": "9ce259a88974d4590e6d2be5f6bc6644f38faf9d72d44afb4516853abac0bf84"
+    },
+    "rust-vexus-lite/src/tag_consistency.rs": {
+      "source": "upstream",
+      "sha256": "a01e1d5682407ad9fd84f7399be7ae3c6cd89b5ce1d9d1da2b348a12513d773a"
+    },
+    "rust-vexus-lite/src/task_lifecycle.rs": {
+      "source": "upstream",
+      "sha256": "43ce80ee12d00ba73a377741cdf76c99d65a477bea9171737eb500df65f63605"
+    },
+    "rust-vexus-lite/src/text.rs": {
+      "source": "upstream",
+      "sha256": "459f04022bffbc1fe550e1c2b16328c7ea5dddd3989fc641d0afc8372c0f6a61"
+    },
+    "rust-vexus-lite/src/warped_chunks.rs": {
+      "source": "upstream",
+      "sha256": "1b7c1dc025c92b89b8e9502d65ac8bedeb1fcb3a9bc5ab1ea0007fcfc66cd62d"
+    },
+    "rust-vexus-lite/src/warped_field_snapshot.rs": {
+      "source": "upstream",
+      "sha256": "74f43225f7948b90594a8a3f690de5c3f2acef6af21bbced843eed7344c81c68"
+    },
+    "rust-vexus-lite/src/warped_lifecycle_tests.rs": {
+      "source": "upstream",
+      "sha256": "fd070c0c7309525239cc12f8d56586cd528b33592ee33ff92ab8c2e32c526d57"
+    },
+    "rust-vexus-lite/src/warped_tag_field.rs": {
+      "source": "upstream",
+      "sha256": "9f426ea44c34c8af0c63dfeb9b15ed8cbe172974fa6fab19f5c27fbb6e6848aa"
+    },
+    "rust-vexus-lite/test.js": {
+      "source": "upstream",
+      "sha256": "3d45b63b7bb6d5158a4c5d6dcbcba2a44e2111821ce2515f4541ae18fd3d63c2"
+    },
+    "rust-vexus-lite/tests/fixtures/rrf_real_output_evidence.json": {
+      "source": "upstream",
+      "sha256": "d1d041df36d05b952add6e0624c7646589db5659ee0c586995c38774f3680f69"
+    },
+    "rust-vexus-lite/tests/fixtures/rrf_score_contract.json": {
+      "source": "upstream",
+      "sha256": "96cd4e5b38e0eb89502498fe3a61470e1fb3e4931b39e97bd5f8f1bffdcd57d0"
+    },
+    "scripts/build-vexus.sh": {
+      "source": "monorepo",
+      "sha256": "debed46550359cc60f16282b47a0a0f7633c16ea4a5f4b854f226028d386f368"
+    },
+    "scripts/build_rust_plugin.js": {
+      "source": "upstream",
+      "sha256": "ee83bb75bc1f38aabc8f4213d7fcb12820b754b5d02b75b14432ebaa3e1d2d1b"
+    },
+    "scripts/ensure_admin_panel.js": {
+      "source": "upstream",
+      "sha256": "b9b7c05e46c2780a07ced7ff34e19c8052031b98e2310341319fac9155cc30dc"
+    },
+    "server.js": {
+      "source": "candidate",
+      "sha256": "3095443182aca5d60dec2f6ee776790906028befa9364496fd8fac5951a096df"
+    },
+    "shared/fileKit/binaryReader.js": {
+      "source": "upstream",
+      "sha256": "8c98f4db109cca99cf68d72a6e71ff83296b6a00b7af56b45cc1ba4b7faa9337"
+    },
+    "shared/fileKit/diff.js": {
+      "source": "upstream",
+      "sha256": "ea1e860b0afde54de47f9b662215b748e713b320c4a3f08ae02bb56bab3c4375"
+    },
+    "shared/fileKit/index.js": {
+      "source": "upstream",
+      "sha256": "7c00a4a743458c16a6ddb3652a9cffbb0ffbe9220ab1bf09201bd4ac4b9f0454"
+    },
+    "shared/fileKit/output.js": {
+      "source": "upstream",
+      "sha256": "62d3820f0ee1581c99bc917e13206829449f1d7e741b85e6df3aba894b0d9aca"
+    },
+    "shared/fileKit/paths.js": {
+      "source": "upstream",
+      "sha256": "3f598042d5a0a68226f9d037ee06bb35988b4eea4426a3d0c22a7ebc6cb12602"
+    },
+    "shared/fileKit/reader.js": {
+      "source": "upstream",
+      "sha256": "3b6990a3ea92e5e03aa2ef03330342799a929155ef2c3252b975b5932079e8c0"
+    },
+    "shared/fileKit/text.js": {
+      "source": "upstream",
+      "sha256": "7bad0d57dbc1b922c0e4f6ef92a52e08146d819682df0b7f1a15f35dada6b6e9"
+    },
+    "shared/fileKit/validator.js": {
+      "source": "upstream",
+      "sha256": "a74b77edf6c947d47916b6c4a85a486c0570fc512aabaca905238a9bd91c405a"
+    },
+    "toolApprovalConfig.json": {
+      "source": "upstream",
+      "sha256": "8d1270fa4a7e505837e82494fc93cc96c4a3fa7516be9d18acf0da3a6a66a48d"
+    },
+    "toolbox_map.json": {
+      "source": "upstream",
+      "sha256": "2a9efe3b74a563c32cdb027e9c55d7f782740b692967a2dc6dec0e51a5acd8da"
+    },
+    "validate-plugin-json.js": {
+      "source": "candidate",
+      "sha256": "5f22b488ba82d3177ed971ebc679b496c4c28a6888a32137096ea192f52a1e92"
+    },
+    "vcpInfoHandler.js": {
+      "source": "candidate",
+      "sha256": "ba0cc73bb6c4b8821e372da52646bf65a9a407ac3023e8869d83aa6f8e3c0466"
+    }
+  }
+}

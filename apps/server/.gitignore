@@ -1,0 +1,12 @@
+/Agent/
+/DebugLog/
+/VectorStore/
+/dailynote/
+/file/
+/image/
+/logs/
+/tmp/
+/.file_cache/
+/ip_blacklist.json
+/multimodal-config.json
+/rust-vexus-lite/*.node

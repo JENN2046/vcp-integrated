@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VCP 灵视中心 | Ether Observer</title>
+    <link rel="stylesheet" href="../styles/themes.css">
+
+    <!-- Pretext 文本布局引擎 -->
+    <script type="module" src="../modules/renderer/pretext-bridge.js"></script>
+
+    <link rel="stylesheet" href="./RAG_Observer.css">
+    <script src="../vendor/marked.min.js"></script>
+    <script src="./rag-observer-config.js"></script>
+  </head>
+  <body>
+    <!-- Title Bar -->
+    <div id="custom-title-bar">
+      <div class="window-controls window-controls-mac">
+        <button
+          id="mac-close-btn"
+          class="window-control-btn"
+          title="关闭"
+        ></button>
+        <button
+          id="mac-minimize-btn"
+          class="window-control-btn"
+          title="最小化"
+        ></button>
+        <button
+          id="mac-maximize-btn"
+          class="window-control-btn"
+          title="最大化"
+        ></button>
+      </div>
+      <div class="title">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <circle cx="12" cy="12" r="4"></circle>
+        </svg>
+        VCP 信息流监听器
+      </div>
+      <div class="title-toolbar" style="display: none">
+        <button
+          id="oldNotificationCategoryToggle"
+          class="toolbar-switch"
+          type="button"
+          aria-pressed="true"
+          onclick="toggleNotificationCategory()"
+        >
+          通知分类：开
+        </button>
+        <button
+          id="oldOverlayFeatureToggle"
+          class="toolbar-switch"
+          type="button"
+          aria-pressed="true"
+          onclick="toggleOverlayFeature()"
+        >
+          悬浮窗：开
+        </button>
+      </div>
+      <div class="window-controls window-controls-win">
+        <button
+          id="win-tray-btn"
+          class="win-control-btn"
+          title="最小化到系统托盘"
+          aria-label="最小化到系统托盘"
+        >
+          <svg><use href="#icon-win-tray"></use></svg>
+        </button>
+        <button id="win-minimize-btn" class="win-control-btn" title="最小化">
+          <svg><use href="#icon-win-minimize"></use></svg>
+        </button>
+        <button id="win-maximize-btn" class="win-control-btn" title="最大化">
+          <svg><use href="#icon-win-maximize"></use></svg>
+        </button>
+        <button id="win-close-btn" class="win-control-btn" title="关闭">
+          <svg><use href="#icon-win-close"></use></svg>
+        </button>
+      </div>
+    </div>
+
+    <canvas id="spectrum-canvas"></canvas>
+
+    <div class="main-wrapper">
+      <div class="header-section">
+        <div class="status-container">
+          <div
+            id="connectionStatus"
+            class="status-pill"
+            style="margin-bottom: 0"
+          >
+            <div class="status-dot dot-red" id="statusDot"></div>
+            <span id="statusText">未连接</span>
+          </div>
+          <button
+            class="settings-trigger"
+            onclick="toggleSettingsModal()"
+            title="设置"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="3"></circle>
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+              ></path>
+            </svg>
+          </button>
+          <button
+            id="compareEntryBtn"
+            class="filter-btn compare-entry-btn"
+            type="button"
+            onclick="toggleCompareMode()"
+            title="选择召回项进行双列对比"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="3" y="4" width="7" height="16" rx="1"></rect>
+              <rect x="14" y="4" width="7" height="16" rx="1"></rect>
+              <path d="M7 8h0"></path>
+              <path d="M17 8h0"></path>
+            </svg>
+            对比
+          </button>
+        </div>
+
+        <div class="filter-bar">
+          <div class="filter-highlight"></div>
+          <button
+            class="filter-btn active"
+            data-type="all"
+            onclick="filterLogs('all', this)"
+          >
+            全部
+          </button>
+          <button
+            class="filter-btn"
+            data-type="rag"
+            onclick="filterLogs('rag', this)"
+          >
+            RAG知识库
+          </button>
+          <button
+            class="filter-btn"
+            data-type="chain"
+            onclick="filterLogs('chain', this)"
+          >
+            元思考链
+          </button>
+          <button
+            class="filter-btn"
+            data-type="chat"
+            onclick="filterLogs('chat', this)"
+          >
+            Agent会话
+          </button>
+          <button
+            class="filter-btn"
+            data-type="memo"
+            onclick="filterLogs('memo', this)"
+          >
+            记忆检索
+          </button>
+          <button
+            class="filter-btn"
+            data-type="dream"
+            onclick="filterLogs('dream', this)"
+          >
+            Agent梦境
+          </button>
+          <button
+            class="filter-btn"
+            data-type="notification"
+            onclick="filterLogs('notification', this)"
+          >
+            通知消息
+          </button>
+          <button
+            class="filter-btn"
+            onclick="clearLogs()"
+            style="margin-left: 10px; color: #ff5f56"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+              ></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="infoContainer">
+        <div
+          style="
+            text-align: center;
+            color: rgba(255, 255, 255, 0.3);
+            margin-top: 50px;
+            font-size: 0.9rem;
+          "
+        >
+          <p>等待数据接入...</p>
+          <p style="font-size: 0.8em">System Ready</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="compareFloatingBar" class="compare-floating-bar" aria-live="polite">
+      <div id="compareToolbarStatus" class="compare-toolbar-status">
+        A 轮：未选择 · B 轮：未选择
+      </div>
+      <button
+        class="compare-toolbar-btn"
+        type="button"
+        onclick="clearCompareSelection()"
+      >
+        清空
+      </button>
+      <button
+        id="openCompareModalButton"
+        class="compare-toolbar-btn primary"
+        type="button"
+        onclick="openCompareModal()"
+        disabled
+      >
+        开始对比 A vs B
+      </button>
+      <button
+        class="compare-toolbar-btn danger"
+        type="button"
+        onclick="toggleCompareMode(false)"
+      >
+        退出
+      </button>
+    </div>
+
+    <div
+      id="compareModal"
+      class="compare-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="compareModalTitle"
+      onclick="if (event.target === this) closeCompareModal()"
+    >
+      <div class="compare-panel">
+        <div class="compare-panel-header">
+          <div class="compare-panel-title">
+            <h2 id="compareModalTitle">召回对比视图 (A vs B)</h2>
+            <span id="compareModalSummary"></span>
+          </div>
+          <button
+            class="compare-close-btn"
+            type="button"
+            title="关闭对比视图"
+            aria-label="关闭对比视图"
+            onclick="closeCompareModal()"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            >
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="compare-columns">
+          <section class="compare-column" data-slot="A">
+            <div id="compareColumnAHeader" class="compare-column-header"></div>
+            <div id="compareColumnAList" class="compare-column-list"></div>
+          </section>
+          <section class="compare-column" data-slot="B">
+            <div id="compareColumnBHeader" class="compare-column-header"></div>
+            <div id="compareColumnBList" class="compare-column-list"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <button
+      id="scrollToTopBtn"
+      class="scroll-top-btn"
+      type="button"
+      title="回到顶部"
+      aria-label="回到顶部"
+      onclick="scrollInfoToTop()"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M18 15l-6-6-6 6"></path>
+      </svg>
+    </button>
+
+    <!-- Settings Modal -->
+    <div
+      id="settingsModal"
+      class="settings-modal"
+      onclick="if(event.target === this) toggleSettingsModal()"
+    >
+      <div class="settings-panel">
+        <div class="settings-header">
+          <h2>偏好设置</h2>
+          <button class="settings-close-btn" onclick="toggleSettingsModal()">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="settings-group">
+          <div class="settings-item">
+            <div class="settings-label">
+              <span>监控分区</span>
+              <span style="font-size:0.75rem; color:rgba(255,255,255,0.4);">显示与监听</span>
+            </div>
+            <div id="settingsPartitionsContainer" class="settings-partitions-grid">
+              <!-- 由 JavaScript 动态渲染分区勾选项 -->
+            </div>
+          </div>
+          <div class="settings-item">
+            <div class="settings-label">悬浮窗功能</div>
+            <div
+              id="overlayFeatureToggle"
+              class="settings-toggle-pill"
+              onclick="toggleOverlayFeature()"
+            >
+              <span class="status-text">已开启</span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="3" y1="9" x2="21" y2="9"></line>
+                <line x1="9" y1="21" x2="9" y2="9"></line>
+              </svg>
+            </div>
+          </div>
+          <div class="settings-item">
+            <div class="settings-label">悬浮窗交互模式</div>
+            <div class="settings-control-row">
+              <button
+                id="overlayPassThroughBtn"
+                class="settings-switch-btn active"
+                onclick="setOverlayPassThrough(true)"
+              >
+                鼠标穿透
+              </button>
+              <button
+                id="overlayInteractiveBtn"
+                class="settings-switch-btn"
+                onclick="setOverlayPassThrough(false)"
+              >
+                可交互
+              </button>
+            </div>
+          </div>
+          <div class="settings-item">
+            <div class="settings-label">
+              <span>悬浮窗透明度</span>
+              <span id="overlayOpacityValue">90%</span>
+            </div>
+            <input
+              id="overlayOpacityRange"
+              type="range"
+              min="20"
+              max="100"
+              step="1"
+              value="90"
+              oninput="setOverlayOpacity(this.value)"
+              style="width: 100%; accent-color: #3498db"
+           >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Icons Def -->
+    <svg style="display: none">
+      <symbol
+        id="icon-copy"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path
+          d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+        ></path>
+      </symbol>
+      <symbol
+        id="icon-chevron"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </symbol>
+      <symbol
+        id="icon-check"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </symbol>
+      <symbol id="icon-win-tray" viewBox="0 0 10 10">
+        <polygon points="5,8 0,2 10,2" fill="currentColor"></polygon>
+      </symbol>
+      <symbol id="icon-win-minimize" viewBox="0 0 10 10">
+        <path stroke="currentColor" stroke-width="1.2" d="M0 5 H10"></path>
+      </symbol>
+      <symbol id="icon-win-maximize" viewBox="0 0 10 10">
+        <path
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.2"
+          d="M1,1 h8 v8 h-8 z"
+        ></path>
+      </symbol>
+      <symbol id="icon-win-close" viewBox="0 0 10 10">
+        <path
+          stroke="currentColor"
+          stroke-width="1.2"
+          d="M1,1 L9,9 M9,1 L1,9"
+        ></path>
+      </symbol>
+    </svg>
+
+    <script src="./RAG_Observer.js"></script>
+  </body>
+</html>

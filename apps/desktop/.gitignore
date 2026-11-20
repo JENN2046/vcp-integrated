@@ -1,0 +1,109 @@
+gitignore
+
+# 不忽略 .gitignore 文件本身（这是Git的常见实践）
+!.gitignore
+
+# AppData 默认为本地运行数据，仅追踪官方预设、脱敏示例配置和 VCP Loom 官方测试应用。
+AppData/*
+!AppData/VCPChatTarven.official.json
+!AppData/VCPChatTarven.json.example
+!AppData/mimotts/
+!AppData/mimotts/**
+!AppData/LoomApps/
+AppData/LoomApps/*
+!AppData/LoomApps/example-mobile/
+!AppData/LoomApps/example-mobile/**
+
+node_modules/
+/node_modules
+
+.env
+!audio_engine/.env
+
+/public/assets
+
+**/.DS_Store
+
+# Rust build artifacts
+**/target/
+**/Cargo.lock
+!rust_chat_data_service/Cargo.lock
+!apps/bootstrap-installer/src-tauri/Cargo.lock
+!rust_voice_input_engine/Cargo.lock
+# ProjectForge 索引器精确锁定 tree-sitter 与 grammar 版本（ABI 兼容），必须提交
+!rust_projectforge_indexer/Cargo.lock
+rust_audio_engine/.cargo/
+
+# VCP-CDS native runtime binaries：仅跟踪 win32-x64 bootstrap 运行时，其他平台产物本地生成
+modules/services/chatDataService/bin/**
+!modules/services/chatDataService/bin/README.md
+!modules/services/chatDataService/bin/win32-x64/
+!modules/services/chatDataService/bin/win32-x64/vcp_chat_data_service.exe
+audio_engine/bin/**
+
+# ProjectForge AST 索引器：仅跟踪 win32-x64 bootstrap 运行时（与 VCP-CDS 同策略），其他平台产物本地生成
+VCPDistributedServer/Plugin/ProjectForge/bin/**
+!VCPDistributedServer/Plugin/ProjectForge/bin/README.md
+!VCPDistributedServer/Plugin/ProjectForge/bin/win32-x64/
+!VCPDistributedServer/Plugin/ProjectForge/bin/win32-x64/projectforge_indexer.exe
+
+# Reports and logs
+**/reports/
+test-results/
+
+
+
+# LibreHardwareMonitor 官方二进制由开发者本地自行准备，不进入仓库
+vendor/LibreHardwareMonitor/*
+!vendor/LibreHardwareMonitor/README.md
+
+# Cubism Core 是 Live2D 的专有组件，安装依赖/打包时由 scripts/deskpet/fetch-cubism-core.cjs 下载，不进入仓库
+vendor/live2d-cubism-core/*
+!vendor/live2d-cubism-core/README.md
+
+# 忽略 WebIndexTTS2 生成输出目录
+/WebIndexTTS2/tmp-output/
+
+# rust_audio_engine 运行时缓存（响度分析等）
+loudness_cache.db
+loudness_cache.db-journal
+loudness_cache.db-wal
+loudness_cache.db-shm
+
+
+# AI CLI local state/config directories
+**/.snow/
+**/.claude/
+**/.codex/
+
+/开发文档/
+
+# UI QA screenshots captured by Electron smoke tests; never commit generated
+# visual artifacts as source baselines.
+/screenshots/
+
+# 本机字体名称表兼容副本（可能受第三方字体许可证约束，不进入仓库）
+/font-compat-output/
+# Locally generated portable Windows bootstrapper (release artifact, never commit).
+VCPChat-Setup.exe
+
+
+# 独立的 VChat Music Next 音频引擎源码，不由主仓库跟踪
+/vchat_music_next/
+
+
+# Python runtime / test caches
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+.coverage
+coverage.xml
+
+# Temporary source transforms; only bundled dist and input manifest are candidate assets.
+/preloads/bundled/generated/
+
+# Rebuildable Electron sandbox and local CDS outputs.
+/preloads/bundled/
+/modules/nativeSyncDesktopRuntime/agentNameOwner.cjs
+/modules/services/chatDataService/bin/*/vcp_chat_data_service*

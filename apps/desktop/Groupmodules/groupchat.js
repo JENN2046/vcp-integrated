@@ -1,0 +1,2915 @@
+// Groupmodules/groupchat.js - 群聊核心逻辑模块
+
+const fs = require('fs-extra');
+const nativeFs = require('node:fs/promises');
+const path = require('path');
+const { ipcMain } = require('electron');
+const crypto = require('crypto');
+const sharedGroup = require('../modules/services/nativeSync/sharedGroup');
+const { withTopicGenerationLease } = require('../modules/services/topicGenerationLease');
+const { replaceFile } = require('../modules/utils/atomicReplace');
+const { protectHistoryConfiguration } = require('../modules/utils/historyConfiguration');
+const contextSanitizer = require('../modules/contextSanitizer');
+const { beginTrajectoryCall, sessionKeyFromContext, sourceFromContext } = require('../modules/modelTrajectory');
+const fileManager = require('../modules/fileManager');
+const canvasHandlers = require('../modules/ipc/canvasHandlers');
+const tavernHandlers = require('../modules/ipc/tavernHandlers');
+const tavernEngine = require('../modules/tavernRulesEngine');
+
+// 群聊模式策略模块
+const sequentialMode = require('./modes/sequentialMode');
+const natureRandomMode = require('./modes/natureRandomMode');
+const inviteOnlyMode = require('./modes/inviteOnlyMode');
+const {
+    DEFAULT_JEV_MODE_SETTINGS,
+    normalizeJevModeSettings
+} = require('./modes/jevDecisionMode');
+const { JevGroupSessionOrchestrator } = require('./jevGroupSessionOrchestrator');
+const {
+    DEFAULT_GROUP_CONTEXT_MESSAGE_WINDOW_SIZE,
+    normalizeGroupContextWindowSettings,
+    selectGroupContextHistory
+} = require('./groupContextWindow');
+
+// 话题标题管理模块
+const topicTitleManager = require('./topicTitleManager');
+const { noteToolApprovalMessage, isWaitingForToolApproval, isWatchdogAbort, withWatchdogNote, getGroupErrorMessage, normalizeGroupFetchError } = require('./streamWatchdog');
+const { resolveGroupChatUrl } = require('./groupChatUrl');
+
+// 模式注册表 - 添加新模式只需在此注册
+const CHAT_MODES = {
+    'sequential': sequentialMode,
+    'naturerandom': natureRandomMode,
+    'invite_only': inviteOnlyMode,
+    'game': { determineSpeakers() { return []; } }
+};
+
+const activeRequestControllers = new Map();
+const groupQueueCancellationVersions = new Map();
+const CANVAS_PLACEHOLDER = '{{VCPChatCanvas}}';
+const GROUP_SESSION_WATCHER_PLACEHOLDER = '{{VCPChatGroupSessionWatcher}}';
+const WORKSPACE_PLACEHOLDER_HINT = '{{VCPChatWorkSpace';
+
+// {{VCPChatWorkSpace}} / {{VCPChatWorkSpace:文件夹名}}：展开为工作区目录树。
+// 延迟 require，避免与主进程模块初始化顺序耦合；失败时保留原文，不阻断群聊。
+async function expandWorkspacePlaceholdersInPrompt(text, snapshot = null) {
+    if (typeof text !== 'string' || !text.includes(WORKSPACE_PLACEHOLDER_HINT)) return text;
+    try {
+        const { expandPlaceholders } = require('../modules/ipc/workspaceHandlers');
+        return typeof expandPlaceholders === 'function' ? await expandPlaceholders(text, snapshot) : text;
+    } catch (error) {
+        console.warn('[GroupChat] 工作区占位符展开失败，保留原文:', error?.message || error);
+        return text;
+    }
+}
+
+
+let mainAppPaths = {}; // 将由 main.js 初始化时传入
+let groupHistoryMutationQueue = null;
+let groupTopicAdmission = null;
+let groupJevService = null;
+let groupAgentConfigLoader = null;
+let jevSessionOrchestrator = null;
+const groupStreamCallbacks = new Map();
+const ordinaryGroupRuns = new Map();
+
+// History is a trusted completed-message authority. Partial transport content
+// stays in the existing native admission uncertainty path, never a success row.
+function requireTrustedGroupTerminal(reason, partialText) {
+    if (reason === 'stop') return;
+    const code = reason === 'length' ? 'MODEL_RESPONSE_TRUNCATED' : 'MODEL_RESPONSE_INCOMPLETE';
+    const error = Object.assign(new Error(code), { code, modelFinishReason: reason });
+    if (typeof partialText === 'string' && partialText) error.partialText = partialText;
+    throw error;
+}
+function observeGroupFinishReason(previous, choices) {
+    for (const choice of choices || []) {
+        const reason = choice.finish_reason;
+        if (reason === null || reason === undefined) continue;
+        if (!['stop', 'length'].includes(reason) || previous && previous !== reason) {
+            requireTrustedGroupTerminal(null);
+        }
+        previous = reason;
+    }
+    return previous;
+}
+function isUntrustedGroupTerminal(error) {
+    return ['MODEL_RESPONSE_TRUNCATED', 'MODEL_RESPONSE_INCOMPLETE', 'STREAM_INCOMPLETE', 'STREAM_MALFORMED'].includes(error?.code);
+}
+
+
+function getGroupQueueKey(groupId, topicId) {
+    return `${String(groupId)}\u0000${String(topicId)}`;
+}
+
+function createGroupQueueContext(groupId, topicId) {
+    const queueKey = getGroupQueueKey(groupId, topicId);
+    const cancellationVersion = groupQueueCancellationVersions.get(queueKey) || 0;
+
+    return Object.freeze({
+        groupId,
+        topicId,
+        cancellationVersion,
+        isAborted() {
+            return (groupQueueCancellationVersions.get(queueKey) || 0) !== cancellationVersion;
+        }
+    });
+}
+
+function registerActiveGroupRequest(messageId, controller, groupId, topicId) {
+    activeRequestControllers.set(messageId, {
+        controller,
+        groupId,
+        topicId
+    });
+}
+
+async function sendRemoteGroupInterrupt(messageId) {
+    try {
+        const globalSettings = await getVcpGlobalSettings();
+        if (!globalSettings.vcpUrl || !globalSettings.vcpApiKey) return false;
+
+        const urlObj = new URL(globalSettings.vcpUrl);
+        urlObj.pathname = '/v1/interrupt';
+        const interruptUrl = urlObj.toString();
+
+        console.log(`[GroupChat] Sending remote interrupt request to: ${interruptUrl}`);
+        const response = await fetch(interruptUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${globalSettings.vcpApiKey}`
+            },
+            body: JSON.stringify({ messageId })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            console.log('[GroupChat] Remote interrupt success:', result.message);
+            return true;
+        }
+
+        const errorText = await response.text();
+        console.error('[GroupChat] Remote interrupt failed:', response.status, errorText);
+    } catch (remoteError) {
+        console.error('[GroupChat] Error sending remote interrupt:', remoteError);
+    }
+    return false;
+}
+
+function stableStringify(value) {
+    if (value === null || typeof value !== 'object') {
+        return JSON.stringify(value);
+    }
+    if (Array.isArray(value)) {
+        return `[${value.map(item => stableStringify(item)).join(',')}]`;
+    }
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+}
+
+function extractTextForHash(content) {
+    if (typeof content === 'string') {
+        return content;
+    }
+    if (Array.isArray(content)) {
+        return content
+            .filter(part => part && part.type === 'text' && typeof part.text === 'string')
+            .map(part => part.text)
+            .join('\n');
+    }
+    if (content && typeof content.text === 'string') {
+        return content.text;
+    }
+    return '';
+}
+
+function hashSentMessage(message) {
+    return `sha256:${crypto.createHash('sha256').update(extractTextForHash(message.content), 'utf8').digest('hex')}`;
+}
+
+function attachTimestampMetaToVcpMessage(vcpMessage, historyMessage) {
+    if (!vcpMessage || !historyMessage || !historyMessage.id || typeof historyMessage.timestamp !== 'number') {
+        return vcpMessage;
+    }
+    return {
+        ...vcpMessage,
+        __vcpchatTimestampMeta: {
+            messageId: historyMessage.id,
+            role: historyMessage.role,
+            timestamp: historyMessage.timestamp
+        }
+    };
+}
+
+function buildVcpChatExtensionsFromMessages(messages) {
+    const messageTimestampBindings = [];
+    messages.forEach((message, index) => {
+        const meta = message && message.__vcpchatTimestampMeta;
+        if (!meta || !meta.messageId || typeof meta.timestamp !== 'number') {
+            return;
+        }
+        messageTimestampBindings.push({
+            messageId: meta.messageId,
+            role: message.role || meta.role,
+            timestamp: meta.timestamp,
+            timestampIso: new Date(meta.timestamp).toISOString(),
+            source: 'client_history',
+            sentMessageHash: hashSentMessage(message),
+            sentMessageIndex: index
+        });
+    });
+
+    if (messageTimestampBindings.length === 0) {
+        return null;
+    }
+
+    return {
+        schemaVersion: 1,
+        messageMetadataMode: 'hash_only',
+        messageTimestampBindings
+    };
+}
+
+function stripInternalMessageMetadata(messages) {
+    return messages.map(message => {
+        if (!message || typeof message !== 'object') return message;
+        const { __vcpchatTimestampMeta, ...cleanMessage } = message;
+        return cleanMessage;
+    });
+}
+
+function buildGroupRequestBody(messagesForAI, modelConfig, messageId) {
+    const vcpchatExtensions = buildVcpChatExtensionsFromMessages(messagesForAI);
+    const requestBody = {
+        messages: stripInternalMessageMetadata(messagesForAI),
+        ...modelConfig,
+        messageId
+    };
+    if (vcpchatExtensions) {
+        requestBody.vcpchatExtensions = vcpchatExtensions;
+    }
+    return requestBody;
+}
+
+/**
+ * 初始化模块所需的路径配置
+ * @param {object} paths - 包含 APP_DATA_ROOT_IN_PROJECT, AGENTS_DIR, USER_DATA_DIR, SETTINGS_FILE 等路径的对象
+ */
+function initializePaths(paths) {
+    mainAppPaths = {
+        ...paths,
+        AGENT_GROUPS_DIR: path.join(paths.APP_DATA_ROOT_IN_PROJECT, 'AgentGroups'),
+    };
+    fs.ensureDirSync(mainAppPaths.AGENT_GROUPS_DIR);
+    console.log('[GroupChat] Paths initialized. AgentGroups directory ensured:', mainAppPaths.AGENT_GROUPS_DIR);
+}
+
+function initializeRuntimeServices({
+    historyMutationQueue = null,
+    topicAdmission = null,
+    jevService = null,
+    getAgentConfigById = null
+} = {}) {
+    groupHistoryMutationQueue = historyMutationQueue;
+    groupTopicAdmission = topicAdmission;
+    groupJevService = jevService;
+    groupAgentConfigLoader = getAgentConfigById;
+    jevSessionOrchestrator = null;
+}
+
+function getGroupHistoryDescriptor(groupId, topicId) {
+    return { itemId: groupId, itemType: 'group', topicId };
+}
+
+async function assertNativeGroupTopic(groupId, topicId, groupConfig, groupHistoryPath) {
+    // Frozen execution config owns generation; native config owns topic membership.
+    const nativeTopicConfig = sharedGroup.current()
+        ? await fs.readJson(path.join(mainAppPaths.AGENT_GROUPS_DIR, groupId, 'config.json')) : groupConfig;
+    if (nativeTopicConfig._historyDeleting || !nativeTopicConfig.topics?.some(topic => topic.id === topicId)
+        || !await fs.pathExists(groupHistoryPath)) {
+        throw new Error('目标群聊话题或历史已不存在');
+    }
+}
+
+async function readLatestGroupHistory(groupId, topicId) {
+    if(sharedGroup.current())return sharedGroup.history(groupId,topicId,[]);
+    if (groupHistoryMutationQueue) {
+        return groupHistoryMutationQueue.read(getGroupHistoryDescriptor(groupId, topicId));
+    }
+    return getGroupChatHistory(groupId, topicId);
+}
+
+function requireGroupHistoryQueue() {
+    if (!groupHistoryMutationQueue) throw new Error('HistoryMutationQueue is unavailable');
+    return groupHistoryMutationQueue;
+}
+
+async function initializeGroupHistory(groupId, topicId) {
+    return requireGroupHistoryQueue().initializeIfMissing(getGroupHistoryDescriptor(groupId, topicId), []);
+}
+
+async function appendGroupHistoryMessage(groupId, topicId, message) {
+    if(sharedGroup.current())return sharedGroup.append(groupId,topicId,message);
+    requireGroupHistoryQueue();
+    const nativeIntent = { source: 'group-append', known: true, causalContextIds: [] };
+    const result = await groupHistoryMutationQueue.mutate(
+        getGroupHistoryDescriptor(groupId, topicId),
+        history => {
+            nativeIntent.causalContextIds = history.map(entry => entry.id);
+            if (!history.some(entry => entry?.id === message?.id)) history.push(message);
+            return history;
+        },
+        { intent: nativeIntent }
+    );
+    return result.history;
+}
+
+function setGroupStreamCallback(groupId, topicId, callback) {
+    if (typeof callback === 'function') {
+        groupStreamCallbacks.set(getGroupQueueKey(groupId, topicId), callback);
+    }
+}
+
+function emitGroupStreamEvent(groupId, topicId, payload) {
+    const callback = groupStreamCallbacks.get(getGroupQueueKey(groupId, topicId));
+    if (typeof callback === 'function') callback(payload);
+}
+
+function detectMentionedAgentIds(text, members) {
+    const normalized = typeof text === 'string' ? text.toLowerCase() : '';
+    return members
+        .filter(member => {
+            const name = String(member?.name || '').trim().toLowerCase();
+            return name && normalized.includes(`@${name}`);
+        })
+        .map(member => member.id);
+}
+
+function ensureJevSessionOrchestrator() {
+    if (jevSessionOrchestrator) return jevSessionOrchestrator;
+    if (!groupJevService || typeof groupAgentConfigLoader !== 'function') {
+        throw new Error('JEV 群聊运行时尚未初始化。');
+    }
+    jevSessionOrchestrator = new JevGroupSessionOrchestrator({
+        jevService: groupJevService,
+        loadGroupConfig: getAgentGroupConfig,
+        loadActiveMembers: async groupConfig => {
+            const configs = await Promise.all(
+                (groupConfig?.members || []).map(id => groupAgentConfigLoader(id))
+            );
+            return configs.filter(config => config && !config.error);
+        },
+        readHistory: readLatestGroupHistory,
+        transferWaitingAdmission: async ({ groupId, topicId, token, handoffOwner }) => {
+            if (!groupTopicAdmission) throw new Error('JEV admission runtime missing');
+            return groupTopicAdmission.transferToWaiting(
+                getGroupHistoryDescriptor(groupId, topicId), token, handoffOwner);
+        },
+        finalizeAdmission: async ({ groupId, topicId, token, error }) => {
+            if (!groupTopicAdmission) throw new Error('JEV admission runtime missing');
+            const scope = getGroupHistoryDescriptor(groupId, topicId);
+            const result = error && error.name !== 'AbortError'
+                ? await groupTopicAdmission.fail(scope, token, error.message || String(error))
+                : await groupTopicAdmission.release(scope, token, { saved: true });
+            if (!result?.success) throw new Error(result?.code || 'JEV admission finalization failed');
+        },
+        runAgent: async ({ groupId, topicId, agent, signal, admissionToken, handoffOwner }) => {
+            const callback = groupStreamCallbacks.get(getGroupQueueKey(groupId, topicId));
+            await handleInviteAgentToSpeak(
+                groupId,
+                topicId,
+                agent.id,
+                callback,
+                groupAgentConfigLoader,
+                { skipSummary: true, signal, admissionToken, handoffOwner }
+            );
+        },
+        emitEvent: event => emitGroupStreamEvent(
+            event.context.groupId,
+            event.context.topicId,
+            event
+        ),
+        logger: console
+    });
+    return jevSessionOrchestrator;
+}
+
+/**
+ * 获取群聊会话监控信息
+ * @param {string} groupId - 群组ID
+ * @param {string} topicId - 话题ID
+ * @returns {Promise<object>} - 群聊会话监控信息
+ */
+async function getGroupSessionWatcher(groupId, topicId) {
+    try {
+        if (!mainAppPaths.USER_DATA_DIR) {
+            return {
+                status: "error",
+                error: "用户数据目录未初始化",
+                timestamp: new Date().toISOString(),
+                displayTime: new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' })
+            };
+        }
+
+        const groupHistoryPath = path.join(mainAppPaths.USER_DATA_DIR, groupId, 'topics', topicId, 'history.json');
+
+        if (await fs.pathExists(groupHistoryPath)) {
+            const stats = await fs.stat(groupHistoryPath);
+            const historyContent = await fs.readJson(groupHistoryPath);
+
+            return {
+                status: "active",
+                currentSession: {
+                    groupId: groupId,
+                    topicId: topicId,
+                    filePath: groupHistoryPath,
+                    lastModified: stats.mtime.toISOString(),
+                    lastModifiedDisplay: stats.mtime.toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+                    modifiedTimestamp: stats.mtime.getTime(),
+                    size: stats.size,
+                    messageCount: historyContent.length
+                },
+                timestamp: new Date().toISOString(),
+                displayTime: new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' })
+            };
+        } else {
+            return {
+                status: "no_session",
+                message: `未找到群聊会话文件: ${groupHistoryPath}`,
+                groupId: groupId,
+                topicId: topicId,
+                timestamp: new Date().toISOString(),
+                displayTime: new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' })
+            };
+        }
+    } catch (error) {
+        console.error(`[GroupChat] Error in getGroupSessionWatcher for group ${groupId}, topic ${topicId}:`, error.message);
+        return {
+            status: "error",
+            error: error.message,
+            groupId: groupId,
+            topicId: topicId,
+            timestamp: new Date().toISOString(),
+            displayTime: new Date().toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai' })
+        };
+    }
+}
+
+
+/**
+ * 获取全局VCP设置（如URL, API Key, 用户名）
+ * @returns {Promise<object>}
+ */
+async function getVcpGlobalSettings() {
+    if (mainAppPaths.SETTINGS_FILE && await fs.pathExists(mainAppPaths.SETTINGS_FILE)) {
+        try {
+            const settings = sharedGroup.policy(await fs.readJson(mainAppPaths.SETTINGS_FILE));
+            return {
+                vcpUrl: settings.vcpServerUrl,
+                vcpApiKey: settings.vcpApiKey,
+                userName: settings.userName || '用户',
+                topicSummaryModel: settings.topicSummaryModel,
+                // 添加净化器相关配置
+                enableContextSanitizer: settings.enableContextSanitizer === true,
+                contextSanitizerDepth: settings.contextSanitizerDepth,
+                // 添加元思考链注入配置
+                enableThoughtChainInjection: settings.enableThoughtChainInjection === true,
+                // 和单聊一致：打开时发言请求走 chatvcp，拿到完整工具结果
+                enableVcpToolInjection: settings.enableVcpToolInjection === true
+            };
+        } catch (e) {
+            console.error("[GroupChat] Error reading VCP settings from settings.json", e);
+        }
+    }
+    return {
+        vcpUrl: null,
+        vcpApiKey: null,
+        userName: '用户',
+        topicSummaryModel: null,
+        // 添加净化器默认值
+        enableContextSanitizer: false,
+        contextSanitizerDepth: 2,
+        // 添加元思考链注入默认值
+        enableThoughtChainInjection: false
+    };
+}
+
+/**
+ * Resolve the model that should be used for this agent in group chat.
+ * When unified model is enabled, it has priority over per-agent model.
+ * @param {object} groupConfig
+ * @param {object} agentConfig
+ * @returns {{usingUnifiedModel: boolean, unifiedModel: string, agentModel: string, effectiveModel: string}}
+ */
+function resolveEffectiveModel(groupConfig, agentConfig) {
+    const usingUnifiedModel = groupConfig && groupConfig.useUnifiedModel === true;
+    const unifiedModel = (groupConfig && typeof groupConfig.unifiedModel === 'string')
+        ? groupConfig.unifiedModel.trim()
+        : '';
+    const agentModel = (agentConfig && typeof agentConfig.model === 'string')
+        ? agentConfig.model.trim()
+        : '';
+
+    return {
+        usingUnifiedModel,
+        unifiedModel,
+        agentModel,
+        effectiveModel: usingUnifiedModel ? unifiedModel : agentModel
+    };
+}
+
+
+
+function normalizeUniqueStringArray(value) {
+    if (!Array.isArray(value)) return [];
+    return value.filter((item, index) => (
+        typeof item === 'string'
+        && item.trim() !== ''
+        && value.indexOf(item) === index
+    ));
+}
+
+function normalizeGroupModeSettings(config = {}) {
+    const members = normalizeUniqueStringArray(config.members);
+    const existingModeSettings = config.modeSettings && typeof config.modeSettings === 'object'
+        ? config.modeSettings
+        : {};
+    const legacySequentialOrder = normalizeUniqueStringArray(config.sequentialSpeakerOrder);
+    const configuredSequentialOrder = normalizeUniqueStringArray(
+        existingModeSettings.sequential?.speakerOrder
+    );
+    const preferredSequentialOrder = configuredSequentialOrder.length > 0
+        ? configuredSequentialOrder
+        : legacySequentialOrder;
+    const memberSet = new Set(members);
+    const sequentialSpeakerOrder = [
+        ...preferredSequentialOrder.filter(memberId => memberSet.has(memberId)),
+        ...members.filter(memberId => !preferredSequentialOrder.includes(memberId))
+    ];
+
+    const legacyMemberTags = config.memberTags && typeof config.memberTags === 'object'
+        ? config.memberTags
+        : {};
+    const naturalSettings = existingModeSettings.naturerandom && typeof existingModeSettings.naturerandom === 'object'
+        ? existingModeSettings.naturerandom
+        : {};
+    const memberTags = {
+        ...legacyMemberTags,
+        ...(naturalSettings.memberTags && typeof naturalSettings.memberTags === 'object'
+            ? naturalSettings.memberTags
+            : {})
+    };
+    const tagMatchMode = naturalSettings.tagMatchMode === 'natural' || config.tagMatchMode === 'natural'
+        ? 'natural'
+        : 'strict';
+
+    const jevSettings = normalizeJevModeSettings(existingModeSettings.jev, members);
+
+    return {
+        ...config,
+        ...normalizeGroupContextWindowSettings(config),
+        members,
+        modeSettings: {
+            ...existingModeSettings,
+            sequential: {
+                ...(existingModeSettings.sequential || {}),
+                speakerOrder: sequentialSpeakerOrder
+            },
+            naturerandom: {
+                ...naturalSettings,
+                tagMatchMode,
+                memberTags
+            },
+            invite_only: {
+                ...(existingModeSettings.invite_only || {})
+            },
+            jev: jevSettings
+        },
+        // 同步旧字段，确保旧版本客户端仍能读取。
+        sequentialSpeakerOrder,
+        tagMatchMode,
+        memberTags
+    };
+}
+
+
+/**
+ * 创建一个新的 AgentGroup
+ * @param {string} groupName - 群组名称
+ * @param {object} initialConfig - 可选的初始配置
+ * @returns {Promise<object>} - 包含成功状态和群组信息的对象
+ */
+async function createAgentGroup(groupName, initialConfig = {}) {
+    if (!mainAppPaths.AGENT_GROUPS_DIR) {
+        return { success: false, error: 'GroupChat module paths not initialized.' };
+    }
+    try {
+        const baseName = groupName.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const groupId = `${baseName}_${crypto.randomUUID()}`;
+        const groupDir = path.join(mainAppPaths.AGENT_GROUPS_DIR, groupId);
+
+        const shared = requireGroupHistoryQueue().syncPolicy?.sharedExecution?.runtime;
+        if (shared) {
+            if (!shared.ready || shared.closed) throw new Error('SHARED_STARTUP_PENDING');
+            shared.assertNativeMutation('group', groupId);
+        }
+        await fs.mkdir(groupDir);
+
+        const defaultConfig = {
+            id: groupId,
+            name: groupName,
+            avatar: null,
+            avatarCalculatedColor: null, // 新增：用于存储头像计算出的颜色
+            members: [],
+            mode: 'sequential', // 可选: 'sequential', 'naturerandom', 'invite_only', 'jev'
+            modeSettings: {
+                sequential: { speakerOrder: [] },
+                naturerandom: { tagMatchMode: 'strict', memberTags: {} },
+                invite_only: {},
+                jev: { ...DEFAULT_JEV_MODE_SETTINGS, memberStyles: {} }
+            },
+            // 兼容旧版本读取；权威配置保存在 modeSettings。
+            sequentialSpeakerOrder: [],
+            tagMatchMode: 'strict',
+            memberTags: {},
+            groupPrompt: '',
+            invitePrompt: '[系统邀请指令:] 现在轮到你{{VCPChatAgentName}}发言了。系统已经为大家添加[xxx的发言：]这样的标记头，以用于区分不同发言来自谁。大家不用自己再输出自己的发言标记头，也不需要讨论发言标记系统，正常聊天即可。',
+            // 模型上下文窗口默认关闭；开启后仅发送最近指定楼层。
+            enableContextMessageWindow: false,
+            contextMessageWindowSize: DEFAULT_GROUP_CONTEXT_MESSAGE_WINDOW_SIZE,
+           // 新增：统一模型设置
+           useUnifiedModel: false,
+           unifiedModel: '',
+            createdAt: Date.now(),
+            topics: [{ id: `group_topic_${crypto.randomUUID()}`, name: "主要群聊", createdAt: Date.now() }]
+        };
+
+        const configToSave = normalizeGroupModeSettings({
+            ...defaultConfig,
+            ...initialConfig,
+            modeSettings: {
+                ...defaultConfig.modeSettings,
+                ...(initialConfig.modeSettings || {})
+            },
+            id: groupId,
+            name: groupName
+        });
+        const topics = configToSave.topics;
+        if (!Array.isArray(topics) || !topics.length || topics.some(topic => !topic || typeof topic.id !== 'string') || new Set(topics.map(topic => topic.id)).size !== topics.length) {
+            throw new Error('Invalid or duplicate group topic identity');
+        }
+        await replaceFile(path.join(groupDir, 'config.json'), JSON.stringify(configToSave, null, 2));
+        // Discovery needs the saved group config to bind its topics before History opens them.
+        if (shared) await shared.tick({ forceLocal: true, skipExecution: true, skipAttachments: true });
+        for (const topic of topics) await initializeGroupHistory(groupId, topic.id);
+
+        console.log(`[GroupChat] AgentGroup created: ${groupName} (ID: ${groupId})`);
+        return { success: true, agentGroup: configToSave };
+    } catch (error) {
+        console.error('[GroupChat] 创建 AgentGroup 失败:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 获取所有 AgentGroup 列表
+ * @returns {Promise<Array<object>>} - AgentGroup 配置对象数组
+ */
+async function getAgentGroups() {
+    if (!mainAppPaths.AGENT_GROUPS_DIR) {
+        console.error('[GroupChat] Cannot get agent groups, paths not initialized.');
+        return [];
+    }
+    try {
+        const groupFolders = await fs.readdir(mainAppPaths.AGENT_GROUPS_DIR);
+        const agentGroups = [];
+        for (const folderName of groupFolders) {
+            const groupPath = path.join(mainAppPaths.AGENT_GROUPS_DIR, folderName);
+            const stat = await fs.stat(groupPath);
+            if (stat.isDirectory()) {
+                const configPath = path.join(groupPath, 'config.json');
+                if (await fs.pathExists(configPath)) {
+                    const config = normalizeGroupModeSettings(await fs.readJson(configPath));
+                    if (config._historyDeleting) continue;
+                    if (config.avatar) {
+                        config.avatarUrl = await versionedGroupAvatarUrl(groupPath, config.avatar);
+                    } else {
+                        config.avatarUrl = null;
+                    }
+                    // avatarCalculatedColor 应该已随config加载
+                    agentGroups.push(config);
+                }
+            }
+        }
+        // TODO: 根据 settings.json 中的 itemOrder 排序 (如果需要，但这通常在renderer端处理)
+        agentGroups.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        return agentGroups;
+    } catch (error) {
+        console.error('[GroupChat] 获取 AgentGroup 列表失败:', error);
+        return [];
+    }
+}
+
+// Version the avatar URL by modification time so the agent list keeps its
+// cached image until the avatar file actually changes.
+async function versionedGroupAvatarUrl(groupDir, avatarFile) {
+    const avatarPath = path.join(groupDir, avatarFile);
+    const stat = await fs.stat(avatarPath).catch(() => null);
+    return `file://${avatarPath}?v=${stat ? Math.round(stat.mtimeMs) : Date.now()}`;
+}
+
+/**
+ * 获取指定 AgentGroup 的配置
+ * @param {string} groupId - 群组 ID
+ * @returns {Promise<object|null>} - 群组配置对象，或 null (如果未找到)
+ */
+async function getAgentGroupConfig(groupId) {
+    const frozen=sharedGroup.groupConfig(groupId);if(frozen)return frozen;
+    if (!mainAppPaths.AGENT_GROUPS_DIR) return null;
+    try {
+        const groupDir = path.join(mainAppPaths.AGENT_GROUPS_DIR, groupId);
+        const configPath = path.join(groupDir, 'config.json');
+        if (await fs.pathExists(configPath)) {
+            const config = normalizeGroupModeSettings(await fs.readJson(configPath));
+            if (config._historyDeleting) return null;
+            if (config.avatar) {
+                config.avatarUrl = await versionedGroupAvatarUrl(groupDir, config.avatar);
+            } else {
+                config.avatarUrl = null;
+            }
+            return config;
+        }
+        return null;
+    } catch (error) {
+        console.error(`[GroupChat] 获取 AgentGroup ${groupId} 配置失败:`, error);
+        return null;
+    }
+}
+
+/**
+ * 保存 AgentGroup 的配置
+ * @param {string} groupId - 群组 ID
+ * @param {object} configData - 要保存的配置数据
+ * @returns {Promise<object>} - 包含成功状态的对象
+ */
+const groupConfigQueues = new Map();
+function runGroupConfigTask(groupId, operation) {
+    const authority = require('../modules/services/historyAuthority').authorityForQueue(groupHistoryMutationQueue);
+    if (authority && !authority.inChange) return authority.withChange(() => runGroupConfigTask(groupId, operation));
+    const previous = groupConfigQueues.get(groupId) || Promise.resolve();
+    const task = previous.catch(() => {}).then(operation);
+    groupConfigQueues.set(groupId, task);
+    const cleanup = () => { if (groupConfigQueues.get(groupId) === task) groupConfigQueues.delete(groupId); };
+    task.then(cleanup, cleanup);
+    return task;
+}
+function mutateGroupConfig(groupId, mutate, afterSave) {
+    return runGroupConfigTask(groupId, async () => {
+        requireGroupHistoryQueue().getHistoryPath(groupId, 'validate-group-config');
+        const groupPath = path.join(mainAppPaths.AGENT_GROUPS_DIR, groupId);
+        if (await fs.realpath(groupPath) !== path.resolve(groupPath)) throw new Error('Group config directory identity is unverified');
+        const configStat = await fs.lstat(path.join(groupPath, 'config.json'));
+        if (!configStat.isFile() || configStat.isSymbolicLink() || configStat.nlink !== 1) throw new Error('Group config file identity is unverified');
+        const current = await getAgentGroupConfig(groupId);
+        if (!current || current.error) throw new Error(current?.error || '群配置不存在');
+        if (current._historyDeleting) throw new Error('Group history deletion is pending');
+        if (current.id !== groupId || !Array.isArray(current.topics) ||
+            current.topics.some(topic => !topic || typeof topic.id !== 'string' || !topic.id) ||
+            new Set(current.topics.map(topic => topic.id)).size !== current.topics.length ||
+            (current._historyDeletedTopics !== undefined && (!Array.isArray(current._historyDeletedTopics) || current._historyDeletedTopics.some(id => typeof id !== 'string')))) {
+            throw new Error('Group lifecycle config is invalid');
+        }
+        for (const topic of current.topics) requireGroupHistoryQueue().getHistoryPath(groupId, topic.id);
+        const result = await saveAgentGroupConfigUnlocked(groupId, await mutate(current));
+        await afterSave?.(result);
+        return result;
+    });
+}
+
+// Internal materialization primitive. It publishes configuration only; History
+// initialization remains subject to the same native HistoryMutationQueue.
+function initializeAgentGroupConfig(groupId, configData = {}) {
+    return runGroupConfigTask(groupId, async () => {
+        let temporary;
+        let published = false;
+        try {
+            requireGroupHistoryQueue().getHistoryPath(groupId, 'validate-owner-identity');
+            const root = path.resolve(mainAppPaths.AGENT_GROUPS_DIR);
+            if (groupHistoryMutationQueue.ownerDirectories?.group !== root) throw new Error('Group config root differs from the native History authority');
+            if (await nativeFs.realpath(root) !== root) throw new Error('Group root identity is unverified');
+            const groupDir = path.join(root, groupId);
+            try { await nativeFs.lstat(path.join(groupHistoryMutationQueue.ownerDirectories.agent, groupId)); throw new Error('Group owner identity conflicts with an Agent'); }
+            catch (error) { if (error.code !== 'ENOENT') throw error; }
+            if (!configData || typeof configData !== 'object' || Array.isArray(configData) || configData._historyDeleting) throw new Error('Invalid initial group configuration');
+            const topics = configData.topics ?? [];
+            if (!Array.isArray(topics) || topics.some(topic => !topic || typeof topic.id !== 'string') || new Set(topics.map(topic => topic.id)).size !== topics.length) throw new Error('Invalid initial group topics');
+            if (configData._historyDeletedTopics !== undefined && (!Array.isArray(configData._historyDeletedTopics) || configData._historyDeletedTopics.some(id => typeof id !== 'string') || topics.some(topic => configData._historyDeletedTopics.includes(topic.id)))) throw new Error('Invalid initial group deletion facts');
+            for (const topic of topics) requireGroupHistoryQueue().getHistoryPath(groupId, topic.id);
+            const config = normalizeGroupModeSettings({ name: groupId, mode: 'sequential', members: [], ...configData, id: groupId, topics });
+            if (!['sequential', 'naturerandom', 'invite_only', 'jev', 'game'].includes(config.mode)) throw new Error('Invalid initial group mode');
+            await nativeFs.mkdir(groupDir);
+            const configPath = path.join(groupDir, 'config.json');
+            temporary = `${configPath}.${crypto.randomUUID()}.tmp`;
+            const file = await nativeFs.open(temporary, 'wx');
+            try { await file.writeFile(JSON.stringify(config, null, 2), 'utf8'); await file.sync(); }
+            finally { await file.close(); }
+            await nativeFs.link(temporary, configPath);
+            published = true;
+            await nativeFs.unlink(temporary); temporary = null;
+            if (require('node:process').platform !== 'win32') {
+                const directory = await nativeFs.open(groupDir, 'r');
+                try { await directory.sync(); } finally { await directory.close(); }
+            }
+            return { success: true, status: 'created', agentGroup: config };
+        } catch (error) {
+            return { success: false, status: published ? 'unknown' : 'denied', error: error.message };
+        } finally { if (temporary) await nativeFs.unlink(temporary).catch(() => {}); }
+    });
+}
+
+function saveAgentGroupConfig(groupId, configData) {
+    return mutateGroupConfig(groupId, current => ({
+        ...configData,
+        conversationOverrides: current.conversationOverrides,
+        topics: current.topics,
+        _historyDeleting: current._historyDeleting,
+        _historyDeletedTopics: current._historyDeletedTopics,
+    }));
+}
+async function saveAgentGroupConfigUnlocked(groupId, configData) {
+    if (!mainAppPaths.AGENT_GROUPS_DIR) {
+        return { success: false, error: 'GroupChat module paths not initialized.' };
+    }
+    try {
+        const groupDir = path.join(mainAppPaths.AGENT_GROUPS_DIR, groupId);
+        await fs.ensureDir(groupDir);
+        const configPath = path.join(groupDir, 'config.json');
+
+        let existingConfig = {};
+        if (await fs.pathExists(configPath)) {
+            existingConfig = await fs.readJson(configPath);
+        }
+
+        // avatarUrl 是动态生成的，不保存到文件
+        // avatar 字段（文件名）应该在 configData 中，如果被修改的话
+        // avatarCalculatedColor 也是动态获取的，但如果 main.js 决定持久化它，它应该在 configData 中
+        const { avatarUrl, ...dataToSave } = configData;
+
+        const mergedModeSettings = {
+            ...(existingConfig.modeSettings || {}),
+            ...(dataToSave.modeSettings || {})
+        };
+        Object.keys(mergedModeSettings).forEach(modeName => {
+            mergedModeSettings[modeName] = {
+                ...(existingConfig.modeSettings?.[modeName] || {}),
+                ...(dataToSave.modeSettings?.[modeName] || {})
+            };
+        });
+        let newConfigData = normalizeGroupModeSettings({
+            ...existingConfig,
+            ...dataToSave,
+            modeSettings: mergedModeSettings,
+            id: groupId
+        });
+
+        // Backend guard: unified model mode must have a non-empty model id.
+        if (newConfigData.useUnifiedModel === true) {
+            const normalizedUnifiedModel = typeof newConfigData.unifiedModel === 'string'
+                ? newConfigData.unifiedModel.trim()
+                : '';
+            if (!normalizedUnifiedModel) {
+                return { success: false, error: '启用群组统一模型时，群组统一模型不能为空。' };
+            }
+            newConfigData.unifiedModel = normalizedUnifiedModel;
+        } else if (typeof newConfigData.unifiedModel === 'string') {
+            newConfigData.unifiedModel = newConfigData.unifiedModel.trim();
+        }
+
+        if (!['sequential', 'naturerandom', 'invite_only', 'jev', 'game'].includes(newConfigData.mode)) {
+            return { success: false, error: `不支持的群聊模式: ${newConfigData.mode}` };
+        }
+
+        newConfigData = await protectHistoryConfiguration(configPath, newConfigData);
+        await replaceFile(configPath, JSON.stringify(newConfigData, null, 2));
+        groupHistoryMutationQueue?.syncPolicy?.directoryChanged?.();
+        console.log(`[GroupChat] AgentGroup ${groupId} 配置已保存。`);
+
+        if (newConfigData.avatar) {
+            newConfigData.avatarUrl = `file://${path.join(groupDir, newConfigData.avatar)}?t=${Date.now()}`;
+        } else {
+            newConfigData.avatarUrl = null;
+        }
+        return { success: true, agentGroup: newConfigData };
+    } catch (error) {
+        console.error(`[GroupChat] 保存 AgentGroup ${groupId} 配置失败:`, error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 删除 AgentGroup
+ * @param {string} groupId - 群组 ID
+ * @returns {Promise<object>} - 包含成功状态的对象
+ */
+async function deleteAgentGroup(groupId) {
+    if (!mainAppPaths.AGENT_GROUPS_DIR || !mainAppPaths.USER_DATA_DIR) {
+        return { success: false, error: 'GroupChat module paths not initialized.' };
+    }
+    try {
+        return await requireGroupHistoryQueue().deleteHistory({ itemId: groupId, itemType: 'group' }, async lifecycle => {
+            await lifecycle.beforeConfigUpdate();
+            const groupDir = path.join(mainAppPaths.AGENT_GROUPS_DIR, groupId);
+            if (await fs.realpath(groupDir) !== path.resolve(groupDir)) throw new Error('Group deletion directory identity is unverified');
+            const configPath = path.join(groupDir, 'config.json');
+            const stat = await fs.lstat(configPath);
+            if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw new Error('Group deletion identity is unverified');
+            const existing = await fs.readJson(configPath);
+            if (existing?._historyDeleting) {
+                if (existing.id !== groupId || !Array.isArray(existing.topics) || existing.topics.length ||
+                    (existing._historyDeletedTopics !== undefined && (!Array.isArray(existing._historyDeletedTopics) || existing._historyDeletedTopics.some(id => typeof id !== 'string')))) throw new Error('Group deletion tombstone is invalid');
+            } else {
+                const result = await mutateGroupConfig(groupId, current => ({ ...current, topics: [], _historyDeleting: true }));
+                if (!result.success) throw new Error(result.error);
+            }
+            await lifecycle.changed();
+            await lifecycle.destructive();
+            await fs.remove(path.join(mainAppPaths.USER_DATA_DIR, groupId));
+            return { success: true };
+        });
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 处理群聊消息，并触发AI响应
+ * @param {string} groupId - 群组ID
+ * @param {string} topicId - 话题ID
+ * @param {object} userMessage - 用户发送的消息对象 { role: 'user', content: { text: '...', image?: 'base64...' }, id: 'messageId', name?: 'UserName' }
+ * @param {function} sendStreamChunkToRenderer - 用于发送流式数据的回调函数 (channel, data) => {}
+ * @param {function} getAgentConfigById - 函数，用于根据Agent ID获取其完整配置 (agentId) => Promise<AgentConfig|null>
+ * @returns {Promise<void>}
+ */
+async function handleGroupChatMessage(groupId, topicId, userMessage, sendStreamChunkToRenderer, getAgentConfigById, options = {}) {
+    const handoffOwner = crypto.randomUUID();
+    console.log('[GroupChat] handleGroupChatMessage invoked.');
+    const queueContext = createGroupQueueContext(groupId, topicId);
+    console.log('[GroupChat] mainAppPaths:', mainAppPaths ? JSON.stringify(Object.keys(mainAppPaths)) : 'undefined/null');
+    console.log('[GroupChat] typeof getAgentConfigById:', typeof getAgentConfigById);
+
+    if (!mainAppPaths || !mainAppPaths.AGENT_GROUPS_DIR || !mainAppPaths.AGENT_DIR || !mainAppPaths.USER_DATA_DIR || typeof getAgentConfigById !== 'function') {
+        console.error('[GroupChat] handleGroupChatMessage: Critical paths or getAgentConfigById not initialized properly.');
+        console.error(`[GroupChat] Details - mainAppPaths keys: ${mainAppPaths ? Object.keys(mainAppPaths).join(', ') : 'N/A'}, AGENT_GROUPS_DIR exists: ${!!mainAppPaths?.AGENT_GROUPS_DIR}, AGENT_DIR exists: ${!!mainAppPaths?.AGENT_DIR}, USER_DATA_DIR exists: ${!!mainAppPaths?.USER_DATA_DIR}, getAgentConfigById is function: ${typeof getAgentConfigById === 'function'}`);
+        if (typeof sendStreamChunkToRenderer === 'function') {
+            sendStreamChunkToRenderer({ type: 'error', error: '群聊模块关键路径或依赖未正确初始化。', messageId: userMessage.id || Date.now(), context: { groupId, topicId, isGroupMessage: true } });
+        }
+        return;
+    }
+
+    const groupConfig = await getAgentGroupConfig(groupId);
+    if (!groupConfig) {
+        console.error(`[GroupChat] 未找到群组配置: ${groupId}`);
+        if (typeof sendStreamChunkToRenderer === 'function') {
+            sendStreamChunkToRenderer({ type: 'error', error: `未找到群组配置: ${groupId}`, messageId: userMessage.id || Date.now(), context: { groupId, topicId, isGroupMessage: true } });
+        }
+        return;
+    }
+
+    if (groupConfig.mode === 'game') {
+        throw new Error('游戏会话请通过游戏界面提交操作与发言。');
+    }
+    const groupHistoryPath = path.join(mainAppPaths.USER_DATA_DIR, groupId, 'topics', topicId, 'history.json');
+    await assertNativeGroupTopic(groupId, topicId, groupConfig, groupHistoryPath);
+    let groupHistory = await fs.readJson(groupHistoryPath);
+
+    groupHistory = await sharedGroup.history(groupId,topicId,groupHistory);
+    const globalVcpSettings = await getVcpGlobalSettings();
+    const userNameForMessage = userMessage.name || globalVcpSettings.userName || '用户';
+
+    // VCPChatTarven (高级回复) - 收集生效的群聊规则
+    const conversationSnapshot = await require('../modules/services/conversationContext').resolve({ type: 'group', id: groupId });
+    const tavernRules = sharedGroup.rules(() => conversationSnapshot.rules);
+
+
+
+    // 确保 userMessage.content 是对象，并且 text 存在
+    // userMessage.content.text is combinedTextContent (user input + non-image file texts)
+    // userMessage.originalUserText is the raw user input
+    const userOriginalTextForHistory = userMessage.originalUserText ||
+                                     ((userMessage.content && typeof userMessage.content.text === 'string') ? userMessage.content.text : ''); // Fallback if originalUserText is somehow missing
+
+    // userMessage.attachments from grouprenderer.js now contains full _fileManagerData
+    let userMessageEntry = {
+        role: 'user',
+        name: userNameForMessage,
+        content: userOriginalTextForHistory, // Store original user text in history
+        attachments: userMessage.attachments || [], // Preserve full attachment info in history
+        timestamp: Date.now(),
+        id: userMessage.id || `msg_user_${Date.now()}`
+        // We might want to store userMessage.content.text (combined) separately in history if needed for other features,
+        // but for UI rendering and consistent history, originalUserText is better for the main 'content' field.
+    };
+    if (options.committedMessageId) {
+        groupHistory = await readLatestGroupHistory(groupId, topicId);
+        const committed = groupHistory.find(message => message.id === options.committedMessageId);
+        if (!committed || !['user', 'assistant'].includes(committed.role)) {
+            throw new Error('中央提交的群聊消息不存在或角色无效');
+        }
+        userMessageEntry = committed;
+    } else {
+        groupHistory = await appendGroupHistoryMessage(groupId, topicId, userMessageEntry);
+    }
+    // Only real human turns receive request-only user suffix rules.
+    // Resolve committed identity first; external assistant messages stay assistant.
+    if (userMessageEntry.role === 'user'
+        && Array.isArray(tavernRules) && tavernRules.length > 0
+        && typeof userMessage.content?.text === 'string') {
+        userMessage.content.text = tavernEngine.applyUserSuffix(userMessage.content.text, tavernRules, 'group');
+    }
+    setGroupStreamCallback(groupId, topicId, sendStreamChunkToRenderer);
+
+    // 获取所有成员的详细配置
+    const memberAgentConfigs = {};
+    for (const memberId of groupConfig.members) {
+        const agentConfig = await getAgentConfigById(memberId); // 使用传入的函数获取Agent配置
+        if (agentConfig && !agentConfig.error) {
+            memberAgentConfigs[memberId] = agentConfig;
+        } else {
+            console.warn(`[GroupChat] 未找到或无法加载群成员 ${memberId} 的配置: ${agentConfig?.error}`);
+        }
+    }
+
+    const activeMembers = groupConfig.members
+        .map(id => memberAgentConfigs[id])
+        .filter(Boolean); // 过滤掉未成功加载配置的成员
+
+    const releaseUnusedAdmission = async () => {
+        if (!options.admissionToken || !groupTopicAdmission) return;
+        const result = await groupTopicAdmission.release(
+            getGroupHistoryDescriptor(groupId, topicId), options.admissionToken, { saved: true });
+        if (!result?.success) throw new Error(result?.code || 'Unused group lease release failed');
+    };
+    if (activeMembers.length === 0) {
+        await releaseUnusedAdmission();
+        console.log('[GroupChat] 群聊中没有可用的活跃成员。');
+         if (typeof sendStreamChunkToRenderer === 'function') {
+            sendStreamChunkToRenderer({ type: 'no_ai_response', message: '当前群聊没有可响应的AI成员。', messageId: userMessage.id, context: { groupId, topicId, isGroupMessage: true } });
+        }
+        return;
+    }
+
+    if (groupConfig.mode === 'jev') {
+        const orchestrator = ensureJevSessionOrchestrator();
+        const mentionedAgentIds = detectMentionedAgentIds(
+            userOriginalTextForHistory,
+            activeMembers
+        );
+        const stateBefore = orchestrator.getState(groupId, topicId);
+        if (userMessageEntry.role === 'user') {
+            orchestrator.notifyHumanMessage(
+                groupId,
+                topicId,
+                userMessageEntry,
+                mentionedAgentIds
+            );
+        } else {
+            orchestrator.notifyExternalMessage(groupId, topicId);
+        }
+        if (stateBefore.running && options.admissionToken) {
+            const handoff = await orchestrator.handoffAdmission(groupId, topicId, options.admissionToken);
+            if (!handoff.accepted) {
+                throw Object.assign(new Error('JEV编排正在停止或收尾，中央批次交接已暂停'), {
+                    code: 'GROUP_HANDOFF_PAUSED',
+                });
+            }
+        } else if (!stateBefore.running) {
+            const startResult = orchestrator.start(groupId, topicId, {
+                trigger: userMessageEntry.role === 'user' ? 'user_message' : 'external_message',
+                admissionToken: options.admissionToken || null
+            });
+            if (startResult.promise) await startResult.promise;
+        }
+        return;
+    }
+
+    const runKey = getGroupQueueKey(groupId, topicId);
+    const existingRun = ordinaryGroupRuns.get(runKey);
+    if (options.admissionToken && existingRun) {
+        if (!existingRun.accepting || existingRun.queueContext.isAborted()
+            || existingRun.barrier || existingRun.token) {
+            throw Object.assign(new Error('群聊队列不接受当前批次交接，已暂停'), { code: 'GROUP_HANDOFF_PAUSED' });
+        }
+        let unblock;
+        existingRun.barrier = new Promise(resolve => { unblock = resolve; });
+        existingRun.token = options.admissionToken;
+        try {
+            const result = await groupTopicAdmission.transferToWaiting(
+                getGroupHistoryDescriptor(groupId, topicId),
+                options.admissionToken, existingRun.handoffOwner);
+            if (result?.success) {
+                existingRun.token = null;
+            } else if (!['NO_WAITING_SPEAKER', 'HANDOFF_CANCELLED'].includes(result?.code)) {
+                throw new Error(result?.error || result?.code || 'Group handoff failed');
+            } else if (!existingRun.accepting || existingRun.queueContext.isAborted()) {
+                throw new Error('群聊队列已停止，批次交接暂停');
+            }
+        } catch (error) {
+            existingRun.token = null;
+            throw error;
+        } finally {
+            existingRun.barrier = null;
+            unblock();
+        }
+        return;
+    }
+
+    // 群聊引擎持有队列运行上下文；模式只通过统一接口读取中止状态。
+    // 使用策略模式决定发言者
+    let agentsToRespond = [];
+    const modeHandler = CHAT_MODES[groupConfig.mode];
+    if (modeHandler) {
+        agentsToRespond = sharedGroup.speakers() || modeHandler.determineSpeakers(activeMembers, groupHistory, groupConfig, userMessageEntry, queueContext);
+    } else {
+        console.warn(`[GroupChat] 未知的群聊模式: ${groupConfig.mode}，不自动响应。`);
+        agentsToRespond = [];
+    }
+
+    // 只有在 agentsToRespond 明确有内容时才继续自动发言流程
+    // 在 invite_only 模式下，这个循环不会执行
+    if (agentsToRespond.length > 0) {
+        console.log(`[GroupChat] Agents to respond automatically: ${agentsToRespond.map(a => a.name).join(', ')}`);
+        // The admission batch remains owned until the first speaker durably saves.
+        const run = {
+            handoffOwner, queueContext, token: options.admissionToken || null,
+            barrier: null, accepting: true,
+        };
+        if (ordinaryGroupRuns.has(runKey)) throw new Error('群聊发言队列已运行');
+        ordinaryGroupRuns.set(runKey, run);
+        try {
+        // 按顺序让选中的 Agent 发言 (严格串行处理)
+        for (const agentConfig of agentsToRespond) {
+            // 中止作用于整组队列，而不只是当前正在流式输出的 Agent。
+            if (queueContext.isAborted()) {
+                console.log(`[GroupChat] Queue aborted; remaining speakers will not be scheduled for ${groupId}/${topicId}.`);
+                break;
+            }
+            const agentId = agentConfig.id;
+        const agentName = agentConfig.name || agentId; // 修复：如果名称丢失，回退到 agentId
+        // 为每个Agent的响应生成唯一ID
+        const messageIdForAgentResponse = sharedGroup.replyId(agentId, `msg_group_${userMessage.id}_${agentId}_${Date.now()}`);
+
+        // 重新从文件读取最新的历史记录，确保获取到上一个Agent的发言
+        // 注意：如果Agent非常多且发言很快，频繁读写文件可能会有性能影响，
+        // 但为了严格的上下文连续性，这是必要的。
+        // 或者，在 handleGroupChatMessage 开始时读取一次，然后在此循环中仅更新内存中的 groupHistory 数组，
+        // 并在每个 agent 发言完毕后，将该 agent 的发言追加到文件。
+        // 当前的 groupHistory 是在函数开始时加载的，并在用户发言后追加了用户消息。
+        // 我们将在每个 AI 发言后，将 AI 的回复也追加到这个内存中的 groupHistory，并写回文件。
+
+        const admission = sharedGroup.current() ? null : groupTopicAdmission;
+        const admissionScope = getGroupHistoryDescriptor(groupId, topicId);
+        while (run.barrier) await run.barrier;
+        const admissionToken = run.token || crypto.randomUUID();
+        run.token = null;
+        let admissionDispatched = false;
+        let admissionCommitted = false;
+        let admissionFailure = null;
+        if (admission) {
+            await admission.acquireWhenIdle(admissionScope, admissionToken, { handoffOwner });
+        }
+        const persistAgentResponse = async (targetGroupId, targetTopicId, message) => {
+            const terminal = admission
+                ? { ...message, admissionToken, admissionTerminal: true }
+                : message;
+            const history = await appendGroupHistoryMessage(targetGroupId, targetTopicId, terminal);
+            admissionCommitted = true;
+            return history;
+        };
+        try {
+        if (queueContext.isAborted()) break;
+        groupHistory = await readLatestGroupHistory(groupId, topicId);
+
+        // 1. 构建 SystemPrompt (基于当前 agentConfig 和 groupConfig)
+        let combinedSystemPrompt = agentConfig.systemPrompt || `你是${agentName}。`;
+        if (groupConfig.groupPrompt) {
+            let groupPrompt = groupConfig.groupPrompt;
+            // 处理 VCPChatGroupSessionWatcher 占位符
+            if (groupPrompt.includes(GROUP_SESSION_WATCHER_PLACEHOLDER)) {
+                const sessionWatcherInfo = await getGroupSessionWatcher(groupId, topicId);
+                groupPrompt = groupPrompt.replace(new RegExp(GROUP_SESSION_WATCHER_PLACEHOLDER, 'g'), JSON.stringify(sessionWatcherInfo));
+            }
+            combinedSystemPrompt += `\n\n[群聊设定]:\n${groupPrompt}`;
+        }
+
+        // VCPChatTarven: 在系统提示词尾部追加 system_suffix 规则
+        if (Array.isArray(tavernRules) && tavernRules.length > 0) {
+            combinedSystemPrompt = tavernEngine.applySystemSuffix(combinedSystemPrompt, tavernRules, 'group');
+        }
+        // 最后展开工作区占位符，使 Tavern 预设规则中的占位符同样生效。
+        combinedSystemPrompt = await expandWorkspacePlaceholdersInPrompt(combinedSystemPrompt, conversationSnapshot);
+
+        // 2. 构建上下文结构 (每次循环都基于最新的 groupHistory)
+        // 历史仍完整持久化；窗口仅限制本次发送给模型的最近楼层。
+        const contextHistoryForAgent = selectGroupContextHistory(groupHistory, groupConfig);
+        const contextForAgentPromises = contextHistoryForAgent.map(async msg => {
+            const speakerName = msg.name || (msg.role === 'user' ? userNameForMessage : (memberAgentConfigs[msg.agentId]?.name || 'AI'));
+
+            let textForAIContext;
+            if (msg.id === userMessage.id && msg.role === 'user') {
+                // This is the current user message being processed for the AI turn.
+                // Use the combined text passed from grouprenderer (userMessage.content.text).
+                textForAIContext = (userMessage.content && typeof userMessage.content.text === 'string')
+                                   ? userMessage.content.text
+                                   : '';
+
+                if (textForAIContext.includes(CANVAS_PLACEHOLDER)) {
+                    try {
+                        const canvasData = await canvasHandlers.handleGetLatestCanvasContent();
+                        if (canvasData && !canvasData.error) {
+                            const formattedCanvasContent = `
+[Canvas Content]
+${canvasData.content || ''}
+[Canvas Path]
+${canvasData.path || 'No file path'}
+[Canvas Errors]
+${canvasData.errors || 'No errors'}
+`;
+                            textForAIContext = textForAIContext.replace(new RegExp(CANVAS_PLACEHOLDER, 'g'), formattedCanvasContent);
+                        } else {
+                            console.error("[GroupChat] Failed to get latest canvas content:", canvasData?.error);
+                            textForAIContext = textForAIContext.replace(new RegExp(CANVAS_PLACEHOLDER, 'g'), '\n[Canvas content could not be loaded]\n');
+                        }
+                    } catch (error) {
+                        // 这个catch块现在理论上不会因为handleGetLatestCanvasContent本身被触发，但保留以防万一
+                        console.error("[GroupChat] Error processing canvas content:", error);
+                        textForAIContext = textForAIContext.replace(new RegExp(CANVAS_PLACEHOLDER, 'g'), '\n[Error processing canvas content]\n');
+                    }
+                }
+            } else {
+                // This is a historical message. msg.content is now the original user text.
+                // We need to reconstruct the text with appended file contents for the AI.
+                textForAIContext = (typeof msg.content === 'string') ? msg.content : '';
+                if (msg.attachments && msg.attachments.length > 0) {
+                    for (const att of msg.attachments) {
+                        const fileManagerData = att && att._fileManagerData ? att._fileManagerData : {};
+                        // 🟢 同步：多级路径探测。优先使用 internalPath (物理路径)
+                        // 兼容上下文编辑/拖拽追加后附件元数据位于顶层，或 _fileManagerData 丢失的历史结构。
+                        const effectiveType = fileManagerData.type || att?.type || '';
+                        // @笔记实时引用：从笔记区真实文件重新读取最新内容。
+                        const isLiveNote = fileManagerData.isLiveReference === true || att?.isLiveReference === true;
+                        let effectiveExtractedText = fileManagerData.extractedText || att?.extractedText || '';
+                        const effectiveImageFrames = fileManagerData.imageFrames || att?.imageFrames;
+                        if (isLiveNote) {
+                            const liveText = await fileManager.readLiveReferenceText({ ...att, ...fileManagerData, isLiveReference: true });
+                            if (typeof liveText === 'string') effectiveExtractedText = liveText;
+                        }
+                        const effectiveInternalPath = fileManagerData.internalPath || att?.internalPath;
+                        const filePathForContext = effectiveInternalPath ||
+                                                   att?.localPath ||
+                                                   att?.src ||
+                                                   (att?.name || '未知文件');
+
+                        if (isLiveNote) {
+                            const liveLabel = fileManager.describeLiveReference({ ...att, ...fileManagerData });
+                            textForAIContext += `\n\n[附加文件: ${filePathForContext} (${liveLabel})]\n${effectiveExtractedText}\n[/附加文件结束: ${att?.name || '未知文件'}]`;
+                        } else if (Array.isArray(effectiveImageFrames) && effectiveImageFrames.length > 0) {
+                            textForAIContext += `\n\n[附加文件: ${filePathForContext} (扫描版/图像型PDF，已内联 ${effectiveImageFrames.length} 页多模态图像)]\n${effectiveExtractedText || ''}`;
+                        } else if (typeof effectiveExtractedText === 'string' && effectiveExtractedText.trim() !== '') {
+                            textForAIContext += `\n\n[附加文件: ${filePathForContext}]\n${effectiveExtractedText}\n[/附加文件结束: ${att?.name || '未知文件'}]`;
+                        } else if (effectiveType.startsWith('audio/')) {
+                            textForAIContext += `\n\n[附加音频: ${filePathForContext}]`;
+                        } else if (effectiveType.startsWith('video/')) {
+                            textForAIContext += `\n\n[附加视频: ${filePathForContext}]`;
+                        } else if (effectiveType.startsWith('image/')) {
+                             textForAIContext += `\n\n[附加图片: ${filePathForContext}]`;
+                        } else if (effectiveType && !effectiveType.startsWith('image/')) {
+                            textForAIContext += `\n\n[附加文件: ${filePathForContext} (无法预览文本内容)]`;
+                        } else if (!att?._fileManagerData) {
+                            console.warn(`[GroupChat Context] Historical message attachment for "${att?.name || '未知文件'}" is missing _fileManagerData. Text content cannot be appended.`);
+                        }
+                    }
+                }
+            }
+
+            textForAIContext = sharedGroup.contextText(contextHistoryForAgent,msg,textForAIContext,agentConfig,userMessageEntry.id);
+            const contentWithSpeakerTag = textForAIContext.startsWith(`[${speakerName}的发言]`)
+                ? textForAIContext : `[${speakerName}的发言]: ${textForAIContext}`;
+            const vcpMessageContent = [{ type: 'text', text: contentWithSpeakerTag }];
+
+            // Image handling: Iterate through attachments of the current message (msg)
+            // msg.attachments contains _fileManagerData which has internalPath
+            if (msg.attachments && msg.attachments.length > 0) {
+                for (const att of msg.attachments) {
+                    const fileManagerData = att && att._fileManagerData ? att._fileManagerData : {};
+                    const effectiveImageFrames = fileManagerData.imageFrames || att?.imageFrames;
+                    if (Array.isArray(effectiveImageFrames) && effectiveImageFrames.length > 0) {
+                        for (const frame of effectiveImageFrames) {
+                            vcpMessageContent.push({
+                                type: 'image_url',
+                                image_url: { url: `data:image/jpeg;base64,${frame}` }
+                            });
+                        }
+                        continue;
+                    }
+                    const effectiveType = fileManagerData.type || att?.type || '';
+                    const effectiveInternalPath = fileManagerData.internalPath || att?.internalPath || att?.src || att?.localPath;
+                    const isSupportedMediaType = effectiveType.startsWith('image/') || effectiveType.startsWith('audio/') || effectiveType.startsWith('video/');
+                    if (effectiveType && isSupportedMediaType && effectiveInternalPath) {
+                        try {
+                            const result = await fileManager.getFileAsBase64(effectiveInternalPath);
+                            if (result && result.success && result.base64Frames && result.base64Frames.length > 0) {
+                                // 对于多帧的媒体（如GIF），我们这里只取第一帧给AI，以避免上下文过长。
+                                // 未来可以根据模型能力进行优化。
+                                vcpMessageContent.push({
+                                    type: 'image_url',
+                                    image_url: { url: `data:${effectiveType};base64,${result.base64Frames[0]}` }
+                                });
+                            } else {
+                                console.warn(`[GroupChat] Failed to get base64 for media ${att?.name || fileManagerData.name || '未知文件'}: ${result?.error}`);
+                            }
+                        } catch (e) {
+                            console.error(`[GroupChat] Error getting base64 for media ${att?.name || fileManagerData.name || '未知文件'} in context:`, e);
+                        }
+                    }
+                }
+            }
+
+            return attachTimestampMetaToVcpMessage(
+                {
+                    role: msg.role,
+                    content: vcpMessageContent, // This is now an array
+                },
+                msg
+            );
+        });
+
+        const contextForAgent = await Promise.all(contextForAgentPromises);
+
+        // 3. 构建 InvitePrompt
+        let invitePromptContent = (groupConfig.invitePrompt || `[系统邀请指令:] 现在轮到你 {{VCPChatAgentName}} 发言了。`).replace(/{{VCPChatAgentName}}/g, agentName);
+
+        let messagesForAI = [];
+        if (combinedSystemPrompt.trim()) {
+            messagesForAI.push({ role: 'system', content: combinedSystemPrompt });
+        }
+        messagesForAI.push(...contextForAgent);
+        // 添加触发AI发言的模拟用户输入 (as text part of a content array)
+        messagesForAI.push({ role: 'user', content: [{ type: 'text', text: invitePromptContent }], name: userNameForMessage });
+
+        // VCPChatTarven: 应用 context_inject 规则（按深度插入消息，跳过 system）
+        if (Array.isArray(tavernRules) && tavernRules.some(r => r.type === 'context_inject' && r.enabled !== false)) {
+            const sysMsgs = messagesForAI.filter(m => m.role === 'system');
+            const nonSysMsgs = messagesForAI.filter(m => m.role !== 'system');
+            const injected = tavernEngine.applyContextInject(nonSysMsgs, tavernRules, 'group', {
+                makeMessage: (role, text) => ({
+                    role,
+                    content: [{ type: 'text', text }]
+                })
+            });
+            messagesForAI = [...sysMsgs, ...injected];
+        }
+        // --- VCP Thought Chain Stripping ---
+        try {
+            // 默认不注入元思考链，除非明确开启
+            if (globalVcpSettings.enableThoughtChainInjection !== true) {
+                messagesForAI = messagesForAI.map(msg => {
+                    if (typeof msg.content === 'string') {
+                        return { ...msg, content: contextSanitizer.stripThoughtChains(msg.content) };
+                    } else if (Array.isArray(msg.content)) {
+                        return {
+                            ...msg,
+                            content: msg.content.map(part => {
+                                if (part.type === 'text' && typeof part.text === 'string') {
+                                    return { ...part, text: contextSanitizer.stripThoughtChains(part.text) };
+                                }
+                                return part;
+                            })
+                        };
+                    }
+                    return msg;
+                });
+                console.log(`[GroupChat ThoughtChain] Thought chains stripped from context`);
+            }
+        } catch (e) {
+            console.error('[GroupChat ThoughtChain] Failed to strip thought chains:', e);
+        }
+        // --- End of Thought Chain Stripping ---
+
+        // 添加净化器处理
+        if (globalVcpSettings.enableContextSanitizer === true) {
+            const sanitizerDepth = globalVcpSettings.contextSanitizerDepth !== undefined ? globalVcpSettings.contextSanitizerDepth : 2;
+            console.log(`[GroupChat Context Sanitizer] Enabled with depth: ${sanitizerDepth}`);
+
+            const systemMessages = messagesForAI.filter(m => m.role === 'system');
+            const nonSystemMessages = messagesForAI.filter(m => m.role !== 'system');
+
+            // 使用已加载的净化器，传入 enableThoughtChainInjection 参数
+            const sanitizedNonSystemMessages = contextSanitizer.sanitizeMessages(
+                nonSystemMessages,
+                sanitizerDepth,
+                globalVcpSettings.enableThoughtChainInjection === true
+            );
+
+            messagesForAI = [...systemMessages, ...sanitizedNonSystemMessages];
+
+            console.log(`[GroupChat Context Sanitizer] Messages processed successfully`);
+        }
+        const modelResolution = resolveEffectiveModel(groupConfig, agentConfig);
+        if (!globalVcpSettings.vcpUrl) {
+            const errorMsg = `Agent ${agentName} (${agentId}) 无法响应：VCP URL 未配置。`;
+            console.error(`[GroupChat] ${errorMsg}`);
+            const errorResponse = { role: 'assistant', name: agentName, agentId: agentId, content: `[系统消息] ${errorMsg}`, timestamp: Date.now(), id: messageIdForAgentResponse };
+            groupHistory = await persistAgentResponse(groupId, topicId, errorResponse);
+            if (typeof sendStreamChunkToRenderer === 'function') {
+                sendStreamChunkToRenderer({ type: 'error', error: errorMsg, messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId, agentName, isGroupMessage: true } });
+            }
+            continue; // 继续处理下一个需要发言的Agent
+        }
+
+        if (!modelResolution.effectiveModel) {
+            const modelHint = modelResolution.usingUnifiedModel
+                ? '已启用群组统一模型，但群组统一模型为空。'
+                : '当前成员未配置模型。';
+            const errorMsg = `Agent ${agentName} (${agentId}) 无法响应：${modelHint}`;
+            console.error(`[GroupChat] ${errorMsg}`);
+            const errorResponse = { role: 'assistant', name: agentName, agentId: agentId, content: `[系统消息] ${errorMsg}`, timestamp: Date.now(), id: messageIdForAgentResponse };
+            groupHistory = await persistAgentResponse(groupId, topicId, errorResponse);
+            if (typeof sendStreamChunkToRenderer === 'function') {
+                sendStreamChunkToRenderer({ type: 'error', error: errorMsg, messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId, agentName, isGroupMessage: true } });
+            }
+            continue; // 继续处理下一个需要发言的Agent
+        }
+
+        try {
+            if (queueContext.isAborted()) break;
+
+            // Send 'agent_thinking' event before VCP call for ALL agents
+            console.log(`[GroupChat] Preparing to send 'agent_thinking' event for ${agentName} (msgId: ${messageIdForAgentResponse})`);
+            if (typeof sendStreamChunkToRenderer === 'function') {
+                sendStreamChunkToRenderer({
+                    type: 'agent_thinking',
+                    messageId: messageIdForAgentResponse,
+                    context: {
+                        groupId,
+                        topicId,
+                        agentId,
+                        agentName,
+                        avatarUrl: agentConfig.avatarUrl,
+                        avatarColor: agentConfig.avatarCalculatedColor,
+                        isGroupMessage: true
+                    }
+                });
+                console.log(`[GroupChat] 'agent_thinking' event sent for ${agentName}.`);
+                // Short delay to allow renderer to process 'thinking' bubble
+                await new Promise(resolve => setTimeout(resolve, 200));
+                if (queueContext.isAborted()) {
+                    sendStreamChunkToRenderer({
+                        type: 'end',
+                        error: '群聊队列已中止',
+                        fullResponse: '',
+                        messageId: messageIdForAgentResponse,
+                        context: { groupId, topicId, agentId, agentName, isGroupMessage: true },
+                        interrupted: true,
+                        queueInterrupted: true
+                    });
+                    break;
+                }
+            } else {
+                console.error(`[GroupChat] sendStreamChunkToRenderer is not a function when sending 'agent_thinking' for ${agentName}!`);
+            }
+
+            const modelConfigForAgent = {
+               model: modelResolution.effectiveModel,
+                temperature: parseFloat(agentConfig.temperature),
+                max_tokens: agentConfig.maxOutputTokens ? parseInt(agentConfig.maxOutputTokens) : undefined,
+                stream: agentConfig.streamOutput === true || String(agentConfig.streamOutput) === 'true'
+            };
+
+            // === 分阶段弹性超时设计 (Phased Timeout Architecture) ===
+            // 阶段 1: 等待 HTTP 响应头 (120秒)；fetch 返回即清除，不等待正文或 reasoning
+            // 阶段 2: 块间流式看门狗 (62秒)，开始收到流数据后若连续 62秒无新数据则熔断僵死
+            const GROUP_TTFT_TIMEOUT_MS = 120000;
+            const GROUP_CHUNK_IDLE_TIMEOUT_MS = 62000;
+
+            const controller = new AbortController();
+            let activeTimer = setTimeout(() => {
+                console.warn(`[GroupChat] TTFT 超时 (${GROUP_TTFT_TIMEOUT_MS}ms) 未收到响应头，主动中止: ${agentName}`);
+                controller.abort('ttft_timeout');
+            }, GROUP_TTFT_TIMEOUT_MS);
+            registerActiveGroupRequest(messageIdForAgentResponse, controller, groupId, topicId);
+
+            const trajectoryCall = beginTrajectoryCall({
+                sessionKey: sessionKeyFromContext({ groupId, topicId }),
+                requestId: messageIdForAgentResponse,
+                source: sourceFromContext({ groupId, topicId, agentId, agentName, isGroupMessage: true }),
+                model: modelConfigForAgent.model,
+                params: { temperature: modelConfigForAgent.temperature, max_tokens: modelConfigForAgent.max_tokens, stream: modelConfigForAgent.stream },
+                messages: messagesForAI
+            });
+            let response;
+            try {
+                admissionDispatched = true;
+                response = await sharedGroup.send(fetch,resolveGroupChatUrl(globalVcpSettings.vcpUrl, globalVcpSettings.enableVcpToolInjection), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${globalVcpSettings.vcpApiKey}`
+                    },
+                    body: JSON.stringify(buildGroupRequestBody(messagesForAI, {
+                        model: modelConfigForAgent.model,
+                        temperature: modelConfigForAgent.temperature,
+                        max_tokens: modelConfigForAgent.max_tokens,
+                        stream: modelConfigForAgent.stream
+                    }, messageIdForAgentResponse)),
+                    signal: controller.signal
+                });
+            } catch (fetchError) {
+                fetchError = normalizeGroupFetchError(fetchError, controller, GROUP_TTFT_TIMEOUT_MS);
+                trajectoryCall.finish({ error: fetchError, aborted: controller.signal.aborted });
+                clearTimeout(activeTimer);
+                if (fetchError.name === 'AbortError') {
+                    console.log(`[GroupChat] VCP fetch for ${agentName} was aborted before stream began.`);
+                     if (typeof sendStreamChunkToRenderer === 'function') {
+                         sendStreamChunkToRenderer({ type: 'end', error: '用户中止', fullResponse: '', messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId, agentName, isGroupMessage: true }, interrupted: true });
+                     }
+                    activeRequestControllers.delete(messageIdForAgentResponse);
+                    continue;
+                }
+                throw fetchError;
+            } finally {
+                clearTimeout(activeTimer);
+            }
+
+            if (!response.ok) {
+            trajectoryCall.finish({ error: { name: 'HTTPError', message: `VCP request failed: ${response.status}` } });
+                const errorText = await (await import('../modules/chat/boundedResponse.mjs')).readResponseText(response,{maxBytes:64*1024,deadline:Date.now()+15000,signal:controller.signal});
+                console.error(`[GroupChat] VCP request failed for ${agentName}. Status: ${response.status}, Response Text:`, errorText);
+                let errorData = { message: `Server returned status ${response.status}`, details: errorText };
+                try { const parsedError = JSON.parse(errorText); if (typeof parsedError === 'object' && parsedError !== null) errorData = parsedError; } catch (e) { /* Not JSON */ }
+
+                const errorMessageToPropagate = `VCP request failed: ${response.status} - ${errorData.message || errorData.error || (typeof errorData === 'string' ? errorData : 'Unknown server error')}`;
+                const errorResponseEntry = { role: 'assistant', name: agentName, agentId: agentId, content: `[System Message] ${errorMessageToPropagate}`, timestamp: Date.now(), id: messageIdForAgentResponse };
+                groupHistory = await persistAgentResponse(groupId, topicId, errorResponseEntry);
+
+                if (typeof sendStreamChunkToRenderer === 'function') {
+                    // Finalize the 'thinking' bubble with an error message
+                    sendStreamChunkToRenderer({ type: 'end', error: errorMessageToPropagate, fullResponse: `[错误] ${errorMessageToPropagate}`, messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId, agentName, isGroupMessage: true } });
+                }
+                activeRequestControllers.delete(messageIdForAgentResponse);
+                continue; // Move to the next agent
+            }
+
+            if (modelConfigForAgent.stream) {
+                // For streaming, now send the 'start' event to replace the 'thinking' bubble
+                console.log(`[GroupChat] VCP Response: Starting stream for ${agentName} (msgId: ${messageIdForAgentResponse})`);
+                if (typeof sendStreamChunkToRenderer === 'function') {
+                    sendStreamChunkToRenderer({
+                        type: 'start',
+                        messageId: messageIdForAgentResponse,
+                        context: {
+                            groupId,
+                            topicId,
+                            agentId,
+                            agentName,
+                            avatarUrl: agentConfig.avatarUrl,
+                            avatarColor: agentConfig.avatarCalculatedColor,
+                            isGroupMessage: true
+                        }
+                    });
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                // 启动阶段 2 块间流式看门狗 (Chunk Idle Watchdog)
+                const resetIdleTimer = () => {
+                    clearTimeout(activeTimer);
+                    activeTimer = setTimeout(() => {
+                        // 服务端在等用户审批工具调用时不发数据，这不是僵死
+                        if (isWaitingForToolApproval(agentName)) { resetIdleTimer(); return; }
+                        console.warn(`[GroupChat] 流式空闲超时：连续 ${GROUP_CHUNK_IDLE_TIMEOUT_MS}ms 无新数据，判定僵死主动熔断: ${agentName}`);
+                        controller.abort('chunk_idle_timeout');
+                    }, GROUP_CHUNK_IDLE_TIMEOUT_MS);
+                };
+
+                // This function will now be awaited
+                async function processStreamForGroupAndUpdateHistory() {
+                    let accumulatedResponse = "";
+                    const {createSseDecoder}=await import('../modules/chat/sseProtocol.mjs');
+                    let finishReason=null;
+                    let observedFinishReason=null;
+                    const protocol=createSseDecoder({onData:parsedChunk=>{
+observedFinishReason=observeGroupFinishReason(observedFinishReason,parsedChunk.choices);
+trajectoryCall.chunk(parsedChunk);
+
+                                        // 更全面的安全检查，处理各种可能的响应格式
+                                        let hasContent = false;
+
+                                        // 标准OpenAI格式 (choices[0].delta.content)
+                                        if (parsedChunk.choices && Array.isArray(parsedChunk.choices) && parsedChunk.choices.length > 0) {
+                                            const choice = parsedChunk.choices[0];
+                                            if (choice && choice.delta) {
+                                                if (typeof choice.delta.content === 'string' && choice.delta.content !== '') {
+                                                    accumulatedResponse += choice.delta.content;
+                                                    hasContent = true;
+                                                }
+                                            }
+                                        }
+
+                                        // 备选格式1 (delta.content)
+                                        if (!hasContent && parsedChunk.delta) {
+                                            if (typeof parsedChunk.delta.content === 'string' && parsedChunk.delta.content !== '') {
+                                                accumulatedResponse += parsedChunk.delta.content;
+                                                hasContent = true;
+                                            }
+                                        }
+
+                                        // 备选格式2 (content)
+                                        if (!hasContent && typeof parsedChunk.content === 'string' && parsedChunk.content !== '') {
+                                            accumulatedResponse += parsedChunk.content;
+                                            hasContent = true;
+                                        }
+
+                                        // 备选格式3 (message.content) - 某些API的格式
+                                        if (!hasContent && parsedChunk.message && typeof parsedChunk.message.content === 'string' && parsedChunk.message.content !== '') {
+                                            accumulatedResponse += parsedChunk.message.content;
+                                            hasContent = true;
+                                        }
+
+                                        // 总是发送chunk事件，即使没有新内容（保持流的连续性）
+                                        if (typeof sendStreamChunkToRenderer === 'function') {
+                                            sendStreamChunkToRenderer({
+                                                type: 'data',
+                                                chunk: parsedChunk,
+                                                messageId: messageIdForAgentResponse,
+                                                context: { groupId, topicId, agentId, agentName, isGroupMessage: true },
+                                                hasContent: hasContent // 添加标志位，让前端知道是否有实际内容
+                                            });
+                                        }
+                                    
+                            },onDone:value=>{finishReason=value.finishReason;}});
+                    try {
+                        resetIdleTimer();
+                        while (true) {
+                            const { done: eof, value } = protocol.done ? {done:true} : await reader.read();
+                            if(eof)protocol.finish();else protocol.push(value);
+                            const done=eof||protocol.done;
+
+                            if (done) {
+                            requireTrustedGroupTerminal(finishReason === observedFinishReason ? finishReason : null, accumulatedResponse);
+                            trajectoryCall.finish();
+                                clearTimeout(activeTimer);
+                                console.log(`[GroupChat] VCP stream ended for ${agentName} (msgId: ${messageIdForAgentResponse})`);
+                                const finalAiResponseEntry = { role: 'assistant', name: agentName, agentId: agentId, model: modelConfigForAgent.model, modelSource: modelResolution.usingUnifiedModel ? 'group_unified' : 'agent', content: accumulatedResponse, finishReason:finishReason==='length'?'length':'completed', timestamp: Date.now(), id: messageIdForAgentResponse, isGroupMessage: true, groupId, topicId, avatarUrl: agentConfig.avatarUrl, avatarColor: agentConfig.avatarCalculatedColor };
+                                groupHistory = await persistAgentResponse(groupId, topicId, finalAiResponseEntry);
+                                if (typeof sendStreamChunkToRenderer === 'function') {
+                                    sendStreamChunkToRenderer({ type: 'end', messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId, agentName, isGroupMessage: true }, fullResponse: accumulatedResponse });
+                                }
+                                break;
+                            }
+                            resetIdleTimer();
+                        }
+                    } catch (streamError) {
+                        if (isUntrustedGroupTerminal(streamError)) {
+                            if (accumulatedResponse) streamError.partialText = accumulatedResponse;
+                            throw streamError;
+                        }
+                        trajectoryCall.finish({ error: streamError, aborted: streamError?.name === 'AbortError' });
+                        if (isWatchdogAbort(streamError, controller)) {
+                            // 看门狗熔断：reader 抛出的是 abort 的字符串原因，没有 .message；已收到的内容（可能含已执行的工具调用和结果）要留下
+                            console.warn(`[GroupChat] VCP stream for ${agentName} (msgId: ${messageIdForAgentResponse}) stopped by the idle watchdog.`);
+                            const partialContent = withWatchdogNote(accumulatedResponse, GROUP_CHUNK_IDLE_TIMEOUT_MS);
+                            const finalAiResponseEntry = { role: 'assistant', name: agentName, agentId: agentId, model: modelConfigForAgent.model, modelSource: modelResolution.usingUnifiedModel ? 'group_unified' : 'agent', content: partialContent, timestamp: Date.now(), id: messageIdForAgentResponse, isGroupMessage: true, groupId, topicId, avatarUrl: agentConfig.avatarUrl, avatarColor: agentConfig.avatarCalculatedColor, interrupted: true };
+                            groupHistory = await persistAgentResponse(groupId, topicId, finalAiResponseEntry);
+                            if (typeof sendStreamChunkToRenderer === 'function') {
+                                sendStreamChunkToRenderer({ type: 'end', messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId, agentName, isGroupMessage: true }, fullResponse: partialContent, interrupted: true });
+                            }
+                        } else if (streamError.name === 'AbortError') {
+                            console.log(`[GroupChat] VCP stream for ${agentName} (msgId: ${messageIdForAgentResponse}) was aborted by user.`);
+                            // Even though it was aborted, we save the content received so far.
+                            const finalAiResponseEntry = { role: 'assistant', name: agentName, agentId: agentId, model: modelConfigForAgent.model, modelSource: modelResolution.usingUnifiedModel ? 'group_unified' : 'agent', content: accumulatedResponse, timestamp: Date.now(), id: messageIdForAgentResponse, isGroupMessage: true, groupId, topicId, avatarUrl: agentConfig.avatarUrl, avatarColor: agentConfig.avatarCalculatedColor, interrupted: true };
+                            groupHistory = await persistAgentResponse(groupId, topicId, finalAiResponseEntry);
+                            if (typeof sendStreamChunkToRenderer === 'function') {
+                                // Send 'end' event to finalize the UI with the partial content.
+                                sendStreamChunkToRenderer({ type: 'end', messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId, agentName, isGroupMessage: true }, fullResponse: accumulatedResponse, interrupted: true });
+                            }
+                        } else {
+                            console.error(`[GroupChat] VCP stream reading error for ${agentName}:`, streamError);
+                            const errorText = `[System Message] ${agentName} stream processing error: ${streamError.message}`;
+                            const streamErrorResponseEntry = { role: 'assistant', name: agentName, agentId: agentId, content: accumulatedResponse, finishReason:accumulatedResponse?'interrupted':'failed',errorCode:streamError.code||'STREAM_FAILED', timestamp: Date.now(), id: messageIdForAgentResponse, isGroupMessage: true, groupId, topicId };
+                            groupHistory = await persistAgentResponse(groupId, topicId, streamErrorResponseEntry);
+                            if (typeof sendStreamChunkToRenderer === 'function') {
+                                sendStreamChunkToRenderer({ type: 'end', fullResponse:accumulatedResponse,interrupted:Boolean(accumulatedResponse),finish_reason:accumulatedResponse?'interrupted':'failed',errorCode:streamError.code, error: `VCP stream reading error: ${streamError.message}`, messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId, agentName, isGroupMessage: true } });
+                            }
+                        }
+                    } finally {
+                        clearTimeout(activeTimer);
+                        reader.releaseLock();
+                        activeRequestControllers.delete(messageIdForAgentResponse);
+                        console.log(`[GroupChat] Active request controller removed for ${messageIdForAgentResponse}`);
+                    }
+                }
+                await processStreamForGroupAndUpdateHistory();
+            } else { // Non-streaming response
+                console.log(`[GroupChat] VCP Response: Non-streaming for ${agentName}`);
+                const vcpResponseJson = (await import('../modules/chat/boundedResponse.mjs')).validateCompletion(JSON.parse(await (await import('../modules/chat/boundedResponse.mjs')).readResponseText(response,{signal:controller.signal})));
+                requireTrustedGroupTerminal(vcpResponseJson.choices?.[0]?.finish_reason, vcpResponseJson.choices?.[0]?.message?.content);
+                trajectoryCall.finish({ response: vcpResponseJson });
+                const aiResponseContent = vcpResponseJson.choices && vcpResponseJson.choices.length > 0 ? vcpResponseJson.choices[0].message.content : "[AI failed to generate a valid response]";
+
+                const aiResponseEntry = { role: 'assistant', name: agentName, agentId: agentId, model: modelConfigForAgent.model, modelSource: modelResolution.usingUnifiedModel ? 'group_unified' : 'agent', content: aiResponseContent, timestamp: Date.now(), id: messageIdForAgentResponse, isGroupMessage: true, groupId, topicId, avatarUrl: agentConfig.avatarUrl, avatarColor: agentConfig.avatarCalculatedColor };
+                groupHistory = await persistAgentResponse(groupId, topicId, aiResponseEntry);
+
+                // Directly send the 'end' event. The 'thinking' placeholder already exists.
+                // Directly send the 'full_response' event. The 'thinking' placeholder already exists.
+                if (typeof sendStreamChunkToRenderer === 'function') {
+                    sendStreamChunkToRenderer({
+                        type: 'full_response',
+                        messageId: messageIdForAgentResponse,
+                        fullResponse: aiResponseContent,
+                        context: {
+                            groupId,
+                            topicId,
+                            agentId,
+                            agentName,
+                            isGroupMessage: true
+                        }
+                    });
+               }
+               activeRequestControllers.delete(messageIdForAgentResponse);
+           }
+        } catch (error) {
+            if (!(error instanceof Error)) error = new Error(getGroupErrorMessage(error), { cause: error });
+            console.error(`[GroupChat] Error during response for Agent ${agentName}:`, error);
+            const errorText = `[System Message] ${agentName} failed to respond: ${error.message}`;
+            const errorResponse = { role: 'assistant', name: agentName, agentId: agentId, content:error.partialText||errorText,finishReason:error.partialText?'interrupted':'failed',interrupted:Boolean(error.partialText),errorCode:error.code||'REQUEST_FAILED', timestamp: Date.now(), id: messageIdForAgentResponse };
+            if (isUntrustedGroupTerminal(error)) admissionFailure = error;
+            else groupHistory = await persistAgentResponse(groupId, topicId, errorResponse);
+            if (typeof sendStreamChunkToRenderer === 'function') {
+                // Finalize the 'thinking' bubble with an error
+                sendStreamChunkToRenderer({ type: 'end', error: error.message, fullResponse:error.partialText||errorText,interrupted:Boolean(error.partialText),finish_reason:error.partialText?'interrupted':'failed', messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId, agentName, isGroupMessage: true } });
+            }
+            activeRequestControllers.delete(messageIdForAgentResponse);
+            if (isUntrustedGroupTerminal(error)) throw error;
+        }
+        } finally {
+            if (admission) {
+                if (!admissionDispatched || admissionCommitted) {
+                    const released = await admission.release(admissionScope, admissionToken, { saved: true });
+                    if (!released?.success) throw new Error(released?.code || 'Group lease release failed');
+                } else {
+                    if (admissionFailure) {
+                        const report = await admission.reportUncertain(admissionScope, admissionToken, admissionFailure);
+                        if (!report?.success) throw new Error(report?.code || 'Group uncertainty journal failed');
+                    }
+                    throw admissionFailure || new Error('群聊请求已派发但终稿保存未确认，保留占用并停止后续发言');
+                }
+            }
+        }
+        } // End of loop for agentsToRespond
+        } finally {
+            run.accepting = false;
+            await run.barrier;
+            try {
+                if (run.token && groupTopicAdmission) {
+                    const result = await groupTopicAdmission.fail(
+                        getGroupHistoryDescriptor(groupId, topicId), run.token,
+                        '群聊队列已结束，尚未消费的推进批次已暂停');
+                    if (!result?.success) throw new Error(result?.code || 'Group pending batch finalization failed');
+                }
+            } finally {
+                if (ordinaryGroupRuns.get(runKey) === run) ordinaryGroupRuns.delete(runKey);
+            }
+        }
+    } else if (groupConfig.mode !== 'invite_only') { // 如果不是邀请模式，但也没有AI响应，也发送 no_ai_response
+        console.log('[GroupChat] 根据群聊模式，没有 Agent 需要响应。');
+        if (typeof sendStreamChunkToRenderer === 'function') {
+            sendStreamChunkToRenderer({ type: 'no_ai_response', message: '当前没有AI需要发言。', messageId: userMessage.id, context: { groupId, topicId, isGroupMessage: true } });
+        }
+        // 即使没有AI响应，也可能需要总结话题（例如，用户连续发了几条消息）
+    }
+
+
+    if (agentsToRespond.length === 0) await releaseUnusedAdmission();
+
+    // 队列中止后不再执行该轮的后置任务。
+    if (queueContext.isAborted()) return;
+
+    // 总结话题的逻辑现在移到函数末尾，无论是否有AI自动回复，都可能触发
+    // （例如，用户发了多条消息，即使在邀请模式下没有AI回复，也可能达到总结条件）
+    if(sharedGroup.current())return; // Shared turn does not dispatch a background title-model call.
+    const finalGroupConfigForSummary = await getAgentGroupConfig(groupId);
+    const finalGroupHistoryPathForSummary = path.join(mainAppPaths.USER_DATA_DIR, groupId, 'topics', topicId, 'history.json');
+    let finalGroupHistoryForSummary = [];
+    if (await fs.pathExists(finalGroupHistoryPathForSummary)) {
+        finalGroupHistoryForSummary = await fs.readJson(finalGroupHistoryPathForSummary);
+    }
+
+    if (finalGroupConfigForSummary && finalGroupHistoryForSummary.length > 0) {
+        const latestGlobalVcpSettingsForSummary = await getVcpGlobalSettings();
+        await topicTitleManager.triggerSummarizationIfNeeded(groupId, topicId, finalGroupHistoryForSummary, latestGlobalVcpSettingsForSummary, finalGroupConfigForSummary, sendStreamChunkToRenderer, saveGroupTopicTitle);
+    }
+}
+
+
+/**
+ * 新增：处理特定Agent被邀请发言的逻辑
+ * @param {string} groupId - 群组ID
+ * @param {string} topicId - 话题ID
+ * @param {string} invitedAgentId - 被邀请发言的Agent ID
+ * @param {function} sendStreamChunkToRenderer - 用于发送流式数据的回调函数
+ * @param {function} getAgentConfigById - 用于根据Agent ID获取其完整配置的函数
+ * @returns {Promise<void>}
+ */
+async function handleInviteAgentToSpeak(groupId, topicId, invitedAgentId, sendStreamChunkToRenderer, getAgentConfigById, options = {}) {
+    const admissionQueueContext = createGroupQueueContext(groupId, topicId);
+    const admission = sharedGroup.current() ? null : groupTopicAdmission;
+    const config = admission ? await getAgentGroupConfig(groupId) : null;
+    if (!admission || config?.mode === 'game') {
+        return handleInviteAgentToSpeakOwned(groupId, topicId, invitedAgentId, sendStreamChunkToRenderer, getAgentConfigById, options);
+    }
+    return withTopicGenerationLease({
+        admission,
+        scope: getGroupHistoryDescriptor(groupId, topicId),
+        token: options.admissionToken || crypto.randomUUID(),
+        wait: true,
+        signal: options.signal,
+        handoffOwner: options.handoffOwner,
+        operation: lifecycle => {
+            if (admissionQueueContext.isAborted() || options.signal?.aborted) return;
+            return handleInviteAgentToSpeakOwned(
+                groupId, topicId, invitedAgentId, sendStreamChunkToRenderer,
+                getAgentConfigById, { ...options, admissionQueueContext, admissionLifecycle: lifecycle });
+        },
+    });
+}
+
+async function handleInviteAgentToSpeakOwned(groupId, topicId, invitedAgentId, sendStreamChunkToRenderer, getAgentConfigById, options = {}) {
+    console.log(`[GroupChat] handleInviteAgentToSpeak invoked for agent ${invitedAgentId} in group ${groupId}, topic ${topicId}.`);
+    const queueContext = options.admissionQueueContext || createGroupQueueContext(groupId, topicId);
+
+    if (!mainAppPaths || !mainAppPaths.AGENT_GROUPS_DIR || !mainAppPaths.AGENT_DIR || !mainAppPaths.USER_DATA_DIR || typeof getAgentConfigById !== 'function') {
+        console.error('[GroupChat] handleInviteAgentToSpeak: Critical paths or getAgentConfigById not initialized properly.');
+        if (typeof sendStreamChunkToRenderer === 'function') {
+            sendStreamChunkToRenderer({ type: 'error', error: '群聊模块关键路径或依赖未正确初始化 (邀请发言)。', context: { groupId, topicId, agentId: invitedAgentId, isGroupMessage: true } });
+        }
+        return;
+    }
+
+    const groupConfig = await getAgentGroupConfig(groupId);
+    if (!groupConfig) {
+        console.error(`[GroupChat] 未找到群组配置: ${groupId} (邀请发言)`);
+        if (typeof sendStreamChunkToRenderer === 'function') {
+            sendStreamChunkToRenderer({ type: 'error', error: `未找到群组配置: ${groupId}`, context: { groupId, topicId, agentId: invitedAgentId, isGroupMessage: true } });
+        }
+        return;
+    }
+
+    const agentConfig = await getAgentConfigById(invitedAgentId);
+    if (!agentConfig || agentConfig.error) {
+        console.error(`[GroupChat] 未找到或无法加载被邀请的群成员 ${invitedAgentId} 的配置: ${agentConfig?.error}`);
+        if (typeof sendStreamChunkToRenderer === 'function') {
+            sendStreamChunkToRenderer({ type: 'error', error: `未找到受邀Agent ${invitedAgentId} 的配置。`, context: { groupId, topicId, agentId: invitedAgentId, isGroupMessage: true } });
+        }
+        return;
+    }
+
+    const groupHistoryPath = path.join(mainAppPaths.USER_DATA_DIR, groupId, 'topics', topicId, 'history.json');
+    await assertNativeGroupTopic(groupId, topicId, groupConfig, groupHistoryPath);
+    let groupHistory = await fs.readJson(groupHistoryPath);
+
+    groupHistory = await sharedGroup.history(groupId,topicId,groupHistory);
+    const globalVcpSettings = await getVcpGlobalSettings();
+    const agentName = agentConfig.name || invitedAgentId; // 修复：如果名称丢失，回退到 invitedAgentId
+    const messageIdForAgentResponse = sharedGroup.replyId(invitedAgentId, `msg_group_invited_${groupId}_${topicId}_${invitedAgentId}_${Date.now()}`);
+
+    // VCPChatTarven (高级回复) - 收集生效的群聊规则
+    const conversationSnapshot = await require('../modules/services/conversationContext').resolve({ type: 'group', id: groupId });
+    const tavernRulesInvite = sharedGroup.rules(() => conversationSnapshot.rules);
+
+    // 1. 构建 SystemPrompt
+    let combinedSystemPrompt = agentConfig.systemPrompt || `你是${agentName}。`;
+    if (groupConfig.groupPrompt) {
+        let groupPrompt = groupConfig.groupPrompt;
+        // 处理 VCPChatGroupSessionWatcher 占位符
+        if (groupPrompt.includes(GROUP_SESSION_WATCHER_PLACEHOLDER)) {
+            const sessionWatcherInfo = await getGroupSessionWatcher(groupId, topicId);
+            groupPrompt = groupPrompt.replace(new RegExp(GROUP_SESSION_WATCHER_PLACEHOLDER, 'g'), JSON.stringify(sessionWatcherInfo));
+        }
+        combinedSystemPrompt += `\n\n[群聊设定]:\n${groupPrompt}`;
+    }
+
+    if (groupConfig.mode === 'game') {
+        const { GAME_SYSTEM_PROMPT, DOUDIZHU_SYSTEM_PROMPT } = require('./modes/gamePrompts');
+        combinedSystemPrompt += `\n\n[游戏模式]:\n${GAME_SYSTEM_PROMPT}`;
+        if (groupConfig.modeSettings?.game?.gameTypeId === 'doudizhu') {
+            combinedSystemPrompt += `\n\n[斗地主规则]:\n${DOUDIZHU_SYSTEM_PROMPT}`;
+        }
+    }
+
+    // VCPChatTarven: 在系统提示词尾部追加 system_suffix 规则
+    if (Array.isArray(tavernRulesInvite) && tavernRulesInvite.length > 0) {
+        combinedSystemPrompt = tavernEngine.applySystemSuffix(combinedSystemPrompt, tavernRulesInvite, 'group');
+    }
+    // 最后展开工作区占位符，使 Tavern 预设规则中的占位符同样生效。
+    combinedSystemPrompt = await expandWorkspacePlaceholdersInPrompt(combinedSystemPrompt, conversationSnapshot);
+
+    // 2. 构建上下文结构 (基于最新的 groupHistory)
+    // 历史仍完整持久化；窗口仅限制本次发送给模型的最近楼层。
+    // JEV 的 Agent 发言也通过邀请路径执行，因此自动继承该窗口。
+    const contextHistoryForAgent = selectGroupContextHistory(groupHistory, groupConfig);
+    const contextForAgentPromises = contextHistoryForAgent.map(async (msg, index, arr) => {
+        const speakerName = msg.name || (msg.role === 'user' ? (globalVcpSettings.userName || '用户') : (msg.agentName || 'AI')); // Use msg.agentName if available for AI
+
+        let textForAIContext = (typeof msg.content === 'string') ? msg.content : (msg.content?.text || '');
+
+        // 检查当前消息是否为上下文中的最后一条用户消息
+        const isLastUserMessageInContext = msg.role === 'user' && !arr.slice(index + 1).some(futureMsg => futureMsg.role === 'user');
+
+        // 仅当是最后一条用户消息时，才解析Canvas占位符
+        if (isLastUserMessageInContext && textForAIContext.includes(CANVAS_PLACEHOLDER)) {
+            try {
+                const canvasData = await canvasHandlers.handleGetLatestCanvasContent();
+                if (canvasData && !canvasData.error) {
+                    const formattedCanvasContent = `
+[Canvas Content]
+${canvasData.content || ''}
+[Canvas Path]
+${canvasData.path || 'No file path'}
+[Canvas Errors]
+${canvasData.errors || 'No errors'}
+`;
+                    textForAIContext = textForAIContext.replace(new RegExp(CANVAS_PLACEHOLDER, 'g'), formattedCanvasContent);
+                } else {
+                    console.error("[GroupChat Invite] Failed to get latest canvas content:", canvasData?.error);
+                    textForAIContext = textForAIContext.replace(new RegExp(CANVAS_PLACEHOLDER, 'g'), '\n[Canvas content could not be loaded]\n');
+                }
+            } catch (error) {
+                console.error("[GroupChat Invite] Error processing canvas content:", error);
+                textForAIContext = textForAIContext.replace(new RegExp(CANVAS_PLACEHOLDER, 'g'), '\n[Error processing canvas content]\n');
+            }
+        }
+
+        if (msg.attachments && msg.attachments.length > 0) {
+            for (const att of msg.attachments) {
+                const fileManagerData = att && att._fileManagerData ? att._fileManagerData : {};
+                // 🟢 极其关键：直接强取物理路径，不给文件名回退的机会
+                // 兼容上下文编辑/拖拽追加后附件元数据位于顶层，或 _fileManagerData 丢失的历史结构。
+                const effectiveType = fileManagerData.type || att?.type || '';
+                // @笔记实时引用：从笔记区真实文件重新读取最新内容。
+                const isLiveNote = fileManagerData.isLiveReference === true || att?.isLiveReference === true;
+                let effectiveExtractedText = fileManagerData.extractedText || att?.extractedText || '';
+                const effectiveImageFrames = fileManagerData.imageFrames || att?.imageFrames;
+                if (isLiveNote) {
+                    const liveText = await fileManager.readLiveReferenceText({ ...att, ...fileManagerData, isLiveReference: true });
+                    if (typeof liveText === 'string') effectiveExtractedText = liveText;
+                }
+                const effectiveInternalPath = fileManagerData.internalPath || att?.internalPath;
+                const filePathForContext = effectiveInternalPath ||
+                                           att?.localPath ||
+                                           att?.src ||
+                                           (att?.name || '未知文件');
+
+                if (isLiveNote) {
+                    const liveLabel = fileManager.describeLiveReference({ ...att, ...fileManagerData });
+                    textForAIContext += `\n\n[附加文件: ${filePathForContext} (${liveLabel})]\n${effectiveExtractedText}\n[/附加文件结束: ${att?.name || '未知文件'}]`;
+                } else if (Array.isArray(effectiveImageFrames) && effectiveImageFrames.length > 0) {
+                    textForAIContext += `\n\n[附加文件: ${filePathForContext} (扫描版/图像型PDF，已内联 ${effectiveImageFrames.length} 页多模态图像)]\n${effectiveExtractedText || ''}`;
+                } else if (typeof effectiveExtractedText === 'string' && effectiveExtractedText.trim() !== '') {
+                    textForAIContext += `\n\n[附加文件: ${filePathForContext}]\n${effectiveExtractedText}\n[/附加文件结束: ${att?.name || '未知文件'}]`;
+                } else if (effectiveType.startsWith('audio/')) {
+                    textForAIContext += `\n\n[附加音频: ${filePathForContext}]`;
+                } else if (effectiveType.startsWith('video/')) {
+                    textForAIContext += `\n\n[附加视频: ${filePathForContext}]`;
+                } else if (effectiveType.startsWith('image/')) {
+                     textForAIContext += `\n\n[附加图片: ${filePathForContext}]`;
+                } else if (effectiveType && !effectiveType.startsWith('image/')) {
+                    textForAIContext += `\n\n[附加文件: ${filePathForContext} (无法预览文本内容)]`;
+                } else if (!att?._fileManagerData) {
+                    console.warn(`[GroupChat Invite Context] Historical message attachment for "${att?.name || '未知文件'}" is missing _fileManagerData. Text content cannot be appended.`);
+                }
+            }
+        }
+
+        textForAIContext = sharedGroup.contextText(contextHistoryForAgent,msg,textForAIContext,agentConfig);
+        const contentWithSpeakerTag = textForAIContext.startsWith(`[${speakerName}的发言]`)
+                ? textForAIContext : `[${speakerName}的发言]: ${textForAIContext}`;
+        const vcpMessageContent = [{ type: 'text', text: contentWithSpeakerTag }];
+
+        if (msg.attachments && msg.attachments.length > 0) {
+            for (const att of msg.attachments) {
+                const fileManagerData = att && att._fileManagerData ? att._fileManagerData : {};
+                const effectiveImageFrames = fileManagerData.imageFrames || att?.imageFrames;
+                if (Array.isArray(effectiveImageFrames) && effectiveImageFrames.length > 0) {
+                    for (const frame of effectiveImageFrames) {
+                        vcpMessageContent.push({
+                            type: 'image_url',
+                            image_url: { url: `data:image/jpeg;base64,${frame}` }
+                        });
+                    }
+                    continue;
+                }
+                const effectiveType = fileManagerData.type || att?.type || '';
+                const effectiveInternalPath = fileManagerData.internalPath || att?.internalPath || att?.src || att?.localPath;
+                const isSupportedMediaType = effectiveType.startsWith('image/') || effectiveType.startsWith('audio/') || effectiveType.startsWith('video/');
+                if (effectiveType && isSupportedMediaType && effectiveInternalPath) {
+                    try {
+                        const result = await fileManager.getFileAsBase64(effectiveInternalPath);
+                        if (result && result.success && result.base64Frames && result.base64Frames.length > 0) {
+                            vcpMessageContent.push({
+                                type: 'image_url',
+                                image_url: { url: `data:${effectiveType};base64,${result.base64Frames[0]}` }
+                            });
+                        } else {
+                             console.warn(`[GroupChat Invite] Failed to get base64 for media ${att?.name || fileManagerData.name || '未知文件'}: ${result?.error}`);
+                        }
+                    } catch (e) {
+                        console.error(`[GroupChat Invite] Error getting base64 for media ${att?.name || fileManagerData.name || '未知文件'} in context:`, e);
+                    }
+                }
+            }
+        }
+
+        return attachTimestampMetaToVcpMessage(
+            {
+                role: msg.role,
+                content: vcpMessageContent,
+            },
+            msg
+        );
+    });
+
+    const contextForAgent = await Promise.all(contextForAgentPromises);
+
+    // 3. 构建 InvitePrompt
+    const gameRequest = groupConfig.mode === 'game';
+    if (gameRequest && (typeof options.invitePrompt !== 'string' || !options.invitePrompt.trim())) {
+        throw new Error('游戏决策只能由对局运行时提供私有邀请。');
+    }
+    let invitePromptContent = (gameRequest ? options.invitePrompt : (groupConfig.invitePrompt || `[系统邀请指令:] 现在轮到你 {{VCPChatAgentName}} 发言了。`)).replace(/{{VCPChatAgentName}}/g, agentName);
+    const persistResponse = gameRequest
+        ? async () => groupHistory
+        : async (targetGroupId, targetTopicId, message) => {
+            const token = options.admissionLifecycle?.token;
+            const terminal = token
+                ? { ...message, admissionToken: token, admissionTerminal: true }
+                : message;
+            const history = await appendGroupHistoryMessage(targetGroupId, targetTopicId, terminal);
+            options.admissionLifecycle?.committed();
+            return history;
+        };
+
+    let messagesForAI = [];
+    if (combinedSystemPrompt.trim()) {
+        messagesForAI.push({ role: 'system', content: combinedSystemPrompt });
+    }
+    messagesForAI.push(...contextForAgent);
+    messagesForAI.push({ role: 'user', content: [{ type: 'text', text: invitePromptContent }], name: (globalVcpSettings.userName || '用户') }); // 模拟用户触发
+
+    // VCPChatTarven: 应用 context_inject 规则（按深度插入消息，跳过 system）
+    if (Array.isArray(tavernRulesInvite) && tavernRulesInvite.some(r => r.type === 'context_inject' && r.enabled !== false)) {
+        const sysMsgs = messagesForAI.filter(m => m.role === 'system');
+        const nonSysMsgs = messagesForAI.filter(m => m.role !== 'system');
+        const injected = tavernEngine.applyContextInject(nonSysMsgs, tavernRulesInvite, 'group', {
+            makeMessage: (role, text) => ({
+                role,
+                content: [{ type: 'text', text }]
+            })
+        });
+        messagesForAI = [...sysMsgs, ...injected];
+    }
+    // --- VCP Thought Chain Stripping ---
+    try {
+        // 默认不注入元思考链，除非明确开启
+        if (globalVcpSettings.enableThoughtChainInjection !== true) {
+            messagesForAI = messagesForAI.map(msg => {
+                if (typeof msg.content === 'string') {
+                    return { ...msg, content: contextSanitizer.stripThoughtChains(msg.content) };
+                } else if (Array.isArray(msg.content)) {
+                    return {
+                        ...msg,
+                        content: msg.content.map(part => {
+                            if (part.type === 'text' && typeof part.text === 'string') {
+                                return { ...part, text: contextSanitizer.stripThoughtChains(part.text) };
+                            }
+                            return part;
+                        })
+                    };
+                }
+                return msg;
+            });
+            console.log(`[GroupChat Invite ThoughtChain] Thought chains stripped from context`);
+        }
+    } catch (e) {
+        console.error('[GroupChat Invite ThoughtChain] Failed to strip thought chains:', e);
+    }
+    // --- End of Thought Chain Stripping ---
+
+    // 添加净化器处理
+    if (globalVcpSettings.enableContextSanitizer === true) {
+        const sanitizerDepth = globalVcpSettings.contextSanitizerDepth !== undefined ? globalVcpSettings.contextSanitizerDepth : 2;
+        console.log(`[GroupChat Context Sanitizer] Enabled with depth: ${sanitizerDepth}`);
+
+        const systemMessages = messagesForAI.filter(m => m.role === 'system');
+        const nonSystemMessages = messagesForAI.filter(m => m.role !== 'system');
+
+        // 使用已加载的净化器，传入 enableThoughtChainInjection 参数
+        const sanitizedNonSystemMessages = contextSanitizer.sanitizeMessages(
+            nonSystemMessages,
+            sanitizerDepth,
+            globalVcpSettings.enableThoughtChainInjection === true
+        );
+
+        messagesForAI = [...systemMessages, ...sanitizedNonSystemMessages];
+
+        console.log(`[GroupChat Context Sanitizer] Messages processed successfully`);
+    }
+    const modelResolution = resolveEffectiveModel(groupConfig, agentConfig);
+    if (!globalVcpSettings.vcpUrl) {
+        const errorMsg = `Agent ${agentName} (${invitedAgentId}) 无法响应（邀请）：VCP URL 未配置。`;
+        console.error(`[GroupChat Invite] ${errorMsg}`);
+        const errorResponse = { role: 'assistant', name: agentName, agentId: invitedAgentId, content: `[系统消息] ${errorMsg}`, timestamp: Date.now(), id: messageIdForAgentResponse };
+        groupHistory = await persistResponse(groupId, topicId, errorResponse);
+        if (typeof sendStreamChunkToRenderer === 'function') {
+            sendStreamChunkToRenderer({ type: 'error', error: errorMsg, messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true } });
+        }
+        return;
+    }
+
+    if (!modelResolution.effectiveModel) {
+        const modelHint = modelResolution.usingUnifiedModel
+            ? '已启用群组统一模型，但群组统一模型为空。'
+            : '当前成员未配置模型。';
+        const errorMsg = `Agent ${agentName} (${invitedAgentId}) 无法响应（邀请）：${modelHint}`;
+        console.error(`[GroupChat Invite] ${errorMsg}`);
+        const errorResponse = { role: 'assistant', name: agentName, agentId: invitedAgentId, content: `[系统消息] ${errorMsg}`, timestamp: Date.now(), id: messageIdForAgentResponse };
+        groupHistory = await persistResponse(groupId, topicId, errorResponse);
+        if (typeof sendStreamChunkToRenderer === 'function') {
+            sendStreamChunkToRenderer({ type: 'error', error: errorMsg, messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true } });
+        }
+        return;
+    }
+
+    try {
+        if (queueContext.isAborted()) return;
+
+        // Always send 'agent_thinking' before the fetch call
+        if (typeof sendStreamChunkToRenderer === 'function') {
+            sendStreamChunkToRenderer({
+                type: 'agent_thinking',
+                messageId: messageIdForAgentResponse,
+                context: {
+                    groupId,
+                    topicId,
+                    agentId: invitedAgentId,
+                    agentName,
+                    avatarUrl: agentConfig.avatarUrl,
+                    avatarColor: agentConfig.avatarCalculatedColor,
+                    isGroupMessage: true
+                }
+            });
+            await new Promise(resolve => setTimeout(resolve, 200)); // Give renderer time to create the bubble
+            if (queueContext.isAborted()) {
+                sendStreamChunkToRenderer({
+                    type: 'end',
+                    error: '群聊队列已中止',
+                    fullResponse: '',
+                    messageId: messageIdForAgentResponse,
+                    context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true },
+                    interrupted: true,
+                    queueInterrupted: true
+                });
+                return;
+            }
+        }
+
+        const modelConfigForAgent = {
+           model: modelResolution.effectiveModel,
+            temperature: parseFloat(agentConfig.temperature),
+            max_tokens: agentConfig.maxOutputTokens ? parseInt(agentConfig.maxOutputTokens) : undefined,
+            stream: agentConfig.streamOutput === true || String(agentConfig.streamOutput) === 'true'
+        };
+
+        // === 分阶段弹性超时设计 (Phased Timeout Architecture) - Jev / 点名邀请 ===
+        // 阶段 1: 等待 HTTP 响应头 (120秒)；fetch 返回即清除，不等待正文或 reasoning
+        // 阶段 2: 块间流式看门狗 (62秒)，开始收到流数据后若连续 62秒无新数据则熔断僵死
+        const GROUP_TTFT_TIMEOUT_MS = 120000;
+        const GROUP_CHUNK_IDLE_TIMEOUT_MS = 62000;
+
+        const controller = new AbortController();
+        const abortFromSession = () => controller.abort();
+        if (options.signal?.aborted) controller.abort();
+        else options.signal?.addEventListener?.('abort', abortFromSession, { once: true });
+        let activeTimer = setTimeout(() => {
+            console.warn(`[GroupChat Invite] TTFT 超时 (${GROUP_TTFT_TIMEOUT_MS}ms) 未收到响应头，主动中止: ${agentName}`);
+            controller.abort('ttft_timeout');
+        }, GROUP_TTFT_TIMEOUT_MS);
+        registerActiveGroupRequest(messageIdForAgentResponse, controller, groupId, topicId);
+
+        const trajectoryCall = (gameRequest ? () => ({ chunk() {}, finish() {} }) : beginTrajectoryCall)({
+            sessionKey: sessionKeyFromContext({ groupId, topicId }),
+            requestId: messageIdForAgentResponse,
+            source: sourceFromContext({ groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true }),
+            model: modelConfigForAgent.model,
+            params: { temperature: modelConfigForAgent.temperature, max_tokens: modelConfigForAgent.max_tokens, stream: modelConfigForAgent.stream },
+            messages: messagesForAI
+        });
+        let response;
+        try {
+            options.admissionLifecycle?.dispatched();
+            response = await sharedGroup.send(fetch,resolveGroupChatUrl(globalVcpSettings.vcpUrl, globalVcpSettings.enableVcpToolInjection), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${globalVcpSettings.vcpApiKey}`
+                },
+                body: JSON.stringify(buildGroupRequestBody(messagesForAI, {
+                    model: modelConfigForAgent.model,
+                    temperature: modelConfigForAgent.temperature,
+                    stream: modelConfigForAgent.stream,
+                    max_tokens: modelConfigForAgent.max_tokens
+                }, messageIdForAgentResponse)),
+                signal: controller.signal
+            });
+        } catch (fetchError) {
+            fetchError = normalizeGroupFetchError(fetchError, controller, GROUP_TTFT_TIMEOUT_MS);
+            trajectoryCall.finish({ error: fetchError, aborted: controller.signal.aborted });
+            clearTimeout(activeTimer);
+            if (fetchError.name === 'AbortError') {
+                console.log(`[GroupChat Invite] VCP fetch for ${agentName} was aborted before stream began.`);
+                if (typeof sendStreamChunkToRenderer === 'function') {
+                    sendStreamChunkToRenderer({ type: 'end', error: '用户中止', fullResponse: '', messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true }, interrupted: true });
+                }
+                activeRequestControllers.delete(messageIdForAgentResponse);
+                return;
+            }
+            throw fetchError;
+        } finally {
+            clearTimeout(activeTimer);
+            options.signal?.removeEventListener?.('abort', abortFromSession);
+        }
+
+        if (!response.ok) {
+        trajectoryCall.finish({ error: { name: 'HTTPError', message: `VCP request failed: ${response.status}` } });
+            const errorText = await (await import('../modules/chat/boundedResponse.mjs')).readResponseText(response,{maxBytes:64*1024,deadline:Date.now()+15000,signal:controller.signal});
+            console.error(`[GroupChat Invite] VCP request failed for ${agentName}. Status: ${response.status}, Response Text:`, errorText);
+            let errorData = { message: `Server returned status ${response.status}`, details: errorText };
+            try { const parsedError = JSON.parse(errorText); if (typeof parsedError === 'object' && parsedError !== null) errorData = parsedError; } catch (e) { /* Not JSON */ }
+
+            const errorMessageToPropagate = `VCP request failed (invite): ${response.status} - ${errorData.message || errorData.error || (typeof errorData === 'string' ? errorData : 'Unknown server error')}`;
+            const errorResponseEntry = { role: 'assistant', name: agentName, agentId: invitedAgentId, content: `[System Message] ${errorMessageToPropagate}`, timestamp: Date.now(), id: messageIdForAgentResponse };
+            groupHistory = await persistResponse(groupId, topicId, errorResponseEntry);
+
+            if (typeof sendStreamChunkToRenderer === 'function') {
+                sendStreamChunkToRenderer({ type: 'end', error: errorMessageToPropagate, fullResponse: `[错误] ${errorMessageToPropagate}`, messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true } });
+            }
+            activeRequestControllers.delete(messageIdForAgentResponse);
+            return;
+        }
+
+        if (modelConfigForAgent.stream) {
+            // Send 'start' to replace 'thinking'
+            if (typeof sendStreamChunkToRenderer === 'function') {
+                sendStreamChunkToRenderer({
+                    type: 'start',
+                    messageId: messageIdForAgentResponse,
+                    context: {
+                        groupId,
+                        topicId,
+                        agentId: invitedAgentId,
+                        agentName,
+                        avatarUrl: agentConfig.avatarUrl,
+                        avatarColor: agentConfig.avatarCalculatedColor,
+                        isGroupMessage: true
+                    }
+                });
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            // 启动阶段 2 块间流式看门狗 (Chunk Idle Watchdog) - Jev / 点名邀请
+            const resetIdleTimer = () => {
+                clearTimeout(activeTimer);
+                activeTimer = setTimeout(() => {
+                    if (isWaitingForToolApproval(agentName)) { resetIdleTimer(); return; }
+                    console.warn(`[GroupChat Invite] 流式空闲超时：连续 ${GROUP_CHUNK_IDLE_TIMEOUT_MS}ms 无新数据，判定僵死主动熔断: ${agentName}`);
+                    controller.abort('chunk_idle_timeout');
+                }, GROUP_CHUNK_IDLE_TIMEOUT_MS);
+            };
+
+            async function processStreamForInvitedAgent() {
+                let accumulatedResponse = "";
+                    const {createSseDecoder}=await import('../modules/chat/sseProtocol.mjs');
+                    let finishReason=null;
+                    let observedFinishReason=null;
+                    const protocol=createSseDecoder({onData:parsedChunk=>{
+observedFinishReason=observeGroupFinishReason(observedFinishReason,parsedChunk.choices);
+trajectoryCall.chunk(parsedChunk);
+
+                                    // 更全面的安全检查，处理各种可能的响应格式
+                                    let hasContent = false;
+
+                                    // 标准OpenAI格式 (choices[0].delta.content)
+                                    if (parsedChunk.choices && Array.isArray(parsedChunk.choices) && parsedChunk.choices.length > 0) {
+                                        const choice = parsedChunk.choices[0];
+                                        if (choice && choice.delta) {
+                                            if (typeof choice.delta.content === 'string' && choice.delta.content !== '') {
+                                                accumulatedResponse += choice.delta.content;
+                                                hasContent = true;
+                                            }
+                                        }
+                                    }
+
+                                    // 备选格式1 (delta.content)
+                                    if (!hasContent && parsedChunk.delta) {
+                                        if (typeof parsedChunk.delta.content === 'string' && parsedChunk.delta.content !== '') {
+                                            accumulatedResponse += parsedChunk.delta.content;
+                                            hasContent = true;
+                                        }
+                                    }
+
+                                    // 备选格式2 (content)
+                                    if (!hasContent && typeof parsedChunk.content === 'string' && parsedChunk.content !== '') {
+                                        accumulatedResponse += parsedChunk.content;
+                                        hasContent = true;
+                                    }
+
+                                    // 备选格式3 (message.content) - 某些API的格式
+                                    if (!hasContent && parsedChunk.message && typeof parsedChunk.message.content === 'string' && parsedChunk.message.content !== '') {
+                                        accumulatedResponse += parsedChunk.message.content;
+                                        hasContent = true;
+                                    }
+
+                                    // 总是发送chunk事件，即使没有新内容（保持流的连续性）
+                                    if (typeof sendStreamChunkToRenderer === 'function') {
+                                        sendStreamChunkToRenderer({
+                                            type: 'data',
+                                            chunk: parsedChunk,
+                                            messageId: messageIdForAgentResponse,
+                                            context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true },
+                                            hasContent: hasContent // 添加标志位，让前端知道是否有实际内容
+                                        });
+                                    }
+                                
+                            },onDone:value=>{finishReason=value.finishReason;}});
+                try {
+                    resetIdleTimer();
+                    while (true) {
+                        const { done: eof, value } = protocol.done ? {done:true} : await reader.read();
+                            if(eof)protocol.finish();else protocol.push(value);
+                            const done=eof||protocol.done;
+
+                        if (done) {
+                        requireTrustedGroupTerminal(finishReason === observedFinishReason ? finishReason : null, accumulatedResponse);
+                        trajectoryCall.finish();
+                            clearTimeout(activeTimer);
+                            const finalAiResponseEntry = { role: 'assistant', name: agentName, agentId: invitedAgentId, model: modelConfigForAgent.model, modelSource: modelResolution.usingUnifiedModel ? 'group_unified' : 'agent', content: accumulatedResponse, finishReason:finishReason==='length'?'length':'completed', timestamp: Date.now(), id: messageIdForAgentResponse, isGroupMessage: true, groupId, topicId, avatarUrl: agentConfig.avatarUrl, avatarColor: agentConfig.avatarCalculatedColor };
+                            groupHistory = await persistResponse(groupId, topicId, finalAiResponseEntry);
+                            if (typeof sendStreamChunkToRenderer === 'function') {
+                                sendStreamChunkToRenderer({ type: 'end', messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true }, fullResponse: accumulatedResponse });
+                            }
+                            break;
+                        }
+                        resetIdleTimer();
+                        }
+                    } catch (streamError) {
+                    if (isUntrustedGroupTerminal(streamError)) {
+                        if (accumulatedResponse) streamError.partialText = accumulatedResponse;
+                        throw streamError;
+                    }
+                    trajectoryCall.finish({ error: streamError, aborted: streamError?.name === 'AbortError' });
+                    if (isWatchdogAbort(streamError, controller)) {
+                        console.warn(`[GroupChat Invite] VCP stream for ${agentName} (msgId: ${messageIdForAgentResponse}) stopped by the idle watchdog.`);
+                        const partialContent = withWatchdogNote(accumulatedResponse, GROUP_CHUNK_IDLE_TIMEOUT_MS);
+                        const finalAiResponseEntry = { role: 'assistant', name: agentName, agentId: invitedAgentId, model: modelConfigForAgent.model, modelSource: modelResolution.usingUnifiedModel ? 'group_unified' : 'agent', content: partialContent, timestamp: Date.now(), id: messageIdForAgentResponse, isGroupMessage: true, groupId, topicId, avatarUrl: agentConfig.avatarUrl, avatarColor: agentConfig.avatarCalculatedColor, interrupted: true };
+                        groupHistory = await persistResponse(groupId, topicId, finalAiResponseEntry);
+                        if (typeof sendStreamChunkToRenderer === 'function') {
+                            sendStreamChunkToRenderer({ type: 'end', messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true }, fullResponse: partialContent, interrupted: true });
+                        }
+                    } else if (streamError.name === 'AbortError') {
+                        console.log(`[GroupChat Invite] VCP stream for ${agentName} (msgId: ${messageIdForAgentResponse}) was aborted by user.`);
+                        // Save the content received so far upon abortion.
+                        const finalAiResponseEntry = { role: 'assistant', name: agentName, agentId: invitedAgentId, model: modelConfigForAgent.model, modelSource: modelResolution.usingUnifiedModel ? 'group_unified' : 'agent', content: accumulatedResponse, timestamp: Date.now(), id: messageIdForAgentResponse, isGroupMessage: true, groupId, topicId, avatarUrl: agentConfig.avatarUrl, avatarColor: agentConfig.avatarCalculatedColor, interrupted: true };
+                        groupHistory = await persistResponse(groupId, topicId, finalAiResponseEntry);
+                        if (typeof sendStreamChunkToRenderer === 'function') {
+                            sendStreamChunkToRenderer({ type: 'end', messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true }, fullResponse: accumulatedResponse, interrupted: true });
+                        }
+                    } else {
+                        console.error(`[GroupChat Invite] VCP stream reading error for ${agentName}:`, streamError);
+                        const errorText = `[System Message] ${agentName} stream processing error (invite): ${streamError.message}`;
+                        const streamErrorResponseEntry = { role: 'assistant', name: agentName, agentId: invitedAgentId, content: accumulatedResponse, finishReason:accumulatedResponse?'interrupted':'failed',errorCode:streamError.code||'STREAM_FAILED', timestamp: Date.now(), id: messageIdForAgentResponse, isGroupMessage: true, groupId, topicId };
+                        groupHistory = await persistResponse(groupId, topicId, streamErrorResponseEntry);
+                        if (typeof sendStreamChunkToRenderer === 'function') {
+                            sendStreamChunkToRenderer({ type: 'end', fullResponse:accumulatedResponse,interrupted:Boolean(accumulatedResponse),finish_reason:accumulatedResponse?'interrupted':'failed',errorCode:streamError.code, error: `VCP stream reading error (invite): ${streamError.message}`, messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true } });
+                        }
+                    }
+                } finally {
+                    clearTimeout(activeTimer);
+                    reader.releaseLock();
+                    activeRequestControllers.delete(messageIdForAgentResponse);
+                    console.log(`[GroupChat Invite] Active request controller removed for ${messageIdForAgentResponse}`);
+                }
+            }
+            await processStreamForInvitedAgent();
+        } else { // Non-streaming response
+            const vcpResponseJson = (await import('../modules/chat/boundedResponse.mjs')).validateCompletion(JSON.parse(await (await import('../modules/chat/boundedResponse.mjs')).readResponseText(response,{signal:controller.signal})));
+            requireTrustedGroupTerminal(vcpResponseJson.choices?.[0]?.finish_reason, vcpResponseJson.choices?.[0]?.message?.content);
+            trajectoryCall.finish({ response: vcpResponseJson });
+            const aiResponseContent = vcpResponseJson.choices && vcpResponseJson.choices.length > 0 ? vcpResponseJson.choices[0].message.content : "[AI failed to generate a valid response (invite)]";
+
+            const aiResponseEntry = { role: 'assistant', name: agentName, agentId: invitedAgentId, model: modelConfigForAgent.model, modelSource: modelResolution.usingUnifiedModel ? 'group_unified' : 'agent', content: aiResponseContent, timestamp: Date.now(), id: messageIdForAgentResponse, isGroupMessage: true, groupId, topicId, avatarUrl: agentConfig.avatarUrl, avatarColor: agentConfig.avatarCalculatedColor };
+            groupHistory = await persistResponse(groupId, topicId, aiResponseEntry);
+
+            if (typeof sendStreamChunkToRenderer === 'function') {
+                sendStreamChunkToRenderer({
+                    type: 'full_response',
+                    messageId: messageIdForAgentResponse,
+                    fullResponse: aiResponseContent,
+                    context: {
+                        groupId,
+                        topicId,
+                        agentId: invitedAgentId,
+                        agentName,
+                        isGroupMessage: true
+                    }
+                });
+            }
+            activeRequestControllers.delete(messageIdForAgentResponse);
+        }
+
+    } catch (error) {
+        if (!(error instanceof Error)) error = new Error(getGroupErrorMessage(error), { cause: error });
+        console.error(`[GroupChat Invite] Error responding for agent ${agentName}:`, error);
+        const errorText = `[System Message] ${agentName} failed to respond (invite): ${error.message}`;
+        const errorResponse = { role: 'assistant', name: agentName, agentId: invitedAgentId, content:error.partialText||errorText,finishReason:error.partialText?'interrupted':'failed',interrupted:Boolean(error.partialText),errorCode:error.code||'REQUEST_FAILED', timestamp: Date.now(), id: messageIdForAgentResponse };
+        if (!isUntrustedGroupTerminal(error)) groupHistory = await persistResponse(groupId, topicId, errorResponse);
+        if (typeof sendStreamChunkToRenderer === 'function') {
+            sendStreamChunkToRenderer({ type: 'end', error: error.message, fullResponse:error.partialText||errorText,interrupted:Boolean(error.partialText),finish_reason:error.partialText?'interrupted':'failed', messageId: messageIdForAgentResponse, context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true } });
+        }
+        activeRequestControllers.delete(messageIdForAgentResponse);
+        if (isUntrustedGroupTerminal(error)) throw error;
+    }
+
+    if (gameRequest || options.skipSummary === true || queueContext.isAborted()) return;
+
+    // 邀请发言后也尝试总结话题
+    if(sharedGroup.current())return; // Shared turn does not dispatch a background title-model call.
+    const finalGroupConfigForSummary = await getAgentGroupConfig(groupId);
+    const finalGroupHistoryPathForSummary = path.join(mainAppPaths.USER_DATA_DIR, groupId, 'topics', topicId, 'history.json');
+    let finalGroupHistoryForSummary = [];
+    if (await fs.pathExists(finalGroupHistoryPathForSummary)) {
+        finalGroupHistoryForSummary = await fs.readJson(finalGroupHistoryPathForSummary);
+    }
+
+    if (finalGroupConfigForSummary && finalGroupHistoryForSummary.length > 0) {
+        const latestGlobalVcpSettingsForSummary = await getVcpGlobalSettings();
+        await topicTitleManager.triggerSummarizationIfNeeded(groupId, topicId, finalGroupHistoryForSummary, latestGlobalVcpSettingsForSummary, finalGroupConfigForSummary, sendStreamChunkToRenderer, saveGroupTopicTitle);
+    }
+}
+
+// cleanSummarizedTitle, triggerTopicSummarizationIfNeeded, determineNatureRandomSpeakers
+// 已模块化至 Groupmodules/topicTitleManager.js 和 Groupmodules/modes/ 目录
+
+
+
+/**
+ * 保存 AgentGroup 的头像
+ * @param {string} groupId
+ * @param {object} avatarData - { name: 'avatar.png', type: 'image/png', buffer: ArrayBuffer }
+ * @returns {Promise<object>}
+ */
+async function saveAgentGroupAvatar(groupId, avatarData) {
+    if (!mainAppPaths.AGENT_GROUPS_DIR) {
+        return { success: false, error: 'GroupChat module paths not initialized.' };
+    }
+    let primary;
+    try {
+        if (!avatarData || !avatarData.name || !avatarData.buffer) {
+            return { success: false, error: '无效的头像数据。' };
+        }
+        const groupDir = path.join(mainAppPaths.AGENT_GROUPS_DIR, groupId);
+
+        const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+        let newExt = path.extname(avatarData.name).toLowerCase();
+        if (!allowedExtensions.includes(newExt)) {
+            if (avatarData.type === 'image/png') newExt = '.png';
+            else if (avatarData.type === 'image/jpeg') newExt = '.jpg';
+            else if (avatarData.type === 'image/gif') newExt = '.gif';
+            else if (avatarData.type === 'image/webp') newExt = '.webp';
+            else newExt = '.png';
+        }
+
+        const newAvatarFileName = `avatar${newExt}`;
+        const newAvatarPath = path.join(groupDir, newAvatarFileName);
+        const nodeBuffer = Buffer.from(avatarData.buffer);
+        let pointerAlreadyCurrent = false;
+        const saved = await mutateGroupConfig(groupId, async current => {
+            await replaceFile(newAvatarPath, nodeBuffer);
+            primary = { success: true, avatarFileName: newAvatarFileName, avatarUrl: `file://${newAvatarPath}?t=${Date.now()}` };
+            pointerAlreadyCurrent = current.avatar === newAvatarFileName;
+            return { ...current, avatar: newAvatarFileName };
+        }, async result => {
+            if (!result.success && !pointerAlreadyCurrent) return;
+            try {
+                await Promise.all(allowedExtensions.filter(old => old !== newExt).map(
+                    old => fs.remove(path.join(groupDir, `avatar${old}`))
+                ));
+            } catch (error) {
+                primary.avatarLocalError = error.message;
+            }
+        });
+        if (!saved.success && !pointerAlreadyCurrent) return { ...primary, avatarConfigError: saved.error };
+        return primary;
+    } catch (error) {
+        console.error(`[GroupChat] 保存 AgentGroup ${groupId} 头像失败:`, error);
+        return primary ? { ...primary, avatarConfigError: error.message } : { success: false, error: error.message };
+    }
+}
+
+// --- Group Topic Management (与Agent topics类似) ---
+async function getGroupTopics(groupId, searchTerm = '') {
+    const config = await getAgentGroupConfig(groupId);
+    if (!config) return { error: `Group ${groupId} not found.` };
+    let topics = Array.isArray(config.topics) ? config.topics : [];
+    if (!topics.length && !searchTerm) {
+        const created = await createNewTopicForGroup(groupId, '主要群聊', true);
+        if (!created.success) return { error: created.error };
+        topics = created.topics;
+    }
+    return searchTerm ? topics.filter(topic => topic.name.toLowerCase().includes(searchTerm.toLowerCase())) : topics;
+}
+
+async function createNewTopicForGroup(groupId, topicName, onlyIfEmpty = false) {
+    try {
+        requireGroupHistoryQueue();
+        const topicId = `group_topic_${crypto.randomUUID()}`;
+        let acceptedTopic;
+        const result = await mutateGroupConfig(groupId, current => {
+            const topics = Array.isArray(current.topics) ? current.topics : [];
+            if (onlyIfEmpty && topics.length) {
+                acceptedTopic = topics[0];
+                return current;
+            }
+            if (topics.some(topic => topic.id === topicId) || current._historyDeletedTopics?.includes(topicId)) throw new Error('Duplicate or deleted group topic identity');
+            acceptedTopic = { id: topicId, name: topicName || `新话题 ${topics.length + 1}`, createdAt: Date.now() };
+            return { ...current, topics: [acceptedTopic, ...topics] };
+        });
+        if (!result.success) return { success: false, error: result.error };
+        const shared=require('../modules/services/nativeSync/sharedHost').runtimeForRoot(mainAppPaths.APP_DATA_ROOT_IN_PROJECT);
+        if(shared?.ready&&!shared.closed)await shared.tick({forceLocal:true,skipExecution:true,skipAttachments:true});
+        await initializeGroupHistory(groupId, acceptedTopic.id);
+        return { success: true, topicId: acceptedTopic.id, topicName: acceptedTopic.name, topics: result.agentGroup.topics };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+async function deleteGroupTopic(groupId, topicIdToDelete) {
+    try {
+        let replacement;
+        const result = await requireGroupHistoryQueue().deleteHistory(getGroupHistoryDescriptor(groupId, topicIdToDelete), async lifecycle => {
+            await lifecycle.beforeConfigUpdate();
+            const saved = await mutateGroupConfig(groupId, current => {
+                if (!current.topics.some(topic => topic.id === topicIdToDelete)) {
+                    if (current._historyDeletedTopics?.includes(topicIdToDelete)) return current;
+                    throw new Error(`Topic ID ${topicIdToDelete} not found in group ${groupId}.`);
+                }
+                const topics = current.topics.filter(topic => topic.id !== topicIdToDelete);
+                if (!topics.length) {
+                    replacement = { id: `group_topic_${crypto.randomUUID()}`, name: '主要群聊', createdAt: Date.now() };
+                    topics.push(replacement);
+                }
+                return { ...current, topics, _historyDeletedTopics: [...new Set([...(current._historyDeletedTopics || []), topicIdToDelete])] };
+            });
+            if (!saved.success) throw new Error(saved.error);
+            await lifecycle.changed();
+            await lifecycle.destructive();
+            await fs.remove(path.join(mainAppPaths.USER_DATA_DIR, groupId, 'topics', topicIdToDelete));
+            return { success: true, remainingTopics: saved.agentGroup.topics };
+        });
+        // A prior failed delete may already have published the replacement identity.
+        // Initialize retained members after deletion, using no-replace semantics.
+        for (const topic of result.remainingTopics) await initializeGroupHistory(groupId, topic.id);
+        return result;
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+async function regenerateGroupTopicTitle(groupId, topicId) {
+    if (!groupId || !topicId) {
+        return { success: false, error: '群组ID或话题ID不能为空。' };
+    }
+
+    try {
+        const shared=require('../modules/services/nativeSync/sharedHost').runtimeForRoot(mainAppPaths.APP_DATA_ROOT_IN_PROJECT);
+        const titleContext=shared?.nativeObject('group',groupId)?await shared.nativeDeletionContext({itemType:'group',itemId:groupId,topicId}):null;
+        if(titleContext?.pendingMode)throw Error('SHARED_DIRECTORY_PENDING');
+        const groupConfig = await getAgentGroupConfig(groupId);
+        const topic = groupConfig?.topics?.find(candidate => candidate.id === topicId);
+        if (!topic) {
+            return { success: false, error: `未找到群组话题 ${topicId}。` };
+        }
+
+        const groupHistory = await getGroupChatHistory(groupId, topicId);
+        const effectiveMessageCount = Array.isArray(groupHistory)
+            ? groupHistory.filter(message => message && message.role !== 'system' && message.isThinking !== true).length
+            : 0;
+        if (effectiveMessageCount === 0) {
+            return { success: false, error: '该话题还没有可用于生成标题的对话。' };
+        }
+
+        const globalVcpSettings = await getVcpGlobalSettings();
+        if (!globalVcpSettings.vcpUrl) {
+            return { success: false, error: '请先在全局设置中配置 VCP 服务器 URL。' };
+        }
+
+        const newTitle = await topicTitleManager.generateTitleForHistory(groupHistory, globalVcpSettings, { groupId, topicId });
+        if (!newTitle) {
+            return { success: false, error: 'AI 未能生成有效的话题标题。' };
+        }
+
+        const saveResult = titleContext?await shared.renameNativeTopic({itemType:'group',itemId:groupId,topicId},newTitle,titleContext):await saveGroupTopicTitle(groupId, topicId, newTitle);
+        if (!saveResult.success) return saveResult;
+
+        return {
+            success: true,
+            newTitle,
+            topics: saveResult.topics,
+            sourceMessageCount: Math.min(effectiveMessageCount, topicTitleManager.MIN_MESSAGES_FOR_SUMMARY)
+        };
+    } catch (error) {
+        console.error(`[GroupChat] 重新生成群组话题 ${topicId} 标题失败:`, error);
+        return { success: false, error: error.message };
+    }
+}
+
+async function saveGroupTopicTitle(groupId, topicId, newTitle) {
+    try {
+        const result = await mutateGroupConfig(groupId, current => {
+            if (!Array.isArray(current.topics) || !current.topics.some(topic => topic.id === topicId)) {
+                throw new Error(`Topic ID ${topicId} not found in group ${groupId}.`);
+            }
+            return { ...current, topics: current.topics.map(topic => topic.id === topicId ? { ...topic, name: newTitle } : topic) };
+        });
+        return result.success ? { success: true, topics: result.agentGroup.topics } : { success: false, error: result.error };
+    } catch (error) { return { success: false, error: error.message }; }
+}
+
+async function getGroupChatHistory(groupId, topicId) {
+    if (!mainAppPaths.USER_DATA_DIR) return { error: "Paths not initialized" };
+    const historyFile = path.join(mainAppPaths.USER_DATA_DIR, groupId, 'topics', topicId, 'history.json');
+    if (await fs.pathExists(historyFile)) {
+        try {
+            return await fs.readJson(historyFile);
+        } catch (e) {
+            // console.error(`[GroupChat] Error reading or parsing history for ${groupId}/${topicId}:`, e); // 根据用户要求移除此报错
+            // If reading or parsing fails, treat it as an empty history to avoid blocking the chat.
+            return [];
+        }
+    }
+    return []; // Return empty array if no history
+}
+
+
+/**
+ * 新增：处理“重新回复”群聊消息的逻辑
+ * @param {string} groupId - 群组ID
+ * @param {string} topicId - 话题ID
+ * @param {string} messageIdToDelete - 要删除并重新生成的消息ID
+ * @param {string} agentIdToReInvite - 要重新邀请发言的Agent ID
+ * @param {function} sendStreamChunkToRenderer - 用于发送流式数据的回调函数
+ * @param {function} getAgentConfigById - 用于根据Agent ID获取其完整配置的函数
+ * @returns {Promise<void>}
+ */
+async function redoGroupChatMessage(groupId, topicId, messageIdToDelete, agentIdToReInvite, sendStreamChunkToRenderer, getAgentConfigById) {
+    const queueContext = createGroupQueueContext(groupId, topicId);
+    const groupConfig = await getAgentGroupConfig(groupId);
+    if (groupConfig?.mode === 'game') {
+        throw new Error('已提交游戏事件不能通过聊天redo删除或重演。');
+    }
+    const admission = sharedGroup.current() ? null : groupTopicAdmission;
+    const scope = getGroupHistoryDescriptor(groupId, topicId);
+    const operation = async lifecycle => {
+        if (queueContext.isAborted()) return;
+        const historyPath = path.join(mainAppPaths.USER_DATA_DIR, groupId, 'topics', topicId, 'history.json');
+        if (!await fs.pathExists(historyPath)) throw new Error('无法重新回复：找不到历史记录文件。');
+        const agent = await getAgentConfigById(agentIdToReInvite);
+        if (!groupConfig || !groupConfig.members?.includes(agentIdToReInvite) || !agent || agent.error) {
+            throw new Error('无法重新回复：受邀群成员不存在或配置无效。');
+        }
+        let removed = false;
+        const removeTarget = history => {
+            const target = history.find(message => message.id === messageIdToDelete);
+            if (!target) return history;
+            if (target.role !== 'assistant' || target.agentId !== agentIdToReInvite) {
+                throw new Error('只能重做指定群成员的 assistant 回复。');
+            }
+            removed = true;
+            return history.filter(message => message.id !== messageIdToDelete);
+        };
+        await requireGroupHistoryQueue().mutate(scope, async history => {
+            if (!await fs.pathExists(historyPath)) throw new Error('目标话题历史已不存在');
+            return removeTarget(history);
+        }, { requireExisting: true, intent:{source:"group-redo-delete",known:true,deleteIds:[messageIdToDelete]} });
+        if (!removed) return;
+        sendStreamChunkToRenderer?.({
+            type: 'remove_message', messageId: messageIdToDelete,
+            context: { groupId, topicId, isGroupMessage: true },
+        });
+        return handleInviteAgentToSpeakOwned(
+            groupId, topicId, agentIdToReInvite, sendStreamChunkToRenderer,
+            getAgentConfigById, {
+                admissionQueueContext: queueContext,
+                admissionLifecycle: lifecycle,
+            });
+    };
+    if (!admission) return operation(null);
+    return withTopicGenerationLease({
+        admission, scope, token: crypto.randomUUID(), wait: true, operation,
+    });
+}
+
+
+/**
+ * 中断一个正在进行的群聊 VCP 请求，但不取消该轮剩余发言者。
+ * @param {string} messageId - 要中断的消息的 ID
+ * @returns {{success: boolean, error?: string}}
+ */
+async function interruptGroupRequest(messageId) {
+    const request = activeRequestControllers.get(messageId);
+    if (!request) {
+        console.warn(`[GroupChat] Could not find active request controller for messageId to interrupt: ${messageId}`);
+        return { success: false, error: 'Request not found or already completed.' };
+    }
+
+    console.log(`[GroupChat] Interrupting local request for messageId: ${messageId}`);
+    request.controller.abort();
+    await sendRemoteGroupInterrupt(messageId);
+    return { success: true, message: 'Interrupt signal sent locally and remote request attempted.' };
+}
+
+/**
+ * 中止指定群组话题的整组发言队列。
+ * 当前活动请求会被取消，尚未启动的模式发言者会由队列上下文阻止调度。
+ */
+function requireLocalJevAdmission(groupId) {
+    // Shared turns must enter through their existing accepted-native owner.
+    // JEV has no shared native-turn admission contract; do not start its local orchestrator.
+    if (groupHistoryMutationQueue?.syncPolicy?.sharedExecution?.runtime?.nativeObject('group', groupId)) {
+        throw Object.assign(new Error('当前共享群聊尚不支持 JEV 原生执行，请使用已支持的共享群聊模式。'), {
+            code: 'SHARED_NATIVE_ADMISSION_REQUIRED'
+        });
+    }
+}
+
+async function startJevGroupChat(groupId, topicId, sendStreamChunkToRenderer) {
+    requireLocalJevAdmission(groupId);
+    const groupConfig = await getAgentGroupConfig(groupId);
+    if (!groupConfig || groupConfig.mode !== 'jev') {
+        return { success: false, error: '当前群组未启用 JEV 群聊模式。' };
+    }
+    setGroupStreamCallback(groupId, topicId, sendStreamChunkToRenderer);
+    const result = ensureJevSessionOrchestrator().startRandomOpening(groupId, topicId);
+    return {
+        success: result.started,
+        error: result.started ? undefined : 'JEV 群聊正在运行中。',
+        state: result.state
+    };
+}
+
+async function continueJevGroupChat(groupId, topicId, sendStreamChunkToRenderer) {
+    requireLocalJevAdmission(groupId);
+    const groupConfig = await getAgentGroupConfig(groupId);
+    if (!groupConfig || groupConfig.mode !== 'jev') {
+        return { success: false, error: '当前群组未启用 JEV 群聊模式。' };
+    }
+    setGroupStreamCallback(groupId, topicId, sendStreamChunkToRenderer);
+    const result = await ensureJevSessionOrchestrator().continue(groupId, topicId);
+
+    // result may contain the internal runPromise. Electron IPC cannot clone Promise
+    // instances, so expose only the renderer-facing, structured-clone-safe fields.
+    return {
+        success: result.success,
+        error: result.error,
+        reason: result.reason,
+        state: result.state
+    };
+}
+
+async function enqueueJevGroupAgent(groupId, topicId, agentId, sendStreamChunkToRenderer) {
+    requireLocalJevAdmission(groupId);
+    const groupConfig = await getAgentGroupConfig(groupId);
+    if (!groupConfig || groupConfig.mode !== 'jev') {
+        return { success: false, error: '当前群组未启用 JEV 群聊模式。' };
+    }
+    if (!groupConfig.members.includes(agentId)) {
+        return { success: false, error: '该 Agent 不属于当前群组。' };
+    }
+    setGroupStreamCallback(groupId, topicId, sendStreamChunkToRenderer);
+    const state = ensureJevSessionOrchestrator().enqueueAgent(groupId, topicId, agentId);
+    return { success: true, state };
+}
+
+function getJevGroupChatState(groupId, topicId) {
+    if (!jevSessionOrchestrator) {
+        return {
+            groupId,
+            topicId,
+            status: 'idle',
+            running: false,
+            currentAgentId: null,
+            queue: [],
+            manualQueue: [],
+            autonomousRound: 0,
+            historyRevision: 0,
+            dirty: false,
+            stopReason: null
+        };
+    }
+    return jevSessionOrchestrator.getState(groupId, topicId);
+}
+
+/**
+ * 优雅停止指定群组话题的后续发言队列。
+ * 已经开始的 Agent 回复继续流式完成；尚未启动的成员与后续 JEV 裁决停止。
+ * 当前回复如需立即终止，应使用 interruptGroupRequest(messageId)。
+ */
+async function interruptGroupChatQueue(groupId, topicId) {
+    if (!groupId || !topicId) {
+        return { success: false, error: '群组 ID 和话题 ID 不能为空。' };
+    }
+
+    const queueKey = getGroupQueueKey(groupId, topicId);
+    groupQueueCancellationVersions.set(
+        queueKey,
+        (groupQueueCancellationVersions.get(queueKey) || 0) + 1
+    );
+
+    const activeMessageIds = [];
+    for (const [messageId, request] of activeRequestControllers.entries()) {
+        if (request.groupId !== groupId || request.topicId !== topicId) continue;
+        activeMessageIds.push(messageId);
+    }
+
+    const jevResult = jevSessionOrchestrator
+        ? await jevSessionOrchestrator.interrupt(groupId, topicId)
+        : { success: true, wasRunning: false, currentReplyContinues: false };
+    const currentReplyContinues = activeMessageIds.length > 0
+        || jevResult.currentReplyContinues === true;
+
+    console.log(
+        `[GroupChat] Gracefully stopped queue for ${groupId}/${topicId}; ` +
+        `${activeMessageIds.length} active reply/replies continue to completion.`
+    );
+
+    return {
+        success: true,
+        groupId,
+        topicId,
+        interruptedRequests: 0,
+        interruptedMessageIds: [],
+        continuingRequests: activeMessageIds.length,
+        continuingMessageIds: activeMessageIds,
+        currentReplyContinues,
+        jevSessionInterrupted: jevResult.wasRunning === true,
+        message: currentReplyContinues
+            ? '已停止后续群聊队列，当前回复将继续完成。'
+            : '已停止后续群聊队列。'
+    };
+}
+
+
+module.exports = {
+    noteToolApprovalMessage,
+    DEFAULT_GROUP_CONTEXT_MESSAGE_WINDOW_SIZE,
+    normalizeGroupContextWindowSettings,
+    selectGroupContextHistory,
+    initializePaths,
+    initializeRuntimeServices,
+    createAgentGroup,
+    initializeAgentGroupConfig,
+    getAgentGroups,
+    getAgentGroupConfig,
+    saveAgentGroupConfig,
+    deleteAgentGroup,
+    handleGroupChatMessage: (...args) => sharedGroup.wrap(groupHistoryMutationQueue,'message',handleGroupChatMessage)(...args),
+    handleInviteAgentToSpeak: (...args) => sharedGroup.wrap(groupHistoryMutationQueue,'invite',handleInviteAgentToSpeak)(...args),
+    appendGroupHistoryMessage, // Game runtime publishes committed public events only.
+    redoGroupChatMessage: (...args) => sharedGroup.wrap(groupHistoryMutationQueue,'regenerate',redoGroupChatMessage,handleInviteAgentToSpeak)(...args),
+    interruptGroupRequest,
+    interruptGroupChatQueue,
+    startJevGroupChat,
+    continueJevGroupChat,
+    enqueueJevGroupAgent,
+    getJevGroupChatState,
+    saveAgentGroupAvatar,
+    getGroupTopics,
+    createNewTopicForGroup,
+    deleteGroupTopic,
+    saveGroupTopicTitle,
+    mutateGroupConfig,
+    regenerateGroupTopicTitle,
+    getGroupChatHistory,
+};

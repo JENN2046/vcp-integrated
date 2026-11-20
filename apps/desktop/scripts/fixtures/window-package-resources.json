@@ -1,0 +1,1082 @@
+{
+  "schema": 1,
+  "windows": [
+    {
+      "id": "themes",
+      "page": "Themesmodules/themes.html",
+      "preload": "preloads/bundled/dist/utility.cjs"
+    },
+    {
+      "id": "canvas",
+      "page": "Canvasmodules/canvas.html",
+      "preload": "preloads/bundled/dist/utility.cjs"
+    },
+    {
+      "id": "memo",
+      "page": "Memomodules/memo.html",
+      "preload": "preloads/bundled/dist/utility.cjs"
+    },
+    {
+      "id": "forum",
+      "page": "Forummodules/forum.html",
+      "preload": "preloads/bundled/dist/utility.cjs"
+    },
+    {
+      "id": "log",
+      "page": "Logmodules/log.html",
+      "preload": "preloads/bundled/dist/utility.cjs"
+    },
+    {
+      "id": "tasks",
+      "page": "Agenttaskmodules/task.html",
+      "preload": "preloads/bundled/dist/utility.cjs"
+    },
+    {
+      "id": "plugins",
+      "page": "PluginManagerModules/plugin-manager.html",
+      "preload": "preloads/bundled/dist/utility.cjs"
+    },
+    {
+      "id": "desktop",
+      "page": "Desktopmodules/desktop.html",
+      "preload": "preloads/bundled/dist/desktop.cjs"
+    },
+    {
+      "id": "music",
+      "page": "Musicmodules/music.html",
+      "preload": "preloads/bundled/dist/utility.cjs"
+    },
+    {
+      "id": "rag-observer",
+      "page": "RAGmodules/RAG_Observer.html",
+      "preload": "preloads/bundled/dist/utility.cjs"
+    },
+    {
+      "id": "rag-overlay",
+      "page": "RAGmodules/RAG_Overlay.html",
+      "preload": "preloads/bundled/dist/utility.cjs"
+    },
+    {
+      "id": "loom-manager",
+      "page": "Loommodules/manager.html",
+      "preload": "preloads/loom.js"
+    },
+    {
+      "id": "loom-shell",
+      "page": "Loommodules/shell.html",
+      "preload": "preloads/loom.js"
+    },
+    {
+      "id": "loom-device-menu",
+      "page": "Loommodules/device-menu.html",
+      "preload": "preloads/loom.js"
+    },
+    {
+      "id": "dice",
+      "page": "Dicemodules/dice.html",
+      "preload": "preloads/bundled/dist/utility.cjs"
+    }
+  ],
+  "resources": [
+    {
+      "path": "Agenttaskmodules/task.css",
+      "size": 27761,
+      "sha256": "b83a950e272bd801176b754ec673710d1566fc0823db77ffc7f947df42abd086"
+    },
+    {
+      "path": "Agenttaskmodules/task.html",
+      "size": 11823,
+      "sha256": "4350c3ace3d4d9ab9c351a7d27c3bf9c5972f7fe143dd12a6bd37b6f3b36a62e"
+    },
+    {
+      "path": "Agenttaskmodules/task.js",
+      "size": 59244,
+      "sha256": "355f4c29a6b4bbb1c34271c39c1f581b4462405d5296ab9134eee258f5464a13"
+    },
+    {
+      "path": "Canvasmodules/canvas.css",
+      "size": 33106,
+      "sha256": "ff44ded2fa39136db99eb27f65684273b2501f46913fa1bb030c429a810849f6"
+    },
+    {
+      "path": "Canvasmodules/canvas.html",
+      "size": 15839,
+      "sha256": "6d8ada5ccc70583ba7b269f1cfb0b4bbede7ce15bcfc6b6b0a4c7814ab1c1ed0"
+    },
+    {
+      "path": "Canvasmodules/canvas.js",
+      "size": 53220,
+      "sha256": "9ce79d4bae9175c7d3342b2fcb9ef8729d7a57dc925b9b06d6239099cfc9df0d"
+    },
+    {
+      "path": "Canvasmodules/vendor/diff_match_patch.js",
+      "size": 78068,
+      "sha256": "945584f96cba95b7b82de5f67dc3d9cb224c3d37997a1d74b3ef4da303f58a95"
+    },
+    {
+      "path": "Desktopmodules/api/desktopMetrics.js",
+      "size": 10683,
+      "sha256": "715c07ae1d801f1a6fa410e670472bafe540074e9ebcc71cd374f4ce5b8ab0b5"
+    },
+    {
+      "path": "Desktopmodules/api/ipcBridge.js",
+      "size": 19988,
+      "sha256": "ca8365d969253dddf5a9612b36874988fc7d77d63635323c51b26c8e53bf5f7d"
+    },
+    {
+      "path": "Desktopmodules/api/vcpProxy.js",
+      "size": 7847,
+      "sha256": "0d7c25280fe88330fa005a2f3352d884ec2530b01b577a6dbb054baacc1a5958"
+    },
+    {
+      "path": "Desktopmodules/builtinWidgets/appTrayWidget.js",
+      "size": 12402,
+      "sha256": "2984d42bc337f9844c5346f27ef0495e0ab3d956c6bf1ecb209be34069d950d3"
+    },
+    {
+      "path": "Desktopmodules/builtinWidgets/musicWidget.js",
+      "size": 9083,
+      "sha256": "31e35bfe3d16a9353cb882d4514683f22a64650d42bcfbde08d8e377452ecbf0"
+    },
+    {
+      "path": "Desktopmodules/builtinWidgets/newsWidget.js",
+      "size": 14122,
+      "sha256": "626ede1d2413c3a15d8492246b368373123b7734f13dde48aefbde3f785f50a0"
+    },
+    {
+      "path": "Desktopmodules/builtinWidgets/performanceMonitorWidget.js",
+      "size": 12886,
+      "sha256": "3a841f66ee6c614690396cc0b1f632eb00716c7268c8a1fe92297f2b3eec89ea"
+    },
+    {
+      "path": "Desktopmodules/builtinWidgets/systemMonitorWidget.js",
+      "size": 29834,
+      "sha256": "dec9d24819bba71fcfae08a4c573a1a0b64b41bbd9116927ee471d3c15d124f7"
+    },
+    {
+      "path": "Desktopmodules/builtinWidgets/translateWidget.js",
+      "size": 18419,
+      "sha256": "ae5d5aa6d82ab04b2f8716942e00b1d7e0a6e0f2c464307de877f4b3ab766fc2"
+    },
+    {
+      "path": "Desktopmodules/builtinWidgets/vchatApps.js",
+      "size": 33982,
+      "sha256": "bd6645f72b60dbf4af8dcbc2f8563fb79e64c6c176a6973ca903f707d89b13f9"
+    },
+    {
+      "path": "Desktopmodules/builtinWidgets/weatherWidget.js",
+      "size": 10252,
+      "sha256": "c3160b28481f25181d86e043c1e8b41d5c7cbb3dfa829be35899267f5137ec38"
+    },
+    {
+      "path": "Desktopmodules/core/dragSystem.js",
+      "size": 3211,
+      "sha256": "1d033a17c62fa354f56f3ebb9edcfba7296891cacad74feb1ec99bcc4182a2db"
+    },
+    {
+      "path": "Desktopmodules/core/performanceManager.js",
+      "size": 4649,
+      "sha256": "39f3906cc1f6642a8818d03d26ccda69e94991af39213e7fda0f107cd8709d0a"
+    },
+    {
+      "path": "Desktopmodules/core/state.js",
+      "size": 4744,
+      "sha256": "ccd651e133ba97920c7fcd9c3cc44e3829a81700b20f776b38349f55911665bc"
+    },
+    {
+      "path": "Desktopmodules/core/statusIndicator.js",
+      "size": 1666,
+      "sha256": "2a48127a7613ca82ec4611d15ba704fe350f381e82aca5356cfbd96d09bee8d0"
+    },
+    {
+      "path": "Desktopmodules/core/styleAutomation.js",
+      "size": 17414,
+      "sha256": "7798be4e4571092222f7d57bb8ca5f699a52a87785c105c19a583c548b6ade46"
+    },
+    {
+      "path": "Desktopmodules/core/theme.js",
+      "size": 1777,
+      "sha256": "c5993ca068c7698805b8efd219e79c6f81c4dc5830b44d47253185b759e07841"
+    },
+    {
+      "path": "Desktopmodules/core/visibilityFreezer.js",
+      "size": 14119,
+      "sha256": "7a8c546a33d1648b91937eb82be983cb7d32ffd133b70115874aaee21bcfc9e9"
+    },
+    {
+      "path": "Desktopmodules/core/wallpaperManager.js",
+      "size": 12426,
+      "sha256": "fe0ee59bb42419acdf44e7587c0b9f68f1c8db2e4a247fd296e352877e3ec27f"
+    },
+    {
+      "path": "Desktopmodules/core/widgetManager.js",
+      "size": 42172,
+      "sha256": "62bbfc26d89f1de6c3f44be30363c269c980069356bd43cd8670e9a699e38c8d"
+    },
+    {
+      "path": "Desktopmodules/core/zIndexManager.js",
+      "size": 4971,
+      "sha256": "a45fd27a1a20e80575cc9ce73465bb4e35b0772a8606db5aaa5931f992bdb882"
+    },
+    {
+      "path": "Desktopmodules/css/base.css",
+      "size": 5077,
+      "sha256": "a21a21c5e6ffe063bc08ff21d1cd289d6fa27459d467a9b29e4482c0c750a32d"
+    },
+    {
+      "path": "Desktopmodules/css/dock.css",
+      "size": 12260,
+      "sha256": "86bc4eda633f66c7fc8448685d7e0c19dbff3cfa530016b2afa6635c44c51e49"
+    },
+    {
+      "path": "Desktopmodules/css/icon-picker.css",
+      "size": 6805,
+      "sha256": "0b660e29f910f932be2696b584b2f08017a9784f70fc9648a010ecaef5bc7d93"
+    },
+    {
+      "path": "Desktopmodules/css/living-icons.css",
+      "size": 400,
+      "sha256": "b4fad4de3f2aceb11d8351e9b51cad5d36029d05d7b39301b0ed300ff444389a"
+    },
+    {
+      "path": "Desktopmodules/css/settings.css",
+      "size": 11218,
+      "sha256": "99b09447c7f83d215cda70d7ee8bf8257aba4ed775e634ef6bb013db59328cfe"
+    },
+    {
+      "path": "Desktopmodules/css/shortcuts.css",
+      "size": 3221,
+      "sha256": "15effb2b89552b8764e35a7efa0c041b90ba866217987e100bede1dc5d940723"
+    },
+    {
+      "path": "Desktopmodules/css/sidebar.css",
+      "size": 13017,
+      "sha256": "16edfba201b49646def8ed385f89493546ec71df9a237e7c79e611aa5fe7325b"
+    },
+    {
+      "path": "Desktopmodules/css/theme-overrides.css",
+      "size": 12951,
+      "sha256": "ba5c929b6216529cd4516689bb5e6e9da8247bd827669cc638846f3fc413187d"
+    },
+    {
+      "path": "Desktopmodules/css/ui-components.css",
+      "size": 5682,
+      "sha256": "c925afbe573dad619bb45129df041fa05dd19841ff93eacefba1f976635275e3"
+    },
+    {
+      "path": "Desktopmodules/css/widgets.css",
+      "size": 5151,
+      "sha256": "e25d9e0a78363d2582fd3d1e9dfff4171328a0981fb3e28e89500ae16723c853"
+    },
+    {
+      "path": "Desktopmodules/debug/debugTools.js",
+      "size": 5722,
+      "sha256": "f33b59a560f91665af2bf8d2c32c6c6d9f25a26a87cc652a49d1d30eb4b7388d"
+    },
+    {
+      "path": "Desktopmodules/desktop.css",
+      "size": 1309,
+      "sha256": "01a8502fcd94a66bdea970e561bc297040b5f47864ab7f0991fafcdb0d6e1553"
+    },
+    {
+      "path": "Desktopmodules/desktop.html",
+      "size": 26956,
+      "sha256": "7e2f145f11510183c38257b539e70c4ff5bb07145453798550bce8e9c11f35ed"
+    },
+    {
+      "path": "Desktopmodules/desktop.js",
+      "size": 5763,
+      "sha256": "e0d16857e0579d11c7bb86248048e26ca00209af0c993a069a16413cf7201ed4"
+    },
+    {
+      "path": "Desktopmodules/favorites/favoritesManager.js",
+      "size": 8710,
+      "sha256": "eb2e8d49f2125a9e7f4728f0ce8daa53bd73ebb5277fa212aa2449936d56ad66"
+    },
+    {
+      "path": "Desktopmodules/favorites/thumbnail.js",
+      "size": 4368,
+      "sha256": "740dca7e2f4e6600c7dbdb876893813dfe68e8a285199b904d3269624d926dcf"
+    },
+    {
+      "path": "Desktopmodules/ui/contextMenu.js",
+      "size": 18428,
+      "sha256": "885bcfff9c85d57c2a20fe31647f61476de62b41b737a0c6a11f43910d3397c0"
+    },
+    {
+      "path": "Desktopmodules/ui/dock.js",
+      "size": 78669,
+      "sha256": "1cd2c41691726a406a0b15c1b0179d25fce0e6304e991d53e4ccf858297a88d5"
+    },
+    {
+      "path": "Desktopmodules/ui/globalSettings.js",
+      "size": 33525,
+      "sha256": "4fed2e4c944dfb47c3665ddefcb613e3967e7967dc62c242b7dd67b363d1a457"
+    },
+    {
+      "path": "Desktopmodules/ui/iconPicker.js",
+      "size": 13451,
+      "sha256": "328fc9a05c0c7fe566a36694755689750af2bf5637dca2e252fdfecf6fb59042"
+    },
+    {
+      "path": "Desktopmodules/ui/livingIcons.js",
+      "size": 3779,
+      "sha256": "5c944ff1aba19160ed9e285ec89f3f00221fea25f5977813843a98f13ef3d713"
+    },
+    {
+      "path": "Desktopmodules/ui/saveModal.js",
+      "size": 2905,
+      "sha256": "6475bc5fb5ebc66f9930f6cc12a12f0daffeb4e794624121d8758ed0e1fc077c"
+    },
+    {
+      "path": "Desktopmodules/ui/sidebar.js",
+      "size": 43278,
+      "sha256": "841a9f9afc29514820c673f58c03e8248486c274e39cdf0caa40acb3a9e7f17c"
+    },
+    {
+      "path": "Dicemodules/assets/dice-box/ammo/ammo.wasm.wasm",
+      "size": 316981,
+      "sha256": "007a4e93dce707e222e5f895a792a9e089f9dce65b36c057a32416644aa6be5e"
+    },
+    {
+      "path": "Dicemodules/dice-soundscape.js",
+      "size": 12292,
+      "sha256": "1a9df1d9f3fc7ea86820c5971043c7174514232274d949ca850e70425a58947b"
+    },
+    {
+      "path": "Dicemodules/dice.css",
+      "size": 22132,
+      "sha256": "bb2de7b13c4141e27ac82ec073625f8f950b4b9208fcc7f3da072aecddaeb774"
+    },
+    {
+      "path": "Dicemodules/dice.html",
+      "size": 7535,
+      "sha256": "792263d308c62e00e26d11a0706007b3c6dccf051bb6bca469dab56e19161523"
+    },
+    {
+      "path": "Dicemodules/dice.js",
+      "size": 24178,
+      "sha256": "1fb1e88de4e5d9c56feb7d025c3edb2c6847599604dc57b4fa2b9185a6de3ada"
+    },
+    {
+      "path": "Forummodules/forum.css",
+      "size": 38939,
+      "sha256": "5cdf540562ed5d923bcf02fce92836719a8f133053100ebf38ff724dc19b40b9"
+    },
+    {
+      "path": "Forummodules/forum.html",
+      "size": 11492,
+      "sha256": "ba2229a3d6f43dd1ad531ba078fd5a7cba3bf6f9be66fcfc3fba7af41156e9c4"
+    },
+    {
+      "path": "Forummodules/forum.js",
+      "size": 87099,
+      "sha256": "4723ef05cbfd19b6d8d80e5da7f1b060e0cf81c0ec7b6841344e734a7b503782"
+    },
+    {
+      "path": "Gamemodules/doudizhu/index.html",
+      "size": 4906,
+      "sha256": "88d455b4722b80df96076dca8865ec1694fcfd184f9ff4efd5463aa484211507"
+    },
+    {
+      "path": "Gamemodules/doudizhu/style.css",
+      "size": 6496,
+      "sha256": "84480e12715d9632d3a982193f62c4d4011c4d0b9a683a1a687c0081c4b5d66e"
+    },
+    {
+      "path": "Gamemodules/doudizhu/ui.js",
+      "size": 30723,
+      "sha256": "f9beda20dcd54d4d94dbc9c2d7a134a10f84b91e3a4e9262e252fd891eb6bd1a"
+    },
+    {
+      "path": "Gamemodules/forge-tax/audio.js",
+      "size": 5764,
+      "sha256": "6add08a426d8fae96427219f3ecc93c67ad8d69f13912a049a70332b81ea05b6"
+    },
+    {
+      "path": "Gamemodules/forge-tax/engine.js",
+      "size": 22189,
+      "sha256": "9147f0141b9b5673a7336fd7df4f047f3109317ad19afd42798953728523bed1"
+    },
+    {
+      "path": "Gamemodules/forge-tax/index.html",
+      "size": 2573,
+      "sha256": "52d2e441d68809be551643223b5b843ded0a5f5859b0f33bf3ebf236362751c8"
+    },
+    {
+      "path": "Gamemodules/forge-tax/preload.cjs",
+      "size": 863,
+      "sha256": "170097d48c8dd1b78f4f9e9051a5c4a0f06d1292a27506764554661fe29a8c03"
+    },
+    {
+      "path": "Gamemodules/forge-tax/service.cjs",
+      "size": 4849,
+      "sha256": "b26f2b07d4ac6272de8aae465637d9e57e545a9773b3114744a7bc9562cba0a3"
+    },
+    {
+      "path": "Gamemodules/forge-tax/session-store.cjs",
+      "size": 7345,
+      "sha256": "e48eee2d36f79adf0cbd3333fecd9ea9260324c05249b3e3c8f9b4e93474a14d"
+    },
+    {
+      "path": "Gamemodules/forge-tax/style.css",
+      "size": 4958,
+      "sha256": "9e611afec212e2f3b27b0a186498c471ff63b82760cbb9eaff68e9e7f3e66ec2"
+    },
+    {
+      "path": "Gamemodules/forge-tax/tool-result.cjs",
+      "size": 3964,
+      "sha256": "455b5bd6933c386be498da2f938d2b63b44eb7feeb39f7752184552860f9ee17"
+    },
+    {
+      "path": "Gamemodules/forge-tax/ui.js",
+      "size": 19328,
+      "sha256": "7083ed93e3fab8af33a679359bbfa3142f0360be5d972075cf04aa8c7f99f87d"
+    },
+    {
+      "path": "Gamemodules/game.css",
+      "size": 3465,
+      "sha256": "0650ebd9b7913c766278be42cb942c434ab444749722d6942f480ad1f69ad8a3"
+    },
+    {
+      "path": "Gamemodules/game.html",
+      "size": 5259,
+      "sha256": "334dda02467613777060caaf4c161b932ee5a5fe7667bc4f249539a6c0c3b703"
+    },
+    {
+      "path": "Gamemodules/game.js",
+      "size": 9532,
+      "sha256": "d04aefe30ccf2b5e1c5d0d5d9564802961ce409ce8790c5426b973da267fda46"
+    },
+    {
+      "path": "Gamemodules/srpg/index.html",
+      "size": 4823,
+      "sha256": "7134c9dab7c374893676706f513939908afb8dad462b47598ddb2c46517558c9"
+    },
+    {
+      "path": "Gamemodules/srpg/package.json",
+      "size": 74,
+      "sha256": "d9c63f2cad92d8afe210dd3402c199da22589bcd8ff47758a30139c2b9aba7ac"
+    },
+    {
+      "path": "Gamemodules/srpg/preload.cjs",
+      "size": 938,
+      "sha256": "f949ef3f48592e29158e5dc61e405dfdbe1a30ed0b39faf52044b27bb4782ac6"
+    },
+    {
+      "path": "Gamemodules/srpg/service.cjs",
+      "size": 4604,
+      "sha256": "7cbf3849b4481f9ed776521259853eca2d23fc64abc243c1ee606b2b3d276c43"
+    },
+    {
+      "path": "Gamemodules/srpg/session-store.cjs",
+      "size": 26019,
+      "sha256": "f79d514b9c08007be52e344fdbe0dbb83ef31bf9cd7378c07d9c95a676a0368f"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ai-api.js",
+      "size": 3667,
+      "sha256": "32865a76eac2f7ef8b570cb71a41628641bec5633fbf4ce003f7cd93c981fe90"
+    },
+    {
+      "path": "Gamemodules/srpg/src/commander.js",
+      "size": 5666,
+      "sha256": "261da8f643d4feb7a55b6efa6e1abf3da89bd9517b8b7e4dd4c9f07e061f06c2"
+    },
+    {
+      "path": "Gamemodules/srpg/src/commands.js",
+      "size": 14330,
+      "sha256": "c85aab3f5d8ce847c20b16c8a59d5dcd4c85d5daebe4c2c0b3d231d65a9a29f9"
+    },
+    {
+      "path": "Gamemodules/srpg/src/context.js",
+      "size": 12708,
+      "sha256": "b2f676c0e9abb47d31ace6cf77b34afbec92c280f433505d92570ae327e52ddc"
+    },
+    {
+      "path": "Gamemodules/srpg/src/defaults.js",
+      "size": 30080,
+      "sha256": "17f3c789e24a0290419312f3bf51a4b500505af822377548393a9b8109f4555c"
+    },
+    {
+      "path": "Gamemodules/srpg/src/designer.js",
+      "size": 30244,
+      "sha256": "6cd67fa34b548ae0ea4e8f56904ba280d052cdce61b5f254f51b5b5f088e6d0e"
+    },
+    {
+      "path": "Gamemodules/srpg/src/engine.js",
+      "size": 93992,
+      "sha256": "88e76e26c3246dbf19741bebff12fee71b10f14dc05409b3eed34c382c3b840b"
+    },
+    {
+      "path": "Gamemodules/srpg/src/exchange.js",
+      "size": 1203,
+      "sha256": "10ab45174a227f8d5b9527fa82e2d037e0b3ab70f6f74013d95bd3bb201a4fd4"
+    },
+    {
+      "path": "Gamemodules/srpg/src/history.js",
+      "size": 2882,
+      "sha256": "88725f0e8513ba6b45a4ad7c19e3dac34fc4292022abbb1fb4c7bb14bea407f3"
+    },
+    {
+      "path": "Gamemodules/srpg/src/llm.js",
+      "size": 4497,
+      "sha256": "1748863b670a9dfde3fcc25ba170d9765b03393a172a56d43c4e2a06e5cf9c4d"
+    },
+    {
+      "path": "Gamemodules/srpg/src/manual.js",
+      "size": 6247,
+      "sha256": "72a6f10c1791918e3869560d9e60dfb425ffc84e43c2045d2d800d1adfbe0fb9"
+    },
+    {
+      "path": "Gamemodules/srpg/src/narrator.js",
+      "size": 18430,
+      "sha256": "96376ac88c576fc46f1cb52b82940b17547d8c4c5571e740ca6ebbf01d896955"
+    },
+    {
+      "path": "Gamemodules/srpg/src/profiles.js",
+      "size": 3720,
+      "sha256": "a308ca5b385df5f3fbc645578f651cb92724f613203aef305fa33b956ccb8979"
+    },
+    {
+      "path": "Gamemodules/srpg/src/st.js",
+      "size": 20302,
+      "sha256": "584930f24838082b9ad50de877c41b6b7637e54858d91e31af81eebdca5f5eed"
+    },
+    {
+      "path": "Gamemodules/srpg/src/story.js",
+      "size": 22252,
+      "sha256": "89b585ebd01980f60fa5d7b125b49dfd57792286c7e0596b6c4498a1c5d9def2"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ui/action-process.js",
+      "size": 7955,
+      "sha256": "00fe563d5249d944a024066dea351eae55eb7f251be95f3b24e4f18edf2fd21e"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ui/battle.js",
+      "size": 71467,
+      "sha256": "daf019c37db4e60d5cd3966d1754c8a847b5cd41be1109a99a77e7d264fd6aa9"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ui/chat-messages.js",
+      "size": 3929,
+      "sha256": "0ac09b860e0d535dfc1e5c53d7b4c219ae4baa39408598002eea080dfef93bd5"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ui/designer-tab.js",
+      "size": 37133,
+      "sha256": "bf236428537b97af91b56f7d97df15b8ead86496be3c4df52db524960188e39a"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ui/dom.js",
+      "size": 12257,
+      "sha256": "1ebc8252b5ac641a95190d6dc23e97ff4283b8a0ee0727a5898c66ed55d92c2e"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ui/editors.js",
+      "size": 50371,
+      "sha256": "1653baaf8f605ffafef93b602e49340d5763c3598ccf84b8f45167eb6414d53c"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ui/files.js",
+      "size": 1092,
+      "sha256": "1840db743c3d923c5263c158549106c80397e44582580669a6e6579afe402a46"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ui/llm-flow.js",
+      "size": 9704,
+      "sha256": "9c75355d92a4a4102c88f0eeb60c2732189dcbcf6b034a2eae0ee113d26d5cab"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ui/panel.js",
+      "size": 20130,
+      "sha256": "18a6e93ff52743afe12c3ecd51af8411462361377553430dfadce66e06755fe7"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ui/profiles-tab.js",
+      "size": 10756,
+      "sha256": "631ce65ba3cdb7dec3ac187770027334815c2e13cb3420bac5904b65afe193f9"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ui/settings.js",
+      "size": 18354,
+      "sha256": "503166f9807335cba0036b875ef11a4294dd94f72839d880b998b40b6290c51a"
+    },
+    {
+      "path": "Gamemodules/srpg/src/ui/story-flow.js",
+      "size": 14680,
+      "sha256": "3494d92252e884bb0ea851337320fe444e764e1773c9db57b57c0adc7a7a2bd3"
+    },
+    {
+      "path": "Gamemodules/srpg/src/unit-lore.js",
+      "size": 4184,
+      "sha256": "6db75abe3b172bf193454c86aa4064fd56593c4936d674140a91a186d30a111c"
+    },
+    {
+      "path": "Gamemodules/srpg/style.css",
+      "size": 48244,
+      "sha256": "678b1dc8a058230322809e062ee7e9415df27cb3cddd9608e1c9bec788eacf93"
+    },
+    {
+      "path": "Gamemodules/srpg/tool-result.cjs",
+      "size": 1650,
+      "sha256": "47771118933db4f7c180861f97b6e30f6b395133cf82bdc0471a1853ca2f8e14"
+    },
+    {
+      "path": "Gamemodules/srpg/ui.js",
+      "size": 6826,
+      "sha256": "a9816c5812e94c134c8f475f775ebd818f8c2187843881869822ae3e9d9b5a14"
+    },
+    {
+      "path": "Gamemodules/vcp-neon-game/index.html",
+      "size": 6945,
+      "sha256": "0dbcd1b72a953bbd21e9d88085d6a852f7d230e952156dade6efd9f6838ee95d"
+    },
+    {
+      "path": "Gamemodules/vcp-neon-game/js/audio.js",
+      "size": 9078,
+      "sha256": "6008a81d3ca6656f35a099001d2b17399aa6dada0262f169352d0cb2b38474f9"
+    },
+    {
+      "path": "Gamemodules/vcp-neon-game/js/config.js",
+      "size": 13845,
+      "sha256": "f71ca552b20572a6a32246d57bf994e4246ae2b5e952a8c444b329040a9004f7"
+    },
+    {
+      "path": "Gamemodules/vcp-neon-game/js/entities.js",
+      "size": 21506,
+      "sha256": "20949aa650b1e89af69947ffda2c3fdaa41c9dd6b22093c10266e40cfc7a3bd7"
+    },
+    {
+      "path": "Gamemodules/vcp-neon-game/js/game.js",
+      "size": 30923,
+      "sha256": "2a80f390795c6fbfb6330c6ec5749bed5d5331cdbff8323e70962ed1959f38db"
+    },
+    {
+      "path": "Gamemodules/vcp-neon-game/js/main.js",
+      "size": 10233,
+      "sha256": "370346adc7b8d3b5ddaca2d44dcf2f687a587430d6617d153982c32db9263db2"
+    },
+    {
+      "path": "Gamemodules/vcp-neon-game/js/utils.js",
+      "size": 2934,
+      "sha256": "76b2144ccb5070a56c8e9cac8096bec73ee4a32a52494a2faf3d90548550a5a3"
+    },
+    {
+      "path": "Gamemodules/vcp-neon-game/js/weapons.js",
+      "size": 23957,
+      "sha256": "1cd9daaa87fb75e8436d5dce292f5ed123de7d02425ddee3faefd01116b15aa1"
+    },
+    {
+      "path": "Gamemodules/vcp-neon-game/styles.css",
+      "size": 17855,
+      "sha256": "8a1c21bcd336b8ab1b77e752b74650396ba45a6b9048b980e2d3df45c49c789c"
+    },
+    {
+      "path": "Logmodules/log.css",
+      "size": 10181,
+      "sha256": "a0e45cd1380b5ec9573a6b4ebb332e1dd63053fcc597431d9ae51a94574b9001"
+    },
+    {
+      "path": "Logmodules/log.html",
+      "size": 5157,
+      "sha256": "d04c1fe8c89aeaa27a58d17a13ecd64c4054d612f4c586b9984cad30db07e154"
+    },
+    {
+      "path": "Logmodules/log.js",
+      "size": 16698,
+      "sha256": "4a1e30a121e83f9c2812efde5416a27cf437177f7f141f0be09df1d49edc3197"
+    },
+    {
+      "path": "Loommodules/device-menu.html",
+      "size": 8070,
+      "sha256": "b2dcc4ea4421822813528c8c1911ba22e2f6f21a82590adce8177527bea303b3"
+    },
+    {
+      "path": "Loommodules/manager.html",
+      "size": 36038,
+      "sha256": "ed44593321f625e30f70dd286d4b4a7d9441ed5bc218fb742669c54e8ddc3923"
+    },
+    {
+      "path": "Loommodules/shell.html",
+      "size": 11808,
+      "sha256": "121e00d5c7fee843c021d062f2c5a4942e381d99c3fc6c29cbd5b1ebd5b3586e"
+    },
+    {
+      "path": "Memomodules/memo-graph.js",
+      "size": 27269,
+      "sha256": "f5180c28990a88e3e2dd6f366cb257077d58fa2b7609b8418255f840bd3385ec"
+    },
+    {
+      "path": "Memomodules/memo-workbench.js",
+      "size": 14085,
+      "sha256": "f6e0266fa07c8e6b6e9ccc8885c0ccadc425628b2337f150e4a9c926542f42a8"
+    },
+    {
+      "path": "Memomodules/memo.css",
+      "size": 29362,
+      "sha256": "d1a2bdd6526b20fd8888a377cdaa83b162fbab60e0ee4efc7338452be40ed1f1"
+    },
+    {
+      "path": "Memomodules/memo.html",
+      "size": 30841,
+      "sha256": "48837edc1e8d6b57abcd3bf2784087ea9d1f86db91f0c046b710bc6e83ab328a"
+    },
+    {
+      "path": "Memomodules/memo.js",
+      "size": 61754,
+      "sha256": "601b1efb3f25dd8f5964e5fea9f3c840f569cabcb738f59d9458b69ac0e1e94f"
+    },
+    {
+      "path": "Musicmodules/music-ambient-pixi.js",
+      "size": 18189,
+      "sha256": "dbbb045fda1410fa23e11366ab19a58efca911d037d89abe3aa361de844fd500"
+    },
+    {
+      "path": "Musicmodules/music-effects.js",
+      "size": 9743,
+      "sha256": "70b7d294dcd960b2addbbabf5ad2055193fb35b46414d6816bd89fcfa33b3a92"
+    },
+    {
+      "path": "Musicmodules/music-lyrics.js",
+      "size": 25379,
+      "sha256": "66ed639276b9a6b4a1b9f9e6dba9f4ad0babd990166d3c381070321bf4de1f9c"
+    },
+    {
+      "path": "Musicmodules/music-output.js",
+      "size": 3829,
+      "sha256": "9270344ef087d051f2f4b4a368eba3a70f33f4e937ba0fd66c1b3bf68c146755"
+    },
+    {
+      "path": "Musicmodules/music-player.js",
+      "size": 18964,
+      "sha256": "c14a5990a55d854eb52e6ca3b4ed4037d65a51db6bf7c222db77ccfb8f0f4ca9"
+    },
+    {
+      "path": "Musicmodules/music-sidebar.js",
+      "size": 10712,
+      "sha256": "3a8a6b83b96909f369efadf2a8362828fe395efc28369e451ac1a065eac255cb"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/cadenza-manager.js",
+      "size": 9694,
+      "sha256": "61da5942ee26d2429824581bcd8ca40900e5b960a06cbfa90d06fedef80d3eb6"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/diorama-camera.js",
+      "size": 12994,
+      "sha256": "f88ae35407108a5aab3e7a22635064384ff8e25000ee538d401cead5a22896cc"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/diorama-director.js",
+      "size": 16315,
+      "sha256": "e40995a330a71f5a8a2873fb8a09b3745e712a28302ec5c63a1c97cc8b7488f5"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/diorama-events.js",
+      "size": 53428,
+      "sha256": "88f6d49237e172e6ec4e2216632e0b278052de00b10eef426e91be289b48b504"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/diorama-lyrics.js",
+      "size": 33972,
+      "sha256": "e942833472534502316ed3c7a14e31f3305461772cb0eaa695e16ca1b0fb020d"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/diorama-manager.js",
+      "size": 13341,
+      "sha256": "e886442561c4f955a5fb8b37942b2dea242637f8a5c97ea5c0a5fe01de460482"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/diorama-optics.js",
+      "size": 3976,
+      "sha256": "4c32e64478c9f7847296031a5fdfd3558074b2563301d61e421dd2c89d3ac981"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/diorama-stations.js",
+      "size": 25832,
+      "sha256": "f2d8c641306dd81e250cadc787beee6a4c46ab0bd1f1a07aa219bfe460863719"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/diorama-world.js",
+      "size": 48170,
+      "sha256": "7418389d2ea942f903fb87b8649551277dd463522c0a81de94a047d2f62ef865"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/fume-manager.js",
+      "size": 22092,
+      "sha256": "0cee9da912b47f1649ee059403ee19c300afdfa6d19ca954ecd84c19d33a94a5"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/luminous-manager.js",
+      "size": 3231,
+      "sha256": "a252a4032604de25851eb7b56d8d86583daefeb79f039aa9055bb532f4ba2569"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/partita-manager.js",
+      "size": 3838,
+      "sha256": "adbc943750e390a3bb78e6cdf40e53832dce96fbf9efb910577a0ec7119920df"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/sonnet-manager.js",
+      "size": 4583,
+      "sha256": "8ee8b1fa5d59572f7d6cdce81fe392c4c86e7d41c5e4b2cecff3afa862d84dab"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/sonnet-pixi-core.js",
+      "size": 22339,
+      "sha256": "fde8528104c050cd1a282d820248272a078696d6e35e1ed57aa304d61d7d645f"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/stage-lyric-decor.js",
+      "size": 9874,
+      "sha256": "74617488a3fde6eb4a9be317c007c6547cece42c413958a92ec65e0283b50070"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/stage-lyric-layout.js",
+      "size": 7771,
+      "sha256": "ae65b211526879e5005c5e2dab011dd089b7eec873baa28c7dfa2afbb6741470"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/stage-lyric-performance.css",
+      "size": 7286,
+      "sha256": "a08e0bebb0d9141bae3c1a1be05768176b5eddb70f37500738a0f389d675accb"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/stage-lyric-performance.js",
+      "size": 21258,
+      "sha256": "3f700ce0056b7b1badef620e007bf729cd8f79884c8be448efc18257ef22a4c3"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/stage-mode-utils.js",
+      "size": 6706,
+      "sha256": "e78f0cfba4a5913eacdbd8582ed27a2d4e77606299a5553844f551b8c2f73895"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/stage-pixi-effects.js",
+      "size": 71475,
+      "sha256": "1b883676deb2242561f9f27b30b6a93681f5cbe7d717f6666f5c455034e37908"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/stage-starbloom.js",
+      "size": 35972,
+      "sha256": "70a0dbe56e4ccca1980bfe02e4554c33905180fb84a6912635a0c11b5a4b4533"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/tempera-manager.js",
+      "size": 4843,
+      "sha256": "89ec1ecf126f372125c1be1f77f3f98501305b6d79efaedf05eb64050f928cc0"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/tempera-pixi-core.js",
+      "size": 27784,
+      "sha256": "878e17dccb7ad8b08fed6e8589ba54370480aeca3dc6fff662fceab72b40f1c3"
+    },
+    {
+      "path": "Musicmodules/music-stage/modes/tunnel-manager.js",
+      "size": 113879,
+      "sha256": "c8d18dcd0ef71d2b2c2c7c5b9048607241bfcdd60f2b3ca8f23dc1027386d9cf"
+    },
+    {
+      "path": "Musicmodules/music-stage/music-stage-advanced-modes.js",
+      "size": 1118,
+      "sha256": "401c6b157aafea4881e877b954ecd2e42cd293e7566f96c778121d78dccb087c"
+    },
+    {
+      "path": "Musicmodules/music-stage/music-stage-config.js",
+      "size": 18935,
+      "sha256": "2f3ce8ce418ca41b64ad1c7d4bffc8b3dfa63557dc003f5d85c3ff4974f3f28a"
+    },
+    {
+      "path": "Musicmodules/music-stage/music-stage-host.js",
+      "size": 68917,
+      "sha256": "65a72af72a16720a62d52c260ec2a686cc71c139fd26e4b537a7efcf6447dcf1"
+    },
+    {
+      "path": "Musicmodules/music-stage/music-stage-modes.js",
+      "size": 12247,
+      "sha256": "2e7d46dca846ad9c0716651f35231f41a1b653a7e242c43e6718f669e5c883d5"
+    },
+    {
+      "path": "Musicmodules/music-stage/music-stage-runtime.js",
+      "size": 25074,
+      "sha256": "7ac2955043636e3ff55108817c3fb89b0d368eee8fd94faec76fa6fba54c43af"
+    },
+    {
+      "path": "Musicmodules/music-stage/music-stage.css",
+      "size": 83674,
+      "sha256": "445046ef7fb53979de6f5abacedef8b24c9c0ca2a36f01c4bb2802f64c1560a4"
+    },
+    {
+      "path": "Musicmodules/music-ui.js",
+      "size": 9437,
+      "sha256": "7e46c9900f1d077ca646d70c7279281a23f91a13b8295ce17d971fd4c7319f66"
+    },
+    {
+      "path": "Musicmodules/music-utils.js",
+      "size": 10220,
+      "sha256": "dce014801fffa8826094ccf09d420326323dbda286af7dc602af8d861a0f0faf"
+    },
+    {
+      "path": "Musicmodules/music-visualizer.js",
+      "size": 17478,
+      "sha256": "0df2501e66438ed7664478a6e01c8950f8cae55e147364debbc1292b496172b7"
+    },
+    {
+      "path": "Musicmodules/music-webdav.js",
+      "size": 11924,
+      "sha256": "38ed039d483c3c552f726430f3641cd3b0d9843e2176abae6d0d6418ef2ccb5a"
+    },
+    {
+      "path": "Musicmodules/music.css",
+      "size": 58905,
+      "sha256": "ef533a9f48e2ded3ff70fa343c3c1f7f328714fdcbd08b5f9f5cd6d9d439f08c"
+    },
+    {
+      "path": "Musicmodules/music.html",
+      "size": 51432,
+      "sha256": "cc32c403d8258f9e3d26467e02c8db8dad6dc5ea03fa3516010f83b341701c76"
+    },
+    {
+      "path": "Musicmodules/music.js",
+      "size": 63309,
+      "sha256": "2e782df067dcfc1ce52e066aafc4b03d733da4c6cd830cbeb4e4fe5de95dc2e1"
+    },
+    {
+      "path": "Musicmodules/socket.io.min.js",
+      "size": 49993,
+      "sha256": "73eba16bc895fdfa454e27ecb80def31ede8d861f99e175ff93b110eabec044f"
+    },
+    {
+      "path": "PluginManagerModules/plugin-manager.css",
+      "size": 24433,
+      "sha256": "35a48dd3474fadcc400118d655d0267d7ca9b95b8d3982f348ff88a8ac07035e"
+    },
+    {
+      "path": "PluginManagerModules/plugin-manager.html",
+      "size": 9869,
+      "sha256": "74644af16da989c0aca9927e779ad1275474fc9fe3fea0c78f1a1414926e0ef1"
+    },
+    {
+      "path": "PluginManagerModules/plugin-manager.js",
+      "size": 30898,
+      "sha256": "0499bdf2d371bec47d6609a332067669df45e10d9cb73add23503a218368b2fb"
+    },
+    {
+      "path": "RAGmodules/RAG_Observer.css",
+      "size": 40868,
+      "sha256": "4c15d43d8d831c1cf8201c4df40336cb992baf09b48664f9d092f914417e14ea"
+    },
+    {
+      "path": "RAGmodules/RAG_Observer.html",
+      "size": 15344,
+      "sha256": "2df32cc037276f4aecca4fc051ae5b9ebf0744ff61d089ee000081c53cfb23a7"
+    },
+    {
+      "path": "RAGmodules/RAG_Observer.js",
+      "size": 122984,
+      "sha256": "318803b64bac0902cd2ec44bcceeb1b655dc51959234492ad3a3e1ac788889b0"
+    },
+    {
+      "path": "RAGmodules/RAG_Overlay.html",
+      "size": 25032,
+      "sha256": "ef97141d204fdc87afc50268e8d5d77e33ee82ebd9f9b9ec69051c942c0e9142"
+    },
+    {
+      "path": "RAGmodules/rag-observer-config.js",
+      "size": 13560,
+      "sha256": "42475d6e93f422a7dd73ef8719c28703b084d0215b49288224efc13877be616a"
+    },
+    {
+      "path": "Themesmodules/themes-module.css",
+      "size": 17895,
+      "sha256": "fb203ac3c9bd12cf97a3fcc685b6a9b05555a198a18791e04214216f9247cbaf"
+    },
+    {
+      "path": "Themesmodules/themes.html",
+      "size": 8409,
+      "sha256": "5bb3641d3e6d1c66d99620eee25f952e2c0d2f0971ef34ba1bcc12cea16ced53"
+    },
+    {
+      "path": "Themesmodules/themes.js",
+      "size": 21162,
+      "sha256": "b5141b0e7016fde417c2c4466e829ae28237b95c563f69cf10ddc099a967a9c7"
+    },
+    {
+      "path": "VCPDistributedServer/Plugin/BladeGame/blade-electron.css",
+      "size": 13748,
+      "sha256": "aa4dfd7fbcf0224a8b8b5cb2642cb9bb2f2fa0e0193c7919c6fbbcbeb87ba0b5"
+    },
+    {
+      "path": "VCPDistributedServer/Plugin/BladeGame/blade-electron.html",
+      "size": 4293,
+      "sha256": "a196ef6bbc6451372d84bbc5707834eb057147880083c2546dbee6ee32ef64c8"
+    },
+    {
+      "path": "VCPDistributedServer/Plugin/BladeGame/blade-electron.js",
+      "size": 44681,
+      "sha256": "0d9533d560fc72d76f6fc24412a103ff2600e3103f4326459e2a574496dc9a85"
+    },
+    {
+      "path": "VCPDistributedServer/Plugin/BladeGame/blade-preload.js",
+      "size": 1270,
+      "sha256": "49fdcecc3a11f285aef56d55f15f9938c22aba7ea151150851e7d39a9a57731a"
+    },
+    {
+      "path": "VCPDistributedServer/Plugin/BladeGame/blade-service.js",
+      "size": 13879,
+      "sha256": "6235c8ac2c415569182e35b86cfb0fde6de49d725ca28654344d4ed51c53ed0e"
+    },
+    {
+      "path": "VCPDistributedServer/Plugin/BladeGame/plugin-manifest.json",
+      "size": 4490,
+      "sha256": "0b9c6218c6dc9c5c14deb35e9d29a88ea593e4d23dfe99e84d388041dc2574cb"
+    },
+    {
+      "path": "VCPDistributedServer/Plugin/ForgeTax/forge-tax-service.js",
+      "size": 285,
+      "sha256": "da7f7a4ac994acafae4aae03670f4dfac6943249d0b8991e31573fd2a8ffcc1f"
+    },
+    {
+      "path": "VCPDistributedServer/Plugin/ForgeTax/plugin-manifest.json",
+      "size": 3131,
+      "sha256": "679d37cb5ec39a969ed0d126e3fd9b13c032888467933fb4b73bfc1b42018e8b"
+    },
+    {
+      "path": "VCPDistributedServer/Plugin/GameController/GameControllerService.js",
+      "size": 759,
+      "sha256": "a579d5fcccc7d8320531aacb6ff8e07221ea54ca0984ec5318c13b652003aa47"
+    },
+    {
+      "path": "VCPDistributedServer/Plugin/GameController/plugin-manifest.json",
+      "size": 2287,
+      "sha256": "51dab9067c10c2f2770d7e924aa8686d6438c705d0ad5689d390ae7906e6b605"
+    },
+    {
+      "path": "VCPDistributedServer/Plugin/TavernSRPG/plugin-manifest.json",
+      "size": 3979,
+      "sha256": "9a43591857f6a741c0f2d595d8078c9ebfb188ed639edce8034be65c32e71156"
+    },
+    {
+      "path": "VCPDistributedServer/Plugin/TavernSRPG/tavern-srpg-service.js",
+      "size": 281,
+      "sha256": "0b9f6ba0c7e17cc9e36cfce0422b792d22ed29e4baa387d8c1a00ab169428bac"
+    },
+    {
+      "path": "preloads/loom-page.js",
+      "size": 4854,
+      "sha256": "dde36038ecc11818ac58b9e12d586fce5f50c5724354c54d20ece6fd471f3764"
+    },
+    {
+      "path": "preloads/loom.js",
+      "size": 2513,
+      "sha256": "597d024ca84e1ec5bec590aca5614267c0e1b6fa70f267f3a89b25c58174a8de"
+    }
+  ],
+  "sourceBaseline": "20268e79fe62718fcc14dd3ac2748abbec574515",
+  "upstreamTarget": "c20cc942826cd2b61fe179097602f6a85b648b2f",
+  "status": "candidate-identities-not-installation-acceptance",
+  "loomReviewAddition": "NS-R21: actual normal packaged manager/shell/device-menu were missing; explicitly ship tracked resources and dedicated preloads, preserve existing source identities",
+  "diceReviewAddition": "NS-R21 actual packaged local dice route404: ship tracked application/static assets and checked page/script/style/wasm instead of misclassifying missing resources as GPU failure"
+}

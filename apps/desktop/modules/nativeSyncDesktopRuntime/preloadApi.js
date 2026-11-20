@@ -1,0 +1,32 @@
+'use strict';
+const { invoke, on } = require('../../preloads/core/define');
+module.exports = {
+    handlers: ['modules/nativeSyncDesktopRuntime/profileStatus.js', 'modules/services/nativeSync/queries.js'],
+    roles: ['chat'],
+    api: {
+        getNativeSyncDesktopStatus: invoke('native-sync:desktop-status'),
+        onNativeSyncShowProfileStatus: on('native-sync:show-profile-status'),
+        cancelSharedSession: invoke('native-sync:session-cancel', 'payload'),
+        getNativeDeletionContext: invoke('native-sync:directory-context', 'scope'),
+        getNativeExecutionStatus: invoke('native-sync:executions', 'itemId', 'itemType', 'topicId', 'refresh'),
+        getNativeTaskResult: invoke('native-sync:task-result', 'itemId', 'itemType', 'topicId', 'executionId', 'nativeTaskId'),
+        onNativeExecutionStatusChanged: on('native-sync:executions-changed'),
+        onSharedDirectoryChanged:on('native-sync:directory-changed'),
+        sharedConfigContext: invoke('native-sync:shared-config-context'),
+        sharedConfigRequest: invoke('native-sync:shared-config-request','payload'),
+        noteSharedSendFailure:invoke('native-sync:send-failure','payload'),
+        confirmSharedModelSave:invoke('native-sync:model-confirm','payload'),
+        prepareSharedCompaction:invoke('native-sync:compact-prepare','payload'),
+        cancelSharedCompaction:invoke('native-sync:compact-cancel','payload'),
+        commitSharedCompaction:invoke('native-sync:compact-commit','payload'),
+        handoffSharedWork:invoke('native-sync:handoff','payload'),
+        retrySharedInput:invoke('native-sync:retry-input','payload'),
+        readySharedInput:invoke('native-sync:input-ready','payload'),
+        submitSharedSteering: invoke('native-sync:steer', 'payload'),
+        prepareSharedContinuation: invoke('native-sync:continue', 'payload'),
+        stageLocalSharedInput: invoke('native-sync:stage-input', 'payload'),
+        prepareSharedSend: invoke('native-sync:prepare-send', 'payload'),
+        abandonSharedSend: invoke('native-sync:abandon-send', 'payload'),
+        checkOpenedAttachment: invoke('native-sync-setup:check-opened-attachment','input'),
+    },
+};

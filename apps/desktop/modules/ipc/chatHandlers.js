@@ -1,0 +1,1852 @@
+// modules/ipc/chatHandlers.js
+const { ipcMain, dialog, BrowserWindow } = require('electron');
+const fs = require('fs-extra');
+const path = require('path');
+const crypto = require('crypto');
+const contextSanitizer = require('../contextSanitizer');
+const {
+    RESIDENT_PRESENTATION_CHANNEL_HEADER,
+    redactResidentPresentationDiagnostic,
+    sendResidentPresentation,
+    takeResidentPresentationFromChunk,
+    takeResidentPresentationsFromResponse
+} = require('../vcpClient');
+const { SenderTaskRegistry } = require('../services/senderTaskRegistry');
+const {
+    resolveRememberedAttachmentDirectory,
+    rememberAttachmentDirectory
+} = require('../services/attachmentDialogState');
+const topicTitleManager = require('../../Groupmodules/topicTitleManager');
+const { beginTrajectoryCall, clearTrajectoryOf, sessionKeyFromContext, sourceFromContext } = require('../modelTrajectory');
+const { observeAgentMood, teeCall } = require('../agentMood');
+const { HistoryMutationQueue } = require('../services/historyMutationQueue');
+const workspaceHandlers = require('./workspaceHandlers');
+const { removeSideChatChildrenOfParent } = require('./sideChatHandlers');
+const { hostHooks } = require('../hostHooks');
+
+/**
+ * 若 filePath 属于已登记工作区且是文本/代码文件，创建真实路径实时引用；否则返回 null，
+ * 调用方继续走复制附件逻辑。超出大小上限等失败同样回退复制，不阻断附件添加。
+ */
+async function tryCreateWorkspaceLiveReference(filePath, displayName, fileTypeHint) {
+    if (typeof filePath !== 'string' || !filePath) return null;
+    const fileManager = require('../fileManager');
+    const owner = workspaceHandlers.resolveWorkspaceFile(filePath);
+    if (!owner || !fileManager.isLiveReferenceCandidate(owner.absolutePath, { workspace: true })) return null;
+    try {
+        const liveRef = await fileManager.createLiveFileReference(
+            owner.absolutePath,
+            displayName || path.basename(owner.absolutePath),
+            fileTypeHint || 'text/plain',
+            { workspace: { workspaceId: owner.workspaceId, alias: owner.alias, relPath: owner.relPath } }
+        );
+        console.log(`[ChatHandlers] Attached workspace live reference ${owner.alias}:${owner.relPath}`);
+        return liveRef;
+    } catch (error) {
+        console.warn(`[ChatHandlers] Workspace live reference failed for ${filePath}, falling back to copy:`, error.message);
+        return null;
+    }
+}
+
+function stableStringify(value) {
+    if (value === null || typeof value !== 'object') {
+        return JSON.stringify(value);
+    }
+    if (Array.isArray(value)) {
+        return `[${value.map(item => stableStringify(item)).join(',')}]`;
+    }
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+}
+
+function extractTextForHash(content) {
+    if (typeof content === 'string') {
+        return content;
+    }
+    if (Array.isArray(content)) {
+        return content
+            .filter(part => part && part.type === 'text' && typeof part.text === 'string')
+            .map(part => part.text)
+            .join('\n');
+    }
+    if (content && typeof content.text === 'string') {
+        return content.text;
+    }
+    return '';
+}
+
+function hashSentMessage(message) {
+    return `sha256:${crypto.createHash('sha256').update(extractTextForHash(message.content), 'utf8').digest('hex')}`;
+}
+
+function buildVcpChatExtensionsFromMessages(messages, context = null, requestId = null) {
+    const messageTimestampBindings = [];
+    messages.forEach((message, index) => {
+        const meta = message && message.__vcpchatTimestampMeta;
+        if (!meta || !meta.messageId || typeof meta.timestamp !== 'number') {
+            return;
+        }
+        messageTimestampBindings.push({
+            messageId: meta.messageId,
+            role: message.role || meta.role,
+            timestamp: meta.timestamp,
+            timestampIso: new Date(meta.timestamp).toISOString(),
+            source: 'client_history',
+            sentMessageHash: hashSentMessage(message),
+            sentMessageIndex: index
+        });
+    });
+
+    const requestContext = buildRequestContext(context, requestId);
+    if (messageTimestampBindings.length === 0 && !requestContext) {
+        return null;
+    }
+
+    return {
+        schemaVersion: 1,
+        messageMetadataMode: 'hash_only',
+        ...(messageTimestampBindings.length > 0 ? { messageTimestampBindings } : {}),
+        ...(requestContext ? { requestContext } : {})
+    };
+}
+
+function buildRequestContext(context, requestId) {
+    if (!context || typeof context !== 'object') return null;
+    const agentId = typeof context.agentId === 'string' ? context.agentId.trim() : '';
+    const agentName = typeof context.agentName === 'string' ? context.agentName.trim() : '';
+    const topicId = typeof context.topicId === 'string' ? context.topicId.trim() : '';
+    if (!agentId && !topicId) return null;
+
+    return {
+        requestId: typeof requestId === 'string' ? requestId : undefined,
+        agentId: agentId || undefined,
+        agentName: agentName || undefined,
+        topicId: topicId || undefined,
+        ownerType: context.isGroupMessage === true ? 'group' : 'agent',
+        isGroupMessage: context.isGroupMessage === true
+    };
+}
+
+function stripInternalMessageMetadata(messages) {
+    return messages.map(message => {
+        if (!message || typeof message !== 'object') return message;
+        const { __vcpchatTimestampMeta, __vcpContextCheckpoint, ...cleanMessage } = message;
+        return cleanMessage;
+    });
+}
+
+function omitUnsetOptionalModelParams(modelConfig = {}) {
+    const normalizedConfig = { ...modelConfig };
+    const optionalParamKeys = [
+        'temperature',
+        'contextTokenLimit',
+        'max_tokens',
+        'top_p',
+        'top_k'
+    ];
+
+    optionalParamKeys.forEach(key => {
+        const value = normalizedConfig[key];
+        if (
+            value === null ||
+            value === undefined ||
+            value === '' ||
+            (typeof value === 'number' && !Number.isFinite(value))
+        ) {
+            delete normalizedConfig[key];
+        }
+    });
+
+    return normalizedConfig;
+}
+
+/**
+ * Initializes chat and topic related IPC handlers.
+ * @param {BrowserWindow} mainWindow The main window instance.
+ * @param {object} context - An object containing necessary context.
+ * @param {string} context.AGENT_DIR - The path to the agents directory.
+ * @param {string} context.USER_DATA_DIR - The path to the user data directory.
+ * @param {string} context.APP_DATA_ROOT_IN_PROJECT - The path to the app data root.
+ * @param {string} context.NOTES_AGENT_ID - The agent ID for notes.
+ * @param {function} context.getSelectionListenerStatus - Function to get the current status of the selection listener.
+ * @param {function} context.stopSelectionListener - Function to stop the selection listener.
+ * @param {function} context.startSelectionListener - Function to start the selection listener.
+ */
+let ipcHandlersRegistered = false;
+const flowlockClaimLocks = new Map();
+const vcpStreamTasks = new SenderTaskRegistry({ label: 'vcp-stream-tasks' });
+const INTERRUPT_TIMEOUT_MS = 5000;
+
+function getVcpStreamTaskSnapshot() {
+    return vcpStreamTasks.snapshot();
+}
+
+async function withFlowlockClaimLock(agentId, task) {
+    const previous = flowlockClaimLocks.get(agentId) || Promise.resolve();
+    let release;
+    const current = new Promise(resolve => { release = resolve; });
+    flowlockClaimLocks.set(agentId, previous.then(() => current));
+
+    await previous;
+    try {
+        return await task();
+    } finally {
+        release();
+        if (flowlockClaimLocks.get(agentId) === current) {
+            flowlockClaimLocks.delete(agentId);
+        }
+    }
+}
+
+function sanitizeFlowlockRequest(request) {
+    if (!request || typeof request !== 'object') return null;
+    return {
+        requestId: request.requestId,
+        requestedByAgentId: request.requestedByAgentId,
+        createdAt: request.createdAt,
+        heartbeatSeconds: Math.max(1, Math.min(86400, Number.parseInt(request.heartbeatSeconds, 10) || 5)),
+        prompt: typeof request.prompt === 'string' ? request.prompt : '',
+        status: request.status
+    };
+}
+
+function initialize(mainWindow, context) {
+    const topicExecutionAuthority = context.topicExecutionAuthority;
+    const {
+        AGENT_DIR,
+        USER_DATA_DIR,
+        APP_DATA_ROOT_IN_PROJECT,
+        NOTES_AGENT_ID,
+        getMusicState,
+        fileWatcher,
+        agentConfigManager,
+        settingsManager,
+        historyMutationQueue = new HistoryMutationQueue({ userDataDir: USER_DATA_DIR, fileWatcher })
+    } = context;
+
+    // Ensure the watcher is in a clean state on initialization
+    if (fileWatcher) {
+        fileWatcher.stopWatching();
+    }
+
+    if (ipcHandlersRegistered) {
+        return;
+    }
+
+    ipcMain.handle('claim-pending-flowlock-topic', async (event, agentId, constraints = {}) => {
+        if (!agentId) {
+            return { success: false, code: 'INVALID_AGENT', error: '缺少 agentId。' };
+        }
+
+        return withFlowlockClaimLock(agentId, async () => {
+            try {
+                if (!agentConfigManager) {
+                    return { success: false, code: 'MANAGER_UNAVAILABLE', error: 'AgentConfigManager 未初始化。' };
+                }
+
+                const config = await agentConfigManager.readAgentConfig(agentId);
+                const topics = Array.isArray(config.topics) ? config.topics : [];
+                const requestId = typeof constraints.requestId === 'string' ? constraints.requestId : null;
+                const createdAfter = Number.isFinite(constraints.createdAfter) ? constraints.createdAfter : null;
+                const candidates = [];
+
+                for (const topic of topics) {
+                    const request = sanitizeFlowlockRequest(topic.flowlockRequest);
+                    if (!request || request.status !== 'pending') continue;
+                    if (request.requestedByAgentId !== agentId) continue;
+                    if (requestId && request.requestId !== requestId) continue;
+                    if (createdAfter !== null && request.createdAt < createdAfter) continue;
+
+                    const historyPath = path.join(USER_DATA_DIR, agentId, 'topics', topic.id, 'history.json');
+                    if (!await fs.pathExists(historyPath)) {
+                        await agentConfigManager.updateAgentConfig(agentId, existing => ({
+                            ...existing,
+                            topics: (existing.topics || []).map(item => item.id === topic.id
+                                ? {
+                                    ...item,
+                                    flowlockRequest: {
+                                        ...item.flowlockRequest,
+                                        status: 'rejected',
+                                        rejectedAt: Date.now(),
+                                        rejectionReason: 'topic_history_missing'
+                                    }
+                                }
+                                : item)
+                        }));
+                        continue;
+                    }
+                    candidates.push({ topic, request });
+                }
+
+                if (candidates.length === 0) {
+                    return { success: false, code: 'NOT_FOUND', error: '没有符合约束的 pending Flowlock 请求。' };
+                }
+                if (candidates.length > 1) {
+                    return {
+                        success: false,
+                        code: 'CONFLICT',
+                        error: '存在多个 pending Flowlock 请求，拒绝隐式选择。',
+                        conflicts: candidates.map(({ topic, request }) => ({
+                            topicId: topic.id,
+                            requestId: request.requestId,
+                            createdAt: request.createdAt
+                        }))
+                    };
+                }
+
+                const [{ topic, request }] = candidates;
+                let claimed = false;
+                await agentConfigManager.updateAgentConfig(agentId, existing => ({
+                    ...existing,
+                    topics: (existing.topics || []).map(item => {
+                        if (item.id !== topic.id) return item;
+                        const current = item.flowlockRequest;
+                        if (!current || current.requestId !== request.requestId || current.status !== 'pending') {
+                            return item;
+                        }
+                        claimed = true;
+                        return {
+                            ...item,
+                            flowlockRequest: {
+                                ...current,
+                                status: 'consumed',
+                                consumedAt: Date.now()
+                            }
+                        };
+                    })
+                }));
+
+                if (!claimed) {
+                    return { success: false, code: 'ALREADY_CLAIMED', error: '请求已被消费或状态已变化。' };
+                }
+
+                return {
+                    success: true,
+                    claim: {
+                        agentId,
+                        topicId: topic.id,
+                        topicName: topic.name,
+                        requestId: request.requestId,
+                        heartbeatSeconds: request.heartbeatSeconds,
+                        prompt: request.prompt,
+                        createdAt: request.createdAt
+                    }
+                };
+            } catch (error) {
+                console.error(`[Flowlock Claim] Failed for agent ${agentId}:`, error);
+                return { success: false, code: 'CLAIM_FAILED', error: error.message };
+            }
+        });
+    });
+
+    ipcMain.handle('restore-flowlock-claim', async (event, agentId, requestId, reason = 'session_creation_failed') => {
+        if (!agentId || !requestId || !agentConfigManager) {
+            return { success: false, error: '缺少恢复认领所需参数。' };
+        }
+
+        return withFlowlockClaimLock(agentId, async () => {
+            let restored = false;
+            await agentConfigManager.updateAgentConfig(agentId, existing => ({
+                ...existing,
+                topics: (existing.topics || []).map(topic => {
+                    const request = topic.flowlockRequest;
+                    if (!request || request.requestId !== requestId || request.status !== 'consumed') {
+                        return topic;
+                    }
+                    restored = true;
+                    return {
+                        ...topic,
+                        flowlockRequest: {
+                            ...request,
+                            status: 'pending',
+                            consumedAt: undefined,
+                            lastRestoreAt: Date.now(),
+                            lastRestoreReason: reason
+                        }
+                    };
+                })
+            }));
+            return restored
+                ? { success: true }
+                : { success: false, error: '未找到可恢复的 consumed 请求。' };
+        });
+    });
+
+    ipcMain.handle('list-pending-flowlock-topics', async () => {
+        const result = [];
+        try {
+            const agentIds = await fs.readdir(AGENT_DIR);
+            for (const agentId of agentIds) {
+                try {
+                    const config = agentConfigManager
+                        ? await agentConfigManager.readAgentConfig(agentId)
+                        : await fs.readJson(path.join(AGENT_DIR, agentId, 'config.json'));
+                    for (const topic of (config.topics || [])) {
+                        const request = sanitizeFlowlockRequest(topic.flowlockRequest);
+                        if (request?.status === 'pending' && request.requestedByAgentId === agentId) {
+                            result.push({
+                                agentId,
+                                topicId: topic.id,
+                                topicName: topic.name,
+                                requestId: request.requestId,
+                                createdAt: request.createdAt
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`[Flowlock Recovery] Skipping invalid agent ${agentId}:`, error.message);
+                }
+            }
+            return { success: true, requests: result };
+        } catch (error) {
+            return { success: false, error: error.message, requests: [] };
+        }
+    });
+
+    ipcMain.handle('save-topic-order', async (event, agentId, orderedTopicIds) => {
+        if (!agentId || !Array.isArray(orderedTopicIds)) {
+            return { success: false, error: '无效的 agentId 或 topic IDs' };
+        }
+        try {
+            if (agentConfigManager) {
+                await agentConfigManager.updateAgentConfig(agentId, config => {
+                    if (!config.topics || !Array.isArray(config.topics)) {
+                        console.error(`保存Agent ${agentId} 的话题顺序失败: 配置文件损坏或缺少话题列表。`);
+                        return config;
+                    }
+                    const topicMap = new Map(config.topics.map(topic => [topic.id, topic]));
+                    const newTopicsArray = [];
+                    orderedTopicIds.forEach(id => {
+                        if (topicMap.has(id)) {
+                            newTopicsArray.push(topicMap.get(id));
+                            topicMap.delete(id);
+                        }
+                    });
+                    newTopicsArray.push(...topicMap.values());
+                    return { ...config, topics: newTopicsArray };
+                });
+            } else {
+                console.error(`AgentConfigManager not available, cannot safely save topic order for agent ${agentId}`);
+                return { success: false, error: 'AgentConfigManager 未初始化，无法安全保存话题顺序。' };
+            }
+            return { success: true };
+        } catch (error) {
+            console.error(`Error saving topic order for agent ${agentId}:`, error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('save-group-topic-order', async (event, groupId, orderedTopicIds) => {
+        if (!groupId || !Array.isArray(orderedTopicIds)) {
+            return { success: false, error: '无效的 groupId 或 topic IDs' };
+        }
+        const groupConfigPath = path.join(APP_DATA_ROOT_IN_PROJECT, 'AgentGroups', groupId, 'config.json');
+        try {
+            const groupConfig = await fs.readJson(groupConfigPath);
+            if (!Array.isArray(groupConfig.topics)) groupConfig.topics = [];
+
+            const newTopicsArray = [];
+            const topicMap = new Map(groupConfig.topics.map(topic => [topic.id, topic]));
+
+            orderedTopicIds.forEach(id => {
+                if (topicMap.has(id)) {
+                    newTopicsArray.push(topicMap.get(id));
+                    topicMap.delete(id);
+                }
+            });
+
+            newTopicsArray.push(...topicMap.values());
+            groupConfig.topics = newTopicsArray;
+
+            await fs.writeJson(groupConfigPath, groupConfig, { spaces: 2 });
+            return { success: true };
+        } catch (error) {
+            console.error(`Error saving topic order for group ${groupId}:`, error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('search-topics-by-content', async (event, itemId, itemType, searchTerm) => {
+        if (!itemId || !itemType || typeof searchTerm !== 'string' || searchTerm.trim() === '') {
+            return { success: false, error: 'Invalid arguments for topic content search.', matchedTopicIds: [] };
+        }
+        const searchTermLower = searchTerm.toLowerCase();
+        const matchedTopicIds = [];
+
+        try {
+            let itemConfig;
+            let basePath = itemType === 'agent' ? AGENT_DIR : path.join(APP_DATA_ROOT_IN_PROJECT, 'AgentGroups');
+            const configPath = path.join(basePath, itemId, 'config.json');
+
+            if (await fs.pathExists(configPath)) {
+                itemConfig = await fs.readJson(configPath);
+            }
+
+            if (!itemConfig || !itemConfig.topics || !Array.isArray(itemConfig.topics)) {
+                return { success: true, matchedTopicIds: [] };
+            }
+
+            for (const topic of itemConfig.topics) {
+                const historyFilePath = path.join(USER_DATA_DIR, itemId, 'topics', topic.id, 'history.json');
+                if (await fs.pathExists(historyFilePath)) {
+                    try {
+                        const history = await fs.readJson(historyFilePath);
+                        if (Array.isArray(history)) {
+                            for (const message of history) {
+                                if (message.content && typeof message.content === 'string' && message.content.toLowerCase().includes(searchTermLower)) {
+                                    matchedTopicIds.push(topic.id);
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error(`Error reading history for ${itemType} ${itemId}, topic ${topic.id}:`, e);
+                    }
+                }
+            }
+            return { success: true, matchedTopicIds: [...new Set(matchedTopicIds)] };
+        } catch (error) {
+            console.error(`Error searching topic content for ${itemType} ${itemId}:`, error);
+            return { success: false, error: error.message, matchedTopicIds: [] };
+        }
+    });
+
+    ipcMain.handle('save-agent-topic-title', async (event, agentId, topicId, newTitle, options) => {
+        const shared=historyMutationQueue?.syncPolicy?.sharedExecution?.runtime;
+        shared?.assertNativeMutation('agent',agentId,topicId);
+        if(shared?.nativeObject('agent',agentId)){try{return await shared.renameNativeTopic({itemType:'agent',itemId:agentId,topicId},newTitle,options);}catch(e){return {success:false,error:e.code||'SHARED_CONFIG_CONFLICT'};}}
+        if (!topicId || !newTitle) return { error: "保存话题标题失败: topicId 或 newTitle 未提供。" };
+        try {
+            if (agentConfigManager) {
+                await agentConfigManager.updateAgentConfig(agentId, existingConfig => {
+                    if (!existingConfig.topics || !Array.isArray(existingConfig.topics)) {
+                        return existingConfig;
+                    }
+                    const updatedConfig = { ...existingConfig, topics: [...existingConfig.topics] };
+                    const topicIndex = updatedConfig.topics.findIndex(t => t.id === topicId);
+                    if (topicIndex !== -1) {
+                        updatedConfig.topics[topicIndex] = { ...updatedConfig.topics[topicIndex], name: newTitle };
+                    }
+                    return updatedConfig;
+                });
+                const updatedConfig = await agentConfigManager.readAgentConfig(agentId);
+                return { success: true, topics: updatedConfig.topics };
+            } else {
+                console.error(`AgentConfigManager not available, cannot safely save topic title for agent ${agentId}`);
+                return { error: 'AgentConfigManager 未初始化，无法安全保存话题标题。' };
+            }
+        } catch (error) {
+            console.error(`保存Agent ${agentId} 话题 ${topicId} 标题为 "${newTitle}" 失败:`, error);
+            return { error: error.message };
+        }
+    });
+
+    ipcMain.handle('regenerate-agent-topic-title', async (event, agentId, topicId) => {
+        historyMutationQueue?.syncPolicy?.sharedExecution?.runtime?.assertNativeMutation('agent',agentId,topicId);
+        if (!agentId || !topicId) {
+            return { success: false, error: 'Agent ID 或话题 ID 不能为空。' };
+        }
+        try {
+            const shared=historyMutationQueue?.syncPolicy?.sharedExecution?.runtime;
+            const titleContext=shared?.nativeObject('agent',agentId)?await shared.nativeDeletionContext({itemType:'agent',itemId:agentId,topicId}):null;
+            if(titleContext?.pendingMode)throw Error('SHARED_DIRECTORY_PENDING');
+            const agentConfig = agentConfigManager
+                ? await agentConfigManager.readAgentConfig(agentId)
+                : await fs.readJson(path.join(AGENT_DIR, agentId, 'config.json'));
+            const topic = agentConfig?.topics?.find(candidate => candidate.id === topicId);
+            if (!topic) {
+                return { success: false, error: `未找到 Agent 话题 ${topicId}。` };
+            }
+
+            const historyFile = path.join(USER_DATA_DIR, agentId, 'topics', topicId, 'history.json');
+            let history = [];
+            if (await fs.pathExists(historyFile)) {
+                history = await fs.readJson(historyFile);
+            }
+            const effectiveMessageCount = Array.isArray(history)
+                ? history.filter(message => message && message.role !== 'system' && message.isThinking !== true).length
+                : 0;
+            if (effectiveMessageCount === 0) {
+                return { success: false, error: '该话题还没有可用于生成标题的对话。' };
+            }
+
+            const settingsPath = path.join(APP_DATA_ROOT_IN_PROJECT, 'settings.json');
+            let settings = {};
+            if (await fs.pathExists(settingsPath)) {
+                settings = await fs.readJson(settingsPath);
+            }
+            const globalVcpSettings = {
+                vcpUrl: settings.vcpServerUrl,
+                vcpApiKey: settings.vcpApiKey,
+                userName: settings.userName || '用户',
+                topicSummaryModel: settings.topicSummaryModel
+            };
+            if (!globalVcpSettings.vcpUrl) {
+                return { success: false, error: '请先在全局设置中配置 VCP 服务器 URL。' };
+            }
+
+            const newTitle = await topicTitleManager.generateTitleForHistory(history, globalVcpSettings, { agentId, topicId });
+            if (!newTitle) {
+                return { success: false, error: 'AI 未能生成有效的话题标题。' };
+            }
+
+            if(titleContext){const saved=await shared.renameNativeTopic({itemType:'agent',itemId:agentId,topicId},newTitle,titleContext);return {...saved,newTitle,sourceMessageCount:Math.min(effectiveMessageCount,topicTitleManager.MIN_MESSAGES_FOR_SUMMARY)};}
+            let savedTopics = null;
+            if (agentConfigManager) {
+                await agentConfigManager.updateAgentConfig(agentId, existingConfig => {
+                    if (!existingConfig.topics || !Array.isArray(existingConfig.topics)) {
+                        return existingConfig;
+                    }
+                    const updatedConfig = { ...existingConfig, topics: [...existingConfig.topics] };
+                    const topicIndex = updatedConfig.topics.findIndex(t => t.id === topicId);
+                    if (topicIndex !== -1) {
+                        updatedConfig.topics[topicIndex] = { ...updatedConfig.topics[topicIndex], name: newTitle };
+                    }
+                    return updatedConfig;
+                });
+                const updatedConfig = await agentConfigManager.readAgentConfig(agentId);
+                savedTopics = updatedConfig.topics;
+            } else {
+                const configPath = path.join(AGENT_DIR, agentId, 'config.json');
+                const config = await fs.readJson(configPath);
+                const topicIndex = (config.topics || []).findIndex(t => t.id === topicId);
+                if (topicIndex !== -1) {
+                    config.topics[topicIndex].name = newTitle;
+                    await fs.writeJson(configPath, config, { spaces: 2 });
+                    savedTopics = config.topics;
+                }
+            }
+
+            return {
+                success: true,
+                newTitle,
+                topics: savedTopics,
+                sourceMessageCount: Math.min(effectiveMessageCount, topicTitleManager.MIN_MESSAGES_FOR_SUMMARY)
+            };
+        } catch (error) {
+            console.error(`[ChatHandlers] 重新生成 Agent ${agentId} 话题 ${topicId} 标题失败:`, error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('get-chat-history', async (event, agentId, topicId) => {
+        if (!topicId) return { error: `获取Agent ${agentId} 聊天历史失败: topicId 未提供。` };
+        try {
+            const historyFile = path.join(USER_DATA_DIR, agentId, 'topics', topicId, 'history.json');
+            // 只读获取历史绝不创建目录，防止已删除的话题被并发的列表未读统计或懒加载重新创建出空文件夹
+            if (await fs.pathExists(historyFile)) {
+                return await fs.readJson(historyFile);
+            }
+            return [];
+        } catch (error) {
+            console.error(`获取Agent ${agentId} 话题 ${topicId} 聊天历史失败:`, error);
+            return { error: error.message };
+        }
+    });
+
+    ipcMain.handle('save-chat-history', async (event, agentId, topicId, history, options) => {
+        if (!agentId || !topicId || !Array.isArray(history)) {
+            return { success: false, error: `保存Agent ${agentId} 聊天历史失败: 参数无效。` };
+        }
+        try {
+            const result = await historyMutationQueue.replace({ itemId: agentId, itemType: 'agent', topicId }, history, { requireExisting:true, expectedRevision:typeof options==="string"?options:options?.expectedRevision,expectedHistory:options?.expectedHistory });
+            return { success: true, localState:result.localState,history:result.history,...(result.sync ? { sync: result.sync, revision: result.revision } : {}) };
+        } catch (error) {
+            console.error(`保存Agent ${agentId} 话题 ${topicId} 聊天历史失败:`, error);
+            return { success: false, error: error.code || error.message }; // 同群组：调用方都按 success === false 判失败
+        }
+    });
+
+    ipcMain.handle('get-agent-topics', async (event, agentId) => {
+        try {
+            let config;
+            if (agentConfigManager) {
+                try {
+                    config = await agentConfigManager.readAgentConfig(agentId, { allowDefault: true });
+                } catch (readError) {
+                    console.error(`读取Agent ${agentId} 的配置失败 (get-agent-topics):`, readError);
+                    return { error: `读取配置文件失败: ${readError.message}` };
+                }
+            } else {
+                const configPath = path.join(AGENT_DIR, agentId, 'config.json');
+                if (await fs.pathExists(configPath)) {
+                    try {
+                        config = await fs.readJson(configPath);
+                    } catch (readError) {
+                        console.error(`读取Agent ${agentId} 的 config.json 失败:`, readError);
+                        return { error: `读取配置文件失败: ${readError.message}` };
+                    }
+                }
+            }
+
+            if (config && config.topics && Array.isArray(config.topics)) {
+                // Part A: 历史数据兼容处理 - 自动为缺少新字段的话题添加默认值
+                const normalizedTopics = config.topics.map(topic => ({
+                    ...topic,
+                    locked: topic.locked !== undefined ? topic.locked : true,
+                    unread: topic.unread !== undefined ? topic.unread : false,
+                    creatorSource: topic.creatorSource || 'unknown'
+                }));
+                return normalizedTopics;
+            }
+            return [];
+        } catch (error) {
+            console.error(`获取Agent ${agentId} 话题列表时发生意外错误:`, error);
+            return { error: error.message };
+        }
+    });
+
+    const createNativeAgentTopic=async (event, agentId, topicName, isBranch = false, locked = true, onlyIfEmpty = false) => {
+        const shared = historyMutationQueue?.syncPolicy?.sharedExecution?.runtime;
+        try {
+            shared?.assertNativeMutation('agent',agentId,undefined);
+            const newTopicId = `topic_${Date.now()}_${crypto.randomUUID()}`;
+            const timestamp = Date.now();
+
+            if (agentConfigManager) {
+                // 先读取当前配置以确定话题命名序号
+                const currentConfig = await agentConfigManager.readAgentConfig(agentId, { allowDefault: true });
+                if (currentConfig.topics && !Array.isArray(currentConfig.topics)) {
+                    return { error: `配置文件已损坏: 'topics' 字段不是一个数组。` };
+                }
+                const existingTopics = currentConfig.topics || [];
+
+                const newTopic = {
+                    id: newTopicId,
+                    name: topicName || `新话题 ${existingTopics.length + 1}`,
+                    createdAt: timestamp,
+                    locked: locked,
+                    unread: false,
+                    creatorSource: "ui"
+                };
+
+                let existingTopicsOnSave;
+                await agentConfigManager.updateAgentConfig(agentId, existingConfig => {
+                    if (existingConfig._historyDeleting) throw new Error('HISTORY_OWNER_DELETING');
+                    if (onlyIfEmpty && existingConfig.topics?.length) {
+                        existingTopicsOnSave = existingConfig.topics;
+                        return existingConfig;
+                    }
+                    if ((existingConfig._historyDeletedTopics || []).includes(newTopicId)) throw new Error('HISTORY_TOPIC_DELETED');
+                    if ((existingConfig.topics || []).some(t => t.id === newTopicId)) throw new Error('HISTORY_DUPLICATE_TOPIC');
+                    return { ...existingConfig, topics: [newTopic, ...(existingConfig.topics || [])] };
+                });
+                if (existingTopicsOnSave) return { success: true, topics: existingTopicsOnSave };
+                // The shared discovery path must bind this new native topic
+                // before the guarded History queue may initialize its file.
+                if (shared?.ready&&!shared.closed) {
+                    await shared.tick({ forceLocal: true, skipExecution: true, skipAttachments: true });
+                }
+                const updatedConfig = await agentConfigManager.readAgentConfig(agentId);
+
+                await historyMutationQueue.initializeIfMissing({ itemId: agentId, itemType: 'agent', topicId: newTopicId });
+
+                return { success: true, topicId: newTopicId, topicName: newTopic.name, topics: updatedConfig.topics };
+            } else {
+                console.error(`AgentConfigManager not available, cannot safely create topic for agent ${agentId}`);
+                return { error: 'AgentConfigManager 未初始化，无法安全创建话题。' };
+            }
+        } catch (error) {
+            console.error(`为Agent ${agentId} 创建新话题失败:`, error);
+            return { error: error.message };
+        }
+     };
+    ipcMain.handle('create-new-topic-for-agent', (event, agentId, name, isBranch, locked) => createNativeAgentTopic(event, agentId, name, isBranch, locked));
+
+    ipcMain.handle('delete-topic', async (event, agentId, topicIdToDelete, options) => {
+        if(typeof topicIdToDelete!=='string'||!topicIdToDelete)return {success:false,error:'INVALID_TOPIC_ID'};
+        const removal = await context.beforeOwnerDelete?.({ itemType: 'agent', itemId: agentId, topicId: topicIdToDelete }, options,
+            () => createNativeAgentTopic(event, agentId, '主要对话', false, true, true));
+        if (removal) return removal;
+        if (options != null) return { success: false, error: 'SHARED_NATIVE_BINDING_CHANGED' };
+        let deletion;
+        try {
+            deletion=await require('../services/syncWriterBoundary').beginNativeDirectoryDeletion(historyMutationQueue,{ ownerType: 'agent', ownerId: agentId, topicId: topicIdToDelete });
+            if (agentConfigManager) {
+                // 先读取当前配置进行验证
+                const currentConfig = await agentConfigManager.readAgentConfig(agentId);
+                if (!currentConfig.topics || !Array.isArray(currentConfig.topics)) {
+                    await deletion.failed?.({code:'NATIVE_DELETE_VALIDATION_FAILED'});
+                    return { error: `配置文件损坏或缺少话题列表。` };
+                }
+                const targetPresent=currentConfig.topics.some(t => t.id === topicIdToDelete);
+                if (!targetPresent&&!deletion.canResumeMissingTopic) {
+                    await deletion.failed?.({code:'NATIVE_DELETE_VALIDATION_FAILED'});
+                    return { error: `未找到要删除的话题 ID: ${topicIdToDelete}` };
+                }
+
+                const replacementTimestamp = Date.now();
+                const replacementTopicId = `topic_${replacementTimestamp}`;
+                let replacementCreated = false;
+                let remainingTopics=currentConfig.topics;
+                if(targetPresent){
+                await deletion.beforeConfigUpdate?.();
+                await agentConfigManager.updateAgentConfig(agentId, existingConfig => {
+                    let filtered = (existingConfig.topics || []).filter(topic => topic.id !== topicIdToDelete);
+                    if (filtered.length === 0) {
+                        filtered = [{
+                            id: replacementTopicId,
+                            name: "主要对话",
+                            createdAt: replacementTimestamp
+                        }];
+                        replacementCreated = true;
+                    }
+                    remainingTopics = filtered;
+                    return { ...existingConfig, topics: filtered };
+                });
+
+                await deletion.changed?.();
+                }
+
+                if (replacementCreated) {
+                    const replacementTopicHistoryDir = path.join(USER_DATA_DIR, agentId, 'topics', replacementTopicId);
+                    await fs.ensureDir(replacementTopicHistoryDir);
+                    const historyPath = path.join(replacementTopicHistoryDir, 'history.json');
+                    if (!await fs.pathExists(historyPath)) {
+                        await fs.writeJson(historyPath, [], { spaces: 2 });
+                    }
+                }
+
+                await deletion.destructive?.();
+                const topicDataDir = path.join(USER_DATA_DIR, agentId, 'topics', topicIdToDelete);
+                await historyMutationQueue.run({itemId:agentId,itemType:"agent",topicId:topicIdToDelete},async()=>{if(await fs.pathExists(topicDataDir))await fs.remove(topicDataDir);});
+                const topicBackupPath = path.join(AGENT_DIR, agentId, 'config.topic.backup.json');
+                if (await fs.pathExists(topicBackupPath)) {
+                    try {
+                        const topicBackup = await fs.readJson(topicBackupPath);
+                        if (topicBackup && Array.isArray(topicBackup.topics)) {
+                            const nextTopics = topicBackup.topics.filter(topic => topic && topic.id !== topicIdToDelete);
+                            if (nextTopics.length !== topicBackup.topics.length) {
+                                topicBackup.topics = nextTopics;
+                                await fs.writeJson(topicBackupPath, topicBackup, { spaces: 2 });
+                            }
+                        }
+                    } catch (backupErr) {
+                        console.warn('[delete-topic] Failed to prune config.topic.backup.json:', backupErr);
+                    }
+                }
+                await clearTrajectoryOf({ agentId, topicId: topicIdToDelete });
+                await removeSideChatChildrenOfParent({ USER_DATA_DIR, agentId, parentTopicId: topicIdToDelete, historyMutationQueue })
+                    .catch(err => console.warn('[delete-topic] Failed to remove side chats:', err));
+
+                await deletion.commit();
+                return { success: true, remainingTopics };
+            } else {
+                await deletion.failed?.({code:'NATIVE_DELETE_VALIDATION_FAILED'});
+                console.error(`AgentConfigManager not available, cannot safely delete topic for agent ${agentId}`);
+                return { error: 'AgentConfigManager 未初始化，无法安全删除话题。' };
+            }
+        } catch (error) {
+            await deletion?.failed?.(error);
+            console.error(`删除Agent ${agentId} 的话题 ${topicIdToDelete} 失败:`, error);
+            return { error: error.message, ...(error.code ? { code: error.code } : {}) };
+        }
+    });
+
+    ipcMain.handle('handle-file-paste', async (event, agentId, topicId, fileData) => {
+        if (!topicId) return { error: "处理文件粘贴失败: topicId 未提供。" };
+        try {
+            let storedFileObject;
+            if (fileData.type === 'path') {
+                const originalFileName = path.basename(fileData.path);
+                const ext = path.extname(fileData.path).toLowerCase();
+                let fileTypeHint = 'application/octet-stream';
+                if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) {
+                    let mimeExt = ext.substring(1);
+                    if (mimeExt === 'jpg') mimeExt = 'jpeg';
+                    fileTypeHint = `image/${mimeExt}`;
+                } else if (['.mp3', '.wav', '.ogg', '.flac', '.aac', '.aiff'].includes(ext)) {
+                    const mimeExt = ext.substring(1);
+                    fileTypeHint = `audio/${mimeExt === 'mp3' ? 'mpeg' : mimeExt}`;
+                } else if (['.mp4', '.webm'].includes(ext)) {
+                    fileTypeHint = `video/${ext.substring(1)}`;
+                }
+
+                const fileManager = require('../fileManager');
+                storedFileObject = await tryCreateWorkspaceLiveReference(fileData.path, originalFileName, fileTypeHint)
+                    || await fileManager.storeFile(fileData.path, originalFileName, agentId, topicId, fileTypeHint);
+            } else if (fileData.type === 'base64') {
+                const fileManager = require('../fileManager');
+                const originalFileName = `pasted_image_${Date.now()}.${fileData.extension || 'png'}`;
+                const buffer = Buffer.from(fileData.data, 'base64');
+                const fileTypeHint = `image/${fileData.extension || 'png'}`;
+                storedFileObject = await fileManager.storeFile(buffer, originalFileName, agentId, topicId, fileTypeHint);
+            } else {
+                throw new Error('不支持的文件粘贴类型');
+            }
+            return { success: true, attachment: storedFileObject };
+        } catch (error) {
+            console.error('处理粘贴文件失败:', error);
+            return { error: error.message };
+        }
+    });
+
+    ipcMain.handle('select-files-to-send', async (event, agentId, topicId) => {
+        if (!agentId || !topicId) {
+            console.error('[Main - select-files-to-send] Agent ID or Topic ID not provided.');
+            return { error: "Agent ID and Topic ID are required to select files." };
+        }
+
+        const listenerWasActive = context.getSelectionListenerStatus();
+        if (listenerWasActive) {
+            context.stopSelectionListener();
+            console.log('[Main] Temporarily stopped selection listener for file dialog.');
+        }
+
+        let defaultPath = null;
+        try {
+            defaultPath = await resolveRememberedAttachmentDirectory(settingsManager);
+        } catch (error) {
+            console.warn('[Main - select-files-to-send] Failed to read remembered attachment directory:', error.message);
+        }
+
+        let result;
+        try {
+            const ownerWindow = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+            result = await dialog.showOpenDialog(ownerWindow, {
+                title: '选择要发送的文件',
+                properties: ['openFile', 'multiSelections'],
+                ...(defaultPath ? { defaultPath } : {})
+            });
+        } finally {
+            if (listenerWasActive) {
+                context.startSelectionListener();
+                console.log('[Main] Restarted selection listener after file dialog.');
+            }
+        }
+
+        if (!result.canceled && result.filePaths.length > 0) {
+            try {
+                await rememberAttachmentDirectory(settingsManager, result.filePaths[0]);
+            } catch (error) {
+                // Directory memory is a convenience feature; selected attachments
+                // must remain usable when settings persistence is temporarily unavailable.
+                console.warn('[Main - select-files-to-send] Failed to remember attachment directory:', error.message);
+            }
+
+            const storedFilesInfo = [];
+            for (const filePath of result.filePaths) {
+                try {
+                    const originalName = path.basename(filePath);
+                    const ext = path.extname(filePath).toLowerCase();
+                    let fileTypeHint = 'application/octet-stream';
+                    if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) {
+                        let mimeExt = ext.substring(1);
+                        if (mimeExt === 'jpg') mimeExt = 'jpeg';
+                        fileTypeHint = `image/${mimeExt}`;
+                    } else if (['.mp3', '.wav', '.ogg', '.flac', '.aac', '.aiff'].includes(ext)) {
+                        const mimeExt = ext.substring(1);
+                        fileTypeHint = `audio/${mimeExt === 'mp3' ? 'mpeg' : mimeExt}`;
+                    } else if (['.mp4', '.webm'].includes(ext)) {
+                        fileTypeHint = `video/${ext.substring(1)}`;
+                    }
+
+                    const fileManager = require('../fileManager');
+                    const storedFile = await tryCreateWorkspaceLiveReference(filePath, originalName, fileTypeHint)
+                        || await fileManager.storeFile(filePath, originalName, agentId, topicId, fileTypeHint);
+                    storedFilesInfo.push(storedFile);
+                } catch (error) {
+                    console.error(`[Main - select-files-to-send] Error storing file ${filePath}:`, error);
+                    storedFilesInfo.push({ name: path.basename(filePath), error: error.message });
+                }
+            }
+            return { success: true, attachments: storedFilesInfo };
+        }
+        return { success: false, attachments: [] };
+    });
+
+    ipcMain.handle('handle-text-paste-as-file', async (event, agentId, topicId, textContent) => {
+        if (!agentId || !topicId) return { error: "处理长文本粘贴失败: agentId 或 topicId 未提供。" };
+        if (typeof textContent !== 'string') return { error: "处理长文本粘贴失败: 无效的文本内容。" };
+
+        try {
+            const originalFileName = `pasted_text_${Date.now()}.txt`;
+            const buffer = Buffer.from(textContent, 'utf8');
+            const fileManager = require('../fileManager');
+            const storedFileObject = await fileManager.storeFile(buffer, originalFileName, agentId, topicId, 'text/plain');
+            return { success: true, attachment: storedFileObject };
+        } catch (error) {
+            console.error('[Main - handle-text-paste-as-file] 长文本转存为文件失败:', error);
+            return { error: `长文本转存为文件失败: ${error.message}` };
+        }
+    });
+
+    ipcMain.handle('handle-file-drop', async (event, agentId, topicId, droppedFilesData) => {
+        if (!agentId || !topicId) return { error: "处理文件拖放失败: agentId 或 topicId 未提供。" };
+        if (!Array.isArray(droppedFilesData) || droppedFilesData.length === 0) return { error: "处理文件拖放失败: 未提供文件数据。" };
+
+        const storedFilesInfo = [];
+        for (const fileData of droppedFilesData) {
+            try {
+                // Check if we have a path or data. One of them must exist.
+                if (!fileData.data && !fileData.path) {
+                    console.warn('[Main - handle-file-drop] Skipping a dropped file due to missing data and path. fileData:', JSON.stringify(fileData));
+                    storedFilesInfo.push({ name: fileData.name || '未知文件', error: '文件内容或路径缺失' });
+                    continue;
+                }
+
+                let fileSource;
+                if (fileData.path) {
+                    // If path is provided, use it as the source.
+                    fileSource = fileData.path;
+                } else {
+                    // Otherwise, use the buffer from data.
+                    fileSource = Buffer.isBuffer(fileData.data) ? fileData.data : Buffer.from(fileData.data);
+                }
+
+                let fileTypeHint = fileData.type;
+                const fileExtension = path.extname(fileData.name).toLowerCase();
+
+                // If file type is generic, try to guess from extension.
+                if (fileTypeHint === 'application/octet-stream' || !fileTypeHint) {
+                    if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(fileExtension)) {
+                        fileTypeHint = `image/${fileExtension.substring(1).replace('jpg', 'jpeg')}`;
+                    } else if (['.mp3', '.wav', '.ogg', '.flac', '.aac', '.aiff'].includes(fileExtension)) {
+                        const mimeExt = fileExtension.substring(1);
+                        fileTypeHint = `audio/${mimeExt === 'mp3' ? 'mpeg' : mimeExt}`;
+                    } else if (['.mp4', '.webm'].includes(fileExtension)) {
+                        fileTypeHint = `video/${fileExtension.substring(1)}`;
+                    } else if (['.md', '.txt'].includes(fileExtension)) {
+                        fileTypeHint = 'text/plain';
+                    }
+                }
+
+                const fileManager = require('../fileManager');
+
+                // 工作区文件（@工作区 / 拖拽 / 分享）：识别为真实路径实时引用。
+                if (typeof fileData.path === 'string') {
+                    const workspaceRef = await tryCreateWorkspaceLiveReference(fileData.path, fileData.name, fileTypeHint);
+                    if (workspaceRef) {
+                        storedFilesInfo.push({ success: true, attachment: workspaceRef, name: fileData.name });
+                        continue;
+                    }
+                }
+
+                // @笔记：以实时引用方式附加真实笔记文件，不复制到 attachments 目录。
+                // AI 拿到的是笔记区真实路径，可直接修改；用户更新笔记后上下文也会同步。
+                if (fileData.liveReference === true
+                    && typeof fileData.path === 'string'
+                    && fileManager.isLiveReferenceCandidate(fileData.path)) {
+                    try {
+                        const liveRef = await fileManager.createLiveFileReference(fileData.path, fileData.name, fileTypeHint || 'text/plain');
+                        console.log(`[Main - handle-file-drop] Attached live note reference: ${liveRef.internalPath}`);
+                        storedFilesInfo.push({ success: true, attachment: liveRef, name: fileData.name });
+                        continue;
+                    } catch (liveError) {
+                        console.warn(`[Main - handle-file-drop] Live reference failed for ${fileData.path}, falling back to copy:`, liveError.message);
+                    }
+                }
+
+                console.log(`[Main - handle-file-drop] Attempting to store dropped file: ${fileData.name} (Type: ${fileTypeHint}) for Agent: ${agentId}, Topic: ${topicId}`);
+
+                const storedFile = await fileManager.storeFile(fileSource, fileData.name, agentId, topicId, fileTypeHint);
+                storedFilesInfo.push({ success: true, attachment: storedFile, name: fileData.name });
+
+            } catch (error) {
+                console.error(`[Main - handle-file-drop] Error storing dropped file ${fileData.name || 'unknown'}:`, error);
+                console.error(`[Main - handle-file-drop] Full error details:`, error.stack);
+                storedFilesInfo.push({ name: fileData.name || '未知文件', error: error.message });
+            }
+        }
+        return storedFilesInfo;
+    });
+
+    ipcMain.handle('save-pasted-image-to-file', async (event, imageData, noteId) => {
+        if (!imageData || !imageData.data || !imageData.extension) return { success: false, error: 'Invalid image data provided.' };
+        if (!noteId) return { success: false, error: 'Note ID is required to save image.' };
+
+        try {
+            const buffer = Buffer.from(imageData.data, 'base64');
+            const fileManager = require('../fileManager');
+            const storedFileObject = await fileManager.storeFile(
+                buffer,
+                `pasted_image_${Date.now()}.${imageData.extension}`,
+                NOTES_AGENT_ID,
+                noteId,
+                `image/${imageData.extension === 'jpg' ? 'jpeg' : imageData.extension}`
+            );
+            return { success: true, attachment: storedFileObject };
+        } catch (error) {
+            console.error('[Main Process] Error saving pasted image for note:', error);
+            return { success: false, error: error.message };
+        }
+    });
+    ipcMain.handle('get-original-message-content', async (event, itemId, itemType, topicId, messageId) => {
+        if (!itemId || !itemType || !topicId || !messageId) {
+            return { success: false, error: '无效的参数' };
+        }
+
+        try {
+            let historyFile;
+            if (itemType === 'agent') {
+                historyFile = path.join(USER_DATA_DIR, itemId, 'topics', topicId, 'history.json');
+            } else if (itemType === 'group') {
+                historyFile = path.join(USER_DATA_DIR, itemId, 'topics', topicId, 'history.json');
+            } else {
+                return { success: false, error: '不支持的项目类型' };
+            }
+
+            if (await fs.pathExists(historyFile)) {
+                const history = await fs.readJson(historyFile);
+                const message = history.find(m => m.id === messageId);
+                if (message) {
+                    return { success: true, content: message.content };
+                } else {
+                    return { success: false, error: '在历史记录中未找到该消息' };
+                }
+            } else {
+                return { success: false, error: '聊天历史文件不存在' };
+            }
+        } catch (error) {
+            console.error(`获取原始消息内容失败 (itemId: ${itemId}, topicId: ${topicId}, messageId: ${messageId}):`, error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('send-to-vcp', async (event, vcpUrl, vcpApiKey, messages, modelConfig, messageId, isGroupCall = false, context = null) => {
+        console.log(`[Main - sendToVCP] ***** sendToVCP HANDLER EXECUTED for messageId: ${messageId}, isGroupCall: ${isGroupCall} *****`, context);
+        const streamChannel = 'vcp-stream-event'; // Use a single, unified channel for all stream events.
+        const streamOperationId = `${messageId}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`;
+
+        let streamTask = null;
+        let streamTaskDetached = false;
+        let trajectoryCall = null; // 侧栏「调用轨迹」的记录句柄；记录器自己吞掉一切异常
+        const finishStreamTask = () => {
+            if (!streamTask) return;
+            vcpStreamTasks.finish(event.sender, messageId);
+            streamTask = null;
+        };
+        const sendStreamPayload = payload => {
+            const aborted = streamTask?.controller.signal.aborted === true;
+            // 挂钩的功能只看事件不看窗口；用户中止时把收尾当作正常结束。
+            if (!isGroupCall && !(aborted && payload.type === 'data')) {
+                hostHooks.emit('chat:stream-payload', aborted ? { ...payload, type: 'end', aborted: true } : payload);
+            }
+            if (aborted || event.sender.isDestroyed()) return false;
+            try {
+                event.sender.send(streamChannel, { ...payload, streamOperationId });
+                return true;
+            } catch (error) {
+                console.warn(`[Main - sendToVCP] Dropped stream event for ${messageId}:`, error.message);
+                return false;
+            }
+        };
+
+        // 🔧 数据验证和规范化
+        try {
+            if (modelConfig?.stream === true) {
+                streamTask = vcpStreamTasks.begin(event.sender, messageId, 'chat:stream', {
+                    cancelOnNavigation: true,
+                });
+            }
+            // 确保messages数组中的content都是正确的格式
+            messages = messages.map(msg => {
+                if (!msg || typeof msg !== 'object') {
+                    console.error('[Main - sendToVCP] Invalid message object:', msg);
+                    return { role: 'system', content: '[Invalid message]' };
+                }
+
+                let processedContent = msg.content;
+
+                // 如果content是对象，尝试提取text字段或转为JSON字符串
+                if (msg.content && typeof msg.content === 'object') {
+                    if (msg.content.text) {
+                        processedContent = String(msg.content.text);
+                    } else if (Array.isArray(msg.content)) {
+                        // 如果是仅包含一个文本部分的多模态消息，则将其简化为纯字符串，保持兼容
+                        if (msg.content.length === 1 && msg.content[0].type === 'text' && typeof msg.content[0].text === 'string') {
+                            processedContent = msg.content[0].text;
+                        } else {
+                            // 保持多模态数组原样
+                            processedContent = msg.content;
+                        }
+                    } else {
+                        // 否则转为JSON字符串
+                        console.warn('[Main - sendToVCP] Message content is object without text field, stringifying:', msg.content);
+                        processedContent = JSON.stringify(msg.content);
+                    }
+                }
+
+                // 强制转换为字符串（除非是多模态数组）
+                if (processedContent && !Array.isArray(processedContent) && typeof processedContent !== 'string') {
+                    processedContent = String(processedContent);
+                }
+
+                // 🛡️ 严格脱敏：只返回由 OpenAI/Gemini/Anthropic 等 API 规范定义的合法字段
+                // 剔除 attachments, isThinking 等非标私有元数据，防止泄露给模型
+                const sanitizedMsg = {
+                    role: msg.role,
+                    content: processedContent
+                };
+                if (msg.name) sanitizedMsg.name = msg.name;
+                if (msg.tool_calls) sanitizedMsg.tool_calls = msg.tool_calls;
+                if (msg.tool_call_id) sanitizedMsg.tool_call_id = msg.tool_call_id;
+                // 内部元数据仅用于最终请求体生成 vcpchatExtensions，不会进入 messages[]。
+                if (msg.__vcpchatTimestampMeta) sanitizedMsg.__vcpchatTimestampMeta = msg.__vcpchatTimestampMeta;
+
+                if (msg.role === 'user' && msg.__vcpContextCheckpoint === true) sanitizedMsg.__vcpContextCheckpoint = true;
+
+                return sanitizedMsg;
+            });
+        } catch (validationError) {
+            console.error('[Main - sendToVCP] Error validating messages:', validationError);
+            return { error: `消息格式验证失败: ${validationError.message}` };
+        }
+
+        // 单聊请求：挂钩的功能可以追加系统提示（例如情绪标记协议），并得知请求开始。
+        if (!isGroupCall && context?.agentId) {
+            messages = hostHooks.pipe('chat:request-messages', messages, context);
+            hostHooks.emit('chat:request-start', messageId, context);
+        }
+
+        let finalVcpUrl = vcpUrl;
+        let settings = {};
+        try {
+            const settingsPath = path.join(APP_DATA_ROOT_IN_PROJECT, 'settings.json');
+            if (await fs.pathExists(settingsPath)) {
+                settings = await fs.readJson(settingsPath);
+            }
+
+            if(historyMutationQueue.syncPolicy?.sharedExecution)settings={...settings,...historyMutationQueue.syncPolicy.sharedExecution.policy(context,messageId)};
+
+            // **强制检查和切换URL**
+            if (settings.enableVcpToolInjection === true) {
+                const urlObject = new URL(vcpUrl);
+                urlObject.pathname = '/v1/chatvcp/completions';
+                finalVcpUrl = urlObject.toString();
+                console.log(`[Main - sendToVCP] VCP tool injection is ON. URL switched to: ${finalVcpUrl}`);
+            } else {
+                console.log(`[Main - sendToVCP] VCP tool injection is OFF. Using original URL: ${vcpUrl}`);
+            }
+        } catch (e) {
+            console.error(`[Main - sendToVCP] Error reading settings or switching URL: ${e.message}. Proceeding with original URL.`);
+        }
+
+        try {
+            // --- Agent Music Control Injection ---
+            if (getMusicState) {
+                try {
+                    const { musicWindow, currentSongInfo } = getMusicState();
+                    const topParts = [];
+                    const bottomParts = [];
+
+                    // 1. 音乐标签右键可关闭当前曲目信息，不影响 Agent 点歌权限。
+                    if (settings.musicInfoInjectionEnabled !== false && currentSongInfo) {
+                        bottomParts.push(`[当前播放音乐：${currentSongInfo.title} - ${currentSongInfo.artist} (${currentSongInfo.album || '未知专辑'})]`);
+                    }
+
+                    // 2. 如果启用了音乐控制，则注入播放列表和控制器
+                    if (settings.agentMusicControl) {
+                        // 2a. 构建播放列表信息 (注入到顶部)
+                        const songlistPath = path.join(APP_DATA_ROOT_IN_PROJECT, 'songlist.json');
+                        if (await fs.pathExists(songlistPath)) {
+                            const songlistJson = await fs.readJson(songlistPath);
+                            if (Array.isArray(songlistJson) && songlistJson.length > 0) {
+                                const titles = songlistJson.map(song => song.title).filter(Boolean);
+                                if (titles.length > 0) {
+                                    topParts.push(`[播放列表——\n${titles.join('\n')}\n]`);
+                                }
+                            }
+                        }
+
+                        // 2b. 注入插件权限
+                        bottomParts.push(`点歌台{{VCPMusicController}}`);
+                    }
+
+                    // 3. 组合并注入到消息数组
+                    if (topParts.length > 0 || bottomParts.length > 0) {
+                        let systemMsgIndex = messages.findIndex(m => m.role === 'system');
+                        let originalContent = '';
+
+                        if (systemMsgIndex !== -1) {
+                            originalContent = messages[systemMsgIndex].content;
+                        } else {
+                            messages.unshift({ role: 'system', content: '' });
+                            systemMsgIndex = 0;
+                        }
+
+                        const finalParts = [];
+                        if (topParts.length > 0) finalParts.push(topParts.join('\n'));
+                        if (originalContent) finalParts.push(originalContent);
+                        if (bottomParts.length > 0) finalParts.push(bottomParts.join('\n'));
+
+                        messages[systemMsgIndex].content = finalParts.join('\n\n').trim();
+                    }
+                } catch (e) {
+                    console.error('[Agent Music Control] Failed to inject music info:', e);
+                }
+            }
+
+            // --- VCP Thought Chain Stripping ---
+            try {
+                // 默认不注入元思考链，除非明确开启
+                if (settings.enableThoughtChainInjection !== true) {
+                    messages = messages.map(msg => {
+                        if (msg.__vcpContextCheckpoint === true) return msg;
+                        if (typeof msg.content === 'string') {
+                            return { ...msg, content: contextSanitizer.stripThoughtChains(msg.content) };
+                        } else if (Array.isArray(msg.content)) {
+                            return {
+                                ...msg,
+                                content: msg.content.map(part => {
+                                    if (part.type === 'text' && typeof part.text === 'string') {
+                                        return { ...part, text: contextSanitizer.stripThoughtChains(part.text) };
+                                    }
+                                    return part;
+                                })
+                            };
+                        }
+                        return msg;
+                    });
+                    console.log(`[ThoughtChain] Thought chains stripped from context`);
+                }
+            } catch (e) {
+                console.error('[ThoughtChain] Failed to strip thought chains:', e);
+            }
+            // --- VCP Hidden Tool Results Stripping ---
+            try {
+                messages = messages.map(msg => {
+                    if (msg.__vcpContextCheckpoint === true) return msg;
+                    if (typeof msg.content === 'string') {
+                        return { ...msg, content: contextSanitizer.stripHiddenToolResults(msg.content) };
+                    } else if (Array.isArray(msg.content)) {
+                        return {
+                            ...msg,
+                            content: msg.content.map(part => {
+                                if (part.type === 'text' && typeof part.text === 'string') {
+                                    return { ...part, text: contextSanitizer.stripHiddenToolResults(part.text) };
+                                }
+                                return part;
+                            })
+                        };
+                    }
+                    return msg;
+                });
+            } catch (e) {
+                console.error('[HiddenToolResult] Failed to strip hidden tool results:', e);
+            }
+
+            // --- Context Sanitizer Integration ---
+            try {
+                if (settings.enableContextSanitizer === true) {
+                    const sanitizerDepth = settings.contextSanitizerDepth !== undefined ? settings.contextSanitizerDepth : 2;
+                    console.log(`[Context Sanitizer] Enabled with depth: ${sanitizerDepth}`);
+
+                    // 只处理非系统消息（排除 system role）
+                    const systemMessages = messages.filter(m => m.role === 'system');
+                    const nonSystemMessages = messages.filter(m => m.role !== 'system');
+
+                    // 对非系统消息应用净化
+                    const sanitizedNonSystemMessages = contextSanitizer.sanitizeMessages(
+                        nonSystemMessages,
+                        sanitizerDepth,
+                        settings.enableThoughtChainInjection === true
+                    );
+
+                    // 重新组合消息数组（保持系统消息在最前面）
+                    messages = [...systemMessages, ...sanitizedNonSystemMessages.map((message, index) =>
+                        nonSystemMessages[index]?.__vcpContextCheckpoint === true
+                            ? nonSystemMessages[index]
+                            : message
+                    )];
+
+                    console.log(`[Context Sanitizer] Messages processed successfully`);
+                }
+            } catch (sanitizerError) {
+                console.error('[Context Sanitizer] Error during sanitization, proceeding with original messages:', sanitizerError);
+                // 出错时继续使用原始消息，不影响正常流程
+            }
+            // --- End of Context Sanitizer Integration ---
+
+            modelConfig = omitUnsetOptionalModelParams(modelConfig);
+
+            console.log(`发送到VCP服务器: ${finalVcpUrl} for messageId: ${messageId}`);
+            console.log('VCP API Key:', vcpApiKey ? '已设置' : '未设置');
+            console.log('模型配置:', modelConfig);
+            if (context) console.log('上下文:', context);
+
+            const vcpchatExtensions = buildVcpChatExtensionsFromMessages(messages, context, messageId);
+            messages = stripInternalMessageMetadata(messages);
+
+            // 🔧 在发送前验证请求体
+            const requestBody = {
+                messages: messages,
+                ...modelConfig,
+                stream: modelConfig.stream === true,
+                requestId: messageId
+            };
+            if (vcpchatExtensions) {
+                requestBody.vcpchatExtensions = vcpchatExtensions;
+            }
+            // 同一个句柄也喂给助手的长期心情（modules/agentMood.js）：用户这句话现在算，回复结束时再算一次
+            trajectoryCall = teeCall(beginTrajectoryCall({
+                sessionKey: sessionKeyFromContext(context),
+                requestId: messageId,
+                source: sourceFromContext(context),
+                model: modelConfig.model,
+                params: modelConfig,
+                messages
+            }), observeAgentMood({ context, messages, messageId }));
+
+            // 验证JSON可序列化性
+            let serializedBody;
+            try {
+                serializedBody = JSON.stringify(requestBody);
+                // 调试：记录前100个字符
+                console.log('[Main - sendToVCP] Request body preview:', serializedBody.substring(0, 100) + '...');
+            } catch (serializeError) {
+                console.error('[Main - sendToVCP] Failed to serialize request body:', serializeError);
+                console.error('[Main - sendToVCP] Problematic request body:', requestBody);
+                trajectoryCall.finish({ error: serializeError });
+                return { error: `请求体序列化失败: ${serializeError.message}` };
+            }
+
+            const sharedRequest=await require('../services/topicExecutionAuthority').prepareNativeRequest({authority:topicExecutionAuthority,queue:historyMutationQueue,context:buildRequestContext(context,messageId),body:requestBody});
+            if(sharedRequest)serializedBody=JSON.stringify(sharedRequest.body);
+            const requestBodyDeadline=Date.now()+900000;
+            const responsePromise = fetch(finalVcpUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(sharedRequest?.headers||{}),
+                    'Authorization': `Bearer ${vcpApiKey}`
+                },
+                body: serializedBody,
+                signal: streamTask?.controller.signal,
+            });
+
+            // Usage statistics are auxiliary. Start the network request first;
+            // cold stats reads and failures must not delay dispatch.
+            const usedModel = modelConfig.model;
+            if (usedModel) setImmediate(() => {
+                try {
+                    Promise.resolve(require('../modelUsageTracker').recordModelUsage(usedModel))
+                        .catch(error => console.warn('[ModelUsage] Failed to record model usage:', error?.message));
+                } catch (error) {
+                    console.warn('[ModelUsage] Failed to record model usage:', error?.message);
+                }
+            });
+            const response = await responsePromise;
+
+            if (!response.ok) {
+                const errorText = redactResidentPresentationDiagnostic(
+                    await (await import('../chat/boundedResponse.mjs')).readResponseText(response,{maxBytes:64*1024,deadline:Date.now()+15000,signal:streamTask?.controller.signal})
+                );
+                console.error(`[Main - sendToVCP] VCP请求失败. Status: ${response.status}, Response Text:`, errorText);
+                let errorData = { message: `服务器返回状态 ${response.status}`, details: errorText };
+                try {
+                    const parsedError = JSON.parse(errorText);
+                    if (typeof parsedError === 'object' && parsedError !== null) {
+                        errorData = parsedError;
+                    }
+                } catch (e) { /* Not JSON, use raw text */ }
+
+                // 🔧 改进错误消息构造，防止 [object Object]
+                let errorMessage = '';
+                if (errorData.message && typeof errorData.message === 'string') {
+                    errorMessage = errorData.message;
+                } else if (errorData.error) {
+                    if (typeof errorData.error === 'string') {
+                        errorMessage = errorData.error;
+                    } else if (errorData.error.message && typeof errorData.error.message === 'string') {
+                        errorMessage = errorData.error.message;
+                    } else if (typeof errorData.error === 'object') {
+                        // 如果error是对象，尝试JSON序列化
+                        errorMessage = JSON.stringify(errorData.error);
+                    }
+                } else if (typeof errorData === 'string') {
+                    errorMessage = errorData;
+                } else {
+                    errorMessage = '未知服务端错误';
+                }
+
+                const errorMessageToPropagate = `VCP请求失败: ${response.status} - ${errorMessage}`;
+                trajectoryCall.finish({ error: { name: 'HTTPError', message: errorMessageToPropagate } });
+
+                if (modelConfig.stream === true && event && event.sender && !event.sender.isDestroyed()) {
+                    // 构造更详细的错误信息
+                    let detailedErrorMessage = `服务器返回状态 ${response.status}.`;
+                    if (errorData && errorData.message && typeof errorData.message === 'string') {
+                        detailedErrorMessage += ` 错误: ${errorData.message}`;
+                    } else if (errorData && errorData.error && errorData.error.message && typeof errorData.error.message === 'string') {
+                        detailedErrorMessage += ` 错误: ${errorData.error.message}`;
+                    } else if (typeof errorData === 'string' && errorData.length < 200) {
+                        detailedErrorMessage += ` 响应: ${errorData}`;
+                    } else if (errorData && errorData.details && typeof errorData.details === 'string' && errorData.details.length < 200) {
+                        detailedErrorMessage += ` 详情: ${errorData.details}`;
+                    }
+
+                    const errorPayload = { type: 'error', error: `VCP请求失败: ${detailedErrorMessage}`, details: errorData, messageId: messageId };
+                    if (context) errorPayload.context = context;
+                    sendStreamPayload(errorPayload);
+                    // 为函数返回值构造统一的 errorDetail.message
+                    const finalErrorMessageForReturn = `VCP请求失败: ${response.status} - ${errorMessage}`;
+                    return { streamError: true, error: `VCP请求失败 (${response.status})`, errorDetail: { message: finalErrorMessageForReturn, originalData: errorData } };
+                }
+                const err = new Error(errorMessageToPropagate);
+                err.details = errorData;
+                err.status = response.status;err.code=errorData?.error?.code||'UPSTREAM_HTTP_ERROR';
+                throw err;
+            }
+
+            const residentPresentationChannel =
+                response.headers?.get?.(
+                    RESIDENT_PRESENTATION_CHANNEL_HEADER
+                ) || null;
+
+            if (modelConfig.stream === true) {
+                console.log(`VCP响应: 开始流式处理 for ${messageId} on channel ${streamChannel}`);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                async function processStream(reader, decoder) {
+                    let bodyReachedEOF = false;
+                    try {
+                        const { createSseDecoder } = await import('../chat/sseProtocol.mjs');
+                        const protocol = createSseDecoder({
+                            onData(parsedChunk) {
+                                const presentation = takeResidentPresentationFromChunk(parsedChunk, residentPresentationChannel);
+                                if (presentation.handled) {
+                                    if (presentation.presentation) sendResidentPresentation({ context, messageId, presentation: presentation.presentation, streamChannel, webContents: event.sender, sendPayload: sendStreamPayload });
+                                    return;
+                                }
+                                trajectoryCall.chunk(parsedChunk);
+                                sendStreamPayload({ type: 'data', chunk: parsedChunk, messageId, context });
+                            },
+                            onDone(terminal) {
+                                trajectoryCall.finish();
+                                sendStreamPayload({ type: 'end', messageId, context, modelFinishReason: terminal.finishReason });
+                            },
+                        });
+                        while (true) {
+                            const result = await reader.read(); bodyReachedEOF = result.done;
+                            if (result.value) protocol.push(result.value);
+                            if (result.done) { protocol.finish(); break; }
+                            if (protocol.done) break;
+                        }
+                    } catch (streamError) {
+                        trajectoryCall.finish({ error: streamError, aborted: streamError?.name === 'AbortError' || streamTask?.controller.signal.aborted === true });
+                        sendStreamPayload({ type: 'error', error: streamError.message, code: streamError.code || 'STREAM_READ_ERROR', messageId, context });
+                    } finally {
+                        finishStreamTask();
+                        if (!bodyReachedEOF) void Promise.resolve(reader.cancel()).catch(() => {});
+                        try { reader.releaseLock(); } catch (_) {}
+                    }
+                }
+
+                // IPC returns when streaming starts; the detached reader owns
+                // terminal delivery and response cleanup.
+                streamTaskDetached = true;
+                processStream(reader, decoder).then(() => {
+                    console.log(`[Main - sendToVCP] 流处理函数 processStream 已正常结束 for ${messageId}`);
+                }).catch(err => {
+                    console.error(`[Main - sendToVCP] processStream 内部抛出未捕获的错误 for ${messageId}:`, err);
+                });
+
+                return { streamingStarted: true };
+            } else { // Non-streaming
+                console.log('VCP响应: 非流式处理');
+                let vcpResponse=JSON.parse(await (await import('../chat/boundedResponse.mjs')).readResponseText(response,{deadline:requestBodyDeadline,signal:streamTask?.controller.signal}));
+                try{(await import('../chat/boundedResponse.mjs')).validateCompletion(vcpResponse);}catch(error){if(error.partialText){trajectoryCall.finish({error:{code:error.code}});return {response:{choices:[{message:{role:'assistant',content:error.partialText},finish_reason:'error'}],nativeFailure:{code:error.code,kind:'interrupted'}},context};}throw error;}
+                const residentPresentations =
+                    takeResidentPresentationsFromResponse(
+                        vcpResponse,
+                        residentPresentationChannel
+                    );
+                for (const presentation of residentPresentations) {
+                    sendResidentPresentation({
+                        context,
+                        messageId,
+                        presentation,
+                        streamChannel,
+                        webContents: event.sender,
+                        sendPayload: sendStreamPayload
+                    });
+                }
+                trajectoryCall.finish({ response: vcpResponse });
+                if (!isGroupCall) hostHooks.emit('chat:full-response', messageId, context, vcpResponse);
+                // For non-streaming, wrap the response with the original context
+                // so the renderer knows where to save the history.
+                return { response: vcpResponse, context };
+            }
+
+        } catch (error) {
+            console.error('VCP请求错误 (catch block):', error);
+            trajectoryCall?.finish({ error, aborted: error?.name === 'AbortError' || streamTask?.controller.signal.aborted === true });
+            if (!isGroupCall && modelConfig.stream !== true) {
+                const aborted = error?.name === 'AbortError' || streamTask?.controller.signal.aborted === true;
+                hostHooks.emit('chat:stream-payload', { type: aborted ? 'end' : 'error', messageId, context, aborted });
+            }
+            if (modelConfig.stream === true && event && event.sender && !event.sender.isDestroyed()) {
+                const catchErrorPayload = { type: 'error', error: `VCP请求错误: ${error.message}`, messageId: messageId, context };
+                sendStreamPayload(catchErrorPayload);
+                return { streamError: true, error: `VCP客户端请求错误`, errorDetail: { message: error.message, stack: error.stack } };
+            }
+            return {error:`VCP请求错误: ${error.message}`,errorCode:error.code||'NETWORK_UNAVAILABLE',context};
+        } finally {
+            if (!streamTaskDetached) finishStreamTask();
+        }
+    });
+
+
+    ipcMain.handle('interrupt-vcp-request', async (event, { messageId }) => {
+        let upstreamAccepted = false;
+        try {
+            const settingsPath = path.join(APP_DATA_ROOT_IN_PROJECT, 'settings.json');
+            if (!await fs.pathExists(settingsPath)) {
+                return { success: false, error: 'Settings file not found.' };
+            }
+            const settings = await fs.readJson(settingsPath);
+            const vcpUrl = settings.vcpServerUrl;
+            const vcpApiKey = settings.vcpApiKey;
+
+            if (!vcpUrl) {
+                return { success: false, error: 'VCP Server URL is not configured.' };
+            }
+
+            // Construct the interrupt URL from the base server URL
+            const urlObject = new URL(vcpUrl);
+            const interruptUrl = `${urlObject.protocol}//${urlObject.host}/v1/interrupt`;
+
+            console.log(`[Main - interrupt] Sending interrupt for messageId: ${messageId} to ${interruptUrl}`);
+
+            const response = await fetch(interruptUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${vcpApiKey}`
+                },
+                body: JSON.stringify({
+                    requestId: messageId // Corrected to requestId to match user's edit
+                }),
+                // 服务卡住时中止请求本身也会挂住，停止按钮跟着卡几分钟；超时就走下面的本地收尾
+                signal: AbortSignal.timeout(INTERRUPT_TIMEOUT_MS)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                console.error(`[Main - interrupt] Failed to send interrupt signal:`, result);
+                return { success: false, error: result.message || `Server returned status ${response.status}` };
+            }
+
+            console.log(`[Main - interrupt] Interrupt signal sent successfully for ${messageId}. Response:`, result.message);
+            upstreamAccepted = true;
+            return { success: true, message: result.message };
+
+        } catch (error) {
+            console.error(`[Main - interrupt] Error sending interrupt request for messageId ${messageId}:`, error);
+            return { success: false, error: error.message };
+        } finally {
+            // 上游拒绝中止时，侧栏走本地流收尾；同时关闭本 IPC 调用者自己的
+            // HTTP 读取。成功中止仍由上游发送终态，保留已接收内容的正常收尾路径。
+            if (!upstreamAccepted) vcpStreamTasks.cancel(event.sender, messageId, 'interrupt-local-fallback');
+        }
+    });
+
+    /**
+     * 统计完全由 Agent 主动发起、尚无用户参与的话题消息数。
+     * 系统消息和思考占位不参与判断；历史中只要出现过用户消息就返回 0。
+     * @param {Array} history - 消息历史
+     * @returns {number}
+     */
+    function countUnreadMessages(history) {
+        if (!Array.isArray(history) || history.length === 0) return 0;
+
+        const effectiveMessages = history.filter(message =>
+            message &&
+            message.role !== 'system' &&
+            message.isThinking !== true
+        );
+
+        if (effectiveMessages.some(message => message.role === 'user')) {
+            return 0;
+        }
+
+        return effectiveMessages.filter(message => message.role === 'assistant').length;
+    }
+
+    /**
+     * 判断话题历史中是否出现过用户参与（用户真实消息）。
+     * @param {Array} history - 消息历史
+     * @returns {boolean}
+     */
+    function hasUserParticipation(history) {
+        return Array.isArray(history) && history.some(message =>
+            message &&
+            message.role === 'user' &&
+            message.isThinking !== true
+        );
+    }
+
+     /**
+      * Part C: 计算单个话题的未读消息数
+      * @param {Object} topic - 话题对象
+      * @param {Array} history - 话题历史消息
+      * @returns {number} - 未读消息数，-1 表示仅显示小点
+      */
+     function calculateTopicUnreadCount(topic, history) {
+         const count = countUnreadMessages(history);
+         if (count > 0) return count;
+ 
+         // 明确的手动未读始终保留；Agent/TopicSponsor 旧标记在用户参与后失效。
+         if (
+             topic.unread === true &&
+             (topic.unreadSource === 'manual' || !hasUserParticipation(history))
+         ) {
+             return -1; // 仅显示小点，不显示数字
+         }
+ 
+         return 0; // 不显示
+     }
+    ipcMain.handle('get-unread-topic-counts', async () => {
+        const counts = {};
+        try {
+            const agentDirs = await fs.readdir(AGENT_DIR, { withFileTypes: true });
+            for (const dirent of agentDirs) {
+                if (dirent.isDirectory()) {
+                    const agentId = dirent.name;
+                    let totalCount = 0;
+                    let hasUnreadMarker = false; // 用于标记是否有未读标记但无计数
+                    const configPath = path.join(AGENT_DIR, agentId, 'config.json');
+
+                    if (await fs.pathExists(configPath)) {
+                        const config = await fs.readJson(configPath);
+                        if (config.topics && Array.isArray(config.topics)) {
+                            for (const topic of config.topics) {
+                                const historyPath = path.join(USER_DATA_DIR, agentId, 'topics', topic.id, 'history.json');
+                                if (await fs.pathExists(historyPath)) {
+                                    try {
+                                        const history = await fs.readJson(historyPath);
+                                        const topicCount = calculateTopicUnreadCount(topic, history);
+                                        if (topicCount > 0) {
+                                            totalCount += topicCount;
+                                        } else if (topicCount === -1) {
+                                            // 有未读标记但无计数，记录这个状态
+                                            hasUnreadMarker = true;
+                                        }
+                                    } catch (readJsonError) {
+                                        console.error(`读取 history.json 失败: ${historyPath}`, readJsonError);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 如果有计数，显示数字
+                    if (totalCount > 0) {
+                        counts[agentId] = totalCount;
+                    } else if (hasUnreadMarker) {
+                        // 如果只有未读标记没有计数，返回 0（前端会识别为仅显示小点）
+                        counts[agentId] = 0;
+                    }
+                }
+            }
+            return { success: true, counts };
+        } catch (error) {
+            console.error('获取未读话题计数时出错:', error);
+            return { success: false, error: error.message, counts: {} };
+        }
+    });
+
+    // Part A: 切换话题锁定状态
+    ipcMain.handle('toggle-topic-lock', async (event, agentId, topicId) => {
+        try {
+            if (!agentId || !topicId) {
+                return { success: false, error: '缺少 agentId 或 topicId。' };
+            }
+
+            if (!agentConfigManager) {
+                return { success: false, error: 'AgentConfigManager 未初始化，无法安全更新话题锁定状态。' };
+            }
+
+            let locked;
+            await agentConfigManager.updateAgentConfig(agentId, existingConfig => {
+                if (!Array.isArray(existingConfig.topics)) {
+                    throw new Error('配置文件损坏或缺少话题列表');
+                }
+
+                let found = false;
+                const topics = existingConfig.topics.map(topic => {
+                    if (topic.id !== topicId) return topic;
+
+                    found = true;
+                    locked = topic.locked === undefined ? false : !topic.locked;
+                    return { ...topic, locked };
+                });
+
+                if (!found) {
+                    throw new Error(`未找到话题 ${topicId}`);
+                }
+
+                return { ...existingConfig, topics };
+            });
+
+            return {
+                success: true,
+                locked,
+                message: locked ? '话题已锁定' : '话题已解锁'
+            };
+        } catch (error) {
+            console.error('[toggleTopicLock] Error:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Part A: 设置话题未读状态
+    ipcMain.handle('set-topic-unread', async (event, agentId, topicId, unread) => {
+        try {
+            if (!agentId || !topicId || typeof unread !== 'boolean') {
+                return { success: false, error: '缺少有效的 agentId、topicId 或 unread 参数。' };
+            }
+
+            if (!agentConfigManager) {
+                return { success: false, error: 'AgentConfigManager 未初始化，无法安全更新话题未读状态。' };
+            }
+
+            let unreadSource = null;
+            await agentConfigManager.updateAgentConfig(agentId, existingConfig => {
+                if (!Array.isArray(existingConfig.topics)) {
+                    throw new Error('配置文件损坏或缺少话题列表');
+                }
+
+                let found = false;
+                const topics = existingConfig.topics.map(topic => {
+                    if (topic.id !== topicId) return topic;
+
+                    found = true;
+                    const updatedTopic = { ...topic, unread };
+                    if (unread) {
+                        // 该 IPC 入口用于用户右键手动标记；Agent 自动未读由创建方直接写入配置。
+                        updatedTopic.unreadSource = 'manual';
+                        unreadSource = 'manual';
+                    } else {
+                        delete updatedTopic.unreadSource;
+                    }
+                    return updatedTopic;
+                });
+
+                if (!found) {
+                    throw new Error(`未找到话题 ${topicId}`);
+                }
+
+                return { ...existingConfig, topics };
+            });
+
+            return {
+                success: true,
+                unread,
+                unreadSource
+            };
+        } catch (error) {
+            console.error('[setTopicUnread] Error:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcHandlersRegistered = true;
+}
+
+module.exports = {
+    initialize,
+    getVcpStreamTaskSnapshot,
+};

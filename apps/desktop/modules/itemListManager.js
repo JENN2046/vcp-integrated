@@ -1,0 +1,1505 @@
+// modules/itemListManager.js
+
+window.itemListManager = (() => {
+    // --- Private Variables ---
+    let itemListUl;
+    let electronAPI;
+    let currentSelectedItemRef;
+    let mainRendererFunctions; // To call back into renderer.js for actions like selectItem
+    let wasSelectionListenerActive = false; // To store the state of the selection listener before dragging
+    let uiHelper;
+    let activeLoadItemsToken = 0;
+    let activeUnreadCountsToken = 0;
+
+    const OPENHER_PERSONA_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+    const OPENHER_PERSONA_CACHE_TTL_MS = 11 * 60 * 1000;
+    const OPENHER_PERSONA_LABELS = Object.freeze({
+        cognitive: {
+            seek: '求知',
+            discern: '分辨',
+            reject: '拒绝',
+            observe: '观测',
+            infer: '推演',
+            remember: '记忆'
+        },
+        drive: {
+            curiosity: '好奇',
+            fear: '恐惧',
+            libido: '性欲',
+            pleasure: '享乐',
+            attachment: '依恋',
+            control: '控制'
+        },
+        affective: {
+            positive: '正性',
+            negative: '负性',
+            arousal: '唤醒'
+        },
+        subAxis: {
+            loss_control: '失序',
+            exposure: '暴露',
+            novelty: '新奇',
+            intimacy: '亲近',
+            challenge: '挑战',
+            comfort: '舒适',
+            conflict: '冲突',
+            ambiguity: '暧昧',
+            safety: '安全',
+            dominance: '支配',
+            submission: '顺从'
+        }
+    });
+
+    let personaStatusCache = {
+        agents: [],
+        fetchedAt: 0,
+        pending: null,
+        unavailable: false
+    };
+    let personaAutoRefreshTimer = null;
+
+    // 流状态独立于列表 DOM 保存，确保列表刷新或切换会话后仍能恢复后台说话标识。
+    const activeStreamOwners = new Map();
+    const activeStreamsByItem = new Map();
+
+    /**
+     * Initializes the ItemListManager module.
+     * @param {object} config - The configuration object.
+     * @param {object} config.elements - DOM elements.
+     * @param {HTMLElement} config.elements.itemListUl - The <ul> element for the item list.
+     * @param {object} config.electronAPI - The preloaded electron API.
+     * @param {object} config.refs - References to shared state.
+     * @param {object} config.refs.currentSelectedItemRef - A ref to the current selected item object.
+     * @param {object} config.mainRendererFunctions - Functions from the main renderer.
+     * @param {function} config.mainRendererFunctions.selectItem - Function to select an item.
+     * @param {object} config.uiHelper - The UI helper functions object.
+     */
+    function init(config) {
+        // Check for necessary configurations
+        if (!config.elements || !config.elements.itemListUl) {
+            console.error('[ItemListManager] Missing required DOM element: itemListUl.');
+            return;
+        }
+        if (!config.electronAPI) {
+            console.error('[ItemListManager] Missing required configuration: electronAPI.');
+            return;
+        }
+        if (!config.refs || !config.refs.currentSelectedItemRef) {
+            console.error('[ItemListManager] Missing required ref: currentSelectedItemRef.');
+            return;
+        }
+        if (!config.mainRendererFunctions || typeof config.mainRendererFunctions.selectItem !== 'function') {
+            console.error('[ItemListManager] Missing required main renderer function: selectItem.');
+            return;
+        }
+        if (!config.uiHelper) {
+            console.error('[ItemListManager] Missing required configuration: uiHelper.');
+            return;
+        }
+
+        activeUnreadCountsToken += 1; // Revoke requests from the previous API or list.
+        itemListUl = config.elements.itemListUl;
+        electronAPI = config.electronAPI;
+        currentSelectedItemRef = config.refs.currentSelectedItemRef;
+        mainRendererFunctions = config.mainRendererFunctions;
+        uiHelper = config.uiHelper; // Store uiHelper
+        bindItemListKeyboard();
+
+        ensureOpenHerPersonaAutoRefresh();
+        console.log('[ItemListManager] Initialized successfully.');
+    }
+
+    /**
+     * Highlights the active item in the list.
+     * @param {string} itemId - The ID of the item to highlight.
+     * @param {string} itemType - The type of the item ('agent' or 'group').
+     */
+    function highlightActiveItem(itemId, itemType) {
+        if (!itemListUl) return;
+        const focusedItem = itemListUl.contains(document.activeElement) ? document.activeElement : null;
+        document.querySelectorAll('#agentList li').forEach(item => {
+            const isActive = item.dataset.itemId === itemId && item.dataset.itemType === itemType;
+            item.classList.toggle('active', isActive);
+            if (item.dataset.itemId && !focusedItem) item.tabIndex = isActive ? 0 : -1;
+        });
+        ensureItemTabStop();
+    }
+
+    // Keyboard model of a listbox (as in Radix): one tab stop
+    // (the active item, else the first) that follows focus; arrows, Home and
+    // End move it; Enter or Space selects the focused Agent or group.
+    function ensureItemTabStop() {
+        if (!itemListUl || itemListUl.querySelector('li[data-item-id][tabindex="0"]')) return;
+        const first = itemListUl.querySelector('li[data-item-id]');
+        if (first) first.tabIndex = 0;
+    }
+
+    function bindItemListKeyboard() {
+        if (!itemListUl || itemListUl.dataset.itemKeyboardBound === 'true') return;
+        itemListUl.dataset.itemKeyboardBound = 'true';
+        itemListUl.addEventListener('focusin', event => {
+            const item = event.target;
+            if (!item?.dataset?.itemId || item.parentElement !== itemListUl) return;
+            itemListUl.querySelectorAll('li[data-item-id][tabindex="0"]').forEach(other => {
+                if (other !== item) other.tabIndex = -1;
+            });
+            item.tabIndex = 0;
+        });
+        itemListUl.addEventListener('keydown', event => {
+            const item = event.target;
+            if (!item?.dataset?.itemId || item.parentElement !== itemListUl) return;
+            const items = [...itemListUl.querySelectorAll('li[data-item-id]')]
+                .filter(candidate => candidate.style.display !== 'none' && !candidate.hidden);
+            const index = items.indexOf(item);
+            let next = null;
+            if (event.key === 'ArrowDown') next = items[index + 1];
+            else if (event.key === 'ArrowUp') next = items[index - 1];
+            else if (event.key === 'Home') next = items[0];
+            else if (event.key === 'End') next = items[items.length - 1];
+            else if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                const data = item._itemData;
+                if (data) mainRendererFunctions.selectItem(data.id, data.type, data.name, data.avatarUrl, data.config || data);
+                return;
+            } else {
+                return;
+            }
+            event.preventDefault();
+            next?.focus();
+        });
+    }
+
+    /**
+     * Initializes the SortableJS functionality for the item list.
+     */
+    function initializeItemSortable() {
+        if (!itemListUl) {
+            console.warn("[ItemListManager] itemListUl element not found. Skipping Sortable initialization.");
+            return;
+        }
+        if (itemListUl.sortableInstance) {
+            itemListUl.sortableInstance.destroy();
+        }
+        itemListUl.sortableInstance = new Sortable(itemListUl, {
+            animation: 150,
+            ghostClass: 'sortable-ghost-main',
+            chosenClass: 'sortable-chosen-main',
+            dragClass: 'sortable-drag-main',
+            onStart: async function(evt) {
+                // Check original state, store it, and then disable if it was active.
+                if (window.electronAPI && window.electronAPI.getSelectionListenerStatus) {
+                    wasSelectionListenerActive = await window.electronAPI.getSelectionListenerStatus();
+                    if (wasSelectionListenerActive) {
+                        window.electronAPI.toggleSelectionListener(false);
+                    }
+                }
+            },
+            onEnd: async function (evt) {
+                // Re-enable selection hook only if it was active before the drag.
+                if (window.electronAPI && window.electronAPI.toggleSelectionListener) {
+                    if (wasSelectionListenerActive) {
+                        window.electronAPI.toggleSelectionListener(true);
+                    }
+                    wasSelectionListenerActive = false; // Reset state
+                }
+
+                // Dropped back in place: nothing changed, so settings.json is not rewritten.
+                if (evt.from === evt.to && evt.oldIndex === evt.newIndex) return;
+                const allListItems = Array.from(evt.to.children);
+                const orderedItems = allListItems.map(item => ({
+                    id: item.dataset.itemId,
+                    type: item.dataset.itemType
+                }));
+                await saveItemOrder(orderedItems);
+            }
+        });
+    }
+
+    /**
+     * Saves the new order of items to the settings file.
+     * @param {Array<object>} orderedItemsWithTypes - An array of objects with id and type.
+     */
+    async function saveItemOrder(orderedItemsWithTypes) {
+        console.log('[ItemListManager] Saving combined item order:', orderedItemsWithTypes);
+        try {
+            const result = await electronAPI.saveCombinedItemOrder(orderedItemsWithTypes);
+            if (result && result.success) {
+                // uiHelper.showToastNotification("项目顺序已保存。"); // Removed successful save notification
+            } else {
+                uiHelper.showToastNotification(`保存项目顺序失败: ${result?.error || '未知错误'}`, 'error');
+                // Consider reloading items to revert to the last saved order if save failed
+                // await loadItems();
+            }
+        } catch (error) {
+            console.error('Error saving combined item order:', error);
+            uiHelper.showToastNotification(`保存项目顺序出错: ${error.message}`, 'error');
+        }
+    }
+
+    // To hold the loaded items in memory for quick access
+    let loadedItemsCache = [];
+    function escapeHtml(str) {
+        return (str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function normalizePersonaMatchText(value) {
+        return String(value || '')
+            .toLowerCase()
+            .replace(/\s+/g, '')
+            .replace(/[^\p{L}\p{N}_-]/gu, '');
+    }
+
+    function stripVcpChatEndpoint(url) {
+        const base = String(url || '').trim().replace(/\/v1\/chat\/completions\/?$/, '');
+        return base ? `${base.replace(/\/+$/, '')}/` : '';
+    }
+
+    function resolveAxisLabel(groupName, key) {
+        const group = OPENHER_PERSONA_LABELS[groupName] || {};
+        return group[key] || key;
+    }
+
+    function toPercent(value) {
+        const num = Number(value) || 0;
+        return Math.round(Math.max(0, Math.min(1, num)) * 100);
+    }
+
+    function getMoodColor(mood = {}) {
+        const positive = Number(mood.positive) || 0;
+        const negative = Number(mood.negative) || 0;
+        const arousal = Number(mood.arousal) || 0;
+        const hue = Math.round(210 + (positive - negative) * 125 + arousal * 30);
+        const saturation = Math.round(62 + arousal * 34);
+        const lightness = Math.round(48 + positive * 14 - negative * 9);
+        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    }
+
+    function axisItems(axisState, groupName) {
+        if (!axisState || typeof axisState !== 'object') return [];
+        return Object.entries(axisState)
+            .map(([key, value]) => ({
+                key,
+                label: resolveAxisLabel(groupName, key),
+                value: Number(value?.value ?? value?.activation ?? 0) || 0,
+                subAxes: value?.subAxes || {}
+            }))
+            .sort((a, b) => b.value - a.value);
+    }
+
+    function residualItems(state) {
+        const groups = [
+            ...axisItems(state?.drive, 'drive'),
+            ...axisItems(state?.cognitive, 'cognitive'),
+            ...axisItems(state?.affective, 'affective')
+        ];
+
+        return groups
+            .flatMap(axis => Object.entries(axis.subAxes || {}).map(([subAxis, score]) => ({
+                axis: axis.key,
+                axisLabel: axis.label,
+                subAxis,
+                subAxisLabel: OPENHER_PERSONA_LABELS.subAxis[subAxis] || subAxis,
+                weight: Number(score?.weight) || 0,
+                similarity: Number(score?.similarity) || 0
+            })))
+            .sort((a, b) => b.weight - a.weight)
+            .slice(0, 5);
+    }
+
+    function normalizeEmotionLabel(label) {
+        const text = String(label || '').trim();
+        if (!text || text === '暂无观测') return '';
+        return text.split(/[\/·,，。|｜]/)[0].trim();
+    }
+
+    function getConciseMoodLabel(persona) {
+        const picked = pickPersonaEmotionLabel(persona);
+        if (picked) return picked.slice(0, 4);
+
+        const candidates = [
+            persona?.primaryArchetype,
+            persona?.moodLabel,
+            persona?.shortLabel
+        ].filter(Boolean);
+
+        for (const label of candidates) {
+            const firstSegment = normalizeEmotionLabel(label);
+            if (firstSegment) {
+                return firstSegment.slice(0, 4);
+            }
+        }
+
+        return '观测中';
+    }
+
+    function addEmotionDistributionCandidate(map, label, score, confidence = 0) {
+        const normalizedLabel = normalizeEmotionLabel(label);
+        const numericScore = Number(score);
+        if (!normalizedLabel || !Number.isFinite(numericScore) || numericScore <= 0) return;
+
+        const numericConfidence = Number(confidence);
+        const confidenceBoost = Number.isFinite(numericConfidence) && numericConfidence > 0
+            ? 1 + Math.min(numericConfidence, 1) * 0.35
+            : 1;
+        map.set(normalizedLabel, (map.get(normalizedLabel) || 0) + numericScore * confidenceBoost);
+    }
+
+    function buildEmotionDistribution(mood = {}, expression = {}) {
+        const archetypes = mood.archetypes || {};
+        const weightedMap = new Map();
+
+        addEmotionDistributionCandidate(
+            weightedMap,
+            archetypes.primary?.label || mood.label,
+            archetypes.primary?.score ?? mood.archetypeScore ?? 1,
+            archetypes.primary?.confidence
+        );
+        addEmotionDistributionCandidate(
+            weightedMap,
+            archetypes.secondary?.label,
+            archetypes.secondary?.score,
+            archetypes.secondary?.confidence
+        );
+
+        if (Array.isArray(archetypes.candidates)) {
+            archetypes.candidates.forEach(candidate => {
+                addEmotionDistributionCandidate(
+                    weightedMap,
+                    candidate?.label,
+                    candidate?.score ?? candidate?.weight ?? candidate?.activation,
+                    candidate?.confidence
+                );
+            });
+        }
+
+        if (Array.isArray(archetypes.families)) {
+            archetypes.families.forEach(family => {
+                addEmotionDistributionCandidate(
+                    weightedMap,
+                    family?.primary?.label,
+                    family?.primary?.score ?? family?.activation ?? family?.gate,
+                    family?.confidence
+                );
+            });
+        }
+
+        // expression.shortLabel 是复合表达，可能包含驱动层/性别轴体（如“好奇上扬”“混合态”），
+        // 悬停随机标签只使用 mood.archetypes 与 mood.label 里的情绪原型，避免性别极向混入。
+        const totalWeight = Array.from(weightedMap.values()).reduce((sum, value) => sum + value, 0);
+        if (totalWeight <= 0) return [];
+
+        return Array.from(weightedMap.entries())
+            .map(([label, weight]) => ({
+                label,
+                weight,
+                probability: weight / totalWeight
+            }))
+            .sort((a, b) => b.probability - a.probability);
+    }
+
+    function pickPersonaEmotionLabel(persona) {
+        const distribution = Array.isArray(persona?.emotionDistribution) ? persona.emotionDistribution : [];
+        if (!distribution.length) return '';
+
+        const totalWeight = distribution.reduce((sum, item) => sum + (Number(item.weight) || 0), 0);
+        if (totalWeight <= 0) return distribution[0]?.label || '';
+
+        let cursor = Math.random() * totalWeight;
+        for (const item of distribution) {
+            cursor -= Number(item.weight) || 0;
+            if (cursor <= 0) {
+                return item.label || '';
+            }
+        }
+
+        return distribution[distribution.length - 1]?.label || '';
+    }
+
+    function setPersonaEmotionText(li, persona) {
+        if (!li || !persona) return;
+        const nameSpan = li.querySelector('.agent-name');
+        if (!nameSpan) return;
+
+        nameSpan.dataset.defaultName = nameSpan.dataset.defaultName || nameSpan.textContent;
+        nameSpan.dataset.emotionText = `${persona.agentLabel}正在｢${getConciseMoodLabel(persona)}｣`;
+    }
+
+    function createPersonaViewModel(rawAgent) {
+        const summary = rawAgent?.summary || {};
+        const state = rawAgent?.status?.state || rawAgent?.state || {};
+        const mood = state.mood || {};
+        const expression = mood.expression || {};
+        const archetypes = mood.archetypes || {};
+
+        const topCognitive = axisItems(state.cognitive, 'cognitive').slice(0, 2);
+        const topDrive = axisItems(state.drive, 'drive').slice(0, 2);
+        const residuals = residualItems(state);
+
+        // 提取新版情绪算法暴露的复合心境字段
+        const shortLabel = expression.shortLabel || mood.label || '暂无观测';
+        const sentence = expression.sentence || '';
+        const primaryArchetype = archetypes.primary?.label || '';
+        const topArchetypes = Array.isArray(archetypes.candidates) ? archetypes.candidates : [];
+        const emotionDistribution = buildEmotionDistribution(mood, expression);
+        const genderLabel = expression.gender?.label || '';
+        const driveLabel = expression.drive?.label || '';
+
+        let counterPressureLabel = '';
+        if (expression.drive?.counterPressure) {
+            const cp = expression.drive.counterPressure;
+            if (cp.label && cp.pressure !== undefined) {
+                counterPressureLabel = `${cp.label}受压${Math.round(cp.pressure * 100)}%`;
+            }
+        } else if (state.coupling?.lastCounterbalance) {
+            const lcb = state.coupling.lastCounterbalance;
+            if (lcb.axis && lcb.pressure !== undefined) {
+                const axisLabel = OPENHER_PERSONA_LABELS.drive[lcb.axis] || lcb.axis;
+                counterPressureLabel = `${axisLabel}受压${Math.round(lcb.pressure * 100)}%`;
+            }
+        }
+
+        return {
+            agentKey: summary.agentKey || state.agentKey || '',
+            agentLabel: state.agentLabel || summary.agentLabel || summary.agentKey || 'Agent',
+            moodLabel: mood.label || '暂无观测',
+            shortLabel,
+            sentence,
+            primaryArchetype,
+            topArchetypes,
+            emotionDistribution,
+            genderLabel,
+            driveLabel,
+            counterPressureLabel,
+            modeLabel: rawAgent?.status?.mode || '纯异步观察',
+            positive: Number(mood.positive) || 0,
+            negative: Number(mood.negative) || 0,
+            arousal: Number(mood.arousal) || 0,
+            color: getMoodColor(mood),
+            topCognitive,
+            topDrive,
+            residuals,
+            observationCount: Number(summary.observationCount) || 0,
+            updatedAt: summary.updatedAt || state.updatedAt || null,
+            lastObservedAt: summary.lastObservedAt || state.lastObservedAt || state.lastObservation?.at || null
+        };
+    }
+
+    function findPersonaForItem(item) {
+        if (!item || item.type !== 'agent') {
+            return null;
+        }
+
+        let matchedAgent = null;
+
+        if (Array.isArray(personaStatusCache.agents) && personaStatusCache.agents.length > 0) {
+            const itemKeys = [
+                item.id,
+                item.name,
+                item.config?.name,
+                item.config?.agentKey,
+                item.config?.agentLabel
+            ].map(normalizePersonaMatchText).filter(Boolean);
+
+            if (itemKeys.length > 0) {
+                let bestScore = 0;
+
+                personaStatusCache.agents.forEach(rawAgent => {
+                    const summary = rawAgent?.summary || {};
+                    const state = rawAgent?.status?.state || rawAgent?.state || {};
+                    const personaKeys = [
+                        summary.agentKey,
+                        summary.agentLabel,
+                        state.agentKey,
+                        state.agentLabel
+                    ].map(normalizePersonaMatchText).filter(Boolean);
+
+                    let score = 0;
+                    itemKeys.forEach(itemKey => {
+                        personaKeys.forEach(personaKey => {
+                            if (!itemKey || !personaKey) return;
+                            if (itemKey === personaKey) score = Math.max(score, 100);
+                            else if (itemKey.includes(personaKey) || personaKey.includes(itemKey)) {
+                                score = Math.max(score, Math.min(itemKey.length, personaKey.length));
+                            }
+                        });
+                    });
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        matchedAgent = rawAgent;
+                    }
+                });
+            }
+        }
+
+        return matchedAgent ? createPersonaViewModel(matchedAgent) : null;
+    }
+
+    async function fetchOpenHerPersonaStatus({ force = false } = {}) {
+        const now = Date.now();
+        if (!force && personaStatusCache.agents.length && now - personaStatusCache.fetchedAt < OPENHER_PERSONA_CACHE_TTL_MS) {
+            return personaStatusCache.agents;
+        }
+
+        if (personaStatusCache.pending) {
+            return personaStatusCache.pending;
+        }
+
+        personaStatusCache.pending = (async () => {
+            try {
+                const settings = await electronAPI.loadSettings();
+                const baseUrl = stripVcpChatEndpoint(settings?.vcpServerUrl);
+                if (!baseUrl) throw new Error('VCP Server URL not configured');
+
+                let username = settings?.adminUsername || '';
+                let password = settings?.adminPassword || '';
+                if ((!username || !password) && typeof electronAPI.loadForumConfig === 'function') {
+                    const forumConfig = await electronAPI.loadForumConfig();
+                    username = username || forumConfig?.username || '';
+                    password = password || forumConfig?.password || '';
+                }
+
+                if (!username || !password) {
+                    throw new Error('Admin credentials not configured');
+                }
+
+                const response = await fetch(`${baseUrl}admin_api/openher-persona/status`, {
+                    headers: {
+                        Authorization: `Basic ${btoa(`${username}:${password}`)}`,
+                        Accept: 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`OpenHerPersona status ${response.status}`);
+                }
+
+                const data = await response.json();
+                personaStatusCache.agents = Array.isArray(data?.agents) ? data.agents : [];
+                personaStatusCache.fetchedAt = Date.now();
+                personaStatusCache.unavailable = false;
+                updateVisiblePersonaCards();
+                return personaStatusCache.agents;
+            } catch (error) {
+                personaStatusCache.unavailable = true;
+                console.debug('[ItemListManager] OpenHerPersona status unavailable:', error?.message || error);
+                return personaStatusCache.agents;
+            } finally {
+                personaStatusCache.pending = null;
+            }
+        })();
+
+        return personaStatusCache.pending;
+    }
+
+    function ensureOpenHerPersonaAutoRefresh() {
+        if (personaAutoRefreshTimer) return;
+        fetchOpenHerPersonaStatus({ force: false });
+        personaAutoRefreshTimer = setInterval(() => {
+            fetchOpenHerPersonaStatus({ force: true });
+        }, OPENHER_PERSONA_REFRESH_INTERVAL_MS);
+    }
+
+    function updateVisiblePersonaCards() {
+        if (!itemListUl) return;
+        itemListUl.querySelectorAll('li[data-item-type="agent"]').forEach(li => {
+            const item = findItemById(li.dataset.itemId, li.dataset.itemType);
+            hydratePersonaElement(li, item);
+        });
+    }
+
+    function buildPersonaCard(persona) {
+        // 组装主弹幕词汇 (Primary Barrage) - 优先使用新版情绪算法的高级表达
+        const primaryWords = [];
+        if (persona.primaryArchetype) primaryWords.push(persona.primaryArchetype);
+        if (persona.driveLabel) primaryWords.push(persona.driveLabel);
+        if (persona.genderLabel) primaryWords.push(persona.genderLabel);
+        if (persona.counterPressureLabel) primaryWords.push(persona.counterPressureLabel);
+
+        // 补充候选原型
+        if (Array.isArray(persona.topArchetypes)) {
+            persona.topArchetypes.forEach(arch => {
+                const label = typeof arch === 'string' ? arch : arch?.label;
+                if (label && label !== persona.primaryArchetype && !primaryWords.includes(label)) {
+                    primaryWords.push(label);
+                }
+            });
+        }
+
+        // 如果主弹幕词汇不够，用旧版的认知和驱力轴补充
+        if (primaryWords.length < 4) {
+            const cognitive = persona.topCognitive.map(item => item.label);
+            const drive = persona.topDrive.map(item => item.label);
+            const backupWords = [...cognitive, ...drive];
+            for (const word of backupWords) {
+                if (!primaryWords.includes(word)) {
+                    primaryWords.push(word);
+                }
+                if (primaryWords.length >= 4) break;
+            }
+        }
+
+        // 组装次弹幕词汇 (Secondary Barrage) - 使用二级残差和轴体
+        const secondaryWords = [];
+        persona.residuals.forEach(item => {
+            secondaryWords.push(`${item.axisLabel}/${item.subAxisLabel}`);
+        });
+
+        // 补充轴体标签到次弹幕
+        const cognitive = persona.topCognitive.map(item => item.label);
+        const drive = persona.topDrive.map(item => item.label);
+        [...cognitive, ...drive].forEach(word => {
+            if (!primaryWords.includes(word) && !secondaryWords.includes(word)) {
+                secondaryWords.push(word);
+            }
+        });
+
+        const finalPrimary = primaryWords.slice(0, 5);
+        const finalSecondary = secondaryWords.slice(0, 5);
+
+        const card = document.createElement('div');
+        card.className = 'agent-emotion-card';
+        card.style.setProperty('--agent-emotion-color', persona.color);
+        card.setAttribute('aria-hidden', 'true');
+
+        const chips = finalPrimary.map((label, index) => (
+            `<span class="agent-emotion-barrage agent-emotion-barrage-primary" style="--emotion-index:${index};--emotion-track:${index % 5};">${escapeHtml(label)}</span>`
+        )).join('');
+
+        const residualHtml = finalSecondary.map((label, index) => {
+            const absoluteIndex = index + finalPrimary.length;
+            return `<span class="agent-emotion-barrage agent-emotion-barrage-secondary" style="--emotion-index:${absoluteIndex};--emotion-track:${absoluteIndex % 5};">${escapeHtml(label)}</span>`;
+        }).join('');
+
+        card.innerHTML = `
+            <div class="agent-emotion-title">
+                <span class="agent-emotion-agent">${escapeHtml(persona.agentLabel)}</span>
+                <span class="agent-emotion-mood">「${escapeHtml(persona.moodLabel)}」</span>
+            </div>
+            <div class="agent-emotion-metrics">
+                <span>正性 ${toPercent(persona.positive)}%</span>
+                <span>负性 ${toPercent(persona.negative)}%</span>
+                <span>唤醒 ${toPercent(persona.arousal)}%</span>
+            </div>
+            <div class="agent-emotion-barrage-layer">${chips}${residualHtml}</div>
+        `;
+
+        return card;
+    }
+
+    function removePersonaCard(li) {
+        if (!li) return;
+        const existing = li.querySelector('.agent-emotion-card');
+        if (existing) existing.remove();
+    }
+
+    function getPersonaRenderKey(persona) {
+        if (!persona) return '';
+        return [
+            persona.agentKey,
+            persona.agentLabel,
+            persona.moodLabel,
+            persona.shortLabel,
+            persona.sentence,
+            persona.primaryArchetype,
+            persona.emotionDistribution.map(item => `${item.label}:${item.weight}:${item.probability}`).join('|'),
+            persona.genderLabel,
+            persona.driveLabel,
+            persona.counterPressureLabel,
+            persona.modeLabel,
+            persona.positive,
+            persona.negative,
+            persona.arousal,
+            persona.color,
+            persona.updatedAt,
+            persona.lastObservedAt,
+            persona.observationCount,
+            persona.topCognitive.map(item => `${item.key}:${item.value}`).join('|'),
+            persona.topDrive.map(item => `${item.key}:${item.value}`).join('|'),
+            persona.residuals.map(item => `${item.axis}:${item.subAxis}:${item.weight}:${item.similarity}`).join('|')
+        ].join('::');
+    }
+
+    function showPersonaCard(li) {
+        if (!li || !li._personaViewModel) return;
+        const existing = li.querySelector('.agent-emotion-card');
+        if (existing && existing.dataset.renderKey === li._personaRenderKey) return;
+
+        removePersonaCard(li);
+        const card = buildPersonaCard(li._personaViewModel);
+        card.dataset.renderKey = li._personaRenderKey || '';
+        li.appendChild(card);
+    }
+
+    function bindPersonaHoverHandlers(li) {
+        if (!li || li._personaHoverHandlersBound) return;
+        li._personaHoverHandlersBound = true;
+
+        li.addEventListener('mouseenter', () => {
+            if (!li.classList.contains('has-agent-emotion')) return;
+            setPersonaEmotionText(li, li._personaViewModel);
+            showPersonaCard(li);
+        });
+
+        li.addEventListener('mouseleave', () => {
+            removePersonaCard(li);
+        });
+    }
+
+    function hydratePersonaElement(li, item) {
+        if (!li || !item || item.type !== 'agent') return;
+
+        const persona = findPersonaForItem(item);
+        const avatarWrapper = li.querySelector('.avatar-wrapper');
+        let avatarEmotionRing = avatarWrapper?.querySelector('.agent-emotion-avatar-ring');
+
+        if (!persona) {
+            li.classList.toggle('has-agent-emotion', false);
+            li.classList.toggle('agent-emotion-unavailable', personaStatusCache.unavailable);
+            li._personaViewModel = null;
+            li._personaRenderKey = '';
+            delete li.dataset.personaRenderKey;
+            avatarEmotionRing?.remove();
+            removePersonaCard(li);
+            return;
+        }
+
+        if (avatarWrapper && !avatarEmotionRing) {
+            avatarEmotionRing = document.createElement('span');
+            avatarEmotionRing.className = 'agent-emotion-avatar-ring';
+            avatarEmotionRing.setAttribute('aria-hidden', 'true');
+            avatarWrapper.insertBefore(avatarEmotionRing, avatarWrapper.firstChild);
+        }
+
+        const renderKey = getPersonaRenderKey(persona);
+        li._personaViewModel = persona;
+        li._personaRenderKey = renderKey;
+        li.dataset.personaRenderKey = renderKey;
+        li.classList.add('has-agent-emotion');
+        li.classList.remove('agent-emotion-unavailable');
+        li.style.setProperty('--agent-emotion-color', persona.color);
+
+        // 主显示保持轻量：仍使用“xx正在 + 4字心境”，但每次悬停会按情绪分布概率重新抽取标签
+        setPersonaEmotionText(li, persona);
+
+        bindPersonaHoverHandlers(li);
+
+        if (!li.matches(':hover')) {
+            removePersonaCard(li);
+            return;
+        }
+
+        showPersonaCard(li);
+    }
+
+    function getStreamItemKey(itemId, itemType) {
+        return itemId && itemType ? `${itemType}:${itemId}` : '';
+    }
+
+    function resolveStreamOwner(event) {
+        const context = event?.context || {};
+        const isGroup = context.isGroupMessage === true || Boolean(context.groupId);
+        const itemId = isGroup ? context.groupId : context.agentId;
+        const itemType = isGroup ? 'group' : 'agent';
+        const operationId = String(event?.streamOperationId || event?.operationId || event?.messageId || '').trim();
+        if (!itemId || !operationId) return null;
+        return { itemId, itemType, operationId, itemKey: getStreamItemKey(itemId, itemType) };
+    }
+
+    function syncSpeakingIndicator(itemId, itemType) {
+        if (!itemListUl) return;
+        const itemKey = getStreamItemKey(itemId, itemType);
+        const activeCount = activeStreamsByItem.get(itemKey)?.size || 0;
+        const li = Array.from(itemListUl.querySelectorAll('li[data-item-id][data-item-type]'))
+            .find(candidate => candidate.dataset.itemId === itemId && candidate.dataset.itemType === itemType);
+        if (!li) return;
+
+        li.classList.toggle('is-stream-speaking', activeCount > 0);
+        li.dataset.activeStreamCount = String(activeCount);
+        const indicator = li.querySelector('.stream-speaking-indicator');
+        if (indicator) {
+            indicator.hidden = activeCount === 0;
+            indicator.setAttribute('aria-label', activeCount > 0 ? '正在说话' : '');
+        }
+    }
+
+    function setStreamOwnerActive(owner, active) {
+        if (!owner) return;
+        const previousOwner = activeStreamOwners.get(owner.operationId);
+        if (previousOwner && previousOwner.itemKey !== owner.itemKey) {
+            const previousSet = activeStreamsByItem.get(previousOwner.itemKey);
+            previousSet?.delete(owner.operationId);
+            if (previousSet?.size === 0) activeStreamsByItem.delete(previousOwner.itemKey);
+            syncSpeakingIndicator(previousOwner.itemId, previousOwner.itemType);
+        }
+
+        if (active) {
+            activeStreamOwners.set(owner.operationId, owner);
+            let operations = activeStreamsByItem.get(owner.itemKey);
+            if (!operations) {
+                operations = new Set();
+                activeStreamsByItem.set(owner.itemKey, operations);
+            }
+            operations.add(owner.operationId);
+        } else {
+            const effectiveOwner = previousOwner || owner;
+            activeStreamOwners.delete(owner.operationId);
+            const operations = activeStreamsByItem.get(effectiveOwner.itemKey);
+            operations?.delete(owner.operationId);
+            if (operations?.size === 0) activeStreamsByItem.delete(effectiveOwner.itemKey);
+            owner = effectiveOwner;
+        }
+        syncSpeakingIndicator(owner.itemId, owner.itemType);
+    }
+
+    function consumeStreamActivityEvent(event) {
+        const owner = resolveStreamOwner(event);
+        if (!owner) return false;
+
+        if (event.type === 'agent_thinking' || event.type === 'start' || event.type === 'data') {
+            setStreamOwnerActive(owner, true);
+            return true;
+        }
+        if (event.type === 'end' || event.type === 'error' || event.type === 'full_response') {
+            setStreamOwnerActive(owner, false);
+            return true;
+        }
+        return false;
+    }
+
+    function createSpeakingIndicator() {
+        const indicator = document.createElement('span');
+        indicator.className = 'stream-speaking-indicator';
+        indicator.hidden = true;
+        indicator.setAttribute('role', 'status');
+        for (let index = 0; index < 3; index += 1) {
+            const bar = document.createElement('span');
+            bar.className = 'stream-speaking-bar';
+            bar.style.setProperty('--stream-bar-index', String(index));
+            indicator.appendChild(bar);
+        }
+        return indicator;
+    }
+
+    const GROUP_COLLAGE_MAX = 4;
+
+    // 没有自定义头像的群组，用前 4 位成员的头像拼成一枚群头像；
+    // 没头像的成员用名字首字母占位。
+    function createGroupCollage(memberPreview) {
+        const collage = document.createElement('div');
+        collage.className = 'group-avatar-collage';
+        collage.dataset.count = String(memberPreview.length);
+        memberPreview.forEach(member => {
+            if (member.avatarUrl) {
+                const img = document.createElement('img');
+                img.className = 'group-avatar-cell';
+                img.src = member.avatarUrl;
+                img.alt = '';
+                img.addEventListener('error', () => {
+                    img.replaceWith(createGroupCollageInitials(member.name));
+                });
+                collage.appendChild(img);
+            } else {
+                collage.appendChild(createGroupCollageInitials(member.name));
+            }
+        });
+        return collage;
+    }
+
+    function createGroupCollageInitials(name) {
+        const cell = document.createElement('span');
+        cell.className = 'group-avatar-cell group-avatar-initials';
+        cell.textContent = String(name || '?').trim().slice(0, 2).toUpperCase();
+        return cell;
+    }
+
+    function createItemElement(item) {
+        const li = document.createElement('li');
+        li.dataset.itemId = item.id;
+        li.dataset.itemType = item.type;
+        li._itemData = item;
+        li.tabIndex = -1;
+
+        // 创建头像包装器
+        const avatarWrapper = document.createElement('div');
+        avatarWrapper.classList.add('avatar-wrapper');
+
+        const avatarImg = document.createElement('img');
+        avatarImg.classList.add('avatar');
+        // The main process versions avatar URLs by file mtime, so the URL is
+        // stable until the avatar changes and the browser cache can serve it.
+        avatarImg.src = item.avatarUrl || (item.type === 'group' ? 'assets/default_group_avatar.png' : 'assets/default_avatar.png');
+        avatarImg.alt = `${item.name} 头像`;
+        avatarImg.onerror = () => { avatarImg.src = (item.type === 'group' ? 'assets/default_group_avatar.png' : 'assets/default_avatar.png'); };
+
+        // 将头像和顶层说话频谱添加到包装器中。
+        if (item.type === 'group' && item.memberPreview && item.memberPreview.length > 0) {
+            avatarWrapper.appendChild(createGroupCollage(item.memberPreview));
+        } else {
+            avatarWrapper.appendChild(avatarImg);
+        }
+        avatarWrapper.appendChild(createSpeakingIndicator());
+
+        const nameSpan = document.createElement('span');
+        nameSpan.classList.add('agent-name');
+        nameSpan.textContent = item.name;
+        if (item.type === 'group') {
+            nameSpan.textContent += " (群)";
+        }
+
+        // 应用自定义样式（仅对agent类型）
+        if (item.type === 'agent' && item.config) {
+            // 只有在未禁用自定义颜色时才应用颜色设置
+            if (!item.config.disableCustomColors) {
+                // 应用头像边框颜色
+                if (item.config.avatarBorderColor) {
+                    avatarImg.style.borderColor = item.config.avatarBorderColor;
+                }
+
+                // 应用名称文字颜色
+                if (item.config.nameTextColor) {
+                    nameSpan.style.color = item.config.nameTextColor;
+                }
+            }
+            // 注意：当disableCustomColors为true时，头像边框和名称颜色将使用主题默认值
+
+            // 自定义CSS始终应用（不受disableCustomColors影响）
+            if (item.config.customCss) {
+                try {
+                    // 解析并应用自定义CSS
+                    const cssRules = item.config.customCss.split(';').filter(rule => rule.trim());
+                    cssRules.forEach(rule => {
+                        const [property, value] = rule.split(':').map(s => s.trim());
+                        if (property && value) {
+                            li.style.setProperty(property, value);
+                        }
+                    });
+                } catch (error) {
+                    console.warn(`[ItemListManager] Failed to apply custom CSS for agent ${item.id}:`, error);
+                }
+            }
+        }
+
+        li.appendChild(avatarWrapper);
+        li.appendChild(nameSpan);
+
+        // Agent 列表可能被未读数或配置刷新重建；从 Flowlock 状态机恢复持久指示器。
+        if (item.type === 'agent' && window.flowlockManager?.isAgentLocked?.(item.id)) {
+            avatarWrapper.classList.add('flowlock-active-ring');
+        }
+
+        hydratePersonaElement(li, item);
+        syncSpeakingIndicator(item.id, item.type);
+
+        // 为每个项目添加独立的状态管理
+        li._lastClickTime = 0;
+        li._middleClickHandled = false;
+
+        // 添加鼠标事件监听器
+        // 专门处理中键点击的辅助事件
+        li.addEventListener('auxclick', (e) => {
+            if (e.button === 1) { // 中键
+                console.log('[ItemListManager] 检测到中键auxclick事件');
+                e.preventDefault();
+                e.stopPropagation();
+                li._middleClickHandled = true;
+                handleMiddleClick(item);
+            }
+        });
+
+        // 普通点击事件（左键双击检测）
+        li.addEventListener('click', (e) => {
+            // 如果是中键点击，已经被auxclick处理了，直接返回
+            if (li._middleClickHandled) {
+                li._middleClickHandled = false;
+                return;
+            }
+
+            const currentTime = Date.now();
+            const timeDiff = currentTime - li._lastClickTime;
+
+            if (e.button === 0 && timeDiff < 300) {
+                // 双击 - 打开设置页面
+                console.log('[ItemListManager] 检测到双击');
+                e.preventDefault();
+                e.stopPropagation();
+                handleDoubleClick(item);
+            } else if (e.button === 0) {
+                // 普通左键点击 - 选择项目
+                console.log('[ItemListManager] 普通左键点击');
+                if (mainRendererFunctions && typeof mainRendererFunctions.selectItem === 'function') {
+                    mainRendererFunctions.selectItem(item.id, item.type, item.name, item.avatarUrl, item.config || item);
+                }
+            }
+
+            li._lastClickTime = currentTime;
+        });
+
+        // 窄侧栏中右键头像：选择该助手/群组并直接打开其话题浮层。
+        li.addEventListener('contextmenu', async (e) => {
+            if (!li.closest('.sidebar.avatar-only')) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (mainRendererFunctions && typeof mainRendererFunctions.selectItem === 'function') {
+                await mainRendererFunctions.selectItem(
+                    item.id,
+                    item.type,
+                    item.name,
+                    item.avatarUrl,
+                    item.config || item
+                );
+            }
+
+            document.dispatchEvent(new CustomEvent('compact-sidebar-open-topics', {
+                detail: {
+                    itemId: item.id,
+                    itemType: item.type
+                }
+            }));
+        });
+
+        return li;
+    }
+
+    function renderItems(items, fallbackHtml = null) {
+        itemListUl.innerHTML = '';
+
+        if (items.length === 0) {
+            itemListUl.innerHTML = fallbackHtml || '<li>没有找到Agent或群组。请创建一个。</li>';
+            return;
+        }
+
+        const fragment = document.createDocumentFragment();
+        items.forEach(item => {
+            fragment.appendChild(createItemElement(item));
+        });
+        itemListUl.appendChild(fragment);
+
+        // 新列表节点已挂载，现在从独立流状态中恢复后台说话标识。
+        items.forEach(item => syncSpeakingIndicator(item.id, item.type));
+
+        const currentSelectedItem = currentSelectedItemRef.get();
+        if (currentSelectedItem && currentSelectedItem.id) {
+            highlightActiveItem(currentSelectedItem.id, currentSelectedItem.type);
+        }
+        // A rebuild (unread refresh, save, reorder) must not drop an active
+        // search: re-apply the term still in the search box.
+        const activeSearch = document.getElementById('agentSearchInput')?.value;
+        if (activeSearch && activeSearch.trim()) window.uiHelperFunctions?.filterAgentList?.(activeSearch);
+        ensureItemTabStop();
+
+        if (typeof Sortable !== 'undefined') {
+            initializeItemSortable();
+        } else {
+            console.warn('[ItemListManager] SortableJS library not found. Item list drag-and-drop ordering will not be available.');
+        }
+    }
+
+    /**
+     * Loads agents and groups, sorts them, and renders them in the list.
+     */
+    async function loadItems() {
+        if (!itemListUl || !electronAPI) {
+            console.error('[ItemListManager] Cannot load items. Module not initialized or missing dependencies.');
+            return;
+        }
+
+        const loadToken = ++activeLoadItemsToken;
+        const hadPreviousItems = loadedItemsCache.length > 0;
+
+        if (!hadPreviousItems) {
+            itemListUl.innerHTML = '<li><div class="loading-spinner-small"></div>加载列表中...</li>';
+        }
+
+        // A rejected IPC call becomes an error row instead of leaving the
+        // first-load spinner up for good; both reads run together.
+        const asError = error => ({ error: error?.message || String(error) });
+        const [agentsResult, groupsResult] = await Promise.all([
+            Promise.resolve().then(() => electronAPI.getAgents()).catch(asError),
+            Promise.resolve().then(() => electronAPI.getAgentGroups()).catch(asError)
+        ]);
+
+        if (loadToken !== activeLoadItemsToken) {
+            console.debug('[ItemListManager] Ignoring stale loadItems result.');
+            return;
+        }
+
+        let items = [];
+        const errors = [];
+
+        if (agentsResult && !agentsResult.error) {
+            items.push(...agentsResult.map(a => ({ ...a, type: 'agent', id: a.id, avatarUrl: a.avatarUrl || 'assets/default_avatar.png' })));
+        } else if (agentsResult && agentsResult.error) {
+            errors.push(`加载Agent失败: ${agentsResult.error}`);
+        }
+
+        if (groupsResult && !groupsResult.error) {
+            const agentById = new Map(Array.isArray(agentsResult) ? agentsResult.map(a => [a.id, a]) : []);
+            items.push(...groupsResult
+                .filter(g => g.mode !== 'game')
+                .map(g => ({
+                    ...g,
+                    type: 'group',
+                    id: g.id,
+                    avatarUrl: g.avatarUrl || 'assets/default_group_avatar.png',
+                    memberPreview: g.avatarUrl ? null : (Array.isArray(g.members) ? g.members : [])
+                        .map(memberId => agentById.get(memberId))
+                        .filter(Boolean)
+                        .slice(0, GROUP_COLLAGE_MAX)
+                        .map(a => ({ name: a.name, avatarUrl: a.avatarUrl || '' }))
+                })));
+        } else if (groupsResult && groupsResult.error) {
+            errors.push(`加载群组失败: ${groupsResult.error}`);
+        }
+
+        let combinedOrderFromSettings = [];
+        try {
+            const settings = await electronAPI.loadSettings();
+            if (settings && settings.combinedItemOrder && Array.isArray(settings.combinedItemOrder)) {
+                combinedOrderFromSettings = settings.combinedItemOrder;
+            }
+        } catch (e) {
+            console.warn("[ItemListManager] Could not load combinedItemOrder from settings:", e);
+        }
+
+        // 读取排序设置时也可能已有新一轮加载完成；最后一次 await 后再确认发布权，
+        // 防止旧成功、空列表或错误回退覆盖当前缓存和 DOM。
+        if (loadToken !== activeLoadItemsToken) {
+            console.debug('[ItemListManager] Ignoring stale loadItems result after settings.');
+            return;
+        }
+
+        if (combinedOrderFromSettings.length > 0 && items.length > 0) {
+            const itemMap = new Map(items.map(item => [`${item.type}_${item.id}`, item]));
+            const orderedItems = [];
+            combinedOrderFromSettings.forEach(orderedItemInfo => {
+                const key = `${orderedItemInfo.type}_${orderedItemInfo.id}`;
+                if (itemMap.has(key)) {
+                    orderedItems.push(itemMap.get(key));
+                    itemMap.delete(key);
+                }
+            });
+            orderedItems.push(...itemMap.values());
+            items = orderedItems;
+        } else {
+            items.sort((a, b) => {
+                if (a.type !== b.type) {
+                    return a.type === 'group' ? -1 : 1;
+                }
+                return (a.name || '').localeCompare(b.name || '', 'zh-Hans-CN');
+            });
+        }
+
+        if (items.length > 0) {
+            loadedItemsCache = [...items]; // Cache the loaded items only when we have valid fresh data
+            renderItems(items);
+        } else if (errors.length > 0) {
+            console.warn('[ItemListManager] Failed to fully reload items, preserving previous list where possible:', errors.join(' | '));
+            if (!hadPreviousItems) {
+                itemListUl.innerHTML = errors.map(error => `<li>${escapeHtml(String(error))}</li>`).join('');
+            }
+        } else {
+            loadedItemsCache = [];
+            renderItems([], '<li>没有找到Agent或群组。请创建一个。</li>');
+        }
+
+        fetchOpenHerPersonaStatus({ force: false });
+        // Asynchronously fetch and update unread counts to avoid blocking initial render
+        refreshUnreadCounts();
+    }
+
+    /**
+     * 仅刷新未读计数，而不重新加载整个列表
+     */
+    async function refreshUnreadCounts({ isCurrent = () => true } = {}) {
+        if (!electronAPI || !isCurrent()) return;
+        const token = ++activeUnreadCountsToken;
+        try {
+            const result = await electronAPI.getUnreadTopicCounts();
+            // Navigation and catalog refresh share one publication order. The
+            // caller can also revoke its own lifecycle while the request waits.
+            if (token !== activeUnreadCountsToken || !isCurrent()) return;
+            if (result && result.success) updateUnreadBadges(result.counts);
+        } catch (err) {
+            console.error('[ItemListManager] Failed to fetch unread counts:', err);
+        }
+    }
+
+    /**
+     * 处理双击事件 - 打开设置页面
+     * @param {object} item - 项目对象
+     */
+    function handleDoubleClick(item) {
+        console.log('[ItemListManager] 双击项目:', item.name, '类型:', item.type);
+
+        // 选择项目
+        if (mainRendererFunctions && typeof mainRendererFunctions.selectItem === 'function') {
+            mainRendererFunctions.selectItem(item.id, item.type, item.name, item.avatarUrl, item.config || item);
+        }
+
+        // 切换到设置页面 - 使用延时确保项目选择完成
+        setTimeout(() => {
+            try {
+                // 方法1：尝试使用uiManager.switchToTab
+                if (window.uiManager && typeof window.uiManager.switchToTab === 'function') {
+                    console.log('[ItemListManager] 使用uiManager.switchToTab切换到设置页面');
+                    window.uiManager.switchToTab('settings');
+                } else {
+                    // 方法2：直接操作DOM元素
+                    console.log('[ItemListManager] uiManager不可用，直接操作DOM');
+
+                    // 激活设置按钮
+                    const settingsTabBtn = document.querySelector('.sidebar-tab-button[data-tab="settings"]');
+                    if (settingsTabBtn) {
+                        settingsTabBtn.click();
+                        console.log('[ItemListManager] 直接点击设置按钮');
+                    } else {
+                        console.warn('[ItemListManager] 找不到设置按钮');
+
+                        // 方法3：手动切换标签页显示
+                        console.log('[ItemListManager] 尝试手动切换到设置标签页');
+
+                        // 隐藏所有标签内容
+                        document.querySelectorAll('.sidebar-tab-content').forEach(content => {
+                            content.classList.remove('active');
+                        });
+
+                        // 显示设置标签内容
+                        const settingsContent = document.getElementById('tabContentSettings');
+                        if (settingsContent) {
+                            settingsContent.classList.add('active');
+                            console.log('[ItemListManager] 手动激活设置标签内容');
+                        }
+
+                        // 更新按钮状态
+                        document.querySelectorAll('.sidebar-tab-button').forEach(btn => {
+                            btn.classList.toggle('active', btn.dataset.tab === 'settings');
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('[ItemListManager] 切换到设置页面时出错:', error);
+            }
+        }, 100); // 增加延时到100ms
+    }
+
+    /**
+     * 处理中键点击事件 - 打开话题页面
+     * @param {object} item - 项目对象
+     */
+    function handleMiddleClick(item) {
+        console.log('[ItemListManager] 中键点击项目:', item.name, '类型:', item.type);
+
+        // 选择项目
+        if (mainRendererFunctions && typeof mainRendererFunctions.selectItem === 'function') {
+            mainRendererFunctions.selectItem(item.id, item.type, item.name, item.avatarUrl, item.config || item);
+        }
+
+        // 切换到话题页面 - 使用延时确保项目选择完成
+        setTimeout(() => {
+            try {
+                // 方法1：尝试使用uiManager.switchToTab
+                if (window.uiManager && typeof window.uiManager.switchToTab === 'function') {
+                    console.log('[ItemListManager] 使用uiManager.switchToTab切换到话题页面');
+                    window.uiManager.switchToTab('topics');
+                } else {
+                    // 方法2：直接操作DOM元素
+                    console.log('[ItemListManager] uiManager不可用，直接操作DOM');
+
+                    // 激活话题按钮
+                    const topicsTabBtn = document.querySelector('.sidebar-tab-button[data-tab="topics"]');
+                    if (topicsTabBtn) {
+                        topicsTabBtn.click();
+                        console.log('[ItemListManager] 直接点击话题按钮');
+                    } else {
+                        console.warn('[ItemListManager] 找不到话题按钮');
+
+                        // 方法3：手动切换标签页显示
+                        console.log('[ItemListManager] 尝试手动切换标签页');
+
+                        // 隐藏所有标签内容
+                        document.querySelectorAll('.sidebar-tab-content').forEach(content => {
+                            content.classList.remove('active');
+                        });
+
+                        // 显示话题标签内容
+                        const topicsContent = document.getElementById('tabContentTopics');
+                        if (topicsContent) {
+                            topicsContent.classList.add('active');
+                            console.log('[ItemListManager] 手动激活话题标签内容');
+                        }
+
+                        // 更新按钮状态
+                        document.querySelectorAll('.sidebar-tab-button').forEach(btn => {
+                            btn.classList.toggle('active', btn.dataset.tab === 'topics');
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('[ItemListManager] 切换到话题页面时出错:', error);
+            }
+        }, 100); // 增加延时到100ms
+    }
+
+    /**
+     * 重置鼠标事件状态，用于页面切换时清理状态
+     */
+    function resetMouseEventStates() {
+        // 重置所有Agent项目的鼠标事件状态
+        const agentItems = document.querySelectorAll('#agentList li');
+        agentItems.forEach(item => {
+            // 重置每个项目的鼠标事件状态（如果有的话）
+            if (item._lastClickTime !== undefined) {
+                item._lastClickTime = 0;
+            }
+            if (item._middleClickHandled !== undefined) {
+                item._middleClickHandled = false;
+            }
+        });
+        console.log('[ItemListManager] 鼠标事件状态已重置');
+    }
+
+    /**
+     * Finds a loaded item by its ID and type from the cache.
+     * @param {string} itemId - The ID of the item to find.
+     * @param {string} itemType - The type of the item ('agent' or 'group').
+     * @returns {object|null} The found item object or null.
+     */
+    function findItemById(itemId, itemType) {
+        if (!loadedItemsCache || loadedItemsCache.length === 0) {
+            console.warn('[ItemListManager] findItemById called before items were loaded or cache is empty.');
+            return null;
+        }
+        return loadedItemsCache.find(item => item.id === itemId && item.type === itemType) || null;
+    }
+
+    /**
+     * Updates the DOM with unread count badges.
+     * @param {object} counts - An object mapping agentId to its unread count.
+     */
+    /**
+     * Part C: 更新未读徽章显示
+     * @param {object} counts - An object mapping agentId to its unread count.
+     */
+    function updateUnreadBadges(counts) {
+        // 获取当前所有的列表项
+        const listItems = itemListUl.querySelectorAll('li[data-item-type="agent"]');
+
+        listItems.forEach(listItem => {
+            const agentId = listItem.dataset.itemId;
+            const count = counts[agentId];
+            const avatarWrapper = listItem.querySelector('.avatar-wrapper');
+            const existingBadge = listItem.querySelector('.unread-badge');
+
+            // 检查是否需要显示徽章 (count 为数字且 >= 0)
+            if (count !== undefined && (count > 0 || count === 0)) {
+                const displayCount = count > 0 ? count.toString() : '';
+                const isDotOnly = count === 0;
+
+                if (existingBadge) {
+                    // 徽章已存在，检查内容是否变化
+                    const currentCount = existingBadge.textContent;
+                    const currentIsDot = existingBadge.classList.contains('unread-badge-dot-only');
+
+                    if (currentCount !== displayCount || currentIsDot !== isDotOnly) {
+                        // 内容有变化，更新内容并触发动画
+                        existingBadge.textContent = displayCount;
+                        existingBadge.classList.toggle('unread-badge-dot-only', isDotOnly);
+
+                        // 触发徽章更新动画
+                        existingBadge.classList.remove('badge-appear');
+                        void existingBadge.offsetWidth; // 强制重绘
+                        existingBadge.classList.add('badge-appear');
+
+                        // 触发头像动画
+                        const avatarImg = avatarWrapper.querySelector('.avatar');
+                        triggerAvatarAnimation(avatarImg);
+                    }
+                } else {
+                    // 徽章不存在，创建新徽章
+                    if (!avatarWrapper) return;
+
+                    const unreadBadge = document.createElement('span');
+                    unreadBadge.className = 'unread-badge';
+                    if (isDotOnly) {
+                        unreadBadge.classList.add('unread-badge-dot-only');
+                    }
+                    unreadBadge.textContent = displayCount;
+                    unreadBadge.classList.add('badge-appear');
+
+                    avatarWrapper.appendChild(unreadBadge);
+
+                    // 触发头像动画
+                    const avatarImg = avatarWrapper.querySelector('.avatar');
+                    triggerAvatarAnimation(avatarImg);
+                }
+            } else {
+                // 不需要显示徽章，如果存在则移除
+                if (existingBadge) {
+                    existingBadge.remove();
+                }
+            }
+        });
+    }
+
+    /**
+     * Part C: 触发头像缩放动画
+     * @param {HTMLElement} avatarElement - 头像元素
+     */
+    function triggerAvatarAnimation(avatarElement) {
+        if (!avatarElement) return;
+
+        // 移除可能存在的动画类
+        avatarElement.classList.remove('avatar-animate');
+
+        // 强制重绘
+        void avatarElement.offsetWidth;
+
+        // 添加动画类
+        avatarElement.classList.add('avatar-animate');
+
+        // 动画结束后移除类，以便下次可以再次触发
+        setTimeout(() => {
+            avatarElement.classList.remove('avatar-animate');
+        }, 600); // 与动画持续时间一致
+    }
+
+    function updateLoadedItemConfig(itemId, itemType, partialConfig) {
+        if (!itemId || !itemType || !partialConfig || typeof partialConfig !== 'object') {
+            return false;
+        }
+
+        const matchedItem = loadedItemsCache.find(item => item.id === itemId && item.type === itemType);
+        if (!matchedItem) {
+            return false;
+        }
+
+        matchedItem.config = {
+            ...(matchedItem.config || {}),
+            ...partialConfig
+        };
+
+        return true;
+    }
+
+    // --- Public API ---
+    return {
+        init,
+        loadItems,
+        highlightActiveItem,
+        resetMouseEventStates,
+        findItemById, // Expose the new function
+        getLoadedItems: () => [...loadedItemsCache], // 暴露只读快照供消息自愈渲染查表
+        updateLoadedItemConfig,
+        updateUnreadBadges, // Part C: 暴露更新徽章函数供外部调用
+        refreshUnreadCounts,
+        consumeStreamActivityEvent
+    };
+})();

@@ -1,0 +1,95 @@
+/* styles/base.css */
+
+@font-face {
+    font-family: 'Maven Pro ExtraBold'; /* Corrected font name with space */
+    src: url('../assets/font/MavenPro-ExtraBold.ttf') format('truetype'); /* Adjusted path for styles directory */
+    font-weight: 800;
+    font-style: normal;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    margin: 0;
+    padding: 0;
+    color: var(--primary-text);
+    display: flex;
+    flex-direction: column; /* Changed to column to stack title-bar and container */
+    height: 100vh;
+    overflow: hidden;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased; /* 提升字体渲染清晰度 */
+    -moz-osx-font-smoothing: grayscale; /* 提升字体渲染清晰度 (Firefox) */
+    text-rendering: optimizeLegibility; /* 优化文本渲染 */
+
+    /* ADD a new block for background */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed; /* 让背景图固定，滚动时不移动 */
+    background-image: var(--chat-wallpaper-dark); /* 直接使用主题变量 */
+}
+
+body.light-theme .main-content {
+    /* background-image: var(--chat-wallpaper-light); */ /* <-- 移除或注释掉这一行 */
+}
+
+/* =======================================================
+ * 主题切换过渡
+ *
+ * 不要在通配符上声明 transition。明暗主题会改变大量继承变量，
+ * 全树动画会让 Markdown token、SVG path 和伪元素各自创建动画，
+ * 在长会话与磨砂表面上造成明显的样式重算和合成压力。
+ * ======================================================= */
+body,
+.next-ui-navigation-material,
+.next-ui-topbar,
+.next-ui-launchpad,
+.sidebar,
+.next-ui-main-panel,
+.chat-header,
+.chat-messages-container,
+.notifications-sidebar,
+.chat-input-card,
+.modal-content {
+    transition:
+        background-color 180ms ease,
+        color 160ms ease,
+        border-color 180ms ease;
+}
+
+/* 气泡背景与主题字体仍然正常跟随变量；只让明确的语义节点
+ * 执行短颜色过渡，不再递归动画气泡中的每一个后代节点。 */
+.message-item .md-content,
+.message-item .sender-name,
+.message-item .message-timestamp,
+.message-item .md-content :is(
+    h1, h2, h3, h4, h5, h6,
+    a, blockquote, code
+) {
+    transition:
+        color 160ms ease,
+        border-color 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body,
+    .next-ui-navigation-material,
+    .next-ui-topbar,
+    .next-ui-launchpad,
+    .sidebar,
+    .next-ui-main-panel,
+    .chat-header,
+    .chat-messages-container,
+    .notifications-sidebar,
+    .chat-input-card,
+    .modal-content,
+    .message-item .md-content,
+    .message-item .sender-name,
+    .message-item .message-timestamp,
+    .message-item .md-content :is(
+        h1, h2, h3, h4, h5, h6,
+        a, blockquote, code
+    ) {
+        transition: none;
+    }
+}

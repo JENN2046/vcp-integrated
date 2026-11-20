@@ -1,0 +1,696 @@
+/**
+ * uiManager.js
+ *
+ * Manages general UI functionalities like the title bar, resizers, theme, and clock.
+ */
+const uiManager = (() => {
+    // --- Private Variables ---
+    let globalSettingsRef = { get: () => ({}) }; // Reference to global settings
+    let electronAPI = null;
+    const themeChannel = window.VCPStateChannels?.create('theme', Object.freeze({ ready: false, effective: 'light' })) || null;
+
+    // DOM Elements (will be initialized in init)
+    let leftSidebar, rightNotificationsSidebar, resizerLeft, resizerRight, vcpSidePane;
+    let digitalClockElement, dateDisplayElement, notificationTitleElement;
+    let sidebarTabButtons, sidebarTabContents;
+    let lifecycleOwner = null;
+    let settingsManagerCapability = null;
+    let itemListManagerCapability = null;
+    let uiHelperCapability = null;
+    let disposed = false;
+    let generation = 0;
+    const saveSettingPatch = (patch) => electronAPI?.saveSettings?.({
+        __vcpSettingsOps: Object.entries(patch || {}).map(([key, value]) => ({ op: 'set', path: [key], value })),
+    });
+    let themeDisposer = null;
+    const tasks = new Set();
+    const fallbackTimers = new Set();
+    const resizers = new Set();
+    const disposeResizers = () => {
+        for (const resizer of resizers) resizer.dispose();
+        resizers.clear();
+    };
+    const isCurrent = token => !disposed && token === generation;
+    const track = value => {
+        const task = Promise.resolve(value);
+        tasks.add(task);
+        task.finally(() => tasks.delete(task)).catch(() => {});
+        return task;
+    };
+    const scheduleTimeout = (callback, delay) => {
+        if (lifecycleOwner?.timeout) return lifecycleOwner.timeout(callback, delay);
+        const timer = setTimeout(() => {
+            fallbackTimers.delete(timer);
+            if (!disposed) callback();
+        }, delay);
+        fallbackTimers.add(timer);
+        return timer;
+    };
+
+
+    // --- Private Functions ---
+
+    /**
+     * Initializes the resizable sidebars.
+     */
+    function initializeResizers() {
+        disposeResizers();
+        const getWidthConstraints = (element, fallbackMin) => {
+            const computed = getComputedStyle(element);
+            return {
+                min: parseFloat(computed.minWidth) || fallbackMin,
+                max: parseFloat(computed.maxWidth) || 600
+            };
+        };
+        const createResizer = (handle, element, fallbackMin, direction, settingKey, label, beforeBegin) => {
+            if (!handle || !element || !window.VCPSidebarResizer) return null;
+            let dragStyles = null;
+            // A focusable separator, like the side pane's handle, so the keyboard
+            // handler below can actually run.
+            const syncAria = (width) => {
+                const bounds = getWidthConstraints(element, fallbackMin);
+                handle.setAttribute('aria-valuemin', String(Math.round(bounds.min)));
+                handle.setAttribute('aria-valuemax', String(Math.round(bounds.max)));
+                handle.setAttribute('aria-valuenow', String(Math.round(width)));
+            };
+            handle.setAttribute('role', 'separator');
+            handle.setAttribute('aria-orientation', 'vertical');
+            handle.setAttribute('aria-label', label);
+            if (!handle.hasAttribute('tabindex')) handle.setAttribute('tabindex', '0');
+            syncAria(element.getBoundingClientRect().width);
+            const persistWidth = async (width) => {
+                if (disposed) return;
+                const currentSettings = globalSettingsRef.get();
+                const roundedWidth = Math.round(width);
+                if (currentSettings[settingKey] === roundedWidth) return;
+                const nextSettings = { ...currentSettings, [settingKey]: roundedWidth };
+                globalSettingsRef.set(nextSettings);
+                try {
+                    await track(saveSettingPatch({ [settingKey]: roundedWidth }));
+                    console.log('Sidebar width saved to settings.');
+                } catch (error) {
+                    console.error('Failed to save sidebar width:', error);
+                }
+            };
+            // Arrow keys resize at once; the setting is written once the keys
+            // stop (or focus leaves), not once per key press.
+            let keyboardCommit = null;
+            const flushKeyboardCommit = () => {
+                if (!keyboardCommit) return;
+                const { timer, width } = keyboardCommit;
+                keyboardCommit = null;
+                clearTimeout(timer);
+                void persistWidth(width);
+            };
+            const resizer = window.VCPSidebarResizer.create({
+                handle,
+                getValue: () => element.getBoundingClientRect().width,
+                getBounds: () => getWidthConstraints(element, fallbackMin),
+                applyValue: (width) => {
+                    element.style.width = `${width}px`;
+                    syncAria(width);
+                },
+                direction,
+                step: 20,
+                beforeBegin,
+                onActiveChange: (active) => {
+                    if (active) {
+                        const body = document.body;
+                        dragStyles = {
+                            body,
+                            resizing: body.classList.contains('vcp-sidebar-resizing'),
+                            declarations: [[body.style, 'cursor'], [body.style, 'user-select'], [element.style, 'transition']]
+                                .map(([style, property]) => [style, property, style.getPropertyValue(property), style.getPropertyPriority(property)])
+                        };
+                        body.style.cursor = 'col-resize';
+                        body.style.userSelect = 'none';
+                        body.classList.add('vcp-sidebar-resizing');
+                        element.style.transition = 'none';
+                    } else if (dragStyles) {
+                        for (const [style, property, value, priority] of dragStyles.declarations) {
+                            if (value) style.setProperty(property, value, priority);
+                            else style.removeProperty(property);
+                        }
+                        dragStyles.body.classList.toggle('vcp-sidebar-resizing', dragStyles.resizing);
+                        dragStyles = null;
+                    }
+                },
+                onCommit: (width, event) => {
+                    if (event?.type !== 'keydown') {
+                        if (keyboardCommit) {
+                            clearTimeout(keyboardCommit.timer);
+                            keyboardCommit = null;
+                        }
+                        void persistWidth(width);
+                        return;
+                    }
+                    if (keyboardCommit) clearTimeout(keyboardCommit.timer);
+                    keyboardCommit = { width, timer: setTimeout(flushKeyboardCommit, 400) };
+                },
+            });
+            handle.addEventListener('blur', flushKeyboardCommit);
+            const owner = {
+                dispose() {
+                    flushKeyboardCommit();
+                    handle.removeEventListener('blur', flushKeyboardCommit);
+                    resizer.dispose();
+                }
+            };
+            resizers.add(owner);
+            return owner;
+        };
+
+        createResizer(resizerLeft, leftSidebar, 180, 1, 'sidebarWidth', '调节左侧栏宽度');
+        if (!vcpSidePane && resizerRight && rightNotificationsSidebar) {
+            createResizer(resizerRight, rightNotificationsSidebar, 220, -1, 'notificationsSidebarWidth', '调节通知栏宽度', (event, resume) => {
+                if (rightNotificationsSidebar.classList.contains('active')) return true;
+                electronAPI?.sendToggleNotificationsSidebar?.();
+                requestAnimationFrame(resume);
+                return false;
+            });
+        }
+    }
+
+    /**
+     * Applies the specified theme (light/dark) to the document body and updates the toggle button.
+     * @param {string} theme - The theme to apply ('light' or 'dark').
+     */
+    function applyTheme(theme) {
+        if (disposed) return false;
+        if (!theme || (theme !== 'light' && theme !== 'dark')) {
+            console.warn(`[UIManager] Invalid theme specified: ${theme}. Defaulting to system or light.`);
+            // As a fallback, we'll default to light, but the initial theme should come from the main process.
+            theme = 'light';
+        }
+
+        const body = document.body;
+        if (!body) return false;
+
+        const shouldUseLight = theme === 'light';
+        const domAlreadyApplied = body.classList.contains('light-theme') === shouldUseLight
+            && body.classList.contains('dark-theme') !== shouldUseLight;
+        const channelState = themeChannel?.get();
+        const channelAlreadyApplied = channelState?.ready === true
+            && channelState.effective === theme;
+
+        const root = document.documentElement;
+        const rootNeedsSync = Boolean(
+            root && (
+                root.classList.contains('light-theme') !== shouldUseLight
+                || root.classList.contains('dark-theme') === shouldUseLight
+                || root.dataset.vcpTheme !== theme
+            )
+        );
+
+        // setThemeMode() performs an optimistic renderer-side update and the main
+        // process broadcasts the persisted value afterwards. Keep this operation
+        // idempotent so that the echo cannot invalidate and repaint the whole tree.
+        if (domAlreadyApplied && channelAlreadyApplied && !rootNeedsSync) {
+            return false;
+        }
+
+        // Express the final state directly. Removing both classes before adding the
+        // target class creates an avoidable unthemed intermediate style state.
+        if (!domAlreadyApplied) {
+            body.classList.toggle('light-theme', shouldUseLight);
+            body.classList.toggle('dark-theme', !shouldUseLight);
+        }
+        // Theme selectors and the UI-system token contract both consume this
+        // attribute. Keep it in lockstep with the legacy classes so a theme
+        // update cannot leave Web Awesome scopes resolving the previous
+        // palette while the document visually reports the new mode.
+        if (body.dataset.vcpTheme !== theme) body.dataset.vcpTheme = theme;
+
+        if (root) {
+            root.classList.toggle('light-theme', shouldUseLight);
+            root.classList.toggle('dark-theme', !shouldUseLight);
+            if (root.dataset.vcpTheme !== theme) root.dataset.vcpTheme = theme;
+        }
+
+        if (!channelAlreadyApplied) {
+            themeChannel?.publish(
+                Object.freeze({ ready: true, effective: theme }),
+                { source: 'ui-manager' }
+            );
+        }
+
+        console.log(`[UIManager] Theme applied: ${theme}`);
+        return true;
+    }
+
+    /**
+     * Initializes theme handling by getting the current theme and listening for updates.
+     */
+    async function initializeTheme(token) {
+        // Listen for theme updates broadcast from the main process
+        if (electronAPI && electronAPI.onThemeUpdated) {
+            themeDisposer?.();
+            themeDisposer = electronAPI.onThemeUpdated((theme) => {
+                if (!isCurrent(token)) return;
+                const themeName = typeof theme === 'object' && theme !== null ? theme.theme : theme;
+                if (themeName) {
+                    applyTheme(themeName);
+                }
+            });
+        }
+
+        // Apply the initial theme based on the settings loaded in the renderer process.
+        // This ensures the UI matches the settings file immediately on load.
+        const settings = globalSettingsRef.get();
+        if (settings && settings.currentThemeMode && electronAPI.setTheme) {
+            console.log(`[UIManager] Applying initial theme from settings: ${settings.currentThemeMode}`);
+            // We tell the main process to set the theme. The onThemeUpdated listener
+            // above will then catch the broadcast and call applyTheme(), ensuring a single
+            // consistent flow for all theme changes.
+            electronAPI.setTheme(settings.currentThemeMode);
+        } else {
+            // Fallback if the setting is not present for some reason.
+            console.warn('[UIManager] currentThemeMode not found in settings, falling back to requesting from main process.');
+            if (electronAPI && electronAPI.getCurrentTheme) {
+                try {
+                    const currentTheme = await electronAPI.getCurrentTheme();
+                    if (!isCurrent(token)) return false;
+                    applyTheme(currentTheme);
+                } catch (error) {
+                    console.error('[UIManager] Fallback failed to get initial theme:', error);
+                    applyTheme('light'); // Final fallback
+                }
+            }
+        }
+    }
+
+    /**
+     * Updates the digital clock and date display.
+     */
+    function updateDateTimeDisplay() {
+        const now = new Date();
+        if (digitalClockElement) {
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            if (!digitalClockElement.querySelector('.colon')) {
+                digitalClockElement.innerHTML = `<span class="hours">${hours}</span><span class="colon">:</span><span class="minutes">${minutes}</span>`;
+            } else {
+                const hoursSpan = digitalClockElement.querySelector('.hours');
+                const minutesSpan = digitalClockElement.querySelector('.minutes');
+                if (hoursSpan) hoursSpan.textContent = hours;
+                if (minutesSpan) minutesSpan.textContent = minutes;
+            }
+        }
+        if (dateDisplayElement) {
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const dayOfWeek = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()];
+            dateDisplayElement.textContent = `${month}-${day} ${dayOfWeek}`;
+        }
+    }
+
+    /**
+     * Initializes the digital clock display.
+     */
+    function initializeDigitalClock() {
+        if (digitalClockElement && notificationTitleElement && dateDisplayElement) {
+            notificationTitleElement.style.display = 'none';
+            updateDateTimeDisplay();
+            // 每分钟更新一次时间显示，减少不必要的每秒刷新
+            const scheduleClock = () => {
+                updateDateTimeDisplay();
+                scheduleTimeout(scheduleClock, 60000);
+            };
+            scheduleTimeout(scheduleClock, 60000);
+        } else {
+            console.error('Digital clock, notification title, or date display element not found.');
+        }
+    }
+
+    /**
+     * Sets up the sidebar tabs functionality.
+     */
+    function setupSidebarTabs() {
+        if (sidebarTabButtons) {
+            const tabIdsByName = {
+                agents: 'sidebarTabAgents',
+                topics: 'sidebarTabTopics',
+                settings: 'sidebarTabSettings'
+            };
+
+            sidebarTabButtons.forEach(button => {
+                const targetTab = button.dataset.tab;
+                const panelId = `tabContent${targetTab.charAt(0).toUpperCase() + targetTab.slice(1)}`;
+                const tabId = tabIdsByName[targetTab] || `sidebarTab${targetTab.charAt(0).toUpperCase() + targetTab.slice(1)}`;
+
+                button.id = button.id || tabId;
+                button.setAttribute('role', 'tab');
+                button.setAttribute('aria-controls', panelId);
+
+                const panel = document.getElementById(panelId);
+                if (panel) {
+                    panel.setAttribute('aria-labelledby', button.id);
+                }
+                // 左键点击 - 切换标签
+                button.addEventListener('click', () => {
+                    switchToTab(button.dataset.tab);
+                });
+
+                button.addEventListener('keydown', (e) => {
+                    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+
+                    e.preventDefault();
+
+                    const buttons = Array.from(sidebarTabButtons);
+                    const currentIndex = buttons.indexOf(button);
+                    let nextIndex = currentIndex;
+
+                    if (e.key === 'ArrowRight') {
+                        nextIndex = (currentIndex + 1) % buttons.length;
+                    } else if (e.key === 'ArrowLeft') {
+                        nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+                    } else if (e.key === 'Home') {
+                        nextIndex = 0;
+                    } else if (e.key === 'End') {
+                        nextIndex = buttons.length - 1;
+                    }
+
+                    const nextButton = buttons[nextIndex];
+                    if (!nextButton) return;
+
+                    switchToTab(nextButton.dataset.tab);
+                    nextButton.focus();
+                });
+
+                // 中键点击 - 如果是设置标签，直接打开全局设置
+                button.addEventListener('mousedown', (e) => {
+                    if (e.button === 1 && button.dataset.tab === 'settings') {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        // 打开全局设置模态框
+                        if ((uiHelperCapability || window.uiHelperFunctions)?.openModal) {
+                            console.log('[UIManager] Middle click on settings tab - opening global settings modal');
+                            (uiHelperCapability || window.uiHelperFunctions).openModal('globalSettingsModal');
+                        } else {
+                            console.warn('[UIManager] uiHelperFunctions.openModal not available');
+                        }
+                    }
+                });
+            });
+            // Default to 'agents' tab (or your preferred default)
+            switchToTab('agents');
+        }
+    }
+
+    /**
+     * Initializes the compact sidebar hover menu and topic drawer.
+     */
+    function setupCompactSidebarNavigation() {
+        if (!leftSidebar) return;
+
+        const navigation = leftSidebar.querySelector('.sidebar-compact-navigation');
+        const trigger = navigation?.querySelector('.sidebar-compact-trigger');
+        const menu = navigation?.querySelector('.sidebar-compact-menu');
+        const compactItems = navigation?.querySelectorAll('.sidebar-compact-menu-item');
+        const topicsPanel = document.getElementById('tabContentTopics');
+        const topicList = document.getElementById('topicList');
+        if (!navigation || !trigger || !menu || !compactItems?.length || !topicsPanel) return;
+
+        let closeMenuTimer = null;
+
+        const setCompactMenuOpen = (open) => {
+            if (closeMenuTimer) {
+                clearTimeout(closeMenuTimer);
+                closeMenuTimer = null;
+            }
+            navigation.classList.toggle('menu-open', open);
+            trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+        };
+
+        const scheduleCompactMenuClose = () => {
+            if (closeMenuTimer) clearTimeout(closeMenuTimer);
+            closeMenuTimer = scheduleTimeout(() => setCompactMenuOpen(false), 200);
+        };
+
+        const closeTopicDrawer = () => {
+            leftSidebar.classList.remove('compact-topics-open');
+            topicsPanel.classList.remove('compact-drawer-open');
+            topicsPanel.setAttribute('aria-hidden', 'true');
+            compactItems.forEach(item => {
+                item.classList.toggle('active', item.dataset.compactAction === 'agents');
+            });
+        };
+
+        const openTopicDrawer = () => {
+            if (!leftSidebar.classList.contains('avatar-only')) return;
+
+            leftSidebar.classList.add('compact-topics-open');
+            topicsPanel.classList.add('compact-drawer-open');
+            topicsPanel.setAttribute('aria-hidden', 'false');
+            compactItems.forEach(item => {
+                item.classList.toggle('active', item.dataset.compactAction === 'topics');
+            });
+
+            window.topicListManager?.loadTopicList?.();
+            window.topicListManager?.setupTopicSearch?.();
+            refreshUnreadCounts();
+            setCompactMenuOpen(false);
+        };
+
+        navigation.addEventListener('mouseenter', () => setCompactMenuOpen(true));
+        navigation.addEventListener('mouseleave', scheduleCompactMenuClose);
+        trigger.addEventListener('focus', () => setCompactMenuOpen(true));
+        navigation.addEventListener('focusout', (event) => {
+            if (!navigation.contains(event.relatedTarget)) scheduleCompactMenuClose();
+        });
+
+        document.addEventListener('compact-sidebar-open-topics', () => {
+            if (!leftSidebar.classList.contains('avatar-only')) return;
+            openTopicDrawer();
+        });
+
+        compactItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const action = item.dataset.compactAction;
+                if (action === 'agents') {
+                    closeTopicDrawer();
+                    setCompactMenuOpen(false);
+                    return;
+                }
+
+                if (action === 'topics') {
+                    if (leftSidebar.classList.contains('compact-topics-open')) {
+                        closeTopicDrawer();
+                    } else {
+                        openTopicDrawer();
+                    }
+                    return;
+                }
+
+                if (action === 'settings') {
+                    closeTopicDrawer();
+                    leftSidebar.classList.remove('avatar-only');
+                    const settings = { ...globalSettingsRef.get(), sidebarAvatarOnly: false };
+                    globalSettingsRef.set(settings);
+                    saveSettingPatch({ sidebarAvatarOnly: false })?.catch(error => {
+                        console.error('[UIManager] Failed to save compact sidebar state:', error);
+                    });
+                    switchToTab('settings');
+                }
+            });
+        });
+
+        topicList?.addEventListener('click', (event) => {
+            if (leftSidebar.classList.contains('compact-topics-open') && event.target.closest('.topic-item')) {
+                closeTopicDrawer();
+            }
+        });
+
+        document.addEventListener('pointerdown', (event) => {
+            if (!leftSidebar.classList.contains('compact-topics-open')) return;
+            if (topicsPanel.contains(event.target) || navigation.contains(event.target)) return;
+            closeTopicDrawer();
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && leftSidebar.classList.contains('compact-topics-open')) {
+                closeTopicDrawer();
+                trigger.focus();
+            }
+        });
+
+        leftSidebar.addEventListener('transitionend', () => {
+            if (!leftSidebar.classList.contains('avatar-only')) {
+                closeTopicDrawer();
+                setCompactMenuOpen(false);
+            }
+        });
+    }
+
+    /**
+     * Switches to the specified tab.
+     * @param {string} targetTab - The tab to switch to.
+     */
+    function switchToTab(targetTab) {
+        // “仅头像”是助手列表专属布局；进入话题或设置时恢复完整侧栏。
+        if (targetTab !== 'agents' && leftSidebar?.classList.contains('avatar-only')) {
+            leftSidebar.classList.remove('avatar-only');
+            const settings = { ...globalSettingsRef.get(), sidebarAvatarOnly: false };
+            globalSettingsRef.set(settings);
+            saveSettingPatch({ sidebarAvatarOnly: false })?.catch(error => {
+                console.error('[UIManager] Failed to save avatar-only sidebar state:', error);
+            });
+        }
+
+        // Settings is an owned surface. Leaving the tab physically detaches
+        // its form from the sidebar, so sticky actions and focusable controls
+        // cannot overlap or intercept the Agent list.
+        if (targetTab !== 'settings') {
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl.closest?.('#agentSettingsForm, #groupSettingsForm')) {
+                try { activeEl.blur(); } catch (_) {}
+            }
+            if (window.settingsManager?.flushPendingSave) {
+                window.settingsManager.flushPendingSave().catch(e => {
+                    console.warn('[UIManager] Error flushing settings before tab switch:', e);
+                });
+            }
+        }
+        window.VCPSettingsSidebar?.setPanelActive?.(targetTab === 'settings');
+
+        if (sidebarTabButtons) {
+            sidebarTabButtons.forEach(btn => {
+                const isActive = btn.dataset.tab === targetTab;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                btn.tabIndex = isActive ? 0 : -1;
+            });
+        }
+        if (sidebarTabContents) {
+            sidebarTabContents.forEach(content => {
+                const isActive = content.id === `tabContent${targetTab.charAt(0).toUpperCase() + targetTab.slice(1)}`;
+                content.classList.toggle('active', isActive);
+                content.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+                if (isActive) {
+                    if (targetTab === 'topics') {
+                        if (window.topicListManager) {
+                            window.topicListManager.loadTopicList(); // This might create/re-render the topic list and search input
+                            window.topicListManager.setupTopicSearch(); // Explicitly set up search listeners after the tab is active and list loaded
+                        }
+                        // 刷新计数
+                        refreshUnreadCounts();
+                    } else if (targetTab === 'settings') {
+                        if (settingsManagerCapability || window.settingsManager) {
+                            // 检查是否有待刷新的 Agent
+                            const pendingAgentId = sessionStorage.getItem('pendingAgentReload');
+                            if (pendingAgentId) {
+                                console.log('[UIManager] Detected pending agent reload, reloading:', pendingAgentId);
+                                sessionStorage.removeItem('pendingAgentReload');
+                                // 延迟执行以确保标签页切换完成
+                                const reload = () => {
+                                    if (disposed) return;
+                                    if ((settingsManagerCapability || window.settingsManager)?.reloadAgentSettings) {
+                                        track((settingsManagerCapability || window.settingsManager).reloadAgentSettings(pendingAgentId));
+                                    }
+                                };
+                                scheduleTimeout(reload, 50);
+                            } else {
+                                (settingsManagerCapability || window.settingsManager)?.displaySettingsForItem?.();
+                            }
+                        }
+                    } else if (targetTab === 'agents') { // Assuming 'agents' is the ID for the items list tab content
+                        // 重置鼠标事件状态，确保双击功能正常工作
+                        if ((itemListManagerCapability || window.itemListManager)?.resetMouseEventStates) {
+                            (itemListManagerCapability || window.itemListManager).resetMouseEventStates();
+                        }
+                        // 刷新计数
+                        refreshUnreadCounts();
+                        // The items list (agents & groups) is always visible in a way,
+                        // but this ensures other tab contents are hidden.
+                        // loadItems() is usually called on init or after create/delete.
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * 刷新未读计数
+     */
+    async function refreshUnreadCounts() {
+        const token = generation;
+        if (!isCurrent(token)) return;
+        try {
+            const manager = itemListManagerCapability || window.itemListManager;
+            await manager?.refreshUnreadCounts?.({ isCurrent: () => isCurrent(token) });
+        } catch (error) {
+            console.error('[UIManager][refreshUnreadCounts] Error:', error);
+        }
+    }
+
+
+    // --- Public API ---
+    return {
+        init: async (options) => {
+            if (disposed) throw new Error('UIManager has been disposed');
+            const token = ++generation;
+            electronAPI = options.electronAPI;
+            globalSettingsRef = options.refs.globalSettingsRef;
+            lifecycleOwner = options.listenerOwner || null;
+            settingsManagerCapability = options.settingsManager || null;
+            itemListManagerCapability = options.itemListManager || null;
+            uiHelperCapability = options.uiHelper || null;
+
+            // Assign DOM elements from options.elements
+            leftSidebar = options.elements.leftSidebar;
+            rightNotificationsSidebar = options.elements.rightNotificationsSidebar;
+            vcpSidePane = options.elements.vcpSidePane || null;
+            resizerLeft = options.elements.resizerLeft;
+            resizerRight = options.elements.resizerRight;
+            digitalClockElement = options.elements.digitalClockElement;
+            dateDisplayElement = options.elements.dateDisplayElement;
+            notificationTitleElement = options.elements.notificationTitleElement;
+            sidebarTabButtons = options.elements.sidebarTabButtons;
+            sidebarTabContents = options.elements.sidebarTabContents;
+
+            // Initialize all features
+            const releaseCapturedListeners = lifecycleOwner?.capture?.() || (() => {});
+            try {
+                initializeResizers();
+                await track(initializeTheme(token)); // Replaces loadAndApplyThemePreference
+                if (!isCurrent(token)) return false;
+                initializeDigitalClock();
+                setupSidebarTabs();
+                setupCompactSidebarNavigation();
+                if (!document.querySelector('.sidebar-tab-button.active[data-tab="settings"]')) {
+                    window.VCPSettingsSidebar?.setPanelActive?.(false);
+                }
+            } finally {
+                releaseCapturedListeners();
+            }
+
+            console.log('uiManager initialized.');
+        },
+        applyTheme: applyTheme, // Expose applyTheme if needed externally
+        getThemeState: () => themeChannel?.get() || Object.freeze({ ready: true, effective: document.body.classList.contains('dark-theme') ? 'dark' : 'light' }),
+        subscribeTheme: (listener, options) => themeChannel?.subscribe(listener, options) || (() => false),
+        switchToTab: switchToTab // Expose switchToTab for external use
+        ,dispose: async () => {
+            if (disposed) return;
+            disposed = true;
+            generation += 1;
+            disposeResizers();
+            themeDisposer?.();
+            themeDisposer = null;
+            for (const timer of fallbackTimers) clearTimeout(timer);
+            fallbackTimers.clear();
+            await Promise.allSettled([...tasks]);
+            lifecycleOwner = null;
+            settingsManagerCapability = null;
+            itemListManagerCapability = null;
+            uiHelperCapability = null;
+            leftSidebar = rightNotificationsSidebar = resizerLeft = resizerRight = vcpSidePane = null;
+            digitalClockElement = dateDisplayElement = notificationTitleElement = null;
+            sidebarTabButtons = sidebarTabContents = null;
+        }
+    };
+})();
+
+// Expose to window
+window.uiManager = uiManager;

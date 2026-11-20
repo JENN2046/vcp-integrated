@@ -1,0 +1,136 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
+const fs = require('node:fs');
+const Module = require('node:module');
+const {
+    MAX_DETACH_COORDINATE,
+    normalizeEmbeddedAction,
+    normalizeDetachPoint,
+} = require('../modules/services/embeddedAppSessionManager.js');
+
+test('embedded actions are restricted to the local application allowlist', () => {
+    assert.equal(normalizeEmbeddedAction('open-notes-window'), 'open-notes-window');
+    assert.equal(normalizeEmbeddedAction(null, { optional: true }), null);
+    assert.throws(() => normalizeEmbeddedAction('open-arbitrary-window'), /无效/);
+    assert.throws(() => normalizeEmbeddedAction({ action: 'open-notes-window' }), /无效/);
+});
+
+test('detach coordinates are finite, rounded and bounded', () => {
+    assert.deepEqual(normalizeDetachPoint({ x: 10.4, y: -20.6 }), { x: 10, y: -21 });
+    assert.equal(normalizeDetachPoint({ x: Infinity, y: 0 }), null);
+    assert.equal(normalizeDetachPoint({ x: MAX_DETACH_COORDINATE + 1, y: 0 }), null);
+    assert.equal(normalizeDetachPoint(null), null);
+});
+
+test('embedded sessions keep child presentation policy independent from main settings', () => {
+    const source = fs.readFileSync(require.resolve('../modules/services/embeddedAppSessionManager.js'), 'utf8');
+    assert.doesNotMatch(source, /settings-updated|ui-mode-updated/,
+        'canonical main settings must not change the presentation of existing child sessions');
+    assert.match(source, /const uiMode = 'classic'/,
+        'unmigrated embedded business pages must keep their explicit Classic policy');
+});
+
+test('embedded session manager bounds its view pool and preserves the active native view', async () => {
+    const originalLoad = Module._load;
+    const nativeCalls = [];
+    class FakeWebContents extends EventEmitter {
+        constructor() { super(); this.destroyed = false; }
+        isDestroyed() { return this.destroyed; }
+        isCrashed() { return false; }
+        setWindowOpenHandler() {}
+        async loadURL(url) { this.url = url; }
+        getURL() { return this.url || ''; }
+        send() {}
+        close() { this.destroyed = true; queueMicrotask(() => this.emit('destroyed')); }
+        stop() {}
+    }
+    class FakeView {
+        static instances = [];
+        constructor() { this.webContents = new FakeWebContents(); this.visible = false; FakeView.instances.push(this); }
+        setBackgroundColor() {}
+        setVisible(value) { this.visible = value; nativeCalls.push(['visible', this, value]); }
+        setBounds(bounds) { this.bounds = { ...bounds }; }
+    }
+    Module._load = function loadWithElectronMock(request, parent, isMain) {
+        if (request === 'electron') return {
+            WebContentsView: FakeView,
+            app: { getAppPath: () => process.cwd() },
+            shell: { openExternal: async () => {} },
+            screen: { getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1200, height: 900 } }) },
+        };
+        return originalLoad.call(this, request, parent, isMain);
+    };
+    const modulePath = require.resolve('../modules/services/embeddedAppSessionManager.js');
+    delete require.cache[modulePath];
+    let manager;
+    let mainWindow;
+    try {
+        let contentBounds = { width: 1200, height: 900 };
+        mainWindow = new EventEmitter();
+        mainWindow.isDestroyed = () => false;
+        mainWindow.getContentBounds = () => ({ ...contentBounds });
+        mainWindow.webContents = new FakeWebContents();
+        mainWindow.webContents.getZoomFactor = () => 1.25;
+        mainWindow.contentView = {
+            addChildView(view) { nativeCalls.push(['add', view]); },
+            removeChildView(view) { nativeCalls.push(['remove', view]); },
+        };
+        const { createEmbeddedAppSessionManager, MAX_EMBEDDED_SESSIONS } = require(modulePath);
+        const powerMonitor = new EventEmitter();
+        manager = createEmbeddedAppSessionManager({
+            mainWindow,
+            powerMonitor,
+            launchStandalone: async () => ({ success: true }),
+        });
+        const actions = [
+            'open-notes-window', 'open-note-mini-window', 'open-translator-window',
+            'open-memo-window', 'open-forum-window', 'open-log-window',
+            'open-themes-window',
+        ];
+        for (const action of actions.slice(0, MAX_EMBEDDED_SESSIONS)) {
+            assert.equal((await manager.create(action)).success, true);
+        }
+        const localView = FakeView.instances[0].webContents;
+        let blocked = false;
+        localView.emit('will-navigate', { preventDefault() { blocked = true; } }, 'https://example.invalid/');
+        assert.equal(blocked, true, 'local utility bridge stays with its application document');
+        blocked = false;
+        localView.emit('will-navigate', { preventDefault() { blocked = true; } }, localView.getURL() + '#section');
+        assert.equal(blocked, false, 'same-document fragments keep working');
+        const overflow = await manager.create(actions[MAX_EMBEDDED_SESSIONS]);
+        assert.equal(overflow.success, false);
+        assert.match(overflow.error, /最多同时打开/);
+        assert.equal((await manager.create(actions[0])).reused, true);
+        assert.equal(manager.activate(actions[0]).success, true);
+        assert.equal(FakeView.instances[0].visible, true);
+        nativeCalls.length = 0;
+        assert.equal(manager.activate(actions[0]).success, true);
+        assert.deepEqual(nativeCalls.filter(([, view]) => view === FakeView.instances[0]), [
+            ['visible', FakeView.instances[0], true],
+        ], 'repeated activation must neither hide nor detach/re-add the target view');
+        assert.ok(FakeView.instances.slice(1).every(view => view.visible === false));
+        nativeCalls.length = 0;
+        assert.equal(manager.activate(actions[1]).success, true);
+        assert.equal(FakeView.instances[0].visible, false);
+        assert.deepEqual(nativeCalls.filter(([, view]) => view === FakeView.instances[1]), [
+            ['add', FakeView.instances[1]],
+            ['visible', FakeView.instances[1], true],
+        ], 'switching sessions must reorder the existing child without detaching it (Linux/Electron 44 stops painting reattached views)');
+        assert.equal(manager.activate(actions[0]).success, true);
+        assert.equal(manager.setBounds(actions[0], { x: 0, y: 35.2, width: 960, height: 684.8 }).success, true);
+        assert.deepEqual(FakeView.instances[0].bounds, { x: 0, y: 44, width: 1200, height: 856 });
+        contentBounds = { width: 1600, height: 1000 };
+        mainWindow.emit('resize');
+        assert.deepEqual(FakeView.instances[0].bounds, { x: 0, y: 44, width: 1600, height: 956 });
+        powerMonitor.emit('suspend');
+        assert.equal(FakeView.instances[0].visible, false);
+        powerMonitor.emit('resume');
+        assert.equal(FakeView.instances[0].visible, true);
+    } finally {
+        mainWindow?.emit('closed');
+        await manager?.closeAll();
+        Module._load = originalLoad;
+        delete require.cache[modulePath];
+    }
+});

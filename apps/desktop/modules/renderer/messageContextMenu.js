@@ -1,0 +1,1324 @@
+// modules/renderer/messageContextMenu.js
+import { effectiveContextHistory, isContextCheckpoint } from '../chat/contextCompactionState.js';
+import { assembleRequestMessages } from '../chat/chatContextPipeline.js';
+
+/** Creates one context-menu state owner for one MessageRenderer instance. */
+export function createMessageContextMenu() {
+let mainRefs = {};
+let contextMenuDependencies = {};
+let ownerDocument = null;
+let ownerWindow = null;
+
+async function cancelOwnedStream(messageId, reason) {
+    const outcome = await contextMenuDependencies.cancelStream?.(messageId, reason);
+    if (!outcome) {
+        contextMenuDependencies.discardStreamingMessage?.(messageId);
+        await contextMenuDependencies.removeMessageById?.(messageId, true);
+    }
+    return outcome;
+}
+
+/**
+ * Initializes the context menu module with necessary references and dependencies.
+ * @param {object} refs - Core references (electronAPI, uiHelper, etc.).
+ * @param {object} dependencies - Functions from other modules (e.g., from messageRenderer).
+ */
+function initializeContextMenu(refs, dependencies) {
+    ownerDocument?.removeEventListener('click', closeContextMenuOnClickOutside, true);
+    mainRefs = refs;
+    contextMenuDependencies = dependencies;
+    ownerDocument = refs.chatMessagesDiv?.ownerDocument || document;
+    ownerWindow = ownerDocument.defaultView || window;
+
+    // 防止重复初始化时叠加全局点击监听，造成右键菜单关闭逻辑重复触发
+    ownerDocument.addEventListener('click', closeContextMenuOnClickOutside, true);
+}
+
+function closeContextMenu() {
+    const existingMenu = ownerDocument?.getElementById('chatContextMenu');
+    if (existingMenu) {
+        existingMenu.remove();
+    }
+}
+
+// Separate closer for topic context menu to avoid interference
+function closeTopicContextMenu() {
+    const existingMenu = ownerDocument?.getElementById('topicContextMenu');
+    if (existingMenu) existingMenu.remove();
+}
+
+function closeContextMenuOnClickOutside(event) {
+    const menu = ownerDocument?.getElementById('chatContextMenu');
+    if (menu && !menu.contains(event.target)) {
+        closeContextMenu();
+    }
+    const topicMenu = ownerDocument?.getElementById('topicContextMenu');
+    if (topicMenu && !topicMenu.contains(event.target)) {
+        closeTopicContextMenu();
+    }
+}
+
+function showContextMenu(event, messageItem, message) {
+    closeContextMenu();
+    closeTopicContextMenu();
+
+    const { electronAPI, uiHelper } = mainRefs;
+    const currentChatHistoryArray = mainRefs.currentChatHistoryRef.get();
+    const currentSelectedItemVal = mainRefs.currentSelectedItemRef.get();
+    const currentTopicIdVal = mainRefs.currentTopicIdRef.get();
+
+    const menu = ownerDocument.createElement('div');
+    menu.id = 'chatContextMenu';
+    menu.classList.add('context-menu');
+
+    const activeSel = ownerWindow?.getSelection ? ownerWindow.getSelection() : null;
+    let selectedTextSnapshot = '';
+    if (activeSel && !activeSel.isCollapsed && activeSel.rangeCount > 0) {
+        try {
+            const range = activeSel.getRangeAt(0);
+            if (messageItem.contains(range.commonAncestorContainer) || messageItem.contains(range.startContainer)) {
+                selectedTextSnapshot = activeSel.toString().trim();
+            }
+        } catch {
+            // ignore range errors
+        }
+    }
+
+    const isThinkingOrStreaming = message.isThinking || messageItem.classList.contains('streaming');
+    const isError = message.finishReason === 'error';
+
+    const createInterruptGroupQueueOption = () => {
+        if (currentSelectedItemVal.type !== 'group') return null;
+        const interruptGroupQueueOption = ownerDocument.createElement('div');
+        interruptGroupQueueOption.classList.add('context-menu-item', 'danger-item');
+        interruptGroupQueueOption.innerHTML = `<i class="fas fa-stop"></i> 中止群聊`;
+        interruptGroupQueueOption.onclick = async () => {
+            closeContextMenu();
+
+            if (!currentSelectedItemVal.id || !currentTopicIdVal) {
+                uiHelper.showToastNotification('无法中止群聊队列：群组或话题上下文不完整。', 'error');
+                return;
+            }
+
+            if (typeof ownerWindow.GroupRenderer?.interruptGroupChatQueue === 'function') {
+                await ownerWindow.GroupRenderer.interruptGroupChatQueue(
+                    currentSelectedItemVal.id,
+                    currentTopicIdVal
+                );
+                return;
+            }
+
+            if (typeof electronAPI?.interruptGroupChatQueue === 'function') {
+                const result = await electronAPI.interruptGroupChatQueue(
+                    currentSelectedItemVal.id,
+                    currentTopicIdVal
+                );
+                uiHelper.showToastNotification(
+                    result?.success
+                        ? '已中止群聊队列。'
+                        : `中止群聊队列失败：${result?.error || '未知错误'}`,
+                    result?.success ? 'success' : 'error'
+                );
+                return;
+            }
+
+            uiHelper.showToastNotification('无法中止群聊队列：接口不可用。', 'error');
+        };
+        return interruptGroupQueueOption;
+    };
+
+    if (isThinkingOrStreaming) {
+        const interruptOption = ownerDocument.createElement('div');
+        interruptOption.classList.add('context-menu-item', 'danger-item');
+        interruptOption.innerHTML = `<i class="fas fa-stop-circle"></i> 中止回复`;
+        interruptOption.onclick = async () => {
+            closeContextMenu();
+            const { electronAPI, uiHelper } = mainRefs;
+            const activeMessageId = message.id;
+
+            if (!activeMessageId) return;
+
+            if (message.isGroupMessage) {
+                // --- 群聊中止逻辑 ---
+                console.log(`[ContextMenu] Attempting to interrupt GROUP message: ${activeMessageId}`);
+                if (electronAPI && typeof electronAPI.interruptGroupRequest === 'function') {
+                    const result = await electronAPI.interruptGroupRequest(activeMessageId);
+                    if (result.success) {
+                        uiHelper.showToastNotification("已发送群聊中止信号。", "success");
+                    } else {
+                        uiHelper.showToastNotification(`群聊中止失败: ${result.error}`, "error");
+                        // 作为后备，在前端直接停止渲染
+                        await cancelOwnedStream(activeMessageId, result.error || 'group-interrupt-failed');
+                    }
+                } else {
+                    console.error("[ContextMenu] electronAPI.interruptGroupRequest is not available.");
+                    uiHelper.showToastNotification("无法发送群聊中止信号 (API不存在)。", "error");
+                }
+            } else {
+                // --- 普通单聊中止逻辑 ---
+                console.log(`[ContextMenu] Attempting to interrupt AGENT message: ${activeMessageId}`);
+                if (contextMenuDependencies.interruptHandler && typeof contextMenuDependencies.interruptHandler.interrupt === 'function') {
+                    const result = await contextMenuDependencies.interruptHandler.interrupt(activeMessageId);
+                    if (result.success) {
+                        uiHelper.showToastNotification("已发送中止信号。", "success");
+                    } else {
+                        console.warn(`[ContextMenu] Interrupt failed: ${result.error}`);
+                        uiHelper.showToastNotification(`中止失败: ${result.error}`, "error");
+
+                        // 中止失败时手动finalize消息
+                        await cancelOwnedStream(activeMessageId, result.error || 'agent-interrupt-failed');
+
+                        // Flowlock 不在此处直接恢复。中止/错误后的重试由对应 Agent Session
+                        // 基于 messageId/context 的最终事件统一调度，避免读取其他 Agent 的输入框。
+                    }
+                } else {
+                    console.error("[ContextMenu] Interrupt handler not available. Manually cancelling.");
+                    uiHelper.showToastNotification("无法发送中止信号，已在本地取消。", "warning");
+                    await cancelOwnedStream(activeMessageId, 'interrupt-handler-unavailable');
+                }
+            }
+        };
+        menu.appendChild(interruptOption);
+
+        const interruptGroupQueueOption = createInterruptGroupQueueOption();
+        if (interruptGroupQueueOption) {
+            menu.appendChild(interruptGroupQueueOption);
+        }
+    }
+
+    // For non-thinking/non-streaming messages (including errors and completed messages)
+    if (!isThinkingOrStreaming) {
+        const isEditing = messageItem.classList.contains('message-item-editing');
+        const textarea = isEditing ? messageItem.querySelector('.message-edit-textarea') : null;
+
+        if (!isEditing) {
+            const editOption = ownerDocument.createElement('div');
+            editOption.classList.add('context-menu-item');
+            editOption.innerHTML = `<i class="fas fa-edit"></i> 编辑消息`;
+            editOption.onclick = () => {
+                toggleEditMode(messageItem, message);
+                closeContextMenu();
+            };
+            menu.appendChild(editOption);
+        }
+
+        if (currentSelectedItemVal.type === 'agent' && contextMenuDependencies.compactContext) {
+            const compactOption = ownerDocument.createElement('div');
+            compactOption.className = 'context-menu-item';
+            compactOption.innerHTML = '<i class="fas fa-compress-alt" aria-hidden="true"></i> 压缩前文';
+            compactOption.title = '压缩当前话题整个有效上下文，与右键气泡位置无关';
+            compactOption.onclick = async () => {
+                closeContextMenu();
+                try { await contextMenuDependencies.compactContext(); }
+                catch (error) {
+                    uiHelper.showToastNotification(`压缩失败：${error.message}`, 'error');
+                    if (error.compactionDiagnostic && typeof electronAPI?.openTextInNewWindow === 'function') {
+                        try {
+                            await electronAPI.openTextInNewWindow(
+                                error.compactionDiagnostic,
+                                '上下文压缩失败：模型返回原文',
+                                ownerDocument.body.classList.contains('light-theme') ? 'light' : 'dark'
+                            );
+                        } catch (diagnosticError) {
+                            console.error('[ContextCompaction] Failed to open response diagnostic:', diagnosticError);
+                        }
+                    }
+                }
+            };
+            menu.appendChild(compactOption);
+        }
+        const copyOption = ownerDocument.createElement('div');
+        copyOption.classList.add('context-menu-item');
+        copyOption.innerHTML = `<i class="fas fa-copy"></i> 复制文本`;
+        copyOption.onclick = () => {
+            const { uiHelper } = mainRefs;
+            const contentDiv = messageItem.querySelector('.md-content');
+            let textToCopy = '';
+
+            if (contentDiv) {
+                // 克隆节点以避免修改实时显示的DOM
+                const contentClone = contentDiv.cloneNode(true);
+                // 移除不应参与复制的渲染辅助节点，避免把附件删除按钮的 × 一起复制进去
+                contentClone.querySelectorAll(
+                    '.vcp-tool-use-bubble, .vcp-tool-result-bubble, .vcp-tool-call-summary-bubble, .vcp-flowlock-bubble, .vcp-role-divider, .vcp-thought-chain-bubble, .message-attachments, .message-attachment-remove-btn, style, script'
+                ).forEach(el => el.remove());
+                // 修复：清理多余的空行，确保最多只有一个空行
+                textToCopy = contentClone.innerText.replace(/\n{3,}/g, '\n\n').trim();
+            } else {
+                // 如果找不到 .md-content，则回退到旧方法
+                let contentToProcess = message.content;
+                if (typeof message.content === 'object' && message.content !== null && typeof message.content.text === 'string') {
+                    contentToProcess = message.content.text;
+                } else if (typeof message.content !== 'string') {
+                    contentToProcess = '';
+                }
+                textToCopy = contentToProcess.replace(/<img[^>]*>/g, '').trim();
+            }
+
+            navigator.clipboard.writeText(textToCopy);
+            uiHelper.showToastNotification("已复制渲染后的文本。", "success");
+            closeContextMenu();
+        };
+        menu.appendChild(copyOption);
+
+        if (isEditing && textarea) {
+            const cutOption = ownerDocument.createElement('div');
+            cutOption.classList.add('context-menu-item');
+            cutOption.innerHTML = `<i class="fas fa-cut"></i> 剪切文本`;
+            cutOption.onclick = () => {
+                textarea.focus(); ownerDocument.execCommand('cut'); closeContextMenu();
+            };
+            menu.appendChild(cutOption);
+
+            const pasteOption = ownerDocument.createElement('div');
+            pasteOption.classList.add('context-menu-item');
+            pasteOption.innerHTML = `<i class="fas fa-paste"></i> 粘贴文本`;
+            pasteOption.onclick = async () => {
+                textarea.focus();
+                try {
+                    const text = await electronAPI.readTextFromClipboard();
+                    if (text) {
+                        const start = textarea.selectionStart; const end = textarea.selectionEnd;
+                        textarea.value = textarea.value.substring(0, start) + text + textarea.value.substring(end);
+                        textarea.selectionStart = textarea.selectionEnd = start + text.length;
+                        textarea.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    }
+                } catch (err) { console.error('Failed to paste text:', err); }
+                closeContextMenu();
+            };
+            menu.appendChild(pasteOption);
+        }
+
+        if (currentSelectedItemVal.type === 'agent' || currentSelectedItemVal.type === 'group') {
+            const createBranchOption = ownerDocument.createElement('div');
+            createBranchOption.classList.add('context-menu-item');
+            createBranchOption.innerHTML = `<i class="fas fa-code-branch"></i> 创建分支`;
+            createBranchOption.onclick = () => {
+                if (typeof mainRefs.handleCreateBranch === 'function') {
+                     mainRefs.handleCreateBranch(message);
+                }
+                closeContextMenu();
+            };
+            menu.appendChild(createBranchOption);
+        }
+
+        if (currentSelectedItemVal.type === 'agent' && typeof ownerWindow?.openSideChatWithSelection === 'function') {
+            const sideChatOption = ownerDocument.createElement('div');
+            sideChatOption.classList.add('context-menu-item');
+            sideChatOption.innerHTML = `<i class="fas fa-columns"></i> 侧栏提问`;
+            sideChatOption.onclick = async () => {
+                closeContextMenu();
+                if (typeof ownerWindow?.openSideChatWithSelection === 'function') {
+                    await ownerWindow.openSideChatWithSelection({
+                        messageItem,
+                        message,
+                        selectedText: selectedTextSnapshot || null
+                    });
+                }
+            };
+            menu.appendChild(sideChatOption);
+        }
+
+        const forwardOption = ownerDocument.createElement('div');
+        forwardOption.classList.add('context-menu-item');
+        forwardOption.innerHTML = `<i class="fas fa-share"></i> 转发消息`;
+        forwardOption.onclick = () => {
+            if (contextMenuDependencies.showForwardModal && typeof contextMenuDependencies.showForwardModal === 'function') {
+                contextMenuDependencies.showForwardModal(message);
+            }
+            closeContextMenu();
+        };
+        menu.appendChild(forwardOption);
+
+        // Add "Read Aloud" option for assistant messages
+        if (message.role === 'assistant') {
+            const readAloudOption = ownerDocument.createElement('div');
+            readAloudOption.classList.add('context-menu-item', 'context-menu-item-speak');
+            readAloudOption.innerHTML = `<i class="fas fa-volume-up"></i> 朗读气泡`;
+            readAloudOption.onclick = async () => {
+                // **关键修复：在发送请求前，确保音频上下文已激活**
+                if (typeof contextMenuDependencies.ensureAudioContext === 'function') {
+                    contextMenuDependencies.ensureAudioContext();
+                }
+
+                const agentId = message.agentId || currentSelectedItemVal.id;
+                if (!agentId) {
+                    uiHelper.showToastNotification("无法确定Agent身份，无法朗读。", "error");
+                    closeContextMenu();
+                    return;
+                }
+
+                try {
+                    const agentConfig = await electronAPI.getAgentConfig(agentId);
+
+                    // 检查是否获取配置失败
+                    if (agentConfig && agentConfig.error) {
+                        console.error('[MessageContextMenu] Failed to get agent config for TTS:', agentConfig.error);
+                        uiHelper.showToastNotification('获取Agent配置失败，无法朗读。', 'error');
+                        closeContextMenu();
+                        return;
+                    }
+
+                    if (agentConfig && agentConfig.ttsVoicePrimary) {
+                        const contentDiv = messageItem.querySelector('.md-content');
+                        const textToRead = contextMenuDependencies.extractSpeakableTextFromContentElement
+                            ? contextMenuDependencies.extractSpeakableTextFromContentElement(contentDiv)
+                            : '';
+
+                        if (textToRead.trim()) {
+                            // Pass bilingual TTS settings
+                            electronAPI.sovitsSpeak({
+                                text: textToRead,
+                                voice: agentConfig.ttsVoicePrimary, // Legacy 'voice' is now primary
+                                speed: agentConfig.ttsSpeed || 1.0,
+                                msgId: message.id,
+                                ttsRegex: agentConfig.ttsRegexPrimary, // Legacy 'ttsRegex' is now primary
+                                directorPrompts: agentConfig.ttsDirectorPrompts,
+                                // New bilingual fields
+                                voiceSecondary: agentConfig.ttsVoiceSecondary,
+                                ttsRegexSecondary: agentConfig.ttsRegexSecondary
+                            });
+                        } else {
+                            uiHelper.showToastNotification("此消息没有可朗读的文本内容。", "info");
+                        }
+                    } else {
+                        uiHelper.showToastNotification("此Agent未配置语音模型。", "warning");
+                    }
+                } catch (error) {
+                    console.error("获取Agent配置以进行朗读时出错:", error);
+                    uiHelper.showToastNotification("获取Agent配置失败。", "error");
+                }
+                closeContextMenu();
+            };
+            menu.appendChild(readAloudOption);
+        }
+
+        const readModeOption = ownerDocument.createElement('div');
+        readModeOption.classList.add('context-menu-item', 'info-item');
+        readModeOption.innerHTML = `<i class="fas fa-book-reader"></i> 阅读模式`;
+        readModeOption.onclick = async () => { // Make it async
+            const { electronAPI, uiHelper } = mainRefs;
+            const currentSelectedItemVal = mainRefs.currentSelectedItemRef.get();
+            const currentTopicIdVal = mainRefs.currentTopicIdRef.get();
+
+            if (!currentSelectedItemVal.id || !currentTopicIdVal || !message.id) {
+                console.error("无法打开阅读模式: 缺少项目、话题或消息ID。");
+                uiHelper.showToastNotification("无法打开阅读模式: 上下文信息不完整。", "error");
+                closeContextMenu();
+                return;
+            }
+
+            try {
+                // A new IPC call to get the raw, original content from the history file
+                const result = await electronAPI.getOriginalMessageContent(
+                    currentSelectedItemVal.id,
+                    currentSelectedItemVal.type,
+                    currentTopicIdVal,
+                    message.id
+                );
+
+                if (result.success && result.content !== undefined) {
+                    // The content from history can be a string or an object like { text: "..." }
+                    const rawContent = result.content;
+                    const contentString = (typeof rawContent === 'string') ? rawContent : (rawContent?.text || '');
+
+                    const windowTitle = `阅读: ${message.id.substring(0, 10)}...`;
+                    const currentTheme = ownerDocument.body.classList.contains('light-theme') ? 'light' : 'dark';
+
+                    if (electronAPI && typeof electronAPI.openTextInNewWindow === 'function') {
+                        electronAPI.openTextInNewWindow(contentString, windowTitle, currentTheme);
+                    }
+                } else {
+                    console.error("获取原始消息内容失败:", result.error);
+                    uiHelper.showToastNotification(`无法加载原始消息: ${result.error || '未知错误'}`, "error");
+                }
+            } catch (error) {
+                console.error("调用 getOriginalMessageContent 时出错:", error);
+                uiHelper.showToastNotification("加载阅读模式时发生IPC错误。", "error");
+            }
+
+            closeContextMenu();
+        };
+        menu.appendChild(readModeOption);
+
+        const deleteOption = ownerDocument.createElement('div');
+        deleteOption.classList.add('context-menu-item', 'danger-item');
+        deleteOption.innerHTML = `<i class="fas fa-trash-alt"></i> 删除消息`;
+        deleteOption.onclick = async () => {
+            let textForConfirm = "";
+            if (typeof message.content === 'string') {
+                textForConfirm = message.content;
+            } else if (message.content && typeof message.content.text === 'string') {
+                textForConfirm = message.content.text;
+            } else {
+                textForConfirm = '[消息内容无法预览]';
+            }
+
+            if (await uiHelper.showConfirmDialog(`确定要删除此消息吗？\n"${textForConfirm.substring(0, 50)}${textForConfirm.length > 50 ? '...' : ''}"`, '删除确认', '删除', '取消', true)) {
+                contextMenuDependencies.removeMessageById(message.id, true); // Pass true to save history
+            }
+            closeContextMenu();
+        };
+
+        // Regenerate option should be here to maintain order
+        if (message.role === 'assistant' && !message.isGroupMessage && currentSelectedItemVal.type === 'agent') {
+            const regenerateOption = ownerDocument.createElement('div');
+            regenerateOption.classList.add('context-menu-item', 'regenerate-text');
+            regenerateOption.innerHTML = `<i class="fas fa-sync-alt"></i> 重新回复`;
+            regenerateOption.onclick = () => {
+                handleRegenerateResponse(message);
+                closeContextMenu();
+            };
+            menu.appendChild(regenerateOption);
+        }
+
+        // 新增：群聊中的“重新回复”功能
+        if (message.role === 'assistant' && message.isGroupMessage) {
+            const redoGroupOption = ownerDocument.createElement('div');
+            redoGroupOption.classList.add('context-menu-item', 'regenerate-text');
+            redoGroupOption.innerHTML = `<i class="fas fa-sync-alt"></i> 重新回复`;
+            redoGroupOption.onclick = () => {
+                const { electronAPI, uiHelper } = mainRefs;
+                const currentSelectedItem = mainRefs.currentSelectedItemRef.get();
+                const currentTopicId = mainRefs.currentTopicIdRef.get();
+
+                if (currentSelectedItem.type === 'group' && currentTopicId && message.id && message.agentId) {
+                    // 调用新的IPC接口
+                    electronAPI.redoGroupChatMessage(currentSelectedItem.id, currentTopicId, message.id, message.agentId);
+                } else {
+                    uiHelper.showToastNotification("无法重新回复：缺少群聊上下文信息。", "error");
+                }
+                closeContextMenu();
+            };
+            menu.appendChild(redoGroupOption);
+        }
+
+        // 这条回复对应的模型调用：在侧栏「调用轨迹」里定位到发出它的那次请求
+        const ownerCommands = ownerWindow?.VCPContributions?.commands;
+        if (message.role === 'assistant' && message.id && ownerCommands?.get('sidepane.open-trajectory')) {
+            const trajectoryOption = ownerDocument.createElement('div');
+            trajectoryOption.classList.add('context-menu-item');
+            trajectoryOption.innerHTML = `<i class="fas fa-route"></i> 调用轨迹`;
+            trajectoryOption.onclick = () => {
+                closeContextMenu();
+                ownerCommands.execute('sidepane.open-trajectory', { requestId: message.id });
+            };
+            menu.appendChild(trajectoryOption);
+        }
+
+        const interruptGroupQueueOption = createInterruptGroupQueueOption();
+        if (interruptGroupQueueOption) {
+            menu.appendChild(interruptGroupQueueOption);
+        }
+
+        menu.appendChild(deleteOption);
+    }
+
+    // 超过 8 个选项时使用双列布局，先应用布局再测量，确保边缘避让尺寸正确。
+    if (menu.querySelectorAll('.context-menu-item').length > 8) {
+        menu.classList.add('context-menu--two-columns');
+    }
+
+    menu.style.visibility = 'hidden';
+    menu.style.position = 'absolute';
+    ownerDocument.body.appendChild(menu);
+
+    const menuWidth = menu.offsetWidth;
+    const menuHeight = menu.offsetHeight;
+    const windowWidth = ownerWindow.innerWidth;
+    const windowHeight = ownerWindow.innerHeight;
+
+    let top = event.clientY;
+    let left = event.clientX;
+
+    if (top + menuHeight > windowHeight) {
+        top = event.clientY - menuHeight;
+        if (top < 0) top = 5;
+    }
+
+    if (left + menuWidth > windowWidth) {
+        left = event.clientX - menuWidth;
+        if (left < 0) left = 5;
+    }
+
+    menu.style.top = `${top}px`;
+    menu.style.left = `${left}px`;
+    menu.style.visibility = 'visible';
+}
+
+function toggleEditMode(messageItem, message) {
+    const { electronAPI, markedInstance, uiHelper } = mainRefs;
+    if (isContextCheckpoint(message)) {
+        uiHelper.showToastNotification('压缩快照为只读状态，请通过阅读模式查看原文', 'info');
+        return;
+    }
+    const currentSelectedItemVal = mainRefs.currentSelectedItemRef.get();
+    const currentTopicIdVal = mainRefs.currentTopicIdRef.get();
+
+    const contentDiv = messageItem.querySelector('.md-content');
+    if (!contentDiv) return;
+
+    const existingTextarea = messageItem.querySelector('.message-edit-textarea');
+    const existingControls = messageItem.querySelector('.message-edit-controls');
+
+    if (existingTextarea) { // Revert to display mode
+        let textToDisplay = "";
+        if (typeof message.content === 'string') {
+            textToDisplay = message.content;
+        } else if (message.content && typeof message.content.text === 'string') {
+            textToDisplay = message.content.text;
+        } else {
+            textToDisplay = '[内容错误]';
+        }
+
+        // 🟢 修复：使用 updateMessageContent 确保正则规则被应用
+        if (contextMenuDependencies.updateMessageContent) {
+            contextMenuDependencies.updateMessageContent(message.id, textToDisplay);
+        } else {
+            // Fallback for safety, though updateMessageContent should be available now
+            const ppResult = contextMenuDependencies.preprocessFullContent(textToDisplay);
+            const rawHtml = markedInstance.parse(ppResult.text || ppResult);
+            contextMenuDependencies.setContentAndProcessImages(contentDiv, rawHtml, message.id);
+            contextMenuDependencies.processRenderedContent(contentDiv);
+            setTimeout(() => {
+                if (contentDiv && contentDiv.isConnected) {
+                    contextMenuDependencies.runTextHighlights(contentDiv);
+                }
+            }, 0);
+        }
+
+        messageItem.classList.remove('message-item-editing');
+        existingTextarea.remove();
+        if (existingControls) existingControls.remove();
+        contentDiv.style.display = '';
+        const avatarEl = messageItem.querySelector('.chat-avatar');
+        const nameTimeEl = messageItem.querySelector('.name-time-block');
+        if(avatarEl) avatarEl.style.display = '';
+        if(nameTimeEl) nameTimeEl.style.display = '';
+    } else { // Switch to edit mode
+        const originalContentHeight = contentDiv.offsetHeight;
+        contentDiv.style.display = 'none';
+        const avatarEl = messageItem.querySelector('.chat-avatar');
+        const nameTimeEl = messageItem.querySelector('.name-time-block');
+        if(avatarEl) avatarEl.style.display = 'none';
+        if(nameTimeEl) nameTimeEl.style.display = 'none';
+
+        messageItem.classList.add('message-item-editing');
+
+        const textarea = ownerDocument.createElement('textarea');
+        textarea.classList.add('message-edit-textarea');
+
+        let textForEditing = "";
+        if (typeof message.content === 'string') {
+            textForEditing = message.content;
+        } else if (message.content && typeof message.content.text === 'string') {
+            textForEditing = message.content.text;
+        } else {
+            textForEditing = '[内容加载错误]';
+        }
+        textarea.value = textForEditing;
+        textarea.style.minHeight = `${Math.max(originalContentHeight, 50)}px`;
+        textarea.style.width = '100%';
+
+        const controlsDiv = ownerDocument.createElement('div');
+        controlsDiv.classList.add('message-edit-controls');
+
+        const saveButton = ownerDocument.createElement('button');
+        saveButton.innerHTML = `<i class="fas fa-save"></i> 保存`;
+        saveButton.onclick = async () => {
+            const newContent = textarea.value;
+
+            // 编辑器打开后，删除操作、JEV 投影或文件同步都可能原子替换历史数组。
+            // 只要原气泡仍连接在当前 Surface，它就继续拥有编辑权；历史暂时缺少
+            // 该 ID 时使用气泡模型恢复，而不是把同步空窗误判成“消息已变化”。
+            const latestHistory = mainRefs.currentChatHistoryRef.get();
+            const liveMessage = latestHistory.find(msg => msg.id === message.id)
+                || messageItem._vcpMessageModel
+                || message;
+
+            if (!messageItem.isConnected || !liveMessage?.id) {
+                uiHelper.showToastNotification("该消息已离开当前聊天，无法保存编辑。", "warning");
+                return;
+            }
+
+            const visibleItems = Array.from(
+                mainRefs.chatMessagesDiv?.querySelectorAll?.('.message-item[data-message-id]') || []
+            );
+            const visibleIndex = visibleItems.indexOf(messageItem);
+            const previousMessageId = visibleIndex > 0
+                ? visibleItems[visibleIndex - 1]?.dataset?.messageId
+                : null;
+            const nextMessageId = visibleIndex >= 0 && visibleIndex < visibleItems.length - 1
+                ? visibleItems[visibleIndex + 1]?.dataset?.messageId
+                : null;
+
+            let originalTextContent = "";
+            if (typeof liveMessage.content === 'string') {
+                originalTextContent = liveMessage.content;
+            } else if (liveMessage.content && typeof liveMessage.content.text === 'string') {
+                originalTextContent = liveMessage.content.text;
+            }
+
+            // If content hasn't changed, just exit edit mode without saving.
+            if (newContent === originalTextContent) {
+                toggleEditMode(messageItem, liveMessage);
+                return;
+            }
+
+            let watcherLeaseToken = null;
+            let committedHistory = null;
+            let committedMessage = null;
+
+            // Watching is ancillary to the edit transaction. Failure to pause
+            // or resume it must not turn a durable save into an apparent
+            // failure or roll the renderer back behind disk state.
+            try {
+                if (electronAPI.watcherBegin) {
+                    console.log('[EditMode] Claiming file watcher lease to prevent race condition');
+                    const lease = await electronAPI.watcherBegin();
+                    if (lease?.stale) return;
+                    if (lease?.success === false) {
+                        console.warn('[EditMode] History watcher unavailable; continuing with edit:', lease.error || lease);
+                    } else {
+                        watcherLeaseToken = lease?.token || null;
+                    }
+                } else if (electronAPI.watcherStop) {
+                    console.log('[EditMode] Temporarily stopping file watcher to prevent race condition');
+                    await electronAPI.watcherStop();
+                }
+            } catch (watcherError) {
+                console.warn('[EditMode] Failed to pause history watcher; continuing with edit:', watcherError);
+            }
+
+            try {
+                if (currentSelectedItemVal.id && currentTopicIdVal) {
+                    if (!mainRefs.historyMutationAuthority) throw new Error('History mutation authority is required for message edits');
+                    const updatedAt = Date.now();
+                    const commit = await mainRefs.historyMutationAuthority.mutate({
+                        itemId: currentSelectedItemVal.id,
+                        itemType: currentSelectedItemVal.type,
+                        topicId: currentTopicIdVal,
+                        category: 'message-edit',
+                    }, historyForSave => {
+                        const nextHistory = [...historyForSave];
+                        let liveIndex = nextHistory.findIndex(entry => entry?.id === message.id);
+
+                        if (liveIndex === -1) {
+                            // 可见气泡仍在，但 JEV/删除写盘竞态使持久历史暂时漏掉它。
+                            // 依据当前 DOM 邻居恢复原楼层；邻居也已变化时按时间戳插入。
+                            const restoredMessage = {
+                                ...liveMessage,
+                                id: message.id
+                            };
+                            const previousIndex = previousMessageId
+                                ? nextHistory.findIndex(entry => entry?.id === previousMessageId)
+                                : -1;
+                            const nextIndex = nextMessageId
+                                ? nextHistory.findIndex(entry => entry?.id === nextMessageId)
+                                : -1;
+
+                            if (previousIndex >= 0) {
+                                liveIndex = previousIndex + 1;
+                            } else if (nextIndex >= 0) {
+                                liveIndex = nextIndex;
+                            } else {
+                                const restoredTimestamp = Number(restoredMessage.timestamp) || 0;
+                                liveIndex = nextHistory.findIndex(entry => (
+                                    (Number(entry?.timestamp) || 0) > restoredTimestamp
+                                ));
+                                if (liveIndex < 0) liveIndex = nextHistory.length;
+                            }
+                            nextHistory.splice(liveIndex, 0, restoredMessage);
+                        }
+
+                        nextHistory[liveIndex] = {
+                            ...nextHistory[liveIndex],
+                            content: newContent,
+                            updatedAt
+                        };
+                        return nextHistory;
+                    });
+                    committedHistory = [...commit.history];
+                    committedMessage = committedHistory.find(entry => entry?.id === message.id) || null;
+                }
+            } catch (error) {
+                console.error('[EditMode] Save failed:', error);
+
+                // 重新启动文件监控（即使保存失败）
+                if (electronAPI.watcherStart && currentSelectedItemVal.config?.agentDataPath) {
+                    try {
+                        const historyFilePath = `${currentSelectedItemVal.config.agentDataPath}\\topics\\${currentTopicIdVal}\\history.json`;
+                        await electronAPI.watcherStart(historyFilePath, currentSelectedItemVal.id, currentTopicIdVal, watcherLeaseToken);
+                    } catch (watcherError) {
+                        console.error('[EditMode] Failed to restart watcher after save failure:', watcherError);
+                    }
+                }
+
+                if (uiHelper && typeof uiHelper.showToastNotification === 'function') {
+                    uiHelper.showToastNotification(`编辑保存失败: ${error.message}`, "error");
+                }
+                return; // 保存错误保留编辑模式，让用户重试
+            }
+
+            const activeItem = mainRefs.currentSelectedItemRef.get();
+            if (
+                committedHistory
+                && activeItem?.id === currentSelectedItemVal.id
+                && activeItem?.type === currentSelectedItemVal.type
+                && mainRefs.currentTopicIdRef.get() === currentTopicIdVal
+            ) {
+                mainRefs.currentChatHistoryRef.set(committedHistory);
+            }
+            if (committedMessage) {
+                message.content = committedMessage.content;
+                message.updatedAt = committedMessage.updatedAt;
+                messageItem._vcpMessageModel = committedMessage;
+            }
+
+            if (contextMenuDependencies.updateMessageContent) {
+                contextMenuDependencies.updateMessageContent(message.id, newContent);
+            } else {
+                const ppResult2 = contextMenuDependencies.preprocessFullContent(newContent);
+                const rawHtml = markedInstance.parse(ppResult2.text || ppResult2);
+                contextMenuDependencies.setContentAndProcessImages(contentDiv, rawHtml, message.id);
+                contextMenuDependencies.processRenderedContent(contentDiv);
+                contextMenuDependencies.renderAttachments(message, contentDiv);
+            }
+
+            if (electronAPI.watcherStart && currentSelectedItemVal.config?.agentDataPath) {
+                try {
+                    const historyFilePath = `${currentSelectedItemVal.config.agentDataPath}\\topics\\${currentTopicIdVal}\\history.json`;
+                    const watcherResult = await electronAPI.watcherStart(
+                        historyFilePath,
+                        currentSelectedItemVal.id,
+                        currentTopicIdVal,
+                        watcherLeaseToken
+                    );
+                    if (watcherResult?.success === false && !watcherResult?.stale) {
+                        console.warn('[EditMode] Failed to restart watcher after successful save:', watcherResult.error || watcherResult);
+                    }
+                } catch (watcherError) {
+                    console.warn('[EditMode] Failed to restart watcher after successful save:', watcherError);
+                }
+            }
+
+            if (uiHelper && typeof uiHelper.showToastNotification === 'function') {
+                uiHelper.showToastNotification("消息编辑已保存。", "success");
+            }
+
+            // 只有在保存成功后才退出编辑模式，并使用最新提交模型恢复显示。
+            toggleEditMode(messageItem, committedMessage || message);
+        };
+
+        const cancelButton = ownerDocument.createElement('button');
+        cancelButton.innerHTML = `<i class="fas fa-times"></i> 取消`;
+        cancelButton.onclick = () => {
+             toggleEditMode(messageItem, message);
+        };
+
+        controlsDiv.appendChild(saveButton);
+        controlsDiv.appendChild(cancelButton);
+
+        messageItem.appendChild(textarea);
+        messageItem.appendChild(controlsDiv);
+
+        if (uiHelper.autoResizeTextarea) uiHelper.autoResizeTextarea(textarea);
+        try {
+            textarea.focus({ preventScroll: true });
+        } catch {
+            textarea.focus();
+        }
+        textarea.addEventListener('input', () => uiHelper.autoResizeTextarea(textarea));
+        textarea.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                cancelButton.click();
+            }
+            if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey) {
+                event.preventDefault();
+                saveButton.click();
+            } else if (event.ctrlKey && event.key === 'Enter') {
+                saveButton.click();
+            }
+        });
+    }
+}
+
+// 实时引用上下文标签（与 singleChatRequestOrchestrator.describeLiveReference 同构）。
+function describeLiveReferenceForContext(data) {
+    const ref = data?.workspaceRef;
+    if (data?.liveSource === 'workspace' || ref) {
+        const location = ref?.alias && ref?.relPath ? ` ${ref.alias}: ${ref.relPath}` : '';
+        return `工作区${location}，实时文件，可直接修改`;
+    }
+    return '笔记区实时文件，可直接修改';
+}
+
+
+async function handleRegenerateResponse(originalAssistantMessage) {
+    const { electronAPI, uiHelper } = mainRefs;
+    if (contextMenuDependencies.isContextCompacting?.()) {
+        uiHelper.showToastNotification('上下文正在压缩，请稍候', 'warning');
+        return;
+    }
+    const currentChatHistoryArray = mainRefs.currentChatHistoryRef.get();
+    const currentSelectedItemVal = mainRefs.currentSelectedItemRef.get();
+    const currentTopicIdVal = mainRefs.currentTopicIdRef.get();
+    const globalSettingsVal = mainRefs.globalSettingsRef.get();
+    let streamingRequested = false;
+    let streamContext = null;
+    let regenerationThinkingItem = null;
+
+    if (!currentSelectedItemVal.id || currentSelectedItemVal.type !== 'agent' || !currentTopicIdVal || !originalAssistantMessage || originalAssistantMessage.role !== 'assistant') {
+        uiHelper.showToastNotification("只能为 Agent 的回复进行重新生成。", "warning");
+        return;
+    }
+
+    const originalMessageIndex = currentChatHistoryArray.findIndex(msg => msg.id === originalAssistantMessage.id);
+    if (originalMessageIndex === -1) return;
+
+    const effectiveHistory = effectiveContextHistory(currentChatHistoryArray);
+    if (!effectiveHistory.includes(currentChatHistoryArray[originalMessageIndex])) {
+        uiHelper.showToastNotification('该回复已归入压缩快照；如需重新回复，请先从该消息创建分支', 'warning');
+        return;
+    }
+    const historyForRegeneration = effectiveContextHistory(currentChatHistoryArray.slice(0, originalMessageIndex));
+
+    // Remove original and subsequent messages from DOM and history
+    const messagesToRemove = currentChatHistoryArray.splice(originalMessageIndex);
+    mainRefs.currentChatHistoryRef.set([...currentChatHistoryArray]);
+    messagesToRemove.forEach(msg => contextMenuDependencies.removeMessageById(msg.id, false)); // false = don't save history again
+
+    if (currentSelectedItemVal.id && currentTopicIdVal) {
+        try {
+            if (!mainRefs.historyMutationAuthority) throw new Error('History mutation authority is required for regeneration');
+            await mainRefs.historyMutationAuthority.replace({
+                itemId: currentSelectedItemVal.id,
+                itemType: currentSelectedItemVal.type,
+                topicId: currentTopicIdVal,
+                category: 'regeneration-truncate',
+            }, currentChatHistoryArray);
+        } catch (saveError) {
+            console.error("ContextMenu: Failed to save chat history after splice in regenerate:", saveError);
+        }
+    }
+
+    const regenerationThinkingMessage = {
+        role: 'assistant',
+        name: currentSelectedItemVal.name || 'AI',
+        content: '',
+        timestamp: Date.now(),
+        id: `msg_${Date.now()}_assistant_${Math.random().toString(36).substring(2, 9)}`,
+        isThinking: true,
+        avatarUrl: currentSelectedItemVal.avatarUrl,
+        avatarColor: currentSelectedItemVal.config?.avatarCalculatedColor,
+    };
+
+    regenerationThinkingItem = await contextMenuDependencies.renderMessage(regenerationThinkingMessage, false);
+    currentChatHistoryArray.push(regenerationThinkingMessage);
+    mainRefs.currentChatHistoryRef.set([...currentChatHistoryArray]);
+
+    if (regenerationThinkingItem) {
+        // renderMessage 已为本次重新回复排过第一次滚动。这里不能紧接着再次走
+        // 通用 scrollToBottom：同一帧的请求会被其 frameId 合并，无法在思考
+        // 占位完成布局后使用新的 scrollHeight。与普通发送保持一致，下一布局帧
+        // 直接提交占位后的真实底部，同时防止切换会话后误滚新的 Surface。
+        const scrollContainer = regenerationThinkingItem.closest('.chat-messages-container');
+        ownerWindow?.requestAnimationFrame?.(() => {
+            const activeItem = mainRefs.currentSelectedItemRef?.get?.();
+            if (
+                regenerationThinkingItem.isConnected
+                && scrollContainer?.isConnected
+                && activeItem?.id === currentSelectedItemVal.id
+                && activeItem?.type === currentSelectedItemVal.type
+                && mainRefs.currentTopicIdRef?.get?.() === currentTopicIdVal
+            ) {
+                scrollContainer.scrollTop = Math.max(
+                    0,
+                    scrollContainer.scrollHeight - scrollContainer.clientHeight
+                );
+            }
+        });
+    }
+
+    // 重新回复的思考占位已经同时进入 DOM 与 history，此时即可投影中止按钮。
+    // 旧路径调用 window.updateSendButtonState，但发送状态现由 MainChatSendOwner
+    // 通过显式 messageCommands 能力持有，不再暴露同名窗口全局函数。
+    mainRefs.messageCommands?.updateSendButtonState?.();
+
+    try {
+        const agentConfig = await electronAPI.getAgentConfig(currentSelectedItemVal.id);
+
+        // 检查是否获取配置失败
+        if (agentConfig && agentConfig.error) {
+            console.error('[MessageContextMenu] Failed to get agent config for regeneration:', agentConfig.error);
+            uiHelper.showToastNotification('获取Agent配置失败，无法重新生成消息。', 'error');
+            // 移除思考中消息
+            const messages = contextMenuDependencies.chatContainer.querySelectorAll('.message-item');
+            if (messages.length > 0) {
+                const lastMessage = messages[messages.length - 1];
+                if (lastMessage.classList.contains('thinking')) {
+                    lastMessage.remove();
+                }
+            }
+            return;
+        }
+
+        const buildRegenerationContent = async ({ message: msg, index }) => {
+            let vcpImageAttachmentsPayload = [];
+            let vcpAudioAttachmentsPayload = [];
+            let vcpVideoAttachmentsPayload = [];
+            let currentMessageTextContent;
+
+            let originalText = (typeof msg.content === 'string') ? msg.content : (msg.content?.text || '');
+
+            // Check if this is the last user message in the history for regeneration
+            const isLastUserMessage = msg.role === 'user' && !historyForRegeneration.slice(index + 1).some(futureMsg => futureMsg.role === 'user');
+
+            if (isLastUserMessage && originalText.includes('{{VCPChatCanvas}}')) {
+                 try {
+                    const canvasData = await electronAPI.getLatestCanvasContent();
+                    if (canvasData && !canvasData.error) {
+                        const formattedCanvasContent = `\n[Canvas Content]\n${canvasData.content || ''}\n[Canvas Path]\n${canvasData.path || 'No file path'}\n[Canvas Errors]\n${canvasData.errors || 'No errors'}\n`;
+                        originalText = originalText.replace(/\{\{VCPChatCanvas\}\}/g, formattedCanvasContent);
+                    } else {
+                        originalText = originalText.replace(/\{\{VCPChatCanvas\}\}/g, '\n[Canvas content could not be loaded]\n');
+                    }
+                } catch (error) {
+                    originalText = originalText.replace(/\{\{VCPChatCanvas\}\}/g, '\n[Error loading canvas content]\n');
+                }
+            }
+
+            if (msg.attachments && msg.attachments.length > 0) {
+                let historicalAppendedText = "";
+                for (const att of msg.attachments) {
+                    const fileManagerData = att._fileManagerData || {};
+                    // 兼容两种附件结构：正常发送的附件数据位于 _fileManagerData，
+                    // 后续添加到消息的附件数据则可能直接位于 att 顶层。
+                    const attachmentSourcePath = fileManagerData.internalPath ||
+                                                 att.internalPath ||
+                                                 att.localPath ||
+                                                 att.src;
+                    const filePathForContext = attachmentSourcePath || att.name || '未知文件';
+                    const effectiveType = fileManagerData.type || att.type || '';
+                    const effectiveImageFrames = fileManagerData.imageFrames || att.imageFrames;
+                    let effectiveExtractedText = fileManagerData.extractedText || att.extractedText;
+
+                    // 历史记录可能缓存了旧版固定按 UTF-8 解码后产生的乱码。
+                    // 重新回复时从原始附件重新提取，确保使用当前的编码检测逻辑。
+                    if (!effectiveImageFrames &&
+                        attachmentSourcePath &&
+                        electronAPI &&
+                        typeof electronAPI.getTextContent === 'function') {
+                        try {
+                            const refreshedContent = await electronAPI.getTextContent(
+                                attachmentSourcePath,
+                                effectiveType
+                            );
+                            if (refreshedContent && typeof refreshedContent.text === 'string') {
+                                effectiveExtractedText = refreshedContent.text;
+                            }
+                        } catch (extractionError) {
+                            console.warn(
+                                `[ContextMenu] Failed to refresh attachment text for ${att.name || attachmentSourcePath}; using cached text:`,
+                                extractionError
+                            );
+                        }
+                    }
+
+                    const isLiveReference = fileManagerData.isLiveReference === true || att.isLiveReference === true;
+                    if (isLiveReference) {
+                        // 与单聊主路径一致：实时引用始终带来源标签，告知 AI 可直接修改真实文件。
+                        const liveLabel = describeLiveReferenceForContext({ ...att, ...fileManagerData });
+                        historicalAppendedText += `\n\n[附加文件: ${filePathForContext} (${liveLabel})]\n${effectiveExtractedText || ''}\n[/附加文件结束: ${att.name || '未知文件'}]`;
+                    } else if (effectiveImageFrames && effectiveImageFrames.length > 0) {
+                        const totalPages = fileManagerData?.pdfMeta?.totalPages;
+                        const pageHint = totalPages
+                            ? `(扫描版/图像型PDF，已内联 ${effectiveImageFrames.length} 页高清多模态图像/共 ${totalPages} 页)`
+                            : `(扫描版/图像型PDF，已提供 ${effectiveImageFrames.length} 页多模态图像)`;
+                        historicalAppendedText += `\n\n[附加文件: ${filePathForContext} ${pageHint}]\n${effectiveExtractedText || ''}`;
+                    } else if (effectiveExtractedText) {
+                        historicalAppendedText += `\n\n[附加文件: ${filePathForContext}]\n${effectiveExtractedText}\n[/附加文件结束: ${att.name || '未知文件'}]`;
+                    } else {
+                        historicalAppendedText += `\n\n[附加文件: ${filePathForContext}]`;
+                    }
+                }
+                currentMessageTextContent = originalText + historicalAppendedText;
+            } else {
+                currentMessageTextContent = originalText;
+            }
+
+
+            if (msg.attachments && msg.attachments.length > 0) {
+                // --- IMAGE PROCESSING ---
+                const imageAttachmentsPromises = msg.attachments.map(async att => {
+                    const fileManagerData = att._fileManagerData || {};
+                    // 兼容读取：优先从 _fileManagerData 读取，回退到 att 顶层字段
+                    const effectiveImageFrames = fileManagerData.imageFrames || att.imageFrames;
+                    // Case 1: Scanned PDF converted to image frames
+                    if (effectiveImageFrames && effectiveImageFrames.length > 0) {
+                        return effectiveImageFrames.map(frameData => ({
+                            type: 'image_url',
+                            image_url: { url: `data:image/jpeg;base64,${frameData}` }
+                        }));
+                    }
+                    // Case 2: Regular image file (including GIFs that get framed)
+                    if (att.type && att.type.startsWith('image/')) {
+                        try {
+                            const result = await electronAPI.getFileAsBase64(att.src || att.internalPath);
+                            if (result && result.success) {
+                                return result.base64Frames.map(frameData => ({
+                                    type: 'image_url',
+                                    image_url: { url: `data:image/jpeg;base64,${frameData}` }
+                                }));
+                            } else {
+                                const errorMsg = result ? result.error : '未知错误';
+                                console.error(`Failed to get Base64 for ${att.name}: ${errorMsg}`);
+                                uiHelper.showToastNotification(`处理图片 ${att.name} 失败: ${errorMsg}`, 'error');
+                                return null;
+                            }
+                        } catch (processingError) {
+                            console.error(`Exception during getBase64 for ${att.name}:`, processingError);
+                            uiHelper.showToastNotification(`处理图片 ${att.name} 时发生异常: ${processingError.message}`, 'error');
+                            return null;
+                        }
+                    }
+                    return null; // Not an image or a convertible PDF
+                });
+
+                const nestedImageAttachments = await Promise.all(imageAttachmentsPromises);
+                const flatImageAttachments = nestedImageAttachments.flat().filter(Boolean);
+                vcpImageAttachmentsPayload.push(...flatImageAttachments);
+
+                // --- AUDIO PROCESSING ---
+                const supportedAudioTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/aiff', 'audio/aac', 'audio/ogg', 'audio/flac'];
+                const audioAttachmentsPromises = msg.attachments
+                    .filter(att => att.type && supportedAudioTypes.includes(att.type))
+                    .map(async att => {
+                        try {
+                            const result = await electronAPI.getFileAsBase64(att.src || att.internalPath);
+                            if (result && result.success && result.base64Frames.length > 0) {
+                                return result.base64Frames.map(frameData => ({
+                                    type: 'image_url',
+                                    image_url: { url: `data:${att.type};base64,${frameData}` }
+                                }));
+                            } else {
+                                const errorMsg = result ? result.error : '未能获取Base64数据';
+                                console.error(`Failed to get Base64 for audio ${att.name}: ${errorMsg}`);
+                                uiHelper.showToastNotification(`处理音频 ${att.name} 失败: ${errorMsg}`, 'error');
+                                return null;
+                            }
+                        } catch (processingError) {
+                            console.error(`Exception during getBase64 for audio ${att.name}:`, processingError);
+                            uiHelper.showToastNotification(`处理音频 ${att.name} 时发生异常: ${processingError.message}`, 'error');
+                            return null;
+                        }
+                    });
+                const nestedAudioAttachments = await Promise.all(audioAttachmentsPromises);
+                vcpAudioAttachmentsPayload.push(...nestedAudioAttachments.flat().filter(Boolean));
+
+                // --- VIDEO PROCESSING ---
+                const videoAttachmentsPromises = msg.attachments
+                    .filter(att => att.type && att.type.startsWith('video/'))
+                    .map(async att => {
+                        try {
+                            const result = await electronAPI.getFileAsBase64(att.src || att.internalPath);
+                            if (result && result.success && result.base64Frames.length > 0) {
+                                return result.base64Frames.map(frameData => ({
+                                    type: 'image_url',
+                                    image_url: { url: `data:${att.type};base64,${frameData}` }
+                                }));
+                            } else {
+                                const errorMsg = result ? result.error : '未能获取Base64数据';
+                                console.error(`Failed to get Base64 for video ${att.name}: ${errorMsg}`);
+                                uiHelper.showToastNotification(`处理视频 ${att.name} 失败: ${errorMsg}`, 'error');
+                                return null;
+                            }
+                        } catch (processingError) {
+                            console.error(`Exception during getBase64 for video ${att.name}:`, processingError);
+                            uiHelper.showToastNotification(`处理视频 ${att.name} 时发生异常: ${processingError.message}`, 'error');
+                            return null;
+                        }
+                    });
+                const nestedVideoAttachments = await Promise.all(videoAttachmentsPromises);
+                vcpVideoAttachmentsPayload.push(...nestedVideoAttachments.flat().filter(Boolean));
+            }
+
+            let finalContentPartsForVCP = [];
+            if (currentMessageTextContent && currentMessageTextContent.trim() !== '') {
+                finalContentPartsForVCP.push({ type: 'text', text: currentMessageTextContent });
+            }
+            finalContentPartsForVCP.push(...vcpImageAttachmentsPayload);
+            finalContentPartsForVCP.push(...vcpAudioAttachmentsPayload);
+            finalContentPartsForVCP.push(...vcpVideoAttachmentsPayload);
+
+            if (finalContentPartsForVCP.length === 0 && msg.role === 'user') {
+                 finalContentPartsForVCP.push({ type: 'text', text: '(用户发送了附件，但无文本或图片内容)' });
+            }
+
+            return finalContentPartsForVCP.length > 0 ? finalContentPartsForVCP : msg.content;
+        };
+
+        const context = {
+            agentId: currentSelectedItemVal.id,
+            topicId: currentTopicIdVal,
+            isGroupMessage: false,
+        };
+        const { messagesForVCP } = await assembleRequestMessages({
+            electronAPI, tavernEngine: ownerWindow.TavernRulesEngine, agentConfig,
+            history: historyForRegeneration, context,
+            currentUserMessage: [...historyForRegeneration].reverse().find(msg => msg.role === 'user'),
+            buildMessageContent: buildRegenerationContent,
+        });
+        const modelConfigForVCP = {
+            model: agentConfig.model,
+            temperature: parseFloat(agentConfig.temperature),
+            max_tokens: agentConfig.maxOutputTokens ? parseInt(agentConfig.maxOutputTokens) : undefined,
+            contextTokenLimit: agentConfig.contextTokenLimit ? parseInt(agentConfig.contextTokenLimit) : undefined,
+            top_p: agentConfig.top_p ? parseFloat(agentConfig.top_p) : undefined,
+            top_k: agentConfig.top_k ? parseInt(agentConfig.top_k) : undefined,
+            stream: agentConfig.streamOutput === true || String(agentConfig.streamOutput) === 'true'
+        };
+        streamingRequested = modelConfigForVCP.stream;
+        streamContext = context;
+
+        // 与正常单聊发送保持同一运行态契约：流式请求必须在交给上游前建立
+        // StreamProjection 所有权。它会给占位同时添加 streaming + thinking，
+        // 从而启用循环省略号和外层流光边框；首个 IPC start/thinking 事件再次
+        // 初始化时会由 StreamProjection 的幂等检查直接复用当前气泡。
+        const startStreamFn = typeof contextMenuDependencies.startStream === 'function'
+            ? contextMenuDependencies.startStream
+            : contextMenuDependencies['startStreamingMessage'];
+        if (streamingRequested && typeof startStreamFn === 'function') {
+            await startStreamFn({
+                ...regenerationThinkingMessage,
+                ...context,
+                context,
+                content: '',
+                isThinking: true
+            }, regenerationThinkingItem);
+        }
+
+        const vcpResult = await electronAPI.sendToVCP(
+            globalSettingsVal.vcpServerUrl,
+            globalSettingsVal.vcpApiKey,
+            messagesForVCP,
+            modelConfigForVCP,
+            regenerationThinkingMessage.id,
+            false, // isGroupCall - legacy
+            context // Pass the correct context
+        );
+
+        if (modelConfigForVCP.stream) {
+            // 如果流启动失败，vcpResult 会包含错误信息
+            if (vcpResult.streamError || !vcpResult.streamingStarted) {
+                let detailedError = vcpResult.error || '未能启动流';
+                contextMenuDependencies.acceptStreamEvent?.({
+                    type: 'error',
+                    messageId: regenerationThinkingMessage.id,
+                    error: `VCP 流错误 (重新生成): ${detailedError}`,
+                    context,
+                });
+            }
+        } else {
+            // 非流式处理逻辑 - 参考 chatManager.js 的健壮实现
+            const { response, context } = vcpResult; // 【修复1】正确解构返回结果
+            const isForActiveChat = context && context.agentId === currentSelectedItemVal.id && context.topicId === currentTopicIdVal;
+
+            if (isForActiveChat) {
+                contextMenuDependencies.removeMessageById(regenerationThinkingMessage.id, false); // 从UI和内存中移除"思考中"
+            }
+
+            if (response.error) {
+                if (isForActiveChat) {
+                    contextMenuDependencies.renderMessage({ role: 'system', notice: 'error', content: `VCP错误 (重新生成): ${response.error}`, timestamp: Date.now() });
+                }
+            } else if (response.choices && response.choices.length > 0) {
+                const assistantMessageContent = response.choices[0].message.content;
+                const assistantMessage = {
+                    role: 'assistant',
+                    name: agentConfig.name,
+                    avatarUrl: agentConfig.avatarUrl,
+                    avatarColor: agentConfig.avatarCalculatedColor,
+                    content: assistantMessageContent,
+                    timestamp: Date.now(),
+                    id: response.id || `msg_${Date.now()}_assistant_${Math.random().toString(36).substring(2, 9)}`
+                };
+
+                // 【修复2】采用更健壮的“读-改-写”模式
+                if (!mainRefs.historyMutationAuthority) throw new Error('History mutation authority is required for regeneration');
+                const commit = await mainRefs.historyMutationAuthority.mutate({
+                    itemId: context.agentId,
+                    itemType: context.isGroupMessage ? 'group' : 'agent',
+                    topicId: context.topicId,
+                    category: 'regeneration-terminal',
+                }, historyForSave => {
+                    const finalHistory = historyForSave.filter(msg => msg.id !== regenerationThinkingMessage.id && !msg.isThinking);
+                    finalHistory.push(assistantMessage);
+                    return finalHistory;
+                });
+                const finalHistory = [...commit.history];
+
+                if (isForActiveChat) {
+                    mainRefs.currentChatHistoryRef.set(finalHistory);
+                    contextMenuDependencies.renderMessage(assistantMessage);
+                }
+            }
+            if (isForActiveChat) {
+                uiHelper.scrollToBottom();
+            }
+        }
+
+    } catch (error) {
+        if (streamingRequested && streamContext) {
+            contextMenuDependencies.acceptStreamEvent?.({
+                type: 'error',
+                messageId: regenerationThinkingMessage.id,
+                error: `客户端错误 (重新生成): ${error.message}`,
+                context: streamContext,
+            });
+        } else {
+            const failedHistory = currentChatHistoryArray.filter(message => message.id !== regenerationThinkingMessage.id);
+            mainRefs.currentChatHistoryRef.set(failedHistory);
+            contextMenuDependencies.removeMessageById(regenerationThinkingMessage.id, false);
+            contextMenuDependencies.renderMessage({
+                role: 'system',
+                content: `客户端错误 (重新生成): ${error.message}`,
+                timestamp: Date.now(),
+            });
+            if (currentSelectedItemVal.id && currentTopicIdVal && mainRefs.historyMutationAuthority) {
+                await mainRefs.historyMutationAuthority.replace({
+                    itemId: currentSelectedItemVal.id,
+                    itemType: currentSelectedItemVal.type,
+                    topicId: currentTopicIdVal,
+                    category: 'regeneration-failure-cleanup',
+                }, failedHistory);
+            }
+        }
+        uiHelper.scrollToBottom();
+    }
+}
+
+function setContextMenuDependencies(newDependencies) {
+    contextMenuDependencies = { ...contextMenuDependencies, ...newDependencies };
+}
+
+function dispose() {
+    ownerDocument?.removeEventListener('click', closeContextMenuOnClickOutside, true);
+    closeContextMenu();
+    closeTopicContextMenu();
+    mainRefs = {};
+    contextMenuDependencies = {};
+    ownerDocument = null;
+    ownerWindow = null;
+}
+
+return Object.freeze({
+    initializeContextMenu,
+    showContextMenu,
+    closeContextMenu,
+    toggleEditMode,
+    handleRegenerateResponse,
+    setContextMenuDependencies,
+    dispose,
+});
+}

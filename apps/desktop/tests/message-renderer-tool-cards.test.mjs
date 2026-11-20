@@ -1,0 +1,679 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { JSDOM } from 'jsdom';
+
+const require = createRequire(import.meta.url);
+const { marked } = require('marked');
+
+// 服务器回传的真实形态：每个工具结果都包在一对 User 分界里，请求参数里常带引号和反斜杠。
+const S = '「始」';
+const E = '「末」';
+const REQ = (tool, fields) => `<<<[TOOL_REQUEST]>>>\ntool_name:${S}${tool}${E},\n${fields}\n<<<[END_TOOL_REQUEST]>>>`;
+const RESULT = (tool, body) => `<<<[ROLE_DIVIDE_USER]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: ${tool}\n- 执行状态: ✅ SUCCESS\n- 返回内容: ${body}\nVCP调用结果结束]]\n\n<<<[END_ROLE_DIVIDE_USER]>>>`;
+const POWERSHELL = "Set-Location 'H:\\VCP\\VCPChat'; $env:PUPPETEER_EXECUTABLE_PATH='C:\\Program Files (x86)\\Microsoft\\Edge'";
+const TRANSCRIPT = [
+    '先改代码再跑一下。',
+    REQ('ProjectForge', `command:${S}EditCode${E},\npath:${S}src/a.js${E}`),
+    RESULT('ProjectForge', '## ✅ 已写入 · `src/a.js`\n### Diff (+1 -1)'),
+    REQ('PowerShellExecutor', `command:${S}${POWERSHELL}${E}`),
+    RESULT('PowerShellExecutor', 'ok'),
+    '都完成了。',
+].join('\n\n');
+
+function createRef(initialValue) {
+    let value = initialValue;
+    return {
+        get: () => value,
+        set: nextValue => { value = nextValue; },
+    };
+}
+
+function createVisibilityStub() {
+    return {
+        initializeVisibilityOptimizer() {},
+        observeMessage() {},
+        unobserveMessage() {},
+        destroyVisibilityOptimizer() {},
+        isMessageInHotZone: () => true,
+        recheckVisibility() {},
+        registerAnimeInstance() {},
+        registerThreeContext() {},
+        registerCanvasAnimation() {},
+        isMessagePaused: () => false,
+        createPausableRAF: () => callback => setTimeout(() => callback(Date.now()), 0),
+        createPausableTimerAPI: () => ({
+            setTimeout,
+            clearTimeout,
+            setInterval,
+            clearInterval,
+        }),
+    };
+}
+
+async function createRendererFixture(messageContent, appearanceProfile, markdown = marked) {
+    const dom = new JSDOM(
+        '<!doctype html><html><head></head><body><div class="chat-messages-container"><div id="chat"></div></div></body></html>',
+        {
+            url: 'https://vcpchat.local/',
+            pretendToBeVisual: true,
+        },
+    );
+    const previousGlobals = {
+        window: globalThis.window,
+        document: globalThis.document,
+        Node: globalThis.Node,
+        NodeFilter: globalThis.NodeFilter,
+        MutationObserver: globalThis.MutationObserver,
+    };
+    if (appearanceProfile) {
+        dom.window.document.documentElement.dataset.uiMode = 'next';
+        dom.window.VCPAppearance = { getCurrent: () => appearanceProfile };
+    }
+    globalThis.window = dom.window;
+    globalThis.document = dom.window.document;
+    globalThis.Node = dom.window.Node;
+    globalThis.NodeFilter = dom.window.NodeFilter;
+    globalThis.MutationObserver = dom.window.MutationObserver;
+
+    const [{ createStreamProjection }, { createStreamTransientHistory }, { createMessageRenderer }] = await Promise.all([
+        import('../modules/renderer/streamManager.js'),
+        import('../modules/chat/streamTransientHistory.js'),
+        import('../modules/messageRenderer.js'),
+    ]);
+
+    const historyRef = createRef([]);
+    const selectedRef = createRef({
+        id: 'tool-card-agent',
+        type: 'agent',
+        name: 'Tool Card Agent',
+        avatarUrl: 'assets/default_avatar.png',
+        config: {},
+    });
+    const topicRef = createRef('tool-card-topic');
+    const settingsRef = createRef({
+        enableSmoothStreaming: false,
+        enableAiMessageButtons: false,
+        userAvatarUrl: 'assets/default_user_avatar.png',
+    });
+    const repository = {
+        async getHistory() { return historyRef.get(); },
+        async saveHistory() { return { success: true }; },
+    };
+    const transientStreamHistory = createStreamTransientHistory({
+        repository,
+        currentHistory: {
+            get: historyRef.get,
+            replace: historyRef.set,
+        },
+    });
+    const streamProjection = createStreamProjection();
+    const renderer = createMessageRenderer({
+        streamManager: streamProjection,
+        visibilityOptimizer: createVisibilityStub(),
+        enableContextMenu: false,
+        enableMiddleClick: false,
+        exposeGlobalCommands: false,
+    });
+    const root = dom.window.document.getElementById('chat');
+    const electronAPI = {
+        async getEmoticonLibrary() { return []; },
+        onDesktopStatus() { return () => {}; },
+        openImageViewer() {},
+        showImageContextMenu() {},
+        sovitsStop() {},
+        async saveAvatarColor() { return { success: true }; },
+    };
+    renderer.initializeMessageRenderer({
+        chatMessagesDiv: root,
+        electronAPI,
+        chatRepository: repository,
+        historyMutationAuthority: {
+            async replace(_context, history) {
+                historyRef.set([...history]);
+                return history;
+            },
+        },
+        transientStreamHistory,
+        markedInstance: markdown,
+        morphdom: require('morphdom'),
+        uiHelper: {
+            scrollToBottom() {},
+            showToastNotification() {},
+        },
+        currentChatHistoryRef: historyRef,
+        currentSelectedItemRef: selectedRef,
+        currentTopicIdRef: topicRef,
+        globalSettingsRef: settingsRef,
+        summarizeTopicFromMessages: async () => null,
+        handleCreateBranch: async () => null,
+        messageCommands: {
+            updateSendButtonState() {},
+            syncNextUiEmptyStateWithMessages() {},
+            handleSendMessage: async () => {},
+        },
+    });
+
+    const message = {
+        id: 'tool-card-message',
+        role: 'assistant',
+        content: messageContent,
+        timestamp: Date.now(),
+    };
+    historyRef.set([message]);
+    const messageItem = await renderer.renderMessage(message, false, true);
+
+    return {
+        dom,
+        renderer,
+        streamProjection,
+        messageItem,
+        historyRef,
+        settingsRef,
+        selectedRef,
+        restoreGlobals() {
+            globalThis.window = previousGlobals.window;
+            globalThis.document = previousGlobals.document;
+            globalThis.Node = previousGlobals.Node;
+            globalThis.NodeFilter = previousGlobals.NodeFilter;
+            globalThis.MutationObserver = previousGlobals.MutationObserver;
+        },
+    };
+}
+
+async function disposeFixture(fixture) {
+    try {
+        fixture.renderer.disposeRendererResources();
+        await fixture.streamProjection.dispose();
+    } finally {
+        fixture.restoreGlobals();
+        fixture.dom.window.close();
+    }
+}
+
+test('lazy renderer labels malformed declared JEV without promoting payload literals', async () => {
+    for (const [fields, isJev, malformed] of [
+        ['JEV:「始»联络[Grok]«末」', true, true],
+        [`JEV:${S}联络[Grok]${E}`, true, false],
+        ['content:「始ESCAPE」example JEV:「始»data«末」「末ESCAPE」', false, true],
+        [`tool_name:${S}Demo${E}\nJEV:「始»data«末」`, false, true],
+    ]) {
+        const fixture = await createRendererFixture(`<<<[TOOL_REQUEST]>>>\n${fields}\n<<<[END_TOOL_REQUEST]>>>`, {toolPresentation:'legacy', toolExpansion:'none'});
+        try {
+            const card = fixture.messageItem.querySelector('.vcp-tool-use-bubble');
+            assert.ok(card);
+            assert.equal(card.dataset.vcpBlockType, isJev ? 'jev-tool-use' : 'tool-use');
+            assert.equal(card.classList.contains('is-malformed'), malformed);
+            if (isJev && malformed) {
+                assert.match(card.textContent, /字段标记写法有误.*JEV/);
+                assert.doesNotMatch(card.textContent, /未识别 tool_name/);
+            } else if (!isJev && !fields.includes('tool_name')) assert.match(card.textContent, /未识别 tool_name/);
+            else if (!isJev) {
+                assert.match(card.textContent, /Demo/);
+                assert.doesNotMatch(card.textContent, /未识别 tool_name/);
+            }
+        } finally { await disposeFixture(fixture); }
+    }
+});
+
+
+async function renderTranscript(toolPresentation) {
+    const fixture = await createRendererFixture(TRANSCRIPT, { toolPresentation, toolExpansion: 'none' });
+    const content = fixture.messageItem.querySelector('.md-content');
+    // 卡片样式在附件等异步步骤之后才套用。
+    for (let i = 0; i < 100 && !content.dataset.vcpToolPresentation; i++) await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(content.dataset.vcpToolPresentation, toolPresentation);
+    return { fixture, content };
+}
+
+function visibleDividers(content) {
+    return [...content.querySelectorAll('.vcp-role-divider')].filter(node => node.dataset.vcpToolWrapper !== 'true');
+}
+
+test('tool request fields reach the card once-escaped: quotes stay quotes in the title and the details', async () => {
+    const { fixture, content } = await renderTranscript('compact');
+    try {
+        const request = [...content.querySelectorAll('[data-vcp-block-type="tool-use"]')].find(node => node.textContent.includes('PowerShellExecutor'));
+        assert.ok(request, 'PowerShell request must render as a card');
+        const title = request.querySelector('.vcp-tool-row-title').textContent;
+        assert.match(title, /Set-Location 'H:\\VCP\\VCPChat'/);
+        assert.doesNotMatch(title, /&#039;|&amp;/);
+        assert.equal(request.querySelector('template'), null);
+        assert.equal(request.querySelector('.vcp-tool-details').textContent, '');
+        request.querySelector('.vcp-tool-row-toggle').click();
+        const details = request.querySelector('.vcp-tool-details').textContent;
+        assert.ok(details.includes(POWERSHELL), 'expanded details must show the original command');
+        request.querySelector('.vcp-tool-row-toggle').click();
+        assert.equal(request.querySelector('.vcp-tool-details').textContent, '');
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+test('grouped style keeps a whole tool run in one group instead of splitting at each result wrapper', async () => {
+    const { fixture, content } = await renderTranscript('grouped');
+    try {
+        const groups = content.querySelectorAll('.vcp-tool-process');
+        assert.equal(groups.length, 1);
+        assert.match(groups[0].querySelector('.vcp-tool-process-title').textContent, /2 请求 2 结果/);
+        assert.equal(visibleDividers(content).length, 0);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+test('single-line style folds each wrapped result into the request row before it', async () => {
+    const { fixture, content } = await renderTranscript('inline');
+    try {
+        const merged = content.querySelectorAll('[data-vcp-block-type="tool-result"][data-vcp-tool-merged="true"]');
+        assert.equal(merged.length, 2);
+        assert.equal(content.querySelectorAll('[data-vcp-tool-pending="true"]').length, 0);
+        assert.equal(visibleDividers(content).length, 0);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+test('legacy style still shows the role dividers around results', async () => {
+    const { fixture, content } = await renderTranscript('legacy');
+    try {
+        assert.equal(content.querySelectorAll('.vcp-role-divider').length, 4);
+        assert.equal(content.querySelectorAll('[data-vcp-tool-wrapper]').length, 0);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+test('emoticon before tool results cannot hide role wrappers and summaries in final render', async () => {
+    const text = [
+        '正文 (`・ω・´)ゞ',
+        REQ('Demo', `command:${S}Read${E}`),
+        RESULT('Demo', '```js\nconst literal = "`";\n```\n<div>data only</div>').replace(
+            '<<<[END_ROLE_DIVIDE_USER]>>>',
+            '[本轮工具调用摘要:]\nDemo 调用成功。\n[本轮工具调用摘要结束]\n<<<[END_ROLE_DIVIDE_USER]>>>'),
+        '后文 `<style>`。',
+        '```js\nx\n```\n',
+    ].join('\n\n');
+    const fixture = await createRendererFixture(text, {toolPresentation:'legacy', toolExpansion:'none'});
+    try {
+        await new Promise(resolve => setTimeout(resolve, 30));
+        const content = fixture.messageItem.querySelector('.md-content');
+        assert.equal(content.querySelectorAll('.vcp-role-divider').length, 2);
+        assert.ok(content.querySelector('[data-vcp-block-type="tool-use"]'));
+        assert.ok(content.querySelector('[data-vcp-block-type="tool-result"]'));
+        assert.doesNotMatch(content.textContent, /<<<\[(?:END_)?ROLE_DIVIDE_USER\]>>>|\[本轮工具调用摘要/);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+test('live stable highlights and request cards survive a split tool result before terminal', async () => {
+    const fixture = await createRendererFixture('', {toolPresentation:'legacy', toolExpansion:'none'});
+    const {streamProjection: projection, messageItem} = fixture;
+    const context = {agentId:'tool-card-agent', topicId:'tool-card-topic'};
+    const wait = () => new Promise(resolve => setTimeout(resolve, 160));
+    try {
+        await projection.startStreamingMessage({
+            id:'tool-card-message', role:'assistant', content:'', ...context,
+        }, messageItem);
+        projection.appendStreamChunk('tool-card-message', {content:'“引用” @测试 @!核心 (`・ω・´)ゞ\n\n第二段。\n\n第三段。\n\n'}, context);
+        await wait();
+        const stable = messageItem.querySelector('.vcp-stream-stable-block');
+        assert.ok(stable, 'ordinary paragraphs must stabilize while stream remains active');
+        assert.ok(stable.querySelector('.highlighted-quote'));
+        assert.ok(stable.querySelector('.highlighted-tag'));
+        assert.ok(stable.querySelector('.highlighted-alert-tag'));
+        projection.appendStreamChunk('tool-card-message', {content:REQ('Demo', `command:${S}Read${E}`)+'\n\n'}, context);
+        await wait();
+        const request = messageItem.querySelector('[data-vcp-block-type="tool-use"]');
+        assert.ok(request);
+        const result = RESULT('Demo', '```js\nconst face = "`";\n```\n<div>raw</div>');
+        const split = result.indexOf('VCP调用结果结束');
+        projection.appendStreamChunk('tool-card-message', {content:result.slice(0, split)}, context);
+        await wait();
+        assert.equal(request.isConnected, true);
+        projection.appendStreamChunk('tool-card-message', {content:result.slice(split)+'\n\n完成。\n\n'}, context);
+        await wait();
+        assert.equal(request.isConnected, true);
+        assert.ok(messageItem.querySelector('[data-vcp-block-type="tool-result"]'));
+        const stableRoot = messageItem.querySelector('.vcp-stream-stable-blocks');
+        assert.doesNotMatch(stableRoot?.textContent || '', /<<<\[(?:END_)?ROLE_DIVIDE_USER\]>>>/);
+        assert.equal(projection.isMessageActive('tool-card-message'), true);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+
+test('ProjectForge topic surface is enabled and revoked by edits and clear', async () => {
+    const fixture = await createRendererFixture(TRANSCRIPT, {toolPresentation:'compact', toolExpansion:'none'});
+    try {
+        const root = fixture.messageItem.parentElement;
+        assert.equal(root.dataset.vcpProjectforgeTopic, 'true');
+        fixture.renderer.updateMessageContent('tool-card-message', '调用已移除');
+        assert.equal(root.hasAttribute('data-vcp-projectforge-topic'), false);
+        fixture.renderer.updateMessageContent('tool-card-message', TRANSCRIPT);
+        assert.equal(root.dataset.vcpProjectforgeTopic, 'true');
+        fixture.renderer.clearChat();
+        assert.equal(root.hasAttribute('data-vcp-projectforge-topic'), false);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+test('ProjectForge streaming tool name enables the topic surface before request completion', async () => {
+    const fixture = await createRendererFixture('', {toolPresentation:'legacy', toolExpansion:'none'});
+    const context = {agentId:'tool-card-agent', topicId:'tool-card-topic'};
+    try {
+        await fixture.streamProjection.startStreamingMessage({
+            id:'tool-card-message', role:'assistant', content:'', ...context,
+        }, fixture.messageItem);
+        fixture.streamProjection.appendStreamChunk('tool-card-message', {
+            content:'<<<[TOOL_REQUEST]>>>\ntool_name:「始」ProjectForge「末」,\n',
+        }, context);
+        await new Promise(resolve => setTimeout(resolve, 200));
+        assert.equal(fixture.messageItem.parentElement.dataset.vcpProjectforgeTopic, 'true');
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+
+test('ProjectForge request with valet before tool_name activates the actual renderer root', async () => {
+    const content = `<<<[TOOL_REQUEST]>>>
+valet:「始」Kerr「末」,
+tool_name:「始」ProjectForge「末」,
+command:「始」ListProjects「末」,
+workspace:「始」vcpchat「末」,
+ink:「始」mark_history「末」
+<<<[END_TOOL_REQUEST]>>>`;
+    const fixture = await createRendererFixture(content, {toolPresentation:'legacy', toolExpansion:'none'});
+    try {
+        assert.equal(fixture.messageItem.parentElement.dataset.vcpProjectforgeTopic, 'true');
+        assert.ok(fixture.messageItem.querySelector('.vcp-tool-use-bubble'));
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+
+test('four-message history with a 600K tool-heavy bubble never parses collapsed payloads', async () => {
+    const marker = 'LAZY_PAYLOAD_SENTINEL';
+    const payload = marker + '\n' + 'const source = 123456789;\n'.repeat(210);
+    const text = Array.from({length:140}, (_, i) =>
+        REQ('ProjectForge', `command:${S}${i < 100 ? 'GetCode' : 'EditCode'}${E},\npath:${S}src/file-${i}.js${E},\ncontent:${S}${payload}${E}`) +
+        '\n\n' + RESULT('ProjectForge', '```js\n' + payload + '\n```')
+    ).join('\n\n') + '\n\n最终回答。';
+    assert.ok(text.length > 600000);
+    const parsed = [];
+    const fixture = await createRendererFixture('', {toolPresentation:'compact', toolExpansion:'none'}, {
+        parse(source, options) { parsed.push(source); return marked.parse(source, options); },
+    });
+    try {
+        fixture.renderer.clearChat();
+        const history = [
+            {id:'u1', role:'user', content:'开始', timestamp:1},
+            {id:'a1', role:'assistant', content:'准备好了', timestamp:2},
+            {id:'u2', role:'user', content:'读取并修改文件', timestamp:3},
+            {id:'a2', role:'assistant', content:text, timestamp:4},
+        ];
+        fixture.historyRef.set(history);
+        const start = performance.now();
+        await fixture.renderer.renderHistory(history);
+        await new Promise(resolve => setTimeout(resolve, 30));
+        const root = fixture.dom.window.document.getElementById('chat');
+        const bubble = root.querySelector('[data-message-id="a2"] .md-content');
+        assert.equal(root.querySelectorAll('.message-item').length, 4);
+        assert.equal(bubble.querySelectorAll('[data-vcp-lazy-tool-id]').length, 280);
+        assert.equal(bubble.querySelectorAll('template, .vcp-tool-details pre, .vcp-tool-result-item').length, 0);
+        assert.ok(!parsed.some(source => source.includes(marker)), 'no collapsed tool payload may reach Markdown');
+        assert.ok(bubble.innerHTML.length < text.length / 2);
+        console.log(`[LazyTools] source=${text.length} initialHTML=${bubble.innerHTML.length} loadMs=${Math.round(performance.now()-start)}`);
+        const result = bubble.querySelector('.vcp-tool-result-bubble');
+        result.querySelector('.vcp-tool-row-toggle').click();
+        assert.ok(result.textContent.includes(marker));
+        assert.equal(parsed.filter(source => source.includes(marker)).length, 1);
+        result.querySelector('.vcp-tool-row-toggle').click();
+        assert.equal(result.querySelector('.vcp-tool-result-collapsible-content').childNodes.length, 0);
+        assert.equal(fixture.historyRef.get()[3].content, text);
+        fixture.renderer.clearChat();
+        assert.equal(fixture.renderer.getLazyToolStats().entries, 0);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+test('legacy request and result clicks mount only the selected block and release on collapse', async () => {
+    const fixture = await createRendererFixture(TRANSCRIPT, {toolPresentation:'legacy', toolExpansion:'none'});
+    try {
+        await new Promise(resolve => setTimeout(resolve, 30));
+        const content = fixture.messageItem.querySelector('.md-content');
+        const request = content.querySelector('.vcp-tool-use-bubble');
+        const result = content.querySelector('.vcp-tool-result-bubble');
+        request.querySelector('.vcp-tool-summary').click();
+        assert.match(request.querySelector('.vcp-tool-details').textContent, /EditCode/);
+        assert.equal(result.querySelector('.vcp-tool-result-collapsible-content').childNodes.length, 0);
+        result.querySelector('.vcp-tool-result-header').click();
+        assert.ok(result.querySelector('.vcp-tool-result-markdown-content'));
+        result.querySelector('.vcp-tool-result-header').click();
+        assert.equal(result.querySelector('.vcp-tool-result-collapsible-content').childNodes.length, 0);
+        request.querySelector('.vcp-tool-summary').click();
+        assert.equal(request.querySelector('.vcp-tool-details').childNodes.length, 0);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+test('closed turn keeps even failed result bodies unparsed until its group opens', async () => {
+    const text = TRANSCRIPT.replace('✅ SUCCESS', '❌ ERROR');
+    const fixture = await createRendererFixture(text, {toolPresentation:'process', toolExpansion:'attention'});
+    try {
+        await new Promise(resolve => setTimeout(resolve, 30));
+        const group = fixture.messageItem.querySelector('.vcp-tool-process');
+        assert.ok(group.querySelector('.vcp-tool-process-body').hidden);
+        assert.equal(group.querySelectorAll('.vcp-tool-result-item').length, 0);
+        group.querySelector('.vcp-tool-process-toggle').click();
+        assert.ok(group.querySelector('.vcp-tool-result-item'));
+        group.querySelector('.vcp-tool-process-toggle').click();
+        assert.equal(group.querySelectorAll('.vcp-tool-result-item').length, 0);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+
+test('context checkpoint is a closed inert user card and preserves raw content on update', async () => {
+    const fixture = await createRendererFixture('', { toolPresentation: 'legacy', toolExpansion: 'none' });
+    try {
+        const content = '<context_checkpoint>\n$x$ &amp; src/core/kbm.rs\n</context_checkpoint>\n<script>bad()</script>\n' + TRANSCRIPT;
+        const message = {
+            id: 'checkpoint-card', role: 'user', timestamp: Date.now(), content,
+            contextCompaction: {
+                kind: 'vchat-context-checkpoint', version: 1,
+                checkpoint: '<context_checkpoint>state</context_checkpoint>',
+                diaries: [], sourceCount: 12,
+            },
+        };
+        fixture.historyRef.set([message]);
+        const item = await fixture.renderer.renderMessage(message);
+        await new Promise(resolve => setTimeout(resolve, 40));
+        const card = item.querySelector('details.vcp-context-checkpoint');
+        assert.ok(card);
+        assert.equal(card.open, false);
+        assert.equal(card.querySelector('.vcp-context-checkpoint-body').textContent, content);
+        assert.equal(item.querySelector('script, .katex, .vcp-tool-use-bubble, .vcp-role-divider'), null);
+        message.content = content + '\n更新 $&';
+        fixture.renderer.updateMessageContent(message.id, message.content);
+        await new Promise(resolve => setTimeout(resolve, 40));
+        assert.equal(item.querySelector('.vcp-context-checkpoint-body').textContent, message.content);
+        assert.equal(item.querySelector('details').open, false);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+
+test('atomic batch hides markers, seals HTML, preserves records and excludes all receipt text from TTS', async () => {
+    const id = '2026-10-29T12:51:34.979Z';
+    const body = '框外机密<style>.batch-evil{color:red}</style><script>bad()</script>\n'
+        + '[[VCP调用结果信息汇总:\n- 工具名称: Demo\n- 执行状态: SUCCESS\n- 返回内容: <img src=x onerror="bad()">\n[危险链接](javascript:bad())\nVCP调用结果结束]]\n'
+        + '[本轮工具调用摘要:]Demo 调用成功，记录 ID: record-123[本轮工具调用摘要结束]';
+    const receipt = `<<<[VCP_TOOL_BATCH_START:${id}]>>>\n${body}\n<<<[VCP_TOOL_BATCH_END:${id}]>>>`;
+    const text = '前文\n\n' + receipt + '\n\n后文';
+    const fixture = await createRendererFixture(text, { toolPresentation: 'legacy', toolExpansion: 'none' });
+    try {
+        await new Promise(resolve => setTimeout(resolve, 40));
+        const content = fixture.messageItem.querySelector('.md-content');
+        assert.doesNotMatch(content.textContent, /VCP_TOOL_BATCH/);
+        assert.doesNotMatch(content.textContent, /record-123/);
+        assert.ok(content.querySelector('.vcp-tool-call-summary-chip.status-success'));
+        assert.equal([...content.querySelectorAll('pre')].filter(node => !node.textContent.trim()).length, 0,
+            'batch whitespace must not create empty code cards');
+        assert.equal(fixture.dom.window.document.head.querySelector('style[data-vcp-scope-id]'), null);
+        assert.equal(content.querySelector('script, style, iframe, [onerror]'), null);
+        const result = content.querySelector('.vcp-tool-result-bubble');
+        assert.ok(result);
+        result.querySelector('.vcp-tool-result-header').click();
+        assert.equal(content.querySelector('script, style, iframe, [onerror], a[href^="javascript:"]'), null);
+        assert.equal(fixture.renderer.extractSpeakableTextFromContentElement(content), '前文\n\n后文');
+        assert.equal(fixture.historyRef.get()[0].content, text);
+        result.querySelector('.vcp-tool-result-delete-btn').click();
+        assert.match(fixture.historyRef.get()[0].content, /\[HIDDEN\]/);
+        assert.match(fixture.historyRef.get()[0].content, /record-123/);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+
+test('atomic receipts remain transparent to existing tool presentation modes', async () => {
+    for (const style of ['compact', 'grouped', 'inline', 'process']) {
+        const id = '2026-10-29T12:51:34.979Z';
+        const result = '[[VCP调用结果信息汇总:\n- 工具名称: Demo\n- 执行状态: SUCCESS\n- 返回内容: secret\nVCP调用结果结束]]';
+        const receipt = `<<<[VCP_TOOL_BATCH_START:${id}]>>>\n${result}\n<<<[VCP_TOOL_BATCH_END:${id}]>>>`;
+        const text = REQ('Demo', `command:${S}ReadFile${E}`) + '\n\n' + receipt + '\n\n正文';
+        const fixture = await createRendererFixture(text, { toolPresentation: style, toolExpansion: 'none' });
+        try {
+            await new Promise(resolve => setTimeout(resolve, 40));
+            const content = fixture.messageItem.querySelector('.md-content');
+            assert.equal(content.querySelectorAll('.vcp-tool-result-bubble').length, 1);
+            assert.doesNotMatch(content.textContent, /VCP_TOOL_BATCH/);
+            assert.equal(fixture.renderer.extractSpeakableTextFromContentElement(content), '正文');
+            if (style === 'inline' || style === 'process') {
+                assert.ok(content.querySelector('[data-vcp-tool-merged="true"]'));
+            }
+            if (style === 'grouped') assert.equal(content.querySelectorAll('.vcp-tool-process').length, 1);
+        } finally {
+            await disposeFixture(fixture);
+        }
+    }
+});
+
+
+test('smooth streaming commits an atomic role-wrapped batch without exposing control markers or payload', async () => {
+    const fixture = await createRendererFixture('', { toolPresentation: 'legacy', toolExpansion: 'none' });
+    const context = { agentId: 'tool-card-agent', topicId: 'tool-card-topic' };
+    const id = '2026-10-29T12:51:34.979Z';
+    const receipt = `<<<[ROLE_DIVIDE_USER]>>>\n<<<[VCP_TOOL_BATCH_START:${id}]>>>\n`
+        + '[[VCP调用结果信息汇总:\n- 工具名称: Demo\n- 执行状态: SUCCESS\n- 返回内容: ```html\n<style>.evil{color:red}</style><script>bad()</script>\nVCP调用结果结束]]\n'
+        + `[本轮工具调用摘要:]成功 record-stream[本轮工具调用摘要结束]\n<<<[VCP_TOOL_BATCH_END:${id}]>>>\n<<<[END_ROLE_DIVIDE_USER]>>>\n`;
+    try {
+        await fixture.streamProjection.startStreamingMessage({
+            id: 'tool-card-message', role: 'assistant', content: '', ...context,
+        }, fixture.messageItem);
+        fixture.dom.window.document.documentElement.dataset.uiMode = 'next';
+        // 修改实际设置引用：本测试使用真实投影队列。
+        fixture.settingsRef.set({ enableSmoothStreaming: true, enableAiMessageButtons: false });
+        fixture.streamProjection.appendStreamChunk('tool-card-message', { content: receipt }, context);
+        await new Promise(resolve => setTimeout(resolve, 160));
+        const content = fixture.messageItem.querySelector('.md-content');
+        assert.ok(content.querySelector('.vcp-tool-result-bubble'));
+        assert.doesNotMatch(content.textContent, /VCP_TOOL_BATCH/);
+        assert.equal(content.querySelector('script, style'), null);
+        assert.equal(fixture.renderer.extractSpeakableTextFromContentElement(content), '');
+        fixture.streamProjection.appendStreamChunk('tool-card-message', { content: '\n完成正文。\n\n第二段。\n\n尾部。' }, context);
+        await fixture.streamProjection.projectStreamTerminal('tool-card-message', 'completed', context, {
+            fullResponse: receipt + '\n完成正文。\n\n第二段。\n\n尾部。',
+        });
+        assert.match(fixture.renderer.extractSpeakableTextFromContentElement(content), /完成正文/);
+        assert.doesNotMatch(fixture.renderer.extractSpeakableTextFromContentElement(content), /record-stream|evil|bad/);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+
+test('batch boundaries reset Markdown, protocol and HTML parser state in both directions', async () => {
+    const id = '2026-10-29T21:25:17.192+08:00';
+    const receipt = `<<<[ROLE_DIVIDE_USER]>>>\n<<<[VCP_TOOL_BATCH_START:${id}]>>>\n`
+        + '[[VCP调用结果信息汇总:\n- 工具名称: BoundaryDemo\n- 执行状态: SUCCESS\n- 返回内容: ```\n</pre> --> </think> $$\nVCP调用结果结束]]\n'
+        + `<<<[VCP_TOOL_BATCH_END:${id}]>>>\n<<<[END_ROLE_DIVIDE_USER]>>>`;
+    for (const opener of ['```js\nopen', '<!-- open', '<pre>open', '<div><b>open', '<think>\nopen', '$$\nopen']) {
+        const text = opener + '\n' + receipt + '\n\n## 后文独立标题';
+        const fixture = await createRendererFixture(text, { toolPresentation: 'legacy', toolExpansion: 'none' });
+        try {
+            await new Promise(resolve => setTimeout(resolve, 30));
+            const content = fixture.messageItem.querySelector('.md-content');
+            const card = content.querySelector('.vcp-tool-result-bubble');
+            assert.ok(card, opener);
+            assert.equal(card.closest('pre, code, think, b'), null, opener);
+            assert.equal(content.querySelector('h2')?.textContent, '后文独立标题', opener);
+            assert.equal(content.querySelectorAll('.vcp-role-divider').length, 2, opener);
+            assert.doesNotMatch(content.textContent, /VCP_TOOL_BATCH|ROLE_DIVIDE/);
+            assert.equal(fixture.historyRef.get()[0].content, text);
+        } finally {
+            await disposeFixture(fixture);
+        }
+    }
+});
+
+test('multiple batch domains keep global result ordinals and independent styles', async () => {
+    const receipt = id => `<<<[VCP_TOOL_BATCH_START:${id}]>>>\n`
+        + '[[VCP调用结果信息汇总:\n- 工具名称: Demo\n- 执行状态: SUCCESS\n- 返回内容: payload\nVCP调用结果结束]]\n'
+        + `<<<[VCP_TOOL_BATCH_END:${id}]>>>`;
+    const text = '<style>.before{color:red}</style>\n' + receipt('one')
+        + '\n<style>.after{color:blue}</style>\n' + receipt('two') + '\n正文';
+    const fixture = await createRendererFixture(text, { toolPresentation: 'legacy', toolExpansion: 'none' });
+    try {
+        await new Promise(resolve => setTimeout(resolve, 30));
+        const content = fixture.messageItem.querySelector('.md-content');
+        assert.deepEqual([...content.querySelectorAll('.vcp-tool-result-bubble')].map(node => node.dataset.vcpToolResultIndex), ['0', '1']);
+        const styles = fixture.dom.window.document.head.querySelector('style[data-vcp-scope-id]')?.textContent || '';
+        assert.match(styles, /\.before/);
+        assert.match(styles, /\.after/);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});
+
+
+test('frontend regex and CSS extraction cannot match through a receipt', async () => {
+    const batch = '<<<[ROLE_DIVIDE_USER]>>>\n<<<[VCP_TOOL_BATCH_START:rules]>>>\n'
+        + '[[VCP调用结果信息汇总:\n- 工具名称: ProtectedTool\n- 执行状态: SUCCESS\n- 返回内容: secret\nVCP调用结果结束]]\n'
+        + '<<<[VCP_TOOL_BATCH_END:rules]>>>\n<<<[END_ROLE_DIVIDE_USER]>>>';
+    const fixture = await createRendererFixture('', { toolPresentation: 'legacy', toolExpansion: 'none' });
+    try {
+        await new Promise(resolve => setTimeout(resolve, 40));
+        const selected = fixture.selectedRef.get();
+        fixture.selectedRef.set({
+            ...selected,
+            config: {
+                stripRegexes: [
+                    { findPattern: '/BEGIN[\\s\\S]*END/g', replaceWith: 'CROSSED' },
+                    { findPattern: '/ProtectedTool/g', replaceWith: 'CHANGED' },
+                ].map(rule => ({ ...rule, applyToFrontend: true, applyToRoles: ['assistant'] })),
+            },
+        });
+        const source = 'BEGIN\n<style>.cross{color:red}\n' + batch + '\n</style>\nEND\n\n## 正文';
+        fixture.historyRef.get()[0].content = source;
+        fixture.renderer.updateMessageContent('tool-card-message', source);
+        await new Promise(resolve => setTimeout(resolve, 40));
+        const content = fixture.messageItem.querySelector('.md-content');
+        assert.equal(content.querySelector('.vcp-tool-result-name')?.textContent, 'ProtectedTool');
+        assert.doesNotMatch(content.textContent, /CROSSED|CHANGED/);
+        assert.equal(content.querySelector('h2')?.textContent, '正文');
+        assert.equal(fixture.dom.window.document.head.querySelector('style[data-vcp-scope-id]'), null);
+        assert.equal(fixture.historyRef.get()[0].content, source);
+    } finally {
+        await disposeFixture(fixture);
+    }
+});

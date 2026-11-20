@@ -1,0 +1,235 @@
+import { createChatSurface } from '../chat/chatSurface.js';
+import { createStreamConsumerRegistry } from '../chat/streamConsumerRegistry.js';
+import { createVcpStreamBridge } from '../chat/vcpStreamBridge.js';
+import { createMainChatStreamConsumer } from './mainChatStreamConsumer.js';
+import { isSideChatChildTopicId } from '../chat/sideChatSessionService.js';
+
+function createStreamCapabilities(root, services) {
+    const required = ['streamProjection', 'historyPersistence', 'messageRenderer', 'getSelection', 'getTopicId'];
+    for (const name of required) {
+        if (!services?.[name]) throw new TypeError(`MainChatSurfaceAdapter requires stream service: ${name}`);
+    }
+    const ownerDocument = root.ownerDocument;
+    const reportError = services.reportError || console.error;
+    return Object.freeze({
+        start: message => services.streamProjection.startStreamingMessage(message),
+        append: (messageId, chunk, context, operationId) => services.streamProjection.appendStreamChunk(messageId, chunk, context, operationId),
+        projectTerminal: (messageId, finishReason, context, payload) => (
+            services.streamProjection.projectStreamTerminal(messageId, finishReason, context, payload)
+        ),
+        async persistTerminal(projected, receivedText = '') {
+            try {
+                if (['length', 'failed', 'error', 'cancelled'].includes(projected?.finishReason)) {
+                    throw Object.assign(new Error(projected.finishReason === 'length'
+                        ? 'MODEL_RESPONSE_TRUNCATED' : 'MODEL_RESPONSE_INCOMPLETE_REVIEW_REQUIRED'),
+                    { code: projected.finishReason === 'length' ? 'MODEL_RESPONSE_TRUNCATED' : 'MODEL_RESPONSE_INCOMPLETE_REVIEW_REQUIRED', reviewRequired: true });
+                }
+                return await services.historyPersistence.commit(projected);
+            } catch (error) {
+                const context = projected?.context;
+                if (context?.admissionToken && context.agentId && context.topicId) {
+                    try {
+                        const api = ownerDocument.defaultView?.chatAPI || ownerDocument.defaultView?.electronAPI;
+                        const detail = error?.message || String(error);
+                        const diagnostic = error?.reviewRequired && receivedText.trim()
+                            ? { message: detail, reviewPartial: receivedText }
+                            : detail;
+                        const receipt = await api.topicAdmissionUncertain({
+                            itemType: 'agent', itemId: context.agentId, topicId: context.topicId,
+                        }, context.admissionToken, diagnostic);
+                        if (!receipt?.success) throw new Error(receipt?.error || receipt?.code || '保存待核实报告失败');
+                    } catch (diagnosticError) {
+                        reportError('[MainChatSurfaceAdapter] uncertain journal failed', diagnosticError);
+                    }
+                }
+                if (error?.reviewRequired) {
+                    try {
+                        await services.flowlockManager?.handleFinalizedMessage?.({
+                            type: projected.finishReason === 'length' ? 'end' : 'error',
+                            messageId: projected.messageId, context, content: projected.content || '',
+                            finishReason: projected.finishReason, error: error.code,
+                        });
+                    } catch (diagnosticError) { reportError('[MainChatSurfaceAdapter] review notification failed', diagnosticError); }
+                }
+                throw error;
+            }
+        },
+        beginHistoryPersistence: context => services.beginHistoryPersistence?.(context),
+        setPersistenceState(messageId, state, error = '') {
+            const messageItem = root.querySelector(`.message-item[data-message-id="${messageId}"]`);
+            if (!messageItem) return;
+            messageItem.dataset.vcpPersistenceState = state;
+            if (state === 'unsaved') {
+                messageItem.dataset.vcpPersistenceError = String(error || '持久化失败');
+                messageItem.setAttribute('aria-label', '消息尚未保存');
+                messageItem.title = `消息尚未保存：${error || '持久化失败'}`;
+            } else {
+                delete messageItem.dataset.vcpPersistenceError;
+                messageItem.removeAttribute('aria-label');
+                messageItem.removeAttribute('title');
+            }
+        },
+        dispatchTerminal: detail => services.dispatchTerminal?.(detail),
+        onProjectionSettled(value) {
+            const terminal = value?.terminal;
+            const event = terminal
+                ? { type: terminal.kind === 'completed' ? 'completed' : terminal.kind, messageId: value.messageId, context: value.context }
+                : null;
+            services.notifySendStateChanged?.({ ...value, event });
+        },
+        onSettled(value) {
+            // 最终 outcome 发布后的幂等兜底，覆盖持久化失败等异常路径。
+            services.chatManager?.abandonStreamContextCompaction?.(value);
+            services.notifySendStateChanged?.(value);
+        },
+        reportError,
+        async afterPersist({ terminal, finalized, context, messageId }) {
+            const finalizedContext = finalized?.context || context;
+            const finalizedContent = finalized?.content || terminal.fullResponse || '';
+            if (services.chatManager?.hasStreamAdmissionRelay?.(messageId)) {
+                await services.chatManager.finishStreamAdmissionRelay({
+                    messageId, context: finalizedContext,
+                });
+                return;
+            }
+            if (finalizedContext?.admissionToken) {
+                const api = ownerDocument.defaultView?.chatAPI || ownerDocument.defaultView?.electronAPI;
+                const release = await api.topicAdmissionRelease({
+                    itemType: 'agent', itemId: finalizedContext.agentId, topicId: finalizedContext.topicId,
+                }, finalizedContext.admissionToken, { saved: true });
+                if (!release?.success) throw new Error(release?.error || release?.code || '入场租约释放失败');
+            }
+            const selected = services.getSelection();
+            const relevant = finalizedContext
+                && selected
+                && (finalizedContext.groupId ? finalizedContext.groupId === selected.id : finalizedContext.agentId === selected.id)
+                && finalizedContext.topicId === services.getTopicId();
+            const effects = [];
+            if (terminal.kind === 'completed' && finalizedContext && !finalizedContext.isGroupMessage && relevant) {
+                effects.push(Promise.resolve().then(() => services.chatManager?.attemptTopicSummarizationIfNeeded?.()));
+            }
+            // 心流锁按助手加锁：侧聊回复若参与，会认领主聊天的待接续请求，或把整个助手锁到看不见的侧聊话题上，
+            // 主聊天随之无法切换、新建话题
+            if (!isSideChatChildTopicId(finalizedContext?.topicId)) effects.push(Promise.resolve().then(() => services.flowlockManager?.handleFinalizedMessage?.({
+                type: terminal.kind === 'failed' ? 'error' : 'end', messageId,
+                context: finalizedContext, content: finalizedContent,
+                finishReason: finalized?.finishReason || terminal.finishReason || terminal.kind,
+                error: terminal.error || null,
+            })));
+            const results = await Promise.allSettled(effects);
+            await services.chatManager?.finishStreamContextCompaction?.({ messageId, context: finalizedContext });
+            results.forEach(result => {
+                if (result.status === 'rejected') reportError('[MainChatSurfaceAdapter] post-commit side effect failed', result.reason);
+            });
+        },
+        renderError({ event, context, messageId }) {
+            const selected = services.getSelection();
+            const relevant = context && selected
+                && (context.groupId ? context.groupId === selected.id : context.agentId === selected.id)
+                && context.topicId === services.getTopicId();
+            if (!relevant) return;
+            const visibleMessageId = messageId || event.messageId || event.sessionId || 'unknown';
+            const error = event.outcome?.transport?.error?.message
+                || event.outcome?.transport?.error
+                || event.outcome?.persistence?.error?.message
+                || '未知连接错误';
+            const errorContent = root.querySelector(`.message-item[data-message-id="${visibleMessageId}"] .md-content`);
+            if (errorContent) {
+                const paragraph = ownerDocument.createElement('p');
+                const strong = ownerDocument.createElement('strong');
+                strong.style.color = 'red';
+                strong.textContent = `流错误: ${error}`;
+                paragraph.appendChild(strong);
+                errorContent.appendChild(paragraph);
+            } else {
+                services.messageRenderer.renderMessage({ role: 'system', notice: 'error', content: `流处理错误 (ID: ${visibleMessageId}): ${error}`, timestamp: Date.now(), id: `err_${visibleMessageId}` });
+            }
+        },
+    });
+}
+
+/** Main-window composition owner. Domain protocols remain outside this adapter. */
+export function createMainChatSurfaceAdapter({
+    root,
+    renderer,
+    repository,
+    focusTarget,
+    operations,
+    presentationState,
+    renderDependencies,
+    streamServices,
+    disposeRenderer,
+    ownerWindow = root?.ownerDocument?.defaultView,
+    onDispose = null,
+}) {
+    if (!root || !renderer || !repository) throw new TypeError('MainChatSurfaceAdapter requires root, renderer and repository');
+    const streamRoutes = createStreamConsumerRegistry();
+    const surface = createChatSurface({
+        root,
+        renderer,
+        repository,
+        focusTarget,
+        mode: 'interactive',
+        operations,
+        presentationState,
+        disposeRenderer,
+    });
+    renderer.initializeMessageRenderer({
+        ...renderDependencies,
+        chatDomRenderer: surface.renderer,
+        streamStartCapability: message => streamServices.streamProjection.startStreamingMessage(message),
+    });
+    const streamCapabilities = createStreamCapabilities(root, streamServices);
+    const bridge = createVcpStreamBridge({
+        createConsumer: initialEvent => createMainChatStreamConsumer(initialEvent, {
+            ...streamCapabilities,
+            resolveProjection: messageId => streamRoutes.claim(messageId),
+            onToolReturnBoundary: value => streamServices.chatManager?.checkStreamContextBudget?.({
+                ...value,
+                isStreamActive: () => bridge.isOperationActive(value.messageId, value.streamOperationId),
+                cancelStream: (messageId, reason) => bridge.cancelOperation(messageId, reason),
+            }),
+        }),
+    });
+    let disposed = false;
+    const unloadHandler = () => { void api.dispose(); };
+    ownerWindow?.addEventListener?.('beforeunload', unloadHandler, { once: true });
+    const registerStreamRoute = (messageId, route) => {
+        const release = streamRoutes.register(messageId, route);
+        const ownedRelease = () => release();
+        ownedRelease.retract = () => {
+            streamRoutes.claim(messageId)?.settle?.({
+                event: Object.freeze({ type: 'discarded', messageId, reason: 'surface-route-retracted' }),
+                finalized: null,
+                context: null,
+                messageId,
+            });
+            release.retract();
+            return bridge.disposeOperation(messageId, 'surface-route-retracted');
+        };
+        ownedRelease.cancel = reason => bridge.cancelOperation(messageId, reason || 'surface-operation-cancelled');
+        return ownedRelease;
+    };
+    const api = Object.freeze({
+        surface,
+        domRenderer: surface.renderer,
+        streamRoutes: Object.freeze({ register: registerStreamRoute }),
+        acceptStreamEvent(event) { return disposed ? false : bridge.accept(event); },
+        startStream(message, messageItem = null) {
+            if (disposed) return Promise.resolve(false);
+            return streamServices.streamProjection.startStreamingMessage(message, messageItem);
+        },
+        cancelStream(messageId, reason) { return disposed ? Promise.resolve(null) : bridge.cancelOperation(messageId, reason); },
+        disposeStream(messageId, reason) { return disposed ? Promise.resolve(false) : bridge.disposeOperation(messageId, reason); },
+        async dispose() {
+            if (disposed) return;
+            disposed = true;
+            ownerWindow?.removeEventListener?.('beforeunload', unloadHandler);
+            streamRoutes.dispose();
+            await bridge.dispose();
+            await surface.dispose();
+            await onDispose?.();
+        },
+    });
+    return api;
+}

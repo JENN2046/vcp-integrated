@@ -1,0 +1,62 @@
+{
+  "component": "apps/desktop",
+  "upstream": {
+    "repository": "https://github.com/lioensky/VCPChat",
+    "hostBaselineCommit": "2fa73d1171e1ee25e220a0905f16dec557f7eb90",
+    "license": "CC-BY-NC-SA-4.0",
+    "licenseFile": "apps/desktop/LICENSE"
+  },
+  "downstream": {
+    "repository": "https://github.com/JENN2046/NativeSync",
+    "commit": "7fb8bdbd494a7e5bee2a604b1025857b031f7d02",
+    "candidateId": "NS-NATIVE-OPS-d5a7f9b15f35",
+    "candidateManifestSHA256": "8a02e5f541872ae3777c26ef253e414de8d2c6072d685447f7a24ad8e09047db",
+    "frozenManifestSHA256": "278f30b1a13c67d89acb2e149830e2ff5fe632cfbc042cb336add01792b451be"
+  },
+  "import": {
+    "fileCount": 3734,
+    "sourceRowsSHA256": "743c44cdc45705a70d4583506de71a59fecd5a747329658b2fd8fbacf4406c0f",
+    "sourceRowsCanonicalization": "Original VCPChat manifest rows in manifest order, array serialized as compact JSON with object keys sorted and non-ASCII escaped. Applies before local changes.",
+    "excluded": {
+      "upstream workflows and generated QA artifacts": 60,
+      "compiled executables and packaged third-party archives": 15,
+      "profile, database and provider config files and examples": 6,
+      "rebuildable sandbox and agent owner bundles": 6
+    }
+  },
+  "entrypoints": {
+    "desktop": "npm --prefix apps/desktop start",
+    "preloads": "npm --prefix apps/desktop run build:preloads",
+    "chatDataService": "npm --prefix apps/desktop run build:cds"
+  },
+  "buildInputs": {
+    "electron": "44.9.3",
+    "webpack": "5.105.4",
+    "cargoLock": "apps/desktop/rust_chat_data_service/Cargo.lock",
+    "agentOwnerBuilderSHA256": "737795772b36766216061f9f1b8af613bdc674d22dca23139e7625326ed7009d",
+    "node": "22.23.1",
+    "rustc": "1.96.1"
+  },
+  "qualifiedLocalBuild": {
+    "platform": "linux-x64",
+    "preloadManifestSHA256": "16fde1af9b38d79d6377f786988228b345a7243908ae0bdb7f23f696455629f1",
+    "cdsBuild": {
+      "authorityProtocol": 1,
+      "birthState": "unknown",
+      "sourceSha256": "c813f0956c67d9a4ff8218a1d75d65a503ef625906d50d4164070ea888a83a1d",
+      "binarySha256": "704d339b23c0471e3aa14d7a0e9d88b3b9da3a55ad6ef1844ab63a96943e3860"
+    },
+    "cdsHandshake": {
+      "protocolVersion": 3,
+      "schemaVersion": 3,
+      "authorityProtocol": 1,
+      "historyAdmission": "unknown"
+    },
+    "cdsStoppedAuthorityProbeSettled": true
+  },
+  "localChanges": [
+    "Add locked webpack and rebuild the four sandbox preloads and portable agent owner from source.",
+    "Generate a matching local CDS authority receipt from the locked Rust source tree and release executable.",
+    "Keep rebuild outputs under ignored paths."
+  ]
+}
