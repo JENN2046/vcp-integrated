@@ -190,13 +190,14 @@ function createAppFeatures({ projectRoot, appDataRoot, modulesDir = path.join(pr
          * app ready、主窗口建好以后调用一次。每个功能拿到同一份 host，外加 host.feature（自己的名字和目录）。
          * 某个功能出错只记日志，不影响其他功能和核心。
          */
-        registerAll(host) {
+        registerAll(host, dependenciesByEntry = new Map()) {
             for (const feature of active) {
                 if (handles.has(feature.name)) continue;
                 try {
                     const entry = requireModule(feature.main);
                     if (typeof entry?.register !== 'function') throw new Error('main 没有导出 register(host)');
-                    const handle = entry.register({ ...host, feature: { name: feature.name, dir: feature.dir } });
+                    const context = { ...host, feature: { name: feature.name, dir: feature.dir } };
+                    const handle = entry.register(context, dependenciesByEntry.get(feature.main));
                     handles.set(feature.name, handle || {});
                 } catch (error) {
                     logger.error(`[AppFeatures] ${feature.name} 加载失败:`, error);

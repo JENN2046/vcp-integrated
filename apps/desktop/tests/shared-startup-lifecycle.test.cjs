@@ -162,7 +162,8 @@ test('actual dormant feature owns one IPC registration set and performs no netwo
         appDataRoot,
         historyQueue: () => queue,
         readSettings: () => assert.fail('settings read'),
-        nativeSync: {
+    };
+    const dependencies = new Map([[path.resolve(__dirname, '../modules/nativeSyncDesktopRuntime/index.js'), {
             ipcMain, localHistoryAuthority,
             waitForHistory: () => assert.fail('CDS wait'),
             agentConfigManager: {
@@ -171,9 +172,8 @@ test('actual dormant feature owns one IPC registration set and performs no netwo
                 writeAgentConfig() { assert.fail('unexpected agent write'); },
                 on() { assert.fail('unexpected subscription'); },
             },
-        },
-    };
-    loader.registerAll(host);
+    }]]);
+    loader.registerAll(host, dependencies);
     const life = loader.getHandle('NativeSyncDesktopRuntime');
     assert.ok(await life.ready);
     loader.registerAll(host);

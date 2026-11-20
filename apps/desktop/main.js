@@ -719,6 +719,12 @@ async function performQuitCleanup() {
             console.warn('[Main] Failed to shut down native voice input engine:', error.message || error);
         }
 
+        // Stop new topic work and drain accepted sync projections while the
+        // native History authority and its CDS child can still serve the queue.
+        await topicAdmissionHost?.dispose?.();
+        topicAdmissionHost = null;
+        topicConversationResolver = null;
+        await nativeSyncLifecycle?.close();
         await historyAuthority?.close();
         if (chatDataService) {
             console.log('[Main] Stopping VCP-CDS...');
@@ -733,10 +739,6 @@ async function performQuitCleanup() {
         }
 
         workspaceHandlers.dispose();
-        await topicAdmissionHost?.dispose?.();
-        topicAdmissionHost = null;
-        topicConversationResolver = null;
-        await nativeSyncLifecycle?.close();
         await historyMutationQueue?.dispose?.();
         historyMutationQueue = null;
         pluginAgentOperationService = null;
@@ -2041,6 +2043,14 @@ if (!gotTheLock) {
         voiceHandlers.initialize({ mainWindow, openChildWindows, settingsManager: appSettingsManager, projectRoot: PROJECT_ROOT });
         localSttHandlers.initialize({ appDataRoot: APP_DATA_ROOT_IN_PROJECT });
         // 应用功能模块拿到的宿主能力（modules/appFeatures.js 的 register(host)）
+        const runtimeEntry = path.join(PROJECT_ROOT, 'modules/nativeSyncDesktopRuntime/index.js');
+        const runtimeServices = {
+            ipcMain, getMainWindow: () => mainWindow, BrowserWindow, nativeImage: require('electron').nativeImage,
+            agentConfigManager, groupChat, tavernHandlers, fileManager, settingsManager: appSettingsManager,
+            historyAuthority, localHistoryAuthority, waitForHistory: () => chatDataServiceStartPromise,
+            isolated: Boolean(isolatedAppDataRoot),
+            invalidateAgentCaches: () => require('./modules/ipc/agentHandlers').invalidateCaches(),
+        };
         appFeatures.registerAll({
             hooks: hostHooks,
             tts: sovitsHandlers,
@@ -2053,14 +2063,7 @@ if (!gotTheLock) {
             readSettings: () => appSettingsManager.readSettings(),
             historyQueue: () => historyMutationQueue,
             agentOps: () => pluginAgentOperationService,
-            nativeSync: {
-                ipcMain, getMainWindow: () => mainWindow, BrowserWindow, nativeImage: require('electron').nativeImage,
-                agentConfigManager, groupChat, tavernHandlers, fileManager, settingsManager: appSettingsManager,
-                historyAuthority, localHistoryAuthority, waitForHistory: () => chatDataServiceStartPromise,
-                isolated: Boolean(isolatedAppDataRoot),
-                invalidateAgentCaches: () => require('./modules/ipc/agentHandlers').invalidateCaches(),
-            },
-        });
+        }, new Map([[runtimeEntry, runtimeServices]]));
         nativeSyncLifecycle = appFeatures.getHandle('NativeSyncDesktopRuntime');
 
         ipcMain.on('minimize-to-tray', () => {

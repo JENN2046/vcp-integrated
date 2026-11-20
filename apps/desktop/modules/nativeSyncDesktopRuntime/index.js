@@ -2,12 +2,12 @@
 
 const { createDesktopRuntimeLifecycle } = require('./lifecycle');
 
-function registerIntegrated({ nativeSync, historyQueue, appDataRoot, readSettings, mainWindow }) {
+function registerIntegrated({ historyQueue, appDataRoot, readSettings, mainWindow }, dependencies) {
     const {
         ipcMain, getMainWindow = () => mainWindow, BrowserWindow, nativeImage, agentConfigManager,
         groupChat, tavernHandlers, fileManager, settingsManager, waitForHistory, historyAuthority, localHistoryAuthority,
         isolated, invalidateAgentCaches,
-    } = nativeSync;
+    } = dependencies;
     function broadcast(channel, change) {
         let sent = false;
         for (const window of BrowserWindow.getAllWindows()) {
@@ -79,10 +79,12 @@ function registerIntegrated({ nativeSync, historyQueue, appDataRoot, readSetting
         },
     });
 }
-function register(host) {
-    const ipc = host.nativeSync?.ipcMain || require('electron').ipcMain;
-    const removeStatus = require('./profileStatus').registerDesktopStatus(host, ipc);
-    if (!host.nativeSync) {
+function register(host, dependencies) {
+    const ipc = dependencies?.ipcMain || require('electron').ipcMain;
+    const removeStatus = require('./profileStatus').registerDesktopStatus(host, ipc, {
+        integrated: Boolean(dependencies), getWindow: dependencies?.getMainWindow,
+    });
+    if (!dependencies) {
         try {
             const unregister = host.agentSettingsSaveOwner?.register(
                 require('./agentNameOwner.cjs').createAgentNameOwner(host));
@@ -93,7 +95,7 @@ function register(host) {
         }
     }
     try {
-        const lifecycle = registerIntegrated(host);
+        const lifecycle = registerIntegrated(host, dependencies);
         let closed;
         return { ...lifecycle, close() {
             if (!closed) {

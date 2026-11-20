@@ -136,11 +136,15 @@ test('registerAll hands every feature the host, isolates failures, and disposes 
         const name = path.basename(path.dirname(file));
         required.push(name);
         if (name === 'b') throw new Error('boom');
-        return { register: (host) => ({ host, dispose: () => disposed.push(host.feature.name) }) };
+        return { register: (host, dependencies) => ({ host, dependencies, dispose: () => disposed.push(host.feature.name) }) };
     };
     const features = loader(paths, { requireModule });
     assert.deepEqual(features.rendererEntries(), [], 'nothing is loaded before registerAll');
-    assert.deepEqual(features.registerAll({ hooks: 'hooks' }), ['A', 'C']);
+    const privateService = {};
+    const dependencies = new Map([[path.join(paths.modulesDir, 'a/index.js'), privateService]]);
+    assert.deepEqual(features.registerAll({ hooks: 'hooks' }, dependencies), ['A', 'C']);
+    assert.equal(features.getHandle('A').dependencies, privateService);
+    assert.equal(features.getHandle('C').dependencies, undefined);
     assert.deepEqual(required, ['a', 'b', 'c'], 'a disabled feature is never required');
     assert.deepEqual(features.rendererEntries(), [{ name: 'A', renderer: 'ui/a.js' }], 'only features that loaded get a renderer entry');
     assert.deepEqual(features.list().map((f) => [f.name, f.active]), [['A', true], ['B', false], ['C', true], ['Off', false]]);

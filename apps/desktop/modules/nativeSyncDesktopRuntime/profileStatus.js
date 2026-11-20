@@ -57,9 +57,7 @@ async function readProfileStatus(host) {
     return { ...connection, serverOrigin };
 }
 
-function registerDesktopStatus(host, ipcMain) {
-    const integrated = Boolean(host.nativeSync);
-    const getWindow = host.nativeSync?.getMainWindow || (() => host.mainWindow);
+function registerDesktopStatus(host, ipcMain, { integrated = false, getWindow = () => host.mainWindow } = {}) {
     const allowed = createApplicationSenderGuard({ projectRoot: host.projectRoot,
         getWebContents: () => resolveWindowWebContents(getWindow) });
     const mode = integrated ? 'integrated' : (host.agentSettingsSaveOwner ? 'agent-name' : 'profile-only');
