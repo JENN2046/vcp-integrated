@@ -10,7 +10,7 @@
     "build:mobile": "node scripts/build.mjs --mobile",
     "dev:isolated": "node tests/integration/run.cjs --dev",
     "test:integration": "node tests/integration/run.cjs",
-    "test:native": "node --test --test-concurrency=1 tests/native/*.test.cjs",
+    "test:native": "node tests/run-host-suite.cjs native",
     "deps": "node scripts/dependencies.mjs",
     "test:collaboration": "node tests/collaboration/run.cjs",
     "test:wire": "node tests/integration/mobile-wire.cjs"

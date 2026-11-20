@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path'),{EventEmitter}=require('node:events');
-const BOX=path.resolve(__dirname,'../../apps/server/Plugin/NativeSync');
+const BOX=path.join(process.env.VCP_TEST_SERVER||path.resolve(__dirname,'../../apps/server'),'Plugin/NativeSync');
 const {CentralStore}=require(BOX+'/sync/centralStore'),{SourceCatalog}=require(BOX+'/sync/sourceCatalog'),{SharedSpace}=require(BOX+'/sync/sharedSpace'),{SharedEvents}=require(BOX+'/sync/sharedEvents'),{openSharedEventStream}=require(BOX+'/sync/sharedEventHttp'),{nativeResponse}=require(BOX+'/mobile/nativeResponse');
 async function fixture(t,limits={},noAdmission=false){
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'ns-events-')),store=new CentralStore(root+'/central.sqlite');

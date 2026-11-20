@@ -1,6 +1,6 @@
 {
   "name": "@vcp/core-rules",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "commonjs",
   "license": "CC-BY-NC-SA-4.0",
@@ -10,9 +10,5 @@
     "./sanitizer": "./contextSanitizer.cjs",
     "./trajectory": "./modelTrajectory.cjs",
     "./renderer/*": "./renderer/*.js"
-  },
-  "peerDependencies": {
-    "jsdom": "^24 || ^27",
-    "turndown": "^7"
   }
 }

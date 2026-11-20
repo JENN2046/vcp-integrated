@@ -2,8 +2,7 @@
 // 上下文HTML标签转MD净化器模块
 
 // 🔴 优化：将沉重的模块改为按需加载，防止阻塞主进程发送消息
-let JSDOM = null;
-let TurndownService = null;
+
 
 /**
  * LRU缓存类，支持过期时间
@@ -68,7 +67,8 @@ class LRUCache {
  * 上下文净化器类
  */
 class ContextSanitizer {
-    constructor() {
+    constructor(loadDependency) {
+        this.loadDependency = loadDependency;
         // 初始化 LRU 缓存，最大100条，1小时过期
         this.cache = new LRUCache(100, 3600000);
 
@@ -82,8 +82,8 @@ class ContextSanitizer {
         if (this.turndownService) return;
 
         console.log('[ContextSanitizer] Initializing heavy dependencies (JSDOM, Turndown)...');
-        if (!JSDOM) JSDOM = require('jsdom').JSDOM;
-        if (!TurndownService) TurndownService = require('turndown');
+        this.JSDOM = this.loadDependency('jsdom').JSDOM;
+        const TurndownService = this.loadDependency('turndown');
 
         this.turndownService = new TurndownService({
             headingStyle: 'atx',
@@ -365,7 +365,7 @@ class ContextSanitizer {
             });
 
             // ✅ 使用 jsdom 解析
-            const dom = new JSDOM(contentWithProtectedThoughtTags);
+            const dom = new this.JSDOM(contentWithProtectedThoughtTags);
             const body = dom.window.document.body;
 
             // 设置 Turndown 服务的临时状态
@@ -494,7 +494,5 @@ class ContextSanitizer {
     }
 }
 
-// 创建单例实例
-const contextSanitizer = new ContextSanitizer();
-
-module.exports = contextSanitizer;
+// The host supplies its own locked DOM implementation and owns the cache.
+module.exports = loadDependency => new ContextSanitizer(loadDependency);

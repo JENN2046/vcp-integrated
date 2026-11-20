@@ -243,9 +243,9 @@ function registerRoutes(app, {
       logger.logOperation(
         "http",
         "auth",
-        req.originalUrl,
+        req.path,
         "warn",
-        `authorization=${authHeader} providedToken=${providedToken} expectedToken=${syncToken}`,
+        "SYNC_AUTH_FAILED",
       );
       return sendHttpError(res, 401, "Unauthorized", {
         code: "SYNC_AUTH_FAILED",
@@ -271,7 +271,7 @@ function registerRoutes(app, {
         `${req.method}`,
         routePath,
         result,
-        `status=${status} duration=${duration}ms url=${req.originalUrl} authorization=${req.headers.authorization}`,
+        `status=${status} duration=${duration}ms`,
       );
     });
 

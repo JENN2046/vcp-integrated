@@ -85,12 +85,22 @@ async function main() {
             .run('agent', 'synthetic-agent', 'synthetic-topic', 'b'.repeat(64), '', 1);
 
         const token = 'fixture-wire-only';
+        const httpLogs = [];
+        const logger = require(path.join(mobileSync, 'core/logger')).getLogger();
+        const logOperation = logger.logOperation.bind(logger);
+        logger.logOperation = (...fields) => {
+            if (fields[0] === 'http') httpLogs.push(fields);
+            return logOperation(...fields);
+        };
         registerRoutes(app, { syncToken: token, appDataPath: fixture });
         server = await new Promise((resolve, reject) => {
             const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
             listener.once('error', reject);
         });
         const url = 'http://127.0.0.1:' + server.address().port + '/api/mobile-sync/messages/push';
+        const declined = await fetch(url + '?note=synthetic-query', { headers: { authorization:'Bearer synthetic-invalid' } });
+        assert.equal(declined.status,401);
+        await declined.text();
         const push = async (id, timestamp) => {
             const message = { id, role: 'user', content: 'synthetic push', timestamp, topicId: 'synthetic-topic', updatedAt: timestamp, attachments: [] };
             message.contentHash = messageContentHash(message);
@@ -114,6 +124,9 @@ async function main() {
         const denied = protectedFrames.find(row => row.kind === 'topic');
         assert.equal(denied?.ok, false, JSON.stringify(protectedFrames));
         assert.equal(denied.error.code, 'SYNC_WRITER_EXCLUDED');
+        assert.ok(httpLogs.some(fields=>fields[1]==='auth') && httpLogs.some(fields=>fields[1]==='POST'));
+        const messages = JSON.stringify(httpLogs);
+        for (const privateValue of [token,'synthetic-invalid','synthetic-query']) assert.ok(!messages.includes(privateValue));
         assert.deepEqual(await fs.readFile(historyFile), before, 'protected route must preserve physical bytes');
         assert.deepEqual((await queue.read(descriptor)).map(message => message.id), ['seed', 'wire-legacy-local']);
         console.log(JSON.stringify({ oldWire: '1.5', localLegacyCommitted: true, protectedBytesUnchanged: true,

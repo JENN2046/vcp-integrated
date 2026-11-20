@@ -1822,7 +1822,7 @@
     },
     "Plugin/NativeSync/nativeRules/modules/contextSanitizer.js": {
       "source": "monorepo-adapted",
-      "sha256": "1ed7a11776bf928a0cfb1a6068e3b06f26d692bec95b3637f7476cfb08546600",
+      "sha256": "7516f60be91c07fdbca3af625c3319cd3601160c9eb5360a541d5d2dd78bbf6a",
       "integratedBaselineSha256": "ddbef2472d52fb641b25d64690bde04bfc074294a8457561b5b1ed6eeacd057f",
       "adaptation": "Use the native hosts’ shared core-rules package."
     },
@@ -2598,7 +2598,7 @@
     },
     "package-lock.json": {
       "source": "monorepo-adapted",
-      "sha256": "d5ce127304035569c613c7fd401a2213757e2a51f6d66d00263fa9a4c52e5259",
+      "sha256": "b557972b0b764f1098b6e524093a955645220f61bd127c172c9e7984204a57b7",
       "integratedBaselineSha256": "bff93d5630e43b7013007dfc8f5ada2ef5f096e2e9be90c7ec9b64ebf57a2917",
       "adaptation": "Use the native hosts’ shared core-rules package."
     },

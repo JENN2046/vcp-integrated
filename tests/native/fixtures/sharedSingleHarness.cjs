@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),http=require('node:http');
-const BOX=path.resolve(__dirname,'../../../apps/server'),CHAT=path.resolve(__dirname,'../../../apps/desktop');
+const BOX=process.env.VCP_TEST_SERVER||path.resolve(__dirname,'../../../apps/server'),CHAT=path.resolve(__dirname,'../../../apps/desktop');
 const express=require(BOX+'/node_modules/express'),{CentralStore}=require(BOX+'/Plugin/NativeSync/sync/centralStore'),{SourceCatalog}=require(BOX+'/Plugin/NativeSync/sync/sourceCatalog'),{SharedSpace}=require(BOX+'/Plugin/NativeSync/sync/sharedSpace'),{SharedNative}=require(BOX+'/Plugin/NativeSync/sync/sharedNative'),{MobilePortal}=require(BOX+'/Plugin/NativeSync/mobile/portal');
 const {createSyncHttpService}=require(BOX+'/Plugin/NativeSync/sync/httpService'),ctx=require(BOX+'/modules/requestExecutionContext');
 const {createNativeSyncRuntime,createSyncRequest,syncHeaders}=require(CHAT+'/modules/services/nativeSync/runtime'),{createSharedHost}=require(CHAT+'/modules/services/nativeSync/sharedHost'),{HistoryMutationQueue}=require(CHAT+'/modules/services/historyMutationQueue'),AgentConfigManager=require(CHAT+'/modules/utils/agentConfigManager');
