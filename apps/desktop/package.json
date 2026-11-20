@@ -114,6 +114,7 @@
   "devDependencies": {
     "@awesome.me/webawesome": "3.11.0",
     "@electron/rebuild": "^4.0.3",
+    "acorn": "8.19.0",
     "electron": "^44.0.0",
     "electron-builder": "^26.0.12",
     "node-abi": "^4.35.0",

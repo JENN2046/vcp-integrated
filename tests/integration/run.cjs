@@ -24,6 +24,10 @@ if (![...modes, 'all', 'ready', '--dev', 'idle'].includes(requested) || process.
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
 const executable = process.env.ELECTRON_BIN || desktopRequire('electron');
+// An interactive developer can opt into a local X11 display while both
+// Electron instances keep their disposable profiles and loopback-only network.
+const devDisplay = requested === '--dev' ? process.env.VCP_DEV_DISPLAY : undefined;
+if (devDisplay && !/^:\d+(?:\.\d+)?$/.test(devDisplay)) throw Error('VCP_DEV_DISPLAY must name a local X11 display');
 
 async function isolatedDisplay(root) {
     const binary = process.env.XVFB_BIN || 'Xvfb';
@@ -50,6 +54,7 @@ function launch(profile, role, mode) {
     fs.mkdirSync(home, { recursive: true });
     const env = { HOME:home, XDG_CONFIG_HOME:home+'/config', XDG_CACHE_HOME:home+'/cache',
         PATH:'/usr/bin:/bin', LANG:'C.UTF-8', DISPLAY:display,
+        ...(devDisplay && process.env.XAUTHORITY ? { XAUTHORITY: process.env.XAUTHORITY } : {}),
         NS_HOST: host, VCPCHAT_APP_DATA_DIR: profile, VCPCHAT_E2E_TEST: '1',
         NODE_EXTRA_CA_CERTS: cert, NS_CERT_FINGERPRINT: fingerprint,
         ...(mode === 'idle' ? { NS_METER_PREFIX: path.join(out, role) } : {}),
@@ -284,11 +289,12 @@ async function runCase(root, mode) {
 async function main() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vcp-integration-'));
     console.log('Isolated integration evidence ' + root);
-    const xvfb = await isolatedDisplay(root);
+    const xvfb = devDisplay ? null : await isolatedDisplay(root);
+    if (devDisplay) display = devDisplay;
     try {
         for (const mode of requested === 'all' ? modes : [requested]) await runCase(root, mode);
     } finally {
-        if (xvfb.exitCode === null && xvfb.signalCode === null) {
+        if (xvfb && xvfb.exitCode === null && xvfb.signalCode === null) {
             const exited = once(xvfb, 'exit');
             xvfb.kill();
             await exited;

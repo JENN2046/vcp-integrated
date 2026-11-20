@@ -2009,7 +2009,19 @@ export const chatManager = (() => {
         let pendingUserSeed = null;
         let promotePendingUserProjection = () => false;
         let promoteReadyUserProjection = () => false;
+        let nativeDraftEdited = false;
+        const nativeDraftItemGeneration = itemSelectionGeneration;
+        const nativeDraftTopicGeneration = topicSelectionGeneration;
+        const shouldPrepareNative = sendAuthority.kind === 'local' && !request && !attachedFiles.length
+            && currentSelectedItem.type !== 'group' && typeof electronAPI.prepareNativeConversation === 'function';
         try {
+        // Unread persistence and prepare can both outlive this draft.
+        // Observe before either await, and detach in the send finalizer.
+        if (shouldPrepareNative) {
+            const markDraftEdited = () => { nativeDraftEdited = true; };
+            input.addEventListener?.('input', markDraftEdited);
+            stopNativeDraftObservation = () => input.removeEventListener?.('input', markDraftEdited);
+        }
         if (Number.isFinite(request?.deadline) && Date.now() >= request.deadline) throw new Error('主窗口请求已过期，消息未发送');
         // Clearing unread can fence History writes while the config transaction runs.
         if (sendAuthority.kind === 'local') {
@@ -2084,20 +2096,9 @@ export const chatManager = (() => {
                 }).catch(() => clearPendingUserProjection());
             } catch { clearPendingUserProjection(); }
         }
-        // Capture ownership before prepare: that await can also outlive a draft
-        // edit or a switch away and back. All listeners leave in the send finally.
-        let nativeDraftEdited = false;
-        const nativeDraftItemGeneration = itemSelectionGeneration;
-        const nativeDraftTopicGeneration = topicSelectionGeneration;
-        const observeNativeDraft = () => {
-            const markDraftEdited = () => { nativeDraftEdited = true; };
-            input.addEventListener?.('input', markDraftEdited);
-            stopNativeDraftObservation = () => input.removeEventListener?.('input', markDraftEdited);
-        };
         let nativeResult = null;
         const modelSaveRef = !request ? window.ComposerModelSaveBarrier?.capture(sendContext.agentId) : null;
-        if (sendAuthority.kind === 'local' && !request && !attachedFiles.length && currentSelectedItem.type !== 'group' && typeof electronAPI.prepareNativeConversation === 'function') {
-            observeNativeDraft();
+        if (shouldPrepareNative) {
             try { nativeResult = await electronAPI.prepareNativeConversation({text:content,conversationId:`${currentSelectedItem.id}:${currentTopicId}`}); }
             catch { nativeResult={handled:true,ok:false,code:'NATIVE_TRANSPORT_UNAVAILABLE'}; }
         }
