@@ -1,0 +1,321 @@
+{
+  "warmupSeconds": 15,
+  "windowSeconds": 60,
+  "scope": "Two Electron main processes and the ToolBox Node process. Renderer, CDS, Provider fixture, proxy and Xvfb excluded.",
+  "writeFields": [
+    "count",
+    "logicalBytes"
+  ],
+  "windows": {
+    "before": [
+      {
+        "A": {
+          "totalProcessCpuMs": 890,
+          "backfillStateWrite": [
+            240,
+            142080
+          ],
+          "configReads": 108,
+          "configBytes": 50688
+        },
+        "B": {
+          "totalProcessCpuMs": 920,
+          "backfillStateWrite": [
+            240,
+            142080
+          ],
+          "configReads": 108,
+          "configBytes": 50688
+        },
+        "backend": {
+          "totalProcessCpuMs": 710,
+          "backfillStateWrite": [
+            0,
+            0
+          ],
+          "configReads": 0,
+          "configBytes": 0
+        },
+        "http": {
+          "shared/info": {
+            "requests": 24,
+            "responseBytes": 11088
+          },
+          "shared/wait": {
+            "requests": 4,
+            "responseBytes": 268
+          },
+          "shared/matches": {
+            "requests": 2,
+            "responseBytes": 76
+          },
+          "shared/changes": {
+            "requests": 2,
+            "responseBytes": 78
+          },
+          "shared/pull": {
+            "requests": 2,
+            "responseBytes": 106
+          }
+        }
+      },
+      {
+        "A": {
+          "totalProcessCpuMs": 760,
+          "backfillStateWrite": [
+            240,
+            142080
+          ],
+          "configReads": 108,
+          "configBytes": 50688
+        },
+        "B": {
+          "totalProcessCpuMs": 760,
+          "backfillStateWrite": [
+            239,
+            141488
+          ],
+          "configReads": 108,
+          "configBytes": 50688
+        },
+        "backend": {
+          "totalProcessCpuMs": 670,
+          "backfillStateWrite": [
+            0,
+            0
+          ],
+          "configReads": 0,
+          "configBytes": 0
+        },
+        "http": {
+          "shared/info": {
+            "requests": 24,
+            "responseBytes": 11088
+          },
+          "shared/wait": {
+            "requests": 4,
+            "responseBytes": 268
+          },
+          "shared/matches": {
+            "requests": 2,
+            "responseBytes": 76
+          },
+          "shared/changes": {
+            "requests": 2,
+            "responseBytes": 78
+          },
+          "shared/pull": {
+            "requests": 2,
+            "responseBytes": 106
+          }
+        }
+      },
+      {
+        "A": {
+          "totalProcessCpuMs": 820,
+          "backfillStateWrite": [
+            239,
+            141488
+          ],
+          "configReads": 108,
+          "configBytes": 50688
+        },
+        "B": {
+          "totalProcessCpuMs": 780,
+          "backfillStateWrite": [
+            240,
+            142080
+          ],
+          "configReads": 108,
+          "configBytes": 50688
+        },
+        "backend": {
+          "totalProcessCpuMs": 690,
+          "backfillStateWrite": [
+            0,
+            0
+          ],
+          "configReads": 0,
+          "configBytes": 0
+        },
+        "http": {
+          "shared/info": {
+            "requests": 24,
+            "responseBytes": 11088
+          },
+          "shared/wait": {
+            "requests": 4,
+            "responseBytes": 268
+          },
+          "shared/matches": {
+            "requests": 2,
+            "responseBytes": 76
+          },
+          "shared/changes": {
+            "requests": 2,
+            "responseBytes": 78
+          },
+          "shared/pull": {
+            "requests": 2,
+            "responseBytes": 106
+          }
+        }
+      }
+    ],
+    "after": [
+      {
+        "A": {
+          "totalProcessCpuMs": 730,
+          "backfillStateWrite": [
+            0,
+            0
+          ],
+          "configReads": 108,
+          "configBytes": 50688
+        },
+        "B": {
+          "totalProcessCpuMs": 740,
+          "backfillStateWrite": [
+            0,
+            0
+          ],
+          "configReads": 108,
+          "configBytes": 50688
+        },
+        "backend": {
+          "totalProcessCpuMs": 810,
+          "backfillStateWrite": [
+            0,
+            0
+          ],
+          "configReads": 0,
+          "configBytes": 0
+        },
+        "http": {
+          "shared/info": {
+            "requests": 24,
+            "responseBytes": 11088
+          },
+          "shared/wait": {
+            "requests": 4,
+            "responseBytes": 268
+          },
+          "shared/matches": {
+            "requests": 2,
+            "responseBytes": 76
+          },
+          "shared/changes": {
+            "requests": 2,
+            "responseBytes": 78
+          },
+          "shared/pull": {
+            "requests": 2,
+            "responseBytes": 106
+          }
+        }
+      },
+      {
+        "A": {
+          "totalProcessCpuMs": 540,
+          "backfillStateWrite": [
+            0,
+            0
+          ],
+          "configReads": 108,
+          "configBytes": 50688
+        },
+        "B": {
+          "totalProcessCpuMs": 520,
+          "backfillStateWrite": [
+            0,
+            0
+          ],
+          "configReads": 108,
+          "configBytes": 50688
+        },
+        "backend": {
+          "totalProcessCpuMs": 840,
+          "backfillStateWrite": [
+            0,
+            0
+          ],
+          "configReads": 0,
+          "configBytes": 0
+        },
+        "http": {
+          "shared/info": {
+            "requests": 24,
+            "responseBytes": 11088
+          },
+          "shared/wait": {
+            "requests": 4,
+            "responseBytes": 268
+          },
+          "shared/matches": {
+            "requests": 2,
+            "responseBytes": 76
+          },
+          "shared/changes": {
+            "requests": 2,
+            "responseBytes": 78
+          },
+          "shared/pull": {
+            "requests": 2,
+            "responseBytes": 106
+          }
+        }
+      },
+      {
+        "A": {
+          "totalProcessCpuMs": 470,
+          "backfillStateWrite": [
+            0,
+            0
+          ],
+          "configReads": 108,
+          "configBytes": 50688
+        },
+        "B": {
+          "totalProcessCpuMs": 490,
+          "backfillStateWrite": [
+            0,
+            0
+          ],
+          "configReads": 108,
+          "configBytes": 50688
+        },
+        "backend": {
+          "totalProcessCpuMs": 700,
+          "backfillStateWrite": [
+            0,
+            0
+          ],
+          "configReads": 0,
+          "configBytes": 0
+        },
+        "http": {
+          "shared/info": {
+            "requests": 24,
+            "responseBytes": 11088
+          },
+          "shared/wait": {
+            "requests": 4,
+            "responseBytes": 268
+          },
+          "shared/matches": {
+            "requests": 2,
+            "responseBytes": 76
+          },
+          "shared/changes": {
+            "requests": 2,
+            "responseBytes": 78
+          },
+          "shared/pull": {
+            "requests": 2,
+            "responseBytes": 106
+          }
+        }
+      }
+    ]
+  }
+}

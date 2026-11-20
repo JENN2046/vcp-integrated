@@ -1,0 +1,682 @@
+{
+  "sourceCommit": "c379d0ca1ebcb6faad72324d2f7b34062749c104",
+  "baseline": "c837e2a7f26453b99b67996b6eb79db94a72c62e",
+  "sourceCheckoutCleanAfterTests": true,
+  "node": "24.22.3",
+  "platform": "Linux x64 GNU",
+  "profile": "fresh synthetic identities; loopback provider and TLS; no production data",
+  "native": {
+    "pass": 197,
+    "fail": 0,
+    "total": 197
+  },
+  "collaboration": {
+    "pass": 49,
+    "fail": 0,
+    "total": 49
+  },
+  "cases": {
+    "lost-only": {
+      "pwa": {
+        "htmlStatus": 200,
+        "bundleStatus": 200,
+        "connectionStatus": 200,
+        "chromium": {
+          "title": "VCP Mobile",
+          "secureContext": true,
+          "connectionReady": true
+        }
+      },
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "A-reopened": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "electron": "44.9.3",
+      "cdsSHA256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+      "desktopInput": [
+        {
+          "id": "msg_1795201361484_user_pkrua0txah",
+          "localOnly": true,
+          "serverSession": false
+        },
+        {
+          "id": "msg_1795201361484_user_pkrua0txah",
+          "localOnly": false,
+          "serverSession": true
+        }
+      ],
+      "admission": {
+        "id": "request_862970c3e99f4ad891941139468558f1",
+        "request_id": "msg_1795201361484_user_pkrua0txah",
+        "principal": "desktop:deviceA",
+        "state": "completed",
+        "dispatched": 1,
+        "native_terminal": 1
+      },
+      "phases": [
+        {
+          "stage": "native_prepared",
+          "request_id": "request_862970c3e99f4ad891941139468558f1",
+          "work_id": "request_862970c3e99f4ad891941139468558f1",
+          "at": 1795201361538
+        },
+        {
+          "stage": "native_entered",
+          "request_id": "request_862970c3e99f4ad891941139468558f1",
+          "work_id": "request_862970c3e99f4ad891941139468558f1",
+          "at": 1795201361560
+        },
+        {
+          "stage": "provider_attempt",
+          "request_id": "request_862970c3e99f4ad891941139468558f1",
+          "work_id": "request_862970c3e99f4ad891941139468558f1",
+          "at": 1795201361573
+        },
+        {
+          "stage": "native_settled",
+          "request_id": "request_862970c3e99f4ad891941139468558f1",
+          "work_id": "request_862970c3e99f4ad891941139468558f1",
+          "at": 1795201364125
+        }
+      ],
+      "work": [
+        {
+          "id": "request_862970c3e99f4ad891941139468558f1",
+          "request_id": "msg_1795201361484_user_pkrua0txah",
+          "topic_key": "shared_d636718545c0473db1ca4210a051c38c",
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "user_message_id": "msg_1795201361484_user_pkrua0txah",
+          "user_seq": 1,
+          "reply_message_id": "reply_request_862970c3e99f4ad891941139468558f1"
+        }
+      ],
+      "native": [
+        {
+          "id": "request_862970c3e99f4ad891941139468558f1",
+          "admission_id": "request_862970c3e99f4ad891941139468558f1",
+          "state": "model_terminal"
+        }
+      ],
+      "recoveryLookup": {
+        "method": "GET",
+        "route": "/api/v1/sync/shared/request",
+        "query": {
+          "sharedSpaceId": "sharedAB",
+          "requestId": "msg_1795201361484_user_pkrua0txah"
+        },
+        "status": 200
+      },
+      "providerCallsBeforeExplicitNewSend": 1,
+      "A": [
+        {
+          "id": "msg_1795201361484_user_pkrua0txah",
+          "role": "user",
+          "content": "Send-recovery compare 02: accept exactly once."
+        },
+        {
+          "id": "reply_request_862970c3e99f4ad891941139468558f1",
+          "role": "assistant",
+          "content": "合成回复完成。"
+        }
+      ],
+      "B": [
+        {
+          "id": "msg_1795201361484_user_pkrua0txah",
+          "role": "user",
+          "content": "Send-recovery compare 02: accept exactly once."
+        },
+        {
+          "id": "reply_request_862970c3e99f4ad891941139468558f1",
+          "role": "assistant",
+          "content": "合成回复完成。"
+        }
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "msg_1795201361484_user_pkrua0txah",
+          "action": "upsert",
+          "role": "user",
+          "content": "Send-recovery compare 02: accept exactly once."
+        },
+        {
+          "seq": 2,
+          "msg_id": "reply_request_862970c3e99f4ad891941139468558f1",
+          "action": "upsert",
+          "role": "assistant",
+          "content": "合成回复完成。"
+        }
+      ],
+      "explicitNewSend": {
+        "requestId": "msg_1795201365020_user_3fonhqsks8",
+        "workId": "request_337d42ae40b64d23b6bffc544cca801d",
+        "totalProvider": 2,
+        "totalPosts": 2,
+        "journalIds": [
+          "msg_1795201361484_user_pkrua0txah",
+          "reply_request_862970c3e99f4ad891941139468558f1",
+          "msg_1795201365020_user_3fonhqsks8",
+          "reply_request_337d42ae40b64d23b6bffc544cca801d"
+        ]
+      },
+      "screenshots": [
+        "screenshots/single-recovered.png"
+      ]
+    },
+    "transport-only": {
+      "pwa": {
+        "htmlStatus": 200,
+        "bundleStatus": 200,
+        "connectionStatus": 200,
+        "chromium": {
+          "title": "VCP Mobile",
+          "secureContext": true,
+          "connectionReady": true
+        }
+      },
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "A-final": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "electron": "44.9.3",
+      "cdsSHA256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+      "counts": {
+        "sessionPosts": 1,
+        "cancelPosts": 0,
+        "providerAttempts": 1
+      },
+      "work": [
+        {
+          "id": "request_d9eb6263488d4bb684d5297c4ce36b28",
+          "request_id": "msg_1795201369714_user_pf2sts4o9u",
+          "topic_key": "shared_e40900dbca9643b78f43705f0d2aec38",
+          "state": "review_required",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": "MODEL_STREAM_ERROR_REVIEW_REQUIRED",
+          "user_message_id": "msg_1795201369714_user_pf2sts4o9u",
+          "user_seq": 1,
+          "reply_message_id": null
+        }
+      ],
+      "native": [
+        {
+          "id": "request_d9eb6263488d4bb684d5297c4ce36b28",
+          "admission_id": "request_d9eb6263488d4bb684d5297c4ce36b28",
+          "state": "unknown"
+        }
+      ],
+      "ledger": {
+        "phase": "review_required",
+        "bodyId": "msg_1795201369714_user_pf2sts4o9u",
+        "admitStarted": true,
+        "acceptedId": "request_d9eb6263488d4bb684d5297c4ce36b28",
+        "content": "Send-recovery compare 03: preserve the partial reply.",
+        "projectionPending": false
+      },
+      "visible": {
+        "partialShown": true,
+        "finalShown": false,
+        "reviewShown": true,
+        "composer": {
+          "mode": "send",
+          "label": "发送消息",
+          "disabled": false,
+          "text": ""
+        }
+      },
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "msg_1795201369714_user_pf2sts4o9u",
+          "action": "upsert",
+          "role": "user",
+          "content": "Send-recovery compare 03: preserve the partial reply."
+        }
+      ],
+      "history": [
+        {
+          "id": "msg_1795201369714_user_pf2sts4o9u",
+          "role": "user",
+          "content": "Send-recovery compare 03: preserve the partial reply."
+        }
+      ],
+      "screenshots": [
+        "screenshots/single-partial-live.png",
+        "screenshots/single-socket-cut-reopened.png"
+      ]
+    },
+    "pre-only": {
+      "pwa": {
+        "htmlStatus": 200,
+        "bundleStatus": 200,
+        "connectionStatus": 200,
+        "chromium": {
+          "title": "VCP Mobile",
+          "secureContext": true,
+          "connectionReady": true
+        }
+      },
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "A-pre-reopened": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "electron": "44.9.3",
+      "cdsSHA256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+      "status": 409,
+      "requestId": "msg_1795201378206_user_c10chj9lgv",
+      "afterReopen": {
+        "input": {
+          "mode": "send",
+          "label": "发送消息",
+          "disabled": false,
+          "text": ""
+        },
+        "ledger": {
+          "phase": "local_pending",
+          "rejected": "SHARED_CONTEXT_CHANGED",
+          "bodyId": "msg_1795201378206_user_c10chj9lgv",
+          "admitStarted": false,
+          "content": "Send-recovery compare 01: keep this draft."
+        },
+        "visible": true
+      },
+      "workCount": 0,
+      "journalRows": 0,
+      "providerCalls": 0,
+      "screenshots": [
+        "screenshots/single-pre-submit.png"
+      ]
+    },
+    "local-only": {
+      "pwa": {
+        "htmlStatus": 200,
+        "bundleStatus": 200,
+        "connectionStatus": 200,
+        "chromium": {
+          "title": "VCP Mobile",
+          "secureContext": true,
+          "connectionReady": true
+        }
+      },
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "electron": "44.9.3",
+      "cdsSHA256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+      "journalCount": 0,
+      "localPosts": 1,
+      "workCount": 0,
+      "sharedPosts": 0,
+      "provider": 1,
+      "history": [
+        {
+          "id": "msg_1795201385217_user_gbqzgwnyag",
+          "role": "user",
+          "content": "Send-recovery compare 02: accept exactly once."
+        },
+        {
+          "id": "admission_8628bf67-4c22-42a9-aaa5-9a2ed7e8946d",
+          "role": "assistant",
+          "content": "合成回复完成。"
+        }
+      ],
+      "screenshots": [
+        "screenshots/local-complete.png"
+      ]
+    },
+    "config-only": {
+      "pwa": {
+        "htmlStatus": 200,
+        "bundleStatus": 200,
+        "connectionStatus": 200,
+        "chromium": {
+          "title": "VCP Mobile",
+          "secureContext": true,
+          "connectionReady": true
+        }
+      },
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "electron": "44.9.3",
+      "cdsSHA256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+      "combinedNameAvatar": {
+        "sharedId": "shared_e802d44c8d224721b468c44ab17b8711",
+        "version": 2,
+        "onePost": true,
+        "oneVersion": true,
+        "identicalAvatarOnBothDevices": true
+      },
+      "conflict": {
+        "sharedId": "shared_1acd99f2e6c74610b33d73595fa8386d",
+        "version": 2,
+        "draftPreserved": true
+      },
+      "lostReceipt": {
+        "sharedId": "shared_48237fb2a69845f080063f0f38e35928",
+        "version": 2,
+        "opId": "native_19b31eafe82cdc952df03d658972859ff4b9acb1",
+        "oneVersion": true,
+        "sameOperation": true,
+        "bothDevices": true
+      },
+      "screenshots": [
+        "screenshots/quick-name-conflict.png",
+        "screenshots/quick-name-recovered.png",
+        "screenshots/native-name-avatar-one-save.png"
+      ]
+    },
+    "shutdown-only": {
+      "pwa": {
+        "htmlStatus": 200,
+        "bundleStatus": 200,
+        "connectionStatus": 200,
+        "chromium": {
+          "title": "VCP Mobile",
+          "secureContext": true,
+          "connectionReady": true
+        }
+      },
+      "exits": {
+        "A": {
+          "code": null,
+          "signal": "SIGKILL"
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "A-reopened": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "electron": "44.9.3",
+      "cdsSHA256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+      "desktopInput": [
+        {
+          "id": "msg_1795201397534_user_9gjr7j6djt",
+          "localOnly": true,
+          "serverSession": false
+        },
+        {
+          "id": "msg_1795201397534_user_9gjr7j6djt",
+          "localOnly": false,
+          "serverSession": true
+        }
+      ],
+      "admission": {
+        "id": "request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+        "request_id": "msg_1795201397534_user_9gjr7j6djt",
+        "principal": "desktop:deviceA",
+        "state": "completed",
+        "dispatched": 1,
+        "native_terminal": 1
+      },
+      "phases": [
+        {
+          "stage": "native_prepared",
+          "request_id": "request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "work_id": "request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "at": 1795201397648
+        },
+        {
+          "stage": "native_entered",
+          "request_id": "request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "work_id": "request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "at": 1795201397676
+        },
+        {
+          "stage": "provider_attempt",
+          "request_id": "request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "work_id": "request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "at": 1795201397689
+        },
+        {
+          "stage": "native_settled",
+          "request_id": "request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "work_id": "request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "at": 1795201400192
+        }
+      ],
+      "work": [
+        {
+          "id": "request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "request_id": "msg_1795201397534_user_9gjr7j6djt",
+          "topic_key": "shared_802f7b0d43344daeadd029d6a74998a5",
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "user_message_id": "msg_1795201397534_user_9gjr7j6djt",
+          "user_seq": 1,
+          "reply_message_id": "reply_request_d7c1171c18dd42c29f3c31a4c8ebe4f4"
+        }
+      ],
+      "native": [
+        {
+          "id": "request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "admission_id": "request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "state": "model_terminal"
+        }
+      ],
+      "recoveryLookup": {
+        "method": "GET",
+        "route": "/api/v1/sync/shared/request",
+        "query": {
+          "sharedSpaceId": "sharedAB",
+          "requestId": "msg_1795201397534_user_9gjr7j6djt"
+        },
+        "status": 200
+      },
+      "providerCallsBeforeExplicitNewSend": 1,
+      "A": [
+        {
+          "id": "msg_1795201397534_user_9gjr7j6djt",
+          "role": "user",
+          "content": "Send-recovery compare 02: accept exactly once."
+        },
+        {
+          "id": "reply_request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "role": "assistant",
+          "content": "合成回复完成。"
+        }
+      ],
+      "B": [
+        {
+          "id": "msg_1795201397534_user_9gjr7j6djt",
+          "role": "user",
+          "content": "Send-recovery compare 02: accept exactly once."
+        },
+        {
+          "id": "reply_request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "role": "assistant",
+          "content": "合成回复完成。"
+        }
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "msg_1795201397534_user_9gjr7j6djt",
+          "action": "upsert",
+          "role": "user",
+          "content": "Send-recovery compare 02: accept exactly once."
+        },
+        {
+          "seq": 2,
+          "msg_id": "reply_request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "action": "upsert",
+          "role": "assistant",
+          "content": "合成回复完成。"
+        }
+      ],
+      "explicitNewSend": {
+        "requestId": "msg_1795201401100_user_72swgsbi1v",
+        "workId": "request_234b8e565df04e0ca6878f857f436cfc",
+        "totalProvider": 2,
+        "totalPosts": 2,
+        "journalIds": [
+          "msg_1795201397534_user_9gjr7j6djt",
+          "reply_request_d7c1171c18dd42c29f3c31a4c8ebe4f4",
+          "msg_1795201401100_user_72swgsbi1v",
+          "reply_request_234b8e565df04e0ca6878f857f436cfc"
+        ]
+      },
+      "shutdown": {
+        "busy": {
+          "alive": true,
+          "admissionResumed": true
+        },
+        "crash": {
+          "electronPid": 2117513,
+          "cdsPid": 2117729,
+          "liveGroupMembers": 0
+        }
+      }
+    }
+  },
+  "ordinaryHost": {
+    "realMainAndIndependentAdminServer": true,
+    "listener": "loopback",
+    "vueTypecheckAndBuild": "PASS",
+    "nativeDailyNoteSearch": "PASS",
+    "mainExit": 0,
+    "independentAdminExitSignal": "SIGTERM"
+  },
+  "isolatedUpgradeRollback": {
+    "baseline": "c837e2a7f26453b99b67996b6eb79db94a72c62e",
+    "sequence": [
+      "baseline normal exit",
+      "baseline SIGKILL after native dispatch",
+      "candidate recovery",
+      "baseline code rollback"
+    ],
+    "sharedSyntheticSQLiteAndHistory": true,
+    "committedAcksAndTopicCursorRetained": true,
+    "originalPendingIntentAndUnknownNativeRequestRetained": true,
+    "newModelDispatchesAcrossRecoveryAndRollback": 0,
+    "layer": "real NativeSync server and desktop modules in disposable worker processes"
+  },
+  "wire": {
+    "oldWire": "1.5",
+    "localLegacyCommitted": true,
+    "protectedBytesUnchanged": true,
+    "denied": "SYNC_WRITER_EXCLUDED",
+    "handshake16": "WIRE_VERSION_MISMATCH",
+    "upstreamWireRejected": true
+  },
+  "ruleTests": 51,
+  "desktopHostTests": 132,
+  "physicalAndroid": "not available",
+  "windowsDesktop": "not available",
+  "observedLoadedFiles": {
+    "apps/desktop/modules/ipc/chatHandlers.js": "177fe4baaa6c650b1bc7293efcb77ef74841608998d0bbc516d2f681265f3545",
+    "apps/desktop/modules/services/topicExecutionAuthority.js": "d95be8d511db7d830cc582cc65f4bef59a718a6e56c69c07c28a8cf014f47486",
+    "apps/desktop/modules/services/nativeSync/sharedSessionClient.js": "784646ebaaff15a2cdc4134daa70d097a730f98a928ba55fc0f51f3252b3744e",
+    "apps/desktop/modules/event-listeners.js": "b1b0d975beba491eec9193a17f63d71d232de15ae16f44ac9ac543603d43b6ea",
+    "apps/desktop/modules/renderer/nativeExecutionStatus.js": "f3400d5145955f4e0ae56c8146b97e1a985432f783feb21821a727005d23b459",
+    "apps/desktop/modules/renderer/mainChatSendOwner.js": "b1c8836bbeb62dc96db5e81439a01ee28d69c36382b441663e7707928ddea0ef",
+    "apps/server/server.js": "3095443182aca5d60dec2f6ee776790906028befa9364496fd8fac5951a096df",
+    "apps/server/Plugin.js": "1d6e821f640a78a4079dd9816d6051e3e3a80304f760491ab0d4a688a1348fff",
+    "apps/server/WebSocketServer.js": "208b07470ed449c14eecdbf91c97baa64a7461adb64338e80c60b56b82894532",
+    "apps/server/modules/requestExecutionContext.js": "2a60d7ad51489741f4ceb3113a5d512afa0c6a527e8e482e49142c98962fe482",
+    "apps/server/modules/chatCompletionHandler.js": "430214198ce02ef2d395edcf5e6d79232b994a13516dffc8cece0d46d7ce5af6",
+    "apps/server/Plugin/NativeSync/sync/sharedNative.js": "5f463aede4ae58973d6b792c2d48458c83159ef80ff15ec87443b2bdeba8a4f0",
+    "apps/server/Plugin/NativeSync/sync/sharedSteering.js": "b301b5273c0a32ae476fd352eb68353abfc7b4c9a0376cfce2e2c540574dc89c",
+    "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "81f8c66028b4e77697b588bc89073c65291202f9ab01977bb6507e0aa7f91c6b",
+    "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+    "apps/server/modules/vcpLoop/toolExecutor.js": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f",
+    "apps/server/modules/handlers/nonStreamHandler.js": "200540207a903bb0e7dc342eba36edb271619df7304eb5f433b7d62353a1cc56",
+    "apps/server/modules/pluginBridgeRegistry.js": "c135a4ae59741a02cdf07653b7112f7932693f10600f6d4dac76e28a72d4d825",
+    "apps/server/modules/toolCallRecordStore.js": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1",
+    "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c",
+    "apps/server/Plugin/NativeSync/mobile/execution.js": "1a78e164d79f50d823aa09dbf26b269d35a1d175ee53806f42d5b1aa0d44b25b",
+    "apps/server/Plugin/NativeSync/native-sync.js": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9",
+    "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+  },
+  "nativeBuild": {
+    "cds": {
+      "authorityProtocol": 1,
+      "birthState": "unknown",
+      "sourceSha256": "dc6cd1f2dea9de92b49d6044c98b6e3ce5a049e0c503b3ab099b0f1a3acbd6ae",
+      "binarySha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    },
+    "vexusSha256": "eca4fa31eba78f7cf4e92d1b0f794e9dc7d7424294df929317489a8462d01051"
+  },
+  "desktopFeatureTests": 28
+}

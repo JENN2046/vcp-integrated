@@ -21,3 +21,5 @@ npm run dev:isolated
 桌面从 apps/desktop 加载，服务端从 apps/server 加载，手机源文件位于 apps/mobile。构建器先生成桌面、服务端和手机所需的四份契约产物，再把 Vite 产物放到服务端已有的 /mobile 挂载位置。源码及原生工件的来源在 provenance；署名与许可见 NOTICE.md 和 LICENSES。
 
 协作浏览器套件需要 Chrome 或 Chromium，可用 `CHROME_BIN` 指定。集成套件默认依次验证丢回执、首段后断流、准入前拒绝、普通本机发送、配置保存、桌面异常重开。两端各自安装的 @vcp/core-rules 通过 npm 本地文件依赖指向本检出的 packages/core-rules；运行 build 会更新浏览器直接加载的原生规则脚本。
+
+本次 Linux 隔离结果、实体设备待验范围与截图见[集成交付记录](docs/integration-result.md)。
