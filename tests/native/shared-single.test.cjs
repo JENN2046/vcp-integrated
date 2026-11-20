@@ -286,7 +286,7 @@ test('late attachment materialization obeys local visibility, merge fencing and 
 });
 
 test('composer model selection uses the real shared native save contract and changes only the requested model across desktops',async t=>{
- const fs=require('node:fs/promises');const f=await fixture(t),a=await f.desktop('A'),b=await f.desktop('B'),{JSDOM}=require('/home/jenn/AGENTS_OS_Workspace/runtime/VCPChat/node_modules/jsdom'),r=a.runtime,id=a.descriptor.itemId;
+ const fs=require('node:fs/promises');const f=await fixture(t),a=await f.desktop('A'),b=await f.desktop('B'),{JSDOM}=require(CHAT+'/node_modules/jsdom'),r=a.runtime,id=a.descriptor.itemId;
  const before=f.shared.get(f.actor('A'),'sharedAB',f.owner.id),readConfig=async()=>r.decorateNativeConfig('agent',id,JSON.parse(await fs.readFile(r.root+'/Agents/'+id+'/config.json','utf8')));
  const dom=new JSDOM('<div class="chat-input-actions"><button id="sendMessageBtn"></button></div>',{runScripts:'outside-only',url:'https://synthetic.invalid'}),w=dom.window;w.console={error(){},warn(){}};let choose,current={id,type:'agent',config:await readConfig()};
  w.ModelPickerPopup={createModelPickerPopup:opts=>{choose=opts.onSelect;return{close(){},dispose(){}};}};w.eval(await fs.readFile(CHAT+'/modules/renderer/composerModelSelect.js','utf8'));

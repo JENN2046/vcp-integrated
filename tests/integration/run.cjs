@@ -5,6 +5,7 @@ const { X509Certificate } = require('node:crypto');
 const { execFileSync, spawn } = require('node:child_process');
 const path = require('node:path');
 const readline = require('node:readline');
+const { once } = require('node:events');
 const os = require('node:os');
 const { setTimeout: delay } = require('node:timers/promises');
 
@@ -12,12 +13,12 @@ const here = __dirname;
 const candidate = path.resolve(here, '../..');
 const host = path.join(candidate, 'apps/desktop');
 const { createRequire } = require('node:module');
-const modes = ['lost-only', 'transport-only', 'pre-only', 'local-only'];
+const modes = ['lost-only', 'transport-only', 'pre-only', 'local-only', 'config-only', 'shutdown-only'];
 const requested = process.argv[2] || 'all';
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, 'all', 'ready', '--dev', 'idle', 'config-only', 'shutdown-only'].includes(requested) || process.argv.length > 3) {
+if (![...modes, 'all', 'ready', '--dev', 'idle'].includes(requested) || process.argv.length > 3) {
     throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only]');
 }
 let out, cert, fingerprint, display;
@@ -44,14 +45,15 @@ async function isolatedDisplay(root) {
 function trace(event, data) {
     fs.appendFileSync(path.join(out, 'events.jsonl'), JSON.stringify({ event, t: Date.now(), data }) + '\n');
 }
-function launch(profile, role) {
+function launch(profile, role, mode) {
     const home = path.join(out, 'home-' + path.basename(profile));
     fs.mkdirSync(home, { recursive: true });
     const env = { HOME:home, XDG_CONFIG_HOME:home+'/config', XDG_CACHE_HOME:home+'/cache',
         PATH:'/usr/bin:/bin', LANG:'C.UTF-8', DISPLAY:display,
         NS_HOST: host, VCPCHAT_APP_DATA_DIR: profile, VCPCHAT_E2E_TEST: '1',
         NODE_EXTRA_CA_CERTS: cert, NS_CERT_FINGERPRINT: fingerprint,
-        ...(requested === 'idle' ? { NS_METER_PREFIX: path.join(out, role) } : {}) };
+        ...(mode === 'idle' ? { NS_METER_PREFIX: path.join(out, role) } : {}),
+        ...(mode === 'shutdown-only' ? { NS_CHECK_QUIT_ADMISSION: '1' } : {}) };
     const args = ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1', '--disable-background-networking', '--ozone-platform=x11', '--disable-gpu', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', path.join(here, './electron.cjs')];
     const proc = spawn(executable, args, { cwd: host, env, detached: true, stdio: ['pipe','pipe','pipe'] });
     const log = fs.createWriteStream(path.join(out, role + '.log'));
@@ -140,7 +142,7 @@ async function runCase(root, mode) {
     const profiles = {};
     const result = { candidate, mode, origin: service.origin, exits:{}, failures:[] };
     const start = async (role, profileRole = role) => {
-        const client = clients[role] = launch(profiles[profileRole], role);
+        const client = clients[role] = launch(profiles[profileRole], role, mode);
         await waitUntil(() => {
             if (client.ended) throw Error(role + ' Electron exited during startup: ' + JSON.stringify(client.ended));
             return client.events.some(e => e.event === 'renderer-ready');
@@ -161,6 +163,15 @@ async function runCase(root, mode) {
     const groupMembers = pgid => execFileSync('ps', ['-e', '-o', 'pid=,pgid=,stat='], { encoding: 'utf8' })
         .trim().split('\n').map(row => row.trim().split(/\s+/))
         .filter(([, group, stat]) => Number(group) === pgid && !stat.startsWith('Z'));
+    const isLive = pid => {
+        try {
+            const stat = fs.readFileSync('/proc/' + pid + '/stat', 'utf8');
+            return stat.slice(stat.lastIndexOf(')') + 2, stat.lastIndexOf(')') + 3) !== 'Z';
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+            return false;
+        }
+    };
     const crash = async role => {
         const client = clients[role];
         const cdsPid = result[role].cds.pid;
@@ -170,8 +181,8 @@ async function runCase(root, mode) {
         assert.deepEqual(result.exits[role], { code:null, signal:'SIGKILL' });
         assert.equal(client.events.some(event => event.event === 'runtime-close-end'), false);
         try {
-            await waitUntil(() => !groupMembers(client.proc.pid).length, 'crashed Electron group and CDS exit', 10000);
-            assert.equal(groupMembers(client.proc.pid).some(([pid]) => Number(pid) === cdsPid), false);
+            await waitUntil(() => !isLive(cdsPid) && !groupMembers(client.proc.pid).length,
+                'crashed Electron group and CDS exit', 10000);
         } finally {
             if (groupMembers(client.proc.pid).length) process.kill(-client.proc.pid, 'SIGKILL');
         }
@@ -196,6 +207,8 @@ async function runCase(root, mode) {
         if (result[role]?.cds) assert.equal(fs.existsSync(path.join('/proc',String(result[role].cds.pid))),false,'C1 CDS child exited');
         assert.deepEqual(result.exits[role],{code:0,signal:null});
         if (mode === 'shutdown-only') {
+            assert.ok(client.events.some(event => event.event === 'runtime-close-start' &&
+                event.data?.admissionCode === 'APPLICATION_SHUTTING_DOWN'), 'new work rejected during runtime drain');
             await waitUntil(() => !groupMembers(client.proc.pid).length, role + ' process group drained', 10000);
         }
     };
@@ -275,7 +288,11 @@ async function main() {
     try {
         for (const mode of requested === 'all' ? modes : [requested]) await runCase(root, mode);
     } finally {
-        xvfb.kill();
+        if (xvfb.exitCode === null && xvfb.signalCode === null) {
+            const exited = once(xvfb, 'exit');
+            xvfb.kill();
+            await exited;
+        }
     }
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

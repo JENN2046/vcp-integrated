@@ -34,7 +34,12 @@ Module._load = function (request, parent, ...rest) {
             if (result?.close) {
                 const close = result.close.bind(result);
                 result.close = function (...closeArgs) {
-                    log('runtime-close-start');
+                    let admissionCode;
+                    if (process.env.NS_CHECK_QUIT_ADMISSION === '1') {
+                        try { require(path.join(process.env.NS_HOST, 'modules/services/quitAdmission.cjs')).assertOpen(); }
+                        catch (error) { admissionCode = error.code; }
+                    }
+                    log('runtime-close-start', { admissionCode });
                     const pending = close(...closeArgs);
                     Promise.resolve(pending).then(() => log('runtime-close-end'), error => log('runtime-close-error',{code:error?.code}));
                     return pending;

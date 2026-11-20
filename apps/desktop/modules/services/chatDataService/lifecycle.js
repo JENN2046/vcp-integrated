@@ -116,6 +116,7 @@ class ChatDataServiceLifecycle extends EventEmitter {
             const child = spawn(this.binaryPath, args, {
                 cwd: path.dirname(this.binaryPath),
                 windowsHide: true,
+                env: { ...process.env, VCP_CDS_MANAGED_PARENT_PIPE: '1' },
                 stdio: ['pipe', 'pipe', 'pipe']
             });
             this.process = child;

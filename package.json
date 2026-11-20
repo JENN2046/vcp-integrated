@@ -11,6 +11,8 @@
     "dev:isolated": "node tests/integration/run.cjs --dev",
     "test:integration": "node tests/integration/run.cjs",
     "test:native": "node --test --test-concurrency=1 tests/native/*.test.cjs",
-    "deps": "node scripts/dependencies.mjs"
+    "deps": "node scripts/dependencies.mjs",
+    "test:collaboration": "node tests/collaboration/run.cjs",
+    "test:wire": "node tests/integration/mobile-wire.cjs"
   }
 }

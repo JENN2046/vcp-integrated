@@ -199,18 +199,28 @@ async fn run() -> Result<()> {
     std::io::stdout().flush()?;
 
     let control_admission = admission.clone();
+    let parent_pipe_cancellation = cancellation.clone();
+    let managed_parent_pipe = std::env::var("VCP_CDS_MANAGED_PARENT_PIPE").as_deref() == Ok("1");
     tokio::spawn(async move {
         use tokio::io::{AsyncBufReadExt, BufReader};
         let mut input = BufReader::new(tokio::io::stdin()).lines();
         while let Ok(Some(line)) = input.next_line().await {
             let value = serde_json::from_str(&line).unwrap_or(serde_json::Value::Null);
             let ack = control_admission.control(value).await;
-            println!("{}", ack);
-            if std::io::stdout().flush().is_err() {
+            let mut output = std::io::stdout().lock();
+            if writeln!(output, "{}", ack)
+                .and_then(|()| output.flush())
+                .is_err()
+            {
                 break;
             }
         }
         control_admission.disconnect().await;
+        // The managed CDS must release its instance lock if Electron crashes.
+        // Standalone callers retain their existing behavior on stdin EOF.
+        if managed_parent_pipe {
+            parent_pipe_cancellation.cancel();
+        }
     });
 
     tracing::info!(
