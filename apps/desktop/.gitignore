@@ -107,3 +107,8 @@ coverage.xml
 /preloads/bundled/
 /modules/nativeSyncDesktopRuntime/agentNameOwner.cjs
 /modules/services/chatDataService/bin/*/vcp_chat_data_service*
+# Browser entry points materialized from the shared rules package.
+/modules/tavernRulesEngine.js
+/modules/renderer/toolBatchRegions.js
+/modules/renderer/toolResultRegions.js
+/modules/renderer/markdownCodeDomainScanner.js

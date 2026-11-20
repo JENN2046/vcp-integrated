@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const engine = require('../modules/tavernRulesEngine');
 
 const officialStore = JSON.parse(
-    fs.readFileSync(path.join(__dirname, '..', 'AppData', 'VCPChatTarven.official.json'), 'utf8')
+    fs.readFileSync(path.join(__dirname, 'fixtures', 'tavern-official.json'), 'utf8')
 );
 
 test('official presets are loaded from the independent official JSON file', () => {

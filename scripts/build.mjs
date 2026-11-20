@@ -54,6 +54,7 @@ try {
     await rename(staging, output);
 } finally { await rm(staging, {recursive:true,force:true}); }
 if (!process.argv.includes('--mobile')) {
+    run(path.join(desktop,'scripts/build-shared-renderer-rules.cjs'), [], desktop);
     run(path.join(desktop,'scripts/build-portable-agent-owner.cjs'), [desktop], desktop);
     run(path.join(desktop,'scripts/build-sandbox-preloads.cjs'), [desktop], desktop);
     run(path.join(desktop,'rust_chat_data_service/build-runtime.js'), [], desktop);
