@@ -16,7 +16,7 @@ if (report) process.on('exit',()=>{
         'Plugin/NativeSync/sync/sharedHttp.js','Plugin/NativeSync/sync/sharedSpace.js','Plugin/NativeSync/sync/sharedTaskRequests.js','Plugin/NativeSync/sync/sharedTaskControls.js',
         'Plugin/AgentAssistant/AgentAssistant.js','Plugin/AgentAssistant/delegationContinuity.js','Plugin/AgentAssistant/delegationControl.js',
         'modules/vcpLoop/toolExecutor.js','modules/handlers/nonStreamHandler.js','modules/pluginBridgeRegistry.js','modules/toolCallRecordStore.js',
-        'Plugin/NativeSync/sync/sharedTopicSponsor.js','Plugin/NativeSync/mobile/execution.js','Plugin/NativeSync/native-sync.js','Plugin/NativeSync/sync/sponsorExecutionBridge.js'];
+        'Plugin/NativeSync/sync/sharedTopicSponsor.js','Plugin/NativeSync/mobile/execution.js','Plugin/NativeSync/mobile/groupTurn.js','Plugin/NativeSync/mobile/sharedGroups.js','Plugin/NativeSync/mobile/portal.js','Plugin/NativeSync/sync/sharedTurns.js','Plugin/NativeSync/sync/sharedEvents.js','Plugin/NativeSync/native-sync.js','Plugin/NativeSync/sync/sponsorExecutionBridge.js'];
     const ok=roots.filter(rel=>require.cache[path.resolve(rel)]?.loaded).map(file=>({file:'apps/server/'+file,
         sha256:createHash('sha256').update(fs.readFileSync(file)).digest('hex')}));
     fs.writeFileSync(report,JSON.stringify(ok,null,2)+'\n');

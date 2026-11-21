@@ -1,0 +1,74 @@
+{
+  "desktop": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+  },
+  "sources": [
+    {
+      "file": "apps/desktop/Groupmodules/groupchat.js",
+      "sha256": "4573e1522f48214b529cbf960e5d959478d7a533ecc9bdd64a4bbd7024909bfd"
+    },
+    {
+      "file": "apps/desktop/modules/ipc/groupChatHandlers.js",
+      "sha256": "6ef48c9802634e5bc7246f7762d3112b45708eff99374b95b2a5136be1e8f303"
+    }
+  ],
+  "exit": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "failures": [],
+  "cancel": {
+    "success": true,
+    "groupId": "Synthetic_native_queue_199f4342-2288-4742-93a8-e119020bf4cb",
+    "topicId": "group_topic_e44bf388-d55d-4e30-a33e-980e0e9037f3",
+    "interruptedRequests": 0,
+    "interruptedMessageIds": [],
+    "continuingRequests": 1,
+    "continuingMessageIds": [
+      "msg_group_5e8214ab-a5ef-454b-a3f1-71048fba0d52_local-group-b_1795249114593"
+    ],
+    "currentReplyContinues": true,
+    "jevSessionInterrupted": false,
+    "message": "已停止后续群聊队列，当前回复将继续完成。"
+  },
+  "history": [
+    {
+      "id": "5e8214ab-a5ef-454b-a3f1-71048fba0d52",
+      "role": "user",
+      "content": "Synthetic local group queue test."
+    },
+    {
+      "id": "msg_group_5e8214ab-a5ef-454b-a3f1-71048fba0d52_local-group-a_1795249114341",
+      "role": "assistant",
+      "agentId": "local-group-a",
+      "content": "Synthetic local group reply A."
+    },
+    {
+      "id": "msg_group_5e8214ab-a5ef-454b-a3f1-71048fba0d52_local-group-b_1795249114593",
+      "role": "assistant",
+      "agentId": "local-group-b",
+      "content": "Synthetic local group reply B."
+    }
+  ],
+  "provider": [
+    {
+      "stream": false,
+      "at": 1795249114574,
+      "localGroupSpeaker": "A"
+    },
+    {
+      "stream": false,
+      "at": 1795249114812,
+      "localGroupSpeaker": "B",
+      "connectedAtRelease": true
+    }
+  ]
+}

@@ -182,7 +182,7 @@ class NativeTaskLinks {
                 terminal ? data.resultRef : null, terminal ? data.resultHash : null, terminal ? data.summary : null,
                 Date.now(), code, unknown ? 1 : 0, resolved, row.plugin_name, row.native_task_id);
         this.engine.fault('native-task-projected');
-        if (terminal) this.engine.store?.shared?.native?.checkTerminal?.(row.execution_id);
+        if (terminal || unknown && this.engine.get(row.execution_id)?.group_stop_index != null) this.engine.store?.shared?.native?.checkTerminal?.(row.execution_id);
         return this.public(this.get(row.plugin_name, row.native_task_id));
     }
     markUnknown(row, code) {
@@ -190,6 +190,7 @@ class NativeTaskLinks {
         const resolved = row.state === 'unknown' ? row.review_resolved : 0;
         this.db.prepare("UPDATE mobile_native_tasks SET state='unknown',review_required=1,review_resolved=?,error_code=?,observed_at=? WHERE plugin_name=? AND native_task_id=?")
             .run(resolved, code, Date.now(), row.plugin_name, row.native_task_id);
+        if (this.engine.get(row.execution_id)?.group_stop_index != null) this.engine.store?.shared?.native?.checkTerminal?.(row.execution_id);
     }
     queryInput(row, includeResult = false) {
         return { nativeTaskId: row.native_task_id, agentBaseName: row.agent_base_name,

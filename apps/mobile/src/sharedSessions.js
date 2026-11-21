@@ -1,6 +1,8 @@
 import {SharedEventProjection,consumeSharedEvents} from '../../desktop/modules/services/nativeSync/sharedEventClient.mjs';
 
 const terminal=new Set(['completed','abandoned','failed','cancelled','review_required','blocked_config','interrupted']);
+// A stopped relay may have one unfinished member after earlier replies committed.
+const needsRelayPreview = job => job.remainingCancelled === true && job.state === 'review_required' && !job.reviewResolved;
 const problem=code=>Object.assign(Error(code),{code});
 const pause=(ms,signal)=>new Promise(resolve=>{
  if(signal.aborted)return resolve();
@@ -109,8 +111,13 @@ export function createSharedSessionObservers({openEvents,onChange=()=>{},onSettl
   const jobs=(next.jobs||[]).filter(job=>job.topicKey===next.topicKey&&typeof job.id==='string');committed=new Set(next.committedIds||[]);watchTopic();
   const settledIds=new Set([...entries.values()].filter(entry=>entry.settled).map(entry=>entry.id));
   const knownIds=new Set(jobs.map(job=>job.id)),placeholders=[...entries.values()].filter(entry=>entry.discovered&&!knownIds.has(entry.id)).map(entry=>entry.job);
-  const desired=[...jobs.filter(job=>!terminal.has(job.state)||entries.has(job.id)),...placeholders].slice(0,maxSubscriptions),ids=new Set(desired.map(job=>job.id));
-  for(const entry of [...entries.values()])if(!ids.has(entry.id)||entry.settled&&committed.has(entry.messageId||entry.job.replyMessageId||'reply_'+entry.id))stop(entry);
+  const desired=[...jobs.filter(job=>!terminal.has(job.state)), ...placeholders,
+   ...jobs.filter(job=>terminal.has(job.state)&&(entries.has(job.id)||needsRelayPreview(job)))].slice(0,maxSubscriptions);
+  const desiredById=new Map(desired.map(job=>[job.id,job]));
+  for(const entry of [...entries.values()]){
+   const job=desiredById.get(entry.id);
+   if(!job||entry.settled&&!needsRelayPreview(job)&&(job.reviewResolved||committed.has(entry.messageId||job.replyMessageId||'reply_'+entry.id)))stop(entry);
+  }
   for(const job of desired){
    if(entries.has(job.id)){
     const previous=entries.get(job.id);previous.job=job;
@@ -120,7 +127,7 @@ export function createSharedSessionObservers({openEvents,onChange=()=>{},onSettl
     }
     continue;
    }
-   if(settledIds.has(job.id)||terminal.has(job.state)||entries.size>=maxSubscriptions)continue;
+   if(settledIds.has(job.id)||(terminal.has(job.state)&&!needsRelayPreview(job))||entries.size>=maxSubscriptions)continue;
    watchWork(job);
   }
   emit();

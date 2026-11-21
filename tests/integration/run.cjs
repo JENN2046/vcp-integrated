@@ -17,6 +17,7 @@ const modes = ['lost-only', 'transport-only', 'pre-only', 'local-only', 'config-
 const requested = process.argv[2] || 'all';
 const ordinaryModes = { 'ordinary-shared': 'pre-only', 'ordinary-local': 'local-only' };
 const ordinaryMode = Object.hasOwn(ordinaryModes, requested) ? ordinaryModes[requested] : undefined;
+const nativeQueue = requested === 'native-local-queue' ? require('../group-extra/local.cjs') : undefined;
 const aaDesktop = requested === 'aa-desktop';
 const approvalRestoreModes = { 'approval-restore': 'desktop', 'approval-restore-stale': 'stale' };
 const approvalRestore = Object.hasOwn(approvalRestoreModes, requested) ? approvalRestoreModes[requested] : undefined;
@@ -35,8 +36,8 @@ const ordinaryFixture = ordinaryMode || approvalRestore ? {
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop]');
+if (![...modes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -152,6 +153,7 @@ async function runCase(root, mode) {
     out = path.join(root, mode);
     fs.mkdirSync(out, { mode: 0o700 });
     let service, aa;
+    const groupRelay = nativeQueue?.createProvider();
     if (aaDesktop) {
         aa = await require('../aa-delegation/fixture.cjs').startFixture({out, candidate, trace, mode: 'pre-only'});
         ({service, cert} = aa);
@@ -163,7 +165,7 @@ async function runCase(root, mode) {
             '-keyout', key, '-out', cert], { env: { PATH: '/usr/bin:/bin' }, stdio: 'ignore' });
         try {
             service = await require('./service.cjs').start({
-                out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision,
+                out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision, groupRelay,
             });
         } finally { fs.rmSync(key, { force: true }); }
     }
@@ -243,7 +245,7 @@ async function runCase(root, mode) {
         }
     };
     try {
-        const roles = approvalRestore || aaDesktop ? ['A'] : ['A', 'B'];
+        const roles = approvalRestore || aaDesktop || nativeQueue ? ['A'] : ['A', 'B'];
         for(const role of roles){
             const profile=profiles[role]=path.join(out,'profile-'+role);
             if (mode==='local-only' && role==='A') {
@@ -251,6 +253,13 @@ async function runCase(root, mode) {
                 write('settings.json',{vcpApiKey:'synthetic-only',disableAsana:true,disableUpdateCheck:true});
                 write('Agents/local-agent/config.json',{id:'local-agent',name:'Synthetic local',model:'synthetic',systemPrompt:'Synthetic test',streamOutput:false,topics:[{id:'local-topic',name:'Local topic',createdAt:1}],current_topic_id:'local-topic'});
                 write('UserData/local-agent/topics/local-topic/history.json',[]);
+                for (const speaker of nativeQueue?.agents || []) {
+                    const id = 'local-group-' + speaker.toLowerCase();
+                    write('Agents/' + id + '/config.json', {
+                        id, name: 'Synthetic group ' + speaker, model: 'synthetic',
+                        systemPrompt: nativeQueue.marker(speaker), streamOutput: false, topics: [],
+                    });
+                }
             } else await restoreProfile(path.join(out,'seed','desktop'+role),profile,service.origin,role);
             const settingsFile=path.join(profile,'settings.json');
             fs.writeFileSync(settingsFile,json({...read(settingsFile),ChatDataServiceEnabled:true,ChatDataServiceNotifyEnabled:false,ChatDataServiceTantivyEnabled:false,vcpServerUrl:service.origin+'/v1/local-chat/completions',userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
@@ -275,9 +284,10 @@ async function runCase(root, mode) {
         } else if (mode !== 'ready') {
             const runScenario = aaDesktop ? require('../aa-desktop/scenario.cjs')
                 : approvalRestore ? require('../approval-restore/' + approvalRestore + '.cjs')
+                : nativeQueue ? nativeQueue.scenario
                 : ordinaryMode ? require('../ordinary-desktop/scenario.cjs')
                 : mode === 'config-only' ? require('./configuration.cjs') : scenario;
-            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash,aa});
+            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash,aa,groupRelay});
         }
     } catch(error) {
         result.failures.push(error.stack);
@@ -326,7 +336,7 @@ async function main() {
     const xvfb = devDisplay ? null : await isolatedDisplay(root);
     if (devDisplay) display = devDisplay;
     try {
-        for (const mode of requested === 'all' ? modes : [ordinaryMode || requested]) await runCase(root, mode);
+        for (const mode of requested === 'all' ? modes : [nativeQueue ? 'local-only' : ordinaryMode || requested]) await runCase(root, mode);
     } finally {
         if (xvfb && xvfb.exitCode === null && xvfb.signalCode === null) {
             const exited = once(xvfb, 'exit');

@@ -1,0 +1,67 @@
+{
+  "desktop": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+  },
+  "sources": [
+    {
+      "file": "apps/desktop/modules/ipc/chatHandlers.js",
+      "sha256": "177fe4baaa6c650b1bc7293efcb77ef74841608998d0bbc516d2f681265f3545"
+    },
+    {
+      "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+      "bytes": 10502,
+      "sha256": "61b86ac0640ef061c93166aaa368f6419e3acd204ab3bee20030315289924a2c"
+    },
+    {
+      "file": "apps/desktop/modules/renderer/mainChatSendOwner.js",
+      "bytes": 9043,
+      "sha256": "b1c8836bbeb62dc96db5e81439a01ee28d69c36382b441663e7707928ddea0ef"
+    }
+  ],
+  "exit": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "failures": [],
+  "roles": [
+    "user",
+    "assistant"
+  ],
+  "provider": [
+    {
+      "id": "admission_414d8d64-4e60-4f36-8919-c4797a074495",
+      "stream": false,
+      "at": 1795249115556,
+      "ordinaryCase": "ORDINARY_TOOL_LOCAL",
+      "ordinaryPhase": "tool-request",
+      "hasToolResult": false
+    },
+    {
+      "id": "admission_414d8d64-4e60-4f36-8919-c4797a074495",
+      "stream": false,
+      "at": 1795249115572,
+      "ordinaryCase": "ORDINARY_TOOL_LOCAL",
+      "ordinaryPhase": "continuation",
+      "hasToolResult": true
+    }
+  ],
+  "counter": [
+    {
+      "marker": "ORDINARY_TOOL_LOCAL"
+    }
+  ],
+  "work": [],
+  "journal": []
+}

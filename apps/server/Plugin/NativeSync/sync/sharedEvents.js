@@ -176,23 +176,52 @@ class SharedEvents{
    body.gap=true;return this.emit(stream,row,'native_gap',{...identity,offset:body.offset,hash:digest(body.text)});
   }catch{return null;}
  }
- nativeSnapshot(row,stream){
+ // Snapshot the already visible member prefix once, in the queue stop transaction.
+ // Never use an unfiltered provider body or record a synthetic final message.
+ retainGroupPrefix(workId,cutoff){
+  const stream=this.streams.get(workId);
+  if(!stream||cutoff<1)return;
+  const native=this.shared.db.prepare(`SELECT n.id FROM shared_native_requests n
+   JOIN mobile_execution_steps s ON s.id=n.id AND s.job_id=n.admission_id AND s.agent_id=n.member_id
+   WHERE n.admission_id=? AND n.ordinal=? AND s.step_index=n.ordinal AND n.state='dispatched'
+   AND s.state IN ('running','waiting_approval')`).get(workId,cutoff-1);
+  const body=native&&stream.nativeBodies.get(native.id);
+  if(!body?.text||Buffer.byteLength(body.text)>this.limits.maxBodyBytes)return;
+  // Keep at most one event's worth of text. Streaming decode omits an
+  // incomplete UTF-8 character at the bound; the cold snapshot marks a gap.
+  const bytes=Buffer.from(body.text);
+  const limit=Math.min(this.limits.maxEventBytes,defaults.maxEventBytes);
+  const text=bytes.length<=limit?body.text:new TextDecoder('utf-8',{ignoreBOM:true}).decode(bytes.subarray(0,limit),{stream:true});
+  const prefix={nativeRequestId:native.id,text,hash:digest(text)};
+  this.shared.db.prepare('UPDATE mobile_executions SET group_stop_preview=? WHERE id=? AND group_stop_index=? AND group_stop_preview IS NULL')
+   .run(JSON.stringify(prefix),workId,cutoff);
+ }
+ nativeSnapshot(row,stream,job){
   const turn=require('./sharedTurns').intent(row),config=JSON.parse(row.config_json);
   if(config.owner.kind!=='group'&&turn.controlMode!=='text-only-v1')return undefined;
   if(config.owner.kind==='group'&&(!Array.isArray(turn.plan)||!turn.plan.length))return undefined;
   const nativeRows=config.owner.kind==='group'
    ?this.shared.db.prepare('SELECT * FROM shared_native_requests WHERE admission_id=? ORDER BY ordinal LIMIT ?').all(row.id,this.limits.maxNativeBodies)
    :this.shared.db.prepare('SELECT n.* FROM shared_native_requests n JOIN shared_work_generations g ON g.work_id=n.admission_id AND g.request_id=n.id WHERE n.admission_id=? ORDER BY g.generation LIMIT ?').all(row.id,this.limits.maxNativeBodies);
+  let retained;
+  if(row.state==='review_required'&&job?.group_stop_preview){
+   try{retained=JSON.parse(job.group_stop_preview);}catch{/* A missing preview cannot certify a result. */}
+  }
   return nativeRows.map(native=>{
    const identity=this.nativeIdentity(row,native),saved=stream.nativeBodies.get(native.id);
-   return saved?{...saved,hash:digest(saved.text)}:{...identity,text:'',offset:0,gap:native.state!=='prepared',hash:digest('')};
+   if(saved)return {...saved,hash:digest(saved.text)};
+   if(retained?.nativeRequestId===native.id&&native.ordinal===job.group_stop_index-1&&
+      typeof retained.text==='string'&&Buffer.byteLength(retained.text)<=this.limits.maxBodyBytes&&digest(retained.text)===retained.hash){
+    return {...identity,text:retained.text,offset:retained.text.length,hash:retained.hash,gap:true};
+   }
+   return {...identity,text:'',offset:0,gap:native.state!=='prepared',hash:digest('')};
   });
  }
  snapshot(actor,query){
   const row=this.validate(actor,query),stream=this.stream(row.id);this.prune(stream);
   const native=this.engine?.get?.(row.id),request=this.shared.publicAdmission(row);
   let body={text:stream.body,offset:0,endOffset:stream.offset,complete:stream.bodyComplete,source:'temporary',hash:stream.hash.copy().digest('hex')};
-  const nativeBodies=this.nativeSnapshot(row,stream);
+  const nativeBodies=this.nativeSnapshot(row,stream,native);
   let partialResult;
   if(row.state==='review_required'&&!row.native_terminal&&!row.reply_seq&&native?.state==='review_required'&&native.pending_operation){
    // Read the original durable intent; never publish it or reinterpret old

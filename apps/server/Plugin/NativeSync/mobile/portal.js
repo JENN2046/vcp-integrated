@@ -87,7 +87,7 @@ class MobilePortal {
                 next();
             } catch (e) { next(e); }
         });
-        this.router.get('/api/session', (req, res) => res.json({ authenticated: true, server: this.connection.information(), recovery: this.recoveryContext(req.mobileSession.id), selectedTopic: req.mobileSession.lastTopicKey || null, topics: this.hasSourceScope(req.mobileSession)?[]:this.catalog(req.mobileSession), agents:this.hasSourceScope(req.mobileSession)?[]:this.agents(req.mobileSession), directory:{version:1,paged:true,scopeMode:this.hasSourceScope(req.mobileSession)?'source':'selected'},sharedPermissions:req.mobileSession.scopes.filter(s=>s.startsWith('shared:')),sharedFeatures:this.store.shared?.events?['shared-events-v1']:[] }));
+        this.router.get('/api/session', (req, res) => res.json({ authenticated: true, server: this.connection.information(), recovery: this.recoveryContext(req.mobileSession.id), selectedTopic: req.mobileSession.lastTopicKey || null, topics: this.hasSourceScope(req.mobileSession)?[]:this.catalog(req.mobileSession), agents:this.hasSourceScope(req.mobileSession)?[]:this.agents(req.mobileSession), directory:{version:1,paged:true,scopeMode:this.hasSourceScope(req.mobileSession)?'source':'selected'},sharedPermissions:req.mobileSession.scopes.filter(s=>s.startsWith('shared:')),sharedFeatures:[...(this.store.shared?.events?['shared-events-v1']:[]),...(this.store.shared?.native?['group-cancel-remaining-v1']:[])] }));
         this.router.get('/api/shared/session-events',(req,res,next)=>{
             try{
                 if(this.engine.quiescing)throw error('HOST_DRAINING',503);
@@ -168,6 +168,22 @@ class MobilePortal {
         });
         this.router.post('/api/executions/:id/resolve',(req,res,next)=>{try{if(!req.body||Object.keys(req.body).some(k=>k!=='action'))throw error('INVALID_REVIEW_RESOLUTION');res.json(this.engine.resolveReview(req.params.id,req.mobileSession.id,req.body.action));}catch(e){next(e);}});
         this.router.get('/api/groups',(req,res)=>res.json({groups:this.agents(req.mobileSession).filter(a=>a.ownerType==='group')}));
+        this.router.post('/api/executions/:id/cancel-remaining', (req,res,next) => {
+            try {
+                if (!req.body || Array.isArray(req.body) || Object.keys(req.body).length) throw error('INVALID_GROUP_CONTROL', 400);
+                const row = this.engine.get(req.params.id);
+                if (!row || row.session_id !== req.mobileSession.id) throw error('EXECUTION_NOT_FOUND', 404);
+                const topic = this.engine.topics.get(row.topic_key);
+                if (!topic?.sharedSpaceId || topic.ownerType !== 'group') throw error('SHARED_GROUP_REQUIRED', 409);
+                const shared = this.store.shared;
+                const actor = shared.mobile(req.mobileSession, topic.sharedSpaceId, 'execute');
+                const canonical = shared.topic(actor, topic.sharedSpaceId, topic.key, 'execute');
+                if (canonical.id !== topic.key) throw error('SHARED_TOPIC_MERGED', 409);
+                if (shared.readOnly) throw error('SHARED_READ_ONLY', 409);
+                this.requireSubmissionContext(req);
+                res.status(202).json(this.engine.cancelRemaining(row.id, req.mobileSession.id));
+            } catch (e) { next(e); }
+        });
         this.router.post('/api/executions/:id/cancel', (req,res,next) => { try {res.status(202).json(this.engine.cancel(req.params.id,req.mobileSession.id));} catch(e) {next(e);} });
         this.router.use('/api/conversations/:key/attachments',require('./attachmentRoutes').attachmentRoutes({storage:()=>this.attachments,authorize:req=>{const topic=this.authorize(req);require('./attachmentPermission').assertAttachmentOperation({method:req.method,path:req.path,topic,session:req.mobileSession,shared:this.store.shared});req.attachmentTopic=topic;},principal:req=>'mobile:'+req.mobileSession.id,topicKey:req=>req.attachmentTopic.key}));
         this.router.use('/api', (_req,res) => res.status(404).json({error:{code:'NOT_FOUND'}}));

@@ -1,0 +1,32 @@
+{
+  "scenario": "legacy-host",
+  "baselineRevision": "2c88e4aad704ac3f089620ce4c481b572c841228",
+  "servedBundle": {
+    "name": "index-osJBDX72.js",
+    "sha256": "0aaa7a62f4d2b50ec27a6f4544fe377369c24745dcfb0cc8e3a4511c2d17724a"
+  },
+  "legacyControl": "中止本轮群聊",
+  "cancelRequests": [
+    {
+      "route": "/mobile/api/executions/request_ea5274c0e7a546908d726350d8dd553b/cancel",
+      "status": 202,
+      "dropped": false
+    }
+  ],
+  "exits": [
+    {
+      "code": 0,
+      "signal": null
+    }
+  ],
+  "stepStates": [
+    "completed",
+    "publishing",
+    "cancelled"
+  ],
+  "providerCounts": [
+    1,
+    1,
+    0
+  ]
+}

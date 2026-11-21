@@ -1,0 +1,547 @@
+{
+  "scenario": "finish",
+  "baselineRevision": null,
+  "mobile": {
+    "htmlStatus": 200,
+    "bundleStatus": 200,
+    "connectionStatus": 200
+  },
+  "browser": "Chrome/158.0.8127.36",
+  "servedBundle": {
+    "name": "index-osJBDX72.js",
+    "sha256": "0aaa7a62f4d2b50ec27a6f4544fe377369c24745dcfb0cc8e3a4511c2d17724a"
+  },
+  "before": {
+    "job": {
+      "id": "request_b920bd47b596491190864c94a332f70d",
+      "request_id": "31a24d0f-c663-45a8-b191-b8cc4e242cb7",
+      "state": "running",
+      "cancel_requested": 0,
+      "error_code": null
+    },
+    "steps": [
+      {
+        "id": "gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "error_code": null
+      },
+      {
+        "id": "gstep_f6b868c2edb5a578d09a73768769cfa39c9f3324",
+        "state": "running",
+        "attempts": 1,
+        "reply_message_id": null,
+        "error_code": null
+      },
+      {
+        "id": "gstep_49ef43e4856681907b3dfdc3d28586a3ec127f0f",
+        "state": "queued",
+        "attempts": 0,
+        "reply_message_id": null,
+        "error_code": null
+      }
+    ],
+    "counts": [
+      1,
+      1,
+      0
+    ],
+    "history": [
+      {
+        "id": "mobile_job_8dae759b1fda91e03350a461e1a9f5a1",
+        "role": "user",
+        "content": "RELAY_ROUND_ONE"
+      },
+      {
+        "id": "reply_gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      }
+    ],
+    "admission": {
+      "state": "dispatched",
+      "dispatched": 1
+    },
+    "native": [
+      {
+        "id": "gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "id": "gstep_f6b868c2edb5a578d09a73768769cfa39c9f3324",
+        "ordinal": 1,
+        "state": "dispatched"
+      }
+    ],
+    "journalCounts": [
+      {
+        "msg_id": "mobile_job_8dae759b1fda91e03350a461e1a9f5a1",
+        "n": 1
+      },
+      {
+        "msg_id": "reply_gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "n": 1
+      }
+    ],
+    "providerBConnected": true
+  },
+  "browserObservedLostAck": true,
+  "observerUiWrites": [],
+  "observerDenial": {
+    "status": 404,
+    "code": "EXECUTION_NOT_FOUND",
+    "explicitTestProbe": true
+  },
+  "retained": {
+    "job": {
+      "id": "request_b920bd47b596491190864c94a332f70d",
+      "request_id": "31a24d0f-c663-45a8-b191-b8cc4e242cb7",
+      "state": "running",
+      "cancel_requested": 0,
+      "error_code": null
+    },
+    "steps": [
+      {
+        "id": "gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "error_code": null
+      },
+      {
+        "id": "gstep_f6b868c2edb5a578d09a73768769cfa39c9f3324",
+        "state": "running",
+        "attempts": 1,
+        "reply_message_id": null,
+        "error_code": null
+      },
+      {
+        "id": "gstep_49ef43e4856681907b3dfdc3d28586a3ec127f0f",
+        "state": "cancelled",
+        "attempts": 0,
+        "reply_message_id": null,
+        "error_code": null
+      }
+    ],
+    "counts": [
+      1,
+      1,
+      0
+    ],
+    "history": [
+      {
+        "id": "mobile_job_8dae759b1fda91e03350a461e1a9f5a1",
+        "role": "user",
+        "content": "RELAY_ROUND_ONE"
+      },
+      {
+        "id": "reply_gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      }
+    ],
+    "admission": {
+      "state": "dispatched",
+      "dispatched": 1
+    },
+    "native": [
+      {
+        "id": "gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "id": "gstep_f6b868c2edb5a578d09a73768769cfa39c9f3324",
+        "ordinal": 1,
+        "state": "dispatched"
+      }
+    ],
+    "journalCounts": [
+      {
+        "msg_id": "mobile_job_8dae759b1fda91e03350a461e1a9f5a1",
+        "n": 1
+      },
+      {
+        "msg_id": "reply_gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "n": 1
+      }
+    ],
+    "reopened": true,
+    "replaySameWork": true,
+    "providerBConnected": true,
+    "observerSawCancelledSuffixWhileBWasRunning": true
+  },
+  "after": {
+    "job": {
+      "id": "request_b920bd47b596491190864c94a332f70d",
+      "request_id": "31a24d0f-c663-45a8-b191-b8cc4e242cb7",
+      "state": "cancelled",
+      "cancel_requested": 0,
+      "error_code": null
+    },
+    "steps": [
+      {
+        "id": "gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "error_code": null
+      },
+      {
+        "id": "gstep_f6b868c2edb5a578d09a73768769cfa39c9f3324",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_f6b868c2edb5a578d09a73768769cfa39c9f3324",
+        "error_code": null
+      },
+      {
+        "id": "gstep_49ef43e4856681907b3dfdc3d28586a3ec127f0f",
+        "state": "cancelled",
+        "attempts": 0,
+        "reply_message_id": null,
+        "error_code": null
+      }
+    ],
+    "counts": [
+      1,
+      1,
+      0
+    ],
+    "history": [
+      {
+        "id": "mobile_job_8dae759b1fda91e03350a461e1a9f5a1",
+        "role": "user",
+        "content": "RELAY_ROUND_ONE"
+      },
+      {
+        "id": "reply_gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      },
+      {
+        "id": "reply_gstep_f6b868c2edb5a578d09a73768769cfa39c9f3324",
+        "role": "assistant",
+        "content": "RELAY_B_PARTIAL RELAY_B_FINAL"
+      }
+    ],
+    "admission": {
+      "state": "completed",
+      "dispatched": 1
+    },
+    "native": [
+      {
+        "id": "gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "id": "gstep_f6b868c2edb5a578d09a73768769cfa39c9f3324",
+        "ordinal": 1,
+        "state": "model_terminal"
+      }
+    ],
+    "journalCounts": [
+      {
+        "msg_id": "mobile_job_8dae759b1fda91e03350a461e1a9f5a1",
+        "n": 1
+      },
+      {
+        "msg_id": "reply_gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "n": 1
+      },
+      {
+        "msg_id": "reply_gstep_f6b868c2edb5a578d09a73768769cfa39c9f3324",
+        "n": 1
+      }
+    ]
+  },
+  "next": {
+    "job": {
+      "id": "request_edac39e230f145228d60cf92e811653d",
+      "request_id": "13af0a0f-2b9d-4521-a125-3d403b2c8bc4",
+      "state": "completed",
+      "cancel_requested": 0,
+      "error_code": null
+    },
+    "steps": [
+      {
+        "id": "gstep_d39fd01c25c8e32b2bcfb9619652028f9c1f8b3f",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_d39fd01c25c8e32b2bcfb9619652028f9c1f8b3f",
+        "error_code": null
+      },
+      {
+        "id": "gstep_9f56cc0892bab8e14368c99d1ae3bf287ecdda4e",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_9f56cc0892bab8e14368c99d1ae3bf287ecdda4e",
+        "error_code": null
+      },
+      {
+        "id": "gstep_dc4780917ac00816980565b6140b33f92fe1c48a",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_dc4780917ac00816980565b6140b33f92fe1c48a",
+        "error_code": null
+      }
+    ],
+    "counts": [
+      1,
+      1,
+      1
+    ],
+    "history": [
+      {
+        "id": "mobile_job_8dae759b1fda91e03350a461e1a9f5a1",
+        "role": "user",
+        "content": "RELAY_ROUND_ONE"
+      },
+      {
+        "id": "reply_gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      },
+      {
+        "id": "reply_gstep_f6b868c2edb5a578d09a73768769cfa39c9f3324",
+        "role": "assistant",
+        "content": "RELAY_B_PARTIAL RELAY_B_FINAL"
+      },
+      {
+        "id": "mobile_job_70d07b5a0e71d62ee264f63d8ffa9a17",
+        "role": "user",
+        "content": "RELAY_ROUND_TWO"
+      },
+      {
+        "id": "reply_gstep_d39fd01c25c8e32b2bcfb9619652028f9c1f8b3f",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      },
+      {
+        "id": "reply_gstep_9f56cc0892bab8e14368c99d1ae3bf287ecdda4e",
+        "role": "assistant",
+        "content": "RELAY_B_FINAL"
+      },
+      {
+        "id": "reply_gstep_dc4780917ac00816980565b6140b33f92fe1c48a",
+        "role": "assistant",
+        "content": "RELAY_C_FINAL"
+      }
+    ],
+    "admission": {
+      "state": "completed",
+      "dispatched": 1
+    },
+    "native": [
+      {
+        "id": "gstep_d39fd01c25c8e32b2bcfb9619652028f9c1f8b3f",
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "id": "gstep_9f56cc0892bab8e14368c99d1ae3bf287ecdda4e",
+        "ordinal": 1,
+        "state": "model_terminal"
+      },
+      {
+        "id": "gstep_dc4780917ac00816980565b6140b33f92fe1c48a",
+        "ordinal": 2,
+        "state": "model_terminal"
+      }
+    ],
+    "journalCounts": [
+      {
+        "msg_id": "mobile_job_70d07b5a0e71d62ee264f63d8ffa9a17",
+        "n": 1
+      },
+      {
+        "msg_id": "mobile_job_8dae759b1fda91e03350a461e1a9f5a1",
+        "n": 1
+      },
+      {
+        "msg_id": "reply_gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+        "n": 1
+      },
+      {
+        "msg_id": "reply_gstep_9f56cc0892bab8e14368c99d1ae3bf287ecdda4e",
+        "n": 1
+      },
+      {
+        "msg_id": "reply_gstep_d39fd01c25c8e32b2bcfb9619652028f9c1f8b3f",
+        "n": 1
+      },
+      {
+        "msg_id": "reply_gstep_dc4780917ac00816980565b6140b33f92fe1c48a",
+        "n": 1
+      },
+      {
+        "msg_id": "reply_gstep_f6b868c2edb5a578d09a73768769cfa39c9f3324",
+        "n": 1
+      }
+    ]
+  },
+  "cancelRequests": [
+    {
+      "route": "/mobile/api/executions/request_b920bd47b596491190864c94a332f70d/cancel-remaining",
+      "status": 202,
+      "dropped": true
+    },
+    {
+      "route": "/mobile/api/executions/request_b920bd47b596491190864c94a332f70d/cancel-remaining",
+      "status": 404,
+      "dropped": false
+    },
+    {
+      "route": "/mobile/api/executions/request_b920bd47b596491190864c94a332f70d/cancel-remaining",
+      "status": 202,
+      "dropped": false
+    }
+  ],
+  "providerCalls": [
+    {
+      "member": "A",
+      "id": "gstep_83967d5c4f569de540cdf129534c2941e183ac61",
+      "stream": true
+    },
+    {
+      "member": "B",
+      "id": "gstep_f6b868c2edb5a578d09a73768769cfa39c9f3324",
+      "stream": true
+    },
+    {
+      "member": "A",
+      "id": "gstep_d39fd01c25c8e32b2bcfb9619652028f9c1f8b3f",
+      "stream": true
+    },
+    {
+      "member": "B",
+      "id": "gstep_9f56cc0892bab8e14368c99d1ae3bf287ecdda4e",
+      "stream": true
+    },
+    {
+      "member": "C",
+      "id": "gstep_dc4780917ac00816980565b6140b33f92fe1c48a",
+      "stream": true
+    }
+  ],
+  "ownerWrites": [
+    "/mobile/api/conversations/shared_f5002a4cb94d440bb3cb06771aecef87/messages",
+    "/mobile/api/executions/request_b920bd47b596491190864c94a332f70d/cancel-remaining",
+    "/mobile/api/executions/request_b920bd47b596491190864c94a332f70d/cancel-remaining",
+    "/mobile/api/conversations/shared_f5002a4cb94d440bb3cb06771aecef87/messages"
+  ],
+  "observerWrites": [
+    "/mobile/api/executions/request_b920bd47b596491190864c94a332f70d/cancel-remaining"
+  ],
+  "browserErrors": [],
+  "exits": [
+    {
+      "code": 0,
+      "signal": null
+    }
+  ],
+  "backendSources": [
+    {
+      "file": "apps/server/server.js",
+      "sha256": "3095443182aca5d60dec2f6ee776790906028befa9364496fd8fac5951a096df"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "a4754eea49c9d91e155d1862e40666bf3c77085760e62bded7e2ecf1336faeee"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "9bac35b45ae82bcdd20a23f73c88fad9eadadaad99e4c8fd37fa424e09e20e08"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "3483b635f0b735b80b0f02d6d0ad5ddefdb9bf52988affb6f5f8b2b63f8ca0b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "6eb7600e0f6212d5fb6569dafa257d28713b1adaea346236adbd8d8a4da88529"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "946cc2c9160ac58e9e213132091b96e47cb57e5cba5c2dde397b3220345c6828"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+      "sha256": "b16e07afa969e4674a98fe093f4e7c892c3125635b9c63ac0064bafdaf47f17d"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "94a2517a153ec8f343ed69ce9c09c2fccd593d441949e5ea8d295106042d91e2"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "c7777a89d9a2b461f1f562764d075d47437473932ae2ecf62985d5d54f01d4d9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+      "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "200540207a903bb0e7dc342eba36edb271619df7304eb5f433b7d62353a1cc56"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "c135a4ae59741a02cdf07653b7112f7932693f10600f6d4dac76e28a72d4d825"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "a3047f7951e3b6030ca1ea6d3163172171bd1c14ef9ff3d29bb234dd24f76e12"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/groupTurn.js",
+      "sha256": "1d159c4a38d0b8247a59b8bec1318bc06ed25bb9ca0e6811392827049ff5bed7"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedGroups.js",
+      "sha256": "68704fc589a6ad43ce33df4c7f2100a57c0242ad36638e195ec96b58e6f0e8be"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/portal.js",
+      "sha256": "3088ccf0e10e0b912164ad2f6e89ec97e19fd5249daa0965947cd7101e5ce95b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTurns.js",
+      "sha256": "023986b7c439261fb2287809543b63a3ba962cf02c1c93197404c71eff4a6025"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedEvents.js",
+      "sha256": "43ce2e77a98be68657b91078dd9fcbcae9382a51baccd2faca6816786d51c915"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/native-sync.js",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    }
+  ]
+}

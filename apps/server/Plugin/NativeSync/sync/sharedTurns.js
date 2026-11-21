@@ -33,9 +33,18 @@ function complete(shared,actor,body,row){
  const topic=shared.topic(actor,row.space_id,row.topic_id,'execute'),turn=intent(row),group=topic.owner_type==='group';
  if(!group)return false;
  if(!['accepted','dispatched','review_required'].includes(row.state))throw fail('SHARED_REQUEST_FENCED');
+ const execution=shared.native?.engine.get?.(row.id),stop=execution?.group_stop_index;
  if(body.finish===true){
   const steps=shared.db.prepare('SELECT * FROM shared_native_requests WHERE admission_id=? ORDER BY ordinal').all(row.id);
-  if(steps.length!==turn.plan.length||steps.some((s,i)=>s.state!=='model_terminal'||s.member_id!==turn.plan[i]))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+  const length=stop??turn.plan.length;
+  if(steps.length!==length||steps.some((s,i)=>s.ordinal!==i||s.state!=='model_terminal'||s.member_id!==turn.plan[i]))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+  if(stop!=null){
+   const ledger=require('../mobile/groupTurn').steps(shared.native.engine,row.id);
+   if(!Number.isSafeInteger(stop)||stop<0||stop>=turn.plan.length||execution.cancel_requested||
+    ledger.length!==turn.plan.length||ledger.some((s,i)=>s.step_index!==i||s.agent_id!==turn.plan[i]||
+     (i<stop?s.state!=='completed'||s.pending_operation||s.id!==steps[i].id||s.reply_message_id!=='reply_'+s.id:s.state!=='cancelled'||s.attempts!==0||s.tool_started||s.pending_operation||s.reply_message_id)))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+   if(shared.native.taskRequests.pending(row.id)||shared.native.engine.nativeTasks.uncertainTools(row.id))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+  }
   const native=shared.native?.engine.nativeTasks;
   if(steps.length&&(!native||native.needsReview(row.id)||native.unsettledTools(row.id)||native.list(row.id).some(t=>!['completed','failed','cancelled','stopped'].includes(t.state))))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
   const replies=shared.store.readProjected(()=>shared.db.prepare('SELECT * FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND msg_id IN (SELECT value FROM json_each(?))').all(...tuple(topic),JSON.stringify(steps.map(s=>'reply_'+s.id))));
@@ -45,10 +54,10 @@ function complete(shared,actor,body,row){
   return {request:shared.publicAdmission(shared.admission(actor,row.space_id,row.id))};
  }
  const step=shared.db.prepare('SELECT * FROM shared_native_requests WHERE id=? AND admission_id=?').get(body.nativeRequestId,row.id),message=body.message;
- if(!step||step.state!=='model_terminal'||turn.plan[step.ordinal]!==step.member_id)throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+ if(!step||step.state!=='model_terminal'||turn.plan[step.ordinal]!==step.member_id||(stop!=null&&step.ordinal>=stop))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
  if(!message||message.role!=='assistant'||message.id!=='reply_'+step.id||message.agentId!==step.member_id)throw fail('INVALID_SHARED_REPLY',400);
  const native=shared.native?.engine.nativeTasks;
- if(!native||native.needsReview(row.id)||native.unsettledTools(row.id))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+ if(!native||native.needsReview(row.id)||native.unsettledTools(row.id)||(stop!=null&&(native.uncertainTools(row.id)||shared.native.taskRequests.uncertain(row.id))))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
  const receipt=writeReply(shared,actor,topic,row,message,'shared-step:'+step.id);
  if(turn.kind==='regenerate')replaceTarget(shared,actor,topic,row,turn);
  shared.db.prepare('UPDATE shared_admissions SET reply_seq=? WHERE id=?').run(receipt.seq,row.id);

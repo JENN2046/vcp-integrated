@@ -62,6 +62,8 @@ class SharedNative {
    else if(body.memberId!==undefined||!generation&&this.db.prepare('SELECT 1 FROM shared_native_requests WHERE admission_id=?').get(admission.id))throw fail('SHARED_REQUEST_ALREADY_DISPATCHED');
    const ordinal=this.db.prepare('SELECT count(*) n FROM shared_native_requests WHERE admission_id=?').get(admission.id).n;
    if(group&&require('./sharedTurns').intent(admission).plan?.[ordinal]!==body.memberId)throw fail('SHARED_GROUP_PLAN_CHANGED');
+   const stop=this.engine.get?.(admission.id)?.group_stop_index;
+   if(stop!=null&&ordinal>=stop)throw fail('SHARED_REQUEST_FENCED');
    if(ordinal>=1000)throw fail('SHARED_REQUEST_LIMIT');
    this.db.prepare("INSERT INTO shared_native_requests VALUES(?,?,?,?,?,'prepared',?)").run(body.requestId,admission.id,actor.principal,body.memberId||null,body.bodyHash,ordinal);
    this.db.prepare('UPDATE shared_admissions SET native_terminal=0 WHERE id=?').run(admission.id);
@@ -114,6 +116,8 @@ class SharedNative {
    row=this.db.prepare('SELECT * FROM shared_native_requests WHERE id=? AND admission_id=?').get(req.body.requestId,ticket);
   }
   if(!row||row.principal!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
+  const stop=this.engine.get?.(admission.id)?.group_stop_index;
+  if(stop!=null&&row.ordinal>=stop)throw fail('SHARED_REQUEST_FENCED');
   const generation=this.shared.steering.requestGeneration(admission.id,row.id);
   if(turn.controlMode==='text-only-v1'&&(!generation||generation.executor!==actor.principal))throw fail('INVALID_STEERING_GENERATION');
   if(turn.controlMode==='text-only-v1'){const gen=req.headers['x-nativesync-generation'],seq=req.headers['x-nativesync-consumed-input-seq'];if(!/^\d+$/.test(gen||'')||!/^\d+$/.test(seq||'')||Number(gen)!==generation.generation||Number(seq)!==generation.consumed_seq)throw fail('INVALID_STEERING_GENERATION');if(this.shared.steering.control(admission).executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');}
@@ -190,10 +194,18 @@ class SharedNative {
   }};
  }
  phase(workId,requestId,stage){const key=requestId+':'+stage;if(this.seenPhases.has(key))return;if(!['native_prepared','native_entered','vcp_preprocessing','provider_attempt','first_model_body','native_settled','final_persisted'].includes(stage))throw fail('INVALID_EXECUTION_PHASE');this.db.prepare('INSERT OR IGNORE INTO shared_request_phases VALUES(?,?,?,?)').run(workId,requestId,stage,Date.now());this.seenPhases.add(key);if(this.seenPhases.size>50000)this.seenPhases.delete(this.seenPhases.values().next().value);}
- checkTerminal(admissionId){
+ checkTerminal(admissionId,{advanceGroup=true}={}){
   if(this.closed)return;
   const admission=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(admissionId);
-  if(!admission||admission.state!=='dispatched')return;
+  const job=this.engine.get?.(admissionId),stop=job?.group_stop_index;
+  if(advanceGroup&&stop!=null&&job.state==='recovering'){
+   queueMicrotask(()=>{
+    if(this.closed)return;
+    try{require('../mobile/groupTurn').advanceRemaining(this.engine,admissionId);}
+    catch(error){console.warn('[NativeSync] GROUP_REMAINDER_SETTLEMENT_FAILED',error.code||'UNEXPECTED');}
+   });
+  }
+  if(!admission||(admission.state!=='dispatched'&&!(stop!=null&&admission.state==='review_required')))return;
   const config=JSON.parse(admission.config_json);
   const pending=this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state IN ('prepared','dispatched','unknown') LIMIT 1").get(admissionId);
   const native=this.engine.nativeTasks;
@@ -203,7 +215,11 @@ class SharedNative {
    this.engine.emitEvent?.(admissionId,'state',{state:'review_required'});
    return;
   }
-  if(config.owner.kind==='group'&&this.db.prepare('SELECT count(*) n FROM shared_native_requests WHERE admission_id=?').get(admissionId).n!==require('./sharedTurns').intent(admission).plan.length)return;
+  if(config.owner.kind==='group'){
+   const counts=this.db.prepare("SELECT count(*) n,coalesce(sum(state='model_terminal'),0) terminal FROM shared_native_requests WHERE admission_id=?").get(admissionId);
+   if(counts.n!==(stop??require('./sharedTurns').intent(admission).plan.length))return;
+   if(stop!=null&&(counts.terminal!==stop||native.uncertainTools(admissionId)))return;
+  }
   if(!this.taskRequests.pending(admissionId)&&!native.unsettledTools(admissionId)&&!native.needsReview(admissionId)&&native.list(admissionId).every(task=>['completed','failed','cancelled','stopped'].includes(task.state))){this.shared.nativeTerminal(admissionId);if(this.shared.steering.enabled)this.shared.steering.closeIfFinished(admissionId);}
  }
  checkpointProof(workId,requestId,settled){const g=this.shared.steering.requestGeneration(workId,requestId);if(g&&settled.length===0&&this.db.prepare('SELECT 1 FROM shared_native_no_dispatch WHERE work_id=? AND generation=?').get(workId,g.generation))return {requestId,hash:null,settledInvocationIds:[],noDispatch:true};return this.continuations.proof(requestId,workId,settled);}

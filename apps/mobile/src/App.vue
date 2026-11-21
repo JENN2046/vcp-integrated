@@ -323,6 +323,25 @@ async function showNativeResult(job,task){
  }catch(error){if(current())nativeResult.value={taskId:task.nativeTaskId,loading:false,content:null,error:'报告暂不可核对，原任务记录保留。'+(error.code?'（'+error.code+'）':'')};}
 }
 async function abandon(j){if(!canResolveReview(j)||!reviewChecks.value[j.id])return;try{await api('executions/'+j.id+'/resolve',{action:'acknowledge_and_abandon_remaining'});notice.value='已记录人工核对并解除本次暂停；旧请求不会重跑。这不代表已取消 AA 或撤回工具副作用。';await refresh();}catch(e){notice.value=e.message;}}
+const supportsCancelRemaining = computed(() => Boolean(currentTopic.value?.sharedSpaceId)
+ && sharedFeatures.value.includes('group-cancel-remaining-v1'));
+async function cancelRemaining(job) {
+ if (!job.own || !supportsCancelRemaining.value || job.topicKey !== selected.value) return;
+ let context;
+ try {
+  context = captureContext();
+  const result = await api('executions/'+encodeURIComponent(job.id)+'/cancel-remaining', {}, {
+   'X-NativeSync-Entry-Id':context.recovery.entryId, 'X-NativeSync-Session-Marker':context.recovery.sessionMarker,
+  });
+  if (!sameView(context)) return;
+  if (result.id !== job.id) throw Error('工作编号不匹配，请重新核对执行状态。');
+  if (result.remainingCancelled) notice.value = '已取消剩余接力';
+  else notice.value = result.steps?.some(step => step.state === 'queued') ? '工作状态已变化，请核对接力进度。' : '没有剩余接力';
+  await refresh();
+ } catch (e) {
+  if (!context || sameView(context)) notice.value = '请核对本轮接力状态。'+e.message;
+ }
+}
 async function cancel(id){try{await api('executions/'+id+'/cancel',{});await refresh();}catch(e){notice.value=e.message;}}
 function applyPairingLink(code){if(!code)return;if(!connectionInitialized){incomingPairing=code;return;}if(paired.value)return;pairCode.value=code;pairingLinkOpen.value=true;settingsOpen.value=true;notice.value='已读取一次性配对码，请确认连接会话。';}
 function pairingHashChanged(){applyPairingLink(consumePairingLink({location:window.location,history:window.history,secureContext:window.isSecureContext}));}
@@ -370,7 +389,11 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
     <div v-if="jobsInfo" class="execution-pages"><small>本页 {{jobs.length}} 项 · 历史范围共 {{jobsInfo.total}} 项 · 待处理／核对范围 {{jobsInfo.attentionTotal}} 项</small><button v-if="jobsInfo.moreAttention" @click="nextExecutions('attention')" :disabled="busy">下一页待处理／核对</button><button v-if="jobsInfo.moreRecent" @click="nextExecutions('recent')" :disabled="busy">更早任务</button><button v-if="jobsInfo.historyPage" @click="latestExecutions" :disabled="busy">返回最新任务</button></div>
     <small v-if="jobs.length">云端已接受 · {{online?'本次查询的原生执行状态':'最近已知状态，联网后重新核对'}}</small>
     <article v-for="j in displayJobs" :key="j.id" class="execution-job" :data-exec-id="j.id" :data-state="j.state">
-     <div class="execution-row"><span>{{errors[j.errorCode]?errors[j.errorCode]:(labels[j.state]||j.state)}}<template v-if="j.steps"> · {{j.steps.filter(s=>s.state==='completed').length}} / {{j.stepCount}} 位成员</template></span><button v-if="j.own&&['queued','running','waiting_approval'].includes(j.state)" :data-cancel-id="j.id" @click="cancel(j.id)">{{j.steps?'取消剩余接力':'请求取消本次回复'}}</button></div>
+     <div class="execution-row"><span>{{j.remainingCancelled && j.state==='cancelled'?'剩余接力已取消':(errors[j.errorCode]||labels[j.state]||j.state)}}<template v-if="j.steps"> · {{j.steps.filter(s=>s.state==='completed').length}} / {{j.stepCount}} 位成员</template></span><template v-if="j.own && j.steps && supportsCancelRemaining">
+      <button v-if="j.canCancelRemaining" :data-cancel-remaining-id="j.id" :disabled="!online" @click="cancelRemaining(j)">取消剩余接力</button>
+     </template>
+     <button v-else-if="j.own && ['queued','running','waiting_approval'].includes(j.state)" :data-cancel-id="j.id" @click="cancel(j.id)">{{j.steps?'中止本轮群聊':'请求取消本次回复'}}</button></div>
+     <p v-if="j.remainingCancelled && j.state!=='cancelled'" role="status">后续接力已取消<template v-if="j.steps?.some(step => ['running','publishing','waiting_approval'].includes(step.state))">，等待当前成员结束</template>。</p>
      <ol v-if="j.steps" class="group-steps"><li v-for="step in j.steps" :key="step.id">{{step.name}} · {{labels[step.state]||step.state}}<small v-if="step.errorCode"> · {{errors[step.errorCode]||'本步异常，详情请核对原生宿主'}}</small></li></ol>
      <p v-if="j.nativeTaskError" class="native-task-error" role="alert">{{j.nativeTaskError}}</p>
      <details v-if="j.toolInvocations.length" class="native-tools"><summary>原生工具调用 {{j.toolInvocations.length}} 项（返回不等于 AA 完成）</summary><ul><li v-for="call in j.toolInvocations" :key="call.invocationId">{{call.pluginName}} · {{toolLabels[call.state]}}<small> · 调用 {{call.invocationId}}</small></li></ul></details>

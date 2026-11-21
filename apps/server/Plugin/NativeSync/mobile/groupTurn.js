@@ -9,16 +9,18 @@ const {withWatchdogNote}=require('../nativeRules/Groupmodules/streamWatchdog');
 const modes={sequential:require('../nativeRules/Groupmodules/modes/sequentialMode'),naturerandom:require('../nativeRules/Groupmodules/modes/natureRandomMode'),invite_only:require('../nativeRules/Groupmodules/modes/inviteOnlyMode')};
 const fail=(code,status=409)=>Object.assign(new Error(code),{code,status});
 const isGroup=row=>row?.kind==='group_message'||row?.kind==='group_invitation';
+const canStopRemaining=job=>['queued','running','waiting_approval','recovering'].includes(job.state)&&!job.cancel_requested;
+const activeStep=step=>['running','waiting_approval','publishing'].includes(step.state);
 
 function schema(engine){
  const db=engine.db,columns=db.prepare('PRAGMA table_info(mobile_executions)').all();
- for(const [name,type]of [['kind','TEXT'],['terminal_state',"TEXT NOT NULL DEFAULT 'completed'"],['group_plan','TEXT'],['anchor_message_id','TEXT'],['group_position','INTEGER NOT NULL DEFAULT 0'],['review_resolved','INTEGER NOT NULL DEFAULT 0']])if(!columns.some(c=>c.name===name))db.exec('ALTER TABLE mobile_executions ADD COLUMN '+name+' '+type);
+ for(const [name,type]of [['kind','TEXT'],['terminal_state',"TEXT NOT NULL DEFAULT 'completed'"],['group_plan','TEXT'],['anchor_message_id','TEXT'],['group_position','INTEGER NOT NULL DEFAULT 0'],['review_resolved','INTEGER NOT NULL DEFAULT 0'],['group_stop_index','INTEGER'],['group_stop_preview','TEXT']])if(!columns.some(c=>c.name===name))db.exec('ALTER TABLE mobile_executions ADD COLUMN '+name+' '+type);
  db.exec(`CREATE TABLE IF NOT EXISTS mobile_execution_steps(id TEXT PRIMARY KEY,job_id TEXT NOT NULL,step_index INTEGER NOT NULL,agent_id TEXT NOT NULL,state TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,pending_operation TEXT,reply_message_id TEXT,error_code TEXT,terminal_state TEXT NOT NULL DEFAULT 'completed',tool_started INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,UNIQUE(job_id,step_index));CREATE INDEX IF NOT EXISTS idx_mobile_steps_job ON mobile_execution_steps(job_id,step_index);`);
  db.exec('CREATE INDEX IF NOT EXISTS idx_mobile_executions_topic_state ON mobile_executions(topic_key,state)');
  engine.nativeWaiters=new Map();
 }
 function held(engine,key){return engine.dependencyHeld(key);}
-function steps(engine,id){return engine.db.prepare('SELECT * FROM mobile_execution_steps WHERE job_id=? ORDER BY step_index').all(id);}
+function steps(engine,id){return engine.db.prepare('SELECT * FROM mobile_execution_steps WHERE job_id=? AND step_index>=0 ORDER BY step_index').all(id);}
 function step(engine,id){return engine.db.prepare('SELECT * FROM mobile_execution_steps WHERE id=?').get(id);}
 
 function accept(engine,sessionId,input,invitation=false){
@@ -27,7 +29,7 @@ function accept(engine,sessionId,input,invitation=false){
  if(topic.sharedSpaceId&&!engine.db.isTransaction)return engine.store.shared.atomic(()=>accept(engine,sessionId,input,invitation));
  if(typeof requestId!=='string'||!/^[a-zA-Z0-9_-]{8,80}$/.test(requestId)||!Array.isArray(attachments)||attachments.length>8||attachments.some(id=>typeof id!=='string')||typeof text!=='string'||text.length>12000||(!invitation&&!text.trim()&&!attachments.length)||(invitation&&(typeof agentId!=='string'||!agentId)))throw fail('INVALID_GROUP_SUBMISSION',400);
  let kind=invitation?'group_invitation':'group_message',id='job_'+sha256(sessionId+'\0'+requestId).slice(0,32),requestHash=sha256(stable({kind,topicKey,...(invitation?{agentId}:{text,attachments})}));
- const prior=engine.db.prepare('SELECT * FROM mobile_executions WHERE session_id=? AND request_id=?').get(sessionId,requestId);if(prior){if(prior.request_hash!==requestHash)throw fail('REQUEST_ID_REUSED');if(!engine.quiescing&&prior.state==='preparing')engine.completeIntent(prior);return {...engine.public(engine.get(id),sessionId),replayed:true};}
+ const prior=engine.db.prepare('SELECT * FROM mobile_executions WHERE session_id=? AND request_id=?').get(sessionId,requestId);if(prior){if(prior.request_hash!==requestHash)throw fail('REQUEST_ID_REUSED');if(!engine.quiescing&&prior.state==='preparing')engine.completeIntent(prior);return {...engine.public(engine.get(prior.id),sessionId),replayed:true};}
  if(engine.quiescing)throw fail('HOST_DRAINING',503);
  if(held(engine,topicKey))throw fail('DEPENDENCY_REVIEW_REQUIRED');
  if(engine.db.prepare('SELECT count(*) AS n FROM mobile_executions WHERE session_id=? AND created_at>?').get(sessionId,Date.now()-60000).n>=20)throw fail('SUBMISSION_RATE_LIMIT',429);
@@ -63,13 +65,13 @@ function accept(engine,sessionId,input,invitation=false){
 function completeStep(engine,row){
  const op=JSON.parse(row.pending_operation),job=engine.get(row.job_id);if(engine.topics.get(job.topic_key)?.sharedSpaceId)require('./sharedGroups').completeStep(engine,row,op);else engine.store.apply(op,{metadataPublisher:Boolean(op.metadata)});engine.fault('group-step-applied');
  const now=Date.now(),terminal=row.terminal_state||'completed';
- engine.db.exec('BEGIN IMMEDIATE');try{
+ const own=!engine.db.isTransaction;if(own)engine.db.exec('BEGIN IMMEDIATE');try{
   engine.db.prepare('UPDATE mobile_execution_steps SET state=?,pending_operation=NULL,reply_message_id=?,updated_at=? WHERE id=?').run(terminal,op.msgId,now,row.id);
   engine.db.prepare('UPDATE mobile_executions SET group_position=?,reply_message_id=?,updated_at=? WHERE id=?').run(row.step_index+1,op.msgId,now,row.job_id);
   if(terminal!=='completed')engine.db.prepare('UPDATE mobile_executions SET state=?,error_code=?,updated_at=? WHERE id=?').run(terminal==='cancelled'?'cancelled':'review_required',row.error_code,now,row.job_id);
   else if(row.error_code?.endsWith('REVIEW_REQUIRED'))engine.db.prepare("UPDATE mobile_executions SET state='review_required',error_code=?,updated_at=? WHERE id=?").run(row.error_code,now,row.job_id);
-  engine.db.exec('COMMIT');
- }catch(e){engine.db.exec('ROLLBACK');throw e;}
+  if(own)engine.db.exec('COMMIT');
+ }catch(e){if(own)engine.db.exec('ROLLBACK');throw e;}
 }
 function publish(engine,row,member,content,code=null,terminal='completed',causality={parents:[],known:false},queuedOnly=false){
  const job=engine.get(row.job_id),topic=engine.topics.get(job.topic_key),msgId='reply_'+row.id;
@@ -77,15 +79,72 @@ function publish(engine,row,member,content,code=null,terminal='completed',causal
  require('../sync/messageCausality').annotateOperation(op,{requestId:row.id,executionId:job.id,...causality});
  // A preparation-only notice must still own a queued step. It does not
  // represent a model attempt and must not revive a step cancelled during await.
- const eligibility=queuedOnly?" AND state='queued' AND EXISTS(SELECT 1 FROM mobile_executions p WHERE p.id=job_id AND p.state='running' AND p.cancel_requested=0)":"";
+ const eligibility=queuedOnly?" AND state='queued' AND EXISTS(SELECT 1 FROM mobile_executions p WHERE p.id=job_id AND p.state='running' AND p.cancel_requested=0 AND p.group_stop_index IS NULL)":"";
  if(!engine.db.prepare("UPDATE mobile_execution_steps SET state='publishing',pending_operation=?,terminal_state=?,error_code=?,updated_at=? WHERE id=?"+eligibility).run(JSON.stringify(op),terminal,code,Date.now(),row.id).changes)return false;
  engine.fault('group-step-intent');completeStep(engine,step(engine,row.id));return true;
 }
+function holdRemaining(engine,job){
+ engine.store.shared.atomic(()=>{
+  engine.db.prepare("UPDATE mobile_executions SET state='review_required',error_code=coalesce(error_code,'EXECUTION_INTERRUPTED_REVIEW_REQUIRED'),updated_at=? WHERE id=?").run(Date.now(),job.id);
+  require('./sharedSingle').hold(engine,job);
+ });
+}
+
+function deferRemaining(engine,id){
+ if(!require('./sharedGroups').hasLiveSettlement(engine,id))return false;
+ engine.db.prepare("UPDATE mobile_executions SET state='recovering',updated_at=? WHERE id=? AND state<>'recovering'").run(Date.now(),id);
+ return true;
+}
+
+function settleRemaining(engine,id){
+ const shared=engine.store.shared;
+ const finished=shared.atomic(()=>{
+  const job=engine.get(id);
+  if(['cancelled','review_required'].includes(job.state)||steps(engine,id).some(activeStep)||deferRemaining(engine,id))return false;
+  try{
+   require('./sharedGroups').finish(engine,job);
+  }catch(error){
+   if(error.code!=='SHARED_NATIVE_TERMINAL_REQUIRED')throw error;
+   holdRemaining(engine,job);
+   return false;
+  }
+  engine.db.prepare("UPDATE mobile_executions SET state='cancelled',error_code=NULL,group_stop_preview=NULL,updated_at=? WHERE id=?").run(Date.now(),id);
+  return true;
+ });
+ if(finished)engine.emitEvent(id,'state',{state:'cancelled'});
+}
+
+function recoverRemaining(engine,job){
+ if(['cancelled','review_required'].includes(job.state))return;
+ const shared=engine.store.shared;
+ shared.atomic(()=>{
+  if(deferRemaining(engine,job.id))return;
+  try{
+   for(const row of steps(engine,job.id).filter(s=>s.state==='publishing'))completeStep(engine,row);
+  }catch(error){
+   if(error.code!=='SHARED_NATIVE_TERMINAL_REQUIRED')throw error;
+   engine.db.prepare("UPDATE mobile_execution_steps SET state='interrupted',error_code='EXECUTION_INTERRUPTED_REVIEW_REQUIRED',updated_at=? WHERE job_id=? AND state='publishing'").run(Date.now(),job.id);
+   holdRemaining(engine,job);
+   return;
+  }
+  const changed=engine.db.prepare("UPDATE mobile_execution_steps SET state='interrupted',error_code=coalesce(error_code,'EXECUTION_INTERRUPTED_REVIEW_REQUIRED'),updated_at=? WHERE job_id=? AND state IN ('running','waiting_approval')").run(Date.now(),job.id).changes;
+  if(changed)holdRemaining(engine,job);
+ });
+ settleRemaining(engine,job.id);
+}
+
+function advanceRemaining(engine,id){
+ const job=engine.get(id);
+ if(job?.group_stop_index!=null&&job.state==='recovering'&&!engine.active.has(id))recoverRemaining(engine,job);
+}
+
 function recover(engine){
- for(const row of engine.db.prepare("SELECT * FROM mobile_execution_steps WHERE state='publishing' ORDER BY created_at,step_index").all())if(!engine.topics.get(engine.get(row.job_id)?.topic_key)?.sharedSpaceId||engine.store.shared?.native)completeStep(engine,row);
+ const native=engine.store.shared?.native,sharedReady=native&&!native.closed;
+ for(const row of engine.db.prepare("SELECT * FROM mobile_execution_steps WHERE state='publishing' ORDER BY created_at,step_index").all())if(engine.get(row.job_id)?.group_stop_index==null&&(!engine.topics.get(engine.get(row.job_id)?.topic_key)?.sharedSpaceId||sharedReady))completeStep(engine,row);
  for(const job of engine.db.prepare("SELECT * FROM mobile_executions WHERE kind IN ('group_message','group_invitation') AND state NOT IN ('completed','cancelled')").all()){
   const sharedTopic=engine.topics.get(job.topic_key)?.sharedSpaceId;
-  if(sharedTopic&&!engine.store.shared?.native)continue;
+  if(sharedTopic&&!sharedReady)continue;
+  if(job.group_stop_index!=null){recoverRemaining(engine,job);continue;}
   const all=steps(engine,job.id),uncertain=all.filter(s=>['running','waiting_approval','interrupted'].includes(s.state));
   if(uncertain.length){for(const s of uncertain)engine.db.prepare("UPDATE mobile_execution_steps SET state='interrupted',error_code=coalesce(error_code,'EXECUTION_INTERRUPTED_REVIEW_REQUIRED'),updated_at=? WHERE id=?").run(Date.now(),s.id);engine.db.prepare("UPDATE mobile_executions SET state='review_required',error_code='EXECUTION_INTERRUPTED_REVIEW_REQUIRED',updated_at=? WHERE id=?").run(Date.now(),job.id);continue;}
   if(!job.review_resolved&&(job.error_code?.endsWith('REVIEW_REQUIRED')||engine.nativeTasks.unsettledTools(job.id)||all.some(s=>s.error_code?.endsWith('REVIEW_REQUIRED')))){
@@ -124,11 +183,11 @@ function observe(engine){
 
 function preparedStepIsCurrent(engine,jobId,stepId){
  const parent=engine.get(jobId),current=step(engine,stepId);
- return !engine.quiescing&&!engine.draining&&parent?.state==='running'&&!parent.cancel_requested&&current?.state==='queued';
+ return !engine.quiescing&&!engine.draining&&parent?.state==='running'&&!parent.cancel_requested&&parent.group_stop_index==null&&current?.state==='queued';
 }
 
 async function run(engine,initial){
- if(!engine.db.prepare("UPDATE mobile_executions SET state='running',attempts=attempts+1,updated_at=? WHERE id=? AND state='queued'").run(Date.now(),initial.id).changes)return;
+ if(!engine.db.prepare("UPDATE mobile_executions SET state='running',attempts=attempts+1,updated_at=? WHERE id=? AND state='queued' AND group_stop_index IS NULL").run(Date.now(),initial.id).changes)return;
  const controller=new AbortController();engine.active.set(initial.id,controller);let release;
  try{
   const job=engine.get(initial.id),topic=engine.topics.get(job.topic_key),config=engine.configs.verify(topic,JSON.parse(job.config_snapshot)),plan=JSON.parse(job.group_plan);
@@ -136,7 +195,8 @@ async function run(engine,initial){
    if(candidate.state==='completed')continue;
    if(engine.quiescing&&!engine.draining)break;
    if(engine.draining)throw fail('EXECUTION_INTERRUPTED_REVIEW_REQUIRED');
-   if(engine.get(job.id).cancel_requested)break;
+   const latest=engine.get(job.id);
+   if(latest.cancel_requested||latest.group_stop_index!=null)break;
    if(candidate.state!=='queued'||plan[candidate.step_index]!==candidate.agent_id)throw fail('GROUP_PLAN_REVIEW_REQUIRED');
    const member=config.agents.find(a=>a.id===candidate.agent_id&&!a.unavailable);if(!member||(!config.authority&&!engine.agentManager.isAgent(member.agentAlias)))throw fail('EXECUTION_CONFIG_IDENTITY_MISMATCH');
    // Request construction cannot call a model or a tool. A failure remains a
@@ -153,7 +213,7 @@ async function run(engine,initial){
    if(engine.draining)throw fail('EXECUTION_INTERRUPTED_REVIEW_REQUIRED');
    if(!preparedStepIsCurrent(engine,job.id,candidate.id))break;
    // Only a successful durable claim permits context registration and dispatch.
-   if(!engine.db.prepare("UPDATE mobile_execution_steps SET state='running',attempts=attempts+1,updated_at=? WHERE id=? AND state='queued' AND EXISTS(SELECT 1 FROM mobile_executions p WHERE p.id=job_id AND p.state='running' AND p.cancel_requested=0)").run(Date.now(),candidate.id).changes)break;
+   if(!engine.db.prepare("UPDATE mobile_execution_steps SET state='running',attempts=attempts+1,updated_at=? WHERE id=? AND state='queued' AND EXISTS(SELECT 1 FROM mobile_executions p WHERE p.id=job_id AND p.state='running' AND p.cancel_requested=0 AND p.group_stop_index IS NULL)").run(Date.now(),candidate.id).changes)break;
    release=topic.sharedSpaceId?require('./sharedGroups').register(engine,job,candidate,prepared.body,member):nativeContext.register(candidate.id,member,engine.nativeTasks.hooks(job.id,candidate.id));engine.fault('group-step-running');
    try{
     const endpoint={...engine.endpoint,url:resolveGroupChatUrl(engine.endpoint.url,config.executionPolicy?.enableVcpToolInjection)};
@@ -167,15 +227,27 @@ async function run(engine,initial){
      if(reviewCode)return;
     }
    }catch(e){
-    const current=step(engine,candidate.id);if(current.state==='publishing'){engine.db.prepare("UPDATE mobile_executions SET state='recovering' WHERE id=?").run(job.id);return;}
-    const cancelled=Boolean(engine.get(job.id).cancel_requested),code=cancelled?(current.tool_started?'EXECUTION_CANCELLED_REVIEW_REQUIRED':'EXECUTION_CANCELLED'):(e.code||'EXECUTION_INTERRUPTED_REVIEW_REQUIRED');
+    const current=step(engine,candidate.id);if(current.state==='publishing'){
+     engine.db.prepare("UPDATE mobile_executions SET state='recovering' WHERE id=?").run(job.id);
+     const pending=engine.get(job.id);
+     if(pending.group_stop_index!=null)recoverRemaining(engine,pending);
+     return;
+    }
+    const latest=engine.get(job.id);
+    if(latest.group_stop_index!=null){
+     engine.db.prepare("UPDATE mobile_execution_steps SET state='interrupted',error_code=?,updated_at=? WHERE id=?").run(e.code||'EXECUTION_INTERRUPTED_REVIEW_REQUIRED',Date.now(),current.id);
+     holdRemaining(engine,latest);
+     return;
+    }
+    const cancelled=Boolean(latest.cancel_requested),code=cancelled?(current.tool_started?'EXECUTION_CANCELLED_REVIEW_REQUIRED':'EXECUTION_CANCELLED'):(e.code||'EXECUTION_INTERRUPTED_REVIEW_REQUIRED');
     if(e.partialContent){const text=code==='STREAM_IDLE_TIMEOUT_REVIEW_REQUIRED'?withWatchdogNote(e.partialContent,engine.groupIdleTimeoutMs||62000):e.partialContent+'\n\n[System Message] 本步已中断，后续接力暂停；系统不会自动重跑不确定执行。';publish(engine,current,member,text,code,cancelled?'cancelled':'interrupted',prepared.causality);}
     else {engine.db.prepare('UPDATE mobile_execution_steps SET state=?,error_code=?,updated_at=? WHERE id=?').run(cancelled?'cancelled':'interrupted',code,Date.now(),current.id);engine.db.prepare('UPDATE mobile_executions SET state=?,error_code=?,updated_at=? WHERE id=?').run(cancelled?'cancelled':'review_required',code,Date.now(),job.id);}
     return;
    }finally{release?.();release=null;engine.nativeWaiters.delete(candidate.id);}
   }
   const latest=engine.get(initial.id);
-  if(latest.cancel_requested&&['running','waiting_approval','cancelling'].includes(latest.state)){
+  if(latest.group_stop_index!=null)settleRemaining(engine,latest.id);
+  else if(latest.cancel_requested&&['running','waiting_approval','cancelling'].includes(latest.state)){
    engine.db.prepare("UPDATE mobile_execution_steps SET state='cancelled' WHERE job_id=? AND state='queued'").run(initial.id);
    engine.db.prepare("UPDATE mobile_executions SET state='cancelled',updated_at=? WHERE id=? AND cancel_requested=1 AND state IN ('running','waiting_approval','cancelling') AND NOT EXISTS(SELECT 1 FROM mobile_execution_steps WHERE job_id=? AND state IN ('running','waiting_approval','publishing'))").run(Date.now(),initial.id,initial.id);
   }else if(latest.state==='running'){
@@ -185,21 +257,55 @@ async function run(engine,initial){
    if(!completed)engine.db.prepare("UPDATE mobile_executions SET state='review_required',error_code='GROUP_PLAN_REVIEW_REQUIRED',updated_at=? WHERE id=? AND state='running' AND cancel_requested=0").run(Date.now(),initial.id);
   }
  }catch(e){
+  const latest=engine.get(initial.id);
+  if(latest.group_stop_index!=null){
+   recoverRemaining(engine,latest);
+   return;
+  }
   const all=steps(engine,initial.id),uncertain=all.filter(s=>['running','waiting_approval','interrupted'].includes(s.state));
   if(uncertain.length){for(const row of uncertain)engine.db.prepare("UPDATE mobile_execution_steps SET state='interrupted',error_code='EXECUTION_INTERRUPTED_REVIEW_REQUIRED',updated_at=? WHERE id=?").run(Date.now(),row.id);engine.db.prepare("UPDATE mobile_executions SET state='review_required',error_code='EXECUTION_INTERRUPTED_REVIEW_REQUIRED',updated_at=? WHERE id=?").run(Date.now(),initial.id);}
   else if(all.some(s=>s.state==='publishing'))engine.db.prepare("UPDATE mobile_executions SET state='recovering',error_code='PUBLISH_INTENT_PENDING',updated_at=? WHERE id=?").run(Date.now(),initial.id);
   else if(engine.draining)engine.db.prepare("UPDATE mobile_executions SET state='queued',error_code=NULL,updated_at=? WHERE id=?").run(Date.now(),initial.id);
   else engine.db.prepare("UPDATE mobile_executions SET state='blocked_config',error_code=?,updated_at=? WHERE id=?").run(e.code||'GROUP_CONTEXT_UNAVAILABLE',Date.now(),initial.id);
  }
- finally{release?.();const row=engine.get(initial.id);if(engine.topics.get(row.topic_key)?.sharedSpaceId&&row.state!=='completed'&&row.state!=='queued')require('./sharedSingle').hold(engine,row);engine.active.delete(initial.id);}
+ finally{release?.();const row=engine.get(initial.id);if(engine.topics.get(row.topic_key)?.sharedSpaceId&&row.state!=='completed'&&row.state!=='queued'&&row.group_stop_index==null)require('./sharedSingle').hold(engine,row);engine.active.delete(initial.id);}
 }
 
 function cancel(engine,id,sessionId){
  let row=engine.get(id);if(!row||row.session_id!==sessionId)throw fail('EXECUTION_NOT_FOUND',404);if(row.state==='preparing'){engine.completeIntent(row);row=engine.get(id);}
+ if(row.state==='cancelled'&&row.group_stop_index!=null)return engine.public(row,sessionId);
  if(['completed','recovering'].includes(row.state))throw fail('EXECUTION_ALREADY_TERMINAL');
  engine.db.prepare("UPDATE mobile_executions SET cancel_requested=1,state=CASE WHEN state IN ('running','waiting_approval') THEN 'cancelling' ELSE 'cancelled' END,updated_at=? WHERE id=?").run(Date.now(),id);
  engine.db.prepare("UPDATE mobile_execution_steps SET state='cancelled' WHERE job_id=? AND state='queued'").run(id);if(engine.topics.get(row.topic_key)?.sharedSpaceId){if(!engine.store.shared.admission(require('./sharedSingle').acceptedActor(engine,row),engine.topics.get(row.topic_key).sharedSpaceId,row.id).dispatched)require('./sharedSingle').abandon(engine,row);else require('./sharedSingle').hold(engine,row);}engine.active.get(id)?.abort();return engine.public(engine.get(id),sessionId);
 }
+function cancelRemaining(engine,id,sessionId){
+ const shared=engine.store.shared;
+ const row=engine.get(id);
+ if(!isGroup(row)||row.session_id!==sessionId||!engine.topics.get(row.topic_key)?.sharedSpaceId)throw fail('EXECUTION_NOT_FOUND',404);
+ if(row.group_stop_index!=null&&['cancelled','review_required'].includes(row.state))return engine.public(row,sessionId);
+ if(!shared?.native||shared.readOnly)throw fail('SHARED_NATIVE_UNAVAILABLE',503);
+ const recognition=shared.atomic(()=>{
+  const job=engine.get(id);
+  if(job.group_stop_index!=null||!canStopRemaining(job))return {job};
+  // Only the durable step claim marks the current speaker as started.
+  // Preparation may be suspended while the step is still queued.
+  const first=steps(engine,id).find(step=>step.state==='queued');
+  if(!first)return {job};
+  const now=Date.now();
+  engine.db.prepare("UPDATE mobile_execution_steps SET state='cancelled',updated_at=? WHERE job_id=? AND state='queued'").run(now,id);
+  engine.db.prepare('UPDATE mobile_executions SET group_stop_index=?,updated_at=? WHERE id=?').run(first.step_index,now,id);
+  shared.events?.retainGroupPrefix?.(id,first.step_index);
+  return {job:engine.get(id),accepted:true};
+ });
+ const {job:recognized,accepted}=recognition;
+ if(accepted)engine.emitEvent(id,'status',{state:recognized.state,code:'GROUP_REMAINDER_CANCELLED'});
+ if(recognized.group_stop_index!=null){
+  if(recognized.state==='recovering'&&!engine.active.has(id))recoverRemaining(engine,recognized);
+  else settleRemaining(engine,recognized.id);
+ }
+ return engine.public(engine.get(id),sessionId);
+}
+
 function resolve(engine,id,sessionId,action){
  engine.db.exec('BEGIN IMMEDIATE');try{
   const row=engine.get(id);
@@ -217,8 +323,8 @@ function resolve(engine,id,sessionId,action){
   engine.db.exec('COMMIT');
  }catch(e){engine.db.exec('ROLLBACK');throw e;}engine.wake();return engine.public(engine.get(id),sessionId);
 }
-function publicState(engine,row){
+function publicState(engine,row,sessionId){
  const config=JSON.parse(row.config_snapshot),all=steps(engine,row.id);
- return {kind:row.kind,groupMode:config.group.mode,stepCount:all.length,position:row.group_position,reviewResolved:Boolean(row.review_resolved),steps:all.map(s=>({id:s.id,index:s.step_index,agentId:s.agent_id,name:config.agents.find(a=>a.id===s.agent_id)?.name||s.agent_id,state:s.state,attempts:s.attempts,replyMessageId:s.reply_message_id,errorCode:s.error_code}))};
+ return {kind:row.kind,remainingCancelled:row.group_stop_index!=null,canCancelRemaining:Boolean(row.session_id===sessionId&&engine.topics.get(row.topic_key)?.sharedSpaceId&&row.group_stop_index==null&&canStopRemaining(row)&&all.some(s=>s.state==='queued')),groupMode:config.group.mode,stepCount:all.length,position:row.group_position,reviewResolved:Boolean(row.review_resolved),steps:all.map(s=>({id:s.id,index:s.step_index,agentId:s.agent_id,name:config.agents.find(a=>a.id===s.agent_id)?.name||s.agent_id,state:s.state,attempts:s.attempts,replyMessageId:s.reply_message_id,errorCode:s.error_code}))};
 }
-module.exports={schema,isGroup,held,accept,completeStep,recover,history,observe,run,cancel,resolve,publicState,steps};
+module.exports={schema,isGroup,held,accept,completeStep,recover,history,observe,run,cancel,cancelRemaining,resolve,publicState,steps,advanceRemaining};

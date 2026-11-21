@@ -22,7 +22,7 @@ async function jsonBody(req) {
     for await (const chunk of req) chunks.push(chunk);
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision}) {
+async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision, mobileBuild, groupRelay}) {
     const sourceApp = path.join(candidate, 'apps/server');
     const box = path.join(out, 'runtime-box');
     fs.mkdirSync(box);
@@ -56,7 +56,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     }
     fs.copyFileSync(builtAddon, path.join(box, nativeAddon));
     const pluginPath = 'Plugin/NativeSync';
-    const builtMobile = path.join(sourceApp, pluginPath, 'mobile-dist');
+    const builtMobile = mobileBuild || path.join(sourceApp, pluginPath, 'mobile-dist');
     if (!fs.existsSync(path.join(builtMobile, 'index.html'))) {
         throw Error('Mobile build missing. Run the repository build before integration.');
     }
@@ -87,7 +87,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         target = f.shared.create(actor, {sharedSpaceId:'sharedAB',opId:'sponsor-target-topic',kind:'topic',parentId:targetAgent.id,localId:'sponsor-target-topic',localParent:'sponsor-target-agent',config:{name:'Sponsor target existing topic'}}).object;
         const stopAgent = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-agent',kind:'agent',localId:'stop-agent',config:{...f.owner.config,name:'Synthetic interrupted single',systemPrompt:'SYNTHETIC_PARTIAL',streamOutput:true}}).object;
         stopTopic = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-topic',kind:'topic',parentId:stopAgent.id,localId:'stop-topic',localParent:'stop-agent',config:{name:'Partial single existing topic'}}).object;
-        ordinaryTopics = ordinaryTools?.seed?.(f);
+        ordinaryTopics = { ...ordinaryTools?.seed?.(f), ...groupRelay?.seed?.(f) };
         if (hardwareStream) hardwareStream.seedHistory(f.store, stopTopic.topic);
         if (observedContext) await observedContext.seed(f, source, out);
         for (const p of ['A','B']) {
@@ -132,6 +132,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 return await delegation.reply(body, row, res);
             }
             calls.push(row);trace('provider',row);
+            if (groupRelay && await groupRelay.respond(body, row, res)) return;
             observedContext?.recordProvider(req.url, body);
             if(which==='lostAck')await lostGate;
             if(which==='interrupted'){
@@ -167,7 +168,8 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             req.resume();
             return res.writeHead(500).end(JSON.stringify({error:{code:'UNEXPECTED_DESKTOP_LOCAL_EXECUTION'}}));
         }
-        const relevant = req.method==='POST' && /\/shared\/(session-send|session-cancel|task-stop|admit|complete|config)$/.test(route);
+        const relayAction = groupRelay && req.method === 'POST' && /\/mobile\/api\/executions\/[^/]+\/cancel(?:-remaining)?$/.test(route);
+        const relevant = relayAction || req.method==='POST' && /\/shared\/(session-send|session-cancel|task-stop|admit|complete|config)$/.test(route);
         const row = {route,method:req.method,at:Date.now(),device:req.headers['x-nativesync-device'],capabilities:req.headers['x-nativesync-capabilities']};
         let body;
         if (relevant) {
@@ -175,7 +177,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             for await (const chunk of req) chunks.push(chunk);
             body=Buffer.concat(chunks);
             row.bodySha256=require('node:crypto').createHash('sha256').update(body).digest('hex');
-            row.body=JSON.parse(body);
+            row.body=body.length ? JSON.parse(body) : {};
             for (const key of ['proof','authorization','capability','ticket']) if (typeof row.body[key]==='string') {
                 row.body[key+'Sha256']=require('node:crypto').createHash('sha256').update(row.body[key]).digest('hex');
                 delete row.body[key];
@@ -206,6 +208,14 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 const payload=Buffer.concat(chunks);
                 row.status=response.statusCode;
                 try { row.response=JSON.parse(payload); } catch {}
+                if (relayAction && groupRelay.dropResponse?.(row)) {
+                    row.dropped = true;
+                    // Send only a prefix of the accepted response so the client cannot
+                    // decode the ACK. A pre-header disconnect permits Chrome auto-retry.
+                    res.writeHead(response.statusCode, { ...response.headers, 'content-length': payload.length });
+                    res.write(payload.subarray(0, 1), () => res.destroy());
+                    return;
+                }
                 if (drop && route.endsWith('/session-send') && row.body?.requestId===lostRequestId && lostRequestId && response.statusCode>=200 && response.statusCode<300) {
                     row.dropped=true;
                     res.destroy();
@@ -330,7 +340,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         return { htmlStatus: page.status, bundleStatus: bundle.status, connectionStatus: connection.status };
     }
     return { checkMobile, get backendPid(){return backend.pid;},
-        ...((ordinaryTools || delegation) && { async restartAfterCrash() {
+        ...((ordinaryTools || delegation || groupRelay) && { async restartAfterCrash() {
             const crashed = await stopBackend('SIGKILL');
             assert.deepEqual(crashed, {code:null,signal:'SIGKILL'});
             await startBackend();

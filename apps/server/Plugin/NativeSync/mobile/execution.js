@@ -69,7 +69,7 @@ class ConversationExecution {
     public(row, sessionId) {
         const config = row.config_snapshot ? JSON.parse(row.config_snapshot) : null;
         const recovery = executionRecovery(row);
-        return { id: row.id, topicKey: row.topic_key, requestId: row.request_id, userMessageId: row.user_message_id, state: row.state, attempts: row.attempts, replyMessageId: row.reply_message_id, errorCode: row.error_code, configVersion:config?.version??null,configHash:config?.hash??null,createdAt: row.created_at, updatedAt: row.updated_at, own: row.session_id === sessionId,reviewResolved:Boolean(row.review_resolved),nativeTasks:this.nativeTasks.list(row.id),toolInvocations:this.nativeTasks.invocations(row.id),...(require('./groupTurn').isGroup(row)?require('./groupTurn').publicState(this,row):{}),...(recovery?{recovery}:{}),...(row.session_id===sessionId&&row.request_payload?{submission:JSON.parse(row.request_payload)}:{}) };
+        return { id: row.id, topicKey: row.topic_key, requestId: row.request_id, userMessageId: row.user_message_id, state: row.state, attempts: row.attempts, replyMessageId: row.reply_message_id, errorCode: row.error_code, configVersion:config?.version??null,configHash:config?.hash??null,createdAt: row.created_at, updatedAt: row.updated_at, own: row.session_id === sessionId,reviewResolved:Boolean(row.review_resolved),nativeTasks:this.nativeTasks.list(row.id),toolInvocations:this.nativeTasks.invocations(row.id),...(require('./groupTurn').isGroup(row)?require('./groupTurn').publicState(this,row,sessionId):{}),...(recovery?{recovery}:{}),...(row.session_id===sessionId&&row.request_payload?{submission:JSON.parse(row.request_payload)}:{}) };
     }
     list(topicKey, sessionId) {
         const rows=this.db.prepare('SELECT * FROM mobile_executions WHERE topic_key=? ORDER BY created_at LIMIT 10001').all(topicKey);
@@ -271,6 +271,9 @@ class ConversationExecution {
             this.db.prepare('UPDATE mobile_executions SET state=?,error_code=?,updated_at=? WHERE id=?').run(state, failureCode, Date.now(), row.id);
             this.emitEvent(row.id,'state',{state,errorCode:failureCode});
         } finally { releaseContext?.();this.nativeWaiters.delete(row.id);this.active.delete(row.id); }
+    }
+    cancelRemaining(id, sessionId) {
+        return require('./groupTurn').cancelRemaining(this, id, sessionId);
     }
     cancel(id, sessionId) {
         const row = this.get(id);

@@ -18,8 +18,17 @@ function completeStep(engine,step,op){
  const job=engine.get(step.job_id),shared=engine.store.shared,topic=engine.topics.get(job.topic_key);
  return shared.complete(acceptedActor(engine,job),{sharedSpaceId:topic.sharedSpaceId,admissionId:job.id,opId:'mobile-step_'+step.id,nativeRequestId:step.id,message:op.message});
 }
+function hasLiveSettlement(engine,id){
+ const native=engine.store.shared.native,tasks=engine.nativeTasks,db=engine.db;
+ if(tasks.needsReview(id)||native.taskRequests.uncertain(id)||
+    db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state='unknown'").get(id)||
+    db.prepare("SELECT 1 FROM mobile_native_invocations WHERE execution_id=? AND state='error' AND coalesce(error_code,'')<>'NATIVE_CANCELLED_BEFORE_EXECUTION'").get(id))return false;
+ return Boolean(db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state='dispatched'").get(id)||
+                db.prepare("SELECT 1 FROM shared_native_child_requests WHERE work_id=? AND state='dispatched'").get(id)||
+                db.prepare("SELECT 1 FROM mobile_native_tasks WHERE execution_id=? AND state IN ('accepted','running','waiting','cancelling')").get(id));
+}
 function finish(engine,job){
- const shared=engine.store.shared,topic=engine.topics.get(job.topic_key);shared.native?.checkTerminal(job.id);
+ const shared=engine.store.shared,topic=engine.topics.get(job.topic_key);shared.native?.checkTerminal(job.id,{advanceGroup:false});
  return shared.complete(acceptedActor(engine,job),{sharedSpaceId:topic.sharedSpaceId,admissionId:job.id,opId:'mobile-group-finish_'+job.id,finish:true});
 }
-module.exports={admit,register,completeStep,finish};
+module.exports={admit,register,completeStep,finish,hasLiveSettlement};
