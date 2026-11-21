@@ -109,6 +109,10 @@ class StreamHandler {
       reasoningToContentModels
     );
     const reasoningTag = normalizeReasoningTag(reasoningToContentTag);
+    const publishFinalReply = require('../requestExecutionContext').finalReplyPublisher();
+    // Most requests already have the exact visible text in the native stream
+    // accumulator. Track transformed deltas only when this Work exposes them.
+    const displayParts = publishFinalReply && reasoningToContentEnabled ? [] : null;
     const id = originalBody.requestId || originalBody.messageId;
     const residentProposalFramingActive = hasResidentProposalSurface(originalBody.messages);
     const residentPresentationChannel = createPresentationChannel(res, residentProposalFramingActive);
@@ -363,7 +367,19 @@ class StreamHandler {
               finish_reason: null
             }]
           };
+          displayParts?.push(closePayload.choices[0].delta.content);
           writeProviderClientChunk(`data: ${JSON.stringify(closePayload)}\n\n`);
+        };
+        const writeClientLine = (line, parsedData, isDoneLine) => {
+          if (isDoneLine) return writeClientReasoningCloseChunk();
+          const nativeStop = publishFinalReply && parsedData?.choices?.[0]?.finish_reason === 'stop';
+          if (!parsedData || (!reasoningToContentEnabled && !nativeStop)) return writeProviderClientChunk(line + '\n');
+          const packet = transformParsedDataForClient(parsedData);
+          const choice = packet.choices?.[0];
+          if (displayParts && typeof choice?.delta?.content === 'string') displayParts.push(choice.delta.content);
+          // ToolBox emits the formal stop below, after the native receipt is durable.
+          if (nativeStop) choice.finish_reason = null;
+          writeProviderClientChunk(`data: ${JSON.stringify(packet)}\n`);
         };
         // 🌟 核心修复：注入 SSE 幽灵心跳保活，防止上游卡顿时浏览器假死
         keepAliveTimer = setInterval(() => {
@@ -466,15 +482,7 @@ class StreamHandler {
             // 转发时才将 reasoning 字段改写成标签化正文；内部处理仍使用原始 parsedData。
             if (!res.writableEnded && !res.destroyed) {
               try {
-                if (isDoneLine) {
-                  writeClientReasoningCloseChunk();
-                } else if (reasoningToContentEnabled && parsedData) {
-                  const transformedData = transformParsedDataForClient(parsedData);
-                  writeProviderClientChunk(`data: ${JSON.stringify(transformedData)}\n`);
-                } else {
-                  // 保留空行，因为 SSE 依靠空行分隔消息块。
-                  writeProviderClientChunk(line + '\n');
-                }
+                writeClientLine(line, parsedData, isDoneLine);
               } catch (writeError) {
                 streamAborted = true;
               }
@@ -511,13 +519,7 @@ class StreamHandler {
 
             if (!res.writableEnded && !res.destroyed) {
               try {
-                if (isDoneLine) {
-                  writeClientReasoningCloseChunk();
-                } else if (reasoningToContentEnabled && parsedData) {
-                  writeProviderClientChunk(`data: ${JSON.stringify(transformParsedDataForClient(parsedData))}\n`);
-                } else {
-                  writeProviderClientChunk(sseLineBuffer + '\n');
-                }
+                writeClientLine(sseLineBuffer, parsedData, isDoneLine);
               } catch (e) { }
             }
           }
@@ -629,6 +631,9 @@ class StreamHandler {
       }
       if (toolCalls.length === 0) {
         if (DEBUG_MODE) console.log('[VCP Stream Loop] No tool calls found. Exiting loop.');
+        if (publishFinalReply && validUpstreamTurns && !abortController?.signal.aborted) {
+          publishFinalReply({ content: displayParts ? displayParts.join('') : currentAIContentForLoop, finishReason: 'stop' });
+        }
         if (!res.writableEnded) {
           const finalChunkPayload = {
             id: `chatcmpl-VCP-final-stop-${Date.now()}`,

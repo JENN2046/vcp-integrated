@@ -1,0 +1,248 @@
+{
+  "baseRevision": "5ed51ba784bf029fc0a16896da1d57451a36cb7c",
+  "node": "v24.22.1",
+  "mode": "--dispatch-only",
+  "originalResult": {
+    "transportError": "UND_ERR_SOCKET"
+  },
+  "before": {
+    "admission": {
+      "id": "request_70eacc9cd7074838b1e396570b022412",
+      "state": "dispatched",
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "request": {
+      "id": "reply_request_70eacc9cd7074838b1e396570b022412_g1",
+      "principal": "desktop:deviceB",
+      "state": "dispatched"
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_70eacc9cd7074838b1e396570b022412",
+        "state": "paused"
+      },
+      {
+        "generation": 1,
+        "executor": "desktop:deviceB",
+        "request_id": "reply_request_70eacc9cd7074838b1e396570b022412_g1",
+        "state": "running"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 2,
+        "msg_id": "5fcfa21a-ea66-4674-bde3-a683a8c970ee",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "a950524f68213cd0574da9aeee25601fceb7bcb30fa65b84a7a2786d5c9d47d4"
+      },
+      {
+        "seq": 3,
+        "msg_id": "reply_request_70eacc9cd7074838b1e396570b022412",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "cd82d8b358a8c252ea87f537e1339c0208ff797f521298755039c0aa77d61426"
+      },
+      {
+        "seq": 4,
+        "msg_id": "checkpoint_compact_51d038fe92c5fffcafcedbb16d7ff3b6deb63dd0",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "f2578d5a3abc0f6b43582836e099aef90ed2497f4039f78843dc7ee4bcf6dffc"
+      }
+    ],
+    "replies": [],
+    "invocations": [
+      {
+        "invocation_id": "e17e9e32-955e-4e98-a649-3a96810eaf92",
+        "native_request_id": "reply_request_70eacc9cd7074838b1e396570b022412",
+        "record_id": "tcr-1795261595273-01cc6c03-0948-4fc8-9db7-a25709c16fbc",
+        "plugin_name": "OrdinaryToolCounter",
+        "state": "returned"
+      }
+    ],
+    "completion": null,
+    "counts": {
+      "provider": 3,
+      "tool": 1
+    },
+    "providerCalls": [
+      {
+        "protocolStep": "nonstream-two-tools",
+        "id": "reply_request_e25aaa36da164acca831aa85e8f830c8",
+        "stream": false
+      },
+      {
+        "protocolStep": "stream-one-tool",
+        "id": "reply_request_70eacc9cd7074838b1e396570b022412",
+        "stream": true
+      },
+      {
+        "protocolStep": "B-continuation",
+        "id": "reply_request_70eacc9cd7074838b1e396570b022412_g1",
+        "stream": false
+      }
+    ],
+    "phases": [
+      "native_prepared",
+      "native_entered",
+      "provider_attempt"
+    ]
+  },
+  "crash": {
+    "code": null,
+    "signal": "SIGKILL",
+    "crashedPid": 2964594,
+    "restartedPid": 2964654
+  },
+  "after": {
+    "admission": {
+      "id": "request_70eacc9cd7074838b1e396570b022412",
+      "state": "review_required",
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "request": {
+      "id": "reply_request_70eacc9cd7074838b1e396570b022412_g1",
+      "principal": "desktop:deviceB",
+      "state": "unknown"
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_70eacc9cd7074838b1e396570b022412",
+        "state": "paused"
+      },
+      {
+        "generation": 1,
+        "executor": "desktop:deviceB",
+        "request_id": "reply_request_70eacc9cd7074838b1e396570b022412_g1",
+        "state": "running"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 2,
+        "msg_id": "5fcfa21a-ea66-4674-bde3-a683a8c970ee",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "a950524f68213cd0574da9aeee25601fceb7bcb30fa65b84a7a2786d5c9d47d4"
+      },
+      {
+        "seq": 3,
+        "msg_id": "reply_request_70eacc9cd7074838b1e396570b022412",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "cd82d8b358a8c252ea87f537e1339c0208ff797f521298755039c0aa77d61426"
+      },
+      {
+        "seq": 4,
+        "msg_id": "checkpoint_compact_51d038fe92c5fffcafcedbb16d7ff3b6deb63dd0",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "f2578d5a3abc0f6b43582836e099aef90ed2497f4039f78843dc7ee4bcf6dffc"
+      }
+    ],
+    "replies": [],
+    "invocations": [
+      {
+        "invocation_id": "e17e9e32-955e-4e98-a649-3a96810eaf92",
+        "native_request_id": "reply_request_70eacc9cd7074838b1e396570b022412",
+        "record_id": "tcr-1795261595273-01cc6c03-0948-4fc8-9db7-a25709c16fbc",
+        "plugin_name": "OrdinaryToolCounter",
+        "state": "returned"
+      }
+    ],
+    "completion": null,
+    "counts": {
+      "provider": 3,
+      "tool": 1
+    },
+    "providerCalls": [
+      {
+        "protocolStep": "nonstream-two-tools",
+        "id": "reply_request_e25aaa36da164acca831aa85e8f830c8",
+        "stream": false
+      },
+      {
+        "protocolStep": "stream-one-tool",
+        "id": "reply_request_70eacc9cd7074838b1e396570b022412",
+        "stream": true
+      },
+      {
+        "protocolStep": "B-continuation",
+        "id": "reply_request_70eacc9cd7074838b1e396570b022412_g1",
+        "stream": false
+      }
+    ],
+    "phases": [
+      "native_prepared",
+      "native_entered",
+      "provider_attempt"
+    ]
+  },
+  "premature": {
+    "status": 409,
+    "code": "SHARED_NATIVE_TERMINAL_REQUIRED"
+  },
+  "late": {
+    "status": 409,
+    "code": "SHARED_REQUEST_FENCED"
+  },
+  "lateTimestamp": 1795261596655,
+  "repeat": {
+    "status": 409,
+    "code": "SHARED_REQUEST_FENCED"
+  },
+  "repeatTimestamp": 1795261596655,
+  "conflict": {
+    "status": 409,
+    "code": "SHARED_REQUEST_FENCED"
+  },
+  "replay": {
+    "status": 409,
+    "code": "SHARED_REQUEST_ALREADY_DISPATCHED"
+  },
+  "secondCrash": {
+    "code": null,
+    "signal": "SIGKILL"
+  },
+  "loadedSources": [
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "79fba138518926edd6c20de95d016689ebb9fb2f8a3fc0614d9c60b8b44dfbdb"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "5458a2605dc66dc1a1958f141e6ee32eacb99fa7c73de7ead54199426fbbda27"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "8a7084be74e91409401e8753afc17e46b763413f58ada3ef827be1b33c9eb345"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "fd8c6cb93e51183ce65b7a79a34e7c32d68c6813a69e6aaa355c9d0a059c945d"
+    },
+    {
+      "file": "apps/server/modules/nativeContinuationStore.cjs",
+      "sha256": "f6774df34bdcc60346f4ed49f5dccaa2e0da5645b5b60ea29f364f89a5090ee6"
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "5930c392fcb42d3bb447ab804b0e811358cd6f3b3496b01c5e7d22cf2f0c2556"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "7bf02ef53d45075ca0426c3511513b090f0a8da4a9d3e13daa0a8878e0289154"
+    }
+  ]
+}

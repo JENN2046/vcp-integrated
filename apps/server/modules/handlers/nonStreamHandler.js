@@ -628,6 +628,10 @@ class NonStreamHandler {
 
     attachNonStreamPresentations(finalJsonResponse, residentPresentations);
     if (writeChatLog) writeChatLog(originalBody, chatLogs);
+    // Seal the same client-facing text before the response can be lost in transport.
+    if (completed && !abortController?.signal.aborted && finalJsonResponse.choices[0].finish_reason === 'stop') {
+      require('../requestExecutionContext').finalReplyPublisher()?.({ content: finalContentForClient, finishReason: 'stop' });
+    }
     // OneRing 由主流程在整轮完成且响应发送完成后提交。
     if (!res.writableEnded && !res.destroyed) {
       res.send(Buffer.from(JSON.stringify(finalJsonResponse)));

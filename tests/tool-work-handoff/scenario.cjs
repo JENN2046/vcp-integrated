@@ -72,6 +72,9 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
     const buttons = client => evalJs(client, `Object.fromEntries([...document.querySelectorAll(${quote(panel + ' button')})]
         .map(button => [button.textContent.trim(), !button.disabled]))`);
     const status = client => evalJs(client, `document.querySelector(${quote(panel + ' [role=status]')})?.innerText`);
+    const renderedFinal = (client, requestId) =>
+        evalJs(client, `[...document.querySelectorAll(${quote('#chatMessages .message-item[data-message-id="' + requestId + '"]')})]
+            .map(item => ({ textShown: item.innerText.includes(${quote(fixture.finalText)}) }))`);
     const action = async (client, label) => {
         await waitUntil(async () => (await buttons(client))[label], label + ' is enabled');
         await click(client, panel + ' button', label);
@@ -97,7 +100,7 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
     await select(A, 'A');
     const sharedId = service.topics.preSubmit.id;
     const topicId = service.topics.preSubmit.topic.topicId;
-    const admissions = () => db.prepare('SELECT id,request_id,principal,state,dispatched,native_terminal FROM shared_admissions WHERE topic_id=?').all(sharedId);
+    const admissions = () => db.prepare('SELECT id,request_id,principal,state,dispatched,native_terminal,reply_seq FROM shared_admissions WHERE topic_id=?').all(sharedId);
     const control = id => db.prepare('SELECT revision,generation,executor FROM shared_work_controls WHERE work_id=?').get(id);
     const generations = id => db.prepare('SELECT generation,executor,request_id,state,checkpoint_json FROM shared_work_generations WHERE work_id=? ORDER BY generation').all(id);
     const invocations = id => db.prepare('SELECT invocation_id,execution_id,native_request_id,plugin_name,record_id,state,error_code FROM mobile_native_invocations WHERE execution_id=?').all(id);
@@ -267,7 +270,6 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         const nativeRow = () => db.prepare('SELECT id,admission_id,principal,state FROM shared_native_requests WHERE id=?').get(requestId);
         const archiveFile = path.join(out, 'runtime-box', '.state', 'native-continuations',
             require('node:crypto').createHash('sha256').update(JSON.stringify(requestId)).digest('hex') + '.json');
-        const finalTextShown = client => evalJs(client, `document.querySelector('#chatMessages').innerText.includes(${quote(fixture.finalText)})`);
         const observedPreview = client => evalJs(client, `(() => {
             const item = document.querySelector(${quote('.native-sync-live-message[data-native-sync-request="' + requestId + '"]')});
             return item ? { kind: item.dataset.nativeSyncPreview, status: item.querySelector('[role=status]')?.innerText,
@@ -278,23 +280,27 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
             const archive = JSON.parse(fs.readFileSync(archiveFile, 'utf8'));
             assert.equal(archive.identity.workId, workId);
             const history = read.B();
-            const canonicalFinal = db.prepare('SELECT message_json FROM journal WHERE topic_id=? AND msg_id=? ORDER BY seq').all(topicId, requestId);
+            const canonicalFinal = db.prepare('SELECT message_json FROM journal WHERE topic_id=? AND msg_id=? ORDER BY seq').all(topicId, requestId)
+                .map(row => JSON.parse(row.message_json));
+            const physicalFinal = history.filter(row => row.id === requestId);
             const value = {
                 backendPid: service.backendPid, admission: admissions()[0], native: nativeRow(), control: control(workId),
                 generations: generations(workId), journal: journal().map(row => row.msg_id), history: history.map(row => row.id),
-                journalFinal: canonicalFinal.map(row => row.message_json && JSON.parse(row.message_json).content),
-                historyFinal: history.filter(row => row.id === requestId).map(row => row.content),
+                journalFinal: canonicalFinal.map(row => row.content),
+                historyFinal: physicalFinal.map(row => row.content),
+                journalFinishReasons: canonicalFinal.map(row => row.finishReason),
+                historyFinishReasons: physicalFinal.map(row => row.finishReason),
                 archive: { identity: archive.identity, assistant: archive.assistant, completion: archive.completion ?? null },
                 phases: db.prepare('SELECT stage,at FROM shared_request_phases WHERE request_id=? ORDER BY at').all(requestId),
                 counter: tool.counts(out), providerCalls: service.calls.map(row => ({ id: row.id, phase: row.toolHandoffPhase })),
-                ...(client && { status: await status(client), buttons: await buttons(client), finalTextShown: await finalTextShown(client),
+                ...(client && { status: await status(client), buttons: await buttons(client), renderedFinal: await renderedFinal(client, requestId),
                     nativePreview: await observedPreview(client) }),
             };
             return value;
         }
         assert.deepEqual({ ...nativeRow() }, { id: requestId, admission_id: workId, principal: 'desktop:deviceB', state: 'dispatched' });
         const beforeExit = await snapshot(recovered);
-        assert.equal(beforeExit.finalTextShown, false);
+        assert.equal(beforeExit.renderedFinal.some(item => item.textShown), false);
         assert.equal(beforeExit.admission.native_terminal, 0);
         await picture(recovered, 'B-final-dispatched-before-exit');
         async function finishUpstream() {
@@ -306,9 +312,9 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         let terminalBeforeExit;
         if (finalReceipt === 'terminal' && process.env.VCP_TEST_TERMINAL_BEFORE_CLOSE === '1') {
             await finishUpstream();
-            await waitUntil(() => nativeRow().state === 'model_terminal', 'ToolBox records the model terminal before B quits');
+            await waitUntil(() => nativeRow().state === 'model_terminal' || admissions()[0]?.state === 'completed',
+                'ToolBox records or publishes the model terminal before B quits');
             terminalBeforeExit = await snapshot(recovered);
-            assert.equal(terminalBeforeExit.finalTextShown, false);
             assert.equal(receipt.downstream, undefined, 'B remains connected without receiving the buffered model response');
         }
         const exit = await quitBeforeFinalReceipt('B-recovered');
@@ -318,6 +324,8 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         assert.equal(receipt.downstream.headersSent, false);
         if (finalReceipt === 'terminal') {
             if (!terminalBeforeExit) await finishUpstream();
+            const [first, second] = terminalBeforeExit ? [receipt.upstream, receipt.downstream] : [receipt.downstream, receipt.upstream];
+            assert.ok(first.at <= second.at, 'The proxy observed the intended ordering between the native response and B disconnecting');
         } else {
             await waitUntil(() => receipt.providerClosed, 'B disconnect closes the Provider request');
             assert.equal(receipt.providerClosed.responseEnded, false);
@@ -356,6 +364,9 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         assert.deepEqual(invocations(workId), invocationsAtPause);
         assert.deepEqual(tool.counts(out), [{ marker }]);
         assert.equal(admissions().length, 1);
+        assert.equal(admissions()[0].request_id, original.request_id);
+        assert.deepEqual(generations(workId).map(({generation, executor, request_id}) => [generation, executor, request_id]),
+            [[paused.generation, 'desktop:deviceA', paused.request_id], [paused.generation + 1, 'desktop:deviceB', requestId]]);
         assert.deepEqual(service.calls.map(row => row.toolHandoffPhase), ['initial', 'summary', 'resumed']);
         assert.deepEqual(journal().slice(0, journalOnA.length), journalOnA);
         if (finalReceipt === 'terminal') {
@@ -363,19 +374,42 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
                 workState: value.admission.state,
                 journalFinal: value.journalFinal,
                 historyFinal: value.historyFinal,
-                finalTextShown: value.finalTextShown,
+                renderedFinal: value.renderedFinal,
             });
-            const expected = { workState: 'completed', journalFinal: [fixture.finalText], historyFinal: [fixture.finalText], finalTextShown: true };
+            const expected = { workState: 'completed', journalFinal: [fixture.finalText], historyFinal: [fixture.finalText], renderedFinal: [{ textShown: true }] };
             assert.deepEqual([outcome(reopened), outcome(reopenedAfterBackend)], [expected, expected],
                 'Reopening should recover one final reply for the original Work in Journal, physical History and chat');
+            const finalRows = journal().slice(journalOnA.length);
+            assert.deepEqual(finalRows.map(row => row.msg_id), [requestId]);
+            for (const value of [reopened, reopenedAfterBackend]) {
+                assert.equal(value.admission.native_terminal, 1);
+                assert.equal(value.native.state, 'model_terminal');
+                assert.equal(value.admission.reply_seq, finalRows[0].seq);
+                assert.deepEqual(value.journalFinishReasons, ['completed']);
+                assert.deepEqual(value.historyFinishReasons, ['completed']);
+                assert.equal(value.generations.at(-1).state, 'completed');
+                assert.equal(value.archive.completion?.finishReason, 'stop');
+                assert.equal(value.archive.completion?.workId, workId);
+                assert.equal(value.archive.completion?.generation, paused.generation + 1);
+                assert.equal(value.archive.completion?.requestId, requestId);
+                assert.equal(value.archive.completion?.executor, 'desktop:deviceB');
+                assert.equal(value.archive.completion?.content, fixture.finalText);
+            }
+            assert.equal(publicationsByB(), 0, 'The recovered native reply needs no desktop publication');
         } else {
             assert.equal(result.finalReceipt.publishedByB, 0, 'B cannot publish a final reply with no authoritative model terminal');
-            assert.equal(reopened.admission.state, 'review_required');
-            assert.equal(reopenedAfterBackend.admission.state, 'review_required');
-            assert.equal(reopened.finalTextShown, false);
-            assert.equal(reopened.history.includes(requestId), false);
-            assert.equal(reopened.journal.includes(requestId), false);
-            assert.equal(reopened.buttons['本端继续执行'] ?? false, false);
+            assert.deepEqual(journal(), journalOnA);
+            for (const value of [reopened, reopenedAfterBackend]) {
+                assert.equal(value.admission.state, 'review_required');
+                assert.equal(value.admission.native_terminal, 0);
+                assert.equal(value.native.state, 'unknown');
+                assert.equal(value.admission.reply_seq, null);
+                assert.equal(value.archive.completion, null);
+                assert.deepEqual(value.historyFinal, []);
+                assert.deepEqual(value.journalFinal, []);
+                assert.deepEqual(value.renderedFinal, []);
+                assert.equal(value.buttons['本端继续执行'] ?? false, false);
+            }
         }
         return;
     }
@@ -399,7 +433,8 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         await select(finalReader, 'B');
         assert.deepEqual(journal(), committedJournal);
         result.publicationAck = { workId, replyId, opId:publication.body.opId, seq:publication.response.receipt.seq,
-            originalInvocation:invocation.invocation_id, status:publication.status, dropped:publication.dropped, before };
+            originalInvocation:invocation.invocation_id, status:publication.status, dropped:publication.dropped,
+            serverReplayed: publication.response.receipt.replayed === true, before };
     }
     const finished = generations(workId);
     assert.deepEqual(finished.map(row => [row.generation, row.executor]), [
@@ -430,8 +465,12 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         return reply?.id === finished.at(-1).request_id && JSON.stringify(reply.content).includes(fixture.finalText) && history;
     }, 'B writes the final original Work reply to its physical History');
     assert.deepEqual(saved.slice(0, -1), compactedHistory);
-    await waitUntil(() => evalJs(finalReader, `document.querySelector('#chatMessages').innerText.includes(${quote(fixture.finalText)})`),
-        'B renders the completed original Work result');
+    const finalReplyId = finished.at(-1).request_id;
+    const rendered = await waitUntil(async () => {
+        const rows = await renderedFinal(finalReader, finalReplyId);
+        return rows.some(item => item.textShown) && rows;
+    }, 'B renders the completed original Work result');
+    assert.deepEqual(rendered, [{ textShown: true }]);
     result.toolHandoff = {
         original, final, paused, nativeProof, committed, generations: finished, invocations: invocationsAtPause,
         waitingCompaction, earlyHandoff, ...(streamTerminal && { streamTerminal: streamTerminal.data.modelFinishReason }), nativePause: { transport: transport.pauseTransport, httpStatus: transport.status, ...transport.nativePause },
@@ -445,7 +484,7 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         assert.ok(attempts.every(row=>row.dropped && row.body.opId===result.publicationAck.opId));
         assert.equal(service.calls.length,result.publicationAck.before.calls);
         Object.assign(result.publicationAck, { exit:result.exits['B-recovered'], postAttempts:attempts.length,
-            workState:final.state, finalHistoryIds:saved.map(row=>row.id), counter:tool.counts(out).length });
+            workState:final.state, finalHistoryIds:saved.map(row=>row.id), chatFinalBubbleCount:rendered.length, counter:tool.counts(out).length });
     }
 }
 

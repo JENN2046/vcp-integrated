@@ -66,3 +66,5 @@ AgentAssistant 长委托已接入共享单聊的 Work。桌面重开、发起端
 共享检查点提交后的 History 身份报错已用真实投影重放复现。A 的共享读现在与原生话题写队列串行；本机确认失败后重试会找回原压缩意图与检查点，B 能用同一检查点继续。[文件身份、宿主差异与回执](evidence/history-identity/README.md)
 
 工具 Work 的 B 末代已派发、终稿尚未送达时退出：未得到模型终态会保留待核对；ToolBox 已输出全文但 B 未发布时，重开仍无法恢复终稿。中央 Journal 已经接受终稿、只丢发布回执的对照通过。[最终确认窗口实测](evidence/final-work-receipt/README.md)
+
+工具型共享单聊的 B 末代已接入 ToolBox 原生终稿持久化。B 收到 JSON 或 SSE 最终响应前退出，重开能按原 Work、代次和回复 ID 取回一条正式回复。归档 fsync 后强停、迟到补交、未知派发及损坏凭据的结果见[原生终稿发布与恢复](evidence/native-final-publication/README.md)。

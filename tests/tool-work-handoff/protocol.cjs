@@ -9,10 +9,17 @@ const { randomUUID } = require('node:crypto');
 const { setTimeout: delay } = require('node:timers/promises');
 const { start } = require('../integration/service.cjs');
 const counter = require('../ordinary-tools/fixture.cjs');
+const { verifyFinalPublication } = require('../tool-work-final/restart.cjs');
 const { stable, sha256 } = require('../../apps/server/Plugin/NativeSync/sync/protocol');
 
 const prefix = '/api/v1/sync/shared/';
 const marker = 'ORDINARY_TOOL_LOCAL';
+const finalText = 'Native final response from loopback provider.';
+const finalMode = process.argv[2];
+assert.ok(!finalMode || ['--final-crash', '--stream-final-crash', '--tampered-final', '--dispatch-only', '--truncated', '--provider-error'].includes(finalMode));
+const finalCrash = ['--final-crash', '--stream-final-crash'].includes(finalMode);
+const crashAfterCheckpoint = finalCrash || finalMode === '--tampered-final';
+const streamingContinuation = ['--truncated', '--stream-final-crash'].includes(finalMode);
 const summary = 'Continue the original Work after the settled counter call.';
 const toolCall = [
     '<<<[TOOL_REQUEST]>>>',
@@ -36,6 +43,8 @@ async function main() {
     const out = fs.mkdtempSync(path.join(os.tmpdir(), 'vcp-tool-work-protocol-'));
     const cert = path.join(out, 'cert.pem');
     const key = path.join(out, 'key.pem');
+    const crashMarker = path.join(out, 'final-checkpoint-crash.json');
+    const crashPreload = require.resolve('../tool-work-final/crash-after-checkpoint.cjs');
     let service;
     let passed = false;
     try {
@@ -44,21 +53,48 @@ async function main() {
         service = await start({
             out, candidate: path.resolve(__dirname, '../..'), cert, key, waitUntil, trace() {},
             ordinaryTools: counter,
-            toolHandoff: { env: { NativeSyncSharedSafeTools: JSON.stringify([counter.name]) }, observeRequest: () => false },
+            toolHandoff: {
+                env: {
+                    NativeSyncSharedSafeTools: JSON.stringify([counter.name]),
+                    ...(crashAfterCheckpoint && {
+                        NODE_OPTIONS: '--require=' + JSON.stringify(crashPreload),
+                        VCP_TEST_FINAL_CRASH_MARKER: crashMarker,
+                    }),
+                },
+                observeRequest: () => false,
+            },
             streamInterrupt: {
                 roleDivider: false,
                 stage() {},
                 async respond(body, row, res) {
                     const ask = body.messages.findLast(message => message.role === 'user').content;
+                    row.protocolStep = ask === summary ? 'B-continuation' : ask;
                     if (ask === 'stream-one-tool') {
                         assert.equal(body.stream, true);
                         const choices = [{ index: 0, delta: { role: 'assistant', content: 'Visible pause.\n' + toolCall }, finish_reason: 'stop' }];
                         res.writeHead(200, { 'Content-Type': 'text/event-stream' });
                         res.end('data: ' + JSON.stringify({ id: 'stream-one', choices }) + '\n\ndata: [DONE]\n\n');
+                    } else if (ask === summary && finalMode === '--dispatch-only') {
+                        // Observe the actual provider dispatch and leave its response open until ToolBox is killed.
+                        return true;
+                    } else if (ask === summary && streamingContinuation) {
+                        assert.equal(body.stream, true);
+                        const choices = [{ index: 0, delta: { role: 'assistant', content: finalText }, finish_reason: null }];
+                        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+                        res.write('data: ' + JSON.stringify({ id: 'stream-B', choices }) + '\n\n');
+                        if (finalCrash) {
+                            const stop = [{ index: 0, delta: {}, finish_reason: 'stop' }];
+                            res.end('data: ' + JSON.stringify({ id: 'stream-B', choices: stop }) + '\n\ndata: [DONE]\n\n');
+                        } else {
+                            res.end();
+                        }
+                    } else if (ask === summary && finalMode === '--provider-error') {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: { message: finalText } }));
                     } else {
                         assert.ok(['nonstream-two-tools', summary].includes(ask));
                         assert.equal(body.stream, false);
-                        const content = ask === summary ? toolCall : toolCall + '\n' + toolCall;
+                        const content = ask === summary ? (finalMode ? finalText : toolCall) : toolCall + '\n' + toolCall;
                         const choices = [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }];
                         res.writeHead(200, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify({ id: 'nonstream-two', choices }));
@@ -164,13 +200,22 @@ async function main() {
         assert.equal(prepared.workId, settled.id);
         assert.equal(prepared.generation, 1);
         const descriptor = service.descriptors.B.interrupted;
-        const packet = { requestId: prepared.requestId, model: 'synthetic', stream: false, messages: [{ role: 'user', content: summary }],
+        const packet = { requestId: prepared.requestId, model: 'synthetic', stream: streamingContinuation, messages: [{ role: 'user', content: summary }],
             vcpchatExtensions: { requestContext: { ownerType: 'agent', agentId: descriptor.itemId, topicId: descriptor.topicId },
                 messageTimestampBindings: [{ messageId: checkpoint.id, sentMessageIndex: 0, timestamp: checkpoint.timestamp }] } };
         await api('native-request', { sharedSpaceId, admissionId: settled.id, requestId: prepared.requestId,
             bodyHash: sha256(stable(packet)), generation: 1, consumedInputSeq: 0 }, b);
-        const retry = await send('/v1/chat/completions', packet, { ...b, 'x-nativesync-admission': settled.id,
+        const dispatchContinuation = () => send('/v1/chat/completions', packet, { ...b, 'x-nativesync-admission': settled.id,
             'x-nativesync-generation': '1', 'x-nativesync-consumed-input-seq': '0' });
+        if (finalMode) {
+            await verifyFinalPublication({
+                mode: finalMode, finalCrash, crashAfterCheckpoint, out, service, counter, work, b, stream, send, prepared, finalText,
+                prefix, settled, crashMarker, waitUntil, dispatchContinuation,
+            });
+            passed = true;
+            return;
+        }
+        const retry = await dispatchContinuation();
         assert.equal(retry.status, 500);
         const rejection = (await retry.json()).details;
         assert.equal(rejection, 'CONTROLLED_TEXT_TOOLS_FORBIDDEN');

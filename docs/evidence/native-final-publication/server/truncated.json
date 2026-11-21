@@ -1,0 +1,247 @@
+{
+  "baseRevision": "5ed51ba784bf029fc0a16896da1d57451a36cb7c",
+  "node": "v24.22.1",
+  "mode": "--truncated",
+  "originalResult": {
+    "status": 200,
+    "body": "data: {\"id\":\"stream-B\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Native final response from loopback provider.\"},\"finish_reason\":null}]}\n\ndata: {\"model\":\"synthetic\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\\n[STREAM_INCOMPLETE: 工具执行已停止，上游响应不完整]\\n\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+  },
+  "before": {
+    "admission": {
+      "id": "request_74165b495640437b97672e42e9f15229",
+      "state": "review_required",
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "request": {
+      "id": "reply_request_74165b495640437b97672e42e9f15229_g1",
+      "principal": "desktop:deviceB",
+      "state": "unknown"
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_74165b495640437b97672e42e9f15229",
+        "state": "paused"
+      },
+      {
+        "generation": 1,
+        "executor": "desktop:deviceB",
+        "request_id": "reply_request_74165b495640437b97672e42e9f15229_g1",
+        "state": "running"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 2,
+        "msg_id": "167365ba-d790-4368-8200-5a9bb7b37490",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "48c5a28ab0ae63271267484e8ee23042c18a52a7a6626bb99f5abec4384fa84d"
+      },
+      {
+        "seq": 3,
+        "msg_id": "reply_request_74165b495640437b97672e42e9f15229",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "f8dc3fdb94fffd9ef3153a1a2d6cfd88613a98b563fd1344cf201daa68e1756a"
+      },
+      {
+        "seq": 4,
+        "msg_id": "checkpoint_compact_d86709a4b5c2f11290b8eac281e9283f7558580e",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "aff12e21e333616c3a63c76ed6cf711a57161a5c6fcb1abd8130ec2790b60b17"
+      }
+    ],
+    "replies": [],
+    "invocations": [
+      {
+        "invocation_id": "cca6782d-9584-48a2-a4ea-6867d51efbd0",
+        "native_request_id": "reply_request_74165b495640437b97672e42e9f15229",
+        "record_id": "tcr-1795261600355-0566fc2c-fbb6-4cfa-9c3b-1cc20564af56",
+        "plugin_name": "OrdinaryToolCounter",
+        "state": "returned"
+      }
+    ],
+    "completion": null,
+    "counts": {
+      "provider": 3,
+      "tool": 1
+    },
+    "providerCalls": [
+      {
+        "protocolStep": "nonstream-two-tools",
+        "id": "reply_request_0dff1ac70ef74d2ca7c35b952fe13f04",
+        "stream": false
+      },
+      {
+        "protocolStep": "stream-one-tool",
+        "id": "reply_request_74165b495640437b97672e42e9f15229",
+        "stream": true
+      },
+      {
+        "protocolStep": "B-continuation",
+        "id": "reply_request_74165b495640437b97672e42e9f15229_g1",
+        "stream": true
+      }
+    ],
+    "phases": [
+      "native_prepared",
+      "native_entered",
+      "provider_attempt",
+      "native_settled"
+    ]
+  },
+  "crash": {
+    "code": null,
+    "signal": "SIGKILL",
+    "crashedPid": 2964777,
+    "restartedPid": 2964831
+  },
+  "after": {
+    "admission": {
+      "id": "request_74165b495640437b97672e42e9f15229",
+      "state": "review_required",
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "request": {
+      "id": "reply_request_74165b495640437b97672e42e9f15229_g1",
+      "principal": "desktop:deviceB",
+      "state": "unknown"
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_74165b495640437b97672e42e9f15229",
+        "state": "paused"
+      },
+      {
+        "generation": 1,
+        "executor": "desktop:deviceB",
+        "request_id": "reply_request_74165b495640437b97672e42e9f15229_g1",
+        "state": "running"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 2,
+        "msg_id": "167365ba-d790-4368-8200-5a9bb7b37490",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "48c5a28ab0ae63271267484e8ee23042c18a52a7a6626bb99f5abec4384fa84d"
+      },
+      {
+        "seq": 3,
+        "msg_id": "reply_request_74165b495640437b97672e42e9f15229",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "f8dc3fdb94fffd9ef3153a1a2d6cfd88613a98b563fd1344cf201daa68e1756a"
+      },
+      {
+        "seq": 4,
+        "msg_id": "checkpoint_compact_d86709a4b5c2f11290b8eac281e9283f7558580e",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "aff12e21e333616c3a63c76ed6cf711a57161a5c6fcb1abd8130ec2790b60b17"
+      }
+    ],
+    "replies": [],
+    "invocations": [
+      {
+        "invocation_id": "cca6782d-9584-48a2-a4ea-6867d51efbd0",
+        "native_request_id": "reply_request_74165b495640437b97672e42e9f15229",
+        "record_id": "tcr-1795261600355-0566fc2c-fbb6-4cfa-9c3b-1cc20564af56",
+        "plugin_name": "OrdinaryToolCounter",
+        "state": "returned"
+      }
+    ],
+    "completion": null,
+    "counts": {
+      "provider": 3,
+      "tool": 1
+    },
+    "providerCalls": [
+      {
+        "protocolStep": "nonstream-two-tools",
+        "id": "reply_request_0dff1ac70ef74d2ca7c35b952fe13f04",
+        "stream": false
+      },
+      {
+        "protocolStep": "stream-one-tool",
+        "id": "reply_request_74165b495640437b97672e42e9f15229",
+        "stream": true
+      },
+      {
+        "protocolStep": "B-continuation",
+        "id": "reply_request_74165b495640437b97672e42e9f15229_g1",
+        "stream": true
+      }
+    ],
+    "phases": [
+      "native_prepared",
+      "native_entered",
+      "provider_attempt",
+      "native_settled"
+    ]
+  },
+  "late": {
+    "status": 409,
+    "code": "SHARED_REQUEST_FENCED"
+  },
+  "lateTimestamp": 1795261601515,
+  "repeat": {
+    "status": 409,
+    "code": "SHARED_REQUEST_FENCED"
+  },
+  "repeatTimestamp": 1795261601515,
+  "conflict": {
+    "status": 409,
+    "code": "SHARED_REQUEST_FENCED"
+  },
+  "replay": {
+    "status": 409,
+    "code": "SHARED_REQUEST_ALREADY_DISPATCHED"
+  },
+  "secondCrash": {
+    "code": null,
+    "signal": "SIGKILL"
+  },
+  "loadedSources": [
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "79fba138518926edd6c20de95d016689ebb9fb2f8a3fc0614d9c60b8b44dfbdb"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "5458a2605dc66dc1a1958f141e6ee32eacb99fa7c73de7ead54199426fbbda27"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "8a7084be74e91409401e8753afc17e46b763413f58ada3ef827be1b33c9eb345"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "fd8c6cb93e51183ce65b7a79a34e7c32d68c6813a69e6aaa355c9d0a059c945d"
+    },
+    {
+      "file": "apps/server/modules/nativeContinuationStore.cjs",
+      "sha256": "f6774df34bdcc60346f4ed49f5dccaa2e0da5645b5b60ea29f364f89a5090ee6"
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "5930c392fcb42d3bb447ab804b0e811358cd6f3b3496b01c5e7d22cf2f0c2556"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "7bf02ef53d45075ca0426c3511513b090f0a8da4a9d3e13daa0a8878e0289154"
+    }
+  ]
+}

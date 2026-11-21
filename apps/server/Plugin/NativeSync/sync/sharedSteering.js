@@ -231,29 +231,127 @@ class SharedSteering {
         });
     }
     completeTurn(actor, body) {
-        const {row,topic}=this.admission(actor,body.sharedSpaceId,body.workId,{existing:true});
-        const result=this.shared.receipt(actor,body,'steer-turn-complete',()=>{
+        const {row:admission,topic}=this.admission(actor,body.sharedSpaceId,body.workId,{existing:true});
+        let row=admission;
+        const action='steer-turn-complete',safeFinal=require('./sharedTurns').intent(row).controlMode===controlled.TOOLS_MODE&&body.generation===1;
+        let intent=body;
+        if(safeFinal){
+            const message=body.message;
+            if(message?.nativeFailure||message?.error||message?.isThinking===true||message?.attachments?.length||message?.desktopReferences?.length||
+                ![undefined,'completed','stop'].includes(message?.finishReason))throw fail('SHARED_REPLY_INTENT_CHANGED');
+            const generation=this.generation(row.id,body.generation);
+            if(!generation||generation.executor!==actor.principal||message?.id!==generation.request_id||message.role!=='assistant')throw fail('INVALID_SHARED_REPLY');
+            if(row.state==='dispatched'&&this.shared.native.tryFinalReply(row.id,generation.request_id))
+                row=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(row.id);
+            const prior=typeof body.opId==='string'&&this.db.prepare('SELECT request_hash FROM shared_receipts WHERE principal=? AND op_id=?').get(actor.principal,body.opId);
+            // Preserve exact replays of receipts recorded before native publication.
+            if(prior?.request_hash!==sha256(stable({action,body})))intent={...body,message:{id:message?.id,role:message?.role,content:message?.content,finishReason:'completed'}};
+        }
+        const result=this.shared.receipt(actor,intent,action,()=>{
+            const generation=this.generation(row.id,body.generation);
+            const native=this.shared.native.engine.nativeTasks;
+            if(safeFinal){
+                const checkpoint=generation?.checkpoint_json&&JSON.parse(generation.checkpoint_json),message=body.message;
+                if(generation.executor!==actor.principal||message.id!==generation.request_id)throw fail('INVALID_SHARED_REPLY');
+                if(row.state==='dispatched')throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+                if(row.state!=='completed'||generation.state!=='completed'||!row.reply_seq||!checkpoint)throw fail('SHARED_REQUEST_FENCED');
+                // The device may submit after the native writer, with its own
+                // local timestamp and display fields. Replay the committed op.
+                if(message.content!==checkpoint.content||![undefined,'completed','stop'].includes(checkpoint.finishReason))throw fail('SHARED_REPLY_INTENT_CHANGED');
+                const opId='work-reply:'+row.id+':'+generation.generation;
+                if(!this.shared.store.findOp.get(generation.executor,opId))throw fail('NATIVE_CHECKPOINT_CHANGED');
+                const receipt=this.applyTurnReply(row,topic,generation,checkpoint);
+                if(receipt.seq!==row.reply_seq)throw fail('NATIVE_CHECKPOINT_CHANGED');
+                return this.turnResult(row,checkpoint,receipt,native);
+            }
             if(!['accepted','dispatched'].includes(row.state))throw fail('SHARED_REQUEST_FENCED');
-            const generation=this.generation(row.id,body.generation),message=this.decorateReply(row,generation,body.message);
+            const message=this.decorateReply(row,generation,body.message);
             if(!generation||generation.executor!==actor.principal||message?.id!==generation.request_id||message.role!=='assistant')throw fail('INVALID_SHARED_REPLY');
             const request=this.db.prepare('SELECT state FROM shared_native_requests WHERE id=? AND admission_id=?').get(generation.request_id,row.id);
             if(request?.state!=='model_terminal')throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
-            const native=this.shared.native.engine.nativeTasks;if(native.unsettledTools(row.id,generation.request_id))throw fail('WORK_SAFE_BOUNDARY_PENDING');
+            if(native.unsettledTools(row.id,generation.request_id))throw fail('WORK_SAFE_BOUNDARY_PENDING');
             if(require('./sharedTurns').intent(row).controlMode===controlled.TOOLS_MODE&&generation.state==='paused')throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
             if(generation.checkpoint_json&&stable(JSON.parse(generation.checkpoint_json))!==stable(message))throw fail('SHARED_REPLY_INTENT_CHANGED');
             const settled=this.db.prepare("SELECT invocation_id FROM mobile_native_invocations WHERE execution_id=? AND native_request_id=? AND (state='returned' OR (state='error' AND error_code='NATIVE_CANCELLED_BEFORE_EXECUTION')) ORDER BY invocation_id").all(row.id,generation.request_id).map(r=>r.invocation_id);
-            const proof=this.shared.native.checkpointProof(row.id,generation.request_id,settled),metadata=require('./metadata'),value={...message};delete value._nativeSyncMetadata;
-            const result=this.shared.store.apply({ownerType:topic.owner_type,ownerId:topic.owner_id,topicId:topic.topic_id,msgId:message.id,deviceId:actor.principal,opId:'work-reply:'+row.id+':'+body.generation,action:'upsert',baseHash:null,message:value,metadata:metadata.envelopeFor(message,1)},{sharedSpace:row.space_id,metadataPublisher:true});
-            this.db.prepare('INSERT OR REPLACE INTO shared_native_checkpoints VALUES(?,?,?)').run(row.id,body.generation,JSON.stringify(proof));
-            const c=this.control(row),state=c.revision>generation.consumed_seq?'paused_terminal':'completed';
-            this.db.prepare('UPDATE shared_work_generations SET state=?,checkpoint_json=? WHERE work_id=? AND generation=?').run(state,JSON.stringify(message),row.id,body.generation);
-            this.db.prepare('UPDATE shared_admissions SET reply_seq=? WHERE id=?').run(result.seq,row.id);this.shared.native.phase(row.id,generation.request_id,'final_persisted');
-            this.closeIfFinished(row.id);
-            const updated=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(row.id);
-            return {turnState:message.finishReason||'completed',workState:updated.state==='completed'?'completed':native.needsReview(row.id)||native.uncertainTools(row.id)?'review_required':'background',steering:this.public(updated,this.control(updated)),receipt:result};
+            const proof=this.shared.native.checkpointProof(row.id,generation.request_id,settled);
+            const receipt=this.commitTurnReply(row,topic,generation,message,proof);
+            return this.turnResult(this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(row.id),message,receipt,native);
         });
-        if(result.workState==='completed')this.notifyCompleted(row.id);
+        if(result.workState==='completed'&&!result.receipt?.replayed)this.notifyCompleted(row.id);
         return result;
+    }
+    applyTurnReply(row,topic,generation,message){
+        const metadata=require('./metadata'),value={...message};delete value._nativeSyncMetadata;
+        return this.shared.store.apply({ownerType:topic.owner_type,ownerId:topic.owner_id,topicId:topic.topic_id,
+            msgId:message.id,deviceId:generation.executor,opId:'work-reply:'+row.id+':'+generation.generation,action:'upsert',
+            baseHash:null,message:value,metadata:metadata.envelopeFor(message,1)},{sharedSpace:row.space_id,metadataPublisher:true});
+    }
+    commitTurnReply(row,topic,generation,message,proof){
+        const receipt=this.applyTurnReply(row,topic,generation,message),c=this.control(row);
+        const state=c.revision>generation.consumed_seq?'paused_terminal':'completed';
+        this.db.prepare('INSERT OR REPLACE INTO shared_native_checkpoints VALUES(?,?,?)').run(row.id,generation.generation,JSON.stringify(proof));
+        this.db.prepare('UPDATE shared_work_generations SET state=?,checkpoint_json=? WHERE work_id=? AND generation=?').run(state,JSON.stringify(message),row.id,generation.generation);
+        this.db.prepare('UPDATE shared_admissions SET reply_seq=? WHERE id=?').run(receipt.seq,row.id);
+        this.closeIfFinished(row.id);
+        this.shared.native.phase(row.id,generation.request_id,'final_persisted');
+        return receipt;
+    }
+    turnResult(row,message,receipt,native){
+        return {turnState:message.finishReason||'completed',workState:row.state==='completed'?'completed':native.needsReview(row.id)||native.uncertainTools(row.id)?'review_required':'background',
+            steering:this.public(row,this.control(row)),receipt};
+    }
+    publishNativeFinal(workId,requestId,data){
+        const shared=this.shared,native=shared.native;
+        shared.atomic(()=>{
+            const row=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(workId);
+            const generation=this.generation(workId,1),c=this.db.prepare('SELECT * FROM shared_work_controls WHERE work_id=?').get(workId);
+            const request=this.db.prepare('SELECT * FROM shared_native_requests WHERE id=? AND admission_id=?').get(requestId,workId);
+            const {digest,...final}=data.completion,identity=data.identity;
+            if(!this.enabled||shared.readOnly||!controlled.enabled(shared,controlled.TOOLS_MODE)||row?.state!=='dispatched'||!row.dispatched||row.reply_seq!==null||
+                require('./sharedTurns').intent(row).controlMode!==controlled.TOOLS_MODE||generation?.state!=='running'||generation.request_id!==requestId||
+                generation.checkpoint_json!==null||c?.generation!==1||c.revision!==generation.revision||c.consumed_seq!==generation.consumed_seq||
+                c.revision!==c.consumed_seq||c.executor!==generation.executor||c.executor===row.principal||
+                !['dispatched','model_terminal'].includes(request?.state)||request.ordinal!==1||request.principal!==generation.executor||request.member_id!==null||
+                final.version!==1||final.workId!==workId||final.requestId!==requestId||final.generation!==1||final.executor!==generation.executor||
+                final.finishReason!=='stop'||typeof final.content!=='string'||!final.content.trim()||!Number.isSafeInteger(final.timestamp)||final.timestamp<0||digest!==sha256(stable(final))||
+                identity.workId!==workId||identity.requestId!==requestId||identity.generation!==1||identity.controlRevision!==generation.revision)
+                throw fail('NATIVE_COMPLETION_INVALID');
+
+            const member=c.executor.startsWith('desktop:')&&this.db.prepare('SELECT source_id,device_id FROM shared_members WHERE space_id=? AND device_id=?').get(row.space_id,c.executor.slice(8));
+            if(!member)throw fail('SHARED_MEMBERSHIP_REQUIRED',403);
+            const actor={kind:'desktop',principal:c.executor,sourceId:member.source_id,deviceId:member.device_id};
+            const topic=shared.topic(actor,row.space_id,row.topic_id,'execute');
+            if(topic.id!==row.topic_id||topic.owner_type!=='agent')throw fail('NATIVE_COMPLETION_INVALID');
+            this.verifyFinalToolBoundary(row,topic,generation,data);
+
+            const owner=JSON.parse(generation.config_json).owner;
+            const message=this.decorateReply(row,generation,{id:requestId,role:'assistant',agentId:topic.owner_id,topicId:topic.topic_id,
+                name:owner.config.name,content:final.content,timestamp:final.timestamp,finishReason:'completed',isThinking:false});
+            const proof=native.checkpointProof(workId,requestId,[]);
+            this.db.prepare("UPDATE shared_native_requests SET state='model_terminal' WHERE id=?").run(requestId);
+            native.phase(workId,requestId,'native_settled');
+            this.commitTurnReply(row,topic,generation,message,proof);
+        });
+        this.notifyCompleted(workId);
+        return true;
+    }
+    verifyFinalToolBoundary(row,topic,generation,data){
+        const native=this.shared.native,tasks=native.engine.nativeTasks,first=this.generation(row.id,0);
+        const firstRequest=first&&this.db.prepare('SELECT * FROM shared_native_requests WHERE id=? AND admission_id=?').get(first.request_id,row.id);
+        const saved=this.db.prepare('SELECT proof_json FROM shared_native_checkpoints WHERE work_id=? AND generation=0').get(row.id);
+        if(first?.state!=='paused'||!first.checkpoint_json||first.executor!==row.principal||firstRequest?.state!=='model_terminal'||firstRequest.ordinal!==0||
+            firstRequest.principal!==first.executor||!saved||this.db.prepare('SELECT count(*) n FROM shared_native_requests WHERE admission_id=?').get(row.id).n!==2||
+            this.db.prepare('SELECT 1 FROM shared_native_child_requests WHERE work_id=?').get(row.id)||
+            tasks.list(row.id).length||tasks.unsettledTools(row.id)||tasks.uncertainTools(row.id)||tasks.needsReview(row.id)||
+            Object.keys(data.results).length||data.events.some(event=>event.kind!=='assistant'))
+            throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
+        const proof=native.verifiedToolBoundary(row.id,first.request_id,JSON.parse(saved.proof_json));
+        const link=this.db.prepare(`SELECT l.* FROM shared_compaction_native_links l JOIN shared_work_compactions w
+            ON w.work_id=? AND w.checkpoint_id=l.checkpoint_id AND w.journal_seq=l.journal_seq
+            WHERE l.request_id=? AND l.proof_hash=? AND l.through_input_seq<=? ORDER BY l.journal_seq DESC LIMIT 1`).get(row.id,first.request_id,proof.hash,generation.consumed_seq);
+        if(!link)throw fail('NATIVE_COMPACTION_CHECKPOINT_MISSING');
+        const [checkpoint]=this.shared.store.readProjected(()=>this.db.prepare('SELECT * FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND msg_id=? AND deleted=0').all(topic.owner_type,topic.owner_id,topic.topic_id,link.checkpoint_id));
+        if(checkpoint?.row.last_seq!==link.journal_seq||!checkpoint.message?.contextCompaction)throw fail('NATIVE_COMPACTION_CHECKPOINT_MISSING');
     }
     notifyCompleted(workId){
         // A hint follows the authoritative transaction. It never creates a

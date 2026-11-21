@@ -1,0 +1,1885 @@
+{
+  "baselineRevision": "5ed51ba784bf029fc0a16896da1d57451a36cb7c",
+  "runs": [
+    {
+      "baseline": {
+        "case": "json-after-quit",
+        "mode": "tool-final-receipt-lost",
+        "result": "FAIL (reproduced)",
+        "electron": "44.9.3",
+        "chromiumSandbox": true,
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+        "loadedBackendCount": 29,
+        "providerRequests": [
+          {
+            "requestId": "reply_request_a04e441860504ef69b48483ce9171ace",
+            "phase": "initial",
+            "stream": false
+          },
+          {
+            "requestId": "compaction_1795261494405_q3v8cff3xq",
+            "phase": "summary",
+            "stream": true
+          },
+          {
+            "requestId": "reply_request_a04e441860504ef69b48483ce9171ace_g1",
+            "phase": "resumed",
+            "stream": false
+          }
+        ],
+        "workId": "request_a04e441860504ef69b48483ce9171ace",
+        "replyId": "reply_request_a04e441860504ef69b48483ce9171ace_g1",
+        "generations": [
+          {
+            "generation": 0,
+            "executor": "desktop:deviceA",
+            "request_id": "reply_request_a04e441860504ef69b48483ce9171ace",
+            "state": "paused"
+          },
+          {
+            "generation": 1,
+            "executor": "desktop:deviceB",
+            "request_id": "reply_request_a04e441860504ef69b48483ce9171ace_g1",
+            "state": "running"
+          }
+        ],
+        "profileDigest": "44457fb5f11c14f10cbe8785ed80ccec5eaa67cf1efbbd5f35240bf3081253fb",
+        "sameProfileReopened": true,
+        "desktopExit": {
+          "normalExit": true,
+          "liveGroupMembers": 0,
+          "code": 0,
+          "signal": null
+        },
+        "toolBoxCrashExit": {
+          "code": null,
+          "signal": "SIGKILL"
+        },
+        "transport": {
+          "downstream": {
+            "at": 1795261502772,
+            "device": "deviceB",
+            "headersSent": false
+          },
+          "providerReplyAt": 1795261502881,
+          "providerClosed": {
+            "at": 1795261502882,
+            "responseEnded": true
+          },
+          "upstream": {
+            "at": 1795261502886,
+            "status": 200,
+            "bodyComplete": true,
+            "finishReason": "stop"
+          }
+        },
+        "desktopPublicationAttempts": 0,
+        "dispatched": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_a04e441860504ef69b48483ce9171ace_g1",
+            "admission_id": "request_a04e441860504ef69b48483ce9171ace",
+            "principal": "desktop:deviceB",
+            "state": "dispatched"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "可继续 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "terminalBeforeExit": null,
+        "afterExit": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_a04e441860504ef69b48483ce9171ace_g1",
+            "admission_id": "request_a04e441860504ef69b48483ce9171ace",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": null,
+          "chatFinalBubbleCount": null,
+          "desktopWorkStatus": null,
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "reopened": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_a04e441860504ef69b48483ce9171ace_g1",
+            "admission_id": "request_a04e441860504ef69b48483ce9171ace",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 原生执行中",
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "reopenedAfterBackendRestart": {
+          "sameToolBoxProcess": false,
+          "workState": "review_required",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_a04e441860504ef69b48483ce9171ace_g1",
+            "admission_id": "request_a04e441860504ef69b48483ce9171ace",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 结果需要核对",
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "explicitWorkRefreshReturned": true
+      },
+      "candidate": {
+        "case": "json-after-quit",
+        "mode": "tool-final-receipt-lost",
+        "result": "PASS",
+        "electron": "44.9.3",
+        "chromiumSandbox": true,
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+        "loadedBackendCount": 28,
+        "providerRequests": [
+          {
+            "requestId": "reply_request_b6d67da4266544b983425a857aa61552",
+            "phase": "initial",
+            "stream": false
+          },
+          {
+            "requestId": "compaction_1795261544307_cqg31wad0g",
+            "phase": "summary",
+            "stream": true
+          },
+          {
+            "requestId": "reply_request_b6d67da4266544b983425a857aa61552_g1",
+            "phase": "resumed",
+            "stream": false
+          }
+        ],
+        "workId": "request_b6d67da4266544b983425a857aa61552",
+        "replyId": "reply_request_b6d67da4266544b983425a857aa61552_g1",
+        "generations": [
+          {
+            "generation": 0,
+            "executor": "desktop:deviceA",
+            "request_id": "reply_request_b6d67da4266544b983425a857aa61552",
+            "state": "paused"
+          },
+          {
+            "generation": 1,
+            "executor": "desktop:deviceB",
+            "request_id": "reply_request_b6d67da4266544b983425a857aa61552_g1",
+            "state": "completed"
+          }
+        ],
+        "profileDigest": "55499c017d538ae0fff71839e259c5fa2082fdfd33b15d67d779a698e716cb5b",
+        "sameProfileReopened": true,
+        "desktopExit": {
+          "normalExit": true,
+          "liveGroupMembers": 0,
+          "code": 0,
+          "signal": null
+        },
+        "toolBoxCrashExit": {
+          "code": null,
+          "signal": "SIGKILL"
+        },
+        "transport": {
+          "downstream": {
+            "at": 1795261558306,
+            "device": "deviceB",
+            "headersSent": false
+          },
+          "providerReplyAt": 1795261558465,
+          "providerClosed": {
+            "at": 1795261558465,
+            "responseEnded": true
+          },
+          "upstream": {
+            "at": 1795261558515,
+            "status": 200,
+            "bodyComplete": true,
+            "finishReason": "stop"
+          }
+        },
+        "desktopPublicationAttempts": 0,
+        "dispatched": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_b6d67da4266544b983425a857aa61552_g1",
+            "admission_id": "request_b6d67da4266544b983425a857aa61552",
+            "principal": "desktop:deviceB",
+            "state": "dispatched"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "可继续 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "terminalBeforeExit": null,
+        "afterExit": {
+          "sameToolBoxProcess": true,
+          "workState": "completed",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_b6d67da4266544b983425a857aa61552_g1",
+            "admission_id": "request_b6d67da4266544b983425a857aa61552",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": 6,
+          "generationState": "completed",
+          "journalMatches": 1,
+          "historyMatches": 0,
+          "journalFinishReasons": [
+            "completed"
+          ],
+          "historyFinishReasons": [],
+          "chatFinalShown": null,
+          "chatFinalBubbleCount": null,
+          "desktopWorkStatus": null,
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": {
+            "workId": "request_b6d67da4266544b983425a857aa61552",
+            "generation": 1,
+            "requestId": "reply_request_b6d67da4266544b983425a857aa61552_g1",
+            "executor": "desktop:deviceB",
+            "finishReason": "stop"
+          },
+          "toolCount": 1
+        },
+        "reopened": {
+          "sameToolBoxProcess": true,
+          "workState": "completed",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_b6d67da4266544b983425a857aa61552_g1",
+            "admission_id": "request_b6d67da4266544b983425a857aa61552",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": 6,
+          "generationState": "completed",
+          "journalMatches": 1,
+          "historyMatches": 1,
+          "journalFinishReasons": [
+            "completed"
+          ],
+          "historyFinishReasons": [
+            "completed"
+          ],
+          "chatFinalShown": true,
+          "chatFinalBubbleCount": 1,
+          "desktopWorkStatus": "当前没有进行中的跨端任务。",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": {
+            "workId": "request_b6d67da4266544b983425a857aa61552",
+            "generation": 1,
+            "requestId": "reply_request_b6d67da4266544b983425a857aa61552_g1",
+            "executor": "desktop:deviceB",
+            "finishReason": "stop"
+          },
+          "toolCount": 1
+        },
+        "reopenedAfterBackendRestart": {
+          "sameToolBoxProcess": false,
+          "workState": "completed",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_b6d67da4266544b983425a857aa61552_g1",
+            "admission_id": "request_b6d67da4266544b983425a857aa61552",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": 6,
+          "generationState": "completed",
+          "journalMatches": 1,
+          "historyMatches": 1,
+          "journalFinishReasons": [
+            "completed"
+          ],
+          "historyFinishReasons": [
+            "completed"
+          ],
+          "chatFinalShown": true,
+          "chatFinalBubbleCount": 1,
+          "desktopWorkStatus": "当前没有进行中的跨端任务。",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": {
+            "workId": "request_b6d67da4266544b983425a857aa61552",
+            "generation": 1,
+            "requestId": "reply_request_b6d67da4266544b983425a857aa61552_g1",
+            "executor": "desktop:deviceB",
+            "finishReason": "stop"
+          },
+          "toolCount": 1
+        },
+        "explicitWorkRefreshReturned": true
+      }
+    },
+    {
+      "baseline": {
+        "case": "json-before-quit",
+        "mode": "tool-final-receipt-lost",
+        "result": "FAIL (reproduced)",
+        "electron": "44.9.3",
+        "chromiumSandbox": true,
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+        "loadedBackendCount": 29,
+        "providerRequests": [
+          {
+            "requestId": "reply_request_29e32631d3604e69939183693daaea2a",
+            "phase": "initial",
+            "stream": false
+          },
+          {
+            "requestId": "compaction_1795261496432_mv6ezp8rph",
+            "phase": "summary",
+            "stream": true
+          },
+          {
+            "requestId": "reply_request_29e32631d3604e69939183693daaea2a_g1",
+            "phase": "resumed",
+            "stream": false
+          }
+        ],
+        "workId": "request_29e32631d3604e69939183693daaea2a",
+        "replyId": "reply_request_29e32631d3604e69939183693daaea2a_g1",
+        "generations": [
+          {
+            "generation": 0,
+            "executor": "desktop:deviceA",
+            "request_id": "reply_request_29e32631d3604e69939183693daaea2a",
+            "state": "paused"
+          },
+          {
+            "generation": 1,
+            "executor": "desktop:deviceB",
+            "request_id": "reply_request_29e32631d3604e69939183693daaea2a_g1",
+            "state": "running"
+          }
+        ],
+        "profileDigest": "39f400f77166d41bf1fe684ad0217a3bc522476f5d9ecb2be2b1ebbafc893af6",
+        "sameProfileReopened": true,
+        "desktopExit": {
+          "normalExit": true,
+          "liveGroupMembers": 0,
+          "code": 0,
+          "signal": null
+        },
+        "toolBoxCrashExit": {
+          "code": null,
+          "signal": "SIGKILL"
+        },
+        "transport": {
+          "providerReplyAt": 1795261506573,
+          "providerClosed": {
+            "at": 1795261506574,
+            "responseEnded": true
+          },
+          "upstream": {
+            "at": 1795261506577,
+            "status": 200,
+            "bodyComplete": true,
+            "finishReason": "stop"
+          },
+          "downstream": {
+            "at": 1795261506643,
+            "device": "deviceB",
+            "headersSent": false
+          }
+        },
+        "desktopPublicationAttempts": 0,
+        "dispatched": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_29e32631d3604e69939183693daaea2a_g1",
+            "admission_id": "request_29e32631d3604e69939183693daaea2a",
+            "principal": "desktop:deviceB",
+            "state": "dispatched"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "可继续 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "terminalBeforeExit": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_29e32631d3604e69939183693daaea2a_g1",
+            "admission_id": "request_29e32631d3604e69939183693daaea2a",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "本轮执行中 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 原生执行中",
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "afterExit": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_29e32631d3604e69939183693daaea2a_g1",
+            "admission_id": "request_29e32631d3604e69939183693daaea2a",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": null,
+          "chatFinalBubbleCount": null,
+          "desktopWorkStatus": null,
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "reopened": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_29e32631d3604e69939183693daaea2a_g1",
+            "admission_id": "request_29e32631d3604e69939183693daaea2a",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 原生执行中",
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "reopenedAfterBackendRestart": {
+          "sameToolBoxProcess": false,
+          "workState": "review_required",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_29e32631d3604e69939183693daaea2a_g1",
+            "admission_id": "request_29e32631d3604e69939183693daaea2a",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 结果需要核对",
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "explicitWorkRefreshReturned": true
+      },
+      "candidate": {
+        "case": "json-before-quit",
+        "mode": "tool-final-receipt-lost",
+        "result": "PASS",
+        "electron": "44.9.3",
+        "chromiumSandbox": true,
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+        "loadedBackendCount": 28,
+        "providerRequests": [
+          {
+            "requestId": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4",
+            "phase": "initial",
+            "stream": false
+          },
+          {
+            "requestId": "compaction_1795261544021_mlvgiobph3",
+            "phase": "summary",
+            "stream": true
+          },
+          {
+            "requestId": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4_g1",
+            "phase": "resumed",
+            "stream": false
+          }
+        ],
+        "workId": "request_8ed38c7bd3e2430ca11a60e3691310b4",
+        "replyId": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4_g1",
+        "generations": [
+          {
+            "generation": 0,
+            "executor": "desktop:deviceA",
+            "request_id": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4",
+            "state": "paused"
+          },
+          {
+            "generation": 1,
+            "executor": "desktop:deviceB",
+            "request_id": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4_g1",
+            "state": "completed"
+          }
+        ],
+        "profileDigest": "4330e8e70c0f616cf4786f96a4d8e93ec45c891c94659caa66fb1ae7de92edfe",
+        "sameProfileReopened": true,
+        "desktopExit": {
+          "normalExit": true,
+          "liveGroupMembers": 0,
+          "code": 0,
+          "signal": null
+        },
+        "toolBoxCrashExit": {
+          "code": null,
+          "signal": "SIGKILL"
+        },
+        "transport": {
+          "providerReplyAt": 1795261557205,
+          "providerClosed": {
+            "at": 1795261557206,
+            "responseEnded": true
+          },
+          "upstream": {
+            "at": 1795261557248,
+            "status": 200,
+            "bodyComplete": true,
+            "finishReason": "stop"
+          },
+          "downstream": {
+            "at": 1795261557549,
+            "device": "deviceB",
+            "headersSent": false
+          }
+        },
+        "desktopPublicationAttempts": 0,
+        "dispatched": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4_g1",
+            "admission_id": "request_8ed38c7bd3e2430ca11a60e3691310b4",
+            "principal": "desktop:deviceB",
+            "state": "dispatched"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "terminalBeforeExit": {
+          "sameToolBoxProcess": true,
+          "workState": "completed",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4_g1",
+            "admission_id": "request_8ed38c7bd3e2430ca11a60e3691310b4",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": 6,
+          "generationState": "completed",
+          "journalMatches": 1,
+          "historyMatches": 0,
+          "journalFinishReasons": [
+            "completed"
+          ],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "本轮执行中 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 已完成",
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": {
+            "workId": "request_8ed38c7bd3e2430ca11a60e3691310b4",
+            "generation": 1,
+            "requestId": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4_g1",
+            "executor": "desktop:deviceB",
+            "finishReason": "stop"
+          },
+          "toolCount": 1
+        },
+        "afterExit": {
+          "sameToolBoxProcess": true,
+          "workState": "completed",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4_g1",
+            "admission_id": "request_8ed38c7bd3e2430ca11a60e3691310b4",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": 6,
+          "generationState": "completed",
+          "journalMatches": 1,
+          "historyMatches": 1,
+          "journalFinishReasons": [
+            "completed"
+          ],
+          "historyFinishReasons": [
+            "completed"
+          ],
+          "chatFinalShown": null,
+          "chatFinalBubbleCount": null,
+          "desktopWorkStatus": null,
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": {
+            "workId": "request_8ed38c7bd3e2430ca11a60e3691310b4",
+            "generation": 1,
+            "requestId": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4_g1",
+            "executor": "desktop:deviceB",
+            "finishReason": "stop"
+          },
+          "toolCount": 1
+        },
+        "reopened": {
+          "sameToolBoxProcess": true,
+          "workState": "completed",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4_g1",
+            "admission_id": "request_8ed38c7bd3e2430ca11a60e3691310b4",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": 6,
+          "generationState": "completed",
+          "journalMatches": 1,
+          "historyMatches": 1,
+          "journalFinishReasons": [
+            "completed"
+          ],
+          "historyFinishReasons": [
+            "completed"
+          ],
+          "chatFinalShown": true,
+          "chatFinalBubbleCount": 1,
+          "desktopWorkStatus": "当前没有进行中的跨端任务。",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": {
+            "workId": "request_8ed38c7bd3e2430ca11a60e3691310b4",
+            "generation": 1,
+            "requestId": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4_g1",
+            "executor": "desktop:deviceB",
+            "finishReason": "stop"
+          },
+          "toolCount": 1
+        },
+        "reopenedAfterBackendRestart": {
+          "sameToolBoxProcess": false,
+          "workState": "completed",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4_g1",
+            "admission_id": "request_8ed38c7bd3e2430ca11a60e3691310b4",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": 6,
+          "generationState": "completed",
+          "journalMatches": 1,
+          "historyMatches": 1,
+          "journalFinishReasons": [
+            "completed"
+          ],
+          "historyFinishReasons": [
+            "completed"
+          ],
+          "chatFinalShown": true,
+          "chatFinalBubbleCount": 1,
+          "desktopWorkStatus": "当前没有进行中的跨端任务。",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": {
+            "workId": "request_8ed38c7bd3e2430ca11a60e3691310b4",
+            "generation": 1,
+            "requestId": "reply_request_8ed38c7bd3e2430ca11a60e3691310b4_g1",
+            "executor": "desktop:deviceB",
+            "finishReason": "stop"
+          },
+          "toolCount": 1
+        },
+        "explicitWorkRefreshReturned": true
+      }
+    },
+    {
+      "baseline": {
+        "case": "sse-before-quit",
+        "mode": "tool-final-receipt-lost",
+        "result": "FAIL (reproduced)",
+        "electron": "44.9.3",
+        "chromiumSandbox": true,
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+        "loadedBackendCount": 29,
+        "providerRequests": [
+          {
+            "requestId": "reply_request_965e64cd786f4140b8e73a2db46a7657",
+            "phase": "initial",
+            "stream": true
+          },
+          {
+            "requestId": "compaction_1795261495508_ofmmcb3p8o",
+            "phase": "summary",
+            "stream": true
+          },
+          {
+            "requestId": "reply_request_965e64cd786f4140b8e73a2db46a7657_g1",
+            "phase": "resumed",
+            "stream": true
+          }
+        ],
+        "workId": "request_965e64cd786f4140b8e73a2db46a7657",
+        "replyId": "reply_request_965e64cd786f4140b8e73a2db46a7657_g1",
+        "generations": [
+          {
+            "generation": 0,
+            "executor": "desktop:deviceA",
+            "request_id": "reply_request_965e64cd786f4140b8e73a2db46a7657",
+            "state": "paused"
+          },
+          {
+            "generation": 1,
+            "executor": "desktop:deviceB",
+            "request_id": "reply_request_965e64cd786f4140b8e73a2db46a7657_g1",
+            "state": "running"
+          }
+        ],
+        "profileDigest": "ef187fb05b7601543eaa82e737509d77c7a7fdd0325544cac3aec6138746434d",
+        "sameProfileReopened": true,
+        "desktopExit": {
+          "normalExit": true,
+          "liveGroupMembers": 0,
+          "code": 0,
+          "signal": null
+        },
+        "toolBoxCrashExit": {
+          "code": null,
+          "signal": "SIGKILL"
+        },
+        "transport": {
+          "providerReplyAt": 1795261504643,
+          "providerClosed": {
+            "at": 1795261504644,
+            "responseEnded": true
+          },
+          "upstream": {
+            "at": 1795261504652,
+            "status": 200,
+            "bodyComplete": true,
+            "finishReason": "stop",
+            "done": true
+          },
+          "downstream": {
+            "at": 1795261504758,
+            "device": "deviceB",
+            "headersSent": false
+          }
+        },
+        "desktopPublicationAttempts": 0,
+        "dispatched": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_965e64cd786f4140b8e73a2db46a7657_g1",
+            "admission_id": "request_965e64cd786f4140b8e73a2db46a7657",
+            "principal": "desktop:deviceB",
+            "state": "dispatched"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "可继续 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "terminalBeforeExit": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_965e64cd786f4140b8e73a2db46a7657_g1",
+            "admission_id": "request_965e64cd786f4140b8e73a2db46a7657",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "本轮执行中 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 原生执行中",
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "afterExit": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_965e64cd786f4140b8e73a2db46a7657_g1",
+            "admission_id": "request_965e64cd786f4140b8e73a2db46a7657",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": null,
+          "chatFinalBubbleCount": null,
+          "desktopWorkStatus": null,
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "reopened": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_965e64cd786f4140b8e73a2db46a7657_g1",
+            "admission_id": "request_965e64cd786f4140b8e73a2db46a7657",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 原生执行中",
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "reopenedAfterBackendRestart": {
+          "sameToolBoxProcess": false,
+          "workState": "review_required",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_965e64cd786f4140b8e73a2db46a7657_g1",
+            "admission_id": "request_965e64cd786f4140b8e73a2db46a7657",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 结果需要核对",
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "explicitWorkRefreshReturned": true
+      },
+      "candidate": {
+        "case": "sse-before-quit",
+        "mode": "tool-final-receipt-lost",
+        "result": "PASS",
+        "electron": "44.9.3",
+        "chromiumSandbox": true,
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+        "loadedBackendCount": 28,
+        "providerRequests": [
+          {
+            "requestId": "reply_request_24e158b4f54747b89e9f7be661e2129a",
+            "phase": "initial",
+            "stream": true
+          },
+          {
+            "requestId": "compaction_1795261543282_9zscdx26x5",
+            "phase": "summary",
+            "stream": true
+          },
+          {
+            "requestId": "reply_request_24e158b4f54747b89e9f7be661e2129a_g1",
+            "phase": "resumed",
+            "stream": true
+          }
+        ],
+        "workId": "request_24e158b4f54747b89e9f7be661e2129a",
+        "replyId": "reply_request_24e158b4f54747b89e9f7be661e2129a_g1",
+        "generations": [
+          {
+            "generation": 0,
+            "executor": "desktop:deviceA",
+            "request_id": "reply_request_24e158b4f54747b89e9f7be661e2129a",
+            "state": "paused"
+          },
+          {
+            "generation": 1,
+            "executor": "desktop:deviceB",
+            "request_id": "reply_request_24e158b4f54747b89e9f7be661e2129a_g1",
+            "state": "completed"
+          }
+        ],
+        "profileDigest": "8016b7982a08fe3bdce3fdd8fb3a7a2c4fef0bd2cb86d9cc1b1706a1535bfc50",
+        "sameProfileReopened": true,
+        "desktopExit": {
+          "normalExit": true,
+          "liveGroupMembers": 0,
+          "code": 0,
+          "signal": null
+        },
+        "toolBoxCrashExit": {
+          "code": null,
+          "signal": "SIGKILL"
+        },
+        "transport": {
+          "providerReplyAt": 1795261556821,
+          "providerClosed": {
+            "at": 1795261556821,
+            "responseEnded": true
+          },
+          "upstream": {
+            "at": 1795261556860,
+            "status": 200,
+            "bodyComplete": true,
+            "finishReason": "stop",
+            "done": true
+          },
+          "downstream": {
+            "at": 1795261557162,
+            "device": "deviceB",
+            "headersSent": false
+          }
+        },
+        "desktopPublicationAttempts": 0,
+        "dispatched": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_24e158b4f54747b89e9f7be661e2129a_g1",
+            "admission_id": "request_24e158b4f54747b89e9f7be661e2129a",
+            "principal": "desktop:deviceB",
+            "state": "dispatched"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "terminalBeforeExit": {
+          "sameToolBoxProcess": true,
+          "workState": "completed",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_24e158b4f54747b89e9f7be661e2129a_g1",
+            "admission_id": "request_24e158b4f54747b89e9f7be661e2129a",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": 6,
+          "generationState": "completed",
+          "journalMatches": 1,
+          "historyMatches": 0,
+          "journalFinishReasons": [
+            "completed"
+          ],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "本轮执行中 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 已完成",
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": {
+            "workId": "request_24e158b4f54747b89e9f7be661e2129a",
+            "generation": 1,
+            "requestId": "reply_request_24e158b4f54747b89e9f7be661e2129a_g1",
+            "executor": "desktop:deviceB",
+            "finishReason": "stop"
+          },
+          "toolCount": 1
+        },
+        "afterExit": {
+          "sameToolBoxProcess": true,
+          "workState": "completed",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_24e158b4f54747b89e9f7be661e2129a_g1",
+            "admission_id": "request_24e158b4f54747b89e9f7be661e2129a",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": 6,
+          "generationState": "completed",
+          "journalMatches": 1,
+          "historyMatches": 1,
+          "journalFinishReasons": [
+            "completed"
+          ],
+          "historyFinishReasons": [
+            "completed"
+          ],
+          "chatFinalShown": null,
+          "chatFinalBubbleCount": null,
+          "desktopWorkStatus": null,
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": {
+            "workId": "request_24e158b4f54747b89e9f7be661e2129a",
+            "generation": 1,
+            "requestId": "reply_request_24e158b4f54747b89e9f7be661e2129a_g1",
+            "executor": "desktop:deviceB",
+            "finishReason": "stop"
+          },
+          "toolCount": 1
+        },
+        "reopened": {
+          "sameToolBoxProcess": true,
+          "workState": "completed",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_24e158b4f54747b89e9f7be661e2129a_g1",
+            "admission_id": "request_24e158b4f54747b89e9f7be661e2129a",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": 6,
+          "generationState": "completed",
+          "journalMatches": 1,
+          "historyMatches": 1,
+          "journalFinishReasons": [
+            "completed"
+          ],
+          "historyFinishReasons": [
+            "completed"
+          ],
+          "chatFinalShown": true,
+          "chatFinalBubbleCount": 1,
+          "desktopWorkStatus": "当前没有进行中的跨端任务。",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": {
+            "workId": "request_24e158b4f54747b89e9f7be661e2129a",
+            "generation": 1,
+            "requestId": "reply_request_24e158b4f54747b89e9f7be661e2129a_g1",
+            "executor": "desktop:deviceB",
+            "finishReason": "stop"
+          },
+          "toolCount": 1
+        },
+        "reopenedAfterBackendRestart": {
+          "sameToolBoxProcess": false,
+          "workState": "completed",
+          "nativeTerminal": true,
+          "nativeRequest": {
+            "id": "reply_request_24e158b4f54747b89e9f7be661e2129a_g1",
+            "admission_id": "request_24e158b4f54747b89e9f7be661e2129a",
+            "principal": "desktop:deviceB",
+            "state": "model_terminal"
+          },
+          "journalSeq": 6,
+          "generationState": "completed",
+          "journalMatches": 1,
+          "historyMatches": 1,
+          "journalFinishReasons": [
+            "completed"
+          ],
+          "historyFinishReasons": [
+            "completed"
+          ],
+          "chatFinalShown": true,
+          "chatFinalBubbleCount": 1,
+          "desktopWorkStatus": "当前没有进行中的跨端任务。",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": true,
+          "nativeCompletion": {
+            "workId": "request_24e158b4f54747b89e9f7be661e2129a",
+            "generation": 1,
+            "requestId": "reply_request_24e158b4f54747b89e9f7be661e2129a_g1",
+            "executor": "desktop:deviceB",
+            "finishReason": "stop"
+          },
+          "toolCount": 1
+        },
+        "explicitWorkRefreshReturned": true
+      }
+    },
+    {
+      "baseline": {
+        "case": "unknown",
+        "mode": "tool-final-receipt-unknown",
+        "result": "PASS",
+        "electron": "44.9.3",
+        "chromiumSandbox": true,
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+        "loadedBackendCount": 29,
+        "providerRequests": [
+          {
+            "requestId": "reply_request_68dcd9b76d4f4bb394184e1080bcd2f4",
+            "phase": "initial",
+            "stream": false
+          },
+          {
+            "requestId": "compaction_1795261318363_9nz6eagoix",
+            "phase": "summary",
+            "stream": true
+          },
+          {
+            "requestId": "reply_request_68dcd9b76d4f4bb394184e1080bcd2f4_g1",
+            "phase": "resumed",
+            "stream": false
+          }
+        ],
+        "workId": "request_68dcd9b76d4f4bb394184e1080bcd2f4",
+        "replyId": "reply_request_68dcd9b76d4f4bb394184e1080bcd2f4_g1",
+        "generations": [
+          {
+            "generation": 0,
+            "executor": "desktop:deviceA",
+            "request_id": "reply_request_68dcd9b76d4f4bb394184e1080bcd2f4",
+            "state": "paused"
+          },
+          {
+            "generation": 1,
+            "executor": "desktop:deviceB",
+            "request_id": "reply_request_68dcd9b76d4f4bb394184e1080bcd2f4_g1",
+            "state": "running"
+          }
+        ],
+        "profileDigest": "b0af4a0c13401f558e498604ffeac2699314ef4a950de9a5729fc281c007f42b",
+        "sameProfileReopened": true,
+        "desktopExit": {
+          "normalExit": true,
+          "liveGroupMembers": 0,
+          "code": 0,
+          "signal": null
+        },
+        "toolBoxCrashExit": {
+          "code": null,
+          "signal": "SIGKILL"
+        },
+        "transport": {
+          "downstream": {
+            "at": 1795261331697,
+            "device": "deviceB",
+            "headersSent": false
+          },
+          "providerClosed": {
+            "at": 1795261331702,
+            "responseEnded": false
+          }
+        },
+        "desktopPublicationAttempts": 0,
+        "dispatched": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_68dcd9b76d4f4bb394184e1080bcd2f4_g1",
+            "admission_id": "request_68dcd9b76d4f4bb394184e1080bcd2f4",
+            "principal": "desktop:deviceB",
+            "state": "dispatched"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "可继续 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "terminalBeforeExit": null,
+        "afterExit": {
+          "sameToolBoxProcess": true,
+          "workState": "review_required",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_68dcd9b76d4f4bb394184e1080bcd2f4_g1",
+            "admission_id": "request_68dcd9b76d4f4bb394184e1080bcd2f4",
+            "principal": "desktop:deviceB",
+            "state": "unknown"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": null,
+          "chatFinalBubbleCount": null,
+          "desktopWorkStatus": null,
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "reopened": {
+          "sameToolBoxProcess": true,
+          "workState": "review_required",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_68dcd9b76d4f4bb394184e1080bcd2f4_g1",
+            "admission_id": "request_68dcd9b76d4f4bb394184e1080bcd2f4",
+            "principal": "desktop:deviceB",
+            "state": "unknown"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 结果需要核对",
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "reopenedAfterBackendRestart": {
+          "sameToolBoxProcess": false,
+          "workState": "review_required",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_68dcd9b76d4f4bb394184e1080bcd2f4_g1",
+            "admission_id": "request_68dcd9b76d4f4bb394184e1080bcd2f4",
+            "principal": "desktop:deviceB",
+            "state": "unknown"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 结果需要核对",
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "explicitWorkRefreshReturned": true
+      },
+      "candidate": {
+        "case": "unknown",
+        "mode": "tool-final-receipt-unknown",
+        "result": "PASS",
+        "electron": "44.9.3",
+        "chromiumSandbox": true,
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+        "loadedBackendCount": 29,
+        "providerRequests": [
+          {
+            "requestId": "reply_request_c2df1ea68ca34b6e9ab03e15182a2011",
+            "phase": "initial",
+            "stream": false
+          },
+          {
+            "requestId": "compaction_1795261543466_dtdyi5smv3",
+            "phase": "summary",
+            "stream": true
+          },
+          {
+            "requestId": "reply_request_c2df1ea68ca34b6e9ab03e15182a2011_g1",
+            "phase": "resumed",
+            "stream": false
+          }
+        ],
+        "workId": "request_c2df1ea68ca34b6e9ab03e15182a2011",
+        "replyId": "reply_request_c2df1ea68ca34b6e9ab03e15182a2011_g1",
+        "generations": [
+          {
+            "generation": 0,
+            "executor": "desktop:deviceA",
+            "request_id": "reply_request_c2df1ea68ca34b6e9ab03e15182a2011",
+            "state": "paused"
+          },
+          {
+            "generation": 1,
+            "executor": "desktop:deviceB",
+            "request_id": "reply_request_c2df1ea68ca34b6e9ab03e15182a2011_g1",
+            "state": "running"
+          }
+        ],
+        "profileDigest": "0f190db120c2b46642fc64ed634e3c8e027b1e1478c1326e8d974e6250730a45",
+        "sameProfileReopened": true,
+        "desktopExit": {
+          "normalExit": true,
+          "liveGroupMembers": 0,
+          "code": 0,
+          "signal": null
+        },
+        "toolBoxCrashExit": {
+          "code": null,
+          "signal": "SIGKILL"
+        },
+        "transport": {
+          "downstream": {
+            "at": 1795261557275,
+            "device": "deviceB",
+            "headersSent": false
+          },
+          "providerClosed": {
+            "at": 1795261557277,
+            "responseEnded": false
+          }
+        },
+        "desktopPublicationAttempts": 0,
+        "dispatched": {
+          "sameToolBoxProcess": true,
+          "workState": "dispatched",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_c2df1ea68ca34b6e9ab03e15182a2011_g1",
+            "admission_id": "request_c2df1ea68ca34b6e9ab03e15182a2011",
+            "principal": "desktop:deviceB",
+            "state": "dispatched"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "terminalBeforeExit": null,
+        "afterExit": {
+          "sameToolBoxProcess": true,
+          "workState": "review_required",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_c2df1ea68ca34b6e9ab03e15182a2011_g1",
+            "admission_id": "request_c2df1ea68ca34b6e9ab03e15182a2011",
+            "principal": "desktop:deviceB",
+            "state": "unknown"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": null,
+          "chatFinalBubbleCount": null,
+          "desktopWorkStatus": null,
+          "canContinue": false,
+          "previewStatus": null,
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "reopened": {
+          "sameToolBoxProcess": true,
+          "workState": "review_required",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_c2df1ea68ca34b6e9ab03e15182a2011_g1",
+            "admission_id": "request_c2df1ea68ca34b6e9ab03e15182a2011",
+            "principal": "desktop:deviceB",
+            "state": "unknown"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 结果需要核对",
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "reopenedAfterBackendRestart": {
+          "sameToolBoxProcess": false,
+          "workState": "review_required",
+          "nativeTerminal": false,
+          "nativeRequest": {
+            "id": "reply_request_c2df1ea68ca34b6e9ab03e15182a2011_g1",
+            "admission_id": "request_c2df1ea68ca34b6e9ab03e15182a2011",
+            "principal": "desktop:deviceB",
+            "state": "unknown"
+          },
+          "journalSeq": null,
+          "generationState": "running",
+          "journalMatches": 0,
+          "historyMatches": 0,
+          "journalFinishReasons": [],
+          "historyFinishReasons": [],
+          "chatFinalShown": false,
+          "chatFinalBubbleCount": 0,
+          "desktopWorkStatus": "原任务需要核对 · 执行端：本端",
+          "canContinue": false,
+          "previewStatus": "Synthetic shared · 第 2 代 · 结果需要核对",
+          "nativeAssistantTextPresent": false,
+          "nativeCompletion": null,
+          "toolCount": 1
+        },
+        "explicitWorkRefreshReturned": true
+      }
+    },
+    {
+      "baseline": {
+        "case": "publication-ack",
+        "mode": "tool-final-publication-ack",
+        "result": "PASS",
+        "electron": "44.9.3",
+        "chromiumSandbox": true,
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+        "loadedBackendCount": 29,
+        "providerRequests": [
+          {
+            "requestId": "reply_request_0b5843e1d3a44063b6cd44148ca036e5",
+            "phase": "initial",
+            "stream": false
+          },
+          {
+            "requestId": "compaction_1795261545673_0tdxzl34jr",
+            "phase": "summary",
+            "stream": true
+          },
+          {
+            "requestId": "reply_request_0b5843e1d3a44063b6cd44148ca036e5_g1",
+            "phase": "resumed",
+            "stream": false
+          }
+        ],
+        "workId": "request_0b5843e1d3a44063b6cd44148ca036e5",
+        "replyId": "reply_request_0b5843e1d3a44063b6cd44148ca036e5_g1",
+        "generations": [
+          {
+            "generation": 0,
+            "executor": "desktop:deviceA",
+            "request_id": "reply_request_0b5843e1d3a44063b6cd44148ca036e5",
+            "state": "paused"
+          },
+          {
+            "generation": 1,
+            "executor": "desktop:deviceB",
+            "request_id": "reply_request_0b5843e1d3a44063b6cd44148ca036e5_g1",
+            "state": "completed"
+          }
+        ],
+        "workState": "completed",
+        "nativeTerminal": true,
+        "profileDigest": "5112f87a02cec86c29f96296806b76701c45f2670c787913bfbea7a59a11d1ef",
+        "sameProfileReopened": true,
+        "desktopExit": {
+          "code": 0,
+          "signal": null
+        },
+        "ack": {
+          "status": 200,
+          "dropped": true,
+          "seq": 6,
+          "opId": "turn_2958632bb28d5284267fbfd91922b2d974c7cbb8",
+          "postAttempts": 1,
+          "serverReplayed": false
+        },
+        "originalInvocation": "a9917576-55d7-4ef4-8aeb-cc9b2bc0d260",
+        "historyMatchesBeforeQuit": 0,
+        "historyMatchesAfterReopen": 1,
+        "journalMatchesAfterReopen": 1,
+        "historyFinishReasons": [
+          null
+        ],
+        "chatFinalBubbleCount": 1,
+        "toolCount": 1
+      },
+      "candidate": {
+        "case": "publication-ack",
+        "mode": "tool-final-publication-ack",
+        "result": "PASS",
+        "electron": "44.9.3",
+        "chromiumSandbox": true,
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+        "loadedBackendCount": 29,
+        "providerRequests": [
+          {
+            "requestId": "reply_request_fb65263e4ef94535b06fd44a01724fb4",
+            "phase": "initial",
+            "stream": false
+          },
+          {
+            "requestId": "compaction_1795261543727_1ejq4xqqc9",
+            "phase": "summary",
+            "stream": true
+          },
+          {
+            "requestId": "reply_request_fb65263e4ef94535b06fd44a01724fb4_g1",
+            "phase": "resumed",
+            "stream": false
+          }
+        ],
+        "workId": "request_fb65263e4ef94535b06fd44a01724fb4",
+        "replyId": "reply_request_fb65263e4ef94535b06fd44a01724fb4_g1",
+        "generations": [
+          {
+            "generation": 0,
+            "executor": "desktop:deviceA",
+            "request_id": "reply_request_fb65263e4ef94535b06fd44a01724fb4",
+            "state": "paused"
+          },
+          {
+            "generation": 1,
+            "executor": "desktop:deviceB",
+            "request_id": "reply_request_fb65263e4ef94535b06fd44a01724fb4_g1",
+            "state": "completed"
+          }
+        ],
+        "workState": "completed",
+        "nativeTerminal": true,
+        "profileDigest": "7436e1d760107a9e886212deb88fcec92d3f25fac18fc6b0c9f1c09cf59b095c",
+        "sameProfileReopened": true,
+        "desktopExit": {
+          "code": 0,
+          "signal": null
+        },
+        "ack": {
+          "status": 200,
+          "dropped": true,
+          "seq": 6,
+          "opId": "turn_f2032a661f2ac9b05729bcbd5219cb12f029eb58",
+          "postAttempts": 1,
+          "serverReplayed": true
+        },
+        "originalInvocation": "f7ef4271-c008-4dd3-9d02-9d0ec732568b",
+        "historyMatchesBeforeQuit": 0,
+        "historyMatchesAfterReopen": 1,
+        "journalMatchesAfterReopen": 1,
+        "historyFinishReasons": [
+          "completed"
+        ],
+        "chatFinalBubbleCount": 1,
+        "toolCount": 1
+      }
+    }
+  ],
+  "actualLoadedSources": {
+    "baseline": {
+      "backend": [
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+          "sha256": "6dd80aeceb8c1d5202fe1151fed4e74ae4d05ea7adc3ebc02d3687426f5ac7cd"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+          "sha256": "78b53bbb5016510fc3a4827c32df1c3e9b8a57fd218d7d6ae7419ae35c601b57"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+          "sha256": "e0cdd6e14834b6b31dbec30afb9b593b4c55b4405d53503c430d0bcfe0aabd07"
+        },
+        {
+          "file": "apps/server/modules/chatCompletionHandler.js",
+          "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+        },
+        {
+          "file": "apps/server/modules/handlers/nonStreamHandler.js",
+          "sha256": "2f27f829f7f269d66b74a7a60fdae5cab17ae42e3c0769fa758d83a398e5dc4c"
+        },
+        {
+          "file": "apps/server/modules/handlers/streamHandler.js",
+          "sha256": "c32debeee780e1a9528c8025cdb77c00d3e6b5f07464471abdc9e1a14fcef712"
+        },
+        {
+          "file": "apps/server/modules/requestExecutionContext.js",
+          "sha256": "bd565d29533bf71863a304dfd88d134f574921e518d7be6a1eb5d0e27ae5c94f"
+        },
+        {
+          "file": "apps/server/server.js",
+          "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+        }
+      ],
+      "desktop": {
+        "main": [
+          {
+            "file": "apps/desktop/modules/ipc/chatHandlers.js",
+            "sha256": "e359a238ce393f22bae5023574139e947257ac29e9ecf3dcfa7b5a1127f48958"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+            "sha256": "9f0138b9fcede09bdd3e03002d8db2075fc8ed7aec8dc6c6806a33dbbe5b9dfb"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "d8bff47764d408b846ffc8267b750c1712171741152b0755f05528f21cac7050"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+            "sha256": "4db5d3730a6da019ae14f7f8c07cdd41cf3e6eaa4a70f2bd20ccb3b9b8492d15"
+          }
+        ],
+        "renderer": [
+          {
+            "file": "apps/desktop/modules/chatManager.js",
+            "bytes": 176549,
+            "sha256": "72dd5ef25ff38115276545838d8c9159fb8ce569a9bfb158a51eb6bd327cfed8"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+            "bytes": 6970,
+            "sha256": "f7379f242fb60012ca172c204c06666db1a300fd7130692e4d12ba3bef3a8936"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+            "bytes": 10994,
+            "sha256": "692768db496c93e73f8444bd66c35be537958082faa07ba8d40252b130dba22d"
+          }
+        ]
+      }
+    },
+    "candidate": {
+      "backend": [
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+          "sha256": "5458a2605dc66dc1a1958f141e6ee32eacb99fa7c73de7ead54199426fbbda27"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+          "sha256": "fd8c6cb93e51183ce65b7a79a34e7c32d68c6813a69e6aaa355c9d0a059c945d"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+          "sha256": "8a7084be74e91409401e8753afc17e46b763413f58ada3ef827be1b33c9eb345"
+        },
+        {
+          "file": "apps/server/modules/chatCompletionHandler.js",
+          "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+        },
+        {
+          "file": "apps/server/modules/handlers/nonStreamHandler.js",
+          "sha256": "7bf02ef53d45075ca0426c3511513b090f0a8da4a9d3e13daa0a8878e0289154"
+        },
+        {
+          "file": "apps/server/modules/handlers/streamHandler.js",
+          "sha256": "5930c392fcb42d3bb447ab804b0e811358cd6f3b3496b01c5e7d22cf2f0c2556"
+        },
+        {
+          "file": "apps/server/modules/requestExecutionContext.js",
+          "sha256": "79fba138518926edd6c20de95d016689ebb9fb2f8a3fc0614d9c60b8b44dfbdb"
+        },
+        {
+          "file": "apps/server/server.js",
+          "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+        }
+      ],
+      "desktop": {
+        "main": [
+          {
+            "file": "apps/desktop/modules/ipc/chatHandlers.js",
+            "sha256": "e359a238ce393f22bae5023574139e947257ac29e9ecf3dcfa7b5a1127f48958"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+            "sha256": "9f0138b9fcede09bdd3e03002d8db2075fc8ed7aec8dc6c6806a33dbbe5b9dfb"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "d8bff47764d408b846ffc8267b750c1712171741152b0755f05528f21cac7050"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+            "sha256": "4db5d3730a6da019ae14f7f8c07cdd41cf3e6eaa4a70f2bd20ccb3b9b8492d15"
+          }
+        ],
+        "renderer": [
+          {
+            "file": "apps/desktop/modules/chatManager.js",
+            "bytes": 176549,
+            "sha256": "72dd5ef25ff38115276545838d8c9159fb8ce569a9bfb158a51eb6bd327cfed8"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+            "bytes": 6970,
+            "sha256": "f7379f242fb60012ca172c204c06666db1a300fd7130692e4d12ba3bef3a8936"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+            "bytes": 10994,
+            "sha256": "692768db496c93e73f8444bd66c35be537958082faa07ba8d40252b130dba22d"
+          }
+        ]
+      }
+    }
+  }
+}

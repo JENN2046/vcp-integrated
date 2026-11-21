@@ -17,12 +17,13 @@ class SharedNative {
    body_hash TEXT NOT NULL,state TEXT NOT NULL,ordinal INTEGER NOT NULL,
    UNIQUE(admission_id,ordinal));`);
   this.db.exec('CREATE INDEX IF NOT EXISTS idx_shared_local_context ON shared_local_bindings(kind,local_id,local_parent)');
-  this.db.prepare("UPDATE shared_native_requests SET state='unknown' WHERE state='dispatched'").run();
   shared.native=this;
   if(!shared.events||shared.events.closed)shared.events=new (require('./sharedEvents').SharedEvents)(shared,engine);
   this.approvalObserver=event=>{try{const row=this.db.prepare('SELECT admission_id FROM shared_native_requests WHERE id=?').get(event.requestId);if(row)this.engine.emitEvent?.(row.admission_id,'approval',{state:event.waiting?'waiting_approval':'running',nativeRequestId:event.requestId});}catch{/* Observers do not own tool or model execution. */}};
   require('../../../modules/requestExecutionContext').events.on('approval',this.approvalObserver);
   this.taskControls=new (require('./sharedTaskControls').SharedTaskControls)(shared);this.taskRequests=new (require('./sharedTaskRequests').SharedTaskRequests)(this);shared.steering.onInput=(workId)=>{require('../../../modules/requestExecutionContext').interruptWork(workId);return this.taskControls.request(workId);};
+  const retryFinal=this.recoverFinalReplies();
+  this.db.prepare("UPDATE shared_native_requests SET state='unknown' WHERE state='dispatched' AND id NOT IN (SELECT value FROM json_each(?))").run(JSON.stringify(retryFinal));
   if(engine?.get&&engine.configs){
    this.verifyRecoveredToolBoundaries();
    require('../mobile/groupTurn').recover(engine);
@@ -35,6 +36,40 @@ class SharedNative {
     WHERE a.state='dispatched' AND a.native_terminal=0 AND EXISTS (
      SELECT 1 FROM mobile_native_tasks t WHERE t.execution_id=a.id AND t.state IN ('completed','failed','stopped','cancelled'))`).all();
    for(const row of pendingReplies)this.checkTerminal(row.id);
+  }
+ }
+ recoverFinalReplies(){
+  const candidates=this.db.prepare(`SELECT a.id,g.request_id FROM shared_admissions a
+   JOIN shared_work_generations g ON g.work_id=a.id AND g.generation=1 AND g.state='running'
+   JOIN shared_work_controls c ON c.work_id=g.work_id AND c.generation=g.generation
+   JOIN shared_native_requests r ON r.id=g.request_id AND r.admission_id=a.id
+   WHERE a.state='dispatched' AND r.state IN ('dispatched','model_terminal')
+    AND json_extract(a.user_op,'$.sharedTurn.controlMode')=?`).all(controlled.TOOLS_MODE);
+  const retry=[];
+  for(const row of candidates){
+   const result=this.tryFinalReply(row.id,row.request_id);
+   if(result===null)retry.push(row.request_id);
+   else if(!result)this.requireFinalReview(row.id);
+  }
+  return retry;
+ }
+ requireFinalReview(workId){
+  return this.db.prepare("UPDATE shared_admissions SET state='review_required',native_terminal=0 WHERE id=? AND state='dispatched'").run(workId).changes;
+ }
+ tryFinalReply(workId,requestId){
+  try{
+   if(this.db.prepare(`SELECT 1 FROM shared_admissions a JOIN shared_work_generations g ON g.work_id=a.id
+    WHERE a.id=? AND a.state='completed' AND a.reply_seq IS NOT NULL
+     AND g.generation=1 AND g.request_id=? AND g.state='completed'`).get(workId,requestId))return true;
+   const data=this.continuations.read(requestId);
+   if(!data?.completion)return false;
+   return this.shared.steering.publishNativeFinal(workId,requestId,data);
+  }catch(error){
+   console.warn('[NativeSync] SAFE_TOOL_FINAL_REPLY_FAILED',error.code||'UNEXPECTED');
+   // Keep the existing dispatch fence through a storage outage. The same
+   // proof may settle on a late submission or the next startup.
+   if(error.code?.startsWith('ERR_SQLITE_')||['EIO','ENOSPC','EDQUOT','EROFS','EACCES','EPERM','EAGAIN','EBUSY','EMFILE','ENFILE'].includes(error.code))return null;
+   return false;
   }
  }
  verifyRecoveredToolBoundaries(){
@@ -210,6 +245,16 @@ class SharedNative {
    onTaskObserved:event=>{const value=base.onTaskObserved(event);hint(event,'observed');this.checkTerminal(admission.id);return value;}
   };
   let ended=false;
+  const ownsFinalReply=safeToolWork&&generation?.generation===1;
+  const finalReply=ownsFinalReply?value=>{
+   if(ended||this.closed)throw fail('SHARED_REQUEST_FENCED');
+   if(value?.finishReason!=='stop'||typeof value.content!=='string'||!value.content.trim())throw fail('NATIVE_COMPLETION_INVALID');
+   const timestamp=this.continuations.read(row.id)?.completion?.timestamp??Date.now();
+   const record={version:1,workId:admission.id,generation:1,requestId:row.id,
+    executor:actor.principal,content:value.content,finishReason:value.finishReason,timestamp};
+   this.continuations.completion(row.id,{...record,digest:sha256(stable(record))});
+   this.tryFinalReply(admission.id,row.id);
+  }:undefined;
   if(generation)this.db.prepare("UPDATE shared_work_generations SET state='preprocessing' WHERE work_id=? AND generation=?").run(admission.id,generation.generation);
   this.phase(admission.id,row.id,'native_entered');this.engine.emitEvent?.(admission.id,'state',{state:'dispatched'});
   let previewStopped=false;
@@ -229,6 +274,15 @@ class SharedNative {
   const finish=success=>{
    if(ended||this.closed)return;ended=true;
    this.phase(admission.id,row.id,'native_settled');
+   if(ownsFinalReply){
+    if(this.tryFinalReply(admission.id,row.id)!==false)return;
+    const held=this.shared.atomic(()=>{
+     this.db.prepare("UPDATE shared_native_requests SET state='unknown' WHERE id=? AND state='dispatched'").run(row.id);
+     return this.requireFinalReview(admission.id);
+    });
+    if(held)this.engine.emitEvent?.(admission.id,'state',{state:'review_required'});
+    return;
+   }
    if(pausedAtFence){
     try{
      this.shared.atomic(()=>{
@@ -249,14 +303,14 @@ class SharedNative {
    if(!success&&!steered){this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE id=? AND state='dispatched'").run(admission.id);this.engine.emitEvent?.(admission.id,'state',{state:'review_required'});}
    else this.checkTerminal(admission.id);
   };
-  return {textOnly,safeTools,observeAssistantText,sponsorAuthority:{actor,admissionId:admission.id,spaceId:admission.space_id,routeHash:JSON.parse(admission.user_op||'{}').sponsorRouteHash},phase:name=>this.phase(admission.id,row.id,name),steeringEnabled,workId:admission.id,generation:generation?.generation||0,fence,applied,continuation:()=>continuedBody,checkpoint:steeringEnabled?{completion:value=>this.continuations.completion(row.id,value),assistant:content=>this.continuations.assistant(row.id,content),result:(invocation,value)=>this.continuations.result(row.id,invocation,value)}:null,bridge:hooks,finish,
+  return {textOnly,safeTools,observeAssistantText,sponsorAuthority:{actor,admissionId:admission.id,spaceId:admission.space_id,routeHash:JSON.parse(admission.user_op||'{}').sponsorRouteHash},phase:name=>this.phase(admission.id,row.id,name),steeringEnabled,workId:admission.id,generation:generation?.generation||0,fence,applied,continuation:()=>continuedBody,checkpoint:steeringEnabled?{finalReply,completion:value=>this.continuations.completion(row.id,value),assistant:content=>this.continuations.assistant(row.id,content),result:(invocation,value)=>this.continuations.result(row.id,invocation,value)}:null,bridge:hooks,finish,
    settleToolPause:()=>{
     if(!pausedAtFence)return false;
     finish(false);
     return this.shared.steering.generation(admission.id,generation.generation)?.state==='paused';
    }};
  }
- phase(workId,requestId,stage){const key=requestId+':'+stage;if(this.seenPhases.has(key))return;if(!['native_prepared','native_entered','vcp_preprocessing','provider_attempt','first_model_body','native_settled','final_persisted'].includes(stage))throw fail('INVALID_EXECUTION_PHASE');this.db.prepare('INSERT OR IGNORE INTO shared_request_phases VALUES(?,?,?,?)').run(workId,requestId,stage,Date.now());this.seenPhases.add(key);if(this.seenPhases.size>50000)this.seenPhases.delete(this.seenPhases.values().next().value);}
+ phase(workId,requestId,stage){const key=requestId+':'+stage;if(this.seenPhases.has(key))return;if(!['native_prepared','native_entered','vcp_preprocessing','provider_attempt','first_model_body','native_settled','final_persisted'].includes(stage))throw fail('INVALID_EXECUTION_PHASE');this.db.prepare('INSERT OR IGNORE INTO shared_request_phases VALUES(?,?,?,?)').run(workId,requestId,stage,Date.now());if(this.db.isTransaction)return;this.seenPhases.add(key);if(this.seenPhases.size>50000)this.seenPhases.delete(this.seenPhases.values().next().value);}
  checkTerminal(admissionId,{advanceGroup=true}={}){
   if(this.closed)return;
   const admission=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(admissionId);

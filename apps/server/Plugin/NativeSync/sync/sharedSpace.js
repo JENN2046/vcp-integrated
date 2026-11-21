@@ -64,8 +64,7 @@ class SharedSpace {
   const publishing=tables.has('mobile_executions')?` AND NOT (EXISTS (SELECT 1 FROM mobile_executions e
    WHERE e.id=shared_admissions.id AND e.state='publishing' AND e.pending_operation IS NOT NULL)
    AND (native_terminal=1${recoverableTask}))`:'';
-  // A committed tool pause remains transferable across restarts. Only an
-  // untouched continuation may survive; a dispatched continuation requires review.
+  // A committed tool pause remains transferable across restarts.
   const safePause=tables.has('shared_native_requests')?` AND NOT (
    coalesce(json_extract(user_op,'$.sharedTurn.controlMode'),'')='safe-tools-v1' AND EXISTS (
     SELECT 1 FROM shared_work_generations g JOIN shared_native_requests r ON r.id=g.request_id
@@ -77,7 +76,17 @@ class SharedSpace {
        SELECT 1 FROM shared_work_generations next WHERE next.work_id=g.work_id AND next.generation=1 AND next.state='prepared')))
       AND NOT EXISTS (SELECT 1 FROM shared_native_requests n WHERE n.admission_id=g.work_id AND n.state IN ('dispatched','unknown'))
    ))`:'';
-  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing+safePause).run();
+  // Leave this narrow dispatch shape to SharedNative. Only its native archive
+  // and the tool ledger can distinguish a durable final reply from a lost one.
+  const nativeFinal=tables.has('shared_native_requests')?` AND NOT (
+   coalesce(json_extract(user_op,'$.sharedTurn.controlMode'),'')='safe-tools-v1' AND EXISTS (
+    SELECT 1 FROM shared_work_generations g
+     JOIN shared_work_controls c ON c.work_id=g.work_id AND c.generation=g.generation
+     JOIN shared_native_requests r ON r.id=g.request_id AND r.admission_id=g.work_id
+    WHERE g.work_id=shared_admissions.id AND g.generation=1 AND g.state='running'
+      AND r.state IN ('dispatched','model_terminal')
+   ))`:'';
+  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing+safePause+nativeFinal).run();
  }
  atomic(fn){
   const own=!this.db.isTransaction;

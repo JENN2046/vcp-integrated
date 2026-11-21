@@ -335,6 +335,7 @@ module.exports = {
         const row=boundary.taskControls.row(workId,identity),base=boundary.engine.nativeTasks.hooks(workId,row.step_id);
         return Object.freeze({identity,control:boundary.taskRequests.binding(workId,identity),observe:result=>base.onTaskObserved({...result,...identity})});
     },
+    finalReplyPublisher: () => local.getStore()?.checkpoint?.finalReply,
     checkpointCompletion:value=>local.getStore()?.checkpoint?.completion?.(value),
     checkpointAssistant: content => local.getStore()?.checkpoint?.assistant(content),
     markModelTerminal: () => { const scope=local.getStore();if(scope)scope.modelTerminalKnown=true; },

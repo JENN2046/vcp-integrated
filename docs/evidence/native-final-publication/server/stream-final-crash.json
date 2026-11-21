@@ -1,0 +1,322 @@
+{
+  "baseRevision": "5ed51ba784bf029fc0a16896da1d57451a36cb7c",
+  "node": "v24.22.1",
+  "mode": "--stream-final-crash",
+  "originalResult": {
+    "transportError": "UND_ERR_SOCKET"
+  },
+  "before": {
+    "admission": {
+      "id": "request_c8f30ecd378b437c9bf45855559d2de1",
+      "state": "dispatched",
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "request": {
+      "id": "reply_request_c8f30ecd378b437c9bf45855559d2de1_g1",
+      "principal": "desktop:deviceB",
+      "state": "dispatched"
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_c8f30ecd378b437c9bf45855559d2de1",
+        "state": "paused"
+      },
+      {
+        "generation": 1,
+        "executor": "desktop:deviceB",
+        "request_id": "reply_request_c8f30ecd378b437c9bf45855559d2de1_g1",
+        "state": "running"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 2,
+        "msg_id": "c2d370c5-2bea-45af-84d6-0dbd7bf07b39",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "0f7ff78ef8ad44757f9bc90d19d6dd82077cc8ea6ca2c3eaddd6b2e658c59719"
+      },
+      {
+        "seq": 3,
+        "msg_id": "reply_request_c8f30ecd378b437c9bf45855559d2de1",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "9ce73b0785efdbc8e4a3a5e4b0226fa92f535b7863cd749f67bcdd21e0e8e4ff"
+      },
+      {
+        "seq": 4,
+        "msg_id": "checkpoint_compact_044342f22206880327670488a95b54b340ae3158",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "5a625978033e74e43144f4e4386fbcd3e9646e2ef754ee68ce18ba2a3636ca4f"
+      }
+    ],
+    "replies": [],
+    "invocations": [
+      {
+        "invocation_id": "f9d98b41-7de3-4d07-9963-bb2cb9407bd8",
+        "native_request_id": "reply_request_c8f30ecd378b437c9bf45855559d2de1",
+        "record_id": "tcr-1795261577110-58eab2dc-0823-4e40-b0ab-feaa419fd091",
+        "plugin_name": "OrdinaryToolCounter",
+        "state": "returned"
+      }
+    ],
+    "completion": {
+      "version": 1,
+      "workId": "request_c8f30ecd378b437c9bf45855559d2de1",
+      "generation": 1,
+      "requestId": "reply_request_c8f30ecd378b437c9bf45855559d2de1_g1",
+      "executor": "desktop:deviceB",
+      "content": "Native final response from loopback provider.",
+      "finishReason": "stop",
+      "timestamp": 1795261577256,
+      "digest": "95e41190103b290ff93bd0eba4cbf5ecf374eaf63d0dd92a9f539ab64906798c"
+    },
+    "counts": {
+      "provider": 3,
+      "tool": 1
+    },
+    "providerCalls": [
+      {
+        "protocolStep": "nonstream-two-tools",
+        "id": "reply_request_c09811940e024faf8fc779cc0162bdff",
+        "stream": false
+      },
+      {
+        "protocolStep": "stream-one-tool",
+        "id": "reply_request_c8f30ecd378b437c9bf45855559d2de1",
+        "stream": true
+      },
+      {
+        "protocolStep": "B-continuation",
+        "id": "reply_request_c8f30ecd378b437c9bf45855559d2de1_g1",
+        "stream": true
+      }
+    ],
+    "phases": [
+      "native_prepared",
+      "native_entered",
+      "provider_attempt"
+    ]
+  },
+  "crash": {
+    "code": null,
+    "signal": "SIGKILL",
+    "crashedPid": 2963930,
+    "restartedPid": 2963989
+  },
+  "after": {
+    "admission": {
+      "id": "request_c8f30ecd378b437c9bf45855559d2de1",
+      "state": "completed",
+      "native_terminal": 1,
+      "reply_seq": 5
+    },
+    "request": {
+      "id": "reply_request_c8f30ecd378b437c9bf45855559d2de1_g1",
+      "principal": "desktop:deviceB",
+      "state": "model_terminal"
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_c8f30ecd378b437c9bf45855559d2de1",
+        "state": "paused"
+      },
+      {
+        "generation": 1,
+        "executor": "desktop:deviceB",
+        "request_id": "reply_request_c8f30ecd378b437c9bf45855559d2de1_g1",
+        "state": "completed"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 2,
+        "msg_id": "c2d370c5-2bea-45af-84d6-0dbd7bf07b39",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "0f7ff78ef8ad44757f9bc90d19d6dd82077cc8ea6ca2c3eaddd6b2e658c59719"
+      },
+      {
+        "seq": 3,
+        "msg_id": "reply_request_c8f30ecd378b437c9bf45855559d2de1",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "9ce73b0785efdbc8e4a3a5e4b0226fa92f535b7863cd749f67bcdd21e0e8e4ff"
+      },
+      {
+        "seq": 4,
+        "msg_id": "checkpoint_compact_044342f22206880327670488a95b54b340ae3158",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "hash": "5a625978033e74e43144f4e4386fbcd3e9646e2ef754ee68ce18ba2a3636ca4f"
+      },
+      {
+        "seq": 5,
+        "msg_id": "reply_request_c8f30ecd378b437c9bf45855559d2de1_g1",
+        "device_id": "desktop:deviceB",
+        "action": "upsert",
+        "hash": "1f8000fa8ee3cfba2e0473b66013b4fc21b4352a904c83d6f1bd69146acc6a6a"
+      }
+    ],
+    "replies": [
+      {
+        "seq": 5,
+        "executor": "desktop:deviceB",
+        "message": {
+          "id": "reply_request_c8f30ecd378b437c9bf45855559d2de1_g1",
+          "role": "assistant",
+          "agentId": "shared_e14cf2f53a9e49d9864a66f218aca9c5",
+          "topicId": "shared_aa40b7b867404b65bb8491f925efc121",
+          "name": "Synthetic interrupted single",
+          "content": "Native final response from loopback provider.",
+          "timestamp": 1795261577256,
+          "finishReason": "completed",
+          "isThinking": false,
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "reply_request_c8f30ecd378b437c9bf45855559d2de1_g1",
+            "executionId": "request_c8f30ecd378b437c9bf45855559d2de1",
+            "dependsOnMessageIds": [
+              "c2d370c5-2bea-45af-84d6-0dbd7bf07b39",
+              "checkpoint_compact_044342f22206880327670488a95b54b340ae3158"
+            ]
+          },
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "4ec2ef26c46473d6311cee4bb64ad53f0d77b92c3d9b91e152ae82a62c060550",
+            "fields": {
+              "isThinking": false,
+              "continuity": {
+                "version": 1,
+                "known": true,
+                "requestId": "reply_request_c8f30ecd378b437c9bf45855559d2de1_g1",
+                "executionId": "request_c8f30ecd378b437c9bf45855559d2de1",
+                "dependsOnMessageIds": [
+                  "c2d370c5-2bea-45af-84d6-0dbd7bf07b39",
+                  "checkpoint_compact_044342f22206880327670488a95b54b340ae3158"
+                ]
+              }
+            }
+          }
+        }
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "f9d98b41-7de3-4d07-9963-bb2cb9407bd8",
+        "native_request_id": "reply_request_c8f30ecd378b437c9bf45855559d2de1",
+        "record_id": "tcr-1795261577110-58eab2dc-0823-4e40-b0ab-feaa419fd091",
+        "plugin_name": "OrdinaryToolCounter",
+        "state": "returned"
+      }
+    ],
+    "completion": {
+      "version": 1,
+      "workId": "request_c8f30ecd378b437c9bf45855559d2de1",
+      "generation": 1,
+      "requestId": "reply_request_c8f30ecd378b437c9bf45855559d2de1_g1",
+      "executor": "desktop:deviceB",
+      "content": "Native final response from loopback provider.",
+      "finishReason": "stop",
+      "timestamp": 1795261577256,
+      "digest": "95e41190103b290ff93bd0eba4cbf5ecf374eaf63d0dd92a9f539ab64906798c"
+    },
+    "counts": {
+      "provider": 3,
+      "tool": 1
+    },
+    "providerCalls": [
+      {
+        "protocolStep": "nonstream-two-tools",
+        "id": "reply_request_c09811940e024faf8fc779cc0162bdff",
+        "stream": false
+      },
+      {
+        "protocolStep": "stream-one-tool",
+        "id": "reply_request_c8f30ecd378b437c9bf45855559d2de1",
+        "stream": true
+      },
+      {
+        "protocolStep": "B-continuation",
+        "id": "reply_request_c8f30ecd378b437c9bf45855559d2de1_g1",
+        "stream": true
+      }
+    ],
+    "phases": [
+      "native_prepared",
+      "native_entered",
+      "provider_attempt",
+      "native_settled",
+      "final_persisted"
+    ]
+  },
+  "late": {
+    "status": 200,
+    "seq": 5,
+    "replayed": false
+  },
+  "lateTimestamp": 1795261578256,
+  "repeat": {
+    "status": 200,
+    "seq": 5,
+    "replayed": true
+  },
+  "repeatTimestamp": 1795261579256,
+  "conflict": {
+    "status": 409,
+    "code": "SHARED_REPLY_INTENT_CHANGED"
+  },
+  "wrongExecutor": {
+    "status": 409,
+    "code": "INVALID_SHARED_REPLY"
+  },
+  "replay": {
+    "status": 409,
+    "code": "SHARED_GENERATION_FENCED"
+  },
+  "secondCrash": {
+    "code": null,
+    "signal": "SIGKILL"
+  },
+  "loadedSources": [
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "79fba138518926edd6c20de95d016689ebb9fb2f8a3fc0614d9c60b8b44dfbdb"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "5458a2605dc66dc1a1958f141e6ee32eacb99fa7c73de7ead54199426fbbda27"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "8a7084be74e91409401e8753afc17e46b763413f58ada3ef827be1b33c9eb345"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "fd8c6cb93e51183ce65b7a79a34e7c32d68c6813a69e6aaa355c9d0a059c945d"
+    },
+    {
+      "file": "apps/server/modules/nativeContinuationStore.cjs",
+      "sha256": "f6774df34bdcc60346f4ed49f5dccaa2e0da5645b5b60ea29f364f89a5090ee6"
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "5930c392fcb42d3bb447ab804b0e811358cd6f3b3496b01c5e7d22cf2f0c2556"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "7bf02ef53d45075ca0426c3511513b090f0a8da4a9d3e13daa0a8878e0289154"
+    }
+  ]
+}
