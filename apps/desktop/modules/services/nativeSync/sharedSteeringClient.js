@@ -1,6 +1,7 @@
 'use strict';
-const {stable,sha256,fail}=require('./protocol');
+const {stable,sha256,fail,messageKey,messageHash}=require('./protocol');
 const endpoint='/api/v1/sync/shared/';
+const finalHistoryCapability='shared-controlled-tools-history-v1';
 const terminal=new Set(['completed','abandoned']);
 class SharedSteeringClient{
  constructor(owner){this.owner=owner;this.runtime=owner.runtime;this.sessions=new Set();this.notified=new Map();}
@@ -8,17 +9,35 @@ class SharedSteeringClient{
  steps(record){if(!record.generations)record.generations=[{generation:0,requestId:'reply_'+record.accepted.id,consumedInputSeq:0,config:record.config,nativeBody:record.nativeBody||null}];return record.generations;}
  find(requestId){for(const record of Object.values(this.owner.state.requests)){if(!record.steeringV1||!record.accepted||record.isSteeringInput)continue;const step=this.steps(record).find(s=>s.requestId===requestId);if(step)return {record,step};}return null;}
  policy(requestId){const found=this.find(requestId);return found?.step.config.rules[0]?.config.executionPolicy||null;}
+ usesFinalHistory(record,step){
+  return record.accepted?.turn?.controlMode==='safe-tools-v1'&&step.generation===1&&
+   (step.finalHistoryReadback===true||this.runtime.capabilities.features?.includes(finalHistoryCapability));
+ }
+ pendingFinalHistory(record,step){
+  return !step.replyAccepted&&!step.finalHistoryReview&&
+   Boolean(step.finalHistoryReadback&&step.nativeBody||step.replyIntent&&this.usesFinalHistory(record,step));
+ }
+ hasPendingFinalHistory(record){return record.generations?.some(step=>this.pendingFinalHistory(record,step))===true;}
+ observeRequest(record,request){
+  record.accepted=request;record.observedAt=Date.now();
+  if(request.steering)record.control=request.steering;
+  if(request.state==='abandoned'||request.state==='review_required'||
+   request.state==='completed'&&!this.hasPendingFinalHistory(record)&&!record.generations?.some(step=>step.finalHistoryReview))
+   record.phase=request.state;
+ }
  async active(d,observedWorkId){
   const mapping=this.owner.mapping(d),value=await this.runtime.send(endpoint+'active?'+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,sharedId:mapping.sharedId}));
   if(!value.request?.turn?.steeringCapable)return null;
   if(observedWorkId&&observedWorkId!==value.request.id)throw fail('STEERING_TARGET_CHANGED');
   let record=Object.values(this.owner.state.requests).find(v=>!v.isSteeringInput&&v.accepted?.id===value.request.id);
   if(!record){record={steeringV1:Boolean(value.request.turn?.steeringCapable),remote:true,descriptor:{...d},sharedId:mapping.sharedId,phase:value.request.state,accepted:value.request,body:{requestId:value.request.requestId}};this.owner.state.requests['remote:'+value.request.id]=record;}
-  else{record.accepted=value.request;if(terminal.has(value.request.state)||value.request.state==='review_required')record.phase=value.request.state;}
-  if(value.request.steering)record.control=value.request.steering;
-  record.observedAt=Date.now();await this.owner.save();return record;
+  this.observeRequest(record,value.request);await this.owner.save();return record;
  }
- async refresh(record){const value=await this.runtime.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,workId:record.accepted.id}));if(value.request){record.accepted=value.request;record.observedAt=Date.now();if(terminal.has(value.request.state)||value.request.state==='review_required')record.phase=value.request.state;if(value.request.steering)record.control=value.request.steering;await this.owner.save();}return value.request;}
+ async refresh(record){
+  const {request}=await this.runtime.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,workId:record.accepted.id}));
+  if(request){this.observeRequest(record,request);await this.owner.save();}
+  return request;
+ }
  query(record, extra={}){return this.runtime.send(endpoint+'steering?'+new URLSearchParams({...extra,sharedSpaceId:this.runtime.connection.sharedSpaceId,workId:record.accepted.id}));}
  async submit(record,d,message,{deferReady=false,modelSaveRef=null}={}){
   const r=this.runtime,o=this.owner,input=o.state.requests[message.id]||{phase:'local_pending',descriptor:{...d},localMessage:JSON.parse(JSON.stringify(message)),body:{requestId:message.id}};
@@ -53,6 +72,7 @@ class SharedSteeringClient{
   if(!known||terminal.has(known.state)||prior&&prior.state!=='prepared')throw fail('SHARED_RESULT_REQUIRES_REVIEW');
   if(body.model!==step.config.owner.config.model)throw fail('SHARED_NATIVE_CONFIG_CHANGED');
   if(!step.nativeBody){step.nativeBody=JSON.parse(JSON.stringify(body));if(step.generation===0)record.nativeBody=step.nativeBody;await this.owner.save();}
+  if(this.usesFinalHistory(record,step)&&!step.finalHistoryReadback){step.finalHistoryReadback=true;await this.owner.save();}
   await this.runtime.send(endpoint+'native-request',{body:{sharedSpaceId:this.runtime.connection.sharedSpaceId,admissionId:record.accepted.id,requestId:step.requestId,bodyHash:sha256(stable(step.nativeBody)),generation:step.generation,consumedInputSeq:step.consumedInputSeq}});
   if(this.runtime.closed)throw fail('APPLICATION_SHUTTING_DOWN');step.phase='dispatching';step.timings||={};step.timings.native_prepared=Date.now();record.phase='dispatching';this.sessions.add(record.accepted.id);await this.owner.save();
   const readPausedMessage = async () => {
@@ -91,22 +111,89 @@ class SharedSteeringClient{
    await o.save();let result;try{result=await r.send(endpoint+'steer-prepare',{body:intent});}catch(error){if(['WORK_SAFE_BOUNDARY_PENDING','WORK_STEERING_COALESCING','SHARED_CONTEXT_CHANGED','STEERING_REVISION_CHANGED','STEERING_GENERATION_CHANGED','MODEL_SAVE_NOT_CURRENT','WORK_EXECUTOR_HANDOFF_REQUIRED'].includes(error.code)){record.continuationRejects||={};record.continuationRejects[intent.opId]=error.code;for(const [key,value]of Object.entries(record.continuationIntents))if(value===intent)delete record.continuationIntents[key];await o.save();}throw error;}ids=result.inputIds||ids;
 
    if(!this.steps(record).some(s=>s.generation===result.generation))record.generations.push({generation:result.generation,requestId:result.requestId,config:result.config,consumedInputSeq:result.consumedInputSeq});
+   const step=this.steps(record).find(value=>value.generation===result.generation);
+   if(this.usesFinalHistory(record,step))step.finalHistoryReadback=true;
    record.currentGeneration=result.generation;record.phase='continuing';await o.save();await r.syncExecutionTopic(mapping);
    const history=await r.replica.queue.read(mapping.shared),lastInput=status.inputs.at(-1),userId=result.contextCheckpoint&&(!lastInput||lastInput.inputSeq<=result.contextCheckpoint.throughInputSeq)?result.contextCheckpoint.messageId:(ids.at(-1)||record.accepted.turn?.userMessageId||record.body.message?.id),user=history.find(m=>m.id===userId);if(!user)throw fail('SHARED_USER_NOT_MATERIALIZED');
-   const {executionConfig}=require('./sharedExecution');return {handled:true,success:true,admissionId:workId,workId,generation:result.generation,replyId:result.requestId,userMessage:user,history,config:executionConfig(result.config),executionPolicy:result.config.rules[0]?.config.executionPolicy||{},tavernRules:require('./contracts.generated.cjs').sharedEffectiveRules([...(result.config.rules[0]?.config.tavernRules||[]),...(result.config.owner.config.tavernRules||[])],result.config.owner.config.ruleOverrides||{})};
+   const {executionConfig}=require('./sharedExecution');return {handled:true,success:true,admissionId:workId,workId,generation:result.generation,replyId:result.requestId,...(step.finalHistoryReadback&&{nativeFinalReadback:true}),userMessage:user,history,config:executionConfig(result.config),executionPolicy:result.config.rules[0]?.config.executionPolicy||{},tavernRules:require('./contracts.generated.cjs').sharedEffectiveRules([...(result.config.rules[0]?.config.tavernRules||[]),...(result.config.owner.config.tavernRules||[])],result.config.owner.config.ruleOverrides||{})};
   });
  }
  async complete(record,message,mapping){
   return this.owner.run(mapping.sharedId,async()=>{
    const step=this.steps(record).find(s=>s.requestId===message.id);if(!step)throw fail('SHARED_NATIVE_ADMISSION_REQUIRED');
    const retained=await this.owner.retainFailure(record,message,mapping);if(retained)return retained;
-   delete step.localFailure;delete step.errorCode;delete step.failureDisposition;const value=this.runtime.adapter.canonical(message,mapping.shared.topicId);
-   if(step.replyIntent&&stable(step.replyIntent)!==stable(value))throw fail('SHARED_REPLY_INTENT_CHANGED');
-   step.replyIntent=value;record.phase='publishing';await this.owner.save();await this.finishStep(record,step);await this.runtime.syncExecutionTopic(mapping);
-   return {handled:true,success:true,localState:'saved',history:await this.runtime.replica.queue.read(mapping.shared),sync:{state:'captured',delivery:step.replyAccepted?'accepted':'pending',recoverable:true}};
+   delete step.localFailure;delete step.errorCode;delete step.failureDisposition;
+   const readback=this.usesFinalHistory(record,step);
+   if(readback){
+    if(typeof message.content!=='string')throw fail('SHARED_REPLY_INTENT_CHANGED');
+    const observedHash=sha256(message.content);
+    if((step.observedFinalHash&&step.observedFinalHash!==observedHash)||(step.replyIntent&&step.replyIntent.content!==message.content))
+     throw fail('SHARED_REPLY_INTENT_CHANGED');
+    step.finalHistoryReadback=true;
+    step.observedFinalHash=observedHash;
+   }else{
+    const value=this.runtime.adapter.canonical(message,mapping.shared.topicId);
+    if(step.replyIntent&&stable(step.replyIntent)!==stable(value))throw fail('SHARED_REPLY_INTENT_CHANGED');
+    step.replyIntent||=value;
+   }
+   record.phase='publishing';await this.owner.save();
+   const result=await this.finishStep(record,step,mapping);
+   if(!readback)await this.runtime.syncExecutionTopic(mapping);
+   else if(!result)throw fail(step.finalHistoryReview?'SHARED_RESULT_REQUIRES_REVIEW':'SHARED_NATIVE_TERMINAL_REQUIRED');
+   const history=result?.history||await this.runtime.replica.queue.read(mapping.shared);
+   return {handled:true,success:true,localState:'saved',history,
+    ...(result&&{authoritativeReply:result.authoritativeReply}),sync:{state:'captured',delivery:step.replyAccepted?'accepted':'pending',recoverable:true}};
   });
  }
- async finishStep(record,step){
+ async readFinalReply(record,step,mapping){
+  const r=this.runtime,workId=record.accepted.id,requestId=step.requestId;
+  if(!step.finalHistoryReadback){step.finalHistoryReadback=true;await this.owner.save();}
+  const result=await r.send(endpoint+'final-reply?'+new URLSearchParams({
+   sharedSpaceId:r.connection.sharedSpaceId,workId,requestId,generation:String(step.generation),
+  }));
+  if(result?.workId!==workId||result.sharedId!==mapping.sharedId||result.requestId!==requestId||result.generation!==step.generation)
+   throw fail('SHARED_FINAL_REPLY_INVALID');
+  if(result.state==='pending')return;
+  if(result.state==='review_required'){
+   step.finalHistoryReview=true;record.phase=result.workState==='abandoned'?'abandoned':'review_required';
+   await this.owner.save();return;
+  }
+  const {seq,currentSeq,historyState,message,contentHash}=result;
+  if(result.state!=='committed'||!Number.isSafeInteger(seq)||seq<1||!Number.isSafeInteger(currentSeq)||currentSeq<seq||
+   !/^[a-f0-9]{64}$/.test(contentHash)||!['original','edited','deleted'].includes(historyState)||
+   (currentSeq===seq)!==(historyState==='original')||
+   (historyState==='deleted'?message!==null:message?.id!==requestId)||
+   (historyState==='original'&&(message.role!=='assistant'||message.finishReason!=='completed'||message.continuity?.executionId!==workId||
+    message.continuity.requestId!==requestId||typeof message.content!=='string'||sha256(message.content)!==contentHash)))
+   throw fail('SHARED_FINAL_REPLY_INVALID');
+  if((step.observedFinalHash&&step.observedFinalHash!==contentHash)||
+   (step.replyIntent&&(typeof step.replyIntent.content!=='string'||sha256(step.replyIntent.content)!==contentHash))){
+   step.finalHistoryReview=true;record.phase='review_required';await this.owner.save();throw fail('SHARED_REPLY_INTENT_CHANGED');
+  }
+
+  // Only the ordinary topic projector writes History. A later acknowledged edit
+  // or tombstone may already have superseded the server read snapshot.
+  await r.syncExecutionTopic(mapping,{minSeq:currentSeq});
+  const history=await r.replica.queue.read(mapping.shared);
+  const key=messageKey({ownerType:mapping.shared.itemType,ownerId:mapping.shared.itemId,topicId:mapping.shared.topicId,msgId:requestId});
+  const ack=r.replica.adapter.state.acked[key],projected=history.find(row=>row.id===requestId)||null;
+  if(!ack||ack.seq<currentSeq||Boolean(projected)===ack.deleted||
+   (projected&&messageHash(r.adapter.canonical(projected,mapping.shared.topicId))!==ack.hash)||
+   (ack.seq===currentSeq&&(ack.deleted!==(historyState==='deleted')||(!ack.deleted&&messageHash(message)!==ack.hash))))
+   throw fail('SHARED_FINAL_REPLY_PROJECTION_PENDING');
+
+  step.replyAccepted=true;record.phase='completed';
+  delete step.localFailure;delete step.failureDisposition;delete step.errorCode;
+  record.accepted={...record.accepted,state:'completed',replySeq:seq};
+  await this.owner.save();
+  return {history,authoritativeReply:{message:projected,state:ack.deleted?'deleted':ack.seq===seq?'original':'edited',seq:ack.seq}};
+ }
+ async finishStep(record,step,mapping){
+  if(this.usesFinalHistory(record,step)){
+   mapping||=this.runtime.mappings().find(value=>value.sharedId===record.sharedId);
+   if(!mapping)throw fail('SHARED_LOCAL_MAPPING_PENDING');
+   return this.readFinalReply(record,step,mapping);
+  }
   if(step.replyAccepted||step.skipped)return;
   const control=await this.query(record);if(control?.generations?.some(g=>g.generation===step.generation&&g.noDispatch)){step.skipped=true;record.phase='steering';await this.owner.save();return;}
   try{
@@ -124,8 +211,16 @@ class SharedSteeringClient{
  async reconcile(record){
   const o=this.owner,r=this.runtime;if(r.closed)return;
   // A retained reply is not permission to publish into a fenced Work.
+  if(this.hasPendingFinalHistory(record)){
+   for(const step of this.steps(record)){
+    if(!this.pendingFinalHistory(record,step))continue;
+    try{await o.run(record.sharedId,()=>this.finishStep(record,step));}
+    catch(error){console.warn('[NativeSync] Final Work History readback pending',error.code||error.name);}
+   }
+   return;
+  }
   const current=await this.refresh(record);if(!current||terminal.has(current.state)||current.state==='review_required')return;
-  for(const step of this.steps(record))if(step.replyIntent&&!step.replyAccepted&&!step.skipped)await o.run(record.sharedId,()=>this.finishStep(record,step));
+  for(const step of this.steps(record))if(step.replyIntent&&!step.replyAccepted&&!step.skipped&&!step.finalHistoryReadback)await o.run(record.sharedId,()=>this.finishStep(record,step));
   const known=await this.refresh(record);if(!known||terminal.has(record.phase)||known.state==='review_required')return;
   record.control=known.steering||await this.query(record);
   for(const input of Object.values(o.state.requests))if(input.isSteeringInput&&input.workId===record.accepted.id&&record.control?.applicationState==='applied'&&input.inputReceipt?.inputSeq<=record.control?.consumedInputSeq){input.phase='input_applied';}

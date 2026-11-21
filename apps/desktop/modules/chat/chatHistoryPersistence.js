@@ -42,6 +42,11 @@ function createHistoryPersistence(repository, { durable, skipTemporaryContexts }
                     if (native?.handled !== true || native.success !== true || native.error) {
                         throw new Error(typeof native?.error === 'string' ? native.error : 'Native terminal persistence failed');
                     }
+                    if (native.authoritativeReply) {
+                        const { message, state } = native.authoritativeReply;
+                        return Object.freeze({ messageId: projected.messageId, context, content: message?.content ?? '',
+                            finishReason: message?.finishReason || projected.finishReason, historyState: state });
+                    }
                     return Object.freeze({ messageId: projected.messageId, context, content: projected.content, finishReason: projected.finishReason });
                 }
             }

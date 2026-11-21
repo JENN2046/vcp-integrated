@@ -162,8 +162,9 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     const proxy = https.createServer({key:fs.readFileSync(key),cert:fs.readFileSync(cert)},async (req,res) => {
         const url=new URL(req.url,'https://127.0.0.1');
         const route=url.pathname;
-        const detachFinal = toolHandoff?.finalReceipt && req.method === 'POST' && route === '/v1/chat/completions' &&
+        const nativeBFinal = req.method === 'POST' && route === '/v1/chat/completions' &&
             req.headers['x-nativesync-device'] === 'deviceB' && Number(req.headers['x-nativesync-generation']) > 0;
+        const detachFinal = toolHandoff?.finalReceipt && nativeBFinal;
         if (handleFixtureRequest && await handleFixtureRequest(req, res, route)) return;
         if (hardwareStream && req.method === 'POST' && route.endsWith('/session-send') &&
             req.headers['x-nativesync-device'] !== 'deviceA') {
@@ -187,6 +188,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             body=Buffer.concat(chunks);
             row.bodySha256=require('node:crypto').createHash('sha256').update(body).digest('hex');
             row.body=body.length ? JSON.parse(body) : {};
+            if (req.method === 'GET') row.query = Object.fromEntries(url.searchParams);
             for (const key of ['proof','authorization','capability','ticket']) if (typeof row.body[key]==='string') {
                 row.body[key+'Sha256']=require('node:crypto').createHash('sha256').update(row.body[key]).digest('hex');
                 delete row.body[key];
@@ -256,13 +258,25 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             }
             row.status=response.statusCode;
             if (detachFinal) {
-                toolHandoff.observeDetachedFinal(response, row);
+                toolHandoff.observeFinalNativeResponse(response, row);
                 return;
             }
             if (streamInterrupt && route === '/v1/chatvcp/completions') streamInterrupt.inspect(response, row);
             if (toolHandoff?.observeNativeResponse && req.headers['x-nativesync-admission'] && route === '/v1/chat/completions') {
                 toolHandoff.observeNativeResponse(response, row);
+                if (nativeBFinal && toolHandoff.readback) toolHandoff.observeFinalNativeResponse(response, row);
+                res.once('finish', () => { row.downstreamFinished = true; });
                 requests.push(row);
+            }
+            if (nativeBFinal && toolHandoff?.finalMutation) {
+                const deliver = Promise.withResolvers();
+                toolHandoff.receipt.deliverFinalResponse = deliver.resolve;
+                res.once('close', () => deliver.resolve());
+                const chunks = [];
+                for await (const chunk of response) chunks.push(chunk);
+                await deliver.promise;
+                if (!res.destroyed) res.writeHead(response.statusCode, response.headers).end(Buffer.concat(chunks));
+                return;
             }
             res.writeHead(response.statusCode,response.headers);
             response.pipe(res);

@@ -85,7 +85,11 @@ function createStreamCapabilities(root, services) {
         reportError,
         async afterPersist({ terminal, finalized, context, messageId }) {
             const finalizedContext = finalized?.context || context;
-            const finalizedContent = finalized?.content || terminal.fullResponse || '';
+            if (finalized?.historyState && finalized.historyState !== 'original') {
+                await services.chatManager?.projectSharedFinal?.(finalizedContext, messageId);
+                if (finalized.historyState === 'deleted') return;
+            }
+            const finalizedContent = finalized?.content ?? terminal.fullResponse ?? '';
             if (services.chatManager?.hasStreamAdmissionRelay?.(messageId)) {
                 await services.chatManager.finishStreamAdmissionRelay({
                     messageId, context: finalizedContext,

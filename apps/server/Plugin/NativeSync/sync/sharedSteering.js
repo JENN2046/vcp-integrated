@@ -230,6 +230,43 @@ class SharedSteering {
             return this.public(row, this.control(row));
         });
     }
+    finalReply(actor, {sharedSpaceId,workId,requestId,generation}) {
+        if(generation!=='1')throw fail('INVALID_SHARED_REQUEST',400);
+        id(requestId);
+        const store=this.shared.store;
+        return store.readSnapshot(()=>{
+            const {row,topic}=this.admission(actor,sharedSpaceId,workId,{existing:true,observe:true});
+            const step=this.generation(workId,1);
+            if(require('./sharedTurns').intent(row).controlMode!==controlled.TOOLS_MODE||step?.request_id!==requestId)
+                throw fail('SHARED_REQUEST_NOT_FOUND',404);
+            if(step.executor!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
+
+            const identity={workId,sharedId:topic.id,requestId,generation:1};
+            if(['review_required','abandoned'].includes(row.state))return {...identity,state:'review_required',workState:row.state};
+            if(row.state!=='completed')return {...identity,state:'pending'};
+
+            const seq=row.reply_seq;
+            const op=store.findOp.get(step.executor,'work-reply:'+workId+':1');
+            const receipt=op&&JSON.parse(op.result_json);
+            const key=[topic.owner_type,topic.owner_id,topic.topic_id,requestId];
+            if(step.state!=='completed'||!row.native_terminal||!Number.isSafeInteger(seq)||seq<1||
+                receipt?.seq!==seq||receipt.deleted!==false)throw fail('NATIVE_CHECKPOINT_CHANGED');
+            const [original]=store.readProjected(()=>this.db.prepare(
+                'SELECT * FROM journal WHERE seq=? AND owner_type=? AND owner_id=? AND topic_id=? AND msg_id=?'
+            ).all(seq,...key));
+            const currentRow=store.findMessage.get(...key);
+            const initial=original?.message;
+            if(original?.row.action!=='upsert'||original.row.hash!==receipt.hash||original.row.device_id!==step.executor||
+                original.row.metadata_version!==receipt.metadataVersion||original.row.metadata_hash!==receipt.metadataHash||
+                initial?.id!==requestId||initial.role!=='assistant'||initial.finishReason!=='completed'||
+                initial.continuity?.executionId!==workId||initial.continuity.requestId!==requestId||
+                typeof initial.content!=='string'||!currentRow||currentRow.last_seq<seq)throw fail('NATIVE_CHECKPOINT_CHANGED');
+
+            const message=store.projectMessage(currentRow),currentSeq=currentRow.last_seq;
+            const historyState=currentRow.deleted?'deleted':currentSeq===seq?'original':'edited';
+            return {...identity,state:'committed',seq,currentSeq,historyState,contentHash:sha256(initial.content),message};
+        });
+    }
     completeTurn(actor, body) {
         const {row:admission,topic}=this.admission(actor,body.sharedSpaceId,body.workId,{existing:true});
         let row=admission;

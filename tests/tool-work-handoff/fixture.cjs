@@ -17,19 +17,23 @@ const initialAnswer = marker => [
     '<<<[END_TOOL_REQUEST]>>>',
 ].join('\n');
 
-function create(out, { unknown = false, loseHandoff = false, stream = false, losePublication = false, finalReceipt } = {}) {
+function create(out, { unknown = false, loseHandoff = false, stream = false, losePublication = false, readback = false, loseReadback = false, legacyReadback = false, finalMutation, finalReceipt } = {}) {
     const marker = unknown ? 'ORDINARY_TOOL_THROW' : 'ORDINARY_TOOL_LOCAL';
     const observed = compaction.observe(out);
-    let dropped = false;
+    let dropped = false, droppedReadback = false;
     const receipt = {};
     return {
         marker,
         loseHandoff,
         losePublication,
         stream,
+        readback,
+        loseReadback,
+        legacyReadback,
+        finalMutation,
         finalReceipt,
         receipt,
-        observeDetachedFinal(response, row) {
+        observeFinalNativeResponse(response, row) {
             const chunks = [];
             response.on('data', chunk => chunks.push(chunk));
             response.on('end', () => {
@@ -126,6 +130,7 @@ function create(out, { unknown = false, loseHandoff = false, stream = false, los
         },
         env: { NativeSyncSharedSafeTools: JSON.stringify([tool.name]) },
         observeRequest(method, route) {
+            if (method === 'GET' && route.endsWith('/shared/final-reply')) return true;
             return method === 'POST' && /\/shared\/(?:steer-[\w-]+|compact-[\w-]+|native-request|work-review)$/.test(route);
         },
         observeNativeResponse(response, row) {
@@ -152,6 +157,11 @@ function create(out, { unknown = false, loseHandoff = false, stream = false, los
             });
         },
         dropResponse(row) {
+            if (loseReadback && !droppedReadback && row.device === 'deviceB' && row.route.endsWith('/final-reply') &&
+                row.status === 200 && Number(row.query?.generation) === 1 && row.response?.state === 'committed') {
+                droppedReadback = true;
+                return true;
+            }
             if (losePublication && row.device === 'deviceB' && row.route.endsWith('/steer-turn-complete') &&
                 row.body?.generation === 1 && row.status === 200 && row.response?.workState === 'completed') return true;
             if (!loseHandoff || dropped || row.device !== 'deviceB' || !row.route.endsWith('/steer-handoff') ||

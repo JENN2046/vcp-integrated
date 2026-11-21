@@ -454,6 +454,7 @@ class SharedSpace {
  steer(actor,body){return this.steering.submit(actor,body);}
  steerReady(actor,body){return this.steering.ready(actor,body);}
  steerCheckpoint(actor,body){return this.steering.checkpoint(actor,body);}
+ steerFinalReply(actor,body){return this.steering.finalReply(actor,body);}
  steerTurnComplete(actor,body){return this.steering.completeTurn(actor,body);}
  compactPrepare(actor,body){return this.compaction.prepare(actor,body);}
  compactInput(actor,body){return this.compaction.get(actor,body);}

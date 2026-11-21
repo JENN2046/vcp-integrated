@@ -21,8 +21,14 @@ const nativeQueue = requested === 'native-local-queue' ? require('../group-extra
 const aaDesktop = requested === 'aa-desktop';
 const desktopStreamClose = requested === 'desktop-stream-close' ? require('../desktop-stream-close/fixture.cjs').create() : undefined;
 const streamInterrupt = requested === 'local-stream-interrupt' ? require('../local-stream-interrupt/fixture.cjs') : undefined;
-const finalReceiptModes = { 'tool-final-receipt-lost': 'terminal', 'tool-final-receipt-unknown': 'unknown' };
-const toolHandoffModes = ['tool-handoff-baseline', 'tool-handoff', 'tool-handoff-unknown', 'tool-handoff-stream', 'tool-final-publication-ack', ...Object.keys(finalReceiptModes)];
+const finalReceiptModes = { 'tool-final-receipt-lost': 'terminal', 'tool-final-receipt-unknown': 'unknown', 'tool-final-readback-terminal-lost': 'terminal' };
+const readbackModes = ['tool-final-readback-json', 'tool-final-readback-stream',
+    'tool-final-readback-terminal-lost', 'tool-final-readback-query-lost',
+    'tool-final-readback-json-delete', 'tool-final-readback-stream-edit'];
+const legacyReadbackMode = 'tool-final-readback-legacy';
+const beforeFinalReadback = 'aa19a637831c1a7fabd3ec0de858d08084097ef7';
+const toolHandoffModes = ['tool-handoff-baseline', 'tool-handoff', 'tool-handoff-unknown', 'tool-handoff-stream',
+    'tool-final-publication-ack', legacyReadbackMode, ...new Set([...readbackModes, ...Object.keys(finalReceiptModes)])];
 const toolHandoffMode = toolHandoffModes.includes(requested) ? requested : undefined;
 const toolHandoffFixture = toolHandoffMode && require('../tool-work-handoff/fixture.cjs');
 const compactionRetryMode = 'compact-history-identity';
@@ -30,7 +36,9 @@ const crossDeviceCompaction = ['compact-cross-device', compactionRetryMode].incl
 const compaction = requested === 'compact-e2e' || crossDeviceCompaction ? require('../compact-e2e/fixture.cjs') : undefined;
 const approvalRestoreModes = { 'approval-restore': 'desktop', 'approval-restore-stale': 'stale' };
 const approvalRestore = Object.hasOwn(approvalRestoreModes, requested) ? approvalRestoreModes[requested] : undefined;
-const serverRevision = ordinaryMode || approvalRestore || toolHandoffMode ? process.env.NS_BASELINE_SERVER_REVISION : undefined;
+const serverRevision = requested === legacyReadbackMode ? beforeFinalReadback :
+    requested === 'tool-final-publication-ack' ? process.env.NS_BASELINE_SERVER_REVISION || beforeFinalReadback :
+    ordinaryMode || approvalRestore || toolHandoffMode ? process.env.NS_BASELINE_SERVER_REVISION : undefined;
 if (serverRevision && !/^[a-f0-9]{40}$/.test(serverRevision)) throw Error('Expected full Git revision for baseline server');
 const ordinaryTools = require('../ordinary-tools/fixture.cjs');
 const ordinaryFixture = ordinaryMode || approvalRestore ? {
@@ -48,7 +56,7 @@ if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.n
     throw Error('Integration requires Linux x64 and Node 24');
 }
 if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', compactionRetryMode, 'local-stream-interrupt', 'desktop-stream-close'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|tool-final-receipt-lost|tool-final-receipt-unknown|tool-final-publication-ack|local-stream-interrupt|desktop-stream-close]');
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|tool-final-receipt-lost|tool-final-receipt-unknown|tool-final-publication-ack|' + [...readbackModes, legacyReadbackMode].join('|') + '|local-stream-interrupt|desktop-stream-close]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -168,9 +176,14 @@ async function runCase(root, mode) {
     let service, aa;
     const toolHandoff = toolHandoffFixture?.create(out, {
         unknown: mode === 'tool-handoff-unknown',
-        loseHandoff: ['tool-handoff', 'tool-handoff-stream', 'tool-final-publication-ack'].includes(mode) || Boolean(finalReceiptModes[mode]),
+        loseHandoff: ['tool-handoff', 'tool-handoff-stream', 'tool-final-publication-ack', legacyReadbackMode].includes(mode) ||
+            readbackModes.includes(mode) || Boolean(finalReceiptModes[mode]),
         losePublication: mode === 'tool-final-publication-ack',
-        stream: mode === 'tool-handoff-stream' ||
+        readback: readbackModes.includes(mode),
+        loseReadback: mode === 'tool-final-readback-query-lost',
+        legacyReadback: mode === legacyReadbackMode,
+        finalMutation: { 'tool-final-readback-json-delete': 'delete', 'tool-final-readback-stream-edit': 'upsert' }[mode],
+        stream: ['tool-handoff-stream', 'tool-final-readback-stream', 'tool-final-readback-stream-edit'].includes(mode) ||
             (finalReceiptModes[mode] === 'terminal' && process.env.VCP_TEST_FINAL_STREAM === '1'),
         finalReceipt: finalReceiptModes[mode],
     });

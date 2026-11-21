@@ -2,6 +2,7 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { createHash, randomUUID } = require('node:crypto');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const { setTimeout: delay } = require('node:timers/promises');
@@ -18,7 +19,7 @@ function createApi(service, out, role) {
     const headers = {
         'content-type': 'application/json', authorization: 'Bearer synthetic-only',
         'x-nativesync-space': connection.spaceId, 'x-nativesync-source': 'source' + role, 'x-nativesync-device': 'device' + role,
-        'x-nativesync-capabilities': 'shared-space-v1,shared-context-v1,shared-controlled-text-v1,shared-controlled-tools-v1,shared-steering-v1',
+        'x-nativesync-capabilities': 'shared-space-v1,shared-context-v1,shared-controlled-text-v1,shared-controlled-tools-v1,shared-steering-v1,message-intents-v1',
     };
     return (route, body) => fetch(service.wsOrigin + '/api/v1/sync/shared/' + route, {
         method: body ? 'POST' : 'GET', headers, body: body && JSON.stringify(body),
@@ -56,6 +57,8 @@ async function loadedDesktop(client, sha, root) {
         renderer: [
             'apps/desktop/modules/renderer/controlledWorkView.mjs',
             'apps/desktop/modules/chatManager.js',
+            'apps/desktop/modules/chat/chatHistoryPersistence.js',
+            'apps/desktop/modules/renderer/mainChatSurfaceAdapter.js',
             'apps/desktop/modules/services/nativeSync/sharedSessionView.mjs',
         ],
     };
@@ -69,6 +72,31 @@ async function loadedDesktop(client, sha, root) {
 async function candidate({ result, service, out, clients: { A, B }, picture, click, evalJs, waitUntil, stop, start, quitBeforeFinalReceipt, profiles, sha, toolHandoff, db }) {
     const { marker, loseHandoff, stream, finalReceipt, receipt } = toolHandoff;
     const read = {};
+    const ledgerFile = path.join(profiles.B, '.native-sync', 'shared', sharedSpaceId, 'executions.json');
+    const expectedObservedHash = createHash('sha256').update(fixture.finalText).digest('hex');
+    function readFinalLedger(workId, requestId) {
+        const state = JSON.parse(fs.readFileSync(ledgerFile, 'utf8'));
+        const work = Object.values(state.requests).find(row => row.accepted?.id === workId);
+        const step = work?.generations?.find(row => row.requestId === requestId);
+        return step && {
+            generation: step.generation, requestId: step.requestId, workState: work.phase,
+            readback: step.finalHistoryReadback === true, replyAccepted: step.replyAccepted === true,
+            hasReplyIntent: Object.hasOwn(step, 'replyIntent'), observedFinalHash: step.observedFinalHash ?? null,
+        };
+    }
+    async function checkFinalLedger(workId, requestId, { observed = false, legacy = false } = {}) {
+        const value = await waitUntil(() => {
+            const row = readFinalLedger(workId, requestId);
+            if (observed && row?.observedFinalHash !== expectedObservedHash) return false;
+            if (legacy && !row?.hasReplyIntent) return false;
+            return row;
+        }, 'B retains the expected original request ledger fields');
+        assert.equal(value.generation, 1);
+        assert.equal(value.readback, !legacy);
+        assert.equal(value.hasReplyIntent, legacy);
+        assert.equal(value.observedFinalHash, observed ? expectedObservedHash : null);
+        return value;
+    }
     const buttons = client => evalJs(client, `Object.fromEntries([...document.querySelectorAll(${quote(panel + ' button')})]
         .map(button => [button.textContent.trim(), !button.disabled]))`);
     const status = client => evalJs(client, `document.querySelector(${quote(panel + ' [role=status]')})?.innerText`);
@@ -263,6 +291,29 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
     assert.equal(service.requests.filter(row => row.route.endsWith('/steer-handoff')).length, 1);
     assert.deepEqual(tool.counts(out), [{ marker }]);
     await action(recovered, '本端继续执行');
+    const publicationsByB = () => service.requests.filter(row => row.device === 'deviceB' && row.route.endsWith('/steer-turn-complete'));
+    const readbacks = () => service.requests.filter(row => row.device === 'deviceB' && row.route.endsWith('/final-reply'));
+    const isCommittedReadback = (row, requestId) =>
+        row.query?.requestId === requestId && row.response?.state === 'committed' && !row.dropped;
+    const waitReadback = (requestId, after = 0) => waitUntil(
+        () => readbacks().find(row => row.at >= after && isCommittedReadback(row, requestId)),
+        'B successfully reads the committed final reply');
+    function assertReadback(reply, generation, seq) {
+        assert.equal(reply.method, 'GET');
+        assert.equal(reply.status, 200);
+        assert.deepEqual(reply.query, { sharedSpaceId, workId, requestId: generation.request_id, generation: String(generation.generation) });
+        const { sharedId: repliedTopic, requestId, state, message, historyState } = reply.response;
+        assert.equal(repliedTopic, sharedId);
+        assert.equal(state, 'committed');
+        assert.equal(historyState, 'original');
+        assert.equal(requestId, generation.request_id);
+        assert.equal(reply.response.workId, workId);
+        assert.equal(reply.response.generation, generation.generation);
+        assert.equal(reply.response.seq, seq);
+        assert.equal(message.id, generation.request_id);
+        assert.equal(message.content, fixture.finalText);
+        assert.equal(message.finishReason, 'completed');
+    }
     if (finalReceipt) {
         const resumed = await waitUntil(() => service.calls.find(call => call.toolHandoffPhase === 'resumed'), 'B reaches the actual Provider');
         assert.ok(receipt.releaseProvider, 'the final Provider response is held after dispatch');
@@ -275,7 +326,6 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
             return item ? { kind: item.dataset.nativeSyncPreview, status: item.querySelector('[role=status]')?.innerText,
                 text: item.querySelector('pre')?.innerText } : null;
         })()`);
-        const publicationsByB = () => service.requests.filter(row => row.device === 'deviceB' && row.route.endsWith('/steer-turn-complete')).length;
         async function snapshot(client) {
             const archive = JSON.parse(fs.readFileSync(archiveFile, 'utf8'));
             assert.equal(archive.identity.workId, workId);
@@ -318,7 +368,7 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
             assert.equal(receipt.downstream, undefined, 'B remains connected without receiving the buffered model response');
         }
         const exit = await quitBeforeFinalReceipt('B-recovered');
-        const publishedBeforeReopen = publicationsByB();
+        const publishedBeforeReopen = publicationsByB().length;
         assert.equal(publishedBeforeReopen, 0, 'B never received and submitted the model reply before it exited');
         await waitUntil(() => receipt.downstream, 'B downstream connection closed');
         assert.equal(receipt.downstream.headersSent, false);
@@ -331,6 +381,7 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
             assert.equal(receipt.providerClosed.responseEnded, false);
         }
         const afterExit = await snapshot();
+        const reopeningAt = Date.now();
         const restarted = await start('B-after-final-loss', 'B');
         assert.equal(result.B.profileDigest, result['B-after-final-loss'].profileDigest);
         await select(restarted, 'B');
@@ -345,7 +396,18 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         const manualCheck = { selectedAt, checkedAt: Date.now(), readsBefore, readsAfter: executionReads(), beforeManualCheck };
         await waitUntil(async () => !(await status(restarted))?.startsWith('操作已确认'),
             'the periodic refresh renders the Work status after the check acknowledgement');
+        const readbackBeforeReopen = terminalBeforeExit &&
+            readbacks().find(row => row.at < reopeningAt && isCommittedReadback(row, requestId));
+        const recoveredReply = toolHandoff.readback ?
+            readbackBeforeReopen || await waitReadback(requestId, reopeningAt) : undefined;
+        if (recoveredReply) {
+            assertReadback(recoveredReply, generations(workId).at(-1), admissions()[0].reply_seq);
+            await waitUntil(async () => (await renderedFinal(restarted, requestId)).some(row => row.textShown),
+                'B shows the readback reply after reopening');
+        }
         const reopened = await snapshot(restarted);
+        const reopenedLedger = toolHandoff.readback || (finalReceipt === 'unknown' && !result.serverRevision)
+            ? await checkFinalLedger(workId, requestId) : undefined;
         assert.equal(reopened.backendPid, beforeExit.backendPid);
         await picture(restarted, 'B-reopened-toolbox-kept-running');
         await stop('B-after-final-loss');
@@ -355,11 +417,13 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         await select(afterBackend, 'B');
         await delay(1600);
         const reopenedAfterBackend = await snapshot(afterBackend);
+        const reopenedAfterBackendLedger = reopenedLedger ? await checkFinalLedger(workId, requestId) : undefined;
         await picture(afterBackend, 'B-reopened-after-toolbox-restart');
         result.finalReceipt = {
             branch: finalReceipt, workId, requestId, receipt, exit, backendExit, beforeExit, terminalBeforeExit, afterExit, reopened, reopenedAfterBackend,
-            manualCheck, profileDigest: result.B.profileDigest, desktopSources: await loadedDesktop(afterBackend, sha, result.candidate),
-            publishedBeforeReopen, publishedByB: publicationsByB(),
+            manualCheck, recoveredReply, reopenedLedger, reopenedAfterBackendLedger,
+            ...(recoveredReply && {readbackBeforeReopen: Boolean(readbackBeforeReopen)}), profileDigest: result.B.profileDigest, desktopSources: await loadedDesktop(afterBackend, sha, result.candidate),
+            publishedBeforeReopen, publishedByB: publicationsByB().length,
         };
         assert.deepEqual(invocations(workId), invocationsAtPause);
         assert.deepEqual(tool.counts(out), [{ marker }]);
@@ -395,7 +459,7 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
                 assert.equal(value.archive.completion?.executor, 'desktop:deviceB');
                 assert.equal(value.archive.completion?.content, fixture.finalText);
             }
-            assert.equal(publicationsByB(), 0, 'The recovered native reply needs no desktop publication');
+            assert.equal(publicationsByB().length, 0, 'The recovered native reply needs no desktop publication');
         } else {
             assert.equal(result.finalReceipt.publishedByB, 0, 'B cannot publish a final reply with no authoritative model terminal');
             assert.deepEqual(journal(), journalOnA);
@@ -459,6 +523,123 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
     assert.ok(!resumedContext.includes('<<<[TOOL_REQUEST]>>>'));
     assert.deepEqual(journal().slice(0, journalOnA.length), journalOnA);
     assert.deepEqual(journal().slice(journalOnA.length).map(row => row.msg_id), [finished.at(-1).request_id]);
+    if (toolHandoff.finalMutation) {
+        const replyId = finished.at(-1).request_id;
+        const current = () => db.prepare('SELECT last_seq,hash,deleted,message_json FROM messages WHERE topic_id=? AND msg_id=?').get(topicId, replyId);
+        const action = toolHandoff.finalMutation;
+        const editedText = 'Synthetic human edit to the published Work reply.';
+        const published = current();
+        const originalMessage = JSON.parse(published.message_json);
+        assert.equal(originalMessage.content, fixture.finalText);
+        assert.equal(published.last_seq, final.reply_seq);
+        const terminal = await waitUntil(() => toolHandoff.receipt.upstream, 'proxy holds the complete original native reply');
+        const nativeTransport = service.requests.find(row => row.device === 'deviceB' && row.route === '/v1/chat/completions');
+        assert.equal(nativeTransport.downstreamFinished, undefined);
+        assert.equal(terminal.finishReason, 'stop');
+        assert.equal(terminal.text, fixture.finalText);
+        assert.equal(terminal.bodyComplete, true);
+        if (stream) assert.equal(terminal.done, true);
+        const { _nativeSyncMetadata, continuity, isThinking, ...editable } = originalMessage;
+        const response = await createApi(service, out, 'A')('message', {
+            sharedSpaceId, sharedId,
+            operation: { opId: randomUUID(), deviceId: 'desktop:deviceA', msgId: replyId, action, baseHash: published.hash,
+                ...(action === 'upsert' && { message: { ...editable, content: editedText } }),
+            },
+        });
+        const mutation = await response.json();
+        assert.equal(response.status, 200, JSON.stringify(mutation));
+        const latest = current();
+        const historyState = action === 'delete' ? 'deleted' : 'edited';
+        assert.equal(latest.deleted, Number(action === 'delete'));
+        assert.ok(latest.last_seq > final.reply_seq);
+        const selector = '#chatMessages .message-item[data-message-id="' + replyId + '"]';
+        await evalJs(recovered, `(() => {
+            const original = ${quote(fixture.finalText)};
+            const timeline = window.__nsFixtureFinalTimeline = [];
+            const observer = new MutationObserver(() => {
+                const rows = document.querySelectorAll(${quote(selector + ':not(.streaming):not(.thinking)')});
+                const stale = [...rows].some(row => row.innerText.includes(original));
+                if (timeline.at(-1)?.stale !== stale) timeline.push({ at: Date.now(), stale });
+            });
+            observer.observe(document.querySelector('#chatMessages'), {
+                childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class'],
+            });
+        })()`);
+        const deliveredAt = Date.now();
+        assert.equal(nativeTransport.downstreamFinished, undefined);
+        toolHandoff.receipt.deliverFinalResponse();
+        await waitUntil(() => nativeTransport.downstreamFinished, 'proxy delivers native final response to the same B window');
+        const finalStreamEvent = stream ? await waitUntil(() => recovered.events.find(row => row.event === 'renderer-event' &&
+            row.t >= deliveredAt && row.data.channel === 'vcp-stream-event' && row.data.type === 'end' && row.data.modelFinishReason === 'stop'),
+        'B renderer receives the late native SSE stop') : null;
+        const readback = await waitUntil(() => readbacks().find(row => row.at >= deliveredAt && isCommittedReadback(row, replyId) &&
+            row.response.historyState === historyState), 'B reads the edited or deleted reply after native delivery');
+        assert.equal(readback.response.seq, final.reply_seq);
+        assert.equal(readback.response.currentSeq, latest.last_seq);
+        assert.equal(readback.response.message?.content ?? null, action === 'delete' ? null : editedText);
+        const commitResult = await waitUntil(() => recovered.events.find(row =>
+            row.event === 'ipc-result' && row.t >= deliveredAt && row.data.channel === (stream ? 'native-history:terminal' : 'native-history:messages') &&
+            row.data.success === true && row.data.authoritativeReply?.state === historyState),
+        'renderer gets the authoritative result of its actual History commit');
+        assert.equal(commitResult.data.authoritativeReply.seq, latest.last_seq);
+        const view = async () => ({
+            history: read.B().filter(row => row.id === replyId).map(row => row.content),
+            chat: await evalJs(recovered, `[...document.querySelectorAll(${quote(selector)})].map(item => item.innerText)`),
+        });
+        const expected = action === 'delete' ? [] : [editedText];
+        const matches = ({ history, chat }) => JSON.stringify(history) === JSON.stringify(expected) &&
+            chat.length === expected.length && chat.every(item => item.includes(editedText) && !item.includes(fixture.finalText));
+        await waitUntil(async () => matches(await view()), 'same B window and physical History preserve current canonical reply');
+        await delay(350);
+        const visible = await view();
+        assert.ok(matches(visible), 'late renderer work must not resurrect the archived native reply');
+        const timeline = await evalJs(recovered, 'window.__nsFixtureFinalTimeline');
+        assert.equal(timeline.some(row => row.at >= commitResult.t && row.stale), false,
+            'the renderer must not show the obsolete text as a settled bubble after receiving authoritative History');
+        assert.deepEqual(current(), latest);
+        const rows = journal().slice(journalOnA.length);
+        assert.deepEqual(rows.map(({ msg_id, action }) => [msg_id, action]), [[replyId, 'upsert'], [replyId, action]]);
+        assert.equal(publicationsByB().length, 0);
+        assert.deepEqual(invocations(workId), invocationsAtPause);
+        assert.deepEqual(tool.counts(out), [{ marker }]);
+        assert.equal(service.calls.length, 3);
+        result.finalMutation = {
+            workId, replyId, originalRequestId: original.request_id, originalReplySeq: final.reply_seq, action,
+            latest: { seq: latest.last_seq, deleted: Boolean(latest.deleted) },
+            generations: finished, invocation, terminal, deliveredAt, finalStreamEvent, readback, commitResult, visible, timeline, journal: rows,
+            desktopLedger: await checkFinalLedger(workId, replyId, { observed: true }),
+            completePosts: publicationsByB().length, desktopSources: await loadedDesktop(recovered, sha, result.candidate),
+        };
+        await picture(recovered, 'B-late-reply-preserves-' + historyState);
+        return;
+    }
+    if (toolHandoff.readback) {
+        const terminal = await waitUntil(() => toolHandoff.receipt.upstream, 'B receives the native provider terminal at the proxy');
+        assert.deepEqual({ ...terminal, at: undefined }, { at: undefined, status: 200, bodyComplete: true,
+            finishReason: 'stop', text: fixture.finalText, ...(stream && { done: true }) });
+        await waitUntil(() => service.requests.find(row => row.device === 'deviceB' && row.route === '/v1/chat/completions' && row.downstreamFinished),
+            'proxy delivers native final response to B');
+        const finalStreamEvent = stream ? await waitUntil(() => recovered.events.find(row => row.event === 'renderer-event' &&
+            row.data.channel === 'vcp-stream-event' && row.data.type === 'end' && row.data.modelFinishReason === 'stop'),
+        'B renderer receives the native SSE stop event') : undefined;
+        const lost = toolHandoff.loseReadback ? await waitUntil(() => readbacks().find(row => row.dropped),
+            'proxy cuts the first committed final-reply response to B') : undefined;
+        if (lost) assertReadback(lost, finished.at(-1), final.reply_seq);
+        const readback = await waitReadback(finished.at(-1).request_id, lost?.at || 0);
+        assertReadback(readback, finished.at(-1), final.reply_seq);
+        assert.equal(final.reply_seq, journal().at(-1).seq);
+        result.finalReadback = { workId, terminal, finalStreamEvent, lost, readback };
+    }
+    if (toolHandoff.legacyReadback) {
+        const publication = await waitUntil(() => publicationsByB().find(row => row.response?.workState === 'completed'),
+            'B still completes through the mutation against a ToolBox without the readback capability');
+        assert.equal(publication.body.generation, finished.at(-1).generation);
+        assert.equal(publication.body.message.id, finished.at(-1).request_id);
+        assert.equal(publication.response.receipt.seq, final.reply_seq);
+        assert.equal(readbacks().length, 0);
+        result.legacyReadback = { serverRevision: result.serverRevision, publication,
+            desktopLedger: await checkFinalLedger(workId, finished.at(-1).request_id, { legacy: true }) };
+    }
     const saved = await waitUntil(() => {
         const history = read.B();
         const reply = history.at(-1);
@@ -479,11 +660,22 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         counter: tool.counts(out), history: saved, journal: journal(), summaryReceipt: summary.toolReceipt,
     };
     await picture(finalReader, 'B-completed-original-tool-work');
+    if (result.finalReadback) {
+        assert.equal(publicationsByB().length, 0, 'B never submits a completion mutation in readback mode');
+        assert.equal(service.calls.length, 3);
+        assert.deepEqual(tool.counts(out), [{ marker }]);
+        const historyReplies = saved.filter(row => row.id === finalReplyId);
+        assert.deepEqual(historyReplies.map(row => [row.content, row.finishReason]), [[fixture.finalText, 'completed']]);
+        const desktopLedger = await checkFinalLedger(workId, finalReplyId, { observed: true });
+        Object.assign(result.finalReadback, { completePosts: publicationsByB().length, chatFinalBubbleCount: rendered.length, desktopLedger,
+            historyFinalCount: historyReplies.length, journalFinalCount: journal().filter(row => row.msg_id === finalReplyId).length });
+    }
     if (result.publicationAck) {
         const attempts = service.requests.filter(row=>row.device==='deviceB' && row.route.endsWith('/steer-turn-complete'));
         assert.ok(attempts.every(row=>row.dropped && row.body.opId===result.publicationAck.opId));
         assert.equal(service.calls.length,result.publicationAck.before.calls);
-        Object.assign(result.publicationAck, { exit:result.exits['B-recovered'], postAttempts:attempts.length,
+        const desktopLedger = await checkFinalLedger(workId, finalReplyId, { legacy: true });
+        Object.assign(result.publicationAck, { exit:result.exits['B-recovered'], postAttempts:attempts.length, desktopLedger,
             workState:final.state, finalHistoryIds:saved.map(row=>row.id), chatFinalBubbleCount:rendered.length, counter:tool.counts(out).length });
     }
 }

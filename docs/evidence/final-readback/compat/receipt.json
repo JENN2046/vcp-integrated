@@ -1,0 +1,424 @@
+{
+  "mode": "normal native publication; same reply ID edited then deleted through shared message API",
+  "id": "reply_request_ae608679353b4d40b6c1159e79669209_g1",
+  "events": [
+    {
+      "seq": 5,
+      "action": "upsert",
+      "hash": "63e9505f1910cdf7cd9f2fa914e0fa41bdad25763181d643acdd7cc7ae0c8c43"
+    },
+    {
+      "seq": 6,
+      "action": "upsert",
+      "hash": "784b37e92c25d782be02ccce88b1c3a15e3cdb6a50159839ea18aaaa2860ddc6"
+    },
+    {
+      "seq": 7,
+      "action": "delete",
+      "hash": "2e3fdf1125f2b357b85f5c36ebdaae60bfc95b085d82be6f98fe8e809a06e165"
+    }
+  ],
+  "afterEdit": {
+    "status": 200,
+    "seq": 5,
+    "replayed": false
+  },
+  "afterDelete": {
+    "status": 200,
+    "seq": 5,
+    "replayed": false
+  },
+  "exactReplay": {
+    "status": 200,
+    "seq": 5,
+    "replayed": true
+  },
+  "wrongExecutor": {
+    "status": 409,
+    "code": "INVALID_SHARED_REPLY"
+  },
+  "wrongReply": {
+    "status": 409,
+    "code": "INVALID_SHARED_REPLY"
+  },
+  "finalProjection": {
+    "seq": 7,
+    "deleted": true
+  },
+  "workAfterRestart": "completed",
+  "counts": {
+    "provider": 3,
+    "tool": 1
+  },
+  "readback": {
+    "capabilityAdvertised": true,
+    "beforeDispatch": {
+      "workId": "request_ae608679353b4d40b6c1159e79669209",
+      "sharedId": "shared_a5626ad32fbf4c39b8dcfdb665c01886",
+      "requestId": "reply_request_ae608679353b4d40b6c1159e79669209_g1",
+      "generation": 1,
+      "state": "pending"
+    },
+    "original": {
+      "workId": "request_ae608679353b4d40b6c1159e79669209",
+      "sharedId": "shared_a5626ad32fbf4c39b8dcfdb665c01886",
+      "requestId": "reply_request_ae608679353b4d40b6c1159e79669209_g1",
+      "generation": 1,
+      "state": "committed",
+      "seq": 5,
+      "currentSeq": 5,
+      "historyState": "original",
+      "contentHash": "bff7acbb3bd534d6633aa8a4658961bd03012980242dc585a40dee8fdfac43e6",
+      "message": {
+        "id": "reply_request_ae608679353b4d40b6c1159e79669209_g1",
+        "role": "assistant",
+        "agentId": "shared_204433a27e8d497caa54eaa58a408043",
+        "topicId": "shared_a5626ad32fbf4c39b8dcfdb665c01886",
+        "name": "Synthetic interrupted single",
+        "content": "Native final response from loopback provider.",
+        "timestamp": 1795282408824,
+        "finishReason": "completed",
+        "_nativeSyncMetadata": {
+          "version": 1,
+          "hash": "2e7c3e75dacd47dad481c6f01a732652d680dbb4327155104d64fef95fc4bee2",
+          "fields": {
+            "isThinking": false,
+            "continuity": {
+              "version": 1,
+              "known": true,
+              "requestId": "reply_request_ae608679353b4d40b6c1159e79669209_g1",
+              "executionId": "request_ae608679353b4d40b6c1159e79669209",
+              "dependsOnMessageIds": [
+                "d464ec27-5a9e-4e4c-88e8-ffb335c5b690",
+                "checkpoint_compact_4c2d95a6648a47825ae286682f9da82b9fb63ba6"
+              ]
+            }
+          }
+        },
+        "isThinking": false,
+        "continuity": {
+          "version": 1,
+          "known": true,
+          "requestId": "reply_request_ae608679353b4d40b6c1159e79669209_g1",
+          "executionId": "request_ae608679353b4d40b6c1159e79669209",
+          "dependsOnMessageIds": [
+            "d464ec27-5a9e-4e4c-88e8-ffb335c5b690",
+            "checkpoint_compact_4c2d95a6648a47825ae286682f9da82b9fb63ba6"
+          ]
+        }
+      }
+    },
+    "edited": {
+      "workId": "request_ae608679353b4d40b6c1159e79669209",
+      "sharedId": "shared_a5626ad32fbf4c39b8dcfdb665c01886",
+      "requestId": "reply_request_ae608679353b4d40b6c1159e79669209_g1",
+      "generation": 1,
+      "state": "committed",
+      "seq": 5,
+      "currentSeq": 6,
+      "historyState": "edited",
+      "contentHash": "bff7acbb3bd534d6633aa8a4658961bd03012980242dc585a40dee8fdfac43e6",
+      "message": {
+        "id": "reply_request_ae608679353b4d40b6c1159e79669209_g1",
+        "role": "assistant",
+        "agentId": "shared_204433a27e8d497caa54eaa58a408043",
+        "topicId": "shared_a5626ad32fbf4c39b8dcfdb665c01886",
+        "name": "Synthetic interrupted single",
+        "content": "Later human edit",
+        "timestamp": 1795282408824,
+        "finishReason": "completed",
+        "_nativeSyncMetadata": {
+          "version": 1,
+          "hash": "2e7c3e75dacd47dad481c6f01a732652d680dbb4327155104d64fef95fc4bee2",
+          "fields": {
+            "isThinking": false,
+            "continuity": {
+              "version": 1,
+              "known": true,
+              "requestId": "reply_request_ae608679353b4d40b6c1159e79669209_g1",
+              "executionId": "request_ae608679353b4d40b6c1159e79669209",
+              "dependsOnMessageIds": [
+                "d464ec27-5a9e-4e4c-88e8-ffb335c5b690",
+                "checkpoint_compact_4c2d95a6648a47825ae286682f9da82b9fb63ba6"
+              ]
+            }
+          }
+        },
+        "isThinking": false,
+        "continuity": {
+          "version": 1,
+          "known": true,
+          "requestId": "reply_request_ae608679353b4d40b6c1159e79669209_g1",
+          "executionId": "request_ae608679353b4d40b6c1159e79669209",
+          "dependsOnMessageIds": [
+            "d464ec27-5a9e-4e4c-88e8-ffb335c5b690",
+            "checkpoint_compact_4c2d95a6648a47825ae286682f9da82b9fb63ba6"
+          ]
+        }
+      }
+    },
+    "deleted": {
+      "workId": "request_ae608679353b4d40b6c1159e79669209",
+      "sharedId": "shared_a5626ad32fbf4c39b8dcfdb665c01886",
+      "requestId": "reply_request_ae608679353b4d40b6c1159e79669209_g1",
+      "generation": 1,
+      "state": "committed",
+      "seq": 5,
+      "currentSeq": 7,
+      "historyState": "deleted",
+      "contentHash": "bff7acbb3bd534d6633aa8a4658961bd03012980242dc585a40dee8fdfac43e6",
+      "message": null
+    },
+    "afterRestart": {
+      "workId": "request_ae608679353b4d40b6c1159e79669209",
+      "sharedId": "shared_a5626ad32fbf4c39b8dcfdb665c01886",
+      "requestId": "reply_request_ae608679353b4d40b6c1159e79669209_g1",
+      "generation": 1,
+      "state": "committed",
+      "seq": 5,
+      "currentSeq": 7,
+      "historyState": "deleted",
+      "contentHash": "bff7acbb3bd534d6633aa8a4658961bd03012980242dc585a40dee8fdfac43e6",
+      "message": null
+    },
+    "invalid": {
+      "wrongExecutor": {
+        "status": 403,
+        "code": "SHARED_REQUEST_OWNER_REQUIRED"
+      },
+      "wrongWork": {
+        "status": 404,
+        "code": "SHARED_REQUEST_NOT_FOUND"
+      },
+      "wrongGeneration": {
+        "status": 400,
+        "code": "INVALID_SHARED_REQUEST"
+      },
+      "wrongReply": {
+        "status": 404,
+        "code": "SHARED_REQUEST_NOT_FOUND"
+      }
+    }
+  },
+  "build": {
+    "baseRevision": "aa19a637831c1a7fabd3ec0de858d08084097ef7",
+    "node": "v24.22.1",
+    "source": "tested candidate working tree",
+    "watchFallback": true,
+    "desktopClient": {
+      "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+      "sha256": "2fc1700e4d7b47ed9fd6a9e693ce44d63a5332698d382966eb972ec3d3b58e86"
+    },
+    "serverSources": [
+      {
+        "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+        "sha256": "3bdd9fba3596f59ecf8a823303cd2b9dc4a44d0ab071203fa5e91f797010557d"
+      },
+      {
+        "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+        "sha256": "3efd8bf1b4c4411d7f8ec5c648ded72bc19f8e836058c644aa8050684baed133"
+      },
+      {
+        "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+        "sha256": "6bd45ec5f20ab1f35db82145467e2569745b641daed4ffec5bed79c747fc260b"
+      },
+      {
+        "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+        "sha256": "a1b166d894a7e697a54a226b78d381388e1fffe39c0984bf20441069beba4fa3"
+      }
+    ]
+  },
+  "legacyWithReceipt": {
+    "revision": "5ed51ba784bf",
+    "serverSourcesBeforeUpgrade": [
+      {
+        "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+        "sha256": "4f7dab15039bb42a5dc1289b21a5a84627abc4c9ce577b7b7575b2ac3648408f"
+      },
+      {
+        "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+        "sha256": "e0cdd6e14834b6b31dbec30afb9b593b4c55b4405d53503c430d0bcfe0aabd07"
+      },
+      {
+        "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+        "sha256": "78b53bbb5016510fc3a4827c32df1c3e9b8a57fd218d7d6ae7419ae35c601b57"
+      },
+      {
+        "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+        "sha256": "f4aea542cdcbbe7273bc66e0aee7d35df01b3688d32c11786681ceb3c04d5fe0"
+      }
+    ],
+    "before": {
+      "work": {
+        "state": "completed",
+        "reply_seq": 5
+      },
+      "request": "model_terminal",
+      "assistantEvents": 1,
+      "completion": null,
+      "journal": [
+        {
+          "seq": 5,
+          "action": "upsert",
+          "hash": "ccd99e4cdfd1ae399c89f2390e22d61d716d91d45bccd6b01d3ec7f131e11f32"
+        }
+      ]
+    },
+    "after": {
+      "work": {
+        "state": "completed",
+        "reply_seq": 5
+      },
+      "request": "model_terminal",
+      "assistantEvents": 1,
+      "completion": null,
+      "journal": [
+        {
+          "seq": 5,
+          "action": "upsert",
+          "hash": "ccd99e4cdfd1ae399c89f2390e22d61d716d91d45bccd6b01d3ec7f131e11f32"
+        }
+      ]
+    },
+    "oldReceipt": {
+      "status": 200,
+      "seq": 5,
+      "replayed": false
+    },
+    "exact": {
+      "status": 200,
+      "seq": 5,
+      "replayed": true
+    },
+    "altered": {
+      "status": 409,
+      "code": "IDEMPOTENCY_KEY_REUSED"
+    },
+    "newOp": {
+      "status": 200,
+      "seq": 5,
+      "replayed": false
+    },
+    "counts": {
+      "provider": 3,
+      "tool": 1
+    },
+    "fallback": {
+      "advertised": false,
+      "routeStatus": 404,
+      "requests": [
+        {
+          "method": "GET",
+          "route": "/api/v1/sync/shared/steering"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v1/sync/shared/steer-turn-complete"
+        }
+      ],
+      "phase": "completed",
+      "accepted": true
+    },
+    "readback": {
+      "workId": "request_10e89ad006744f80b9a61835e68678c3",
+      "sharedId": "shared_c127717443ed49d2a5538f59fbfa08da",
+      "requestId": "reply_request_10e89ad006744f80b9a61835e68678c3_g1",
+      "generation": 1,
+      "state": "committed",
+      "seq": 5,
+      "currentSeq": 5,
+      "historyState": "original",
+      "contentHash": "bff7acbb3bd534d6633aa8a4658961bd03012980242dc585a40dee8fdfac43e6",
+      "message": {
+        "id": "reply_request_10e89ad006744f80b9a61835e68678c3_g1",
+        "role": "assistant",
+        "content": "Native final response from loopback provider.",
+        "timestamp": 1795282436705,
+        "finishReason": "completed",
+        "_nativeSyncMetadata": {
+          "version": 1,
+          "hash": "8cfaefd48d9ede53e87f5075cdb2300510e83c5acdb3ffd73b979cdf7e991923",
+          "fields": {
+            "continuity": {
+              "version": 1,
+              "known": true,
+              "requestId": "reply_request_10e89ad006744f80b9a61835e68678c3_g1",
+              "executionId": "request_10e89ad006744f80b9a61835e68678c3",
+              "dependsOnMessageIds": [
+                "023f0fd2-7041-4ecb-b0e7-5966507fa1f8",
+                "checkpoint_compact_3f08759532c65163c8a2054e67db90fa00bdcee1"
+              ]
+            }
+          }
+        },
+        "continuity": {
+          "version": 1,
+          "known": true,
+          "requestId": "reply_request_10e89ad006744f80b9a61835e68678c3_g1",
+          "executionId": "request_10e89ad006744f80b9a61835e68678c3",
+          "dependsOnMessageIds": [
+            "023f0fd2-7041-4ecb-b0e7-5966507fa1f8",
+            "checkpoint_compact_3f08759532c65163c8a2054e67db90fa00bdcee1"
+          ]
+        }
+      }
+    }
+  },
+  "legacyWithoutProof": {
+    "revision": "5ed51ba784bf",
+    "serverSourcesBeforeUpgrade": [
+      {
+        "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+        "sha256": "4f7dab15039bb42a5dc1289b21a5a84627abc4c9ce577b7b7575b2ac3648408f"
+      },
+      {
+        "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+        "sha256": "e0cdd6e14834b6b31dbec30afb9b593b4c55b4405d53503c430d0bcfe0aabd07"
+      },
+      {
+        "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+        "sha256": "78b53bbb5016510fc3a4827c32df1c3e9b8a57fd218d7d6ae7419ae35c601b57"
+      },
+      {
+        "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+        "sha256": "f4aea542cdcbbe7273bc66e0aee7d35df01b3688d32c11786681ceb3c04d5fe0"
+      }
+    ],
+    "before": {
+      "work": {
+        "state": "dispatched",
+        "reply_seq": null
+      },
+      "request": "model_terminal",
+      "assistantEvents": 1,
+      "completion": null,
+      "journal": []
+    },
+    "after": {
+      "work": {
+        "state": "review_required",
+        "reply_seq": null
+      },
+      "request": "model_terminal",
+      "assistantEvents": 1,
+      "completion": null,
+      "journal": []
+    },
+    "late": {
+      "status": 409,
+      "code": "SHARED_REQUEST_FENCED"
+    },
+    "counts": {
+      "provider": 3,
+      "tool": 1
+    },
+    "readback": {
+      "workId": "request_3c216ad94e814c37b35142f12e72d57e",
+      "sharedId": "shared_4c1147ea1aa84c6196abae625518a312",
+      "requestId": "reply_request_3c216ad94e814c37b35142f12e72d57e_g1",
+      "generation": 1,
+      "state": "review_required",
+      "workState": "review_required"
+    }
+  }
+}

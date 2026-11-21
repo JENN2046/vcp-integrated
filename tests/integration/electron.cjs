@@ -86,10 +86,13 @@ ipcMain.handle = (channel, fn) => {
         }
         const invoke = () => fn.call(this, event, ...args);
         const result = compactionRace ? compactionRace(channel, args, invoke) : invoke();
-        if (detailed && /^(native-sync:|topic-execution:authority|save-avatar$|save-agent-config$|save-agent-group-avatar$|save-agent-group-config$)/.test(channel)) {
+        if (detailed && /^(native-sync:|native-history:(?:terminal|messages)$|topic-execution:authority|save-avatar$|save-agent-config$|save-agent-group-avatar$|save-agent-group-config$)/.test(channel)) {
             return Promise.resolve(result).then(value => {
                 log('ipc-result', {channel, code:value?.code, error:value?.error, handled:value?.handled,
                     success:value?.success,
+                    ...(value?.authoritativeReply && { authoritativeReply: {
+                        state: value.authoritativeReply.state, seq: value.authoritativeReply.seq,
+                    } }),
                     ...(compactionRace && channel.startsWith('native-sync:compact-') && {
                         recovered:value?.recovered, intentId:value?.id, checkpointId:value?.messageId,
                     }),

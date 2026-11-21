@@ -1,0 +1,2130 @@
+{
+  "environment": {
+    "electron": "44.9.3",
+    "chromiumSandbox": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+  },
+  "cases": {
+    "json": {
+      "mode": "tool-final-readback-json",
+      "serverRevision": null,
+      "workId": "request_9d5e76f58f7a468a863689acdba9e33b",
+      "originalRequestId": "controlled_b3cdccf3394e4ca1934d5a32e63dce28",
+      "generations": [
+        {
+          "generation": 0,
+          "executor": "desktop:deviceA",
+          "request_id": "reply_request_9d5e76f58f7a468a863689acdba9e33b",
+          "state": "paused"
+        },
+        {
+          "generation": 1,
+          "executor": "desktop:deviceB",
+          "request_id": "reply_request_9d5e76f58f7a468a863689acdba9e33b_g1",
+          "state": "completed"
+        }
+      ],
+      "workState": "completed",
+      "replySeq": 6,
+      "reply": {
+        "journal": 1,
+        "physicalHistory": 1,
+        "chatBubble": 1,
+        "historyFinishReasons": [
+          "completed"
+        ]
+      },
+      "providerCalls": [
+        {
+          "requestId": "reply_request_9d5e76f58f7a468a863689acdba9e33b",
+          "phase": "initial"
+        },
+        {
+          "requestId": "compaction_1795282420471_izmuqsfdu4",
+          "phase": "summary"
+        },
+        {
+          "requestId": "reply_request_9d5e76f58f7a468a863689acdba9e33b_g1",
+          "phase": "resumed"
+        }
+      ],
+      "toolSideEffects": 1,
+      "bFinalRequests": [
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282444493,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_9d5e76f58f7a468a863689acdba9e33b",
+            "requestId": "reply_request_9d5e76f58f7a468a863689acdba9e33b_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_c3db08db56ab451f85a228813f47a85b",
+            "workId": "request_9d5e76f58f7a468a863689acdba9e33b",
+            "generation": 1,
+            "requestId": "reply_request_9d5e76f58f7a468a863689acdba9e33b_g1",
+            "seq": 6,
+            "currentSeq": 6,
+            "historyState": "original",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282445618,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_9d5e76f58f7a468a863689acdba9e33b",
+            "requestId": "reply_request_9d5e76f58f7a468a863689acdba9e33b_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_c3db08db56ab451f85a228813f47a85b",
+            "workId": "request_9d5e76f58f7a468a863689acdba9e33b",
+            "generation": 1,
+            "requestId": "reply_request_9d5e76f58f7a468a863689acdba9e33b_g1",
+            "seq": 6,
+            "currentSeq": 6,
+            "historyState": "original",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282446085,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_9d5e76f58f7a468a863689acdba9e33b",
+            "requestId": "reply_request_9d5e76f58f7a468a863689acdba9e33b_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_c3db08db56ab451f85a228813f47a85b",
+            "workId": "request_9d5e76f58f7a468a863689acdba9e33b",
+            "generation": 1,
+            "requestId": "reply_request_9d5e76f58f7a468a863689acdba9e33b_g1",
+            "seq": 6,
+            "currentSeq": 6,
+            "historyState": "original",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        }
+      ],
+      "bCompletionPosts": 0,
+      "toolInvocation": {
+        "invocation_id": "24138634-5ed6-409c-81ea-d72bc711b184",
+        "native_request_id": "reply_request_9d5e76f58f7a468a863689acdba9e33b",
+        "record_id": "tcr-1795282416589-673aa46b-c240-4b1d-bc6d-61c1e6b78f2e",
+        "state": "returned"
+      },
+      "nativeHttp": [
+        {
+          "route": "/v1/chat/completions",
+          "method": "POST",
+          "at": 1795282444357,
+          "status": 200,
+          "downstreamFinished": true
+        }
+      ],
+      "nativeTerminal": {
+        "at": 1795282444774,
+        "status": 200,
+        "bodyComplete": true,
+        "finishReason": "stop",
+        "text": "Synthetic B finished the original tool Work."
+      },
+      "desktopLedger": {
+        "generation": 1,
+        "requestId": "reply_request_9d5e76f58f7a468a863689acdba9e33b_g1",
+        "workState": "completed",
+        "readback": true,
+        "replyAccepted": true,
+        "hasReplyIntent": false,
+        "observedFinalHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+      },
+      "screenshots": [
+        "json.webp"
+      ],
+      "loadedSources": "7fc491afd48d"
+    },
+    "sse": {
+      "mode": "tool-final-readback-stream",
+      "serverRevision": null,
+      "workId": "request_ab549670daf243c4a6fda886803a125f",
+      "originalRequestId": "controlled_5f02714ebf774edba694e93f8435bb8f",
+      "generations": [
+        {
+          "generation": 0,
+          "executor": "desktop:deviceA",
+          "request_id": "reply_request_ab549670daf243c4a6fda886803a125f",
+          "state": "paused"
+        },
+        {
+          "generation": 1,
+          "executor": "desktop:deviceB",
+          "request_id": "reply_request_ab549670daf243c4a6fda886803a125f_g1",
+          "state": "completed"
+        }
+      ],
+      "workState": "completed",
+      "replySeq": 6,
+      "reply": {
+        "journal": 1,
+        "physicalHistory": 1,
+        "chatBubble": 1,
+        "historyFinishReasons": [
+          "completed"
+        ]
+      },
+      "providerCalls": [
+        {
+          "requestId": "reply_request_ab549670daf243c4a6fda886803a125f",
+          "phase": "initial"
+        },
+        {
+          "requestId": "compaction_1795282419839_qxzesq51ns",
+          "phase": "summary"
+        },
+        {
+          "requestId": "reply_request_ab549670daf243c4a6fda886803a125f_g1",
+          "phase": "resumed"
+        }
+      ],
+      "toolSideEffects": 1,
+      "bFinalRequests": [
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282444427,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_ab549670daf243c4a6fda886803a125f",
+            "requestId": "reply_request_ab549670daf243c4a6fda886803a125f_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_03b5d53a4eea41ddaa2d77d03f55ee7f",
+            "workId": "request_ab549670daf243c4a6fda886803a125f",
+            "generation": 1,
+            "requestId": "reply_request_ab549670daf243c4a6fda886803a125f_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282444893,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_ab549670daf243c4a6fda886803a125f",
+            "requestId": "reply_request_ab549670daf243c4a6fda886803a125f_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_03b5d53a4eea41ddaa2d77d03f55ee7f",
+            "workId": "request_ab549670daf243c4a6fda886803a125f",
+            "generation": 1,
+            "requestId": "reply_request_ab549670daf243c4a6fda886803a125f_g1",
+            "seq": 6,
+            "currentSeq": 6,
+            "historyState": "original",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282445283,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_ab549670daf243c4a6fda886803a125f",
+            "requestId": "reply_request_ab549670daf243c4a6fda886803a125f_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_03b5d53a4eea41ddaa2d77d03f55ee7f",
+            "workId": "request_ab549670daf243c4a6fda886803a125f",
+            "generation": 1,
+            "requestId": "reply_request_ab549670daf243c4a6fda886803a125f_g1",
+            "seq": 6,
+            "currentSeq": 6,
+            "historyState": "original",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282445465,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_ab549670daf243c4a6fda886803a125f",
+            "requestId": "reply_request_ab549670daf243c4a6fda886803a125f_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_03b5d53a4eea41ddaa2d77d03f55ee7f",
+            "workId": "request_ab549670daf243c4a6fda886803a125f",
+            "generation": 1,
+            "requestId": "reply_request_ab549670daf243c4a6fda886803a125f_g1",
+            "seq": 6,
+            "currentSeq": 6,
+            "historyState": "original",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282445603,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_ab549670daf243c4a6fda886803a125f",
+            "requestId": "reply_request_ab549670daf243c4a6fda886803a125f_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_03b5d53a4eea41ddaa2d77d03f55ee7f",
+            "workId": "request_ab549670daf243c4a6fda886803a125f",
+            "generation": 1,
+            "requestId": "reply_request_ab549670daf243c4a6fda886803a125f_g1",
+            "seq": 6,
+            "currentSeq": 6,
+            "historyState": "original",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        }
+      ],
+      "bCompletionPosts": 0,
+      "toolInvocation": {
+        "invocation_id": "ff6d7b23-0c01-4edc-bde6-b173e2d8043e",
+        "native_request_id": "reply_request_ab549670daf243c4a6fda886803a125f",
+        "record_id": "tcr-1795282415508-d817695c-a1e8-4b67-b681-c1d3c598c05e",
+        "state": "returned"
+      },
+      "nativeHttp": [
+        {
+          "route": "/v1/chat/completions",
+          "method": "POST",
+          "at": 1795282444366,
+          "status": 200,
+          "downstreamFinished": true
+        }
+      ],
+      "nativeTerminal": {
+        "at": 1795282444788,
+        "status": 200,
+        "bodyComplete": true,
+        "finishReason": "stop",
+        "text": "Synthetic B finished the original tool Work.",
+        "done": true
+      },
+      "rendererEnd": {
+        "channel": "vcp-stream-event",
+        "sender": 1,
+        "type": "end",
+        "modelFinishReason": "stop"
+      },
+      "desktopLedger": {
+        "generation": 1,
+        "requestId": "reply_request_ab549670daf243c4a6fda886803a125f_g1",
+        "workState": "completed",
+        "readback": true,
+        "replyAccepted": true,
+        "hasReplyIntent": false,
+        "observedFinalHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+      },
+      "screenshots": [
+        "sse.webp"
+      ],
+      "loadedSources": "4f89a3f97200"
+    },
+    "terminal-lost": {
+      "mode": "tool-final-readback-terminal-lost",
+      "serverRevision": null,
+      "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+      "originalRequestId": "controlled_6b3056cf95c8458e97c750b9e08196ec",
+      "generations": [
+        {
+          "generation": 0,
+          "executor": "desktop:deviceA",
+          "request_id": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+          "state": "paused"
+        },
+        {
+          "generation": 1,
+          "executor": "desktop:deviceB",
+          "request_id": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+          "state": "completed"
+        }
+      ],
+      "workState": "completed",
+      "replySeq": 6,
+      "reply": {
+        "reopened": {
+          "workState": "completed",
+          "replySeq": 6,
+          "nativeRequestState": "model_terminal",
+          "journal": 1,
+          "physicalHistory": 1,
+          "chatBubble": 1,
+          "historyFinishReasons": [
+            "completed"
+          ]
+        },
+        "toolBoxRestarted": {
+          "workState": "completed",
+          "replySeq": 6,
+          "nativeRequestState": "model_terminal",
+          "journal": 1,
+          "physicalHistory": 1,
+          "chatBubble": 1,
+          "historyFinishReasons": [
+            "completed"
+          ]
+        }
+      },
+      "providerCalls": [
+        {
+          "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+          "phase": "initial"
+        },
+        {
+          "requestId": "compaction_1795282420908_2bnezs1up7",
+          "phase": "summary"
+        },
+        {
+          "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+          "phase": "resumed"
+        }
+      ],
+      "toolSideEffects": 1,
+      "bFinalRequests": [
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282443690,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_8ae4ba93d53f491daef63433d51ec29e",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "generation": 1,
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282443894,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_8ae4ba93d53f491daef63433d51ec29e",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "generation": 1,
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282444144,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_8ae4ba93d53f491daef63433d51ec29e",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "generation": 1,
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282444397,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_8ae4ba93d53f491daef63433d51ec29e",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "generation": 1,
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282444648,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_8ae4ba93d53f491daef63433d51ec29e",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "generation": 1,
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282444910,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_8ae4ba93d53f491daef63433d51ec29e",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "generation": 1,
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282445681,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_8ae4ba93d53f491daef63433d51ec29e",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "generation": 1,
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282449440,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_8ae4ba93d53f491daef63433d51ec29e",
+            "workId": "request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+            "generation": 1,
+            "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+            "seq": 6,
+            "currentSeq": 6,
+            "historyState": "original",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        }
+      ],
+      "bCompletionPosts": 0,
+      "toolInvocation": {
+        "invocation_id": "5910748d-96cc-434c-90e5-b67ffd3f1a71",
+        "native_request_id": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10",
+        "record_id": "tcr-1795282418280-539bda3a-1990-4667-8406-c2b7f53de64e",
+        "state": "returned"
+      },
+      "desktopLedger": {
+        "reopened": {
+          "generation": 1,
+          "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+          "workState": "completed",
+          "readback": true,
+          "replyAccepted": true,
+          "hasReplyIntent": false,
+          "observedFinalHash": null
+        },
+        "toolBoxRestarted": {
+          "generation": 1,
+          "requestId": "reply_request_9cfdc6a13a544c3588dcb3a9a1d7cb10_g1",
+          "workState": "completed",
+          "readback": true,
+          "replyAccepted": true,
+          "hasReplyIntent": false,
+          "observedFinalHash": null
+        }
+      },
+      "nativeResponseLost": {
+        "at": 1795282446480,
+        "device": "deviceB",
+        "headersSent": false
+      },
+      "bExit": {
+        "normalExit": true,
+        "electronPid": 200867,
+        "cdsPid": 201548,
+        "liveGroupMembers": 0
+      },
+      "toolBoxCrash": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "nativeTerminal": {
+        "at": 1795282446950,
+        "status": 200,
+        "bodyComplete": true,
+        "finishReason": "stop",
+        "text": "Synthetic B finished the original tool Work.",
+        "done": true
+      },
+      "committedReadbackAfterReopen": true,
+      "screenshots": [
+        "terminal-lost.webp",
+        "terminal-lost-toolbox-restarted.webp"
+      ],
+      "loadedSources": "6bff77ab114f"
+    },
+    "query-lost": {
+      "mode": "tool-final-readback-query-lost",
+      "serverRevision": null,
+      "workId": "request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+      "originalRequestId": "controlled_b2d8f36553b04cde9c23cc08eb124524",
+      "generations": [
+        {
+          "generation": 0,
+          "executor": "desktop:deviceA",
+          "request_id": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+          "state": "paused"
+        },
+        {
+          "generation": 1,
+          "executor": "desktop:deviceB",
+          "request_id": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1",
+          "state": "completed"
+        }
+      ],
+      "workState": "completed",
+      "replySeq": 6,
+      "reply": {
+        "journal": 1,
+        "physicalHistory": 1,
+        "chatBubble": 1,
+        "historyFinishReasons": [
+          "completed"
+        ]
+      },
+      "providerCalls": [
+        {
+          "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+          "phase": "initial"
+        },
+        {
+          "requestId": "compaction_1795282421799_4wj5mr9v7o",
+          "phase": "summary"
+        },
+        {
+          "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1",
+          "phase": "resumed"
+        }
+      ],
+      "toolSideEffects": 1,
+      "bFinalRequests": [
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282446204,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+            "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_a03036f7de2b4422844f4eecdccd4da8",
+            "workId": "request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+            "generation": 1,
+            "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282446337,
+          "status": 200,
+          "dropped": true,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+            "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_a03036f7de2b4422844f4eecdccd4da8",
+            "workId": "request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+            "generation": 1,
+            "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1",
+            "seq": 6,
+            "currentSeq": 6,
+            "historyState": "original",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282446497,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+            "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_a03036f7de2b4422844f4eecdccd4da8",
+            "workId": "request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+            "generation": 1,
+            "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1",
+            "seq": 6,
+            "currentSeq": 6,
+            "historyState": "original",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282447118,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+            "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_a03036f7de2b4422844f4eecdccd4da8",
+            "workId": "request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+            "generation": 1,
+            "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1",
+            "seq": 6,
+            "currentSeq": 6,
+            "historyState": "original",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282447320,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+            "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_a03036f7de2b4422844f4eecdccd4da8",
+            "workId": "request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+            "generation": 1,
+            "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1",
+            "seq": 6,
+            "currentSeq": 6,
+            "historyState": "original",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        }
+      ],
+      "bCompletionPosts": 0,
+      "toolInvocation": {
+        "invocation_id": "478c4fe9-9910-4190-8196-8cee4fcce02d",
+        "native_request_id": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e",
+        "record_id": "tcr-1795282417742-839c88cf-293a-4091-8e1b-d081542f282b",
+        "state": "returned"
+      },
+      "nativeHttp": [
+        {
+          "route": "/v1/chat/completions",
+          "method": "POST",
+          "at": 1795282446230,
+          "status": 200,
+          "downstreamFinished": true
+        }
+      ],
+      "nativeTerminal": {
+        "at": 1795282446404,
+        "status": 200,
+        "bodyComplete": true,
+        "finishReason": "stop",
+        "text": "Synthetic B finished the original tool Work."
+      },
+      "desktopLedger": {
+        "generation": 1,
+        "requestId": "reply_request_dc15afdfaa7c4c26b19148bdbf5a9d5e_g1",
+        "workState": "completed",
+        "readback": true,
+        "replyAccepted": true,
+        "hasReplyIntent": false,
+        "observedFinalHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+      },
+      "screenshots": [
+        "query-lost.webp"
+      ],
+      "loadedSources": "6bff77ab114f"
+    },
+    "legacy": {
+      "mode": "tool-final-readback-legacy",
+      "serverRevision": "aa19a637831c1a7fabd3ec0de858d08084097ef7",
+      "workId": "request_d79b8302deb44a42b58f4daeac7a4412",
+      "originalRequestId": "controlled_b0e550d381bd4783860334ec57356bef",
+      "generations": [
+        {
+          "generation": 0,
+          "executor": "desktop:deviceA",
+          "request_id": "reply_request_d79b8302deb44a42b58f4daeac7a4412",
+          "state": "paused"
+        },
+        {
+          "generation": 1,
+          "executor": "desktop:deviceB",
+          "request_id": "reply_request_d79b8302deb44a42b58f4daeac7a4412_g1",
+          "state": "completed"
+        }
+      ],
+      "workState": "completed",
+      "replySeq": 6,
+      "reply": {
+        "journal": 1,
+        "physicalHistory": 1,
+        "chatBubble": 1,
+        "historyFinishReasons": [
+          "completed"
+        ]
+      },
+      "providerCalls": [
+        {
+          "requestId": "reply_request_d79b8302deb44a42b58f4daeac7a4412",
+          "phase": "initial"
+        },
+        {
+          "requestId": "compaction_1795282426789_qdyeah8alp",
+          "phase": "summary"
+        },
+        {
+          "requestId": "reply_request_d79b8302deb44a42b58f4daeac7a4412_g1",
+          "phase": "resumed"
+        }
+      ],
+      "toolSideEffects": 1,
+      "bFinalRequests": [
+        {
+          "route": "/api/v1/sync/shared/steer-turn-complete",
+          "method": "POST",
+          "at": 1795282450317,
+          "status": 200,
+          "response": {
+            "workState": "completed",
+            "seq": 6,
+            "replayed": true
+          }
+        }
+      ],
+      "bCompletionPosts": 1,
+      "toolInvocation": {
+        "invocation_id": "06fddcf1-ca00-41c1-b7d2-db2b1c29397f",
+        "native_request_id": "reply_request_d79b8302deb44a42b58f4daeac7a4412",
+        "record_id": "tcr-1795282424887-fc3e3b17-52ab-4877-9ae6-4fd831cd0918",
+        "state": "returned"
+      },
+      "nativeHttp": [
+        {
+          "route": "/v1/chat/completions",
+          "method": "POST",
+          "at": 1795282450175,
+          "status": 200,
+          "downstreamFinished": true
+        }
+      ],
+      "desktopLedger": {
+        "generation": 1,
+        "requestId": "reply_request_d79b8302deb44a42b58f4daeac7a4412_g1",
+        "workState": "completed",
+        "readback": false,
+        "replyAccepted": true,
+        "hasReplyIntent": true,
+        "observedFinalHash": null
+      },
+      "screenshots": [
+        "legacy.webp"
+      ],
+      "loadedSources": "9ebf60e4ad27"
+    },
+    "legacy-ack-lost": {
+      "mode": "tool-final-publication-ack",
+      "serverRevision": "aa19a637831c1a7fabd3ec0de858d08084097ef7",
+      "workId": "request_8f5e3f9b01804e398d9af71c440d4df8",
+      "originalRequestId": "controlled_2fb50918756149cdb7b4bf0b735ec74f",
+      "generations": [
+        {
+          "generation": 0,
+          "executor": "desktop:deviceA",
+          "request_id": "reply_request_8f5e3f9b01804e398d9af71c440d4df8",
+          "state": "paused"
+        },
+        {
+          "generation": 1,
+          "executor": "desktop:deviceB",
+          "request_id": "reply_request_8f5e3f9b01804e398d9af71c440d4df8_g1",
+          "state": "completed"
+        }
+      ],
+      "workState": "completed",
+      "replySeq": 6,
+      "reply": {
+        "journal": 1,
+        "physicalHistory": 1,
+        "chatBubble": 1,
+        "historyFinishReasons": [
+          "completed"
+        ]
+      },
+      "providerCalls": [
+        {
+          "requestId": "reply_request_8f5e3f9b01804e398d9af71c440d4df8",
+          "phase": "initial"
+        },
+        {
+          "requestId": "compaction_1795282428019_dvi99q9owg",
+          "phase": "summary"
+        },
+        {
+          "requestId": "reply_request_8f5e3f9b01804e398d9af71c440d4df8_g1",
+          "phase": "resumed"
+        }
+      ],
+      "toolSideEffects": 1,
+      "bFinalRequests": [
+        {
+          "route": "/api/v1/sync/shared/steer-turn-complete",
+          "method": "POST",
+          "at": 1795282451038,
+          "status": 200,
+          "dropped": true,
+          "response": {
+            "workState": "completed",
+            "seq": 6,
+            "replayed": true
+          }
+        }
+      ],
+      "bCompletionPosts": 1,
+      "toolInvocation": {
+        "invocation_id": "41ca1a92-7202-41b9-a3b1-263c4304b0c2",
+        "native_request_id": "reply_request_8f5e3f9b01804e398d9af71c440d4df8",
+        "record_id": "tcr-1795282425498-644692ea-2115-46b0-a27b-408f21426336",
+        "state": "returned"
+      },
+      "nativeHttp": [
+        {
+          "route": "/v1/chat/completions",
+          "method": "POST",
+          "at": 1795282450853,
+          "status": 200,
+          "downstreamFinished": true
+        }
+      ],
+      "desktopLedger": {
+        "generation": 1,
+        "requestId": "reply_request_8f5e3f9b01804e398d9af71c440d4df8_g1",
+        "workState": "completed",
+        "readback": false,
+        "replyAccepted": false,
+        "hasReplyIntent": true,
+        "observedFinalHash": null
+      },
+      "screenshots": [
+        "legacy-ack-lost.webp"
+      ],
+      "loadedSources": "8d045d77f79e"
+    },
+    "unknown": {
+      "mode": "tool-final-receipt-unknown",
+      "serverRevision": null,
+      "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+      "originalRequestId": "controlled_39595fa6cef34b1abff67414d4c552a0",
+      "generations": [
+        {
+          "generation": 0,
+          "executor": "desktop:deviceA",
+          "request_id": "reply_request_bce72c3fb7664c1fb278c60a15135386",
+          "state": "paused"
+        },
+        {
+          "generation": 1,
+          "executor": "desktop:deviceB",
+          "request_id": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1",
+          "state": "running"
+        }
+      ],
+      "workState": "review_required",
+      "replySeq": null,
+      "reply": {
+        "reopened": {
+          "workState": "review_required",
+          "replySeq": null,
+          "nativeRequestState": "unknown",
+          "journal": 0,
+          "physicalHistory": 0,
+          "chatBubble": 0,
+          "historyFinishReasons": []
+        },
+        "toolBoxRestarted": {
+          "workState": "review_required",
+          "replySeq": null,
+          "nativeRequestState": "unknown",
+          "journal": 0,
+          "physicalHistory": 0,
+          "chatBubble": 0,
+          "historyFinishReasons": []
+        }
+      },
+      "providerCalls": [
+        {
+          "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386",
+          "phase": "initial"
+        },
+        {
+          "requestId": "compaction_1795282422035_9vy5yrvz5v",
+          "phase": "summary"
+        },
+        {
+          "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1",
+          "phase": "resumed"
+        }
+      ],
+      "toolSideEffects": 1,
+      "bFinalRequests": [
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282446265,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+            "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_45381545bbf84bda87f0f133e1464a78",
+            "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+            "generation": 1,
+            "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282446515,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+            "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_45381545bbf84bda87f0f133e1464a78",
+            "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+            "generation": 1,
+            "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282446763,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+            "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_45381545bbf84bda87f0f133e1464a78",
+            "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+            "generation": 1,
+            "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282447015,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+            "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_45381545bbf84bda87f0f133e1464a78",
+            "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+            "generation": 1,
+            "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282447265,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+            "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_45381545bbf84bda87f0f133e1464a78",
+            "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+            "generation": 1,
+            "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282450205,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+            "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "review_required",
+            "sharedId": "shared_45381545bbf84bda87f0f133e1464a78",
+            "workId": "request_bce72c3fb7664c1fb278c60a15135386",
+            "generation": 1,
+            "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1"
+          }
+        }
+      ],
+      "bCompletionPosts": 0,
+      "toolInvocation": {
+        "invocation_id": "ddf87f6d-32c2-4e46-9bed-8e7f0ed1942f",
+        "native_request_id": "reply_request_bce72c3fb7664c1fb278c60a15135386",
+        "record_id": "tcr-1795282417149-0ad12628-a8a6-4d4e-a058-07d949333edf",
+        "state": "returned"
+      },
+      "desktopLedger": {
+        "reopened": {
+          "generation": 1,
+          "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1",
+          "workState": "review_required",
+          "readback": true,
+          "replyAccepted": false,
+          "hasReplyIntent": false,
+          "observedFinalHash": null
+        },
+        "toolBoxRestarted": {
+          "generation": 1,
+          "requestId": "reply_request_bce72c3fb7664c1fb278c60a15135386_g1",
+          "workState": "review_required",
+          "readback": true,
+          "replyAccepted": false,
+          "hasReplyIntent": false,
+          "observedFinalHash": null
+        }
+      },
+      "nativeResponseLost": {
+        "at": 1795282447961,
+        "device": "deviceB",
+        "headersSent": false
+      },
+      "bExit": {
+        "normalExit": true,
+        "electronPid": 201361,
+        "cdsPid": 201904,
+        "liveGroupMembers": 0
+      },
+      "toolBoxCrash": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "screenshots": [
+        "unknown.webp"
+      ],
+      "loadedSources": "6bff77ab114f"
+    },
+    "late-json-delete": {
+      "mode": "tool-final-readback-json-delete",
+      "serverRevision": null,
+      "workId": "request_f8a30e6b078840388086b948a8b9e072",
+      "originalRequestId": "controlled_d804d65c40884e3494de3f0d190f5cc4",
+      "generations": [
+        {
+          "generation": 0,
+          "executor": "desktop:deviceA",
+          "request_id": "reply_request_f8a30e6b078840388086b948a8b9e072",
+          "state": "paused"
+        },
+        {
+          "generation": 1,
+          "executor": "desktop:deviceB",
+          "request_id": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+          "state": "completed"
+        }
+      ],
+      "workState": "completed",
+      "replySeq": 6,
+      "reply": {
+        "journal": [
+          {
+            "seq": 6,
+            "msg_id": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+            "action": "upsert",
+            "hash": "1999aea5cc0c067d84979203fdf540cfbd20e2d62f98767e25c9b9d27e6c1c24"
+          },
+          {
+            "seq": 7,
+            "msg_id": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+            "action": "delete",
+            "hash": "e13b21458bc0327071ebba81e713874522401b4db252963579e8f6b1f6dac9cb"
+          }
+        ],
+        "physicalHistory": [],
+        "chatBubble": 0,
+        "historyState": "deleted"
+      },
+      "providerCalls": [
+        {
+          "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072",
+          "phase": "initial"
+        },
+        {
+          "requestId": "compaction_1795282422869_zfc9so1uhd",
+          "phase": "summary"
+        },
+        {
+          "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+          "phase": "resumed"
+        }
+      ],
+      "toolSideEffects": 1,
+      "bFinalRequests": [
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282444864,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_f8a30e6b078840388086b948a8b9e072",
+            "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_6ebe7d95c616490dbd77f9364376edc2",
+            "workId": "request_f8a30e6b078840388086b948a8b9e072",
+            "generation": 1,
+            "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282444949,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_f8a30e6b078840388086b948a8b9e072",
+            "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_6ebe7d95c616490dbd77f9364376edc2",
+            "workId": "request_f8a30e6b078840388086b948a8b9e072",
+            "generation": 1,
+            "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282445226,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_f8a30e6b078840388086b948a8b9e072",
+            "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_6ebe7d95c616490dbd77f9364376edc2",
+            "workId": "request_f8a30e6b078840388086b948a8b9e072",
+            "generation": 1,
+            "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+            "seq": 6,
+            "currentSeq": 7,
+            "historyState": "deleted",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282445685,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_f8a30e6b078840388086b948a8b9e072",
+            "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_6ebe7d95c616490dbd77f9364376edc2",
+            "workId": "request_f8a30e6b078840388086b948a8b9e072",
+            "generation": 1,
+            "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+            "seq": 6,
+            "currentSeq": 7,
+            "historyState": "deleted",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282446116,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_f8a30e6b078840388086b948a8b9e072",
+            "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_6ebe7d95c616490dbd77f9364376edc2",
+            "workId": "request_f8a30e6b078840388086b948a8b9e072",
+            "generation": 1,
+            "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+            "seq": 6,
+            "currentSeq": 7,
+            "historyState": "deleted",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        }
+      ],
+      "bCompletionPosts": 0,
+      "toolInvocation": {
+        "invocation_id": "b1809391-2049-47dd-90de-ebfd26a170a7",
+        "native_request_id": "reply_request_f8a30e6b078840388086b948a8b9e072",
+        "record_id": "tcr-1795282418235-90c8d6ca-1eaa-490b-8a9d-a4bf77f88d5c",
+        "state": "returned"
+      },
+      "nativeHttp": [
+        {
+          "route": "/v1/chat/completions",
+          "method": "POST",
+          "at": 1795282444872,
+          "status": 200,
+          "downstreamFinished": true
+        }
+      ],
+      "nativeTerminal": {
+        "at": 1795282445086,
+        "status": 200,
+        "bodyComplete": true,
+        "finishReason": "stop",
+        "text": "Synthetic B finished the original tool Work."
+      },
+      "resumedNativeDeliveryAt": 1795282445160,
+      "mutatedCurrentSeq": 7,
+      "rendererHistoryCommit": {
+        "event": "ipc-result",
+        "t": 1795282445685,
+        "data": {
+          "channel": "native-history:messages",
+          "handled": true,
+          "success": true,
+          "authoritativeReply": {
+            "state": "deleted",
+            "seq": 7
+          }
+        }
+      },
+      "settledBubbleTimeline": [
+        {
+          "at": 1795282445175,
+          "stale": false
+        }
+      ],
+      "desktopLedger": {
+        "generation": 1,
+        "requestId": "reply_request_f8a30e6b078840388086b948a8b9e072_g1",
+        "workState": "completed",
+        "readback": true,
+        "replyAccepted": true,
+        "hasReplyIntent": false,
+        "observedFinalHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+      },
+      "screenshots": [
+        "late-json-delete.webp"
+      ],
+      "loadedSources": "6bff77ab114f"
+    },
+    "late-sse-edit": {
+      "mode": "tool-final-readback-stream-edit",
+      "serverRevision": null,
+      "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+      "originalRequestId": "controlled_0e607a5d184a4bcdb4e7db9880fabd87",
+      "generations": [
+        {
+          "generation": 0,
+          "executor": "desktop:deviceA",
+          "request_id": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e",
+          "state": "paused"
+        },
+        {
+          "generation": 1,
+          "executor": "desktop:deviceB",
+          "request_id": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+          "state": "completed"
+        }
+      ],
+      "workState": "completed",
+      "replySeq": 6,
+      "reply": {
+        "journal": [
+          {
+            "seq": 6,
+            "msg_id": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+            "action": "upsert",
+            "hash": "a06faf73577c3077686123c6135c0122c699a7a8686b16a3c5f7857c84bdc47e"
+          },
+          {
+            "seq": 7,
+            "msg_id": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+            "action": "upsert",
+            "hash": "bb6ca6993119c37e8d0bc81a86ff865886bc2094d002872ef4bf3e4ff0cbd11c"
+          }
+        ],
+        "physicalHistory": [
+          "Synthetic human edit to the published Work reply."
+        ],
+        "chatBubble": 1,
+        "historyState": "edited"
+      },
+      "providerCalls": [
+        {
+          "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e",
+          "phase": "initial"
+        },
+        {
+          "requestId": "compaction_1795282420212_z2kwzlik7w",
+          "phase": "summary"
+        },
+        {
+          "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+          "phase": "resumed"
+        }
+      ],
+      "toolSideEffects": 1,
+      "bFinalRequests": [
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282444905,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+            "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_e66946f33d6a4dc6abe74e2de0e4fd4a",
+            "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+            "generation": 1,
+            "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282444934,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+            "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "pending",
+            "sharedId": "shared_e66946f33d6a4dc6abe74e2de0e4fd4a",
+            "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+            "generation": 1,
+            "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282445156,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+            "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_e66946f33d6a4dc6abe74e2de0e4fd4a",
+            "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+            "generation": 1,
+            "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+            "seq": 6,
+            "currentSeq": 7,
+            "historyState": "edited",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282446290,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+            "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_e66946f33d6a4dc6abe74e2de0e4fd4a",
+            "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+            "generation": 1,
+            "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+            "seq": 6,
+            "currentSeq": 7,
+            "historyState": "edited",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282446536,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+            "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_e66946f33d6a4dc6abe74e2de0e4fd4a",
+            "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+            "generation": 1,
+            "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+            "seq": 6,
+            "currentSeq": 7,
+            "historyState": "edited",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        },
+        {
+          "route": "/api/v1/sync/shared/final-reply",
+          "method": "GET",
+          "at": 1795282446688,
+          "status": 200,
+          "query": {
+            "sharedSpaceId": "sharedAB",
+            "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+            "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+            "generation": "1"
+          },
+          "response": {
+            "state": "committed",
+            "sharedId": "shared_e66946f33d6a4dc6abe74e2de0e4fd4a",
+            "workId": "request_c0f0aed01c984304b3acfdeb1a97f18e",
+            "generation": 1,
+            "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+            "seq": 6,
+            "currentSeq": 7,
+            "historyState": "edited",
+            "contentHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+          }
+        }
+      ],
+      "bCompletionPosts": 0,
+      "toolInvocation": {
+        "invocation_id": "bff02204-1a89-433e-adf4-04f4979613d6",
+        "native_request_id": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e",
+        "record_id": "tcr-1795282414999-2b0e3edf-7bae-4d7c-a534-155e6a2b2d2b",
+        "state": "returned"
+      },
+      "nativeHttp": [
+        {
+          "route": "/v1/chat/completions",
+          "method": "POST",
+          "at": 1795282444906,
+          "status": 200,
+          "downstreamFinished": true
+        }
+      ],
+      "nativeTerminal": {
+        "at": 1795282445050,
+        "status": 200,
+        "bodyComplete": true,
+        "finishReason": "stop",
+        "text": "Synthetic B finished the original tool Work.",
+        "done": true
+      },
+      "resumedNativeDeliveryAt": 1795282445133,
+      "mutatedCurrentSeq": 7,
+      "rendererHistoryCommit": {
+        "event": "ipc-result",
+        "t": 1795282446535,
+        "data": {
+          "channel": "native-history:terminal",
+          "handled": true,
+          "success": true,
+          "authoritativeReply": {
+            "state": "edited",
+            "seq": 7
+          }
+        }
+      },
+      "settledBubbleTimeline": [
+        {
+          "at": 1795282445154,
+          "stale": false
+        }
+      ],
+      "rendererEnd": {
+        "channel": "vcp-stream-event",
+        "sender": 1,
+        "type": "end",
+        "modelFinishReason": "stop"
+      },
+      "desktopLedger": {
+        "generation": 1,
+        "requestId": "reply_request_c0f0aed01c984304b3acfdeb1a97f18e_g1",
+        "workState": "completed",
+        "readback": true,
+        "replyAccepted": true,
+        "hasReplyIntent": false,
+        "observedFinalHash": "3c82075ab5e681c9627c1f771b140f03dd44a6eaf0eaa0156061aa81950958f2"
+      },
+      "screenshots": [
+        "late-sse-edit.webp"
+      ],
+      "loadedSources": "caa0496f9665"
+    }
+  },
+  "loadedSources": {
+    "7fc491afd48d": {
+      "desktop": {
+        "main": [
+          {
+            "file": "apps/desktop/modules/ipc/chatHandlers.js",
+            "sha256": "6eb541cf4d16f62b108784f496a4dc2163dbbbae00b16771b51f26268cf464cb"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "2b2deb191880b214bb46762c7a678c63d3c6d7563f1f4b29296f50b27cabea66"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+            "sha256": "8961ba1766b4e0b1d2637b2f15338ed00e0aa857c613604c91d3d065de8bc588"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+            "sha256": "2fc1700e4d7b47ed9fd6a9e693ce44d63a5332698d382966eb972ec3d3b58e86"
+          }
+        ],
+        "renderer": [
+          {
+            "file": "apps/desktop/modules/chat/chatHistoryPersistence.js",
+            "bytes": 8337,
+            "sha256": "aece6ac53eee0bf1a6616d6f394ed724b823337c6687d92d845aa227cefb2466"
+          },
+          {
+            "file": "apps/desktop/modules/chatManager.js",
+            "bytes": 178272,
+            "sha256": "49e0bcb455046bad7c78dd29ad0bdcc219ad94fe30c9f2c72d80dd13cc6ac164"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/mainChatSurfaceAdapter.js",
+            "bytes": 13362,
+            "sha256": "655bc01ad0c93edc2e0eadc8eea7b38eb39aaaa62b565fae5133249ffd69b20b"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+            "bytes": 6970,
+            "sha256": "f7379f242fb60012ca172c204c06666db1a300fd7130692e4d12ba3bef3a8936"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+            "bytes": 10994,
+            "sha256": "692768db496c93e73f8444bd66c35be537958082faa07ba8d40252b130dba22d"
+          }
+        ]
+      },
+      "server": [
+        {
+          "file": "apps/server/server.js",
+          "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+          "sha256": "3efd8bf1b4c4411d7f8ec5c648ded72bc19f8e836058c644aa8050684baed133"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+          "sha256": "3bdd9fba3596f59ecf8a823303cd2b9dc4a44d0ab071203fa5e91f797010557d"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+          "sha256": "6bd45ec5f20ab1f35db82145467e2569745b641daed4ffec5bed79c747fc260b"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+          "sha256": "a1b166d894a7e697a54a226b78d381388e1fffe39c0984bf20441069beba4fa3"
+        }
+      ]
+    },
+    "4f89a3f97200": {
+      "desktop": {
+        "main": [
+          {
+            "file": "apps/desktop/modules/ipc/chatHandlers.js",
+            "sha256": "6eb541cf4d16f62b108784f496a4dc2163dbbbae00b16771b51f26268cf464cb"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "2b2deb191880b214bb46762c7a678c63d3c6d7563f1f4b29296f50b27cabea66"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+            "sha256": "8961ba1766b4e0b1d2637b2f15338ed00e0aa857c613604c91d3d065de8bc588"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+            "sha256": "2fc1700e4d7b47ed9fd6a9e693ce44d63a5332698d382966eb972ec3d3b58e86"
+          }
+        ],
+        "renderer": [
+          {
+            "file": "apps/desktop/modules/chat/chatHistoryPersistence.js",
+            "bytes": 8337,
+            "sha256": "aece6ac53eee0bf1a6616d6f394ed724b823337c6687d92d845aa227cefb2466"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+            "bytes": 6970,
+            "sha256": "f7379f242fb60012ca172c204c06666db1a300fd7130692e4d12ba3bef3a8936"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+            "bytes": 10994,
+            "sha256": "692768db496c93e73f8444bd66c35be537958082faa07ba8d40252b130dba22d"
+          },
+          {
+            "file": "apps/desktop/modules/chatManager.js",
+            "bytes": 178272,
+            "sha256": "49e0bcb455046bad7c78dd29ad0bdcc219ad94fe30c9f2c72d80dd13cc6ac164"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/mainChatSurfaceAdapter.js",
+            "bytes": 13362,
+            "sha256": "655bc01ad0c93edc2e0eadc8eea7b38eb39aaaa62b565fae5133249ffd69b20b"
+          }
+        ]
+      },
+      "server": [
+        {
+          "file": "apps/server/server.js",
+          "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+          "sha256": "3efd8bf1b4c4411d7f8ec5c648ded72bc19f8e836058c644aa8050684baed133"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+          "sha256": "3bdd9fba3596f59ecf8a823303cd2b9dc4a44d0ab071203fa5e91f797010557d"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+          "sha256": "6bd45ec5f20ab1f35db82145467e2569745b641daed4ffec5bed79c747fc260b"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+          "sha256": "a1b166d894a7e697a54a226b78d381388e1fffe39c0984bf20441069beba4fa3"
+        }
+      ]
+    },
+    "6bff77ab114f": {
+      "desktop": {
+        "main": [
+          {
+            "file": "apps/desktop/modules/ipc/chatHandlers.js",
+            "sha256": "6eb541cf4d16f62b108784f496a4dc2163dbbbae00b16771b51f26268cf464cb"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "2b2deb191880b214bb46762c7a678c63d3c6d7563f1f4b29296f50b27cabea66"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+            "sha256": "8961ba1766b4e0b1d2637b2f15338ed00e0aa857c613604c91d3d065de8bc588"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+            "sha256": "2fc1700e4d7b47ed9fd6a9e693ce44d63a5332698d382966eb972ec3d3b58e86"
+          }
+        ],
+        "renderer": [
+          {
+            "file": "apps/desktop/modules/chat/chatHistoryPersistence.js",
+            "bytes": 8337,
+            "sha256": "aece6ac53eee0bf1a6616d6f394ed724b823337c6687d92d845aa227cefb2466"
+          },
+          {
+            "file": "apps/desktop/modules/chatManager.js",
+            "bytes": 178272,
+            "sha256": "49e0bcb455046bad7c78dd29ad0bdcc219ad94fe30c9f2c72d80dd13cc6ac164"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+            "bytes": 6970,
+            "sha256": "f7379f242fb60012ca172c204c06666db1a300fd7130692e4d12ba3bef3a8936"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+            "bytes": 10994,
+            "sha256": "692768db496c93e73f8444bd66c35be537958082faa07ba8d40252b130dba22d"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/mainChatSurfaceAdapter.js",
+            "bytes": 13362,
+            "sha256": "655bc01ad0c93edc2e0eadc8eea7b38eb39aaaa62b565fae5133249ffd69b20b"
+          }
+        ]
+      },
+      "server": [
+        {
+          "file": "apps/server/server.js",
+          "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+          "sha256": "3efd8bf1b4c4411d7f8ec5c648ded72bc19f8e836058c644aa8050684baed133"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+          "sha256": "3bdd9fba3596f59ecf8a823303cd2b9dc4a44d0ab071203fa5e91f797010557d"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+          "sha256": "6bd45ec5f20ab1f35db82145467e2569745b641daed4ffec5bed79c747fc260b"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+          "sha256": "a1b166d894a7e697a54a226b78d381388e1fffe39c0984bf20441069beba4fa3"
+        }
+      ]
+    },
+    "9ebf60e4ad27": {
+      "desktop": {
+        "main": [
+          {
+            "file": "apps/desktop/modules/ipc/chatHandlers.js",
+            "sha256": "6eb541cf4d16f62b108784f496a4dc2163dbbbae00b16771b51f26268cf464cb"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "2b2deb191880b214bb46762c7a678c63d3c6d7563f1f4b29296f50b27cabea66"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+            "sha256": "8961ba1766b4e0b1d2637b2f15338ed00e0aa857c613604c91d3d065de8bc588"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+            "sha256": "2fc1700e4d7b47ed9fd6a9e693ce44d63a5332698d382966eb972ec3d3b58e86"
+          }
+        ],
+        "renderer": [
+          {
+            "file": "apps/desktop/modules/chat/chatHistoryPersistence.js",
+            "bytes": 8337,
+            "sha256": "aece6ac53eee0bf1a6616d6f394ed724b823337c6687d92d845aa227cefb2466"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+            "bytes": 6970,
+            "sha256": "f7379f242fb60012ca172c204c06666db1a300fd7130692e4d12ba3bef3a8936"
+          },
+          {
+            "file": "apps/desktop/modules/chatManager.js",
+            "bytes": 178272,
+            "sha256": "49e0bcb455046bad7c78dd29ad0bdcc219ad94fe30c9f2c72d80dd13cc6ac164"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+            "bytes": 10994,
+            "sha256": "692768db496c93e73f8444bd66c35be537958082faa07ba8d40252b130dba22d"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/mainChatSurfaceAdapter.js",
+            "bytes": 13362,
+            "sha256": "655bc01ad0c93edc2e0eadc8eea7b38eb39aaaa62b565fae5133249ffd69b20b"
+          }
+        ]
+      },
+      "server": [
+        {
+          "file": "apps/server/server.js",
+          "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+          "sha256": "8a7084be74e91409401e8753afc17e46b763413f58ada3ef827be1b33c9eb345"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+          "sha256": "34c2f989ad0385511465d5003ed93b27c6e4690e394dab2990dbe080bda8d45a"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+          "sha256": "0474a6a183793dd9b47210c5a546b032c3a4a10cfe9984a9ca1032db95329c98"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+          "sha256": "f4aea542cdcbbe7273bc66e0aee7d35df01b3688d32c11786681ceb3c04d5fe0"
+        }
+      ]
+    },
+    "8d045d77f79e": {
+      "desktop": {
+        "main": [
+          {
+            "file": "apps/desktop/modules/ipc/chatHandlers.js",
+            "sha256": "6eb541cf4d16f62b108784f496a4dc2163dbbbae00b16771b51f26268cf464cb"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "2b2deb191880b214bb46762c7a678c63d3c6d7563f1f4b29296f50b27cabea66"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+            "sha256": "8961ba1766b4e0b1d2637b2f15338ed00e0aa857c613604c91d3d065de8bc588"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+            "sha256": "2fc1700e4d7b47ed9fd6a9e693ce44d63a5332698d382966eb972ec3d3b58e86"
+          }
+        ],
+        "renderer": [
+          {
+            "file": "apps/desktop/modules/chat/chatHistoryPersistence.js",
+            "bytes": 8337,
+            "sha256": "aece6ac53eee0bf1a6616d6f394ed724b823337c6687d92d845aa227cefb2466"
+          },
+          {
+            "file": "apps/desktop/modules/chatManager.js",
+            "bytes": 178272,
+            "sha256": "49e0bcb455046bad7c78dd29ad0bdcc219ad94fe30c9f2c72d80dd13cc6ac164"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+            "bytes": 6970,
+            "sha256": "f7379f242fb60012ca172c204c06666db1a300fd7130692e4d12ba3bef3a8936"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+            "bytes": 10994,
+            "sha256": "692768db496c93e73f8444bd66c35be537958082faa07ba8d40252b130dba22d"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/mainChatSurfaceAdapter.js",
+            "bytes": 13362,
+            "sha256": "655bc01ad0c93edc2e0eadc8eea7b38eb39aaaa62b565fae5133249ffd69b20b"
+          }
+        ]
+      },
+      "server": [
+        {
+          "file": "apps/server/server.js",
+          "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+          "sha256": "8a7084be74e91409401e8753afc17e46b763413f58ada3ef827be1b33c9eb345"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+          "sha256": "34c2f989ad0385511465d5003ed93b27c6e4690e394dab2990dbe080bda8d45a"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+          "sha256": "0474a6a183793dd9b47210c5a546b032c3a4a10cfe9984a9ca1032db95329c98"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+          "sha256": "f4aea542cdcbbe7273bc66e0aee7d35df01b3688d32c11786681ceb3c04d5fe0"
+        }
+      ]
+    },
+    "caa0496f9665": {
+      "desktop": {
+        "main": [
+          {
+            "file": "apps/desktop/modules/ipc/chatHandlers.js",
+            "sha256": "6eb541cf4d16f62b108784f496a4dc2163dbbbae00b16771b51f26268cf464cb"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "2b2deb191880b214bb46762c7a678c63d3c6d7563f1f4b29296f50b27cabea66"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+            "sha256": "8961ba1766b4e0b1d2637b2f15338ed00e0aa857c613604c91d3d065de8bc588"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+            "sha256": "2fc1700e4d7b47ed9fd6a9e693ce44d63a5332698d382966eb972ec3d3b58e86"
+          }
+        ],
+        "renderer": [
+          {
+            "file": "apps/desktop/modules/chat/chatHistoryPersistence.js",
+            "bytes": 8337,
+            "sha256": "aece6ac53eee0bf1a6616d6f394ed724b823337c6687d92d845aa227cefb2466"
+          },
+          {
+            "file": "apps/desktop/modules/chatManager.js",
+            "bytes": 178272,
+            "sha256": "49e0bcb455046bad7c78dd29ad0bdcc219ad94fe30c9f2c72d80dd13cc6ac164"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+            "bytes": 10994,
+            "sha256": "692768db496c93e73f8444bd66c35be537958082faa07ba8d40252b130dba22d"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+            "bytes": 6970,
+            "sha256": "f7379f242fb60012ca172c204c06666db1a300fd7130692e4d12ba3bef3a8936"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/mainChatSurfaceAdapter.js",
+            "bytes": 13362,
+            "sha256": "655bc01ad0c93edc2e0eadc8eea7b38eb39aaaa62b565fae5133249ffd69b20b"
+          }
+        ]
+      },
+      "server": [
+        {
+          "file": "apps/server/server.js",
+          "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+          "sha256": "3efd8bf1b4c4411d7f8ec5c648ded72bc19f8e836058c644aa8050684baed133"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+          "sha256": "3bdd9fba3596f59ecf8a823303cd2b9dc4a44d0ab071203fa5e91f797010557d"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+          "sha256": "6bd45ec5f20ab1f35db82145467e2569745b641daed4ffec5bed79c747fc260b"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+          "sha256": "a1b166d894a7e697a54a226b78d381388e1fffe39c0984bf20441069beba4fa3"
+        }
+      ]
+    }
+  }
+}

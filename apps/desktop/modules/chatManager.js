@@ -2674,6 +2674,19 @@ export const chatManager = (() => {
                     const historyForSave = await getHistory(responseContext.agentId, responseContext.itemType || 'agent', responseContext.topicId);
                     let persistenceError = null;
                     if (historyForSave && !historyForSave.error) {
+                        if (sharedSubmission?.nativeFinalReadback) {
+                            // The response is an observation. The main process reads the
+                            // published operation and projects its current Journal version.
+                            const commit = await historyMutationAuthority.append({
+                                itemId: responseContext.agentId, itemType: sendContext.itemType,
+                                topicId: responseContext.topicId, category: 'non-stream-reply', requestId: thinkingMessage.id,
+                            }, assistantMessage);
+                            const receipt = commit.result?.authoritativeReply;
+                            if (!receipt) throw new Error('共享终稿仍待核对');
+                            await projectSharedFinal(responseContext, thinkingMessage.id);
+                            settleOwnedStreamOperation?.({ event: { type: 'completed' } });
+                            return { handled: true, messageId: thinkingMessage.id, seq: receipt.seq };
+                        }
                         // Remove any lingering 'thinking' message and add the new one
                         let finalHistory = historyForSave.filter(msg => msg.id !== thinkingMessage.id);
                         finalHistory.push(assistantMessage);
@@ -3210,6 +3223,15 @@ export const chatManager = (() => {
         pendingSendControls.clear();deferredHistorySync=null;
     }
 
+    async function projectSharedFinal(context, messageId) {
+        if (currentSelectedItemRef.get()?.type !== 'agent' || currentSelectedItemRef.get()?.id !== context.agentId ||
+            currentTopicIdRef.get() !== context.topicId) return;
+        // Retract the transient model bubble; the native History queue supplies
+        // the current row (possibly edited or deleted) and its conversation order.
+        if (!document.querySelector('.message-item-editing')) messageRenderer.removeMessageById(messageId, false);
+        await syncHistoryFromFile(context.agentId, 'agent', context.topicId);
+    }
+
     async function retryLocalInput({descriptor,inputId,modelSaveRef}) {
         let modelSaveResolutionRef;
         if(modelSaveRef){const saved=await electronAPI.confirmSharedModelSave({itemId:descriptor.itemId,reference:modelSaveRef});if(saved?.success===false)throw Object.assign(Error(saved.error),{code:saved.error});modelSaveResolutionRef=saved.reference;}
@@ -3245,6 +3267,7 @@ export const chatManager = (() => {
         onSharedProjectionSettled,
         retryLocalInput,
         executePreparedShared,
+        projectSharedFinal,
         getPendingSendState,
         cancelPendingSend,
         compactContext,

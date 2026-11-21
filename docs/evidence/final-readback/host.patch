@@ -1,0 +1,298 @@
+diff --git a/apps/desktop/modules/chat/chatHistoryPersistence.js b/apps/desktop/modules/chat/chatHistoryPersistence.js
+index 6d18e4e..5fbe532 100644
+--- a/apps/desktop/modules/chat/chatHistoryPersistence.js
++++ b/apps/desktop/modules/chat/chatHistoryPersistence.js
+@@ -44,2 +44,7 @@ function createHistoryPersistence(repository, { durable, skipTemporaryContexts }
+                     }
++                    if (native.authoritativeReply) {
++                        const { message, state } = native.authoritativeReply;
++                        return Object.freeze({ messageId: projected.messageId, context, content: message?.content ?? '',
++                            finishReason: message?.finishReason || projected.finishReason, historyState: state });
++                    }
+                     return Object.freeze({ messageId: projected.messageId, context, content: projected.content, finishReason: projected.finishReason });
+diff --git a/apps/desktop/modules/chatManager.js b/apps/desktop/modules/chatManager.js
+index 683374e..41bc1c3 100644
+--- a/apps/desktop/modules/chatManager.js
++++ b/apps/desktop/modules/chatManager.js
+@@ -2676,2 +2676,15 @@ export const chatManager = (() => {
+                     if (historyForSave && !historyForSave.error) {
++                        if (sharedSubmission?.nativeFinalReadback) {
++                            // The response is an observation. The main process reads the
++                            // published operation and projects its current Journal version.
++                            const commit = await historyMutationAuthority.append({
++                                itemId: responseContext.agentId, itemType: sendContext.itemType,
++                                topicId: responseContext.topicId, category: 'non-stream-reply', requestId: thinkingMessage.id,
++                            }, assistantMessage);
++                            const receipt = commit.result?.authoritativeReply;
++                            if (!receipt) throw new Error('共享终稿仍待核对');
++                            await projectSharedFinal(responseContext, thinkingMessage.id);
++                            settleOwnedStreamOperation?.({ event: { type: 'completed' } });
++                            return { handled: true, messageId: thinkingMessage.id, seq: receipt.seq };
++                        }
+                         // Remove any lingering 'thinking' message and add the new one
+@@ -3212,2 +3225,11 @@ export const chatManager = (() => {
+
++    async function projectSharedFinal(context, messageId) {
++        if (currentSelectedItemRef.get()?.type !== 'agent' || currentSelectedItemRef.get()?.id !== context.agentId ||
++            currentTopicIdRef.get() !== context.topicId) return;
++        // Retract the transient model bubble; the native History queue supplies
++        // the current row (possibly edited or deleted) and its conversation order.
++        if (!document.querySelector('.message-item-editing')) messageRenderer.removeMessageById(messageId, false);
++        await syncHistoryFromFile(context.agentId, 'agent', context.topicId);
++    }
++
+     async function retryLocalInput({descriptor,inputId,modelSaveRef}) {
+@@ -3247,2 +3269,3 @@ export const chatManager = (() => {
+         executePreparedShared,
++        projectSharedFinal,
+         getPendingSendState,
+diff --git a/apps/desktop/modules/renderer/mainChatSurfaceAdapter.js b/apps/desktop/modules/renderer/mainChatSurfaceAdapter.js
+index d1f4732..3123850 100644
+--- a/apps/desktop/modules/renderer/mainChatSurfaceAdapter.js
++++ b/apps/desktop/modules/renderer/mainChatSurfaceAdapter.js
+@@ -87,3 +87,7 @@ function createStreamCapabilities(root, services) {
+             const finalizedContext = finalized?.context || context;
+-            const finalizedContent = finalized?.content || terminal.fullResponse || '';
++            if (finalized?.historyState && finalized.historyState !== 'original') {
++                await services.chatManager?.projectSharedFinal?.(finalizedContext, messageId);
++                if (finalized.historyState === 'deleted') return;
++            }
++            const finalizedContent = finalized?.content ?? terminal.fullResponse ?? '';
+             if (services.chatManager?.hasStreamAdmissionRelay?.(messageId)) {
+diff --git a/apps/desktop/modules/services/nativeSync/sharedExecution.js b/apps/desktop/modules/services/nativeSync/sharedExecution.js
+index a9107f1..64ff05f 100644
+--- a/apps/desktop/modules/services/nativeSync/sharedExecution.js
++++ b/apps/desktop/modules/services/nativeSync/sharedExecution.js
+@@ -291,3 +291,3 @@ class SharedExecution {
+   for(const record of Object.values(this.state.requests))if(record.projection&&record.projection.state!=='saved'){const mapping=this.runtime.mappings().find(m=>m.sharedId===record.sharedId);if(mapping)try{await this.startProjection(record,mapping);}catch{/* Retain original accepted identity; no model replay. */}}
+-  await this.runtime.recoverSharedCompactionPrepares?.();for(const intent of Object.values(this.state.compactions||{}))if(intent.phase==='publishing')await this.run('compaction:'+intent.body.id,()=>this.runtime.finishSharedCompaction(intent));for(const record of Object.values(this.state.requests))if((!final.has(record.phase)||record.replyProjectionPending||record.committedReply)&&record.phase!=='local_pending'&&!record.isSteeringInput&&!record.serverSession&&(!record.projection||record.projection.state==='saved')){
++  await this.runtime.recoverSharedCompactionPrepares?.();for(const intent of Object.values(this.state.compactions||{}))if(intent.phase==='publishing')await this.run('compaction:'+intent.body.id,()=>this.runtime.finishSharedCompaction(intent));for(const record of Object.values(this.state.requests))if((!final.has(record.phase)||record.replyProjectionPending||record.committedReply||this.steering.hasPendingFinalHistory(record))&&record.phase!=='local_pending'&&!record.isSteeringInput&&!record.serverSession&&(!record.projection||record.projection.state==='saved')){
+   if(record.remote&&!record.steeringV1){await this.steering.refresh(record);continue;}if(record.steeringV1){if(!record.accepted)await this.refresh(record);if(!record.accepted)continue;if(!record.config&&!record.remote){const value=await this.runtime.send(endpoint+'request-config?'+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,admissionId:record.accepted.id}));record.config=value.config;await this.save();}await this.steering.reconcile(record);continue;}
+diff --git a/apps/desktop/modules/services/nativeSync/sharedSteeringClient.js b/apps/desktop/modules/services/nativeSync/sharedSteeringClient.js
+index 388e4ce..cc5ec8e 100644
+--- a/apps/desktop/modules/services/nativeSync/sharedSteeringClient.js
++++ b/apps/desktop/modules/services/nativeSync/sharedSteeringClient.js
+@@ -1,4 +1,5 @@
+ 'use strict';
+-const {stable,sha256,fail}=require('./protocol');
++const {stable,sha256,fail,messageKey,messageHash}=require('./protocol');
+ const endpoint='/api/v1/sync/shared/';
++const finalHistoryCapability='shared-controlled-tools-history-v1';
+ const terminal=new Set(['completed','abandoned']);
+@@ -10,2 +11,18 @@ class SharedSteeringClient{
+  policy(requestId){const found=this.find(requestId);return found?.step.config.rules[0]?.config.executionPolicy||null;}
++ usesFinalHistory(record,step){
++  return record.accepted?.turn?.controlMode==='safe-tools-v1'&&step.generation===1&&
++   (step.finalHistoryReadback===true||this.runtime.capabilities.features?.includes(finalHistoryCapability));
++ }
++ pendingFinalHistory(record,step){
++  return !step.replyAccepted&&!step.finalHistoryReview&&
++   Boolean(step.finalHistoryReadback&&step.nativeBody||step.replyIntent&&this.usesFinalHistory(record,step));
++ }
++ hasPendingFinalHistory(record){return record.generations?.some(step=>this.pendingFinalHistory(record,step))===true;}
++ observeRequest(record,request){
++  record.accepted=request;record.observedAt=Date.now();
++  if(request.steering)record.control=request.steering;
++  if(request.state==='abandoned'||request.state==='review_required'||
++   request.state==='completed'&&!this.hasPendingFinalHistory(record)&&!record.generations?.some(step=>step.finalHistoryReview))
++   record.phase=request.state;
++ }
+  async active(d,observedWorkId){
+@@ -16,7 +33,9 @@ class SharedSteeringClient{
+   if(!record){record={steeringV1:Boolean(value.request.turn?.steeringCapable),remote:true,descriptor:{...d},sharedId:mapping.sharedId,phase:value.request.state,accepted:value.request,body:{requestId:value.request.requestId}};this.owner.state.requests['remote:'+value.request.id]=record;}
+-  else{record.accepted=value.request;if(terminal.has(value.request.state)||value.request.state==='review_required')record.phase=value.request.state;}
+-  if(value.request.steering)record.control=value.request.steering;
+-  record.observedAt=Date.now();await this.owner.save();return record;
++  this.observeRequest(record,value.request);await this.owner.save();return record;
++ }
++ async refresh(record){
++  const {request}=await this.runtime.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,workId:record.accepted.id}));
++  if(request){this.observeRequest(record,request);await this.owner.save();}
++  return request;
+  }
+- async refresh(record){const value=await this.runtime.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,workId:record.accepted.id}));if(value.request){record.accepted=value.request;record.observedAt=Date.now();if(terminal.has(value.request.state)||value.request.state==='review_required')record.phase=value.request.state;if(value.request.steering)record.control=value.request.steering;await this.owner.save();}return value.request;}
+  query(record, extra={}){return this.runtime.send(endpoint+'steering?'+new URLSearchParams({...extra,sharedSpaceId:this.runtime.connection.sharedSpaceId,workId:record.accepted.id}));}
+@@ -55,2 +74,3 @@ class SharedSteeringClient{
+   if(!step.nativeBody){step.nativeBody=JSON.parse(JSON.stringify(body));if(step.generation===0)record.nativeBody=step.nativeBody;await this.owner.save();}
++  if(this.usesFinalHistory(record,step)&&!step.finalHistoryReadback){step.finalHistoryReadback=true;await this.owner.save();}
+   await this.runtime.send(endpoint+'native-request',{body:{sharedSpaceId:this.runtime.connection.sharedSpaceId,admissionId:record.accepted.id,requestId:step.requestId,bodyHash:sha256(stable(step.nativeBody)),generation:step.generation,consumedInputSeq:step.consumedInputSeq}});
+@@ -93,5 +113,7 @@ class SharedSteeringClient{
+    if(!this.steps(record).some(s=>s.generation===result.generation))record.generations.push({generation:result.generation,requestId:result.requestId,config:result.config,consumedInputSeq:result.consumedInputSeq});
++   const step=this.steps(record).find(value=>value.generation===result.generation);
++   if(this.usesFinalHistory(record,step))step.finalHistoryReadback=true;
+    record.currentGeneration=result.generation;record.phase='continuing';await o.save();await r.syncExecutionTopic(mapping);
+    const history=await r.replica.queue.read(mapping.shared),lastInput=status.inputs.at(-1),userId=result.contextCheckpoint&&(!lastInput||lastInput.inputSeq<=result.contextCheckpoint.throughInputSeq)?result.contextCheckpoint.messageId:(ids.at(-1)||record.accepted.turn?.userMessageId||record.body.message?.id),user=history.find(m=>m.id===userId);if(!user)throw fail('SHARED_USER_NOT_MATERIALIZED');
+-   const {executionConfig}=require('./sharedExecution');return {handled:true,success:true,admissionId:workId,workId,generation:result.generation,replyId:result.requestId,userMessage:user,history,config:executionConfig(result.config),executionPolicy:result.config.rules[0]?.config.executionPolicy||{},tavernRules:require('./contracts.generated.cjs').sharedEffectiveRules([...(result.config.rules[0]?.config.tavernRules||[]),...(result.config.owner.config.tavernRules||[])],result.config.owner.config.ruleOverrides||{})};
++   const {executionConfig}=require('./sharedExecution');return {handled:true,success:true,admissionId:workId,workId,generation:result.generation,replyId:result.requestId,...(step.finalHistoryReadback&&{nativeFinalReadback:true}),userMessage:user,history,config:executionConfig(result.config),executionPolicy:result.config.rules[0]?.config.executionPolicy||{},tavernRules:require('./contracts.generated.cjs').sharedEffectiveRules([...(result.config.rules[0]?.config.tavernRules||[]),...(result.config.owner.config.tavernRules||[])],result.config.owner.config.ruleOverrides||{})};
+   });
+@@ -102,9 +124,74 @@ class SharedSteeringClient{
+    const retained=await this.owner.retainFailure(record,message,mapping);if(retained)return retained;
+-   delete step.localFailure;delete step.errorCode;delete step.failureDisposition;const value=this.runtime.adapter.canonical(message,mapping.shared.topicId);
+-   if(step.replyIntent&&stable(step.replyIntent)!==stable(value))throw fail('SHARED_REPLY_INTENT_CHANGED');
+-   step.replyIntent=value;record.phase='publishing';await this.owner.save();await this.finishStep(record,step);await this.runtime.syncExecutionTopic(mapping);
+-   return {handled:true,success:true,localState:'saved',history:await this.runtime.replica.queue.read(mapping.shared),sync:{state:'captured',delivery:step.replyAccepted?'accepted':'pending',recoverable:true}};
++   delete step.localFailure;delete step.errorCode;delete step.failureDisposition;
++   const readback=this.usesFinalHistory(record,step);
++   if(readback){
++    if(typeof message.content!=='string')throw fail('SHARED_REPLY_INTENT_CHANGED');
++    const observedHash=sha256(message.content);
++    if((step.observedFinalHash&&step.observedFinalHash!==observedHash)||(step.replyIntent&&step.replyIntent.content!==message.content))
++     throw fail('SHARED_REPLY_INTENT_CHANGED');
++    step.finalHistoryReadback=true;
++    step.observedFinalHash=observedHash;
++   }else{
++    const value=this.runtime.adapter.canonical(message,mapping.shared.topicId);
++    if(step.replyIntent&&stable(step.replyIntent)!==stable(value))throw fail('SHARED_REPLY_INTENT_CHANGED');
++    step.replyIntent||=value;
++   }
++   record.phase='publishing';await this.owner.save();
++   const result=await this.finishStep(record,step,mapping);
++   if(!readback)await this.runtime.syncExecutionTopic(mapping);
++   else if(!result)throw fail(step.finalHistoryReview?'SHARED_RESULT_REQUIRES_REVIEW':'SHARED_NATIVE_TERMINAL_REQUIRED');
++   const history=result?.history||await this.runtime.replica.queue.read(mapping.shared);
++   return {handled:true,success:true,localState:'saved',history,
++    ...(result&&{authoritativeReply:result.authoritativeReply}),sync:{state:'captured',delivery:step.replyAccepted?'accepted':'pending',recoverable:true}};
+   });
+  }
+- async finishStep(record,step){
++ async readFinalReply(record,step,mapping){
++  const r=this.runtime,workId=record.accepted.id,requestId=step.requestId;
++  if(!step.finalHistoryReadback){step.finalHistoryReadback=true;await this.owner.save();}
++  const result=await r.send(endpoint+'final-reply?'+new URLSearchParams({
++   sharedSpaceId:r.connection.sharedSpaceId,workId,requestId,generation:String(step.generation),
++  }));
++  if(result?.workId!==workId||result.sharedId!==mapping.sharedId||result.requestId!==requestId||result.generation!==step.generation)
++   throw fail('SHARED_FINAL_REPLY_INVALID');
++  if(result.state==='pending')return;
++  if(result.state==='review_required'){
++   step.finalHistoryReview=true;record.phase=result.workState==='abandoned'?'abandoned':'review_required';
++   await this.owner.save();return;
++  }
++  const {seq,currentSeq,historyState,message,contentHash}=result;
++  if(result.state!=='committed'||!Number.isSafeInteger(seq)||seq<1||!Number.isSafeInteger(currentSeq)||currentSeq<seq||
++   !/^[a-f0-9]{64}$/.test(contentHash)||!['original','edited','deleted'].includes(historyState)||
++   (currentSeq===seq)!==(historyState==='original')||
++   (historyState==='deleted'?message!==null:message?.id!==requestId)||
++   (historyState==='original'&&(message.role!=='assistant'||message.finishReason!=='completed'||message.continuity?.executionId!==workId||
++    message.continuity.requestId!==requestId||typeof message.content!=='string'||sha256(message.content)!==contentHash)))
++   throw fail('SHARED_FINAL_REPLY_INVALID');
++  if((step.observedFinalHash&&step.observedFinalHash!==contentHash)||
++   (step.replyIntent&&(typeof step.replyIntent.content!=='string'||sha256(step.replyIntent.content)!==contentHash))){
++   step.finalHistoryReview=true;record.phase='review_required';await this.owner.save();throw fail('SHARED_REPLY_INTENT_CHANGED');
++  }
++
++  // Only the ordinary topic projector writes History. A later acknowledged edit
++  // or tombstone may already have superseded the server read snapshot.
++  await r.syncExecutionTopic(mapping,{minSeq:currentSeq});
++  const history=await r.replica.queue.read(mapping.shared);
++  const key=messageKey({ownerType:mapping.shared.itemType,ownerId:mapping.shared.itemId,topicId:mapping.shared.topicId,msgId:requestId});
++  const ack=r.replica.adapter.state.acked[key],projected=history.find(row=>row.id===requestId)||null;
++  if(!ack||ack.seq<currentSeq||Boolean(projected)===ack.deleted||
++   (projected&&messageHash(r.adapter.canonical(projected,mapping.shared.topicId))!==ack.hash)||
++   (ack.seq===currentSeq&&(ack.deleted!==(historyState==='deleted')||(!ack.deleted&&messageHash(message)!==ack.hash))))
++   throw fail('SHARED_FINAL_REPLY_PROJECTION_PENDING');
++
++  step.replyAccepted=true;record.phase='completed';
++  delete step.localFailure;delete step.failureDisposition;delete step.errorCode;
++  record.accepted={...record.accepted,state:'completed',replySeq:seq};
++  await this.owner.save();
++  return {history,authoritativeReply:{message:projected,state:ack.deleted?'deleted':ack.seq===seq?'original':'edited',seq:ack.seq}};
++ }
++ async finishStep(record,step,mapping){
++  if(this.usesFinalHistory(record,step)){
++   mapping||=this.runtime.mappings().find(value=>value.sharedId===record.sharedId);
++   if(!mapping)throw fail('SHARED_LOCAL_MAPPING_PENDING');
++   return this.readFinalReply(record,step,mapping);
++  }
+   if(step.replyAccepted||step.skipped)return;
+@@ -126,4 +213,12 @@ class SharedSteeringClient{
+   // A retained reply is not permission to publish into a fenced Work.
++  if(this.hasPendingFinalHistory(record)){
++   for(const step of this.steps(record)){
++    if(!this.pendingFinalHistory(record,step))continue;
++    try{await o.run(record.sharedId,()=>this.finishStep(record,step));}
++    catch(error){console.warn('[NativeSync] Final Work History readback pending',error.code||error.name);}
++   }
++   return;
++  }
+   const current=await this.refresh(record);if(!current||terminal.has(current.state)||current.state==='review_required')return;
+-  for(const step of this.steps(record))if(step.replyIntent&&!step.replyAccepted&&!step.skipped)await o.run(record.sharedId,()=>this.finishStep(record,step));
++  for(const step of this.steps(record))if(step.replyIntent&&!step.replyAccepted&&!step.skipped&&!step.finalHistoryReadback)await o.run(record.sharedId,()=>this.finishStep(record,step));
+   const known=await this.refresh(record);if(!known||terminal.has(record.phase)||known.state==='review_required')return;
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedControlledText.js b/apps/server/Plugin/NativeSync/sync/sharedControlledText.js
+index e44df39..d4f732f 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedControlledText.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedControlledText.js
+@@ -3,2 +3,3 @@ const MODE='text-only-v1',CAPABILITY='shared-controlled-text-v1';
+ const TOOLS_MODE='safe-tools-v1',TOOLS_CAPABILITY='shared-controlled-tools-v1';
++const TOOLS_HISTORY_CAPABILITY='shared-controlled-tools-history-v1';
+ const isControlled=mode=>mode===MODE||mode===TOOLS_MODE;
+@@ -29,2 +30,2 @@ function admit(shared,actor,topic,config,body,turn){
+ function assertWork(shared,row,topic,actor,message={content:'',attachments:[]}){if(isControlled(require('./sharedTurns').intent(row).controlMode))assertPortable(shared,topic,shared.freezeForExecution(actor,topic),message);}
+-module.exports={MODE,CAPABILITY,TOOLS_MODE,TOOLS_CAPABILITY,isControlled,enabled,allowedTools,admit,assertPortable,assertWork,local};
++module.exports={MODE,CAPABILITY,TOOLS_MODE,TOOLS_CAPABILITY,TOOLS_HISTORY_CAPABILITY,isControlled,enabled,allowedTools,admit,assertPortable,assertWork,local};
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedHttp.js b/apps/server/Plugin/NativeSync/sync/sharedHttp.js
+index 3e2703c..7a3e0f6 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedHttp.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedHttp.js
+@@ -27,2 +27,3 @@ gets['task-result']=['taskResult',['sharedSpaceId','workId','nativeTaskId']];
+ gets.work=['workState',['sharedSpaceId','workId']];
++gets['final-reply']=['steerFinalReply',['sharedSpaceId','workId','requestId','generation']];
+ gets.steering=['steeringState',['sharedSpaceId','workId','pausedRequestId']];
+@@ -55,3 +56,3 @@ async function sharedRequest(store,req,url,mobileActor,signal){
+    ...(policy.sharedSteering?['shared-steering-v1']:[]),
+-   ...(shared.native?.engine&&require('./sharedControlledText').enabled(shared,require('./sharedControlledText').TOOLS_MODE)?[require('./sharedControlledText').TOOLS_CAPABILITY]:[]),
++   ...(shared.native?.engine&&require('./sharedControlledText').enabled(shared,require('./sharedControlledText').TOOLS_MODE)?[require('./sharedControlledText').TOOLS_CAPABILITY,require('./sharedControlledText').TOOLS_HISTORY_CAPABILITY]:[]),
+    ...(shared.native?.engine&&policy.sharedControlledText?[require('./sharedControlledText').CAPABILITY]:[]),
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedSpace.js b/apps/server/Plugin/NativeSync/sync/sharedSpace.js
+index 6d54feb..7711b7a 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedSpace.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedSpace.js
+@@ -456,2 +456,3 @@ class SharedSpace {
+  steerCheckpoint(actor,body){return this.steering.checkpoint(actor,body);}
++ steerFinalReply(actor,body){return this.steering.finalReply(actor,body);}
+  steerTurnComplete(actor,body){return this.steering.completeTurn(actor,body);}
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedSteering.js b/apps/server/Plugin/NativeSync/sync/sharedSteering.js
+index 31c4f53..222b06a 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedSteering.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedSteering.js
+@@ -232,2 +232,39 @@ class SharedSteering {
+     }
++    finalReply(actor, {sharedSpaceId,workId,requestId,generation}) {
++        if(generation!=='1')throw fail('INVALID_SHARED_REQUEST',400);
++        id(requestId);
++        const store=this.shared.store;
++        return store.readSnapshot(()=>{
++            const {row,topic}=this.admission(actor,sharedSpaceId,workId,{existing:true,observe:true});
++            const step=this.generation(workId,1);
++            if(require('./sharedTurns').intent(row).controlMode!==controlled.TOOLS_MODE||step?.request_id!==requestId)
++                throw fail('SHARED_REQUEST_NOT_FOUND',404);
++            if(step.executor!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
++
++            const identity={workId,sharedId:topic.id,requestId,generation:1};
++            if(['review_required','abandoned'].includes(row.state))return {...identity,state:'review_required',workState:row.state};
++            if(row.state!=='completed')return {...identity,state:'pending'};
++
++            const seq=row.reply_seq;
++            const op=store.findOp.get(step.executor,'work-reply:'+workId+':1');
++            const receipt=op&&JSON.parse(op.result_json);
++            const key=[topic.owner_type,topic.owner_id,topic.topic_id,requestId];
++            if(step.state!=='completed'||!row.native_terminal||!Number.isSafeInteger(seq)||seq<1||
++                receipt?.seq!==seq||receipt.deleted!==false)throw fail('NATIVE_CHECKPOINT_CHANGED');
++            const [original]=store.readProjected(()=>this.db.prepare(
++                'SELECT * FROM journal WHERE seq=? AND owner_type=? AND owner_id=? AND topic_id=? AND msg_id=?'
++            ).all(seq,...key));
++            const currentRow=store.findMessage.get(...key);
++            const initial=original?.message;
++            if(original?.row.action!=='upsert'||original.row.hash!==receipt.hash||original.row.device_id!==step.executor||
++                original.row.metadata_version!==receipt.metadataVersion||original.row.metadata_hash!==receipt.metadataHash||
++                initial?.id!==requestId||initial.role!=='assistant'||initial.finishReason!=='completed'||
++                initial.continuity?.executionId!==workId||initial.continuity.requestId!==requestId||
++                typeof initial.content!=='string'||!currentRow||currentRow.last_seq<seq)throw fail('NATIVE_CHECKPOINT_CHANGED');
++
++            const message=store.projectMessage(currentRow),currentSeq=currentRow.last_seq;
++            const historyState=currentRow.deleted?'deleted':currentSeq===seq?'original':'edited';
++            return {...identity,state:'committed',seq,currentSeq,historyState,contentHash:sha256(initial.content),message};
++        });
++    }
+     completeTurn(actor, body) {

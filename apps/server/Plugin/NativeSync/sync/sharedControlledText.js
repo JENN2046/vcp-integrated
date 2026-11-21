@@ -1,6 +1,7 @@
 'use strict';
 const MODE='text-only-v1',CAPABILITY='shared-controlled-text-v1';
 const TOOLS_MODE='safe-tools-v1',TOOLS_CAPABILITY='shared-controlled-tools-v1';
+const TOOLS_HISTORY_CAPABILITY='shared-controlled-tools-history-v1';
 const isControlled=mode=>mode===MODE||mode===TOOLS_MODE;
 function allowedTools(raw='[]'){
  let tools;try{tools=JSON.parse(raw||'[]');}catch{throw fail('INVALID_SHARED_SAFE_TOOLS');}
@@ -27,4 +28,4 @@ function admit(shared,actor,topic,config,body,turn){
  assertPortable(shared,topic,config,body.message);return true;
 }
 function assertWork(shared,row,topic,actor,message={content:'',attachments:[]}){if(isControlled(require('./sharedTurns').intent(row).controlMode))assertPortable(shared,topic,shared.freezeForExecution(actor,topic),message);}
-module.exports={MODE,CAPABILITY,TOOLS_MODE,TOOLS_CAPABILITY,isControlled,enabled,allowedTools,admit,assertPortable,assertWork,local};
+module.exports={MODE,CAPABILITY,TOOLS_MODE,TOOLS_CAPABILITY,TOOLS_HISTORY_CAPABILITY,isControlled,enabled,allowedTools,admit,assertPortable,assertWork,local};
