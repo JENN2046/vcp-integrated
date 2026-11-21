@@ -1,0 +1,122 @@
+{
+  "environment": "Local NativeSync CentralStore, runtime client, shared HTTP service and mobile worker on loopback; synthetic model responder",
+  "revision": "69573c475e3a72a004df008b5ef5afabacf6ea50",
+  "checkpoint": "Server prepare/input/commit with a fixed synthetic summary; no summarization model was called.",
+  "node": "v24.22.3",
+  "observations": [
+    {
+      "variant": "portable-control",
+      "seedOrder": [
+        "archive",
+        "checkpoint_compact_25e1275e93a082f9d0702337adaeb40cf0e87781"
+      ],
+      "selectedTexts": [
+        "PROMPT",
+        "PORTABLE_SUMMARY",
+        "PORTABLE_CURRENT"
+      ],
+      "sessionSend": {
+        "status": 200
+      },
+      "terminal": {
+        "state": "completed",
+        "dispatched": true,
+        "error": null
+      },
+      "workerCalls": 1,
+      "workerTexts": [
+        [
+          "FROZEN_SHARED_PROMPT",
+          "PORTABLE_SUMMARY",
+          "PORTABLE_CURRENT"
+        ]
+      ],
+      "journalRows": 4
+    },
+    {
+      "variant": "archived-placeholder",
+      "seedOrder": [
+        "archive",
+        "checkpoint_compact_25e1275e93a082f9d0702337adaeb40cf0e87781"
+      ],
+      "selectedTexts": [
+        "PROMPT",
+        "PORTABLE_SUMMARY",
+        "PORTABLE_CURRENT"
+      ],
+      "desktopPreparation": "null; server-session path declined",
+      "sessionSend": {
+        "status": 409,
+        "error": "DESKTOP_CONTEXT_REQUIRED"
+      },
+      "mobileAccepted": 202,
+      "terminal": {
+        "state": "completed",
+        "dispatched": true,
+        "error": null
+      },
+      "workerCalls": 1,
+      "workerTexts": [
+        [
+          "FROZEN_SHARED_PROMPT",
+          "PORTABLE_SUMMARY",
+          "PORTABLE_CURRENT"
+        ]
+      ],
+      "journalRows": 4
+    },
+    {
+      "variant": "archived-reference",
+      "seedOrder": [
+        "archive",
+        "checkpoint_compact_25e1275e93a082f9d0702337adaeb40cf0e87781"
+      ],
+      "selectedTexts": [
+        "PROMPT",
+        "PORTABLE_SUMMARY",
+        "PORTABLE_CURRENT"
+      ],
+      "desktopPreparation": "null; server-session path declined",
+      "sessionSend": {
+        "status": 409,
+        "error": "DESKTOP_CONTEXT_REQUIRED"
+      },
+      "mobileAccepted": 202,
+      "terminal": {
+        "state": "review_required",
+        "dispatched": false,
+        "error": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED"
+      },
+      "workerCalls": 0,
+      "workerTexts": [],
+      "journalRows": 3
+    },
+    {
+      "variant": "retained-reference",
+      "seedOrder": [
+        "checkpoint_compact_25e1275e93a082f9d0702337adaeb40cf0e87781",
+        "archive"
+      ],
+      "selectedTexts": [
+        "PROMPT",
+        "PORTABLE_SUMMARY",
+        "ARCHIVED_BODY",
+        "PORTABLE_CURRENT"
+      ],
+      "desktopPreparation": "null; server-session path declined",
+      "sessionSend": {
+        "status": 409,
+        "error": "DESKTOP_CONTEXT_REQUIRED"
+      },
+      "mobileAccepted": 202,
+      "terminal": {
+        "state": "review_required",
+        "dispatched": false,
+        "error": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED"
+      },
+      "workerCalls": 0,
+      "workerTexts": [],
+      "journalRows": 3
+    }
+  ]
+}

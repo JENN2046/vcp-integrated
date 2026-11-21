@@ -1,0 +1,35 @@
+{
+  "revision": "69573c475e3a72a004df008b5ef5afabacf6ea50",
+  "node": "v24.22.3",
+  "cwd": "integrated repository root",
+  "testCounts": {
+    "total": 130,
+    "passed": 109,
+    "failed": 21
+  },
+  "matchesPriorFailureNames": true,
+  "priorRecord": "../tool-work-handoff/recovery/desktop-baseline.md",
+  "failed": [
+    "DONE before EOF cancels the actual response body and retains a single end event",
+    "DONE closes a real local HTTP response which the server deliberately leaves open",
+    "a non-Error cancellation rejection cannot throw from the cleanup reporter",
+    "a real HTTP disconnect after a data chunk emits one read error and releases the task",
+    "a synchronous reader cancellation failure still releases ownership and the lock",
+    "accepted interruption retains producer terminal delivery and its received content",
+    "chat presentation surfaces retain frosted backdrops without nested card captures",
+    "checkpoint text survives sanitizers and its private protection flag stays local",
+    "failed interruption (hung) releases the caller's HTTP reader without a duplicate terminal",
+    "failed interruption (missing-settings) releases the caller's HTTP reader without a duplicate terminal",
+    "failed interruption (rejected) releases the caller's HTTP reader without a duplicate terminal",
+    "failed interruption (transport-error) releases the caller's HTTP reader without a duplicate terminal",
+    "failed interruption from another IPC window cannot abort the original HTTP reader",
+    "main Surface renders terminal stream errors with the initial messageId",
+    "normal EOF preserves a final partial SSE line and does not cancel a completed body",
+    "pending old cancellation does not retain its reader or finish a reused message task",
+    "read failure remains the primary terminal error when cancellation also rejects",
+    "rejected cancellation is reported without duplicating the successful terminal event",
+    "sender navigation aborts the real HTTP stream without delivering into the next document",
+    "the streamed request body does not ask the server for stream usage",
+    "thinking and streaming messages opt out of content-visibility clipping"
+  ]
+}

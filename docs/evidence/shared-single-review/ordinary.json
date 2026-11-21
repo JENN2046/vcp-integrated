@@ -1,0 +1,132 @@
+{
+  "revision": "69573c475e3a72a004df008b5ef5afabacf6ea50",
+  "runtime": "Node v24.22.1",
+  "rerun": "node tests/shared-single-review/ordinary.cjs",
+  "isolation": "Fresh SQLite stores and tracked ToolBox sources staged under the local home directory. The desktop sends via the existing NativeSyncRuntime fixture and sync HTTP, and the PWA variant uses the same HTTP endpoint and pairing cookie as the PWA. The fault probe uses a synthetic loopback chat handler and does not launch device UIs.",
+  "cutpoints": {
+    "pre-dispatch": "After the durable queued-to-running transition at the first configuration check, before any native request is registered or dispatched. Synchronous process exit prevents the worker catch/finally path.",
+    "native-terminal": "After the synthetic handler wrote the complete stop response and the original native request was marked model_terminal, before the shared worker persisted its reply intent."
+  },
+  "observations": [
+    {
+      "client": "desktop",
+      "cutpoint": "pre-dispatch",
+      "before": {
+        "workId": "request_e54abf0b2f714b3f9d635e89be0c9a62",
+        "requestId": "ordinary-audit-recovery",
+        "kind": "shared_session",
+        "userMessageId": "ordinary-audit-recovery",
+        "state": "running",
+        "dispatch": 0,
+        "admission": {
+          "state": "accepted",
+          "dispatched": 0,
+          "native_terminal": 0
+        },
+        "nativeState": null,
+        "pendingOperation": false,
+        "providerCalls": 0
+      },
+      "after": {
+        "workId": "request_e54abf0b2f714b3f9d635e89be0c9a62",
+        "state": "queued",
+        "errorCode": null,
+        "admission": {
+          "state": "accepted",
+          "dispatched": 0,
+          "native_terminal": 0
+        },
+        "journal": [
+          "ordinary-audit-recovery"
+        ]
+      }
+    },
+    {
+      "client": "pwa",
+      "cutpoint": "pre-dispatch",
+      "before": {
+        "workId": "request_601da44abbe844b197e9d43c8d099961",
+        "requestId": "ordinary-audit-recovery",
+        "kind": null,
+        "userMessageId": "mobile_d4fb8735d95f74005421f944c32d1c4e",
+        "state": "running",
+        "dispatch": 0,
+        "admission": {
+          "state": "accepted",
+          "dispatched": 0,
+          "native_terminal": 0
+        },
+        "nativeState": null,
+        "pendingOperation": false,
+        "providerCalls": 0
+      },
+      "after": {
+        "workId": "request_601da44abbe844b197e9d43c8d099961",
+        "state": "review_required",
+        "errorCode": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+        "admission": {
+          "state": "review_required",
+          "dispatched": 0,
+          "native_terminal": 0
+        },
+        "journal": [
+          "mobile_d4fb8735d95f74005421f944c32d1c4e"
+        ]
+      }
+    },
+    {
+      "client": "desktop",
+      "cutpoint": "native-terminal",
+      "before": {
+        "workId": "request_8b8bb425ba8c4c29b6e35cb5a240d26e",
+        "requestId": "ordinary-audit-recovery",
+        "kind": "shared_session",
+        "userMessageId": "ordinary-audit-recovery",
+        "state": "running",
+        "dispatch": 1,
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1
+        },
+        "nativeState": "model_terminal",
+        "pendingOperation": false,
+        "providerCalls": 1
+      },
+      "after": {
+        "workId": "request_8b8bb425ba8c4c29b6e35cb5a240d26e",
+        "state": "review_required",
+        "errorCode": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 1
+        },
+        "journal": [
+          "ordinary-audit-recovery"
+        ]
+      }
+    }
+  ],
+  "abandonment": {
+    "executed": false,
+    "consentNeeded": true,
+    "pwa": "The original authenticated session must explicitly submit acknowledge_and_abandon_remaining; ordinary cancel rejects review_required. The shared abandon implementation also requires confirm=true.",
+    "desktop": "Original Work principal and confirm=true are required, with a reviewable boundary."
+  },
+  "targetedRegressions": [
+    {
+      "suite": "native",
+      "matched_cases": 7,
+      "failed": 0,
+      "note": "Node reporter prints 29 passes including file-level entries for unmatched files."
+    },
+    {
+      "suite": "collaboration",
+      "matched_cases": 7,
+      "failed": 0,
+      "note": "Node reporter prints 14 passes including file-level entries for unmatched files."
+    }
+  ],
+  "modelCalls": "Pre-dispatch cases reached no handler. Terminal cutpoint reached the synthetic handler once; reconstruction reads the same database before enabling any endpoint for a second call."
+}

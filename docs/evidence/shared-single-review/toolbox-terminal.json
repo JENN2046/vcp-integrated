@@ -1,0 +1,191 @@
+{
+  "base": "69573c475e3a72a004df008b5ef5afabacf6ea50",
+  "node": "v24.22.3",
+  "cases": [
+    {
+      "mode": "before-intent",
+      "requestId": "ordinary-review-before-intent",
+      "workId": "request_33ff034441824916b44338d30b989f74",
+      "cut": {
+        "requestId": "request_33ff034441824916b44338d30b989f74",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/nonStreamHandler.js": "7bf02ef53d45075ca0426c3511513b090f0a8da4a9d3e13daa0a8878e0289154",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "761918b0d8764b662a4e3da3e5ec119100fd6f29af94dd7a2ccf7c571848c5ad",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "5458a2605dc66dc1a1958f141e6ee32eacb99fa7c73de7ead54199426fbbda27"
+        },
+        "contentHash": "db65446e41d62a1f4d27ff221cb0243d2f9160099a839f53718e903be09f9288"
+      },
+      "before": {
+        "work": {
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-before-intent",
+          "reply_message_id": null,
+          "replyIntent": 0
+        },
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_33ff034441824916b44338d30b989f74",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "3e583d20-3202-4f75-b2c2-72af9fe0ca9c",
+            "native_request_id": "request_33ff034441824916b44338d30b989f74",
+            "record_id": "tcr-1795263001199-e9f4e8c1-675e-4ff0-8190-4ff8866fbd62",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ]
+      },
+      "after": {
+        "work": {
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-before-intent",
+          "reply_message_id": null,
+          "replyIntent": 0
+        },
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_33ff034441824916b44338d30b989f74",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "3e583d20-3202-4f75-b2c2-72af9fe0ca9c",
+            "native_request_id": "request_33ff034441824916b44338d30b989f74",
+            "record_id": "tcr-1795263001199-e9f4e8c1-675e-4ff0-8190-4ff8866fbd62",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "mode": "after-intent",
+      "requestId": "ordinary-review-after-intent",
+      "workId": "request_80c994ac57b44d3db86a604f68278c35",
+      "cut": {
+        "requestId": "request_80c994ac57b44d3db86a604f68278c35",
+        "intentTerminalState": "completed",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/nonStreamHandler.js": "7bf02ef53d45075ca0426c3511513b090f0a8da4a9d3e13daa0a8878e0289154",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "761918b0d8764b662a4e3da3e5ec119100fd6f29af94dd7a2ccf7c571848c5ad",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "5458a2605dc66dc1a1958f141e6ee32eacb99fa7c73de7ead54199426fbbda27"
+        },
+        "contentHash": "0b3194cf52dfe274b22d0894db5fa622e8e3b1b407cc66cdf64b334f08d087d6"
+      },
+      "before": {
+        "work": {
+          "state": "publishing",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-after-intent",
+          "reply_message_id": null,
+          "replyIntent": 1
+        },
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_80c994ac57b44d3db86a604f68278c35",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "b1323521-310d-4cb1-8f86-04afbe0f963a",
+            "native_request_id": "request_80c994ac57b44d3db86a604f68278c35",
+            "record_id": "tcr-1795263004052-33d2f2e6-f18d-4707-a2b9-d3cce15f1a64",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ]
+      },
+      "after": {
+        "work": {
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-after-intent",
+          "reply_message_id": "reply_request_80c994ac57b44d3db86a604f68278c35",
+          "replyIntent": 0
+        },
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_80c994ac57b44d3db86a604f68278c35",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "b1323521-310d-4cb1-8f86-04afbe0f963a",
+            "native_request_id": "request_80c994ac57b44d3db86a604f68278c35",
+            "record_id": "tcr-1795263004052-33d2f2e6-f18d-4707-a2b9-d3cce15f1a64",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_80c994ac57b44d3db86a604f68278c35",
+            "action": "upsert",
+            "contentHash": "0b3194cf52dfe274b22d0894db5fa622e8e3b1b407cc66cdf64b334f08d087d6"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ]
+      },
+      "replayed": true
+    }
+  ]
+}

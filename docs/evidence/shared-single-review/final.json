@@ -1,0 +1,144 @@
+{
+  "revision": "69573c475e3a72a004df008b5ef5afabacf6ea50",
+  "node": "v24.22.1",
+  "mode": "normal native publication; same reply ID edited then deleted through shared message API",
+  "id": "reply_request_2fd00018c0b94bdf8ad3f9ab21d82efc_g1",
+  "events": [
+    {
+      "seq": 5,
+      "action": "upsert",
+      "hash": "a95c128fa6342cba257d64c522d12cc389ecad554acd31d3125c6c02b09afdda"
+    },
+    {
+      "seq": 6,
+      "action": "upsert",
+      "hash": "656118425c604e9a7342cd6b7592c5fde585c31b3b1fcde60b1a512a89f6922e"
+    },
+    {
+      "seq": 7,
+      "action": "delete",
+      "hash": "2ea8705b86086ce2c1b16ae8daa675c5b066fe3b83afb426365f2e7950a6c1f6"
+    }
+  ],
+  "afterEdit": {
+    "status": 200,
+    "seq": 5,
+    "replayed": false
+  },
+  "afterDelete": {
+    "status": 200,
+    "seq": 5,
+    "replayed": false
+  },
+  "exactReplay": {
+    "status": 200,
+    "seq": 5,
+    "replayed": true
+  },
+  "wrongExecutor": {
+    "status": 409,
+    "code": "INVALID_SHARED_REPLY"
+  },
+  "wrongReply": {
+    "status": 409,
+    "code": "INVALID_SHARED_REPLY"
+  },
+  "finalProjection": {
+    "seq": 7,
+    "deleted": true
+  },
+  "workAfterRestart": "completed",
+  "counts": {
+    "provider": 3,
+    "tool": 1
+  },
+  "legacyWithoutProof": {
+    "revision": "5ed51ba784bf",
+    "before": {
+      "work": {
+        "state": "dispatched",
+        "reply_seq": null
+      },
+      "request": "model_terminal",
+      "assistantEvents": 1,
+      "completion": null,
+      "journal": []
+    },
+    "after": {
+      "work": {
+        "state": "review_required",
+        "reply_seq": null
+      },
+      "request": "model_terminal",
+      "assistantEvents": 1,
+      "completion": null,
+      "journal": []
+    },
+    "late": {
+      "status": 409,
+      "code": "SHARED_REQUEST_FENCED"
+    },
+    "counts": {
+      "provider": 3,
+      "tool": 1
+    }
+  },
+  "legacyWithReceipt": {
+    "revision": "5ed51ba784bf",
+    "before": {
+      "work": {
+        "state": "completed",
+        "reply_seq": 5
+      },
+      "request": "model_terminal",
+      "assistantEvents": 1,
+      "completion": null,
+      "journal": [
+        {
+          "seq": 5,
+          "action": "upsert",
+          "hash": "459ef171ec252bb73b8592e0cac5ff89b98f3d4bedd1b991b1bb6927d0d4ee7b"
+        }
+      ]
+    },
+    "after": {
+      "work": {
+        "state": "completed",
+        "reply_seq": 5
+      },
+      "request": "model_terminal",
+      "assistantEvents": 1,
+      "completion": null,
+      "journal": [
+        {
+          "seq": 5,
+          "action": "upsert",
+          "hash": "459ef171ec252bb73b8592e0cac5ff89b98f3d4bedd1b991b1bb6927d0d4ee7b"
+        }
+      ]
+    },
+    "oldReceipt": {
+      "status": 200,
+      "seq": 5,
+      "replayed": false
+    },
+    "exact": {
+      "status": 200,
+      "seq": 5,
+      "replayed": true
+    },
+    "altered": {
+      "status": 409,
+      "code": "IDEMPOTENCY_KEY_REUSED"
+    },
+    "newOp": {
+      "status": 200,
+      "seq": 5,
+      "replayed": false
+    },
+    "counts": {
+      "provider": 3,
+      "tool": 1
+    }
+  }
+}

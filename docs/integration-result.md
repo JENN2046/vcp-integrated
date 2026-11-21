@@ -68,3 +68,5 @@ AgentAssistant 长委托已接入共享单聊的 Work。桌面重开、发起端
 工具 Work 的 B 末代已派发、终稿尚未送达时退出：未得到模型终态会保留待核对；ToolBox 已输出全文但 B 未发布时，重开仍无法恢复终稿。中央 Journal 已经接受终稿、只丢发布回执的对照通过。[最终确认窗口实测](evidence/final-work-receipt/README.md)
 
 工具型共享单聊的 B 末代已接入 ToolBox 原生终稿持久化。B 收到 JSON 或 SSE 最终响应前退出，重开能按原 Work、代次和回复 ID 取回一条正式回复。归档 fsync 后强停、迟到补交、未知派发及损坏凭据的结果见[原生终稿发布与恢复](evidence/native-final-publication/README.md)。
+
+共享单聊阶段复审核对了普通 server-session 和受控工具 Work 的两条执行路径。普通 worker 在发布意图写入前仍有终稿恢复缺口；检查点以前的桌面引用也会影响后端准入。工具 Work 末代迟到补交保留编辑与删除，旧库的回执兼容仍有实际用途。[职责、实测发现与下一批顺序](evidence/shared-single-review/README.md)
