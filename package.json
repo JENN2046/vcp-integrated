@@ -10,6 +10,7 @@
     "build:mobile": "node scripts/build.mjs --mobile",
     "dev:isolated": "node tests/integration/run.cjs --dev",
     "test:integration": "node tests/integration/run.cjs",
+    "test:ordinary-tools": "node tests/ordinary-tools/run.cjs",
     "test:context": "node tests/context-chain/run.cjs",
     "test:native": "node tests/run-host-suite.cjs native",
     "deps": "node scripts/dependencies.mjs",

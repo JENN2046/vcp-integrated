@@ -36,3 +36,5 @@
 后续长回复实测覆盖了实体手机首段观察、锁屏恢复及 Windows 阅读位置独立对照，见[长回复联验记录](evidence/long-stream/README.md)。
 
 共享单聊的 History 窗口已交还原生 VCPChat。普通桌面和共享 worker 的实际 handler 与 Provider 请求、附件及原操作恢复对照见[上下文归属回执](evidence/context-chain/README.md)。
+
+共享单聊中的普通直连工具已接入原生审批等待和持久调用记录。停止后迟到批准、工具已执行后断电以及桌面重开的前后对照见[普通工具审批与恢复](evidence/ordinary-tools/README.md)。

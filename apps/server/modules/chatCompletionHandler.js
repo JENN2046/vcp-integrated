@@ -4,6 +4,7 @@ const vcpInfoHandler = require('../vcpInfoHandler.js');
 const contextManager = require('./contextManager.js');
 const roleDivider = require('./roleDivider.js');
 const { projectToolBatchForUpstream } = require('./toolResultBatch.js');
+const nativeContext = require('./requestExecutionContext');
 const fs = require('fs').promises;
 const path = require('path');
 const { createHash, randomBytes } = require('node:crypto');
@@ -887,6 +888,9 @@ async function fetchWithRetry(
         if (removeSealAbortListener) removeSealAbortListener();
       }
     }
+    // Every model turn, including a tool follow-up, uses the original Work fence.
+    try { nativeContext.assertDispatch(); }
+    catch (error) { cleanup(); throw error; }
     if (attemptController.signal.aborted) {
       cleanup();
       throw Object.assign(new Error('The operation was aborted.'), {
@@ -1133,7 +1137,6 @@ class ChatCompletionHandler {
   }
 
   async handle(req, res, forceShowVCP = false) {
-    const nativeContext=require('./requestExecutionContext');
     nativeContext.requireModelOutcome(res);
     let nativeCompleted=false;
     const {
@@ -1857,7 +1860,6 @@ class ChatCompletionHandler {
         )
         : fetchWithRetry;
 
-      nativeContext.assertDispatch();
       let firstAiAPIResponse = await requestFetchWithRetry(
         `${apiUrl}/v1/chat/completions`,
         {

@@ -41,6 +41,7 @@ function throwIfCancelled() {
     if (local.getStore()?.signal?.aborted) throw cancellation();
 }
 function assertDispatch() {
+    assertToolOutcomeKnown();
     throwIfCancelled();
     const scope = local.getStore();
     if (!scope?.workId) return;
@@ -83,21 +84,29 @@ function middleware(req, res, next) {
     const finishNative=success=>{if(!scope)return;scope.transportEnded=true;scope.transportSuccess=success;outcome.check();};
     res.once('finish', () => { releaseContext();finishNative(res.statusCode>=200&&res.statusCode<300);req.removeListener('aborted', abort); res.removeListener('close', abort); });
     if(shared)res.once('close',()=>{if(!res.writableFinished)finishNative(false);});
-    scope={ finishNative,requestId, signal: controller.signal, ...snapshot,...(shared?{bridge:shared.bridge,sponsorAuthority:shared.sponsorAuthority,sponsorBoundary:sharedBoundary,textOnly:shared.textOnly===true,canSteer:shared.steeringEnabled===true,workId:shared.workId,generation:shared.generation,phase:shared.phase,fence:shared.fence,applied:shared.applied,continuation:shared.continuation,checkpoint:shared.checkpoint}:{}) };
+    scope={ toolRun: { waiting: 0 },finishNative,requestId, signal: controller.signal, ...snapshot,...(shared?{bridge:shared.bridge,sponsorAuthority:shared.sponsorAuthority,sponsorBoundary:sharedBoundary,textOnly:shared.textOnly===true,canSteer:shared.steeringEnabled===true,workId:shared.workId,generation:shared.generation,phase:shared.phase,fence:shared.fence,applied:shared.applied,continuation:shared.continuation,checkpoint:shared.checkpoint}:{}) };
     return local.run(scope,next);
 }
 async function waitForApproval(promise, onCancel) {
     const context = local.getStore();
-    if (!context) return promise;
-    throwIfCancelled();
-    note('approval', { waiting: true });
+    if (!context?.signal) return promise;
+    const state = context.toolRun;
+    state.waiting++;
     let abort;
     const cancelled = new Promise((_resolve, reject) => {
         abort = () => { try { onCancel?.(); } finally { reject(cancellation()); } };
         context.signal.addEventListener('abort', abort, { once: true });
+        if (context.signal.aborted) abort();
     });
-    try { const result = await Promise.race([promise, cancelled]); throwIfCancelled(); return result; }
-    finally { context.signal.removeEventListener('abort', abort); note('approval', { waiting: false }); }
+    try {
+        if (state.waiting === 1 && !context.signal.aborted) note('approval', { waiting: true });
+        const result = await Promise.race([promise, cancelled]);
+        throwIfCancelled();
+        return result;
+    } finally {
+        context.signal.removeEventListener('abort', abort);
+        if (--state.waiting === 0) note('approval', { waiting: false });
+    }
 }
 
 // The bridge is supplied by the registered host request, never from tool arguments.
@@ -119,32 +128,77 @@ function agentPrompt(alias) {
     return context && context.agentAlias === alias ? context.agentPrompt : undefined;
 }
 
-async function runToolInvocation({ pluginName, recordId = null, unconfirmedError }, fn) {
-    const context = local.getStore();
-    if(context?.textOnly)throw Object.assign(Error('CONTROLLED_TEXT_TOOLS_FORBIDDEN'),{code:'CONTROLLED_TEXT_TOOLS_FORBIDDEN'});
-    if (!context?.bridge) return fn();
+function assertToolsAllowed() {
+    assertToolOutcomeKnown();
     throwIfCancelled();
-    const invocation = Object.freeze({
-        requestId: context.requestId,
-        nativeRequestId: context.requestId,
-        invocationId: randomUUID(),
-        pluginName,
-        recordId: typeof recordId === 'string' && recordId ? recordId : null
-    });
-    return local.run({ ...context, invocation }, async () => {
-        // Failure here prevents dispatch. The lossy diagnostic emitter is not used.
-        await context.bridge.onToolDispatch(invocation);
-        let value, began = false;
-        try { throwIfCancelled(); began = true; value = await fn(invocation); context.checkpoint?.result(invocation,value); }
-        catch (error) {
-            if (unconfirmedError && error === unconfirmedError) throw error;
-            if(!began)context.checkpoint?.result(invocation,{nativeOutcome:'not_executed',errorCode:'NATIVE_CANCELLED_BEFORE_EXECUTION'});
-            await confirmToolSettlement(context.bridge, { ...invocation, outcome: 'error', errorCode: began ? error?.code || 'NATIVE_TOOL_ERROR' : 'NATIVE_CANCELLED_BEFORE_EXECUTION' });
-            throw error;
-        }
-        await confirmToolSettlement(context.bridge, { ...invocation, outcome: 'returned', errorCode: null });
+    if (local.getStore()?.textOnly) throw Object.assign(Error('CONTROLLED_TEXT_TOOLS_FORBIDDEN'), { code: 'CONTROLLED_TEXT_TOOLS_FORBIDDEN' });
+}
+
+function assertToolOutcomeKnown() {
+    const error = local.getStore()?.toolRun?.unconfirmed;
+    if (error) throw error;
+}
+
+// Only the selected transport calls dispatch. Approval, bridge selection and
+// result formatting stay with PluginManager. Checkpoint the same filtered
+// value the manager returns to its caller, never the raw plugin response.
+async function trackToolInvocation({ pluginName, recordId = null }, process, isUnconfirmed = () => true) {
+    const context = local.getStore();
+    if (!context?.bridge) return process(fn => fn());
+    let invocation, began = false, unconfirmed = false;
+    const dispatch = async fn => {
+        assertToolOutcomeKnown();
+        throwIfCancelled();
+        const identity = Object.freeze({
+            requestId: context.requestId, nativeRequestId: context.requestId,
+            invocationId: randomUUID(), pluginName,
+            recordId: typeof recordId === 'string' && recordId ? recordId : null
+        });
+        await context.bridge.onToolDispatch(identity);
+        invocation = identity;
+        return local.run({ ...context, invocation }, async () => {
+            assertToolOutcomeKnown();
+            throwIfCancelled();
+            context.fence?.();
+            began = true;
+            try { return await fn(invocation); }
+            catch (error) {
+                // A direct plugin can throw or time out after its action took
+                // effect. A specialised transport can identify a lost receipt.
+                unconfirmed = isUnconfirmed(error);
+                if (unconfirmed) {
+                    const code = 'NATIVE_TOOL_RESULT_UNCONFIRMED';
+                    context.toolRun.unconfirmed = Object.assign(Error(code), { code });
+                }
+                throw error;
+            }
+        });
+    };
+    let value, outcome = 'returned', errorCode = null;
+    try {
+        value = await process(dispatch);
         return value;
-    });
+    } catch (error) {
+        outcome = 'error';
+        errorCode = began ? error?.code || 'NATIVE_TOOL_ERROR' : 'NATIVE_CANCELLED_BEFORE_EXECUTION';
+        throw error;
+    } finally {
+        if (invocation && !unconfirmed) {
+            try {
+                if (outcome === 'returned') context.checkpoint?.result(invocation, value);
+                else if (!began) context.checkpoint?.result(invocation, { nativeOutcome: 'not_executed', errorCode });
+                await confirmToolSettlement(context.bridge, { ...invocation, outcome, errorCode });
+            } catch (error) {
+                context.toolRun.unconfirmed = error;
+                throw error;
+            }
+        }
+    }
+}
+
+async function runToolInvocation({ pluginName, recordId, unconfirmedError }, fn) {
+    assertToolsAllowed();
+    return trackToolInvocation({ pluginName, recordId }, dispatch => dispatch(fn), error => error === unconfirmedError);
 }
 
 function currentTopicSponsorCall() {
@@ -229,9 +283,9 @@ module.exports = {
     checkpointAssistant: content => local.getStore()?.checkpoint?.assistant(content),
     markModelTerminal: () => { const scope=local.getStore();if(scope)scope.modelTerminalKnown=true; },
     currentSignal: () => local.getStore()?.signal, currentWork: () => local.getStore()?.workId || null,
-    assertToolsAllowed:()=>{if(local.getStore()?.textOnly)throw Object.assign(Error('CONTROLLED_TEXT_TOOLS_FORBIDDEN'),{code:'CONTROLLED_TEXT_TOOLS_FORBIDDEN'});},
+    assertToolsAllowed, trackToolInvocation,
     currentTopicSponsorCall,
     runToolInvocation, acceptNativeTask, registerNativeTaskProvider, queryNativeTask,
     toolStarted: () => note('tool', { started: true }),
-    run: (requestId, signal, fn) => local.run({ requestId, signal, ...registered.get(requestId) }, fn)
+    run: (requestId, signal, fn) => local.run({ toolRun: { waiting: 0 }, requestId, signal, ...registered.get(requestId) }, fn)
 };

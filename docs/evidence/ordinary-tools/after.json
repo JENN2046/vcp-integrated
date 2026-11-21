@@ -1,0 +1,577 @@
+{
+  "baselineRevision": null,
+  "cases": {
+    "ORDINARY_TOOL_APPROVE": {
+      "id": "request_f916fad9d89644c0b8c28a2c19a38b2e",
+      "inputId": "fd44ea31-8912-4af5-8b90-dfd72cc3d324",
+      "approvalId": "approve-1795242766772-hp3eo99",
+      "beforeDecision": {
+        "job": {
+          "state": "waiting_approval",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "fd44ea31-8912-4af5-8b90-dfd72cc3d324",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 1,
+            "msg_id": "fd44ea31-8912-4af5-8b90-dfd72cc3d324",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_f916fad9d89644c0b8c28a2c19a38b2e"
+          }
+        ]
+      },
+      "approvalExposed": true,
+      "sameAcceptedReplay": true,
+      "afterDecision": {
+        "job": {
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 1,
+          "user_message_id": "fd44ea31-8912-4af5-8b90-dfd72cc3d324",
+          "reply_message_id": "reply_request_f916fad9d89644c0b8c28a2c19a38b2e"
+        },
+        "invocations": [
+          {
+            "invocation_id": "94dc2587-c055-4007-9dee-a04bb3569ea4",
+            "native_request_id": "request_f916fad9d89644c0b8c28a2c19a38b2e",
+            "plugin_name": "OrdinaryToolCounter",
+            "record_id": "tcr-1795242766769-18465ee5-5315-4130-8701-3bb28b26382a",
+            "state": "returned",
+            "error_code": null
+          }
+        ],
+        "journal": [
+          {
+            "seq": 1,
+            "msg_id": "fd44ea31-8912-4af5-8b90-dfd72cc3d324",
+            "action": "upsert"
+          },
+          {
+            "seq": 2,
+            "msg_id": "reply_request_f916fad9d89644c0b8c28a2c19a38b2e",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 1,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_f916fad9d89644c0b8c28a2c19a38b2e"
+          },
+          {
+            "ordinaryPhase": "continuation",
+            "hasToolResult": true,
+            "nativeRequestId": "request_f916fad9d89644c0b8c28a2c19a38b2e"
+          }
+        ]
+      },
+      "nativeAuditRecord": {
+        "id": "tcr-1795242766769-18465ee5-5315-4130-8701-3bb28b26382a",
+        "tool_name": "OrdinaryToolCounter",
+        "status": "success",
+        "success": 1
+      }
+    },
+    "ORDINARY_TOOL_DENY": {
+      "id": "request_581953748e2142a69cdfff72cd5621ad",
+      "inputId": "5ccdf422-2f56-4c7c-8bfb-a181212b15bb",
+      "approvalId": "approve-1795242766960-s9l3e44",
+      "beforeDecision": {
+        "job": {
+          "state": "waiting_approval",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "5ccdf422-2f56-4c7c-8bfb-a181212b15bb",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 3,
+            "msg_id": "5ccdf422-2f56-4c7c-8bfb-a181212b15bb",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_581953748e2142a69cdfff72cd5621ad"
+          }
+        ]
+      },
+      "approvalExposed": true,
+      "afterDecision": {
+        "job": {
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "5ccdf422-2f56-4c7c-8bfb-a181212b15bb",
+          "reply_message_id": "reply_request_581953748e2142a69cdfff72cd5621ad"
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 3,
+            "msg_id": "5ccdf422-2f56-4c7c-8bfb-a181212b15bb",
+            "action": "upsert"
+          },
+          {
+            "seq": 4,
+            "msg_id": "reply_request_581953748e2142a69cdfff72cd5621ad",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_581953748e2142a69cdfff72cd5621ad"
+          },
+          {
+            "ordinaryPhase": "continuation",
+            "hasToolResult": false,
+            "nativeRequestId": "request_581953748e2142a69cdfff72cd5621ad"
+          }
+        ]
+      }
+    },
+    "ORDINARY_TOOL_CANCEL": {
+      "id": "request_2ac01d27732848929a4ce8bf6bf0d7e0",
+      "inputId": "f0c1257b-e97a-477a-a0bb-bcaf7b3eb94a",
+      "approvalId": "approve-1795242767028-j5o1rw7",
+      "beforeDecision": {
+        "job": {
+          "state": "waiting_approval",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "f0c1257b-e97a-477a-a0bb-bcaf7b3eb94a",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 5,
+            "msg_id": "f0c1257b-e97a-477a-a0bb-bcaf7b3eb94a",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_2ac01d27732848929a4ce8bf6bf0d7e0"
+          }
+        ]
+      },
+      "approvalExposed": true,
+      "afterLateApproval": {
+        "job": {
+          "state": "review_required",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 1,
+          "error_code": "EXECUTION_CANCELLED_REVIEW_REQUIRED",
+          "tool_started": 0,
+          "user_message_id": "f0c1257b-e97a-477a-a0bb-bcaf7b3eb94a",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 5,
+            "msg_id": "f0c1257b-e97a-477a-a0bb-bcaf7b3eb94a",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_2ac01d27732848929a4ce8bf6bf0d7e0"
+          }
+        ]
+      }
+    },
+    "ORDINARY_TOOL_TIMEOUT": {
+      "id": "request_eaf03edf24b846ce94204a58e3477303",
+      "inputId": "e17d2697-c10a-4c9c-a4d3-5a33b408b4ec",
+      "approvalId": "approve-1795242767407-uknn27a",
+      "beforeDecision": {
+        "job": {
+          "state": "waiting_approval",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "e17d2697-c10a-4c9c-a4d3-5a33b408b4ec",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 6,
+            "msg_id": "e17d2697-c10a-4c9c-a4d3-5a33b408b4ec",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_eaf03edf24b846ce94204a58e3477303"
+          }
+        ]
+      },
+      "approvalExposed": true,
+      "afterUnconfirmedResult": {
+        "job": {
+          "state": "review_required",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+          "tool_started": 1,
+          "user_message_id": "e17d2697-c10a-4c9c-a4d3-5a33b408b4ec",
+          "reply_message_id": null
+        },
+        "invocations": [
+          {
+            "invocation_id": "fbe675be-cc2e-4824-8d3d-ad2002346fc0",
+            "native_request_id": "request_eaf03edf24b846ce94204a58e3477303",
+            "plugin_name": "OrdinaryToolCounter",
+            "record_id": "tcr-1795242767406-0f26150e-d5b7-4659-ac7a-cd5347e32119",
+            "state": "started",
+            "error_code": null
+          }
+        ],
+        "journal": [
+          {
+            "seq": 6,
+            "msg_id": "e17d2697-c10a-4c9c-a4d3-5a33b408b4ec",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 1,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_eaf03edf24b846ce94204a58e3477303"
+          }
+        ]
+      }
+    },
+    "ORDINARY_TOOL_THROW": {
+      "id": "request_a3106d63967941e88b607648f3f4d94c",
+      "inputId": "10042019-4b64-46b9-862d-466608920c39",
+      "approvalId": "approve-1795242769963-ak2nlf6",
+      "beforeDecision": {
+        "job": {
+          "state": "waiting_approval",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "10042019-4b64-46b9-862d-466608920c39",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 7,
+            "msg_id": "10042019-4b64-46b9-862d-466608920c39",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_a3106d63967941e88b607648f3f4d94c"
+          }
+        ]
+      },
+      "approvalExposed": true,
+      "afterUnconfirmedResult": {
+        "job": {
+          "state": "review_required",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+          "tool_started": 1,
+          "user_message_id": "10042019-4b64-46b9-862d-466608920c39",
+          "reply_message_id": null
+        },
+        "invocations": [
+          {
+            "invocation_id": "fe8b891d-4921-48fa-9d7f-6b2e09b32eef",
+            "native_request_id": "request_a3106d63967941e88b607648f3f4d94c",
+            "plugin_name": "OrdinaryToolCounter",
+            "record_id": "tcr-1795242769963-aa45a510-2364-4ce5-9579-0d1906d918fc",
+            "state": "started",
+            "error_code": null
+          }
+        ],
+        "journal": [
+          {
+            "seq": 7,
+            "msg_id": "10042019-4b64-46b9-862d-466608920c39",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 1,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_a3106d63967941e88b607648f3f4d94c"
+          }
+        ]
+      }
+    },
+    "ORDINARY_TOOL_CRASH": {
+      "id": "request_93ef108900b64914a2fa9d63f32578c2",
+      "inputId": "0ced749b-62a1-4413-bb16-9047ec1761be",
+      "approvalId": "approve-1795242770023-dbj6vrc",
+      "beforeDecision": {
+        "job": {
+          "state": "waiting_approval",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "0ced749b-62a1-4413-bb16-9047ec1761be",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 8,
+            "msg_id": "0ced749b-62a1-4413-bb16-9047ec1761be",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_93ef108900b64914a2fa9d63f32578c2"
+          }
+        ]
+      },
+      "approvalExposed": true,
+      "beforeCrash": {
+        "job": {
+          "state": "running",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 1,
+          "user_message_id": "0ced749b-62a1-4413-bb16-9047ec1761be",
+          "reply_message_id": null
+        },
+        "invocations": [
+          {
+            "invocation_id": "8cf90b93-aaa9-483d-8b6c-6a8006576f3b",
+            "native_request_id": "request_93ef108900b64914a2fa9d63f32578c2",
+            "plugin_name": "OrdinaryToolCounter",
+            "record_id": "tcr-1795242770023-1979b0c9-58d8-4f9a-b7ac-0e874e064ded",
+            "state": "started",
+            "error_code": null
+          }
+        ],
+        "journal": [
+          {
+            "seq": 8,
+            "msg_id": "0ced749b-62a1-4413-bb16-9047ec1761be",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 1,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_93ef108900b64914a2fa9d63f32578c2"
+          }
+        ]
+      },
+      "crash": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "afterReopenAndReplay": {
+        "job": {
+          "state": "review_required",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+          "tool_started": 1,
+          "user_message_id": "0ced749b-62a1-4413-bb16-9047ec1761be",
+          "reply_message_id": null
+        },
+        "invocations": [
+          {
+            "invocation_id": "8cf90b93-aaa9-483d-8b6c-6a8006576f3b",
+            "native_request_id": "request_93ef108900b64914a2fa9d63f32578c2",
+            "plugin_name": "OrdinaryToolCounter",
+            "record_id": "tcr-1795242770023-1979b0c9-58d8-4f9a-b7ac-0e874e064ded",
+            "state": "started",
+            "error_code": null
+          }
+        ],
+        "journal": [
+          {
+            "seq": 8,
+            "msg_id": "0ced749b-62a1-4413-bb16-9047ec1761be",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 1,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_93ef108900b64914a2fa9d63f32578c2"
+          }
+        ]
+      }
+    }
+  },
+  "readOnlyPwa": {
+    "duringApproval": {
+      "composerDisabled": true,
+      "executionButtons": []
+    },
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browser": "Chrome/158.0.8127.36",
+    "observedTerminalResult": true,
+    "normalUiExecutionWrites": 0,
+    "pageErrors": []
+  },
+  "providerAccounting": {
+    "totalRequests": 8,
+    "assignedRequests": 8,
+    "unclassifiedRequests": 0,
+    "totalRequestsAtShutdown": 8
+  },
+  "backendExit": {
+    "code": 0,
+    "signal": null
+  },
+  "loadedSources": [
+    {
+      "file": "apps/server/server.js",
+      "sha256": "3095443182aca5d60dec2f6ee776790906028befa9364496fd8fac5951a096df"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "8470ce924639021ba124fb2e445654d206f5e23fe61faae53fdf89336f143a62"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "208b07470ed449c14eecdbf91c97baa64a7461adb64338e80c60b56b82894532"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "300fcdad73a819267fb65a288079e540a36a846613aa09a86dd9ea511b2e69e2"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "3483b635f0b735b80b0f02d6d0ad5ddefdb9bf52988affb6f5f8b2b63f8ca0b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "5f463aede4ae58973d6b792c2d48458c83159ef80ff15ec87443b2bdeba8a4f0"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "b301b5273c0a32ae476fd352eb68353abfc7b4c9a0376cfce2e2c540574dc89c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+      "sha256": "81f8c66028b4e77697b588bc89073c65291202f9ab01977bb6507e0aa7f91c6b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+      "sha256": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "200540207a903bb0e7dc342eba36edb271619df7304eb5f433b7d62353a1cc56"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "c135a4ae59741a02cdf07653b7112f7932693f10600f6d4dac76e28a72d4d825"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "1a78e164d79f50d823aa09dbf26b269d35a1d175ee53806f42d5b1aa0d44b25b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/native-sync.js",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    }
+  ],
+  "phase": "after",
+  "result": "PASS"
+}

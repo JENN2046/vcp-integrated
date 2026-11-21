@@ -11,6 +11,7 @@ const express = require('express'); // For plugin API routing
 const chokidar = require('chokidar');
 const { getAuthCode } = require('./modules/captchaDecoder'); // 导入统一的解码函数
 const ToolApprovalManager = require('./modules/toolApprovalManager');
+const nativeExecution = require('./modules/requestExecutionContext');
 const { hasFoldMarkers, buildDynamicFoldObject } = require('./modules/foldProtocol');
 const { sanitizeToolResult } = require('./modules/toolResultPrivacyGuard');
 const toolCallRecordStore = require('./modules/toolCallRecordStore');
@@ -1840,12 +1841,18 @@ class PluginManager extends EventEmitter {
     }
 
     async processToolCall(toolName, toolArgs, requestIp = null, sourceNode = null, executionOptions = {}) {
-        require('./modules/requestExecutionContext').assertToolsAllowed();
+        nativeExecution.assertToolsAllowed();
         const shouldManageToolCallRecord = !executionOptions?.toolCallRecordHandle;
         const managedToolCallRecord = shouldManageToolCallRecord
             ? toolCallRecordStore.beginRecord({ toolName, args: toolArgs || {}, requestIp, sourceNode })
             : null;
 
+        const recordId = (executionOptions.toolCallRecordHandle || managedToolCallRecord)?.id;
+        return nativeExecution.trackToolInvocation({ pluginName: toolName, recordId }, invokeDirect =>
+            this._processToolCall(toolName, toolArgs, { requestIp, sourceNode, executionOptions, managedToolCallRecord, invokeDirect }));
+    }
+
+    async _processToolCall(toolName, toolArgs, { requestIp, sourceNode, executionOptions, managedToolCallRecord, invokeDirect }) {
         const residentProposalCall = toolName === RESIDENT_TOOL_NAME
             && typeof toolArgs?.operation === 'string'
             && toolArgs.operation.startsWith('PROPOSE_');
@@ -1910,8 +1917,7 @@ class PluginManager extends EventEmitter {
             const approvalPromise = new Promise((resolve, reject) => {
                 const timeoutDuration = this.toolApprovalManager.getTimeoutMs();
                 const timeoutId = setTimeout(() => {
-                    if (this.pendingApprovals.has(requestId)) {
-                        this.pendingApprovals.delete(requestId);
+                    if (this._takePendingApproval(requestId)) {
                         reject(new Error(JSON.stringify({ plugin_error: `Manual approval for "${toolName}" timed out after ${timeoutDuration / 60000} minutes.` })));
                     }
                 }, timeoutDuration);
@@ -1950,14 +1956,12 @@ class PluginManager extends EventEmitter {
                 this.webSocketServer.broadcast(approvalRequest, 'VCPLog');
                 console.log(`[PluginManager] 🔔 正在等待工具调用人工审核: ${toolName} (ID: ${requestId})`);
             } else {
-                const pendingApproval = this.pendingApprovals.get(requestId);
-                if (pendingApproval) clearTimeout(pendingApproval.timeoutId);
-                this.pendingApprovals.delete(requestId);
+                this._takePendingApproval(requestId);
                 throw new Error(JSON.stringify({ plugin_error: 'WebSocketServer not initialized, cannot request manual approval.' }));
             }
 
             try {
-                const approvalResult = await approvalPromise;
+                const approvalResult = await nativeExecution.waitForApproval(approvalPromise);
                 if (approvalResult && approvalResult.silentRejected === true) {
                     // Silent rejection is a privacy boundary. A reason or a
                     // client-supplied feedback flag cannot override this rule.
@@ -1983,6 +1987,8 @@ class PluginManager extends EventEmitter {
             } catch (error) {
                 if (this.debugMode) console.warn(`[PluginManager] Tool call for "${toolName}" (ID: ${requestId}) rejected: ${error.message}`);
                 throw error;
+            } finally {
+                this._takePendingApproval(requestId);
             }
         }
         // --- 人工审核逻辑结束 ---
@@ -2017,7 +2023,7 @@ class PluginManager extends EventEmitter {
                 },
                 getServiceModule: name => this.getServiceModule(name),
                 getDecryptedAuthCode: () => this._getDecryptedAuthCode(),
-                executeDirectWithTimeout: (...args) => this._executeDirectToolCallWithTimeout(...args),
+                executeDirectWithTimeout: (...args) => invokeDirect(() => this._executeDirectToolCallWithTimeout(...args)),
                 executeStdio: (...args) => this.executePlugin(...args),
                 triggerSleepDream: (...args) => this._tryTriggerDreamForVCPSleep(...args),
                 filterFuzzyDiff,
@@ -2543,21 +2549,22 @@ class PluginManager extends EventEmitter {
         return this._settleApprovalResponse(requestId, approved, reason, approval);
     }
 
-    _settleApprovalResponse(requestId, approved, reason, expectedApproval) {
+    _takePendingApproval(requestId, expectedApproval) {
         const approval = this.pendingApprovals.get(requestId);
-        if (approval && (!expectedApproval || expectedApproval === approval)) {
-            this.pendingApprovals.delete(requestId);
-            clearTimeout(approval.timeoutId);
+        if (!approval || (expectedApproval && expectedApproval !== approval)) return null;
+        this.pendingApprovals.delete(requestId);
+        clearTimeout(approval.timeoutId);
+        try {
+            this.webSocketServer?.cancelVcpLogApprovalCache?.(requestId);
+        } catch (error) {
+            if (this.debugMode) console.warn(`[PluginManager] cancelVcpLogApprovalCache failed for ${requestId}: ${error.message}`);
+        }
+        return approval;
+    }
 
-            // 用户已经响应,把对应的 VCPLog 缓存条目清除,避免后续重连时把已处理的审核请求补发
-            try {
-                if (this.webSocketServer && typeof this.webSocketServer.cancelVcpLogApprovalCache === 'function') {
-                    this.webSocketServer.cancelVcpLogApprovalCache(requestId);
-                }
-            } catch (e) {
-                if (this.debugMode) console.warn(`[PluginManager] cancelVcpLogApprovalCache failed for ${requestId}: ${e.message}`);
-            }
-
+    _settleApprovalResponse(requestId, approved, reason, expectedApproval) {
+        const approval = this._takePendingApproval(requestId, expectedApproval);
+        if (approval) {
             const normalizedReason = typeof reason === 'string' ? reason.trim() : '';
 
             if (approved) {

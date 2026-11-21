@@ -1,0 +1,551 @@
+{
+  "baselineRevision": "89dd204c659f1e7e71efc95cdea8ad76a2d6d8eb",
+  "cases": {
+    "ORDINARY_TOOL_APPROVE": {
+      "id": "request_3f1b192692894df59d75d1f9b41d4ba4",
+      "inputId": "edfb3712-f3e5-425a-9ead-5c2ed9f107a4",
+      "approvalId": "approve-1795242730872-369w0xl",
+      "beforeDecision": {
+        "job": {
+          "state": "running",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "edfb3712-f3e5-425a-9ead-5c2ed9f107a4",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 1,
+            "msg_id": "edfb3712-f3e5-425a-9ead-5c2ed9f107a4",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_3f1b192692894df59d75d1f9b41d4ba4"
+          }
+        ]
+      },
+      "approvalExposed": true,
+      "sameAcceptedReplay": true,
+      "afterDecision": {
+        "job": {
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "edfb3712-f3e5-425a-9ead-5c2ed9f107a4",
+          "reply_message_id": "reply_request_3f1b192692894df59d75d1f9b41d4ba4"
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 1,
+            "msg_id": "edfb3712-f3e5-425a-9ead-5c2ed9f107a4",
+            "action": "upsert"
+          },
+          {
+            "seq": 2,
+            "msg_id": "reply_request_3f1b192692894df59d75d1f9b41d4ba4",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 1,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_3f1b192692894df59d75d1f9b41d4ba4"
+          },
+          {
+            "ordinaryPhase": "continuation",
+            "hasToolResult": true,
+            "nativeRequestId": "request_3f1b192692894df59d75d1f9b41d4ba4"
+          }
+        ]
+      }
+    },
+    "ORDINARY_TOOL_DENY": {
+      "id": "request_d91232c99d734bf6a06f50b0649be215",
+      "inputId": "6cc4387b-2319-4af9-be61-ce8e52e5e637",
+      "approvalId": "approve-1795242731056-sqldfi5",
+      "beforeDecision": {
+        "job": {
+          "state": "running",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "6cc4387b-2319-4af9-be61-ce8e52e5e637",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 3,
+            "msg_id": "6cc4387b-2319-4af9-be61-ce8e52e5e637",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_d91232c99d734bf6a06f50b0649be215"
+          }
+        ]
+      },
+      "approvalExposed": true,
+      "afterDecision": {
+        "job": {
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "6cc4387b-2319-4af9-be61-ce8e52e5e637",
+          "reply_message_id": "reply_request_d91232c99d734bf6a06f50b0649be215"
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 3,
+            "msg_id": "6cc4387b-2319-4af9-be61-ce8e52e5e637",
+            "action": "upsert"
+          },
+          {
+            "seq": 4,
+            "msg_id": "reply_request_d91232c99d734bf6a06f50b0649be215",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_d91232c99d734bf6a06f50b0649be215"
+          },
+          {
+            "ordinaryPhase": "continuation",
+            "hasToolResult": false,
+            "nativeRequestId": "request_d91232c99d734bf6a06f50b0649be215"
+          }
+        ]
+      }
+    },
+    "ORDINARY_TOOL_CANCEL": {
+      "id": "request_aed8d852d6de43d4a4b648f5449c40b3",
+      "inputId": "171294cb-6bc6-4bea-bf46-9f574fc351ac",
+      "approvalId": "approve-1795242731118-m8kn4yk",
+      "beforeDecision": {
+        "job": {
+          "state": "running",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "171294cb-6bc6-4bea-bf46-9f574fc351ac",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 5,
+            "msg_id": "171294cb-6bc6-4bea-bf46-9f574fc351ac",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_aed8d852d6de43d4a4b648f5449c40b3"
+          }
+        ]
+      },
+      "approvalExposed": true,
+      "afterLateApproval": {
+        "job": {
+          "state": "review_required",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 1,
+          "error_code": "EXECUTION_CANCELLED_REVIEW_REQUIRED",
+          "tool_started": 0,
+          "user_message_id": "171294cb-6bc6-4bea-bf46-9f574fc351ac",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 5,
+            "msg_id": "171294cb-6bc6-4bea-bf46-9f574fc351ac",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 1,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_aed8d852d6de43d4a4b648f5449c40b3"
+          },
+          {
+            "ordinaryPhase": "continuation",
+            "hasToolResult": true,
+            "nativeRequestId": "request_aed8d852d6de43d4a4b648f5449c40b3"
+          }
+        ]
+      }
+    },
+    "ORDINARY_TOOL_TIMEOUT": {
+      "id": "request_288d3f235dce42a58a389c148225a5a5",
+      "inputId": "50d43364-a664-4e4b-a91f-97643ea2003c",
+      "approvalId": "approve-1795242731511-ojwelr0",
+      "beforeDecision": {
+        "job": {
+          "state": "running",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "50d43364-a664-4e4b-a91f-97643ea2003c",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 6,
+            "msg_id": "50d43364-a664-4e4b-a91f-97643ea2003c",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_288d3f235dce42a58a389c148225a5a5"
+          }
+        ]
+      },
+      "approvalExposed": true,
+      "afterUnconfirmedResult": {
+        "job": {
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "50d43364-a664-4e4b-a91f-97643ea2003c",
+          "reply_message_id": "reply_request_288d3f235dce42a58a389c148225a5a5"
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 6,
+            "msg_id": "50d43364-a664-4e4b-a91f-97643ea2003c",
+            "action": "upsert"
+          },
+          {
+            "seq": 7,
+            "msg_id": "reply_request_288d3f235dce42a58a389c148225a5a5",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 1,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_288d3f235dce42a58a389c148225a5a5"
+          },
+          {
+            "ordinaryPhase": "continuation",
+            "hasToolResult": false,
+            "nativeRequestId": "request_288d3f235dce42a58a389c148225a5a5"
+          }
+        ]
+      }
+    },
+    "ORDINARY_TOOL_THROW": {
+      "id": "request_a3b8861e90f24a88beb8c9e06d2560bd",
+      "inputId": "427d7bf7-22f6-43df-9c75-4133a6dab027",
+      "approvalId": "approve-1795242734070-ao0qr2t",
+      "beforeDecision": {
+        "job": {
+          "state": "running",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "427d7bf7-22f6-43df-9c75-4133a6dab027",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 8,
+            "msg_id": "427d7bf7-22f6-43df-9c75-4133a6dab027",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_a3b8861e90f24a88beb8c9e06d2560bd"
+          }
+        ]
+      },
+      "approvalExposed": true,
+      "afterUnconfirmedResult": {
+        "job": {
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "427d7bf7-22f6-43df-9c75-4133a6dab027",
+          "reply_message_id": "reply_request_a3b8861e90f24a88beb8c9e06d2560bd"
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 8,
+            "msg_id": "427d7bf7-22f6-43df-9c75-4133a6dab027",
+            "action": "upsert"
+          },
+          {
+            "seq": 9,
+            "msg_id": "reply_request_a3b8861e90f24a88beb8c9e06d2560bd",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 1,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_a3b8861e90f24a88beb8c9e06d2560bd"
+          },
+          {
+            "ordinaryPhase": "continuation",
+            "hasToolResult": false,
+            "nativeRequestId": "request_a3b8861e90f24a88beb8c9e06d2560bd"
+          }
+        ]
+      }
+    },
+    "ORDINARY_TOOL_CRASH": {
+      "id": "request_4dd5b363fb5a49a4a53199482e5dff33",
+      "inputId": "69a17181-ada7-475d-afe5-0219f90f003e",
+      "approvalId": "approve-1795242734127-76hs3pv",
+      "beforeDecision": {
+        "job": {
+          "state": "running",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "69a17181-ada7-475d-afe5-0219f90f003e",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 10,
+            "msg_id": "69a17181-ada7-475d-afe5-0219f90f003e",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 0,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_4dd5b363fb5a49a4a53199482e5dff33"
+          }
+        ]
+      },
+      "approvalExposed": true,
+      "beforeCrash": {
+        "job": {
+          "state": "running",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": null,
+          "tool_started": 0,
+          "user_message_id": "69a17181-ada7-475d-afe5-0219f90f003e",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 10,
+            "msg_id": "69a17181-ada7-475d-afe5-0219f90f003e",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 1,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_4dd5b363fb5a49a4a53199482e5dff33"
+          }
+        ]
+      },
+      "crash": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "afterReopenAndReplay": {
+        "job": {
+          "state": "review_required",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "cancel_requested": 0,
+          "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+          "tool_started": 0,
+          "user_message_id": "69a17181-ada7-475d-afe5-0219f90f003e",
+          "reply_message_id": null
+        },
+        "invocations": [],
+        "journal": [
+          {
+            "seq": 10,
+            "msg_id": "69a17181-ada7-475d-afe5-0219f90f003e",
+            "action": "upsert"
+          }
+        ],
+        "pluginCalls": 1,
+        "provider": [
+          {
+            "ordinaryPhase": "tool-request",
+            "hasToolResult": false,
+            "nativeRequestId": "request_4dd5b363fb5a49a4a53199482e5dff33"
+          }
+        ]
+      }
+    }
+  },
+  "readOnlyPwa": {
+    "duringApproval": {
+      "composerDisabled": true,
+      "executionButtons": []
+    },
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browser": "Chrome/158.0.8127.36",
+    "observedTerminalResult": true,
+    "normalUiExecutionWrites": 0,
+    "pageErrors": []
+  },
+  "providerAccounting": {
+    "totalRequests": 11,
+    "assignedRequests": 11,
+    "unclassifiedRequests": 0,
+    "totalRequestsAtShutdown": 11
+  },
+  "backendExit": {
+    "code": 0,
+    "signal": null
+  },
+  "loadedSources": [
+    {
+      "file": "apps/server/server.js",
+      "sha256": "3095443182aca5d60dec2f6ee776790906028befa9364496fd8fac5951a096df"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "1d6e821f640a78a4079dd9816d6051e3e3a80304f760491ab0d4a688a1348fff"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "208b07470ed449c14eecdbf91c97baa64a7461adb64338e80c60b56b82894532"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "2a60d7ad51489741f4ceb3113a5d512afa0c6a527e8e482e49142c98962fe482"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "430214198ce02ef2d395edcf5e6d79232b994a13516dffc8cece0d46d7ce5af6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "5f463aede4ae58973d6b792c2d48458c83159ef80ff15ec87443b2bdeba8a4f0"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "b301b5273c0a32ae476fd352eb68353abfc7b4c9a0376cfce2e2c540574dc89c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+      "sha256": "81f8c66028b4e77697b588bc89073c65291202f9ab01977bb6507e0aa7f91c6b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+      "sha256": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "200540207a903bb0e7dc342eba36edb271619df7304eb5f433b7d62353a1cc56"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "c135a4ae59741a02cdf07653b7112f7932693f10600f6d4dac76e28a72d4d825"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "1a78e164d79f50d823aa09dbf26b269d35a1d175ee53806f42d5b1aa0d44b25b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/native-sync.js",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    }
+  ],
+  "phase": "before",
+  "result": "observed baseline"
+}

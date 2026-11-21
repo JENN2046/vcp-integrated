@@ -15,11 +15,19 @@ const host = path.join(candidate, 'apps/desktop');
 const { createRequire } = require('node:module');
 const modes = ['lost-only', 'transport-only', 'pre-only', 'local-only', 'config-only', 'shutdown-only'];
 const requested = process.argv[2] || 'all';
+const ordinaryModes = { 'ordinary-shared': 'pre-only', 'ordinary-local': 'local-only' };
+const ordinaryMode = Object.hasOwn(ordinaryModes, requested) ? ordinaryModes[requested] : undefined;
+const serverRevision = ordinaryMode ? process.env.NS_BASELINE_SERVER_REVISION : undefined;
+if (serverRevision && !/^[a-f0-9]{40}$/.test(serverRevision)) throw Error('Expected full Git revision for baseline server');
+const ordinaryFixture = ordinaryMode ? {
+    ...require('../ordinary-tools/fixture.cjs'),
+    ...(process.env.NS_DROP_APPROVAL_RECEIPT === '1' && { lostReceiptMarker: 'ORDINARY_TOOL_APPROVE' }),
+} : undefined;
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, 'all', 'ready', '--dev', 'idle'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only]');
+if (![...modes, ...Object.keys(ordinaryModes), 'all', 'ready', '--dev', 'idle'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -141,11 +149,15 @@ async function runCase(root, mode) {
         '-keyout', key, '-out', cert], { env: { PATH: '/usr/bin:/bin' }, stdio: 'ignore' });
     fingerprint = new X509Certificate(fs.readFileSync(cert)).fingerprint256;
     let service;
-    try { service = await require('./service.cjs').start({out, candidate, cert, key, trace, waitUntil, mode}); }
+    try {
+        service = await require('./service.cjs').start({
+            out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision,
+        });
+    }
     finally { fs.rmSync(key, { force: true }); }
     const clients = {};
     const profiles = {};
-    const result = { candidate, mode, origin: service.origin, exits:{}, failures:[] };
+    const result = { candidate, mode, ...(serverRevision && {serverRevision}), origin: service.origin, exits:{}, failures:[] };
     const start = async (role, profileRole = role) => {
         const client = clients[role] = launch(profiles[profileRole], role, mode);
         await waitUntil(() => {
@@ -245,7 +257,8 @@ async function runCase(root, mode) {
         } else if (mode === 'idle') {
             result.idle = await require('./idle.cjs').measure({out, waitUntil, pids:{ A:A.proc.pid, B:B.proc.pid, backend:service.backendPid }});
         } else if (mode !== 'ready') {
-            const runScenario = mode === 'config-only' ? require('./configuration.cjs') : scenario;
+            const runScenario = ordinaryMode ? require('../ordinary-desktop/scenario.cjs')
+                : mode === 'config-only' ? require('./configuration.cjs') : scenario;
             await runScenario({clients:{A,B},out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash});
         }
     } catch(error) {
@@ -267,7 +280,10 @@ async function runCase(root, mode) {
         try {
             const loaded=read(path.join(out,'backend-loaded.json'));
             for (const row of loaded) {
-                assert.equal(row.sha256,sha(path.join(candidate,row.file)),row.file);
+                const expectedSha = serverRevision
+                    ? createHash('sha256').update(execFileSync('git', ['show', serverRevision + ':' + row.file], { cwd: candidate })).digest('hex')
+                    : sha(path.join(candidate, row.file));
+                assert.equal(row.sha256, expectedSha, row.file);
             }
             assert.ok(loaded.length >= 9, 'required loaded backend source files');
             result.backendSources=loaded;
@@ -292,7 +308,7 @@ async function main() {
     const xvfb = devDisplay ? null : await isolatedDisplay(root);
     if (devDisplay) display = devDisplay;
     try {
-        for (const mode of requested === 'all' ? modes : [requested]) await runCase(root, mode);
+        for (const mode of requested === 'all' ? modes : [ordinaryMode || requested]) await runCase(root, mode);
     } finally {
         if (xvfb && xvfb.exitCode === null && xvfb.signalCode === null) {
             const exited = once(xvfb, 'exit');

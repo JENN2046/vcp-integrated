@@ -1,0 +1,382 @@
+{
+  "environment": "Linux x64, sandboxed Electron under Xvfb, real VCPChat, Chat Data Service and ToolBox, disposable synthetic profiles, loopback synthetic provider and plugin",
+  "baselineServerRevision": "89dd204c659f1e7e71efc95cdea8ad76a2d6d8eb",
+  "baseline": {
+    "loaded": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "desktop": {
+        "apps/desktop/modules/ipc/chatHandlers.js": "177fe4baaa6c650b1bc7293efcb77ef74841608998d0bbc516d2f681265f3545",
+        "apps/desktop/modules/renderer/mainChatSendOwner.js": "b1c8836bbeb62dc96db5e81439a01ee28d69c36382b441663e7707928ddea0ef",
+        "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs": "61b86ac0640ef061c93166aaa368f6419e3acd204ab3bee20030315289924a2c"
+      },
+      "server": {
+        "apps/server/Plugin.js": "1d6e821f640a78a4079dd9816d6051e3e3a80304f760491ab0d4a688a1348fff",
+        "apps/server/modules/requestExecutionContext.js": "2a60d7ad51489741f4ceb3113a5d512afa0c6a527e8e482e49142c98962fe482",
+        "apps/server/modules/chatCompletionHandler.js": "430214198ce02ef2d395edcf5e6d79232b994a13516dffc8cece0d46d7ce5af6"
+      }
+    },
+    "sharedApproval": {
+      "statusBeforeDesktopReopen": [
+        "共享后端 · 原生执行中"
+      ],
+      "statusAfterDesktopReopen": [
+        "共享后端 · 原生执行中"
+      ],
+      "nativeApprovalIdOnA": "approve-1795242603539-g65egey",
+      "nativeApprovalIdOnB": "approve-1795242603539-g65egey",
+      "nativeApprovalCardOnReopenedA": null,
+      "approvedFrom": "B",
+      "sharedSendPosts": 1,
+      "work": {
+        "id": "request_0ccffc64a1e644009e9490a51178df83",
+        "request_id": "msg_1795242603258_user_1nijuqluan",
+        "state": "completed",
+        "attempts": 1
+      },
+      "nativeRequests": [
+        {
+          "id": "request_0ccffc64a1e644009e9490a51178df83",
+          "state": "model_terminal"
+        }
+      ],
+      "provider": [
+        {
+          "requestId": "request_0ccffc64a1e644009e9490a51178df83",
+          "phase": "tool-request",
+          "hasToolResult": false
+        },
+        {
+          "requestId": "request_0ccffc64a1e644009e9490a51178df83",
+          "phase": "continuation",
+          "hasToolResult": true
+        }
+      ],
+      "counterInvocations": 1,
+      "historyOnAAndBMatchesJournal": [
+        {
+          "id": "msg_1795242603258_user_1nijuqluan",
+          "role": "user"
+        },
+        {
+          "id": "reply_request_0ccffc64a1e644009e9490a51178df83",
+          "role": "assistant"
+        }
+      ]
+    },
+    "localTool": {
+      "historyRoles": [
+        "user",
+        "assistant"
+      ],
+      "provider": [
+        {
+          "requestId": "admission_b7ff16f2-f1e7-4c70-8edc-b3a8386586e5",
+          "phase": "tool-request",
+          "hasToolResult": false
+        },
+        {
+          "requestId": "admission_b7ff16f2-f1e7-4c70-8edc-b3a8386586e5",
+          "phase": "continuation",
+          "hasToolResult": true
+        }
+      ],
+      "counterInvocations": 1,
+      "work": 0,
+      "journal": 0,
+      "sharedSendPosts": 0,
+      "localPosts": 1
+    },
+    "regressions": {
+      "preAdmissionRejected": {
+        "status": 409,
+        "code": "SHARED_CONTEXT_CHANGED",
+        "firstInputId": "msg_1795242131837_user_bsut3v7boe",
+        "reopenedInputId": "msg_1795242131837_user_bsut3v7boe",
+        "reopenedInputVisible": true,
+        "providerAttempts": 0,
+        "work": 0,
+        "journal": 0
+      },
+      "acceptedLostReceipt": {
+        "requestId": "msg_1795242146357_user_wy4tlyxt90",
+        "workId": "request_0f6df6095bed45038f51029acc01fa97",
+        "successfulStatusBeforeProxyDrop": 200,
+        "recoveryStatus": 200,
+        "providerAttempts": 1,
+        "journal": [
+          {
+            "id": "msg_1795242146357_user_wy4tlyxt90",
+            "role": "user"
+          },
+          {
+            "id": "reply_request_0f6df6095bed45038f51029acc01fa97",
+            "role": "assistant"
+          }
+        ]
+      },
+      "interruptedPartial": {
+        "workId": "request_b69127bbe887445daab67beb4599ff70",
+        "workState": "review_required",
+        "nativeState": "unknown",
+        "partialVisibleAfterReopen": true,
+        "finalReplyVisibleAfterReopen": false,
+        "history": [
+          {
+            "id": "msg_1795242146373_user_yt4zohw767",
+            "role": "user"
+          }
+        ],
+        "journal": [
+          {
+            "id": "msg_1795242146373_user_yt4zohw767",
+            "role": "user"
+          }
+        ],
+        "counts": {
+          "sessionPosts": 1,
+          "cancelPosts": 0,
+          "providerAttempts": 1
+        }
+      },
+      "ordinaryLocalSend": {
+        "history": [
+          {
+            "id": "msg_1795242145970_user_d9fxs14jlh",
+            "role": "user"
+          },
+          {
+            "id": "admission_74ab777f-ffdd-4736-b453-f4f063bd5a25",
+            "role": "assistant"
+          }
+        ],
+        "localPosts": 1,
+        "sharedSendPosts": 0,
+        "work": 0,
+        "journal": 0
+      }
+    }
+  },
+  "candidate": {
+    "loaded": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "desktop": {
+        "apps/desktop/modules/ipc/chatHandlers.js": "177fe4baaa6c650b1bc7293efcb77ef74841608998d0bbc516d2f681265f3545",
+        "apps/desktop/modules/renderer/mainChatSendOwner.js": "b1c8836bbeb62dc96db5e81439a01ee28d69c36382b441663e7707928ddea0ef",
+        "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs": "61b86ac0640ef061c93166aaa368f6419e3acd204ab3bee20030315289924a2c"
+      },
+      "server": {
+        "apps/server/Plugin.js": "8470ce924639021ba124fb2e445654d206f5e23fe61faae53fdf89336f143a62",
+        "apps/server/modules/requestExecutionContext.js": "300fcdad73a819267fb65a288079e540a36a846613aa09a86dd9ea511b2e69e2",
+        "apps/server/modules/chatCompletionHandler.js": "3483b635f0b735b80b0f02d6d0ad5ddefdb9bf52988affb6f5f8b2b63f8ca0b1"
+      }
+    },
+    "sharedApproval": {
+      "statusBeforeDesktopReopen": [
+        "共享后端 · 等待原生审批"
+      ],
+      "statusAfterDesktopReopen": [
+        "共享后端 · 等待原生审批"
+      ],
+      "nativeApprovalIdOnA": "approve-1795242796635-yrt0yno",
+      "nativeApprovalIdOnB": "approve-1795242796635-yrt0yno",
+      "nativeApprovalCardOnReopenedA": null,
+      "approvedFrom": "B",
+      "sharedSendPosts": 1,
+      "work": {
+        "id": "request_df85f71a444f4ad3806588937f4ab1a7",
+        "request_id": "msg_1795242795936_user_u1vrtxxhrk",
+        "state": "completed",
+        "attempts": 1
+      },
+      "nativeRequests": [
+        {
+          "id": "request_df85f71a444f4ad3806588937f4ab1a7",
+          "state": "model_terminal"
+        }
+      ],
+      "provider": [
+        {
+          "requestId": "request_df85f71a444f4ad3806588937f4ab1a7",
+          "phase": "tool-request",
+          "hasToolResult": false
+        },
+        {
+          "requestId": "request_df85f71a444f4ad3806588937f4ab1a7",
+          "phase": "continuation",
+          "hasToolResult": true
+        }
+      ],
+      "counterInvocations": 1,
+      "historyOnAAndBMatchesJournal": [
+        {
+          "id": "msg_1795242795936_user_u1vrtxxhrk",
+          "role": "user"
+        },
+        {
+          "id": "reply_request_df85f71a444f4ad3806588937f4ab1a7",
+          "role": "assistant"
+        }
+      ]
+    },
+    "sharedApprovalAfterLostSendReceipt": {
+      "statusBeforeDesktopReopen": [
+        "共享后端 · 等待原生审批"
+      ],
+      "statusAfterDesktopReopen": [
+        "共享后端 · 等待原生审批"
+      ],
+      "nativeApprovalIdOnA": "approve-1795242798642-18jl4dj",
+      "nativeApprovalIdOnB": "approve-1795242798642-18jl4dj",
+      "nativeApprovalCardOnReopenedA": null,
+      "approvedFrom": "B",
+      "sharedSendPosts": 1,
+      "work": {
+        "id": "request_97d0e230a6064b9c90a79a5d8cb12197",
+        "request_id": "msg_1795242797707_user_s96z0l9ul",
+        "state": "completed",
+        "attempts": 1
+      },
+      "nativeRequests": [
+        {
+          "id": "request_97d0e230a6064b9c90a79a5d8cb12197",
+          "state": "model_terminal"
+        }
+      ],
+      "provider": [
+        {
+          "requestId": "request_97d0e230a6064b9c90a79a5d8cb12197",
+          "phase": "tool-request",
+          "hasToolResult": false
+        },
+        {
+          "requestId": "request_97d0e230a6064b9c90a79a5d8cb12197",
+          "phase": "continuation",
+          "hasToolResult": true
+        }
+      ],
+      "counterInvocations": 1,
+      "historyOnAAndBMatchesJournal": [
+        {
+          "id": "msg_1795242797707_user_s96z0l9ul",
+          "role": "user"
+        },
+        {
+          "id": "reply_request_97d0e230a6064b9c90a79a5d8cb12197",
+          "role": "assistant"
+        }
+      ],
+      "lostReceipt": {
+        "successfulStatusBeforeProxyDrop": 200,
+        "recoveredRequestId": "msg_1795242797707_user_s96z0l9ul",
+        "recoveryStatus": 200
+      }
+    },
+    "localTool": {
+      "historyRoles": [
+        "user",
+        "assistant"
+      ],
+      "provider": [
+        {
+          "requestId": "admission_9fa42e74-d320-4d36-9f7c-f66ec437a98b",
+          "phase": "tool-request",
+          "hasToolResult": false
+        },
+        {
+          "requestId": "admission_9fa42e74-d320-4d36-9f7c-f66ec437a98b",
+          "phase": "continuation",
+          "hasToolResult": true
+        }
+      ],
+      "counterInvocations": 1,
+      "work": 0,
+      "journal": 0,
+      "sharedSendPosts": 0,
+      "localPosts": 1
+    },
+    "regressions": {
+      "preAdmissionRejected": {
+        "status": 409,
+        "code": "SHARED_CONTEXT_CHANGED",
+        "firstInputId": "msg_1795242793227_user_tpysj13poy",
+        "reopenedInputId": "msg_1795242793227_user_tpysj13poy",
+        "reopenedInputVisible": true,
+        "providerAttempts": 0,
+        "work": 0,
+        "journal": 0
+      },
+      "acceptedLostReceipt": {
+        "requestId": "msg_1795242791123_user_x554jrbbfr",
+        "workId": "request_db23e06d0e324f48974e0da7aa23c654",
+        "successfulStatusBeforeProxyDrop": 200,
+        "recoveryStatus": 200,
+        "providerAttempts": 1,
+        "journal": [
+          {
+            "id": "msg_1795242791123_user_x554jrbbfr",
+            "role": "user"
+          },
+          {
+            "id": "reply_request_db23e06d0e324f48974e0da7aa23c654",
+            "role": "assistant"
+          }
+        ]
+      },
+      "interruptedPartial": {
+        "workId": "request_35c65862627b4742a12f26aee4f548bd",
+        "workState": "review_required",
+        "nativeState": "unknown",
+        "partialVisibleAfterReopen": true,
+        "finalReplyVisibleAfterReopen": false,
+        "history": [
+          {
+            "id": "msg_1795242793323_user_vawfdfgi7w",
+            "role": "user"
+          }
+        ],
+        "journal": [
+          {
+            "id": "msg_1795242793323_user_vawfdfgi7w",
+            "role": "user"
+          }
+        ],
+        "counts": {
+          "sessionPosts": 1,
+          "cancelPosts": 0,
+          "providerAttempts": 1
+        }
+      },
+      "ordinaryLocalSend": {
+        "history": [
+          {
+            "id": "msg_1795242790715_user_8nzvx4509o",
+            "role": "user"
+          },
+          {
+            "id": "admission_219a0c24-374b-475a-a71b-77db5183a1e0",
+            "role": "assistant"
+          }
+        ],
+        "localPosts": 1,
+        "sharedSendPosts": 0,
+        "work": 0,
+        "journal": 0
+      }
+    }
+  },
+  "screenshotsSha256": {
+    "baseline-shared-approval.png": "f7aa86f80d5030743422b143961961560d76a6a844fd9d8c975213ade3ce334e",
+    "baseline-shared-reopened.png": "47b06ba5670217ff9c2bb209a0ba0e453f5edc652ad31937e2eb8414505d35c2",
+    "candidate-shared-approval.png": "448a29c1143a347ee5d4c7f1422c39deb0fcb85402d6a586d0ca133957d2f6dc",
+    "candidate-shared-reopened.png": "7dafa16fde460fddcd198d9ef94491e043992480fc88643e315d9b8c69c6e6b8",
+    "candidate-shared-complete.png": "3c594dbdfeaeffb0b10c0627c49aece066c4c55c33fb7e954e359a29d23c5758",
+    "candidate-shared-tool-lost-ack.png": "68ce5cb8a2f6073375a7f3905fa536677f8d6bcc9875af06ddc04a362f70b60e",
+    "candidate-shared-tool-lost-ack-reopened.png": "0e8adc51fe604e2b0430a6a9eaf2d7c9e0cb071385c2ea178c5c3b8a19a368de",
+    "candidate-local-tool-complete.png": "6b0d503920a2599ac6dc8c9008b57a3e7f06d9102dd6e4fcf0d6587b9970013c",
+    "pre-admission-rejected.png": "e02e47c8b9dcea69ee0973caf7477f7acf9af6da14c4c7ddfe7cf776928421f0",
+    "accepted-lost-ack-recovered.png": "8f52cfe9452a0e47835c6f2329d38f913712161cdd0aed298f040e91eeba80d9",
+    "interrupted-partial-reopened.png": "889f57cb44fd5d42df8eccf201f2326a021127479175f097015651dce923da65"
+  }
+}

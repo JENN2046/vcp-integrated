@@ -22,7 +22,7 @@ async function jsonBody(req) {
     for await (const chunk of req) chunks.push(chunk);
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext}) {
+async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, serverRevision}) {
     const sourceApp = path.join(candidate, 'apps/server');
     const box = path.join(out, 'runtime-box');
     fs.mkdirSync(box);
@@ -30,7 +30,10 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     fs.mkdirSync(path.join(out, 'empty-diaries'));
 
     // Stage only versioned server files. The synthetic DB and plugin config live in this run.
-    const tracked = execFileSync('git', ['ls-files', '-z', '--', 'apps/server/'], { cwd: candidate });
+    const sourceListing = serverRevision
+        ? ['ls-tree', '-r', '--name-only', '-z', serverRevision, '--', 'apps/server/']
+        : ['ls-files', '-z', '--', 'apps/server/'];
+    const tracked = execFileSync('git', sourceListing, { cwd: candidate });
     const excluded = /(?:^|\/)(?:node_modules|DebugLog|logs|TVDaily|dailynote|file|image|Agent|VectorStore|\.file_cache)(?:\/|$)|(?:^|\/)(?:config\.env|\.env(?:\..*)?)(?:$|\/)|\.(?:pem|key|p12|pfx)$/i;
     for (const entry of tracked.toString().split('\0').filter(Boolean)) {
         const rel = entry.slice('apps/server/'.length);
@@ -38,10 +41,12 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         if (rel.startsWith('Plugin/') && !rel.startsWith('Plugin/NativeSync/') &&
             !/^Plugin\/(?:VCPSleep|AgentAssistant)\/(?!plugin-manifest)/.test(rel)) continue;
         const file = path.join(sourceApp, rel);
-        if (!fs.existsSync(file) || !fs.lstatSync(file).isFile()) continue;
+        if (!serverRevision && (!fs.existsSync(file) || !fs.lstatSync(file).isFile())) continue;
         const staged = path.join(box, rel);
         fs.mkdirSync(path.dirname(staged), { recursive: true });
-        fs.copyFileSync(file, staged);
+        if (serverRevision) {
+            fs.writeFileSync(staged, execFileSync('git', ['show', serverRevision + ':' + entry], { cwd: candidate, maxBuffer: 32 * 1024 * 1024 }));
+        } else fs.copyFileSync(file, staged);
     }
     const nativeAddon = 'rust-vexus-lite/vexus-lite.linux-x64-gnu.node';
     const builtAddon = path.join(sourceApp, nativeAddon);
@@ -64,11 +69,13 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         enabled: true, captureMultimodal: false, autoCleanupEnabled: false
     }));
 
+    ordinaryTools?.stage(box);
+
     const cleanup = [];
     const seed = path.join(out, 'seed');
     fs.mkdirSync(seed);
     fs.writeFileSync(path.join(seed, 'L4-SYNTHETIC-ONLY'), 'NativeSync L4 synthetic process fixture\n');
-    let source, target, stopTopic;
+    let source, target, stopTopic, ordinaryTopics;
     const descriptors = {};
     try {
         const f = await fixture({ after: fn => cleanup.push(fn) }, { syntheticRoot: seed });
@@ -78,6 +85,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         target = f.shared.create(actor, {sharedSpaceId:'sharedAB',opId:'sponsor-target-topic',kind:'topic',parentId:targetAgent.id,localId:'sponsor-target-topic',localParent:'sponsor-target-agent',config:{name:'Sponsor target existing topic'}}).object;
         const stopAgent = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-agent',kind:'agent',localId:'stop-agent',config:{...f.owner.config,name:'Synthetic interrupted single',systemPrompt:'SYNTHETIC_PARTIAL',streamOutput:true}}).object;
         stopTopic = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-topic',kind:'topic',parentId:stopAgent.id,localId:'stop-topic',localParent:'stop-agent',config:{name:'Partial single existing topic'}}).object;
+        ordinaryTopics = ordinaryTools?.seed?.(f);
         if (hardwareStream) hardwareStream.seedHistory(f.store, stopTopic.topic);
         if (observedContext) await observedContext.seed(f, source, out);
         for (const p of ['A','B']) {
@@ -115,6 +123,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             const input=Array.isArray(last)?last.filter(x=>x.type==='text').map(x=>x.text).join(''):last;
             const which=Object.entries(contract.cases).find(([,content])=>input===content)?.[0];
             const row={case:which,id:body.requestId,stream:Boolean(body.stream),at:Date.now()};
+            const ordinaryReply = ordinaryTools?.reply(body, row, calls);
             calls.push(row);trace('provider',row);
             observedContext?.recordProvider(req.url, body);
             if(which==='lostAck')await lostGate;
@@ -128,7 +137,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 res.write('data: '+JSON.stringify({choices:[{index:0,delta:{role:'assistant',content:contract.partialText},finish_reason:null}]})+'\n\n');
                 return;
             }
-            const payload={id:'fixture-'+calls.length,object:'chat.completion',created:1,model:'synthetic',choices:[{index:0,message:{role:'assistant',content:observedContext?.reply ?? contract.completeText},finish_reason:'stop'}],usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2}};
+            const payload={id:'fixture-'+calls.length,object:'chat.completion',created:1,model:'synthetic',choices:[{index:0,message:{role:'assistant',content:ordinaryReply ?? observedContext?.reply ?? contract.completeText},finish_reason:'stop'}],usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2}};
             res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify(payload));
         } catch(e) { calls.push({case:'fixtureError',error:e.message}); if(!res.headersSent)res.writeHead(500);res.end(); }
     });
@@ -169,7 +178,10 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 row.status=409;row.injected=true;row.response={error:{code:'SHARED_CONTEXT_CHANGED'}};
                 return res.writeHead(409,{'content-type':'application/json'}).end(JSON.stringify(row.response));
             }
-            if(route.endsWith('/session-send') && row.body.message?.content===contract.cases.lostAck) lostRequestId=row.body.requestId;
+            if (route.endsWith('/session-send') && (row.body.message?.content === contract.cases.lostAck ||
+                ordinaryTools?.lostReceiptMarker && row.body.message?.content === ordinaryTools.lostReceiptMarker)) {
+                lostRequestId = row.body.requestId;
+            }
         }
         if(req.method==='GET'&&route.endsWith('/shared/request')){
             row.query=Object.fromEntries(url.searchParams);requests.push(row);
@@ -216,55 +228,71 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         throw error;
     }
     const node = process.execPath;
-    const log=fs.openSync(path.join(out,'backend.log'),'wx');
-    const backend = spawn(node, ['--require',path.join(__dirname,'loopback.cjs'),
-        ...(observedContext ? ['--require',observedContext.preload] : []),'server.js'], {
-        cwd:box,stdio:['ignore',log,log],env:{
-            PATH:'/usr/bin:/bin',HOME:out,LANG:'C.UTF-8',TZ:'UTC',NS_LOADED_REPORT:path.join(out,'backend-loaded.json'),
-            ...(mode === 'idle' ? { NS_METER_BACKEND:'1', NS_METER_PREFIX:path.join(out,'backend') } : {}),
-            ...(observedContext ? { NS_CONTEXT_HANDLER_LOG: observedContext.handlerLog, NS_CONTEXT_INPUT: observedContext.input } : {}),
-            PORT:String(backendPort),VCP_LOCAL_LISTEN_HOST:'127.0.0.1',Key:auth,API_Key:'synthetic-provider',VCP_Key:'synthetic-sponsor-ws',
-            API_URL:'http://127.0.0.1:'+providerPort,...(mode==='transport-only'?{}:{ApiRetries:'1'}),MaxVCPLoopNonStream:'4',MaxVCPLoopStream:'4',
-            KNOWLEDGEBASE_ROOT_PATH:path.join(out,'empty-diaries'),KNOWLEDGEBASE_STORE_PATH:path.join(data,'vectors'),
-            KNOWLEDGEBASE_FULL_SCAN_ON_STARTUP:'false',TDB_KNOWLEDGE_ENABLED:'false',
-            NativeSyncEnabled:'true',NativeSyncDataDir:data,NativeMobileEnabled:'true',
-            NativeMobileOrigin:'https://127.0.0.1:'+proxyPort,NativeMobileStartDelayMs:'0',
-            ...(observedContext ? { NativeMobileConfigSync:'true', NativeMobileAttachments:'true' } : {}),
-            ...(hardwareStream ? { NativeMobileExecutionTimeoutMs:'300000', NativeMobileGroupIdleTimeoutMs:'300000' } : {}),
-            NativeSyncFullSources:JSON.stringify(['A','B','C','D'].map(x=>({sourceId:'source'+x,deviceId:'device'+x,executionMode:'all-supported'}))),
-            NativeSyncSharedSpaces:JSON.stringify([{id:'sharedAB',sources:['sourceA','sourceB','sourceC']},{id:'foreignSpace',sources:['sourceD']}])
-        }
-    });
-    fs.closeSync(log);
+    let backend, exit;
+    function launchBackend() {
+        const log=fs.openSync(path.join(out,'backend.log'),'a');
+        backend = spawn(node, ['--require',path.join(__dirname,'loopback.cjs'),
+            ...(observedContext ? ['--require',observedContext.preload] : []),'server.js'], {
+            cwd:box,stdio:['ignore',log,log],env:{
+                PATH:'/usr/bin:/bin',HOME:out,LANG:'C.UTF-8',TZ:'UTC',NS_LOADED_REPORT:path.join(out,'backend-loaded.json'),
+                ...(mode === 'idle' ? { NS_METER_BACKEND:'1', NS_METER_PREFIX:path.join(out,'backend') } : {}),
+                ...(observedContext ? { NS_CONTEXT_HANDLER_LOG: observedContext.handlerLog, NS_CONTEXT_INPUT: observedContext.input } : {}),
+                PORT:String(backendPort),VCP_LOCAL_LISTEN_HOST:'127.0.0.1',Key:auth,API_Key:'synthetic-provider',VCP_Key:'synthetic-sponsor-ws',
+                API_URL:'http://127.0.0.1:'+providerPort,...(mode==='transport-only'?{}:{ApiRetries:'1'}),MaxVCPLoopNonStream:'4',MaxVCPLoopStream:'4',
+                KNOWLEDGEBASE_ROOT_PATH:path.join(out,'empty-diaries'),KNOWLEDGEBASE_STORE_PATH:path.join(data,'vectors'),
+                KNOWLEDGEBASE_FULL_SCAN_ON_STARTUP:'false',TDB_KNOWLEDGE_ENABLED:'false',
+                NativeSyncEnabled:'true',NativeSyncDataDir:data,NativeMobileEnabled:'true',
+                NativeMobileOrigin:'https://127.0.0.1:'+proxyPort,NativeMobileStartDelayMs:'0',
+                ...(observedContext ? { NativeMobileConfigSync:'true', NativeMobileAttachments:'true' } : {}),
+                ...(hardwareStream ? { NativeMobileExecutionTimeoutMs:'300000', NativeMobileGroupIdleTimeoutMs:'300000' } : {}),
+                NativeSyncFullSources:JSON.stringify(['A','B','C','D'].map(x=>({sourceId:'source'+x,deviceId:'device'+x,executionMode:'all-supported'}))),
+                NativeSyncSharedSpaces:JSON.stringify([{id:'sharedAB',sources:['sourceA','sourceB','sourceC']},{id:'foreignSpace',sources:['sourceD']}])
+            }
+        });
+        fs.closeSync(log);
+        backendError = null;
+        exit = new Promise(resolve => {
+            backend.once('exit', (code, signal) => resolve({ code, signal }));
+            backend.once('error', error => { backendError = error; resolve({ error: error.message }); });
+        });
+    }
     let backendError;
-    const exit = new Promise(resolve => {
-        backend.once('exit', (code, signal) => resolve({ code, signal }));
-        backend.once('error', error => { backendError = error; resolve({ error: error.message }); });
-    });
+    async function stopBackend(signal) {
+        if (backend.exitCode === null && backend.signalCode === null) backend.kill(signal);
+        let timer;
+        let outcome;
+        try { outcome = await Promise.race([exit, new Promise(resolve => { timer = setTimeout(resolve,4500); })]); }
+        finally { clearTimeout(timer); }
+        if (!outcome) backend.kill('SIGKILL');
+        const stopped = outcome || await exit;
+        trace('backend-exit',stopped);
+        return stopped;
+    }
     async function close() {
         releaseLost();
         hardwareStream?.provider.close();
         if (activePartial && !activePartial.destroyed) activePartial.destroy();
-        backend.kill('SIGTERM');
-        const outcome = await Promise.race([exit,new Promise(r=>setTimeout(r,4500))]);
-        if (!outcome) backend.kill('SIGKILL');
-        const stopped = outcome || await exit;
-        trace('backend-exit',stopped);
+        const stopped = await stopBackend('SIGTERM');
         await closeServer(proxy);
         await closeServer(provider);
         return stopped;
     }
-    try {
+    async function startBackend() {
+        const log = path.join(out, 'backend.log');
+        const offset = fs.existsSync(log) ? fs.statSync(log).size : 0;
+        launchBackend();
         await waitUntil(() => {
             if (backendError) throw backendError;
             if (backend.exitCode!==null) throw Error('Backend exited '+backend.exitCode);
-            const startup = fs.readFileSync(path.join(out, 'backend.log'), 'utf8');
+            const startup = fs.readFileSync(log).subarray(offset).toString('utf8');
             if (startup.includes('Error initializing module for NativeSync')) {
                 throw Error('ToolBox failed to initialize NativeSync. See backend.log in the run evidence directory.');
             }
             return startup.includes('中间层服务器正在监听端口 ' + backendPort);
         },'real backend listening',25000);
-    } catch (error) { await close(); throw error; }
+    }
+    try { await startBackend(); }
+    catch (error) { await close(); throw error; }
     const origin = 'https://127.0.0.1:' + proxyPort;
     const requestMobile = route => new Promise((resolve, reject) => {
         const request = https.get(origin + route, { ca: fs.readFileSync(ca), timeout: 2000 }, response => {
@@ -293,7 +321,13 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         assert.equal(typeof JSON.parse(connection.body), 'object');
         return { htmlStatus: page.status, bundleStatus: bundle.status, connectionStatus: connection.status };
     }
-    return { checkMobile, backendPid: backend.pid, origin:'https://127.0.0.1:'+proxyPort,wsOrigin:'http://127.0.0.1:'+backendPort,calls,requests,topics:{preSubmit:source,lostAck:target,interrupted:stopTopic},descriptors,data,gates,
+    return { checkMobile, get backendPid(){return backend.pid;},
+        ...(ordinaryTools && { async restartAfterCrash() {
+            const crashed = await stopBackend('SIGKILL');
+            assert.deepEqual(crashed, {code:null,signal:'SIGKILL'});
+            await startBackend();
+            return crashed;
+        }}), origin:'https://127.0.0.1:'+proxyPort,wsOrigin:'http://127.0.0.1:'+backendPort,calls,requests,topics:{preSubmit:source,lostAck:target,interrupted:stopTopic,...ordinaryTopics},descriptors,data,gates,
         disarmDrop(){drop=false;}, dropConfigOnce(name) { dropConfigName = name; }, releaseLost,
         cutPartial(){assert.ok(activePartial&&!activePartial.destroyed);gates.providerTransportCut=true;
             trace('actual-provider-socket-cut',{hadPrefix:true});activePartial.destroy();}, close};
