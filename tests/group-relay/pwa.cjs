@@ -5,8 +5,8 @@ const fs = require('node:fs');
 const https = require('node:https');
 const { createHash, X509Certificate } = require('node:crypto');
 
-function mobileControl(service, cert, out) {
-    const { spaceId } = JSON.parse(fs.readFileSync(out + '/seed/desktopA/.native-sync/connection.json'));
+function mobileControl(service, cert, out, spaceId) {
+    spaceId ??= JSON.parse(fs.readFileSync(out + '/seed/desktopA/.native-sync/connection.json')).spaceId;
     return (route, body) => new Promise((resolve, reject) => {
         const req = https.request(service.origin + route, {
             method: body ? 'POST' : 'GET',

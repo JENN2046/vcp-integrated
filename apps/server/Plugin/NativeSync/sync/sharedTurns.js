@@ -29,27 +29,49 @@ function prepare(shared,topic,config,body,sponsored=false){
  }
  return {kind,plan,...(sponsored?{topicSponsor:true}:{}),userMessageId:user?.id||null,...(kind==='regenerate'?{targetId:body.targetId,targetHash:records[index].hash}:{} )};
 }
+// Recheck durable facts even if an older release already issued the central
+// finish receipt but failed to settle the mobile ledger.
+function verifyGroupFinish(shared,topic,row){
+ const turn=intent(row);
+ const engine=shared.native?.engine;
+ const job=engine?.get?.(row.id);
+ const cutoff=job?.group_stop_index;
+ const length=cutoff??turn.plan.length;
+ const requests=shared.db.prepare('SELECT id,ordinal,state,member_id FROM shared_native_requests WHERE admission_id=? ORDER BY ordinal').all(row.id);
+ const incomplete=()=>fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+ if(requests.length!==length||requests.some((request,i)=>request.ordinal!==i||request.state!=='model_terminal'||request.member_id!==turn.plan[i]))throw incomplete();
+
+ if(require('../mobile/groupTurn').isGroup(job)){
+  const speakers=require('../mobile/groupTurn').steps(engine,row.id);
+  if(job.cancel_requested||job.group_plan!==JSON.stringify(turn.plan)||speakers.length!==turn.plan.length||
+     cutoff!=null&&(!Number.isSafeInteger(cutoff)||cutoff<0||cutoff>=turn.plan.length))throw incomplete();
+  for(const [i,speaker] of speakers.entries()){
+   if(speaker.step_index!==i||speaker.agent_id!==turn.plan[i]||speaker.pending_operation||speaker.error_code?.endsWith('REVIEW_REQUIRED'))throw incomplete();
+   if(i<length){
+    if(speaker.state!=='completed'||speaker.id!==requests[i].id||speaker.reply_message_id!=='reply_'+speaker.id)throw incomplete();
+   }else if(speaker.state!=='cancelled'||speaker.attempts!==0||speaker.tool_started||speaker.reply_message_id)throw incomplete();
+  }
+  if(shared.native.taskRequests.pending(row.id)||engine.nativeTasks.uncertainTools(row.id))throw incomplete();
+ }
+ const tasks=engine?.nativeTasks;
+ if(requests.length&&(!row.native_terminal||!tasks||tasks.needsReview(row.id)||tasks.unsettledTools(row.id)))throw incomplete();
+ if(tasks?.list(row.id).some(task=>!['completed','failed','cancelled','stopped'].includes(task.state)||task.revision!==1||!task.resultRef||!task.resultHash))throw incomplete();
+
+ const ids=requests.map(request=>'reply_'+request.id);
+ const replies=shared.store.readProjected(()=>shared.db.prepare(`SELECT m.* FROM messages m JOIN journal j
+  ON j.seq=m.last_seq AND j.owner_type=m.owner_type AND j.owner_id=m.owner_id AND j.topic_id=m.topic_id
+  AND j.msg_id=m.msg_id AND j.hash=m.hash AND j.action='upsert'
+  WHERE m.owner_type=? AND m.owner_id=? AND m.topic_id=? AND m.deleted=0 AND m.msg_id IN (SELECT value FROM json_each(?))`).all(...tuple(topic),JSON.stringify(ids)));
+ const byId=new Map(replies.map(reply=>[reply.row.msg_id,reply.message]));
+ if(requests.some((request,i)=>byId.get(ids[i])?.role!=='assistant'||byId.get(ids[i]).agentId!==request.member_id))throw incomplete();
+}
 function complete(shared,actor,body,row){
  const topic=shared.topic(actor,row.space_id,row.topic_id,'execute'),turn=intent(row),group=topic.owner_type==='group';
  if(!group)return false;
  if(!['accepted','dispatched','review_required'].includes(row.state))throw fail('SHARED_REQUEST_FENCED');
  const execution=shared.native?.engine.get?.(row.id),stop=execution?.group_stop_index;
  if(body.finish===true){
-  const steps=shared.db.prepare('SELECT * FROM shared_native_requests WHERE admission_id=? ORDER BY ordinal').all(row.id);
-  const length=stop??turn.plan.length;
-  if(steps.length!==length||steps.some((s,i)=>s.ordinal!==i||s.state!=='model_terminal'||s.member_id!==turn.plan[i]))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
-  if(stop!=null){
-   const ledger=require('../mobile/groupTurn').steps(shared.native.engine,row.id);
-   if(!Number.isSafeInteger(stop)||stop<0||stop>=turn.plan.length||execution.cancel_requested||
-    ledger.length!==turn.plan.length||ledger.some((s,i)=>s.step_index!==i||s.agent_id!==turn.plan[i]||
-     (i<stop?s.state!=='completed'||s.pending_operation||s.id!==steps[i].id||s.reply_message_id!=='reply_'+s.id:s.state!=='cancelled'||s.attempts!==0||s.tool_started||s.pending_operation||s.reply_message_id)))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
-   if(shared.native.taskRequests.pending(row.id)||shared.native.engine.nativeTasks.uncertainTools(row.id))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
-  }
-  const native=shared.native?.engine.nativeTasks;
-  if(steps.length&&(!native||native.needsReview(row.id)||native.unsettledTools(row.id)||native.list(row.id).some(t=>!['completed','failed','cancelled','stopped'].includes(t.state))))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
-  const replies=shared.store.readProjected(()=>shared.db.prepare('SELECT * FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND msg_id IN (SELECT value FROM json_each(?))').all(...tuple(topic),JSON.stringify(steps.map(s=>'reply_'+s.id))));
-  if(replies.length!==steps.length||replies.some(r=>r.row.deleted))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
-  if(steps.length&&!row.native_terminal)throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+  verifyGroupFinish(shared,topic,row);
   shared.db.prepare("UPDATE shared_admissions SET state='completed' WHERE id=?").run(row.id);
   return {request:shared.publicAdmission(shared.admission(actor,row.space_id,row.id))};
  }
@@ -73,4 +95,4 @@ function replaceTarget(shared,actor,topic,row,turn=intent(row)){
  if(!target||target.hash!==turn.targetHash||target.deleted)throw fail('SHARED_REGENERATION_TARGET_CHANGED');
  shared.store.apply({ownerType:topic.owner_type,ownerId:topic.owner_id,topicId:topic.topic_id,msgId:turn.targetId,deviceId:actor.principal,opId:'shared-replaced:'+row.id,action:'delete',baseHash:turn.targetHash},{sharedSpace:row.space_id,metadataPublisher:true});
 }
-module.exports={intent,history,prepare,complete,writeReply,replaceTarget};
+module.exports={verifyGroupFinish,intent,history,prepare,complete,writeReply,replaceTarget};

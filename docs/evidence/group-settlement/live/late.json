@@ -1,0 +1,382 @@
+{
+  "scenario": "settled-late",
+  "node": "v24.22.1",
+  "browser": "Chrome/158.0.8127.36",
+  "workId": "request_be9eb4caaf19404eae0a9e37b8967600",
+  "requestId": "f6491d01-6179-401c-94e4-0b3877c0069c",
+  "revision": "d8c04e57de2f458b658327df2fcd4596bdf813a7",
+  "sourceHashes": {
+    "mobile/groupTurn.js": "7d37337452fd8428aff74a40f621631a70b7f1bf9584ef6bd3538bac0de3d3f7",
+    "sync/sharedTurns.js": "7df79649f69c57b7ce800a8e85f3345d604b93bda81f45e58dcbee2aa7a6b2a7",
+    "sync/sharedNative.js": "2ea9ab4a6d14774b8c49f1c5dc247dd76a5daec6eadc22dc815152d8f01bebf4",
+    "sync/sharedTaskRequests.js": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa",
+    "mobile/nativeTasks.js": "41f403666b668d65400f7f6869fde8be8a2c29d5afc267dcae49caab9c948f22",
+    "mobile/sharedGroups.js": "ade2d2a839b1ef8da29e2b86208a058a0e74af246c40624b0154f06e981fd404"
+  },
+  "revisionIsCheckoutBase": true,
+  "pwaBundle": {
+    "asset": "/mobile/assets/index-Bnzwj_0K.js",
+    "sha256": "7d1eaaff6d30641af99cf297db3facc97471f5b6c542d3d8a2740d86697eeb4f"
+  },
+  "whileChildRunning": {
+    "job": {
+      "state": "recovering",
+      "error_code": null,
+      "group_stop_index": null,
+      "review_resolved": 0
+    },
+    "admission": {
+      "state": "dispatched",
+      "native_terminal": 0,
+      "reply_seq": 4
+    },
+    "task": {
+      "native_task_id": "aa-delegation-1795252602093-24228147",
+      "state": "running",
+      "review_required": 0,
+      "error_code": null
+    },
+    "childRequests": [
+      {
+        "id": "aa-delegation-1795252602093-24228147-round-1",
+        "state": "dispatched"
+      }
+    ],
+    "speakerRequests": [
+      {
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "ordinal": 1,
+        "state": "model_terminal"
+      },
+      {
+        "ordinal": 2,
+        "state": "model_terminal"
+      }
+    ],
+    "ledger": [
+      {
+        "step_index": -1,
+        "state": "pending",
+        "attempts": 0,
+        "reply_message_id": null
+      },
+      {
+        "step_index": 0,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_53e31e9d47e206ec42b12f0dac5ca2690ebd7d4b"
+      },
+      {
+        "step_index": 1,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_c87de7af5f2e8a9ea61970c669ae49dde50946f5"
+      },
+      {
+        "step_index": 2,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_2a289372b20e885301c66abf80657a76c76ec450"
+      }
+    ],
+    "provider": [
+      {
+        "member": "A"
+      },
+      {
+        "member": "B"
+      },
+      {
+        "role": "parent",
+        "round": 1
+      },
+      {
+        "role": "parent",
+        "round": 2
+      },
+      {
+        "role": "child",
+        "round": 1
+      }
+    ],
+    "pwa": {
+      "state": "recovering",
+      "stepCount": 3
+    },
+    "history": [
+      {
+        "id": "mobile_job_9b64eec76fe4c3bd393b80f6ea248898",
+        "role": "user"
+      },
+      {
+        "id": "reply_gstep_53e31e9d47e206ec42b12f0dac5ca2690ebd7d4b",
+        "role": "assistant"
+      },
+      {
+        "id": "reply_gstep_c87de7af5f2e8a9ea61970c669ae49dde50946f5",
+        "role": "assistant"
+      },
+      {
+        "id": "reply_gstep_2a289372b20e885301c66abf80657a76c76ec450",
+        "role": "assistant"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "mobile_job_9b64eec76fe4c3bd393b80f6ea248898",
+        "action": "upsert"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_gstep_53e31e9d47e206ec42b12f0dac5ca2690ebd7d4b",
+        "action": "upsert"
+      },
+      {
+        "seq": 3,
+        "msg_id": "reply_gstep_c87de7af5f2e8a9ea61970c669ae49dde50946f5",
+        "action": "upsert"
+      },
+      {
+        "seq": 4,
+        "msg_id": "reply_gstep_2a289372b20e885301c66abf80657a76c76ec450",
+        "action": "upsert"
+      }
+    ],
+    "card": {
+      "status": "成员回复已保存，等待原生任务结束 · 3 / 3 位成员",
+      "speakers": [
+        "A · 回复已保存",
+        "B · 回复已保存",
+        "C · 回复已保存"
+      ],
+      "task": "AA 运行中 · SYNTHETIC",
+      "reviewControls": 0
+    },
+    "followUpDenied": {
+      "http": 409,
+      "code": "SHARED_TOPIC_BUSY"
+    },
+    "reviewProbeDenied": {
+      "http": 409,
+      "code": "INVALID_REVIEW_RESOLUTION"
+    }
+  },
+  "after": {
+    "job": {
+      "state": "completed",
+      "error_code": null,
+      "group_stop_index": null,
+      "review_resolved": 0
+    },
+    "admission": {
+      "state": "completed",
+      "native_terminal": 1,
+      "reply_seq": 4
+    },
+    "task": {
+      "native_task_id": "aa-delegation-1795252602093-24228147",
+      "state": "completed",
+      "review_required": 0,
+      "error_code": null
+    },
+    "childRequests": [
+      {
+        "id": "aa-delegation-1795252602093-24228147-round-1",
+        "state": "model_terminal"
+      }
+    ],
+    "speakerRequests": [
+      {
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "ordinal": 1,
+        "state": "model_terminal"
+      },
+      {
+        "ordinal": 2,
+        "state": "model_terminal"
+      }
+    ],
+    "ledger": [
+      {
+        "step_index": -1,
+        "state": "pending",
+        "attempts": 0,
+        "reply_message_id": null
+      },
+      {
+        "step_index": 0,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_53e31e9d47e206ec42b12f0dac5ca2690ebd7d4b"
+      },
+      {
+        "step_index": 1,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_c87de7af5f2e8a9ea61970c669ae49dde50946f5"
+      },
+      {
+        "step_index": 2,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_2a289372b20e885301c66abf80657a76c76ec450"
+      }
+    ],
+    "provider": [
+      {
+        "member": "A"
+      },
+      {
+        "member": "B"
+      },
+      {
+        "role": "parent",
+        "round": 1
+      },
+      {
+        "role": "parent",
+        "round": 2
+      },
+      {
+        "role": "child",
+        "round": 1
+      }
+    ],
+    "pwa": {
+      "state": "completed",
+      "stepCount": 3
+    },
+    "history": [
+      {
+        "id": "mobile_job_9b64eec76fe4c3bd393b80f6ea248898",
+        "role": "user"
+      },
+      {
+        "id": "reply_gstep_53e31e9d47e206ec42b12f0dac5ca2690ebd7d4b",
+        "role": "assistant"
+      },
+      {
+        "id": "reply_gstep_c87de7af5f2e8a9ea61970c669ae49dde50946f5",
+        "role": "assistant"
+      },
+      {
+        "id": "reply_gstep_2a289372b20e885301c66abf80657a76c76ec450",
+        "role": "assistant"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "mobile_job_9b64eec76fe4c3bd393b80f6ea248898",
+        "action": "upsert"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_gstep_53e31e9d47e206ec42b12f0dac5ca2690ebd7d4b",
+        "action": "upsert"
+      },
+      {
+        "seq": 3,
+        "msg_id": "reply_gstep_c87de7af5f2e8a9ea61970c669ae49dde50946f5",
+        "action": "upsert"
+      },
+      {
+        "seq": 4,
+        "msg_id": "reply_gstep_2a289372b20e885301c66abf80657a76c76ec450",
+        "action": "upsert"
+      }
+    ],
+    "card": {
+      "status": "回复已保存 · 3 / 3 位成员",
+      "speakers": [
+        "A · 回复已保存",
+        "B · 回复已保存",
+        "C · 回复已保存"
+      ],
+      "task": "AA 已完成 · SYNTHETIC",
+      "reviewControls": 0
+    },
+    "tool": {
+      "id": "203abea6-6ec3-4aee-96e9-192d81ccade5",
+      "plugin": "AgentAssistant",
+      "state": "returned"
+    },
+    "reportVerified": true
+  },
+  "replay": {
+    "http": 202,
+    "replayed": true,
+    "sameWork": true
+  },
+  "followUp": {
+    "work": {
+      "id": "request_c96f3dd173724b41b77bed81597687f7",
+      "state": "completed"
+    },
+    "admission": {
+      "state": "completed",
+      "native_terminal": 1,
+      "reply_seq": 8
+    },
+    "provider": [
+      {
+        "member": "A"
+      },
+      {
+        "member": "B"
+      },
+      {
+        "member": "C"
+      }
+    ],
+    "history": [
+      {
+        "id": "mobile_job_9b64eec76fe4c3bd393b80f6ea248898",
+        "role": "user",
+        "content": "AA_DELEGATION_COMPLETE"
+      },
+      {
+        "id": "reply_gstep_53e31e9d47e206ec42b12f0dac5ca2690ebd7d4b",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      },
+      {
+        "id": "reply_gstep_c87de7af5f2e8a9ea61970c669ae49dde50946f5",
+        "role": "assistant",
+        "content": "RELAY_B_FINAL"
+      },
+      {
+        "id": "reply_gstep_2a289372b20e885301c66abf80657a76c76ec450",
+        "role": "assistant",
+        "content": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」AgentAssistant「末」,\nagent_name:「始」SyntheticDelegate「末」,\nprompt:「始」AA_DELEGATION_COMPLETE「末」,\ntask_delegation:「始」true「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[VCP_TOOL_BATCH_START:2026-11-21T17:16:42.136+08:00]>>>\n\n[本轮工具调用摘要:]\nAgentAssistant 调用成功 (记录ID: tcr-1795252602083-476d8326-720b-4f0f-824e-7e885298f0e1)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-21T17:16:42.136+08:00]>>>\n\nAA_DELEGATION_PARENT_REPLY\n{{VCP_ASYNC_RESULT::AgentAssistant::aa-delegation-1795252602093-24228147}}"
+      },
+      {
+        "id": "mobile_job_a20a05fa160db10c3feda3300afd7375",
+        "role": "user",
+        "content": "SECOND_GROUP_SUBMISSION"
+      },
+      {
+        "id": "reply_gstep_7525ce9783239193b8b5750ffd78a9e2976c6632",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      },
+      {
+        "id": "reply_gstep_29c79430b4a4e944b0ccd088acd37a52c1b86236",
+        "role": "assistant",
+        "content": "RELAY_B_FINAL"
+      },
+      {
+        "id": "reply_gstep_79a962e586109dde07d201066a8f022016a008f1",
+        "role": "assistant",
+        "content": "RELAY_C_FINAL"
+      }
+    ]
+  }
+}

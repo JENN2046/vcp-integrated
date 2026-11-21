@@ -20,15 +20,26 @@ function completeStep(engine,step,op){
 }
 function hasLiveSettlement(engine,id){
  const native=engine.store.shared.native,tasks=engine.nativeTasks,db=engine.db;
- if(tasks.needsReview(id)||native.taskRequests.uncertain(id)||
+ // A restart marks live projections for one native read. Give that read a
+ // chance to return the already-written AA archive when no request was lost.
+ if(tasks.needsReview(id,{deferReconciliation:true})||native.taskRequests.uncertain(id)||
     db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state='unknown'").get(id)||
     db.prepare("SELECT 1 FROM mobile_native_invocations WHERE execution_id=? AND state='error' AND coalesce(error_code,'')<>'NATIVE_CANCELLED_BEFORE_EXECUTION'").get(id))return false;
  return Boolean(db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state='dispatched'").get(id)||
                 db.prepare("SELECT 1 FROM shared_native_child_requests WHERE work_id=? AND state='dispatched'").get(id)||
-                db.prepare("SELECT 1 FROM mobile_native_tasks WHERE execution_id=? AND state IN ('accepted','running','waiting','cancelling')").get(id));
+                db.prepare(`SELECT 1 FROM mobile_native_tasks WHERE execution_id=? AND (state IN ('accepted','running','waiting','cancelling') OR
+                 (state='unknown' AND error_code='NATIVE_TASK_RECONCILIATION_REQUIRED'))`).get(id));
 }
 function finish(engine,job){
- const shared=engine.store.shared,topic=engine.topics.get(job.topic_key);shared.native?.checkTerminal(job.id,{advanceGroup:false});
- return shared.complete(acceptedActor(engine,job),{sharedSpaceId:topic.sharedSpaceId,admissionId:job.id,opId:'mobile-group-finish_'+job.id,finish:true});
+ const shared=engine.store.shared,topic=engine.topics.get(job.topic_key),actor=acceptedActor(engine,job);
+ const admission=shared.admission(actor,topic.sharedSpaceId,job.id);
+ if(admission.state!=='completed')shared.native.checkTerminal(job.id,{advanceGroup:false});
+ const result=shared.complete(actor,{sharedSpaceId:topic.sharedSpaceId,admissionId:job.id,opId:'mobile-group-finish_'+job.id,finish:true});
+ if(result.replayed){
+  if(admission.state!=='completed')throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+  const source=shared.topic(actor,topic.sharedSpaceId,topic.key,'execute');
+  require('../sync/sharedTurns').verifyGroupFinish(shared,source,admission);
+ }
+ return result;
 }
 module.exports={admit,register,completeStep,finish,hasLiveSettlement};

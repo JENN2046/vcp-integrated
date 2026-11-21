@@ -95,7 +95,7 @@ test('no queued speakers is a no-op while the last speaker is still running',asy
 test('a live delegated native child finishes through the same admission after the suffix is cancelled',async t=>{
  const {f,topic,phone,route}=await groupFixture(t),{ctx}=require('./fixtures/sharedSingleHarness.cjs');
  const hash=require(BOX+'/Plugin/NativeSync/sync/protocol').sha256;
- const childId='group-stop-live-aa-model',taskId='group-stop-live-aa-task';
+ const childId='group-stop-live-aa-'+require('node:crypto').randomUUID(),taskId='group-stop-live-aa-task';
  let link,parentResponse,childResponse;
  const releaseProvider=ctx.registerNativeTaskProvider('AgentAssistant',identity=>({...identity,state:'running',revision:0}));
  t.after(releaseProvider);

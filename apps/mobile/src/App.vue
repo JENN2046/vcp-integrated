@@ -305,6 +305,10 @@ async function retry(){
  finally{busy.value=false;}
 }
 async function invite(){if(!invitedAgent.value||busy.value||currentTopic.value?.executable===false)return;submissionNoticeHeld=false;try{const context=newSubmissionContext();await submit({requestId:crypto.randomUUID(),agentId:invitedAgent.value},'invitation',context);}catch(error){submissionNoticeHeld=true;notice.value=recoveryMessage(error);}}
+function waitingForGroupTasks(job){
+ return job.state==='recovering' && !job.remainingCancelled && job.steps?.length &&
+  job.steps.every(step=>step.state==='completed') && job.nativeTasks.some(task=>['accepted','running','waiting','cancelling'].includes(task.state));
+}
 function needsReview(j){return j.nativeTasks?.some(task=>task.reviewRequired&&!task.reviewResolved)||(!j.reviewResolved&&(['review_required','blocked_config'].includes(j.state)||j.errorCode?.endsWith('REVIEW_REQUIRED')));}
 function canResolveReview(j){
  if(!needsReview(j))return false;
@@ -389,7 +393,7 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
     <div v-if="jobsInfo" class="execution-pages"><small>本页 {{jobs.length}} 项 · 历史范围共 {{jobsInfo.total}} 项 · 待处理／核对范围 {{jobsInfo.attentionTotal}} 项</small><button v-if="jobsInfo.moreAttention" @click="nextExecutions('attention')" :disabled="busy">下一页待处理／核对</button><button v-if="jobsInfo.moreRecent" @click="nextExecutions('recent')" :disabled="busy">更早任务</button><button v-if="jobsInfo.historyPage" @click="latestExecutions" :disabled="busy">返回最新任务</button></div>
     <small v-if="jobs.length">云端已接受 · {{online?'本次查询的原生执行状态':'最近已知状态，联网后重新核对'}}</small>
     <article v-for="j in displayJobs" :key="j.id" class="execution-job" :data-exec-id="j.id" :data-state="j.state">
-     <div class="execution-row"><span>{{j.remainingCancelled && j.state==='cancelled'?'剩余接力已取消':(errors[j.errorCode]||labels[j.state]||j.state)}}<template v-if="j.steps"> · {{j.steps.filter(s=>s.state==='completed').length}} / {{j.stepCount}} 位成员</template></span><template v-if="j.own && j.steps && supportsCancelRemaining">
+     <div class="execution-row"><span>{{waitingForGroupTasks(j)?'成员回复已保存，等待原生任务结束':j.remainingCancelled && j.state==='cancelled'?'剩余接力已取消':(errors[j.errorCode]||labels[j.state]||j.state)}}<template v-if="j.steps"> · {{j.steps.filter(s=>s.state==='completed').length}} / {{j.stepCount}} 位成员</template></span><template v-if="j.own && j.steps && supportsCancelRemaining">
       <button v-if="j.canCancelRemaining" :data-cancel-remaining-id="j.id" :disabled="!online" @click="cancelRemaining(j)">取消剩余接力</button>
      </template>
      <button v-else-if="j.own && ['queued','running','waiting_approval'].includes(j.state)" :data-cancel-id="j.id" @click="cancel(j.id)">{{j.steps?'中止本轮群聊':'请求取消本次回复'}}</button></div>

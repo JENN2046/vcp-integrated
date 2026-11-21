@@ -22,7 +22,7 @@ async function jsonBody(req) {
     for await (const chunk of req) chunks.push(chunk);
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision, mobileBuild, groupRelay, serverDependencies}) {
+async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision, mobileBuild, groupRelay, serverDependencies, restoreSyntheticState, expectedStartupError}) {
     const sourceApp = path.join(candidate, 'apps/server');
     const box = path.join(out, 'runtime-box');
     fs.mkdirSync(box);
@@ -111,7 +111,8 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     fs.writeFileSync(path.join(out,'fixture-descriptors.json'), JSON.stringify({source,target,stopTopic,descriptors},null,2));
     const data = path.join(out, 'data');
     fs.mkdirSync(data, {recursive:Boolean(observedContext)});
-    fs.copyFileSync(path.join(seed,'central.sqlite'), path.join(data,'central.sqlite'));
+    if (restoreSyntheticState) await restoreSyntheticState({ box, data });
+    else fs.copyFileSync(path.join(seed,'central.sqlite'), path.join(data,'central.sqlite'));
     const calls=[], requests=[];
     const gates={partialClosed:false};
     let releaseLost,activePartial;
@@ -309,8 +310,13 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             return startup.includes('中间层服务器正在监听端口 ' + backendPort);
         },'real backend listening',25000);
     }
-    try { await startBackend(); }
-    catch (error) { await close(); throw error; }
+    let startupError;
+    try {
+        try { await startBackend(); }
+        catch (error) { startupError = error; }
+        if (expectedStartupError) assert.match(startupError?.message || '', expectedStartupError);
+        else if (startupError) throw startupError;
+    } catch (error) { await close(); throw error; }
     const origin = 'https://127.0.0.1:' + proxyPort;
     const requestMobile = route => new Promise((resolve, reject) => {
         const request = https.get(origin + route, { ca: fs.readFileSync(ca), timeout: 2000 }, response => {
@@ -339,12 +345,17 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         assert.equal(typeof JSON.parse(connection.body), 'object');
         return { htmlStatus: page.status, bundleStatus: bundle.status, connectionStatus: connection.status };
     }
-    return { checkMobile, get backendPid(){return backend.pid;},
+    return { checkMobile, startupError, get backendPid(){return backend.pid;},
         ...((ordinaryTools || delegation || groupRelay) && { async restartAfterCrash() {
             const crashed = await stopBackend('SIGKILL');
             assert.deepEqual(crashed, {code:null,signal:'SIGKILL'});
             await startBackend();
             return crashed;
+        }, async restartWithUpgrade(beforeStart) {
+            const stopped = await stopBackend('SIGTERM');
+            await beforeStart();
+            await startBackend();
+            return stopped;
         }}), origin:'https://127.0.0.1:'+proxyPort,wsOrigin:'http://127.0.0.1:'+backendPort,calls,requests,topics:{preSubmit:source,lostAck:target,interrupted:stopTopic,...ordinaryTopics},descriptors,data,gates,
         disarmDrop(){drop=false;}, dropConfigOnce(name) { dropConfigName = name; }, releaseLost,
         cutPartial(){assert.ok(activePartial&&!activePartial.destroyed);gates.providerTransportCut=true;

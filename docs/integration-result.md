@@ -50,3 +50,5 @@ AgentAssistant 长委托已接入共享单聊的 Work。桌面重开、发起端
 群聊逐成员上下文现复用原生桌面的酒馆深度规则。A 的正式回复在 B 的 handler 和 Provider 请求中均恰好一次；同一 History、规则、附件与发言计划的前后对照见[群聊逐成员请求验收](evidence/group-context/README.md)。
 
 在进入「压缩后跨端接续」前，阶段复审核对了群聊、原生审批和 AA 的组合故障，并复现普通群聊收尾与共享压缩输入的两项阻断问题。[职责归属、实测回执和开工判断](evidence/stage-review/README.md)
+
+普通共享群聊的成员回复与 AA 已按同一组证据结算。两种完成顺序及原故障库升级结果见[群聊收尾修复](evidence/group-settlement/README.md)。阶段复审记录中的压缩输入问题另案保留。

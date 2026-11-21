@@ -198,14 +198,16 @@ class SharedNative {
   if(this.closed)return;
   const admission=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(admissionId);
   const job=this.engine.get?.(admissionId),stop=job?.group_stop_index;
-  if(advanceGroup&&stop!=null&&job.state==='recovering'){
+  if(advanceGroup&&job?.state==='recovering'&&require('../mobile/groupTurn').isGroup(job)){
    queueMicrotask(()=>{
     if(this.closed)return;
-    try{require('../mobile/groupTurn').advanceRemaining(this.engine,admissionId);}
-    catch(error){console.warn('[NativeSync] GROUP_REMAINDER_SETTLEMENT_FAILED',error.code||'UNEXPECTED');}
+    try{require('../mobile/groupTurn').advanceSettlement(this.engine,admissionId);}
+    catch(error){console.warn('[NativeSync] GROUP_SETTLEMENT_FAILED',error.code||'UNEXPECTED');}
    });
   }
-  if(!admission||(admission.state!=='dispatched'&&!(stop!=null&&admission.state==='review_required')))return;
+  if(!admission)return;
+  const recheck=admission.state==='review_required'&&(stop!=null||(!advanceGroup&&require('../mobile/groupTurn').isGroup(job)));
+  if(admission.state!=='dispatched'&&!recheck)return;
   const config=JSON.parse(admission.config_json);
   const pending=this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state IN ('prepared','dispatched','unknown') LIMIT 1").get(admissionId);
   const native=this.engine.nativeTasks;

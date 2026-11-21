@@ -1,0 +1,402 @@
+diff --git a/apps/mobile/src/App.vue b/apps/mobile/src/App.vue
+index f177990..eb214d7 100644
+--- a/apps/mobile/src/App.vue
++++ b/apps/mobile/src/App.vue
+@@ -305,6 +305,10 @@ async function retry(){
+  finally{busy.value=false;}
+ }
+ async function invite(){if(!invitedAgent.value||busy.value||currentTopic.value?.executable===false)return;submissionNoticeHeld=false;try{const context=newSubmissionContext();await submit({requestId:crypto.randomUUID(),agentId:invitedAgent.value},'invitation',context);}catch(error){submissionNoticeHeld=true;notice.value=recoveryMessage(error);}}
++function waitingForGroupTasks(job){
++ return job.state==='recovering' && !job.remainingCancelled && job.steps?.length &&
++  job.steps.every(step=>step.state==='completed') && job.nativeTasks.some(task=>['accepted','running','waiting','cancelling'].includes(task.state));
++}
+ function needsReview(j){return j.nativeTasks?.some(task=>task.reviewRequired&&!task.reviewResolved)||(!j.reviewResolved&&(['review_required','blocked_config'].includes(j.state)||j.errorCode?.endsWith('REVIEW_REQUIRED')));}
+ function canResolveReview(j){
+  if(!needsReview(j))return false;
+@@ -389,7 +393,7 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
+     <div v-if="jobsInfo" class="execution-pages"><small>本页 {{jobs.length}} 项 · 历史范围共 {{jobsInfo.total}} 项 · 待处理／核对范围 {{jobsInfo.attentionTotal}} 项</small><button v-if="jobsInfo.moreAttention" @click="nextExecutions('attention')" :disabled="busy">下一页待处理／核对</button><button v-if="jobsInfo.moreRecent" @click="nextExecutions('recent')" :disabled="busy">更早任务</button><button v-if="jobsInfo.historyPage" @click="latestExecutions" :disabled="busy">返回最新任务</button></div>
+     <small v-if="jobs.length">云端已接受 · {{online?'本次查询的原生执行状态':'最近已知状态，联网后重新核对'}}</small>
+     <article v-for="j in displayJobs" :key="j.id" class="execution-job" :data-exec-id="j.id" :data-state="j.state">
+-     <div class="execution-row"><span>{{j.remainingCancelled && j.state==='cancelled'?'剩余接力已取消':(errors[j.errorCode]||labels[j.state]||j.state)}}<template v-if="j.steps"> · {{j.steps.filter(s=>s.state==='completed').length}} / {{j.stepCount}} 位成员</template></span><template v-if="j.own && j.steps && supportsCancelRemaining">
++     <div class="execution-row"><span>{{waitingForGroupTasks(j)?'成员回复已保存，等待原生任务结束':j.remainingCancelled && j.state==='cancelled'?'剩余接力已取消':(errors[j.errorCode]||labels[j.state]||j.state)}}<template v-if="j.steps"> · {{j.steps.filter(s=>s.state==='completed').length}} / {{j.stepCount}} 位成员</template></span><template v-if="j.own && j.steps && supportsCancelRemaining">
+       <button v-if="j.canCancelRemaining" :data-cancel-remaining-id="j.id" :disabled="!online" @click="cancelRemaining(j)">取消剩余接力</button>
+      </template>
+      <button v-else-if="j.own && ['queued','running','waiting_approval'].includes(j.state)" :data-cancel-id="j.id" @click="cancel(j.id)">{{j.steps?'中止本轮群聊':'请求取消本次回复'}}</button></div>
+diff --git a/apps/server/Plugin/NativeSync/mobile/groupTurn.js b/apps/server/Plugin/NativeSync/mobile/groupTurn.js
+index 48abf97..007cb51 100644
+--- a/apps/server/Plugin/NativeSync/mobile/groupTurn.js
++++ b/apps/server/Plugin/NativeSync/mobile/groupTurn.js
+@@ -31,7 +31,12 @@ function accept(engine,sessionId,input,invitation=false){
+  let kind=invitation?'group_invitation':'group_message',id='job_'+sha256(sessionId+'\0'+requestId).slice(0,32),requestHash=sha256(stable({kind,topicKey,...(invitation?{agentId}:{text,attachments})}));
+  const prior=engine.db.prepare('SELECT * FROM mobile_executions WHERE session_id=? AND request_id=?').get(sessionId,requestId);if(prior){if(prior.request_hash!==requestHash)throw fail('REQUEST_ID_REUSED');if(!engine.quiescing&&prior.state==='preparing')engine.completeIntent(prior);return {...engine.public(engine.get(prior.id),sessionId),replayed:true};}
+  if(engine.quiescing)throw fail('HOST_DRAINING',503);
+- if(held(engine,topicKey))throw fail('DEPENDENCY_REVIEW_REQUIRED');
++ const dependency=held(engine,topicKey);
++ if(dependency){
++  const previous=engine.get(dependency.id);
++  if(topic.sharedSpaceId&&isGroup(previous)&&previous.state==='recovering'&&require('./sharedGroups').hasLiveSettlement(engine,previous.id))throw fail('SHARED_TOPIC_BUSY');
++  throw fail('DEPENDENCY_REVIEW_REQUIRED');
++ }
+  if(engine.db.prepare('SELECT count(*) AS n FROM mobile_executions WHERE session_id=? AND created_at>?').get(sessionId,Date.now()-60000).n>=20)throw fail('SUBMISSION_RATE_LIMIT',429);
+  const config=engine.configs.snapshot(topic);if(!config?.group)throw fail('EXECUTION_CONFIG_REQUIRED');
+  if(!modes[config.group.mode])throw fail('GROUP_MODE_REQUIRES_DESKTOP');
+@@ -83,75 +88,102 @@ function publish(engine,row,member,content,code=null,terminal='completed',causal
+  if(!engine.db.prepare("UPDATE mobile_execution_steps SET state='publishing',pending_operation=?,terminal_state=?,error_code=?,updated_at=? WHERE id=?"+eligibility).run(JSON.stringify(op),terminal,code,Date.now(),row.id).changes)return false;
+  engine.fault('group-step-intent');completeStep(engine,step(engine,row.id));return true;
+ }
+-function holdRemaining(engine,job){
++function holdForReview(engine,job){
+  engine.store.shared.atomic(()=>{
+   engine.db.prepare("UPDATE mobile_executions SET state='review_required',error_code=coalesce(error_code,'EXECUTION_INTERRUPTED_REVIEW_REQUIRED'),updated_at=? WHERE id=?").run(Date.now(),job.id);
+   require('./sharedSingle').hold(engine,job);
+  });
+ }
+ 
+-function deferRemaining(engine,id){
++function deferSettlement(engine,id){
+  if(!require('./sharedGroups').hasLiveSettlement(engine,id))return false;
+  engine.db.prepare("UPDATE mobile_executions SET state='recovering',updated_at=? WHERE id=? AND state<>'recovering'").run(Date.now(),id);
+  return true;
+ }
+ 
+-function settleRemaining(engine,id){
++function settleGroup(engine,id,repairLegacy=false){
+  const shared=engine.store.shared;
+  const finished=shared.atomic(()=>{
+   const job=engine.get(id);
+-  if(['cancelled','review_required'].includes(job.state)||steps(engine,id).some(activeStep)||deferRemaining(engine,id))return false;
++  if(job.review_resolved||job.cancel_requested||job.state==='cancelled'||(job.state==='review_required'&&!repairLegacy))return false;
++  const speakers=steps(engine,id);
++  if(speakers.some(activeStep)||deferSettlement(engine,id))return false;
+   try{
+-   require('./sharedGroups').finish(engine,job);
++   shared.atomic(()=>require('./sharedGroups').finish(engine,job));
+   }catch(error){
+-   if(error.code!=='SHARED_NATIVE_TERMINAL_REQUIRED')throw error;
+-   holdRemaining(engine,job);
++   if(!['SHARED_NATIVE_TERMINAL_REQUIRED','SHARED_REQUEST_FENCED'].includes(error.code))throw error;
++   holdForReview(engine,job);
+    return false;
+   }
+-  engine.db.prepare("UPDATE mobile_executions SET state='cancelled',error_code=NULL,group_stop_preview=NULL,updated_at=? WHERE id=?").run(Date.now(),id);
+-  return true;
++  const state=job.group_stop_index==null?'completed':'cancelled';
++  engine.db.prepare("UPDATE mobile_executions SET state=?,error_code=NULL,group_stop_preview=NULL,updated_at=? WHERE id=?").run(state,Date.now(),id);
++  return state;
+  });
+- if(finished)engine.emitEvent(id,'state',{state:'cancelled'});
++ if(finished)engine.emitEvent(id,finished==='completed'?'completed':'state',{state:finished});
++}
++
++function hasFinalReplyIntents(speakers){
++ return speakers.every(s=>s.state==='completed'||(s.state==='publishing'&&s.pending_operation&&s.terminal_state==='completed'));
+ }
+ 
+-function recoverRemaining(engine,job){
+- if(['cancelled','review_required'].includes(job.state))return;
++function recoverSettlement(engine,job,repairLegacy=false){
++ if(job.state==='cancelled'||job.review_resolved||(job.state==='review_required'&&!repairLegacy))return;
+  const shared=engine.store.shared;
+- shared.atomic(()=>{
+-  if(deferRemaining(engine,job.id))return;
++ const ready=shared.atomic(()=>{
++  if(deferSettlement(engine,job.id))return false;
+   try{
+    for(const row of steps(engine,job.id).filter(s=>s.state==='publishing'))completeStep(engine,row);
+   }catch(error){
+-   if(error.code!=='SHARED_NATIVE_TERMINAL_REQUIRED')throw error;
++   if(!['SHARED_NATIVE_TERMINAL_REQUIRED','SHARED_REQUEST_FENCED'].includes(error.code))throw error;
+    engine.db.prepare("UPDATE mobile_execution_steps SET state='interrupted',error_code='EXECUTION_INTERRUPTED_REVIEW_REQUIRED',updated_at=? WHERE job_id=? AND state='publishing'").run(Date.now(),job.id);
+-   holdRemaining(engine,job);
++   holdForReview(engine,job);
+    return;
+   }
+   const changed=engine.db.prepare("UPDATE mobile_execution_steps SET state='interrupted',error_code=coalesce(error_code,'EXECUTION_INTERRUPTED_REVIEW_REQUIRED'),updated_at=? WHERE job_id=? AND state IN ('running','waiting_approval')").run(Date.now(),job.id).changes;
+-  if(changed)holdRemaining(engine,job);
++  if(changed)holdForReview(engine,job);
++  return !changed;
+  });
+- settleRemaining(engine,job.id);
++ if(ready)settleGroup(engine,job.id,repairLegacy);
+ }
+ 
+-function advanceRemaining(engine,id){
++function advanceSettlement(engine,id){
+  const job=engine.get(id);
+- if(job?.group_stop_index!=null&&job.state==='recovering'&&!engine.active.has(id))recoverRemaining(engine,job);
++ if(!isGroup(job)||job.state!=='recovering'||engine.active.has(id))return;
++ if(job.group_stop_index!=null||hasFinalReplyIntents(steps(engine,id)))recoverSettlement(engine,job);
+ }
+ 
+ function recover(engine){
+  const native=engine.store.shared?.native,sharedReady=native&&!native.closed;
+- for(const row of engine.db.prepare("SELECT * FROM mobile_execution_steps WHERE state='publishing' ORDER BY created_at,step_index").all())if(engine.get(row.job_id)?.group_stop_index==null&&(!engine.topics.get(engine.get(row.job_id)?.topic_key)?.sharedSpaceId||sharedReady))completeStep(engine,row);
+  for(const job of engine.db.prepare("SELECT * FROM mobile_executions WHERE kind IN ('group_message','group_invitation') AND state NOT IN ('completed','cancelled')").all()){
+   const sharedTopic=engine.topics.get(job.topic_key)?.sharedSpaceId;
+   if(sharedTopic&&!sharedReady)continue;
+-  if(job.group_stop_index!=null){recoverRemaining(engine,job);continue;}
+-  const all=steps(engine,job.id),uncertain=all.filter(s=>['running','waiting_approval','interrupted'].includes(s.state));
++  if(job.group_stop_index!=null){recoverSettlement(engine,job);continue;}
++  let all=steps(engine,job.id);
++  if(sharedTopic&&!job.cancel_requested&&!job.review_resolved&&hasFinalReplyIntents(all)){
++   // Old hosts could leave these two holds after *all* speaker commits.
++   // Recheck the plan, native proofs and reply identities before lifting either.
++   const legacy=all.length>0&&all.every(s=>s.state==='completed')&&(
++    job.state==='blocked_config'&&job.error_code==='SHARED_NATIVE_TERMINAL_REQUIRED'||
++    job.state==='review_required'&&job.error_code==='GROUP_PLAN_REVIEW_REQUIRED');
++   if(legacy||(['running','recovering','queued'].includes(job.state)&&!job.error_code?.endsWith('REVIEW_REQUIRED')))recoverSettlement(engine,job,legacy);
++   continue;
++  }
++  const publishing=all.filter(s=>s.state==='publishing');
++  if(publishing.length){
++   try{for(const s of publishing)completeStep(engine,s);}
++   catch(error){
++    if(!sharedTopic||!['SHARED_NATIVE_TERMINAL_REQUIRED','SHARED_REQUEST_FENCED'].includes(error.code))throw error;
++    holdForReview(engine,job);continue;
++   }
++   all=steps(engine,job.id);
++  }
++  const uncertain=all.filter(s=>['running','waiting_approval','interrupted'].includes(s.state));
+   if(uncertain.length){for(const s of uncertain)engine.db.prepare("UPDATE mobile_execution_steps SET state='interrupted',error_code=coalesce(error_code,'EXECUTION_INTERRUPTED_REVIEW_REQUIRED'),updated_at=? WHERE id=?").run(Date.now(),s.id);engine.db.prepare("UPDATE mobile_executions SET state='review_required',error_code='EXECUTION_INTERRUPTED_REVIEW_REQUIRED',updated_at=? WHERE id=?").run(Date.now(),job.id);continue;}
+   if(!job.review_resolved&&(job.error_code?.endsWith('REVIEW_REQUIRED')||engine.nativeTasks.unsettledTools(job.id)||all.some(s=>s.error_code?.endsWith('REVIEW_REQUIRED')))){
+    engine.db.prepare("UPDATE mobile_executions SET state='review_required',error_code=coalesce(error_code,'NATIVE_TOOL_SETTLEMENT_REVIEW_REQUIRED'),updated_at=? WHERE id=?").run(Date.now(),job.id);continue;
+   }
+   if(job.cancel_requested){engine.db.prepare("UPDATE mobile_execution_steps SET state='cancelled' WHERE job_id=? AND state='queued'").run(job.id);engine.db.prepare("UPDATE mobile_executions SET state='cancelled' WHERE id=?").run(job.id);continue;}
+-  if(all.every(s=>s.state==='completed')){if(sharedTopic)require('./sharedGroups').finish(engine,job);engine.db.prepare("UPDATE mobile_executions SET state='completed',error_code=NULL WHERE id=?").run(job.id);}
++  if(all.every(s=>s.state==='completed')){engine.db.prepare("UPDATE mobile_executions SET state='completed',error_code=NULL WHERE id=?").run(job.id);}
+   else if(sharedTopic&&engine.store.shared.active(job.topic_key)?.state==='review_required')engine.db.prepare("UPDATE mobile_executions SET state='review_required',error_code='EXECUTION_INTERRUPTED_REVIEW_REQUIRED' WHERE id=?").run(job.id);
+   else if(all.some(s=>s.state==='queued'))engine.db.prepare("UPDATE mobile_executions SET state='queued',error_code=NULL WHERE id=?").run(job.id);
+  }
+@@ -230,13 +262,13 @@ async function run(engine,initial){
+     const current=step(engine,candidate.id);if(current.state==='publishing'){
+      engine.db.prepare("UPDATE mobile_executions SET state='recovering' WHERE id=?").run(job.id);
+      const pending=engine.get(job.id);
+-     if(pending.group_stop_index!=null)recoverRemaining(engine,pending);
++     if(topic.sharedSpaceId&&(pending.group_stop_index!=null||hasFinalReplyIntents(steps(engine,job.id))))recoverSettlement(engine,pending);
+      return;
+     }
+     const latest=engine.get(job.id);
+     if(latest.group_stop_index!=null){
+      engine.db.prepare("UPDATE mobile_execution_steps SET state='interrupted',error_code=?,updated_at=? WHERE id=?").run(e.code||'EXECUTION_INTERRUPTED_REVIEW_REQUIRED',Date.now(),current.id);
+-     holdRemaining(engine,latest);
++     holdForReview(engine,latest);
+      return;
+     }
+     const cancelled=Boolean(latest.cancel_requested),code=cancelled?(current.tool_started?'EXECUTION_CANCELLED_REVIEW_REQUIRED':'EXECUTION_CANCELLED'):(e.code||'EXECUTION_INTERRUPTED_REVIEW_REQUIRED');
+@@ -246,20 +278,23 @@ async function run(engine,initial){
+    }finally{release?.();release=null;engine.nativeWaiters.delete(candidate.id);}
+   }
+   const latest=engine.get(initial.id);
+-  if(latest.group_stop_index!=null)settleRemaining(engine,latest.id);
++  if(latest.group_stop_index!=null)settleGroup(engine,latest.id);
+   else if(latest.cancel_requested&&['running','waiting_approval','cancelling'].includes(latest.state)){
+    engine.db.prepare("UPDATE mobile_execution_steps SET state='cancelled' WHERE job_id=? AND state='queued'").run(initial.id);
+    engine.db.prepare("UPDATE mobile_executions SET state='cancelled',updated_at=? WHERE id=? AND cancel_requested=1 AND state IN ('running','waiting_approval','cancelling') AND NOT EXISTS(SELECT 1 FROM mobile_execution_steps WHERE job_id=? AND state IN ('running','waiting_approval','publishing'))").run(Date.now(),initial.id,initial.id);
+   }else if(latest.state==='running'){
+-   if(engine.topics.get(latest.topic_key)?.sharedSpaceId)require('./sharedGroups').finish(engine,latest);
+-   const completed=engine.db.prepare("UPDATE mobile_executions SET state='completed',updated_at=? WHERE id=? AND state='running' AND cancel_requested=0 AND NOT EXISTS(SELECT 1 FROM mobile_execution_steps WHERE job_id=? AND state<>'completed')").run(Date.now(),initial.id,initial.id).changes;
++   if(engine.topics.get(latest.topic_key)?.sharedSpaceId&&steps(engine,initial.id).every(s=>s.state==='completed')){
++    settleGroup(engine,initial.id);
++    return;
++   }
++   const completed=engine.db.prepare("UPDATE mobile_executions SET state='completed',updated_at=? WHERE id=? AND state='running' AND cancel_requested=0 AND NOT EXISTS(SELECT 1 FROM mobile_execution_steps WHERE job_id=? AND step_index>=0 AND state<>'completed')").run(Date.now(),initial.id,initial.id).changes;
+    if(!completed&&engine.quiescing&&!engine.draining){engine.db.prepare("UPDATE mobile_executions SET state='queued',updated_at=? WHERE id=? AND state='running'").run(Date.now(),initial.id);return;}
+    if(!completed)engine.db.prepare("UPDATE mobile_executions SET state='review_required',error_code='GROUP_PLAN_REVIEW_REQUIRED',updated_at=? WHERE id=? AND state='running' AND cancel_requested=0").run(Date.now(),initial.id);
+   }
+  }catch(e){
+   const latest=engine.get(initial.id);
+   if(latest.group_stop_index!=null){
+-   recoverRemaining(engine,latest);
++   recoverSettlement(engine,latest);
+    return;
+   }
+   const all=steps(engine,initial.id),uncertain=all.filter(s=>['running','waiting_approval','interrupted'].includes(s.state));
+@@ -268,7 +303,13 @@ async function run(engine,initial){
+   else if(engine.draining)engine.db.prepare("UPDATE mobile_executions SET state='queued',error_code=NULL,updated_at=? WHERE id=?").run(Date.now(),initial.id);
+   else engine.db.prepare("UPDATE mobile_executions SET state='blocked_config',error_code=?,updated_at=? WHERE id=?").run(e.code||'GROUP_CONTEXT_UNAVAILABLE',Date.now(),initial.id);
+  }
+- finally{release?.();const row=engine.get(initial.id);if(engine.topics.get(row.topic_key)?.sharedSpaceId&&row.state!=='completed'&&row.state!=='queued'&&row.group_stop_index==null)require('./sharedSingle').hold(engine,row);engine.active.delete(initial.id);}
++ finally{
++  release?.();
++  const row=engine.get(initial.id);
++  const waiting=row.state==='recovering'&&hasFinalReplyIntents(steps(engine,row.id));
++  if(engine.topics.get(row.topic_key)?.sharedSpaceId&&row.group_stop_index==null&&!waiting&&!['queued','completed'].includes(row.state))require('./sharedSingle').hold(engine,row);
++  engine.active.delete(initial.id);
++ }
+ }
+ 
+ function cancel(engine,id,sessionId){
+@@ -300,8 +341,8 @@ function cancelRemaining(engine,id,sessionId){
+  const {job:recognized,accepted}=recognition;
+  if(accepted)engine.emitEvent(id,'status',{state:recognized.state,code:'GROUP_REMAINDER_CANCELLED'});
+  if(recognized.group_stop_index!=null){
+-  if(recognized.state==='recovering'&&!engine.active.has(id))recoverRemaining(engine,recognized);
+-  else settleRemaining(engine,recognized.id);
++  if(recognized.state==='recovering'&&!engine.active.has(id))recoverSettlement(engine,recognized);
++  else settleGroup(engine,recognized.id);
+  }
+  return engine.public(engine.get(id),sessionId);
+ }
+@@ -327,4 +368,4 @@ function publicState(engine,row,sessionId){
+  const config=JSON.parse(row.config_snapshot),all=steps(engine,row.id);
+  return {kind:row.kind,remainingCancelled:row.group_stop_index!=null,canCancelRemaining:Boolean(row.session_id===sessionId&&engine.topics.get(row.topic_key)?.sharedSpaceId&&row.group_stop_index==null&&canStopRemaining(row)&&all.some(s=>s.state==='queued')),groupMode:config.group.mode,stepCount:all.length,position:row.group_position,reviewResolved:Boolean(row.review_resolved),steps:all.map(s=>({id:s.id,index:s.step_index,agentId:s.agent_id,name:config.agents.find(a=>a.id===s.agent_id)?.name||s.agent_id,state:s.state,attempts:s.attempts,replyMessageId:s.reply_message_id,errorCode:s.error_code}))};
+ }
+-module.exports={schema,isGroup,held,accept,completeStep,recover,history,observe,run,cancel,cancelRemaining,resolve,publicState,steps,advanceRemaining};
++module.exports={schema,isGroup,held,accept,completeStep,recover,history,observe,run,cancel,cancelRemaining,resolve,publicState,steps,advanceSettlement};
+diff --git a/apps/server/Plugin/NativeSync/mobile/nativeTasks.js b/apps/server/Plugin/NativeSync/mobile/nativeTasks.js
+index 70ea4f6..a5d2e70 100644
+--- a/apps/server/Plugin/NativeSync/mobile/nativeTasks.js
++++ b/apps/server/Plugin/NativeSync/mobile/nativeTasks.js
+@@ -182,7 +182,7 @@ class NativeTaskLinks {
+                 terminal ? data.resultRef : null, terminal ? data.resultHash : null, terminal ? data.summary : null,
+                 Date.now(), code, unknown ? 1 : 0, resolved, row.plugin_name, row.native_task_id);
+         this.engine.fault('native-task-projected');
+-        if (terminal || unknown && this.engine.get(row.execution_id)?.group_stop_index != null) this.engine.store?.shared?.native?.checkTerminal?.(row.execution_id);
++        if (terminal || unknown && require('./groupTurn').isGroup(this.engine.get(row.execution_id))) this.engine.store?.shared?.native?.checkTerminal?.(row.execution_id);
+         return this.public(this.get(row.plugin_name, row.native_task_id));
+     }
+     markUnknown(row, code) {
+@@ -190,7 +190,7 @@ class NativeTaskLinks {
+         const resolved = row.state === 'unknown' ? row.review_resolved : 0;
+         this.db.prepare("UPDATE mobile_native_tasks SET state='unknown',review_required=1,review_resolved=?,error_code=?,observed_at=? WHERE plugin_name=? AND native_task_id=?")
+             .run(resolved, code, Date.now(), row.plugin_name, row.native_task_id);
+-        if (this.engine.get(row.execution_id)?.group_stop_index != null) this.engine.store?.shared?.native?.checkTerminal?.(row.execution_id);
++        if (require('./groupTurn').isGroup(this.engine.get(row.execution_id))) this.engine.store?.shared?.native?.checkTerminal?.(row.execution_id);
+     }
+     queryInput(row, includeResult = false) {
+         return { nativeTaskId: row.native_task_id, agentBaseName: row.agent_base_name,
+diff --git a/apps/server/Plugin/NativeSync/mobile/sharedGroups.js b/apps/server/Plugin/NativeSync/mobile/sharedGroups.js
+index faaae76..823a81a 100644
+--- a/apps/server/Plugin/NativeSync/mobile/sharedGroups.js
++++ b/apps/server/Plugin/NativeSync/mobile/sharedGroups.js
+@@ -20,15 +20,26 @@ function completeStep(engine,step,op){
+ }
+ function hasLiveSettlement(engine,id){
+  const native=engine.store.shared.native,tasks=engine.nativeTasks,db=engine.db;
+- if(tasks.needsReview(id)||native.taskRequests.uncertain(id)||
++ // A restart marks live projections for one native read. Give that read a
++ // chance to return the already-written AA archive when no request was lost.
++ if(tasks.needsReview(id,{deferReconciliation:true})||native.taskRequests.uncertain(id)||
+     db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state='unknown'").get(id)||
+     db.prepare("SELECT 1 FROM mobile_native_invocations WHERE execution_id=? AND state='error' AND coalesce(error_code,'')<>'NATIVE_CANCELLED_BEFORE_EXECUTION'").get(id))return false;
+  return Boolean(db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state='dispatched'").get(id)||
+                 db.prepare("SELECT 1 FROM shared_native_child_requests WHERE work_id=? AND state='dispatched'").get(id)||
+-                db.prepare("SELECT 1 FROM mobile_native_tasks WHERE execution_id=? AND state IN ('accepted','running','waiting','cancelling')").get(id));
++                db.prepare(`SELECT 1 FROM mobile_native_tasks WHERE execution_id=? AND (state IN ('accepted','running','waiting','cancelling') OR
++                 (state='unknown' AND error_code='NATIVE_TASK_RECONCILIATION_REQUIRED'))`).get(id));
+ }
+ function finish(engine,job){
+- const shared=engine.store.shared,topic=engine.topics.get(job.topic_key);shared.native?.checkTerminal(job.id,{advanceGroup:false});
+- return shared.complete(acceptedActor(engine,job),{sharedSpaceId:topic.sharedSpaceId,admissionId:job.id,opId:'mobile-group-finish_'+job.id,finish:true});
++ const shared=engine.store.shared,topic=engine.topics.get(job.topic_key),actor=acceptedActor(engine,job);
++ const admission=shared.admission(actor,topic.sharedSpaceId,job.id);
++ if(admission.state!=='completed')shared.native.checkTerminal(job.id,{advanceGroup:false});
++ const result=shared.complete(actor,{sharedSpaceId:topic.sharedSpaceId,admissionId:job.id,opId:'mobile-group-finish_'+job.id,finish:true});
++ if(result.replayed){
++  if(admission.state!=='completed')throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
++  const source=shared.topic(actor,topic.sharedSpaceId,topic.key,'execute');
++  require('../sync/sharedTurns').verifyGroupFinish(shared,source,admission);
++ }
++ return result;
+ }
+ module.exports={admit,register,completeStep,finish,hasLiveSettlement};
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedNative.js b/apps/server/Plugin/NativeSync/sync/sharedNative.js
+index ec1cd26..464ebd8 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedNative.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedNative.js
+@@ -198,14 +198,16 @@ class SharedNative {
+   if(this.closed)return;
+   const admission=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(admissionId);
+   const job=this.engine.get?.(admissionId),stop=job?.group_stop_index;
+-  if(advanceGroup&&stop!=null&&job.state==='recovering'){
++  if(advanceGroup&&job?.state==='recovering'&&require('../mobile/groupTurn').isGroup(job)){
+    queueMicrotask(()=>{
+     if(this.closed)return;
+-    try{require('../mobile/groupTurn').advanceRemaining(this.engine,admissionId);}
+-    catch(error){console.warn('[NativeSync] GROUP_REMAINDER_SETTLEMENT_FAILED',error.code||'UNEXPECTED');}
++    try{require('../mobile/groupTurn').advanceSettlement(this.engine,admissionId);}
++    catch(error){console.warn('[NativeSync] GROUP_SETTLEMENT_FAILED',error.code||'UNEXPECTED');}
+    });
+   }
+-  if(!admission||(admission.state!=='dispatched'&&!(stop!=null&&admission.state==='review_required')))return;
++  if(!admission)return;
++  const recheck=admission.state==='review_required'&&(stop!=null||(!advanceGroup&&require('../mobile/groupTurn').isGroup(job)));
++  if(admission.state!=='dispatched'&&!recheck)return;
+   const config=JSON.parse(admission.config_json);
+   const pending=this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state IN ('prepared','dispatched','unknown') LIMIT 1").get(admissionId);
+   const native=this.engine.nativeTasks;
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedTurns.js b/apps/server/Plugin/NativeSync/sync/sharedTurns.js
+index baac9a1..f536139 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedTurns.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedTurns.js
+@@ -29,27 +29,49 @@ function prepare(shared,topic,config,body,sponsored=false){
+  }
+  return {kind,plan,...(sponsored?{topicSponsor:true}:{}),userMessageId:user?.id||null,...(kind==='regenerate'?{targetId:body.targetId,targetHash:records[index].hash}:{} )};
+ }
++// Recheck durable facts even if an older release already issued the central
++// finish receipt but failed to settle the mobile ledger.
++function verifyGroupFinish(shared,topic,row){
++ const turn=intent(row);
++ const engine=shared.native?.engine;
++ const job=engine?.get?.(row.id);
++ const cutoff=job?.group_stop_index;
++ const length=cutoff??turn.plan.length;
++ const requests=shared.db.prepare('SELECT id,ordinal,state,member_id FROM shared_native_requests WHERE admission_id=? ORDER BY ordinal').all(row.id);
++ const incomplete=()=>fail('SHARED_NATIVE_TERMINAL_REQUIRED');
++ if(requests.length!==length||requests.some((request,i)=>request.ordinal!==i||request.state!=='model_terminal'||request.member_id!==turn.plan[i]))throw incomplete();
++
++ if(require('../mobile/groupTurn').isGroup(job)){
++  const speakers=require('../mobile/groupTurn').steps(engine,row.id);
++  if(job.cancel_requested||job.group_plan!==JSON.stringify(turn.plan)||speakers.length!==turn.plan.length||
++     cutoff!=null&&(!Number.isSafeInteger(cutoff)||cutoff<0||cutoff>=turn.plan.length))throw incomplete();
++  for(const [i,speaker] of speakers.entries()){
++   if(speaker.step_index!==i||speaker.agent_id!==turn.plan[i]||speaker.pending_operation||speaker.error_code?.endsWith('REVIEW_REQUIRED'))throw incomplete();
++   if(i<length){
++    if(speaker.state!=='completed'||speaker.id!==requests[i].id||speaker.reply_message_id!=='reply_'+speaker.id)throw incomplete();
++   }else if(speaker.state!=='cancelled'||speaker.attempts!==0||speaker.tool_started||speaker.reply_message_id)throw incomplete();
++  }
++  if(shared.native.taskRequests.pending(row.id)||engine.nativeTasks.uncertainTools(row.id))throw incomplete();
++ }
++ const tasks=engine?.nativeTasks;
++ if(requests.length&&(!row.native_terminal||!tasks||tasks.needsReview(row.id)||tasks.unsettledTools(row.id)))throw incomplete();
++ if(tasks?.list(row.id).some(task=>!['completed','failed','cancelled','stopped'].includes(task.state)||task.revision!==1||!task.resultRef||!task.resultHash))throw incomplete();
++
++ const ids=requests.map(request=>'reply_'+request.id);
++ const replies=shared.store.readProjected(()=>shared.db.prepare(`SELECT m.* FROM messages m JOIN journal j
++  ON j.seq=m.last_seq AND j.owner_type=m.owner_type AND j.owner_id=m.owner_id AND j.topic_id=m.topic_id
++  AND j.msg_id=m.msg_id AND j.hash=m.hash AND j.action='upsert'
++  WHERE m.owner_type=? AND m.owner_id=? AND m.topic_id=? AND m.deleted=0 AND m.msg_id IN (SELECT value FROM json_each(?))`).all(...tuple(topic),JSON.stringify(ids)));
++ const byId=new Map(replies.map(reply=>[reply.row.msg_id,reply.message]));
++ if(requests.some((request,i)=>byId.get(ids[i])?.role!=='assistant'||byId.get(ids[i]).agentId!==request.member_id))throw incomplete();
++}
+ function complete(shared,actor,body,row){
+  const topic=shared.topic(actor,row.space_id,row.topic_id,'execute'),turn=intent(row),group=topic.owner_type==='group';
+  if(!group)return false;
+  if(!['accepted','dispatched','review_required'].includes(row.state))throw fail('SHARED_REQUEST_FENCED');
+  const execution=shared.native?.engine.get?.(row.id),stop=execution?.group_stop_index;
+  if(body.finish===true){
+-  const steps=shared.db.prepare('SELECT * FROM shared_native_requests WHERE admission_id=? ORDER BY ordinal').all(row.id);
+-  const length=stop??turn.plan.length;
+-  if(steps.length!==length||steps.some((s,i)=>s.ordinal!==i||s.state!=='model_terminal'||s.member_id!==turn.plan[i]))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+-  if(stop!=null){
+-   const ledger=require('../mobile/groupTurn').steps(shared.native.engine,row.id);
+-   if(!Number.isSafeInteger(stop)||stop<0||stop>=turn.plan.length||execution.cancel_requested||
+-    ledger.length!==turn.plan.length||ledger.some((s,i)=>s.step_index!==i||s.agent_id!==turn.plan[i]||
+-     (i<stop?s.state!=='completed'||s.pending_operation||s.id!==steps[i].id||s.reply_message_id!=='reply_'+s.id:s.state!=='cancelled'||s.attempts!==0||s.tool_started||s.pending_operation||s.reply_message_id)))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+-   if(shared.native.taskRequests.pending(row.id)||shared.native.engine.nativeTasks.uncertainTools(row.id))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+-  }
+-  const native=shared.native?.engine.nativeTasks;
+-  if(steps.length&&(!native||native.needsReview(row.id)||native.unsettledTools(row.id)||native.list(row.id).some(t=>!['completed','failed','cancelled','stopped'].includes(t.state))))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+-  const replies=shared.store.readProjected(()=>shared.db.prepare('SELECT * FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND msg_id IN (SELECT value FROM json_each(?))').all(...tuple(topic),JSON.stringify(steps.map(s=>'reply_'+s.id))));
+-  if(replies.length!==steps.length||replies.some(r=>r.row.deleted))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+-  if(steps.length&&!row.native_terminal)throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
++  verifyGroupFinish(shared,topic,row);
+   shared.db.prepare("UPDATE shared_admissions SET state='completed' WHERE id=?").run(row.id);
+   return {request:shared.publicAdmission(shared.admission(actor,row.space_id,row.id))};
+  }
+@@ -73,4 +95,4 @@ function replaceTarget(shared,actor,topic,row,turn=intent(row)){
+  if(!target||target.hash!==turn.targetHash||target.deleted)throw fail('SHARED_REGENERATION_TARGET_CHANGED');
+  shared.store.apply({ownerType:topic.owner_type,ownerId:topic.owner_id,topicId:topic.topic_id,msgId:turn.targetId,deviceId:actor.principal,opId:'shared-replaced:'+row.id,action:'delete',baseHash:turn.targetHash},{sharedSpace:row.space_id,metadataPublisher:true});
+ }
+-module.exports={intent,history,prepare,complete,writeReply,replaceTarget};
++module.exports={verifyGroupFinish,intent,history,prepare,complete,writeReply,replaceTarget};
