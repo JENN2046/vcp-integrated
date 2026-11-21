@@ -58,3 +58,5 @@ AgentAssistant 长委托已接入共享单聊的 Work。桌面重开、发起端
 本机单聊的六项自动中断测试已通过。真实桌面在两种角色分隔设置下均能在工具返回处中断，部分回复以原 ID 落盘后触发自动压缩。基线、候选、重开结果与截图见[本机流式中断回执](evidence/local-stream-interrupt/README.md)。
 
 共享单聊已完成 A 发布检查点并退出、B 重开同话题发送和丢接纳回执后的恢复验证。原生窗口按 Journal 消息顺序选择检查点，两次独立桌面实测均找回原 Work，无重复派发或工具执行。[跨端接续差异、回执和截图](evidence/cross-device-compaction/README.md)
+
+同端压缩的两条中间故障已复现。桌面现在核实原子替换后的实际配置路径，并在持久化准备回执前登记活跃压缩意图。同端重开及跨端丢回执恢复均已复验。[原故障、宿主差异与验收回执](evidence/compaction-failures/README.md)

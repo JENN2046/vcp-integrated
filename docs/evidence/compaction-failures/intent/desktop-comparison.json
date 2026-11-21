@@ -1,0 +1,187 @@
+{
+  "baseRevision": "941fb8149b7513823a382b5fd373837a3d41c950",
+  "isolatedModule": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+  "original": {
+    "rawEvidence": "/home/jenn/sc-e2e-YEZ2z0/vcp-integration-JbUd87/compact-e2e/evidence.json",
+    "rawEvidenceSha256": "f324e809478dc715c98d4137af8e12ef783e1096ce39260ac1d38853216f1415",
+    "failures": [
+      "Error: Timed out: durable checkpoint commit"
+    ],
+    "ipcErrors": [
+      {
+        "channel": "native-sync:compact-prepare",
+        "error": "SHARED_COMPACTION_SUPERSEDED",
+        "at": 1795256549896
+      }
+    ],
+    "intents": [
+      {
+        "id": "compact_1eaf1793e2c5a2b25ece5549ae420bd60d6da2a4",
+        "principal": "desktop:deviceA",
+        "message_id": "checkpoint_compact_1eaf1793e2c5a2b25ece5549ae420bd60d6da2a4",
+        "committed_seq": null,
+        "work_id": null,
+        "state": "cancelled"
+      }
+    ],
+    "sharedReceiptOps": [
+      {
+        "rowid": 29,
+        "principal": "desktop:deviceA",
+        "op_id": "compact_prepare_df8134d6-5921-4829-82e0-f568eac93b15",
+        "result": {
+          "id": "compact_1eaf1793e2c5a2b25ece5549ae420bd60d6da2a4",
+          "messageId": "checkpoint_compact_1eaf1793e2c5a2b25ece5549ae420bd60d6da2a4",
+          "sourceHash": "449bed28c765f1594f3e3ad4461d1707d05a555d794a50cf32de26e29953a428",
+          "head": 8,
+          "workId": null
+        }
+      },
+      {
+        "rowid": 30,
+        "principal": "desktop:deviceA",
+        "op_id": "compact_cancel_compact_1eaf1793e2c5a2b25ece5549ae420bd60d6da2a4",
+        "result": {
+          "success": true,
+          "cancelled": true
+        }
+      }
+    ],
+    "sharedSessionWorks": [],
+    "checkpoints": [],
+    "summaryProviderCalls": 0,
+    "totalProviderCallsIncludingTwoSeedTurns": 2
+  },
+  "scheduledPair": {
+    "base": {
+      "rawEvidence": "/home/jenn/ns-cf-1zU2EY/vcp-integration-V2wuIE/compact-e2e/evidence.json",
+      "rawEvidenceSha256": "9b5aab372c97f465af870e915de273a4967ab9642151c2eefab8188d7bc546b2",
+      "failures": [
+        "Error: Timed out: durable checkpoint commit"
+      ],
+      "ipcErrors": [
+        {
+          "channel": "native-sync:compact-prepare",
+          "error": "SHARED_COMPACTION_SUPERSEDED",
+          "at": 1795257247526
+        }
+      ],
+      "intents": [
+        {
+          "id": "compact_a1743369718cf24c4a922bfdcecc014eb1de232d",
+          "principal": "desktop:deviceA",
+          "message_id": "checkpoint_compact_a1743369718cf24c4a922bfdcecc014eb1de232d",
+          "committed_seq": null,
+          "work_id": null,
+          "state": "cancelled"
+        }
+      ],
+      "sharedReceiptOps": [
+        {
+          "rowid": 29,
+          "principal": "desktop:deviceA",
+          "op_id": "compact_prepare_bd6f9d1c-3b4d-4acf-a26f-b5ae4b848d12",
+          "result": {
+            "id": "compact_a1743369718cf24c4a922bfdcecc014eb1de232d",
+            "messageId": "checkpoint_compact_a1743369718cf24c4a922bfdcecc014eb1de232d",
+            "sourceHash": "899747c4cb7bf365d43c99a56a675d3ebefd5af46e5d243625a19949dd573d92",
+            "head": 8,
+            "workId": null
+          }
+        },
+        {
+          "rowid": 30,
+          "principal": "desktop:deviceA",
+          "op_id": "compact_cancel_compact_a1743369718cf24c4a922bfdcecc014eb1de232d",
+          "result": {
+            "success": true,
+            "cancelled": true
+          }
+        }
+      ],
+      "sharedSessionWorks": [],
+      "checkpoints": [],
+      "summaryProviderCalls": 0,
+      "totalProviderCallsIncludingTwoSeedTurns": 2,
+      "scheduledObservation": {
+        "id": "compact_a1743369718cf24c4a922bfdcecc014eb1de232d",
+        "opId": "compact_prepare_bd6f9d1c-3b4d-4acf-a26f-b5ae4b848d12",
+        "owned": false,
+        "cancelled": true
+      },
+      "comparedModuleSha256": "9acff2a2977af6697437c6f8f1f9dd82bfe57a131cdc270c08a4e5bb01724ae5"
+    },
+    "candidate": {
+      "rawEvidence": "/home/jenn/ns-cf-cwGoDR/vcp-integration-8EiBXH/compact-e2e/evidence.json",
+      "rawEvidenceSha256": "95cfbde7c2189e0e7150db6aeb638814c754a7aed00c33b4cfe3364585ecc043",
+      "failures": [],
+      "ipcErrors": [],
+      "intents": [
+        {
+          "id": "compact_ce81ef57bdc5bcaa23fe678cda8815e9c35c323e",
+          "principal": "desktop:deviceA",
+          "message_id": "checkpoint_compact_ce81ef57bdc5bcaa23fe678cda8815e9c35c323e",
+          "committed_seq": 9,
+          "work_id": null,
+          "state": "committed"
+        }
+      ],
+      "sharedReceiptOps": [
+        {
+          "rowid": 29,
+          "principal": "desktop:deviceA",
+          "op_id": "compact_prepare_aa324418-631c-45a0-b7b8-5bb5da6b8f5b",
+          "result": {
+            "id": "compact_ce81ef57bdc5bcaa23fe678cda8815e9c35c323e",
+            "messageId": "checkpoint_compact_ce81ef57bdc5bcaa23fe678cda8815e9c35c323e",
+            "sourceHash": "873bf6de3ed68d574eb5e9d18b7ba345ce6db1b5dd1cfc335b9cf883e49abbbe",
+            "head": 8,
+            "workId": null
+          }
+        },
+        {
+          "rowid": 30,
+          "principal": "desktop:deviceA",
+          "op_id": "compact_commit_compact_ce81ef57bdc5bcaa23fe678cda8815e9c35c323e",
+          "result": {
+            "success": true,
+            "messageId": "checkpoint_compact_ce81ef57bdc5bcaa23fe678cda8815e9c35c323e",
+            "seq": 9
+          }
+        }
+      ],
+      "sharedSessionWorks": [
+        {
+          "id": "request_c10483bff5b84e2fbd9ed182a127ed35",
+          "request_id": "msg_1795257250482_user_dvn1rw1myo",
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "user_message_id": "msg_1795257250482_user_dvn1rw1myo",
+          "reply_message_id": "reply_request_c10483bff5b84e2fbd9ed182a127ed35"
+        },
+        {
+          "id": "request_4287705c3d724f39925e062467be2510",
+          "request_id": "msg_1795257251328_user_ppyrixt7uj",
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "user_message_id": "msg_1795257251328_user_ppyrixt7uj",
+          "reply_message_id": "reply_request_4287705c3d724f39925e062467be2510"
+        }
+      ],
+      "checkpoints": [
+        "checkpoint_compact_ce81ef57bdc5bcaa23fe678cda8815e9c35c323e"
+      ],
+      "summaryProviderCalls": 1,
+      "totalProviderCallsIncludingTwoSeedTurns": 5,
+      "scheduledObservation": {
+        "id": "compact_ce81ef57bdc5bcaa23fe678cda8815e9c35c323e",
+        "opId": "compact_prepare_aa324418-631c-45a0-b7b8-5bb5da6b8f5b",
+        "owned": true,
+        "cancelled": false
+      },
+      "comparedModuleSha256": "35a8bcfb7cc250f805e20cc397c3ddc431e6ca3218375d16b0509e03b282ddcf"
+    }
+  }
+}

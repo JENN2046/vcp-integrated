@@ -1,0 +1,2 @@
+{"node":"v24.22.1","mode":"baseline","path":"Agents/synthetic/config.json","writes":1000,"reads":46282,"observed":7,"aliases":7,"first":{"oldInode":1174568,"oldLinks":0,"currentInode":1174571,"currentLinks":1}}
+{"node":"v24.22.1","mode":"candidate","path":"Agents/synthetic/config.json","writes":1000,"reads":46407,"observed":7,"aliases":0,"first":{"oldInode":1177647,"oldLinks":0,"currentInode":1177651,"currentLinks":1}}

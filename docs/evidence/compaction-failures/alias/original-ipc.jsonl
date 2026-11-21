@@ -1,0 +1,8 @@
+{"event":"A-reopened:ipc","t":1795256397620,"data":{"channel":"set-topic-unread","sender":1,"sourceMs":1795256397620}}
+{"event":"A-reopened:ipc","t":1795256397621,"data":{"channel":"native-sync:prepare-send","sender":1,"sourceMs":1795256397621}}
+{"event":"A-reopened:desktop-input","t":1795256397621,"data":{"id":"msg_1795256397616_user_3rz6orclae","localOnly":true,"serverSession":false,"sourceMs":1795256397621}}
+{"event":"A-reopened:ipc-result","t":1795256397632,"data":{"channel":"native-sync:prepare-send","handled":true,"success":true,"sourceMs":1795256397632}}
+{"event":"A-reopened:ipc","t":1795256397633,"data":{"channel":"native-sync:executions","sender":1,"sourceMs":1795256397633}}
+{"event":"A-reopened:ipc","t":1795256397636,"data":{"channel":"native-sync:prepare-send","sender":1,"sourceMs":1795256397634}}
+{"event":"A-reopened:desktop-input","t":1795256397636,"data":{"id":"msg_1795256397616_user_3rz6orclae","localOnly":false,"serverSession":true,"sourceMs":1795256397634}}
+{"event":"A-reopened:ipc-result","t":1795256397637,"data":{"channel":"native-sync:prepare-send","error":"SOURCE_PATH_ALIAS","success":false,"sourceMs":1795256397635}}

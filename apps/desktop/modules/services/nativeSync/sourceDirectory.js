@@ -3,8 +3,14 @@ const fs=require('node:fs/promises'),path=require('node:path');
 const {identity,fail,sha256,stable}=require('./protocol');
 const key=d=>JSON.stringify([d.ownerType,d.ownerId,d.topicId||'']);
 async function plain(file,{directory=false,missing=false}={}){
- try{const s=await fs.lstat(file);if(s.isSymbolicLink()||(!directory&&(!s.isFile()||s.nlink!==1)))throw fail('SOURCE_PATH_ALIAS');if(directory&&!s.isDirectory())throw fail('SOURCE_PATH_ALIAS');return s;}
- catch(e){if(missing&&e.code==='ENOENT')return null;throw e;}
+ try {
+  let stat=await fs.lstat(file);
+  // Atomic replacement can unlink the inode lstat just resolved. Check the
+  // current name once and still reject any alias found at that name.
+  if(!directory&&stat.isFile()&&stat.nlink===0)stat=await fs.lstat(file);
+  if(directory?!stat.isDirectory():!stat.isFile()||stat.nlink!==1)throw fail('SOURCE_PATH_ALIAS');
+  return stat;
+ }catch(e){if(missing&&e.code==='ENOENT')return null;throw e;}
 }
 // Native config membership is authoritative. Missing/failed reads are observations,
 // never deletions. In particular, do not upload the get-agents DTO or its prompts.

@@ -12,6 +12,7 @@ const { SharedSpace } = require(box + '/Plugin/NativeSync/sync/sharedSpace');
 const { SourceCatalog } = require(box + '/Plugin/NativeSync/sync/sourceCatalog');
 const { stable, sha256 } = require(box + '/Plugin/NativeSync/sync/protocol');
 const { createNativeContinuationStore } = require(box + '/modules/nativeContinuationStore.cjs');
+const { SharedRuntime } = require('../../apps/desktop/modules/services/nativeSync/sharedRuntime');
 
 function fixture(t) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'shared-compaction-input-'));
@@ -77,8 +78,63 @@ function fixture(t) {
             contextCompaction: { kind: 'vchat-context-checkpoint', version: 1, checkpoint: 'Synthetic checkpoint' },
         },
     });
-    return { db: store.db, append, generation, prepare, get, commit, head: () => shared.head(topic) };
+    return { db: store.db, append, generation, prepare, get, commit, shared, actor, scope, head: () => shared.head(topic) };
 }
+
+test('live compaction owns its preparation while the receipt is being persisted', async t => {
+    const f = fixture(t);
+    f.append('first', 'user', 'Summarize this');
+    const descriptor = { itemType: 'agent', itemId: 'agent', topicId: 'topic' };
+    const receiptSaveStarted = Promise.withResolvers();
+    const resumeReceiptSave = Promise.withResolvers();
+    let receiptSavePaused = false;
+    const state = {};
+    const runtime = Object.assign(Object.create(SharedRuntime.prototype), {
+        ready: true,
+        activeCompactionPrepares: new Set(),
+        activeCompactions: new Set(),
+        capabilities: { features: ['shared-compaction-v1'] },
+        connection: { sharedSpaceId: f.scope.sharedSpaceId },
+        execution: {
+            state,
+            mapping: () => f.scope,
+            async save() {
+                if (!receiptSavePaused && Object.keys(state.compactionPreparations || {}).length) {
+                    receiptSavePaused = true;
+                    receiptSaveStarted.resolve();
+                    await resumeReceiptSave.promise;
+                }
+            },
+        },
+        refreshForExecution: async () => ({ head: f.head() }),
+        async send(route, options) {
+            const url = new URL(route, 'http://localhost');
+            const actions = { 'compact-prepare': 'prepare', 'compact-input': 'get', 'compact-cancel': 'cancel' };
+            return f.shared.compaction[actions[url.pathname.split('/').at(-1)]](
+                f.actor, options?.body || Object.fromEntries(url.searchParams));
+        },
+    });
+    const preparing = runtime.prepareSharedCompaction({ descriptor });
+    await receiptSaveStarted.promise;
+    try {
+        await runtime.recoverSharedCompactionPrepares();
+    } finally {
+        resumeReceiptSave.resolve();
+    }
+    const result = await preparing;
+    assert.deepEqual(result.history.map(m => m.id), ['first']);
+    const intentState = () => f.db.prepare('SELECT state FROM shared_compaction_intents WHERE id=?').get(result.id).state;
+    assert.equal(intentState(), 'prepared');
+
+    // Simulate a reopened runtime with the same persisted state and no live owner.
+    const reopened = Object.assign(Object.create(SharedRuntime.prototype), runtime, {
+        activeCompactionPrepares: new Set(),
+        activeCompactions: new Set(),
+    });
+    await reopened.recoverSharedCompactionPrepares();
+    assert.equal(intentState(), 'cancelled');
+    assert.equal(reopened.execution.state.compactionPreparations[result.id].cancelled, true);
+});
 
 function rejectsPublication(f, prepared) {
     const head = f.head();

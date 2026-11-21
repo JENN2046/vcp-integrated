@@ -552,6 +552,8 @@ class SharedRuntime {
   if(typeof receipt?.id!=='string'||receipt.messageId!=='checkpoint_'+receipt.id||!/^[a-f0-9]{64}$/.test(receipt.sourceHash||''))throw fail('SHARED_COMPACTION_RESPONSE_INVALID');
   this.execution.state.compactionPreparations||={};const prepared={descriptor:{...intent.descriptor},sharedId:intent.body.sharedId,sourceHash:receipt.sourceHash,messageId:receipt.messageId,workId:receipt.workId};
   const old=this.execution.state.compactionPreparations[receipt.id];if(old&&stable({...old,cancelled:undefined})!==stable(prepared))throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
+  // Reserve the receipt before publishing it to the recovery loop as a preparation.
+  if(this.activeCompactionPrepares.has(intent.body.opId))this.activeCompactions.add(receipt.id);
   this.execution.state.compactionPreparations[receipt.id]=old||prepared;intent.receipt=receipt;intent.phase='prepared';await this.execution.save();return receipt;
  }
  async recoverSharedCompactionPrepares(){
@@ -565,9 +567,9 @@ class SharedRuntime {
   if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(descriptor);if(!this.capabilities.features?.includes('shared-compaction-v1'))throw fail('SHARED_COMPACTION_UPGRADE_REQUIRED');const context=await this.refreshForExecution(descriptor);if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');
   const opId='compact_prepare_'+randomUUID(),intent={descriptor:{...descriptor},body:{sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId,opId,expectedHead:context.head},phase:'preparing'};this.execution.state.compactionPrepareRequests||={};this.execution.state.compactionPrepareRequests[opId]=intent;this.activeCompactionPrepares.add(opId);
   try{
-   await this.execution.save();if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');const receipt=await this.recoverSharedCompactionPrepare(intent);this.activeCompactions.add(receipt.id);if(this.closed){await this.cancelSharedCompaction({descriptor,id:receipt.id,closing:true});throw fail('APPLICATION_SHUTTING_DOWN');}
+   await this.execution.save();if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');const receipt=await this.recoverSharedCompactionPrepare(intent);if(this.closed){await this.cancelSharedCompaction({descriptor,id:receipt.id,closing:true});throw fail('APPLICATION_SHUTTING_DOWN');}
    const result=await this.send(endpoint+'compact-input?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,id:receipt.id}));if(result?.id!==receipt.id||result.messageId!==receipt.messageId||result.sourceHash!==receipt.sourceHash||!Array.isArray(result.history))throw fail('SHARED_COMPACTION_RESPONSE_INVALID');
-   this.activeCompactions.add(receipt.id);return {handled:true,success:true,...result};
+   return {handled:true,success:true,...result};
   }catch(error){if(intent.receipt)this.activeCompactions.delete(intent.receipt.id);throw error;}finally{this.activeCompactionPrepares.delete(opId);}
  }
 

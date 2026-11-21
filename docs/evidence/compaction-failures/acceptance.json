@@ -1,0 +1,560 @@
+{
+  "baseRevision": "941fb8149b7513823a382b5fd373837a3d41c950",
+  "node": "24.22.3",
+  "electron": "44.9.3",
+  "runs": [
+    {
+      "rawEvidence": "/home/jenn/ns-cf-bWW76Z/vcp-integration-8Kb22E/compact-e2e/evidence.json",
+      "rawEvidenceSha256": "7d04434a3073ae80f6ba58836aaf15650b0762eb1d6590964cd48181901cb346",
+      "failures": [],
+      "ipcErrors": [],
+      "intents": [
+        {
+          "id": "compact_618fb609228797ee9f0385f0f1eb311fcaf4b813",
+          "principal": "desktop:deviceA",
+          "message_id": "checkpoint_compact_618fb609228797ee9f0385f0f1eb311fcaf4b813",
+          "committed_seq": 9,
+          "work_id": null,
+          "state": "committed"
+        }
+      ],
+      "sharedReceiptOps": [
+        {
+          "rowid": 29,
+          "principal": "desktop:deviceA",
+          "op_id": "compact_prepare_4d59e40b-a14f-4090-8a22-d8e71e449e1b",
+          "result": {
+            "id": "compact_618fb609228797ee9f0385f0f1eb311fcaf4b813",
+            "messageId": "checkpoint_compact_618fb609228797ee9f0385f0f1eb311fcaf4b813",
+            "sourceHash": "50292c1012c88abfa1e963391fb44a4d465e138f211a574b0a0871f88fe9f037",
+            "head": 8,
+            "workId": null
+          }
+        },
+        {
+          "rowid": 30,
+          "principal": "desktop:deviceA",
+          "op_id": "compact_commit_compact_618fb609228797ee9f0385f0f1eb311fcaf4b813",
+          "result": {
+            "success": true,
+            "messageId": "checkpoint_compact_618fb609228797ee9f0385f0f1eb311fcaf4b813",
+            "seq": 9
+          }
+        }
+      ],
+      "sharedSessionWorks": [
+        {
+          "id": "request_2e7146759b124a7c99da1092d0e04dbb",
+          "request_id": "msg_1795257153380_user_1n0pnxagci",
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "user_message_id": "msg_1795257153380_user_1n0pnxagci",
+          "reply_message_id": "reply_request_2e7146759b124a7c99da1092d0e04dbb"
+        },
+        {
+          "id": "request_2964fb404e0d4349a6c2b80b0d0be300",
+          "request_id": "msg_1795257154239_user_fzczf3v2zh",
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "user_message_id": "msg_1795257154239_user_fzczf3v2zh",
+          "reply_message_id": "reply_request_2964fb404e0d4349a6c2b80b0d0be300"
+        }
+      ],
+      "checkpoints": [
+        "checkpoint_compact_618fb609228797ee9f0385f0f1eb311fcaf4b813"
+      ],
+      "summaryProviderCalls": 1,
+      "totalProviderCallsIncludingTwoSeedTurns": 5,
+      "actualDesktopSources": {
+        "A": [
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sourceDirectory.js",
+            "sha256": "f6f379f2b17c0514d5e334d38f1c82820d68febd6a2e61632b6ec3077a5efbde"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "35a8bcfb7cc250f805e20cc397c3ddc431e6ca3218375d16b0509e03b282ddcf"
+          }
+        ],
+        "A-reopened": [
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sourceDirectory.js",
+            "sha256": "f6f379f2b17c0514d5e334d38f1c82820d68febd6a2e61632b6ec3077a5efbde"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "35a8bcfb7cc250f805e20cc397c3ddc431e6ca3218375d16b0509e03b282ddcf"
+          }
+        ]
+      },
+      "profileReused": true,
+      "journalAndHistoryPrefixesPreserved": true,
+      "nextRequests": [
+        {
+          "workId": "request_2e7146759b124a7c99da1092d0e04dbb",
+          "requestId": "msg_1795257153380_user_1n0pnxagci",
+          "selection": [
+            "checkpoint_compact_618fb609228797ee9f0385f0f1eb311fcaf4b813",
+            "msg_1795257153380_user_1n0pnxagci"
+          ],
+          "handler": {
+            "roles": [
+              "system",
+              "user",
+              "user"
+            ],
+            "checkpointOccurrences": 1,
+            "contentSha256": [
+              "d11354164fc1862b9567c7107bf082867bb8edde14870a73eb5774bd058455ed",
+              "5a9dd355918c4d57e128330f2e92274e45033ffbd2fa9dd28062d20de7f343f0",
+              "7a5ebf38d0002665ceb3cbfab89bd82e14eaa28331a2d076381da6119023da31"
+            ]
+          },
+          "provider": {
+            "roles": [
+              "system",
+              "user",
+              "user"
+            ],
+            "checkpointOccurrences": 1,
+            "contentSha256": [
+              "d11354164fc1862b9567c7107bf082867bb8edde14870a73eb5774bd058455ed",
+              "5a9dd355918c4d57e128330f2e92274e45033ffbd2fa9dd28062d20de7f343f0",
+              "7a5ebf38d0002665ceb3cbfab89bd82e14eaa28331a2d076381da6119023da31"
+            ]
+          }
+        },
+        {
+          "workId": "request_2964fb404e0d4349a6c2b80b0d0be300",
+          "requestId": "msg_1795257154239_user_fzczf3v2zh",
+          "selection": [
+            "checkpoint_compact_618fb609228797ee9f0385f0f1eb311fcaf4b813",
+            "msg_1795257153380_user_1n0pnxagci",
+            "reply_request_2e7146759b124a7c99da1092d0e04dbb",
+            "msg_1795257154239_user_fzczf3v2zh"
+          ],
+          "handler": {
+            "roles": [
+              "system",
+              "user",
+              "user",
+              "assistant",
+              "user"
+            ],
+            "checkpointOccurrences": 1,
+            "contentSha256": [
+              "d11354164fc1862b9567c7107bf082867bb8edde14870a73eb5774bd058455ed",
+              "5a9dd355918c4d57e128330f2e92274e45033ffbd2fa9dd28062d20de7f343f0",
+              "7a5ebf38d0002665ceb3cbfab89bd82e14eaa28331a2d076381da6119023da31",
+              "64823d90d7751b57b5b1c172823e117af53baf170035b7aea4d6ef07de3aec80",
+              "94e8528b3bc5ff9b779495358196c01ed45689d33703718f4e8446d27c3de0c0"
+            ]
+          },
+          "provider": {
+            "roles": [
+              "system",
+              "user",
+              "user",
+              "assistant",
+              "user"
+            ],
+            "checkpointOccurrences": 1,
+            "contentSha256": [
+              "d11354164fc1862b9567c7107bf082867bb8edde14870a73eb5774bd058455ed",
+              "5a9dd355918c4d57e128330f2e92274e45033ffbd2fa9dd28062d20de7f343f0",
+              "7a5ebf38d0002665ceb3cbfab89bd82e14eaa28331a2d076381da6119023da31",
+              "64823d90d7751b57b5b1c172823e117af53baf170035b7aea4d6ef07de3aec80",
+              "94e8528b3bc5ff9b779495358196c01ed45689d33703718f4e8446d27c3de0c0"
+            ]
+          }
+        }
+      ],
+      "case": "same-1",
+      "processExits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "A-reopened": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      }
+    },
+    {
+      "rawEvidence": "/home/jenn/ns-cf-R2TPTm/vcp-integration-kzWRNc/compact-e2e/evidence.json",
+      "rawEvidenceSha256": "47d439de6c77db906b3a18fbc1aac0ad2d791f640849c0d568f586650add4593",
+      "failures": [],
+      "ipcErrors": [],
+      "intents": [
+        {
+          "id": "compact_c37a53915a9aaf2ba4891c3bd1f638b223d93814",
+          "principal": "desktop:deviceA",
+          "message_id": "checkpoint_compact_c37a53915a9aaf2ba4891c3bd1f638b223d93814",
+          "committed_seq": 9,
+          "work_id": null,
+          "state": "committed"
+        }
+      ],
+      "sharedReceiptOps": [
+        {
+          "rowid": 29,
+          "principal": "desktop:deviceA",
+          "op_id": "compact_prepare_9a56cc07-52d3-41a4-98af-c9e67ab0ecb2",
+          "result": {
+            "id": "compact_c37a53915a9aaf2ba4891c3bd1f638b223d93814",
+            "messageId": "checkpoint_compact_c37a53915a9aaf2ba4891c3bd1f638b223d93814",
+            "sourceHash": "7cf7d7b8685ef6c59ed5c7cfbb3490476a287ab5d9d324bc927c384fa327e7a1",
+            "head": 8,
+            "workId": null
+          }
+        },
+        {
+          "rowid": 30,
+          "principal": "desktop:deviceA",
+          "op_id": "compact_commit_compact_c37a53915a9aaf2ba4891c3bd1f638b223d93814",
+          "result": {
+            "success": true,
+            "messageId": "checkpoint_compact_c37a53915a9aaf2ba4891c3bd1f638b223d93814",
+            "seq": 9
+          }
+        }
+      ],
+      "sharedSessionWorks": [
+        {
+          "id": "request_6cfc3f339b5541a0b4c6ec43234f8323",
+          "request_id": "msg_1795257153193_user_obcmlw2hyp",
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "user_message_id": "msg_1795257153193_user_obcmlw2hyp",
+          "reply_message_id": "reply_request_6cfc3f339b5541a0b4c6ec43234f8323"
+        },
+        {
+          "id": "request_fa4a4b1c83cc44c8a180577549f5ad67",
+          "request_id": "msg_1795257154060_user_23m8u0ls11",
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "user_message_id": "msg_1795257154060_user_23m8u0ls11",
+          "reply_message_id": "reply_request_fa4a4b1c83cc44c8a180577549f5ad67"
+        }
+      ],
+      "checkpoints": [
+        "checkpoint_compact_c37a53915a9aaf2ba4891c3bd1f638b223d93814"
+      ],
+      "summaryProviderCalls": 1,
+      "totalProviderCallsIncludingTwoSeedTurns": 5,
+      "actualDesktopSources": {
+        "A": [
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sourceDirectory.js",
+            "sha256": "f6f379f2b17c0514d5e334d38f1c82820d68febd6a2e61632b6ec3077a5efbde"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "35a8bcfb7cc250f805e20cc397c3ddc431e6ca3218375d16b0509e03b282ddcf"
+          }
+        ],
+        "A-reopened": [
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sourceDirectory.js",
+            "sha256": "f6f379f2b17c0514d5e334d38f1c82820d68febd6a2e61632b6ec3077a5efbde"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "35a8bcfb7cc250f805e20cc397c3ddc431e6ca3218375d16b0509e03b282ddcf"
+          }
+        ]
+      },
+      "profileReused": true,
+      "journalAndHistoryPrefixesPreserved": true,
+      "nextRequests": [
+        {
+          "workId": "request_6cfc3f339b5541a0b4c6ec43234f8323",
+          "requestId": "msg_1795257153193_user_obcmlw2hyp",
+          "selection": [
+            "checkpoint_compact_c37a53915a9aaf2ba4891c3bd1f638b223d93814",
+            "msg_1795257153193_user_obcmlw2hyp"
+          ],
+          "handler": {
+            "roles": [
+              "system",
+              "user",
+              "user"
+            ],
+            "checkpointOccurrences": 1,
+            "contentSha256": [
+              "d11354164fc1862b9567c7107bf082867bb8edde14870a73eb5774bd058455ed",
+              "5a9dd355918c4d57e128330f2e92274e45033ffbd2fa9dd28062d20de7f343f0",
+              "7a5ebf38d0002665ceb3cbfab89bd82e14eaa28331a2d076381da6119023da31"
+            ]
+          },
+          "provider": {
+            "roles": [
+              "system",
+              "user",
+              "user"
+            ],
+            "checkpointOccurrences": 1,
+            "contentSha256": [
+              "d11354164fc1862b9567c7107bf082867bb8edde14870a73eb5774bd058455ed",
+              "5a9dd355918c4d57e128330f2e92274e45033ffbd2fa9dd28062d20de7f343f0",
+              "7a5ebf38d0002665ceb3cbfab89bd82e14eaa28331a2d076381da6119023da31"
+            ]
+          }
+        },
+        {
+          "workId": "request_fa4a4b1c83cc44c8a180577549f5ad67",
+          "requestId": "msg_1795257154060_user_23m8u0ls11",
+          "selection": [
+            "checkpoint_compact_c37a53915a9aaf2ba4891c3bd1f638b223d93814",
+            "msg_1795257153193_user_obcmlw2hyp",
+            "reply_request_6cfc3f339b5541a0b4c6ec43234f8323",
+            "msg_1795257154060_user_23m8u0ls11"
+          ],
+          "handler": {
+            "roles": [
+              "system",
+              "user",
+              "user",
+              "assistant",
+              "user"
+            ],
+            "checkpointOccurrences": 1,
+            "contentSha256": [
+              "d11354164fc1862b9567c7107bf082867bb8edde14870a73eb5774bd058455ed",
+              "5a9dd355918c4d57e128330f2e92274e45033ffbd2fa9dd28062d20de7f343f0",
+              "7a5ebf38d0002665ceb3cbfab89bd82e14eaa28331a2d076381da6119023da31",
+              "64823d90d7751b57b5b1c172823e117af53baf170035b7aea4d6ef07de3aec80",
+              "94e8528b3bc5ff9b779495358196c01ed45689d33703718f4e8446d27c3de0c0"
+            ]
+          },
+          "provider": {
+            "roles": [
+              "system",
+              "user",
+              "user",
+              "assistant",
+              "user"
+            ],
+            "checkpointOccurrences": 1,
+            "contentSha256": [
+              "d11354164fc1862b9567c7107bf082867bb8edde14870a73eb5774bd058455ed",
+              "5a9dd355918c4d57e128330f2e92274e45033ffbd2fa9dd28062d20de7f343f0",
+              "7a5ebf38d0002665ceb3cbfab89bd82e14eaa28331a2d076381da6119023da31",
+              "64823d90d7751b57b5b1c172823e117af53baf170035b7aea4d6ef07de3aec80",
+              "94e8528b3bc5ff9b779495358196c01ed45689d33703718f4e8446d27c3de0c0"
+            ]
+          }
+        }
+      ],
+      "case": "same-2",
+      "processExits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "A-reopened": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      }
+    },
+    {
+      "rawEvidence": "/home/jenn/ns-cf-JcrftF/vcp-integration-ACbh7Z/compact-cross-device/evidence.json",
+      "rawEvidenceSha256": "8235225717200708441bfc4b5a2ef45187c86d535ef03d6bac82a542cd2f21a2",
+      "failures": [],
+      "ipcErrors": [],
+      "intents": [
+        {
+          "id": "compact_5b41df6f1f523d71a0d7b1a9fe89dc28c87715fb",
+          "principal": "desktop:deviceA",
+          "message_id": "checkpoint_compact_5b41df6f1f523d71a0d7b1a9fe89dc28c87715fb",
+          "committed_seq": 9,
+          "work_id": null,
+          "state": "committed"
+        }
+      ],
+      "sharedReceiptOps": [
+        {
+          "rowid": 29,
+          "principal": "desktop:deviceA",
+          "op_id": "compact_prepare_7172a8e4-e8ef-49e0-b9f7-e23f1254fb78",
+          "result": {
+            "id": "compact_5b41df6f1f523d71a0d7b1a9fe89dc28c87715fb",
+            "messageId": "checkpoint_compact_5b41df6f1f523d71a0d7b1a9fe89dc28c87715fb",
+            "sourceHash": "19a9754623af783b05f64275ae327877bcb30fd142c522585baee82678871d48",
+            "head": 8,
+            "workId": null
+          }
+        },
+        {
+          "rowid": 30,
+          "principal": "desktop:deviceA",
+          "op_id": "compact_commit_compact_5b41df6f1f523d71a0d7b1a9fe89dc28c87715fb",
+          "result": {
+            "success": true,
+            "messageId": "checkpoint_compact_5b41df6f1f523d71a0d7b1a9fe89dc28c87715fb",
+            "seq": 9
+          }
+        }
+      ],
+      "sharedSessionWorks": [
+        {
+          "id": "request_666c3cbef9ca45aa971beaf325d27a76",
+          "request_id": "msg_1795257154378_user_d1a46xtx21",
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "user_message_id": "msg_1795257154378_user_d1a46xtx21",
+          "reply_message_id": "reply_request_666c3cbef9ca45aa971beaf325d27a76"
+        }
+      ],
+      "checkpoints": [
+        "checkpoint_compact_5b41df6f1f523d71a0d7b1a9fe89dc28c87715fb"
+      ],
+      "summaryProviderCalls": 1,
+      "totalProviderCallsIncludingTwoSeedTurns": 5,
+      "actualDesktopSources": {
+        "B": [
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sourceDirectory.js",
+            "sha256": "f6f379f2b17c0514d5e334d38f1c82820d68febd6a2e61632b6ec3077a5efbde"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "35a8bcfb7cc250f805e20cc397c3ddc431e6ca3218375d16b0509e03b282ddcf"
+          }
+        ],
+        "A": [
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sourceDirectory.js",
+            "sha256": "f6f379f2b17c0514d5e334d38f1c82820d68febd6a2e61632b6ec3077a5efbde"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "35a8bcfb7cc250f805e20cc397c3ddc431e6ca3218375d16b0509e03b282ddcf"
+          }
+        ],
+        "B-reopened": [
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sourceDirectory.js",
+            "sha256": "f6f379f2b17c0514d5e334d38f1c82820d68febd6a2e61632b6ec3077a5efbde"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "35a8bcfb7cc250f805e20cc397c3ddc431e6ca3218375d16b0509e03b282ddcf"
+          }
+        ],
+        "B-recovered": [
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sourceDirectory.js",
+            "sha256": "f6f379f2b17c0514d5e334d38f1c82820d68febd6a2e61632b6ec3077a5efbde"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "35a8bcfb7cc250f805e20cc397c3ddc431e6ca3218375d16b0509e03b282ddcf"
+          }
+        ]
+      },
+      "aExitedBeforeBReopened": true,
+      "originalBProfileReused": true,
+      "lostReceipt": {
+        "status": 200,
+        "requestId": "msg_1795257154378_user_d1a46xtx21",
+        "workId": "request_666c3cbef9ca45aa971beaf325d27a76",
+        "device": "deviceB",
+        "dropped": true
+      },
+      "recovery": {
+        "requestId": "msg_1795257154378_user_d1a46xtx21",
+        "workId": "request_666c3cbef9ca45aa971beaf325d27a76",
+        "status": 200,
+        "device": "deviceB",
+        "response": {
+          "id": "request_666c3cbef9ca45aa971beaf325d27a76",
+          "requestId": "msg_1795257154378_user_d1a46xtx21",
+          "state": "completed"
+        }
+      },
+      "sendPosts": 1,
+      "windowChecks": [
+        {
+          "stage": "handler",
+          "checkpointCount": 1,
+          "leakedCompactedText": [],
+          "hasNewInput": true
+        },
+        {
+          "stage": "tool-request",
+          "checkpointCount": 1,
+          "leakedCompactedText": [],
+          "hasNewInput": true
+        },
+        {
+          "stage": "continuation",
+          "checkpointCount": 1,
+          "leakedCompactedText": [],
+          "hasNewInput": true
+        }
+      ],
+      "recoveredUi": {
+        "messageIds": [
+          "checkpoint_compact_5b41df6f1f523d71a0d7b1a9fe89dc28c87715fb",
+          "msg_1795257154378_user_d1a46xtx21",
+          "reply_request_666c3cbef9ca45aa971beaf325d27a76"
+        ],
+        "pendingHistoryError": false,
+        "pendingReceipt": false
+      },
+      "invocations": [
+        {
+          "invocation_id": "c637336b-d3ea-43b4-9695-cfb88e264f5d",
+          "execution_id": "request_666c3cbef9ca45aa971beaf325d27a76",
+          "native_request_id": "request_666c3cbef9ca45aa971beaf325d27a76",
+          "plugin_name": "OrdinaryToolCounter",
+          "state": "returned"
+        }
+      ],
+      "toolInvocations": [
+        {
+          "marker": "ORDINARY_TOOL_LOCAL"
+        }
+      ],
+      "case": "cross-1",
+      "processExits": {
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B-reopened": {
+          "code": 0,
+          "signal": null
+        },
+        "B-recovered": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      }
+    }
+  ]
+}
