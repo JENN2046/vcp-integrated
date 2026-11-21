@@ -1,6 +1,7 @@
 import '../tavernRulesEngine.js';
 import { stripHiddenToolResults } from '../renderer/toolResultRegions.js';
 import { effectiveContextHistory, isContextCheckpoint } from './contextCompactionState.js';
+import { applyContextRules } from './historyWindow/tavernContext.mjs';
 
 function requireDependency(value, name) {
     if (!value) throw new Error(`SingleChatRequestOrchestrator requires ${name}`);
@@ -282,20 +283,6 @@ function applySystemRules(systemPrompt, rules, engine) {
 function applyUserRules(content, rules, engine) {
     if (!engine || rules.length === 0) return normalizeContentParts(content);
     return updateFirstTextPart(content, text => engine.applyUserSuffix(text, rules, 'agent'));
-}
-
-function applyContextRules(messages, rules, engine) {
-    if (!engine || rules.length === 0) return messages;
-    const systemMessages = messages.filter(message => message.role === 'system');
-    const conversationMessages = messages.filter(message => message.role !== 'system');
-    const injected = engine.applyContextInject(conversationMessages, rules, 'agent', {
-        makeMessage: (role, text) => ({
-            role,
-            content: [{ type: 'text', text }],
-            __tavernInjected: true,
-        }),
-    });
-    return [...systemMessages, ...injected];
 }
 
 // {{VCPChatWorkSpace}} / {{VCPChatWorkSpace:文件夹名}}：由主进程按工作区索引展开为目录树。

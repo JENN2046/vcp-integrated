@@ -1,0 +1,56 @@
+{
+  "environment": "Linux Electron / isolated profiles / loopback synthetic Provider",
+  "beforeAdmission": {
+    "httpStatus": 409,
+    "providerRequests": 0,
+    "sharedWorks": 0,
+    "journalRows": 0,
+    "localIntent": {
+      "phase": "local_pending",
+      "rejected": "SHARED_CONTEXT_CHANGED",
+      "bodyId": "msg_1795246742727_user_nx9ntf1jw3",
+      "admitStarted": false,
+      "content": "Send-recovery compare 01: keep this draft."
+    },
+    "sameIntentAfterReopen": true,
+    "visibleAfterReopen": true
+  },
+  "lostReceipt": {
+    "inputId": "msg_1795246750294_user_20nvmeijfs",
+    "admittedWork": "request_c498e821621c415686cb819b904034c8",
+    "lostHttpStatus": 200,
+    "dropped": true,
+    "recoveredWork": "request_c498e821621c415686cb819b904034c8",
+    "lookupStatus": 200,
+    "attempts": 1,
+    "providerRequests": 1,
+    "journal": [
+      {
+        "id": "msg_1795246750294_user_20nvmeijfs",
+        "role": "user"
+      },
+      {
+        "id": "reply_request_c498e821621c415686cb819b904034c8",
+        "role": "assistant"
+      }
+    ]
+  },
+  "partialThenDisconnected": {
+    "workId": "request_24794273a2e74d86bfeaf5ca579453b3",
+    "workState": "review_required",
+    "nativeState": "unknown",
+    "partialVisibleAfterReopen": true,
+    "finalVisibleAfterReopen": false,
+    "history": [
+      {
+        "id": "msg_1795246759184_user_vr6riqctpk",
+        "role": "user"
+      }
+    ],
+    "counts": {
+      "sessionPosts": 1,
+      "cancelPosts": 0,
+      "providerAttempts": 1
+    }
+  }
+}

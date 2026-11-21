@@ -1,5 +1,6 @@
 'use strict';
 const {effectiveContextHistory,isContextCheckpoint}=require('@vcp/native-history-window');
+const {applyContextRules}=require('@vcp/native-history-window/tavern-context');
 const {attachTimestampMetadata}=require('../nativeRules/modules/chat/requestMetadata');
 const {stripHiddenToolResults}=require('../nativeRules/modules/renderer/toolResultRegions');
 const tavern=require('../nativeRules/modules/tavernRulesEngine');
@@ -18,7 +19,7 @@ async function effectiveRequest(history,config,currentId,buildContent=async m=>[
     }
     const base=require('./snapshotPrompt').snapshotPrompt(config);
     const prompt=tavern.applySystemSuffix(base,rules,'agent');
-    const injected=tavern.applyContextInject(messages,rules,'agent',{makeMessage:(role,text)=>({role,content:[{type:'text',text}],__tavernInjected:true})});
-    return [...(prompt.trim()?[{role:'system',content:prompt}]:[]),...injected];
+    if(prompt.trim())messages.unshift({role:'system',content:prompt});
+    return applyContextRules(messages,rules,tavern);
 }
 module.exports={effectiveRequest};

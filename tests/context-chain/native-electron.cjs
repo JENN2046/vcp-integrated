@@ -7,7 +7,7 @@ const evidence = process.env.NS_CONTEXT_HANDLER_EVIDENCE;
 if (!evidence || !path.isAbsolute(evidence)) throw Error('Native context capture requires an absolute evidence path');
 
 const coverageFiles = ['contextCompactionState.js','historyWindow/index.mjs',
-    'chatContextPipeline.js','singleChatRequestOrchestrator.js','chatManager.js'];
+    'chatContextPipeline.js','historyWindow/tavernContext.mjs','tavernRulesEngine.js','singleChatRequestOrchestrator.js','chatManager.js'];
 
 function debuggerFor(window) {
     if (!window || window.isDestroyed()) throw Error('The native context window is unavailable');

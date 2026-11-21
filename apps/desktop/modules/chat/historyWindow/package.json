@@ -3,5 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "license": "CC-BY-NC-SA-4.0",
-  "exports": "./index.mjs"
+  "exports": {
+    ".": "./index.mjs",
+    "./tavern-context": "./tavernContext.mjs"
+  }
 }

@@ -32,3 +32,29 @@ test('shared assembly reads content only for retained non-checkpoint rows and le
     assert.deepEqual(packet.slice(1).map(message => message.content[0].text), ['latest','reply','unsupported-version','hello']);
     assert.deepEqual(history, before);
 });
+
+test('a historical system message does not consume single-chat Tavern injection depth', async () => {
+    const { assembleRequestMessages } = await import('../../apps/desktop/modules/chat/chatContextPipeline.js');
+    const engine = server('@vcp/core-rules/tavern');
+    const history = [
+        { role: 'user', id: 'first', content: 'first', timestamp: 1 },
+        { role: 'system', id: 'notice', content: 'notice', timestamp: 2 },
+        { role: 'user', id: 'current', content: 'last', timestamp: 3 },
+    ];
+    const rules = [{ type:'context_inject', role:'assistant', scope:'agent', enabled:true, wrap:false, depth:2, content:'depth two' }];
+    const config = { systemPrompt:'prompt', tavernRules:rules };
+    const assemble = tavernRules => assembleRequestMessages({
+        context:{agentId:'agent', topicId:'topic'}, agentConfig:config, history, electronAPI:{},
+        tavernRules, tavernEngine:engine, currentUserMessageId:'current',
+    }).then(result => result.messagesForVCP);
+    const before = structuredClone(history);
+    const native = await assemble(rules);
+    const shared = await effectiveRequest(history, config, 'current');
+    const body = row => typeof row.content === 'string' ? row.content : row.content[0].text;
+    assert.deepEqual(native.map(body), ['prompt', 'notice', 'depth two', 'first', 'last']);
+    assert.deepEqual(shared, native);
+    assert.deepEqual(shared.map(row => row.__vcpchatTimestampMeta?.messageId ?? null),
+        [null, 'notice', null, 'first', 'current']);
+    assert.deepEqual(await effectiveRequest(history, { ...config, tavernRules:[] }, 'current'), await assemble([]));
+    assert.deepEqual(history, before);
+});

@@ -10,7 +10,11 @@ const { start } = require('./server-fixture.cjs');
 const execute = promisify(execFile);
 
 async function main() {
-    const fixture = await start();
+    const [mode, baseline] = process.argv.slice(2);
+    assert.ok(!mode || mode === 'tavern-depth', 'unknown context chain scenario');
+    assert.ok(!baseline || (mode === 'tavern-depth' && baseline === '--baseline'), 'unknown context chain option');
+    const contract = mode ? require('./tavern-depth.cjs') : require('./input.json');
+    const fixture = await start({ contract });
     const file = name => path.join(fixture.out, name);
     const snapshot = name => fs.writeFile(file(name), JSON.stringify(fixture.snapshot(), null, 2) + '\n', { mode: 0o600 });
     const run = async (script, ...args) => {
@@ -21,13 +25,14 @@ async function main() {
         return stdout;
     };
     try {
-        await run('native-run.cjs', path.join(__dirname, 'input.json'), fixture.completionUrl, file('native.json'), fixture.cert);
+        await fs.writeFile(file('input.json'), JSON.stringify(contract, null, 2) + '\n', { mode: 0o600 });
+        await run('native-run.cjs', file('input.json'), fixture.completionUrl, file('native.json'), fixture.cert);
         await run('server-submit.cjs', file('ready.json'));
         await fixture.waitUntil(() => fixture.snapshot().work[0]?.state === 'completed', 'shared terminal');
         await snapshot('before-replay.json');
         await run('server-submit.cjs', file('ready.json'), '--replay');
         await snapshot('snapshot.json');
-        const verified = JSON.parse(await run('server-verify.cjs', fixture.out));
+        const verified = JSON.parse(await run('server-verify.cjs', fixture.out, ...process.argv.slice(2)));
         assert.ok(verified.fullSyntheticBodies && verified.replay?.sameWork);
         await fs.writeFile(file('verified.json'), JSON.stringify(verified, null, 2) + '\n');
     } finally {

@@ -11,6 +11,23 @@ if (!file || !input) throw Error('Context fixture capture requires its isolated 
 const original = Module._load;
 const observed = new WeakSet();
 const selectors = new WeakSet();
+const tavern = new WeakMap();
+function observeTavern(loaded, method, resolved) {
+    if (tavern.has(loaded)) return tavern.get(loaded);
+    const operation = loaded[method];
+    const sha256 = createHash('sha256').update(fs.readFileSync(resolved)).digest('hex');
+    const layout = messages => messages.map(row => [row.role, row.__tavernInjected === true]);
+    const view = { ...loaded, [method](messages, ...args) {
+        const result = operation(messages, ...args);
+        fs.appendFileSync(file, JSON.stringify({
+            kind:'tavern-context', method, module:path.relative(process.cwd(),resolved), sha256,
+            before:layout(messages), after:layout(result),
+        }) + '\n', {mode:0o600});
+        return result;
+    } };
+    tavern.set(loaded, view);
+    return view;
+}
 Module._load = function (request, parent, isMain) {
     const loaded = original.call(this, request, parent, isMain);
     if (parent?.filename?.endsWith('/mobile/effectiveContext.js') && typeof loaded?.effectiveContextHistory === 'function' && !selectors.has(loaded)) {
@@ -27,6 +44,12 @@ Module._load = function (request, parent, isMain) {
                 beforeIds:history.map(row=>row.id), afterIds:selected.map(row=>row.id) }) + '\n', {mode:0o600});
             return selected;
         } };
+    }
+    if (parent?.filename?.endsWith('/mobile/effectiveContext.js')) {
+        const method = request === '../nativeRules/modules/tavernRulesEngine' ? 'applyContextInject' : 'applyContextRules';
+        if (typeof loaded?.[method] === 'function') {
+            return observeTavern(loaded, method, Module._resolveFilename(request, parent));
+        }
     }
     if (request !== './modules/chatCompletionHandler.js' || path.basename(parent?.filename || '') !== 'server.js' ||
         typeof loaded?.prototype?.handle !== 'function' || observed.has(loaded)) return loaded;

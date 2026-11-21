@@ -16,7 +16,7 @@ const prior = contract.history;
 const sharedInput = contract.input;
 const nativeInput = contract.input;
 const sha = bytes => require('node:crypto').createHash('sha256').update(bytes).digest('hex');
-async function seedContext(f, source, out, history) {
+async function seedContext(f, source, out, history, contract) {
     assert.ok(contract.agent && Number.isFinite(contract.agent.temperature));
     const { AttachmentStore } = require(path.join(root,'apps/server/Plugin/NativeSync/mobile/attachments'));
     const { envelopeFor } = require(path.join(root,'apps/server/Plugin/NativeSync/sync/metadata'));
@@ -62,7 +62,7 @@ async function start(options = {}) {
     fs.mkdirSync(evidenceRoot,{recursive:true});
     const out = fs.mkdtempSync(path.join(evidenceRoot,'run-'));
     fs.chmodSync(out, 0o700);
-    const { prior: seed = prior } = options;
+    const { contract: spec = contract, prior: seed = spec.history } = options;
     const cert = path.join(out,'cert.pem'), key = path.join(out,'key.pem');
     execFileSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=VCP context fixture',
         '-addext','subjectAltName=IP:127.0.0.1','-out',cert,'-keyout',key], {stdio:'ignore'});
@@ -72,12 +72,12 @@ async function start(options = {}) {
     try {
         service = await startService({out,candidate:root,cert,key,trace(){},waitUntil,mode:'context-chain',
             observedContext:{
-                seedCount:seed.length,preload,handlerLog,reply:contract.reply,input:contract.input,
-                seed:(f,topic,out)=>seedContext(f,topic,out,seed),
+                seedCount:seed.length,preload,handlerLog,reply:spec.reply,input:spec.input,
+                seed:(f,topic,out)=>seedContext(f,topic,out,seed,spec),
                 recordProvider(route,body) {
                     const current=Array.isArray(body.messages)?body.messages.findLast(row=>row.role==='user')?.content:null;
                     const text=typeof current==='string'?current:Array.isArray(current)?current.map(part=>part?.text||'').join(''):null;
-                    if(!text?.startsWith(contract.input))return;
+                    if(!text?.startsWith(spec.input))return;
                     const { requestId, messages, model, stream, temperature, max_tokens, tools, tool_choice }=body;
                     fs.appendFileSync(providerLog,JSON.stringify({ route,requestId,messages,model,stream,temperature,max_tokens,tools,tool_choice,body })+'\n',
                         {mode:0o600});
@@ -92,8 +92,8 @@ async function start(options = {}) {
     const topic = service.topics.preSubmit;
     const ready = { out, origin:service.origin, completionUrl:service.origin+'/v1/chat/completions', cert,
         plainLoopbackOrigin:service.wsOrigin, handlerLog, providerLog, profileSeed:path.join(out,'seed','desktopA'),
-        stageHost:path.join(out,'runtime-box'), sharedInput, nativeInput, prior:seed, topic,
-        agent:contract.agentName, descriptor:service.descriptors.A.preSubmit, backendPid:service.backendPid };
+        stageHost:path.join(out,'runtime-box'), sharedInput:spec.input, nativeInput:spec.input, prior:seed, topic,
+        agent:spec.agentName, descriptor:service.descriptors.A.preSubmit, backendPid:service.backendPid };
     const snapshot = () => ({
         handler:parseRows(handlerLog), provider:parseRows(providerLog),
         attachment:JSON.parse(fs.readFileSync(path.join(out,'attachment-proof.json'),'utf8')),

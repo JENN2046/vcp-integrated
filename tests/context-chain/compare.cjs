@@ -50,14 +50,36 @@ function canonical(path, local) {
     return {handler, provider};
 }
 
+function reorderBaselineTavernDepth({ handler, provider }) {
+    // Baseline counted a historical system row toward depth and left it in place.
+    // This is the only permitted difference when comparing the two shared bodies.
+    const oldIndexByNewIndex = [0, 4, 2, 1, 3, 5, 6];
+    for (const body of [handler, provider]) {
+        assert.equal(body.messages.length, oldIndexByNewIndex.length);
+        body.messages = oldIndexByNewIndex.map(index => body.messages[index]);
+    }
+    const bindings = handler.vcpchatExtensions.messageTimestampBindings;
+    for (const binding of bindings) {
+        binding.sentMessageIndex = oldIndexByNewIndex.indexOf(binding.sentMessageIndex);
+    }
+    bindings.sort((a, b) => a.sentMessageIndex - b.sentMessageIndex);
+}
+
 const [beforeFile, afterFile] = process.argv.slice(2);
 if (!beforeFile || !afterFile) throw Error('Usage: node compare.cjs BEFORE.json AFTER.json');
 const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const before = read(beforeFile), after = read(afterFile);
 assert.equal(before.inputSha256, after.inputSha256);
+assert.equal(before.scenario, after.scenario);
 for (const variant of ['native','shared']) {
     const a = canonical(before.paths[variant], variant === 'native');
     const b = canonical(after.paths[variant], variant === 'native');
+    const depthChanged = before.scenario === 'tavern-depth' && variant === 'shared';
+    if (depthChanged) {
+        assert.notDeepEqual(b, a, 'baseline shared depth divergence was not observed');
+        reorderBaselineTavernDepth(a);
+    }
     assert.deepEqual(b, a, variant + ' request changed');
-    console.log(variant + ': handler and Provider bodies match after canonicalization');
+    console.log(variant + ': handler and Provider bodies match after canonicalization' +
+        (depthChanged ? ' and the expected Tavern depth reorder' : ''));
 }

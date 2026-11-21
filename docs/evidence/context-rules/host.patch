@@ -1,0 +1,88 @@
+diff --git a/apps/desktop/modules/chat/chatContextPipeline.js b/apps/desktop/modules/chat/chatContextPipeline.js
+index 13a5196..9186949 100644
+--- a/apps/desktop/modules/chat/chatContextPipeline.js
++++ b/apps/desktop/modules/chat/chatContextPipeline.js
+@@ -1,6 +1,7 @@
+ import '../tavernRulesEngine.js';
+ import { stripHiddenToolResults } from '../renderer/toolResultRegions.js';
+ import { effectiveContextHistory, isContextCheckpoint } from './contextCompactionState.js';
++import { applyContextRules } from './historyWindow/tavernContext.mjs';
+ 
+ function requireDependency(value, name) {
+     if (!value) throw new Error(`SingleChatRequestOrchestrator requires ${name}`);
+@@ -284,20 +285,6 @@ function applyUserRules(content, rules, engine) {
+     return updateFirstTextPart(content, text => engine.applyUserSuffix(text, rules, 'agent'));
+ }
+ 
+-function applyContextRules(messages, rules, engine) {
+-    if (!engine || rules.length === 0) return messages;
+-    const systemMessages = messages.filter(message => message.role === 'system');
+-    const conversationMessages = messages.filter(message => message.role !== 'system');
+-    const injected = engine.applyContextInject(conversationMessages, rules, 'agent', {
+-        makeMessage: (role, text) => ({
+-            role,
+-            content: [{ type: 'text', text }],
+-            __tavernInjected: true,
+-        }),
+-    });
+-    return [...systemMessages, ...injected];
+-}
+-
+ // {{VCPChatWorkSpace}} / {{VCPChatWorkSpace:文件夹名}}：由主进程按工作区索引展开为目录树。
+ // 无占位符时不发 IPC；展开失败保留原文，不阻断发送。
+ const WORKSPACE_PLACEHOLDER_HINT = '{{VCPChatWorkSpace';
+diff --git a/apps/desktop/modules/chat/historyWindow/package.json b/apps/desktop/modules/chat/historyWindow/package.json
+index a253d16..67f942f 100644
+--- a/apps/desktop/modules/chat/historyWindow/package.json
++++ b/apps/desktop/modules/chat/historyWindow/package.json
+@@ -3,5 +3,8 @@
+   "version": "1.0.0",
+   "private": true,
+   "license": "CC-BY-NC-SA-4.0",
+-  "exports": "./index.mjs"
++  "exports": {
++    ".": "./index.mjs",
++    "./tavern-context": "./tavernContext.mjs"
++  }
+ }
+diff --git a/apps/desktop/modules/chat/historyWindow/tavernContext.mjs b/apps/desktop/modules/chat/historyWindow/tavernContext.mjs
+new file mode 100644
+index 0000000..6d52b32
+--- /dev/null
++++ b/apps/desktop/modules/chat/historyWindow/tavernContext.mjs
+@@ -0,0 +1,14 @@
++// Tavern depth is measured within the conversation, after the history window is selected.
++export function applyContextRules(messages, rules, engine) {
++    if (!engine || rules.length === 0) return messages;
++    const systemMessages = messages.filter(message => message.role === 'system');
++    const conversationMessages = messages.filter(message => message.role !== 'system');
++    const injected = engine.applyContextInject(conversationMessages, rules, 'agent', {
++        makeMessage: (role, text) => ({
++            role,
++            content: [{ type: 'text', text }],
++            __tavernInjected: true,
++        }),
++    });
++    return [...systemMessages, ...injected];
++}
+diff --git a/apps/server/Plugin/NativeSync/mobile/effectiveContext.js b/apps/server/Plugin/NativeSync/mobile/effectiveContext.js
+index 481d882..2a60fc5 100644
+--- a/apps/server/Plugin/NativeSync/mobile/effectiveContext.js
++++ b/apps/server/Plugin/NativeSync/mobile/effectiveContext.js
+@@ -1,5 +1,6 @@
+ 'use strict';
+ const {effectiveContextHistory,isContextCheckpoint}=require('@vcp/native-history-window');
++const {applyContextRules}=require('@vcp/native-history-window/tavern-context');
+ const {attachTimestampMetadata}=require('../nativeRules/modules/chat/requestMetadata');
+ const {stripHiddenToolResults}=require('../nativeRules/modules/renderer/toolResultRegions');
+ const tavern=require('../nativeRules/modules/tavernRulesEngine');
+@@ -18,7 +19,7 @@ async function effectiveRequest(history,config,currentId,buildContent=async m=>[
+     }
+     const base=require('./snapshotPrompt').snapshotPrompt(config);
+     const prompt=tavern.applySystemSuffix(base,rules,'agent');
+-    const injected=tavern.applyContextInject(messages,rules,'agent',{makeMessage:(role,text)=>({role,content:[{type:'text',text}],__tavernInjected:true})});
+-    return [...(prompt.trim()?[{role:'system',content:prompt}]:[]),...injected];
++    if(prompt.trim())messages.unshift({role:'system',content:prompt});
++    return applyContextRules(messages,rules,tavern);
+ }
+ module.exports={effectiveRequest};
