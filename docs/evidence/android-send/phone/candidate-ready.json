@@ -1,0 +1,22 @@
+{
+  "secure": true,
+  "origin": "https://127.0.0.1:18443",
+  "bundle": "/mobile/assets/index-CEYqWIUX.js",
+  "paired": true,
+  "visible": true,
+  "connection": "已连接",
+  "selectedAgent": "Synthetic lost receipt",
+  "selectedTopic": "shared_2cc01cdc6c7c434e8ff520bef729e725",
+  "progress": null,
+  "text": "",
+  "editable": true,
+  "sendEnabled": false,
+  "retryEnabled": false,
+  "files": [],
+  "status": "中央会话已更新",
+  "attachmentPreview": null,
+  "pending": null,
+  "accepted": null,
+  "jobs": [],
+  "messages": []
+}

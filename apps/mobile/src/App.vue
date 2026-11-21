@@ -12,17 +12,17 @@ import {createHistoryCache,historyCacheKey} from './historyCache.js';
 import {consumePairingLink} from './pairingLink.js';
 import {uploadAttachment} from './attachmentUpload.js';
 import {readAttachment,saveAttachment} from './attachmentRead.js';
-import {createSubmissionRecovery,restoreRejectedDraft,validSessionRecovery,SUBMISSION_STORAGE_KEY} from './submissionRecovery.js';
+import {createSubmissionRecovery,rejectedDraftFiles,restoreRejectedDraft,validSessionRecovery,SUBMISSION_STORAGE_KEY} from './submissionRecovery.js';
 import {projectNativeWork,verifyNativeResult,nativeTaskLabels,toolLabels,resultHash} from './nativeTasks.js';
 import {createSharedSessionObservers,sharedSessionPreviews} from './sharedSessions.js';
 const attachmentPager=createAttachmentStatusPager(),historyCache=createHistoryCache();
 const executionPager=createExecutionPager(),jobsInfo=ref(null),jobsError=ref('');
 const attachmentStates=ref({}),reviewChecks=ref({}),invitedAgent=ref('');
 const attachmentPreview=ref(null),attachmentDialog=ref(null);let attachmentReadRequest=0,attachmentReadController=null;
-// Unsent drafts belong to this page and one entry/owner/topic. They never enter
-// the durable submission store until the existing explicit send path is used.
+// Ordinary drafts live in this page. Verified rejections also keep editable
+// text and uploaded attachment references in the device recovery store.
 const drafts=new Map(),composerDraft=ref({text:'',files:[],revision:0});let composerScope='';
-const text=computed({get:()=>composerDraft.value.text,set:value=>{composerDraft.value.text=value;composerDraft.value.revision++;}});
+const text=computed({get:()=>composerDraft.value.text,set:value=>{composerDraft.value.text=value;composerDraft.value.revision++;saveDraftEdit(composerDraft.value);}});
 const pendingFiles=computed({get:()=>composerDraft.value.files,set:value=>{composerDraft.value.files=value;}});
 const nativeResult=ref(null),nativeResultPanel=ref(null);let nativeResultRequest=0;
 let incomingPairing=consumePairingLink({location:window.location,history:window.history,secureContext:window.isSecureContext});
@@ -82,16 +82,51 @@ const topicSearch=ref('');
 const visibleTopics=computed(()=>topics.value.filter(t=>sourceMatches(t)&&ownerKey(t)===agentId.value));
 const searchedTopics=computed(()=>{const query=topicSearch.value.trim().toLocaleLowerCase();return query?visibleTopics.value.filter(t=>[t.topicName,t.topicId].some(value=>String(value||'').toLocaleLowerCase().includes(query))):visibleTopics.value;});
 const currentTopic=computed(()=>{const topic=topics.value.find(t=>t.key===selected.value);if(topic&&!historyContextReady.value)return{...topic,executable:false,unavailableReason:'HISTORY_CONTEXT_LOADING'};return topic&&!(topic.sharedSpaceId&&topic.ownerType==='agent')&&historyKey===selected.value&&messages.value.some(m=>m.desktopReferences?.length)?{...topic,executable:false,unavailableReason:'DESKTOP_CONTEXT_REQUIRED'}:topic;});
-function draftScope(){const topic=currentTopic.value;return paired.value&&validSessionRecovery(recoveryContext.value)&&topic?JSON.stringify([recoveryContext.value.entryId,ownerKey(topic),topic.topicId,topic.key]):'';}
-function switchDraft(){
- const next=draftScope();if(next===composerScope)return;
+function draftScope(){const topic=currentTopic.value;return paired.value&&validSessionRecovery(recoveryContext.value)&&topic?JSON.stringify([recoveryContext.value.entryId,recoveryContext.value.sessionMarker,ownerKey(topic),topic.topicId,topic.key]):'';}
+function switchDraft(next=draftScope()){
+ if(next===composerScope)return;
  if(composerScope&&!text.value&&!pendingFiles.value.length&&!composerDraft.value.submitted)drafts.delete(composerScope);
  composerScope=next;composerDraft.value=drafts.get(next)||{text:'',files:[],revision:0};
- if(next)drafts.set(next,composerDraft.value);
+ if(next){drafts.set(next,composerDraft.value);syncRejectedDraft();}
+}
+function syncRejectedDraft(){
+ if(!composerScope||composerScope!==draftScope())return;
+ const draft=composerDraft.value;
+ if(draft.revision||draft.submitted||draft.files.some(item=>item.file))return;
+ try{
+  const saved=submissionStore.rejectedDraft({...recoveryContext.value,topicKey:selected.value});
+  if(!saved&&!draft.rejected)return;
+  draft.rejected=saved;
+  draft.text=saved?.text||'';
+  draft.files=saved?rejectedDraftFiles(saved):[];
+ }catch(error){recoveryError.value=recoveryMessage(error);}
+}
+function draftContents(draft,sessionMarker){
+ return {text:draft.text,attachments:draft.files.filter(file=>file.uploadId&&file.uploadSessionMarker===sessionMarker).map(file=>file.uploadId)};
+}
+const draftWrites=new WeakMap();
+function saveDraftEdit(draft){
+ if(!draft.rejected)return;
+ const contents=draftContents(draft,draft.rejected.sessionMarker);
+ const prior=draftWrites.get(draft)||Promise.resolve();
+ const write=prior.catch(()=>{}).then(async()=>{
+  if(draft.rejected){draft.rejected=await submissionStore.updateRejectedDraft(draft.rejected,contents);}
+ });
+ draftWrites.set(draft,write);
+ const finish=()=>{if(draftWrites.get(draft)===write)draftWrites.delete(draft);};
+ write.then(finish,error=>{
+  finish();if(composerDraft.value!==draft)return;
+  submissionNoticeHeld=true;notice.value='草稿修改尚未保存：'+recoveryMessage(error);
+ });
+}
+function removeDraftFile(index){
+ const draft=composerDraft.value;draft.files.splice(index,1);draft.revision++;saveDraftEdit(draft);
 }
 function confirmDraft(record,context){
  const draft=drafts.get(context.draftScope),sent=draft?.submitted;
- if(!sent||sent.requestId!==record.requestId)return;
+ if(!draft)return;
+ if(!sent||sent.requestId!==record.requestId){syncRejectedDraft();return;}
+ draft.rejected=submissionStore.rejectedDraft(record);
  if(draft.revision===sent.revision&&draft.text===record.payload.text)draft.text='';
  draft.files=draft.files.filter(item=>!sent.files.includes(item));
  delete draft.submitted;
@@ -154,7 +189,7 @@ async function refreshDirectory(force=false,{adjustSelection=true}={}){
 async function session(){const epoch=authEpoch;try{
  const r=await api('session');if(epoch!==authEpoch)return;
  const nextRecovery=validSessionRecovery(r.recovery)?{version:1,entryId:r.recovery.entryId,sessionMarker:r.recovery.sessionMarker}:null;
- if(nextRecovery?.entryId!==recoveryContext.value?.entryId||nextRecovery?.sessionMarker!==recoveryContext.value?.sessionMarker){authEpoch++;clearSharedObservers();historyCache.clear();closeNativeResult();closeAttachment();submissionNoticeHeld=false;acceptedReceipt.value=null;recoveryDetail.value='';}
+ if(nextRecovery?.entryId!==recoveryContext.value?.entryId||nextRecovery?.sessionMarker!==recoveryContext.value?.sessionMarker){authEpoch++;switchDraft('');clearSharedObservers();historyCache.clear();closeNativeResult();closeAttachment();submissionNoticeHeld=false;acceptedReceipt.value=null;recoveryDetail.value='';}
  sharedFeatures.value=Array.isArray(r.sharedFeatures)?r.sharedFeatures:[];recoveryContext.value=nextRecovery;sharedSpaces.value=(r.sharedPermissions||[]).filter(v=>v.endsWith(':read')).map(v=>({id:v.split(':')[1],config:r.sharedPermissions.includes(v.replace(/:read$/,':config'))}));paired.value=true;online.value=true;server.value=r.server||server.value;serverUrl.value=r.server?.serverUrl||serverUrl.value;
  directoryPaged=r.directory?.paged===true;
  const currentEpoch=authEpoch,result=directoryPaged?await readDirectoryPages(api,()=>currentEpoch===authEpoch):{topics:r.topics,agents:r.agents};
@@ -236,8 +271,16 @@ async function postPrepared(record,context){
    const draft=drafts.get(context.draftScope);
    if(!draft)throw error;
    const response=await api(conversation+'/execution-request?'+new URLSearchParams({requestId:record.requestId}));
-   if(!sameView(context)||!await submissionStore.releaseDesktopRejection(record,error,response.executions,context.recovery))throw error;
-   restoreRejectedDraft(draft,record);
+   if(!sameView(context))throw error;
+   const saved=await submissionStore.releaseDesktopRejection(record,error,response.executions,context.recovery,()=>
+    draft.submitted?.requestId===record.requestId?draftContents(draft,record.sessionMarker):null);
+   if(!saved)throw error;
+   if(draft.submitted?.requestId===record.requestId||draft.revision||draft.files.some(item=>item.file)){
+    restoreRejectedDraft(draft,record);
+   }else{
+    draft.text=saved.text;draft.files=rejectedDraftFiles(saved);
+   }
+   draft.rejected=saved;
    if(!loadRecovery())throw Error(recoveryError.value);
    if(sameView(context)){
     submissionNoticeHeld=true;
@@ -258,7 +301,7 @@ async function submit(submission,kind='message',context=newSubmissionContext()){
  busy.value=true;submissionNoticeHeld=false;
  try{
   if(!sameView(context))return;
-  const record=await submissionStore.prepare({entryId:context.recovery.entryId,sessionMarker:context.recovery.sessionMarker,topicKey:context.topicKey,kind,payload:submission});
+  const record=await submissionStore.prepare({entryId:context.recovery.entryId,sessionMarker:context.recovery.sessionMarker,topicKey:context.topicKey,kind,payload:submission,rejected:context.rejected});
   if(!loadRecovery())throw Error(recoveryError.value);
   if(sameView(context)){recoveryDetail.value='本地已保存，尚未收到可核验的云端接受回执。';acceptedReceipt.value=null;}
   await postPrepared(record,context);
@@ -289,13 +332,13 @@ function downloadAttachment(){const item=attachmentPreview.value;if(item?.blob)s
 async function send(){
  if((!text.value.trim()&&!pendingFiles.value.length)||busy.value||currentTopic.value?.executable===false)return;
  let context;busy.value=true;submissionNoticeHeld=false;
- try{context=newSubmissionContext();const draft=composerDraft.value,snapshot={text:draft.text,revision:draft.revision,files:[...draft.files]},ids=[];for(const item of snapshot.files){item.error='';try{if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;if(!item.uploadId&&!item.file)throw Error('请移除已上传附件并重新选择原文件');item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n);item.uploadSessionMarker=context.recovery.sessionMarker;ids.push(item.uploadId);}catch(e){item.error=e.message;throw e;}}if(!sameView(context))return;const requestId=crypto.randomUUID();draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};await submit({requestId,text:snapshot.text,attachments:ids},'message',context);}
+ try{context=newSubmissionContext();const draft=composerDraft.value;await draftWrites.get(draft);if(!sameView(context))return;context.rejected=draft.rejected;const snapshot={text:draft.text,revision:draft.revision,files:[...draft.files]},ids=[];for(const item of snapshot.files){item.error='';try{if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;if(!item.uploadId&&!item.file)throw Error('请移除已上传附件并重新选择原文件');item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n);item.uploadSessionMarker=context.recovery.sessionMarker;ids.push(item.uploadId);}catch(e){item.error=e.message;throw e;}}if(!sameView(context))return;const requestId=crypto.randomUUID();draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};await submit({requestId,text:snapshot.text,attachments:ids},'message',context);}
  catch(error){if(!context||sameView(context)){submissionNoticeHeld=true;notice.value=recoveryMessage(error);}}finally{busy.value=false;}
 }
 async function refreshRetrySession(context){
  const result=await api('session');if(!sameView(context))return null;
  const nextRecovery=validSessionRecovery(result.recovery)?{version:1,entryId:result.recovery.entryId,sessionMarker:result.recovery.sessionMarker}:null;
- if(nextRecovery?.entryId!==recoveryContext.value?.entryId||nextRecovery?.sessionMarker!==recoveryContext.value?.sessionMarker){authEpoch++;clearSharedObservers();historyCache.clear();closeNativeResult();closeAttachment();submissionNoticeHeld=false;acceptedReceipt.value=null;recoveryDetail.value='';}
+ if(nextRecovery?.entryId!==recoveryContext.value?.entryId||nextRecovery?.sessionMarker!==recoveryContext.value?.sessionMarker){authEpoch++;switchDraft('');clearSharedObservers();historyCache.clear();closeNativeResult();closeAttachment();submissionNoticeHeld=false;acceptedReceipt.value=null;recoveryDetail.value='';}
  sharedFeatures.value=Array.isArray(result.sharedFeatures)?result.sharedFeatures:[];recoveryContext.value=nextRecovery;directoryPaged=result.directory?.paged===true;
  const readEpoch=authEpoch,directory=directoryPaged?await readDirectoryPages(api,()=>readEpoch===authEpoch):{topics:Array.isArray(result.topics)?result.topics:[],agents:result.agents};
  if(!directory||readEpoch!==authEpoch)return null;await setDirectory(directory,{adjustSelection:false});
@@ -373,7 +416,7 @@ function applyPairingLink(code){if(!code)return;if(!connectionInitialized){incom
 function pairingHashChanged(){applyPairingLink(consumePairingLink({location:window.location,history:window.history,secureContext:window.isSecureContext}));}
 async function deviceVisibilityChanged(){resetHistory({remember:false});if(lastDirectory)await setDirectory(lastDirectory);await refreshDirectory(true);await refresh();}
 function clearTransientKey(){pageSuspended=true;refreshing?.abort();refreshing=null;generation++;clearSharedObservers();sharedObserver.suspend();historyCache.clear();accessKey.value='';pairCode.value='';incomingPairing=null;closeAttachment();}
-function storageChanged(event){if(event.key===SUBMISSION_STORAGE_KEY||event.key===null){loadRecovery();recoveryDetail.value='';}}
+function storageChanged(event){if(event.key===SUBMISSION_STORAGE_KEY||event.key===null){if(loadRecovery())syncRejectedDraft();recoveryDetail.value='';}}
 async function refreshView(){if(pageSuspended)return;try{await refreshDirectory();}catch{}if(sharedObserver.hasLive()&&historyContextReady.value&&!pendingSubmission.value&&!sharedRefreshPending)return;await refresh();}
 async function reconnect(){if(pageSuspended)return;clearSharedObservers();sharedObserver.resume();loadRecovery();await session();}
 async function pageShown(){pageSuspended=false;sharedObserver.resume();await session();}
@@ -439,7 +482,7 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
    <SharedDirectoryView v-for="space in sharedSpaces" :key="space.id" :space="space" :context="recoveryContext" :api="api" :on-device-visibility="deviceVisibilityChanged" />
    <SharedConfigEditor v-if="currentTopic?.sharedSpaceId&&sharedSpaces.some(s=>s.id===currentTopic.sharedSpaceId&&s.config)" :key="currentTopic.sharedOwnerId" :topic="currentTopic" :context="recoveryContext" :api="api" />
    </details>
-   <footer><div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div><div v-if="currentTopic?.attachmentsEnabled" class="upload-area"><label class="attachment-picker">添加图片或文件<input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false"></label><small>最多 8 个，每个 20 MB；断线后可重新选择同一文件续传。</small><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||item.progress+'%'}}</span><button @click="pendingFiles.splice(i,1)" :disabled="busy">移除</button></div></div><small v-else-if="currentTopic?.sharedSpaceId" role="status" class="attachment-unavailable">此共享会话尚未启用附件传输，可继续发送文字；文件不会被静默上传。</small><small class="draft-scope">草稿按话题暂存于本页；刷新或关闭页面会清空。</small><form @submit.prevent="send"><label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" placeholder="输入文字…" rows="2" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form><div class="send-state"><span id="send-state" role="status">{{notice}}</span><button id="retry-last" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
+   <footer><div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div><div v-if="currentTopic?.attachmentsEnabled" class="upload-area"><label class="attachment-picker">添加图片或文件<input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false"></label><small>最多 8 个，每个 20 MB；断线后可重新选择同一文件续传。</small><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||item.progress+'%'}}</span><button @click="removeDraftFile(i)" :disabled="busy">移除</button></div></div><small v-else-if="currentTopic?.sharedSpaceId" role="status" class="attachment-unavailable">此共享会话尚未启用附件传输，可继续发送文字；文件不会被静默上传。</small><small class="draft-scope">普通草稿暂存于本页。已确认被拒绝的草稿保存在此设备的当前会话和话题。</small><form @submit.prevent="send"><label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" placeholder="输入文字…" rows="2" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form><div class="send-state"><span id="send-state" role="status">{{notice}}</span><button id="retry-last" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
   </template>
  </div>
 </template>

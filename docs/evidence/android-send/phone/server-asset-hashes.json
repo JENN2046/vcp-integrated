@@ -1,0 +1,22 @@
+{
+  "baseline": {
+    "indexSha256": "5a4af3866f6e68ba24d79f77d42fc7568c1275b4c589a28347e7e39d8b07bbf5",
+    "assets": {
+      "assets/index-BHR501B_.js": "3c2fea6114e23a552faf0607d4264afb6dadbc618cd5d9b75adccb8f393c3d98",
+      "assets/index-h-NJxJX1.css": "db91b90765bef8a5e5840355bd07981a9be4cee941aafcac3c9edefcd8b37b11"
+    }
+  },
+  "candidate": {
+    "indexSha256": "6db3def8d6836bd703b909885d54f4657d1fcebba9596b68d453a5541967b3ff",
+    "assets": {
+      "assets/index-CEYqWIUX.js": "5d53b27dca6f3e1864a5e03776ee5adbff976ac8488254acd4a962823ba252ed",
+      "assets/index-h-NJxJX1.css": "db91b90765bef8a5e5840355bd07981a9be4cee941aafcac3c9edefcd8b37b11"
+    }
+  },
+  "candidateSources": {
+    "apps/mobile/src/App.vue": "c9acaf8e1d284a6f7b0ca7fade5dfac705f671669607a7ab0551b0f7bf99d6e4",
+    "apps/mobile/src/submissionRecovery.js": "68c1d4786f64c849d9b308cd165b052b3457ee00238f6d685616ee376f253a1b"
+  },
+  "independentBuildMatches": true,
+  "candidateHttpsMatches": true
+}

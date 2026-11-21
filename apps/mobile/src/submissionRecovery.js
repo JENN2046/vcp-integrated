@@ -1,11 +1,12 @@
 import {submissionText} from './contracts.generated.js';
-// This store contains only unconfirmed submissions. It is not a chat cache or
-// an execution queue: reconnecting can check records, but cannot send them.
+// This store holds unconfirmed submissions and editable drafts from verified
+// rejections. Reconnecting can check records, but cannot send them.
 export const SUBMISSION_STORAGE_KEY = 'vcp.nativeSync.submissions.v1';
 export const MAX_PENDING_SUBMISSIONS = 16;
 export const MAX_PENDING_BYTES = 256 * 1024;
 const HEX = /^[a-f0-9]{64}$/;
 const KINDS = new Set(['message', 'invitation']);
+const DRAFT_KEYS = ['origin','entryId','topicKey','sessionMarker','requestId','editVersion','text','attachments'];
 const RECORD_KEYS = ['version','origin','entryId','topicKey','requestId','kind','payload','sessionMarker','payloadHash','status','createdAt'];
 
 function fail(code) { throw Object.assign(new Error(code), {code}); }
@@ -47,23 +48,38 @@ export async function submissionPayloadHash({topicKey, kind, payload}, cryptoApi
 }
 
 function validRecord(record, origin) {
-  if (!exactKeys(record, RECORD_KEYS) || record.version !== 1 || record.origin !== origin || !HEX.test(record.entryId) || !HEX.test(record.sessionMarker) || !HEX.test(record.payloadHash) || !boundedString(record.topicKey, 2048) || !KINDS.has(record.kind) || record.status !== 'unconfirmed' || !Number.isSafeInteger(record.createdAt) || record.createdAt < 0) return false;
+  const keys = Object.hasOwn(record || {}, 'draftSource') ? [...RECORD_KEYS, 'draftSource'] : RECORD_KEYS;
+  if (!exactKeys(record, keys) || (keys !== RECORD_KEYS && (record.kind !== 'message' ||
+      !exactKeys(record.draftSource, ['requestId','editVersion']) || !boundedString(record.draftSource.requestId, 80) ||
+      !Number.isSafeInteger(record.draftSource.editVersion) || record.draftSource.editVersion < 0)) || record.version !== 1 || record.origin !== origin || !HEX.test(record.entryId) || !HEX.test(record.sessionMarker) || !HEX.test(record.payloadHash) || !boundedString(record.topicKey, 2048) || !KINDS.has(record.kind) || record.status !== 'unconfirmed' || !Number.isSafeInteger(record.createdAt) || record.createdAt < 0) return false;
   try { return record.requestId === record.payload.requestId && stable(clonePayload(record.kind, record.payload)) === stable(record.payload); }
   catch { return false; }
 }
 function sameScope(a, b) { return a.origin === b.origin && a.entryId === b.entryId && a.topicKey === b.topicKey; }
-function sameRecord(a, b) { return sameScope(a, b) && a.requestId === b.requestId && a.kind === b.kind && a.sessionMarker === b.sessionMarker && a.payloadHash === b.payloadHash && stable(a.payload) === stable(b.payload); }
+function sameRecord(a, b) { return sameScope(a, b) && a.requestId === b.requestId && a.kind === b.kind && a.sessionMarker === b.sessionMarker && a.payloadHash === b.payloadHash && stable(a.payload) === stable(b.payload) && stable(a.draftSource) === stable(b.draftSource); }
 
+function sameDraftScope(a, b) {
+  return sameScope(a, b) && a.sessionMarker === b.sessionMarker;
+}
+function validDraft(draft, origin) {
+  return exactKeys(draft, DRAFT_KEYS) && draft.origin === origin && HEX.test(draft.entryId)
+    && HEX.test(draft.sessionMarker) && boundedString(draft.topicKey, 2048)
+    && boundedString(draft.requestId, 80) && Number.isSafeInteger(draft.editVersion) && draft.editVersion >= 0
+    && typeof draft.text === 'string' && draft.text.length <= 12000
+    && Array.isArray(draft.attachments) && draft.attachments.length <= 8
+    && draft.attachments.every(id => boundedString(id, 256));
+}
+export function rejectedDraftFiles(draft) {
+  return draft.attachments.map(uploadId => ({uploadId, uploadSessionMarker:draft.sessionMarker, progress:100, error:''}));
+}
 export function restoreRejectedDraft(draft, record) {
   if (draft.submitted?.requestId === record.requestId) {
     delete draft.submitted;
     return;
   }
   if (!draft.revision && !draft.text) draft.text = record.payload.text;
-  for (const uploadId of record.payload.attachments || []) {
-    if (!draft.files.some(item => item.uploadId === uploadId)) {
-      draft.files.push({uploadId, uploadSessionMarker:record.sessionMarker, progress:100, error:''});
-    }
+  for (const item of rejectedDraftFiles({...record, attachments:record.payload.attachments || []})) {
+    if (!draft.files.some(file => file.uploadId === item.uploadId)) draft.files.push(item);
   }
 }
 
@@ -91,22 +107,42 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
     try { return getStorage().getItem(SUBMISSION_STORAGE_KEY); }
     catch { fail('SUBMISSION_STORE_UNAVAILABLE'); }
   }
-  function load() {
+  function readState() {
     const raw = readRaw();
-    if (raw === null) return [];
+    if (raw === null) return {records:[], drafts:[]};
     if (typeof raw !== 'string' || byteLength(raw) > maxBytes) fail('SUBMISSION_STORE_BUDGET');
     let data;
     try { data = JSON.parse(raw); } catch { fail('SUBMISSION_STORE_CORRUPT'); }
-    if (!exactKeys(data, ['version','records']) || data.version !== 1 || !Array.isArray(data.records) || data.records.length > maxRecords || data.records.some(record => !validRecord(record, origin))) fail('SUBMISSION_STORE_CORRUPT');
+    const keys = Object.hasOwn(data || {}, 'drafts') ? ['version','records','drafts'] : ['version','records'];
+    if (!exactKeys(data, keys) || data.version !== 1 || !Array.isArray(data.records) || data.records.length > maxRecords || data.records.some(record => !validRecord(record, origin))) fail('SUBMISSION_STORE_CORRUPT');
     if (data.records.some((record, index) => data.records.slice(0, index).some(previous => sameScope(record, previous)))) fail('SUBMISSION_STORE_CORRUPT');
-    return data.records;
+    const drafts = keys.includes('drafts') ? data.drafts : [];
+    if (!Array.isArray(drafts) || drafts.length > maxRecords || drafts.some(draft => !validDraft(draft, origin))
+        || drafts.some((draft, index) => drafts.slice(0, index).some(previous => sameDraftScope(draft, previous)))) fail('SUBMISSION_STORE_CORRUPT');
+    return {records:data.records, drafts};
   }
-  function save(records) {
-    const raw = JSON.stringify({version:1, records});
-    if (records.length > maxRecords || byteLength(raw) > maxBytes) fail('SUBMISSION_STORE_BUDGET');
+  function load() { return readState().records; }
+  function save({records, drafts}) {
+    const raw = JSON.stringify({version:1, records, ...(drafts.length ? {drafts} : {})});
+    if (records.length > maxRecords || drafts.length > maxRecords || byteLength(raw) > maxBytes) fail('SUBMISSION_STORE_BUDGET');
     try { getStorage().setItem(SUBMISSION_STORAGE_KEY, raw); }
     catch { fail('SUBMISSION_STORE_UNAVAILABLE'); }
     if (readRaw() !== raw) fail('SUBMISSION_STORE_UNVERIFIED');
+  }
+  function rejectedDraft(scope) {
+    return readState().drafts.find(draft => sameDraftScope(draft, {...scope, origin})) || null;
+  }
+  async function updateRejectedDraft(previous, {text, attachments}) {
+    return mutate(() => {
+      const {records, drafts} = readState();
+      const index = drafts.findIndex(draft => sameDraftScope(draft, previous));
+      if (index < 0 || stable(drafts[index]) !== stable(previous)) fail('SUBMISSION_RECORD_CHANGED');
+      const next = {...previous, editVersion:previous.editVersion+1, text, attachments};
+      if (!validDraft(next, origin)) fail('SUBMISSION_INVALID');
+      drafts[index] = next;
+      save({records, drafts});
+      return next;
+    });
   }
   function current({entryId, topicKey}) { return load().find(record => sameScope(record, {origin, entryId, topicKey})) || null; }
   function requireCurrent(record) {
@@ -118,15 +154,19 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
     if (!validRecord(record, origin) || await submissionPayloadHash(record, cryptoApi) !== record.payloadHash) fail('SUBMISSION_STORE_CORRUPT');
     return record;
   }
-  async function prepare({entryId, sessionMarker, topicKey, kind, payload}) {
+  async function prepare({entryId, sessionMarker, topicKey, kind, payload, rejected}) {
     if (!validSessionRecovery({version:1, entryId, sessionMarker})) fail('SUBMISSION_RECOVERY_UNAVAILABLE');
     const original = clonePayload(kind, payload);
     const payloadHash = await submissionPayloadHash({topicKey, kind, payload:original}, cryptoApi);
     const record = {version:1, origin, entryId, topicKey, requestId:original.requestId, kind, payload:original, sessionMarker, payloadHash, status:'unconfirmed', createdAt:now()};
     return mutate(() => {
-      const records = load(); // Reread after hashing AND after acquiring the cross-page lock.
+      const {records, drafts} = readState(); // Reread after hashing AND after acquiring the cross-page lock.
       if (records.some(previous => sameScope(previous, record))) fail('SUBMISSION_PENDING');
-      save([...records, record]);
+      if (kind === 'message' && rejected && drafts.some(draft => sameDraftScope(draft, record)
+          && draft.requestId === rejected.requestId && draft.editVersion === rejected.editVersion)) {
+        record.draftSource = {requestId:rejected.requestId, editVersion:rejected.editVersion};
+      }
+      save({records:[...records, record], drafts});
       return requireCurrent(record);
     });
   }
@@ -148,25 +188,34 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
     const lockName = SUBMISSION_STORAGE_KEY + ':send:' + record.entryId + ':' + record.requestId;
     return mutate(() => submit(requireCurrent(record)), lockName);
   }
-  async function releaseDesktopRejection(record, rejection, executions, session) {
+  async function releaseDesktopRejection(record, rejection, executions, session, readDraft) {
     if (record.kind !== 'message' || rejection?.status !== 409 || rejection.code !== 'DESKTOP_CONTEXT_REQUIRED'
         || (await inspect(record, executions, session)).state !== 'absent') return false;
     return mutate(() => {
-      const records = load(), index = records.findIndex(previous => sameScope(previous, record));
+      const {records, drafts} = readState();
+      const index = records.findIndex(previous => sameScope(previous, record));
       if (index < 0 || !sameRecord(records[index], record)) return false;
-      save(records.filter((_, at) => at !== index));
-      return true;
+      const {text, attachments = []} = readDraft?.() || record.payload;
+      const {entryId, topicKey, sessionMarker, requestId} = record;
+      const draft = {origin, entryId, topicKey, sessionMarker, requestId, editVersion:0, text, attachments};
+      if (!validDraft(draft, origin)) fail('SUBMISSION_INVALID');
+      save({records:records.filter((_, at) => at !== index),
+        drafts:[...drafts.filter(previous => !sameDraftScope(previous, draft)), draft]});
+      return draft;
     });
   }
   async function confirm(record, execution, session) {
     if ((await inspect(record, [execution], session)).state !== 'confirmed') fail('SUBMISSION_RECEIPT_UNVERIFIED');
     return mutate(() => {
-      const records = load(), index = records.findIndex(previous => sameScope(previous, record));
+      const {records, drafts} = readState();
+      const index = records.findIndex(previous => sameScope(previous, record));
       if (index < 0) return false; // Another successful check already cleared this same record.
       if (!sameRecord(records[index], record)) fail('SUBMISSION_RECORD_CHANGED');
-      save(records.filter((_, at) => at !== index));
+      save({records:records.filter((_, at) => at !== index),
+        drafts:drafts.filter(draft => !(record.draftSource && sameDraftScope(draft, record)
+          && draft.requestId === record.draftSource.requestId && draft.editVersion === record.draftSource.editVersion))});
       return true;
     });
   }
-  return {load, current, prepare, verify, requireCurrent, inspect, confirm, withSendLock, releaseDesktopRejection};
+  return {load, current, prepare, verify, requireCurrent, inspect, confirm, withSendLock, releaseDesktopRejection, rejectedDraft, updateRejectedDraft};
 }

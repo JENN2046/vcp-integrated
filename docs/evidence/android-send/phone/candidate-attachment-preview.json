@@ -1,0 +1,42 @@
+{
+  "secure": true,
+  "origin": "https://127.0.0.1:18443",
+  "bundle": "/mobile/assets/index-CEYqWIUX.js",
+  "paired": true,
+  "visible": true,
+  "connection": "已连接",
+  "selectedAgent": "Synthetic lost receipt",
+  "selectedTopic": "shared_2cc01cdc6c7c434e8ff520bef729e725",
+  "progress": null,
+  "text": "",
+  "editable": true,
+  "sendEnabled": false,
+  "retryEnabled": false,
+  "files": [],
+  "status": "中央会话已更新",
+  "attachmentPreview": "fixture-note.txt\n关闭\nVCP physical attachment fixture 2026\n\n保存文件",
+  "pending": null,
+  "accepted": "3044f596-162b-4724-8b31-1886b8977464",
+  "jobs": [
+    {
+      "id": "request_d58e9dcef2fb4e8f94f42dd51ee01e79",
+      "state": "completed"
+    }
+  ],
+  "messages": [
+    {
+      "id": "mobile_9afe97b0b8fd133f59f8a0a60466cf05",
+      "role": "user",
+      "text": "PHYSICAL_ATTACHMENT",
+      "attachments": [
+        "fixture-note.txt\n查看文本"
+      ]
+    },
+    {
+      "id": "reply_request_d58e9dcef2fb4e8f94f42dd51ee01e79",
+      "role": "assistant",
+      "text": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」OrdinaryToolCounter「末」,\ncommand:「始」Count「末」,\nmarker:「始」ORDINARY_TOOL_APPROVE「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[VCP_TOOL_BATCH_START:2026-11-22T01:03:35.637+08:00]>>>\n\n[本轮工具调用摘要:]\nOrdinaryToolCounter 调用成功 (记录ID: tcr-1795280615631-8c432cac-1f0a-468f-997a-841839f08f25)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-22T01:03:35.637+08:00]>>>\n\nPhysical attachment turn completed.",
+      "attachments": []
+    }
+  ]
+}

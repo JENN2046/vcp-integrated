@@ -1,0 +1,240 @@
+{
+  "bundleSha256": "6db3def8d6836bd703b909885d54f4657d1fcebba9596b68d453a5541967b3ff",
+  "provider": [
+    {
+      "id": "request_d58e9dcef2fb4e8f94f42dd51ee01e79",
+      "stream": false,
+      "at": 1795280615624,
+      "marker": "PHYSICAL_ATTACHMENT",
+      "phase": "tool-request",
+      "attachmentSeen": true,
+      "toolResultSeen": false
+    },
+    {
+      "id": "request_d58e9dcef2fb4e8f94f42dd51ee01e79",
+      "stream": false,
+      "at": 1795280615639,
+      "marker": "PHYSICAL_ATTACHMENT",
+      "phase": "tool-result",
+      "attachmentSeen": true,
+      "toolResultSeen": true
+    },
+    {
+      "id": "request_3a101f7c817e4e949586c4b5e33e6b12",
+      "stream": false,
+      "at": 1795280620147,
+      "marker": "PHYSICAL_LOST_ACK",
+      "phase": "tool-request",
+      "attachmentSeen": true,
+      "toolResultSeen": false
+    },
+    {
+      "id": "request_3a101f7c817e4e949586c4b5e33e6b12",
+      "stream": false,
+      "at": 1795280620152,
+      "marker": "PHYSICAL_LOST_ACK",
+      "phase": "tool-result",
+      "attachmentSeen": true,
+      "toolResultSeen": true
+    }
+  ],
+  "tools": [
+    {
+      "marker": "ORDINARY_TOOL_APPROVE"
+    },
+    {
+      "marker": "ORDINARY_TOOL_DENY"
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/attachments/uploads",
+      "at": 1795280597093,
+      "status": 201,
+      "requestId": "file_c3b1beac9d9bfc9296cfa3a6df90c81b452650905f1bb40735696160898675c1"
+    },
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/attachments/uploads/0af9b6b7-b00f-4c78-a467-fe9826fcf20d/chunks",
+      "at": 1795280597111,
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/attachments/uploads/0af9b6b7-b00f-4c78-a467-fe9826fcf20d/finish",
+      "at": 1795280597128,
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/messages",
+      "at": 1795280597173,
+      "status": 409,
+      "requestId": "b386a9d3-00bf-4a7d-a077-75f9a125125b",
+      "text": "PHYSICAL_ATTACHMENT {{VCPChatCanvas}}",
+      "attachments": [
+        "0af9b6b7-b00f-4c78-a467-fe9826fcf20d"
+      ],
+      "code": "DESKTOP_CONTEXT_REQUIRED"
+    },
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/execution-request",
+      "at": 1795280597188,
+      "status": 200,
+      "matchedExecutions": []
+    },
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/messages",
+      "at": 1795280615570,
+      "status": 202,
+      "requestId": "3044f596-162b-4724-8b31-1886b8977464",
+      "text": "PHYSICAL_ATTACHMENT",
+      "workId": "request_d58e9dcef2fb4e8f94f42dd51ee01e79",
+      "attachments": [
+        "0af9b6b7-b00f-4c78-a467-fe9826fcf20d"
+      ]
+    },
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/attachments/messages/mobile_9afe97b0b8fd133f59f8a0a60466cf05/attachment_a7e8a4d8e373abb0512fb65992a67870a7f6d999feb9b7339a29f32a5613076f",
+      "at": 1795280617267,
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/messages",
+      "at": 1795280620126,
+      "status": 202,
+      "dropped": true,
+      "requestId": "8677d995-f96b-4f3d-a85d-af85323bdfde",
+      "text": "PHYSICAL_LOST_ACK",
+      "workId": "request_3a101f7c817e4e949586c4b5e33e6b12",
+      "attachments": []
+    }
+  ],
+  "exactLookups": [
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/execution-request",
+      "requestId": "b386a9d3-00bf-4a7d-a077-75f9a125125b",
+      "at": 1795280597188,
+      "held": false
+    },
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/execution-request",
+      "requestId": "8677d995-f96b-4f3d-a85d-af85323bdfde",
+      "at": 1795280620223,
+      "held": true
+    },
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/execution-request",
+      "requestId": "8677d995-f96b-4f3d-a85d-af85323bdfde",
+      "at": 1795280622569,
+      "held": true
+    },
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/execution-request",
+      "requestId": "8677d995-f96b-4f3d-a85d-af85323bdfde",
+      "at": 1795280624417,
+      "held": true
+    },
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/execution-request",
+      "requestId": "8677d995-f96b-4f3d-a85d-af85323bdfde",
+      "at": 1795280626414,
+      "held": true
+    },
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/execution-request",
+      "requestId": "8677d995-f96b-4f3d-a85d-af85323bdfde",
+      "at": 1795280628420,
+      "held": true
+    },
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/execution-request",
+      "requestId": "8677d995-f96b-4f3d-a85d-af85323bdfde",
+      "at": 1795280630475,
+      "held": true
+    },
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/execution-request",
+      "requestId": "8677d995-f96b-4f3d-a85d-af85323bdfde",
+      "at": 1795280632469,
+      "held": true
+    },
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_2cc01cdc6c7c434e8ff520bef729e725/execution-request",
+      "requestId": "8677d995-f96b-4f3d-a85d-af85323bdfde",
+      "at": 1795280634461,
+      "held": true
+    }
+  ],
+  "lostRequestId": "8677d995-f96b-4f3d-a85d-af85323bdfde",
+  "work": [
+    {
+      "id": "request_d58e9dcef2fb4e8f94f42dd51ee01e79",
+      "request_id": "3044f596-162b-4724-8b31-1886b8977464",
+      "state": "completed",
+      "attempts": 1,
+      "request_dispatched": 1,
+      "user_message_id": "mobile_9afe97b0b8fd133f59f8a0a60466cf05",
+      "user_seq": 1,
+      "reply_message_id": "reply_request_d58e9dcef2fb4e8f94f42dd51ee01e79"
+    },
+    {
+      "id": "request_3a101f7c817e4e949586c4b5e33e6b12",
+      "request_id": "8677d995-f96b-4f3d-a85d-af85323bdfde",
+      "state": "completed",
+      "attempts": 1,
+      "request_dispatched": 1,
+      "user_message_id": "mobile_a0a3a5c5b90061be514adabe8e176717",
+      "user_seq": 3,
+      "reply_message_id": "reply_request_3a101f7c817e4e949586c4b5e33e6b12"
+    }
+  ],
+  "journal": [
+    {
+      "seq": 1,
+      "msg_id": "mobile_9afe97b0b8fd133f59f8a0a60466cf05",
+      "action": "upsert"
+    },
+    {
+      "seq": 2,
+      "msg_id": "reply_request_d58e9dcef2fb4e8f94f42dd51ee01e79",
+      "action": "upsert"
+    },
+    {
+      "seq": 3,
+      "msg_id": "mobile_a0a3a5c5b90061be514adabe8e176717",
+      "action": "upsert"
+    },
+    {
+      "seq": 4,
+      "msg_id": "reply_request_3a101f7c817e4e949586c4b5e33e6b12",
+      "action": "upsert"
+    }
+  ],
+  "links": [
+    {
+      "msg_id": "mobile_9afe97b0b8fd133f59f8a0a60466cf05",
+      "attachment_id": "attachment_a7e8a4d8e373abb0512fb65992a67870a7f6d999feb9b7339a29f32a5613076f",
+      "hash": "a7e8a4d8e373abb0512fb65992a67870a7f6d999feb9b7339a29f32a5613076f"
+    }
+  ],
+  "paired": 2,
+  "attachmentFixture": {
+    "name": "fixture-note.txt",
+    "sha256": "a7e8a4d8e373abb0512fb65992a67870a7f6d999feb9b7339a29f32a5613076f"
+  }
+}

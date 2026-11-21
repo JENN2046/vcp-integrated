@@ -1,0 +1,270 @@
+diff --git a/apps/mobile/src/App.vue b/apps/mobile/src/App.vue
+index c92f02f..a743cc7 100644
+--- a/apps/mobile/src/App.vue
++++ b/apps/mobile/src/App.vue
+@@ -14,3 +14,3 @@ import {uploadAttachment} from './attachmentUpload.js';
+ import {readAttachment,saveAttachment} from './attachmentRead.js';
+-import {createSubmissionRecovery,restoreRejectedDraft,validSessionRecovery,SUBMISSION_STORAGE_KEY} from './submissionRecovery.js';
++import {createSubmissionRecovery,rejectedDraftFiles,restoreRejectedDraft,validSessionRecovery,SUBMISSION_STORAGE_KEY} from './submissionRecovery.js';
+ import {projectNativeWork,verifyNativeResult,nativeTaskLabels,toolLabels,resultHash} from './nativeTasks.js';
+@@ -21,6 +21,6 @@ const attachmentStates=ref({}),reviewChecks=ref({}),invitedAgent=ref('');
+ const attachmentPreview=ref(null),attachmentDialog=ref(null);let attachmentReadRequest=0,attachmentReadController=null;
+-// Unsent drafts belong to this page and one entry/owner/topic. They never enter
+-// the durable submission store until the existing explicit send path is used.
++// Ordinary drafts live in this page. Verified rejections also keep editable
++// text and uploaded attachment references in the device recovery store.
+ const drafts=new Map(),composerDraft=ref({text:'',files:[],revision:0});let composerScope='';
+-const text=computed({get:()=>composerDraft.value.text,set:value=>{composerDraft.value.text=value;composerDraft.value.revision++;}});
++const text=computed({get:()=>composerDraft.value.text,set:value=>{composerDraft.value.text=value;composerDraft.value.revision++;saveDraftEdit(composerDraft.value);}});
+ const pendingFiles=computed({get:()=>composerDraft.value.files,set:value=>{composerDraft.value.files=value;}});
+@@ -84,8 +84,41 @@ const searchedTopics=computed(()=>{const query=topicSearch.value.trim().toLocale
+ const currentTopic=computed(()=>{const topic=topics.value.find(t=>t.key===selected.value);if(topic&&!historyContextReady.value)return{...topic,executable:false,unavailableReason:'HISTORY_CONTEXT_LOADING'};return topic&&!(topic.sharedSpaceId&&topic.ownerType==='agent')&&historyKey===selected.value&&messages.value.some(m=>m.desktopReferences?.length)?{...topic,executable:false,unavailableReason:'DESKTOP_CONTEXT_REQUIRED'}:topic;});
+-function draftScope(){const topic=currentTopic.value;return paired.value&&validSessionRecovery(recoveryContext.value)&&topic?JSON.stringify([recoveryContext.value.entryId,ownerKey(topic),topic.topicId,topic.key]):'';}
+-function switchDraft(){
+- const next=draftScope();if(next===composerScope)return;
++function draftScope(){const topic=currentTopic.value;return paired.value&&validSessionRecovery(recoveryContext.value)&&topic?JSON.stringify([recoveryContext.value.entryId,recoveryContext.value.sessionMarker,ownerKey(topic),topic.topicId,topic.key]):'';}
++function switchDraft(next=draftScope()){
++ if(next===composerScope)return;
+  if(composerScope&&!text.value&&!pendingFiles.value.length&&!composerDraft.value.submitted)drafts.delete(composerScope);
+  composerScope=next;composerDraft.value=drafts.get(next)||{text:'',files:[],revision:0};
+- if(next)drafts.set(next,composerDraft.value);
++ if(next){drafts.set(next,composerDraft.value);syncRejectedDraft();}
++}
++function syncRejectedDraft(){
++ if(!composerScope||composerScope!==draftScope())return;
++ const draft=composerDraft.value;
++ if(draft.revision||draft.submitted||draft.files.some(item=>item.file))return;
++ try{
++  const saved=submissionStore.rejectedDraft({...recoveryContext.value,topicKey:selected.value});
++  if(!saved&&!draft.rejected)return;
++  draft.rejected=saved;
++  draft.text=saved?.text||'';
++  draft.files=saved?rejectedDraftFiles(saved):[];
++ }catch(error){recoveryError.value=recoveryMessage(error);}
++}
++function draftContents(draft,sessionMarker){
++ return {text:draft.text,attachments:draft.files.filter(file=>file.uploadId&&file.uploadSessionMarker===sessionMarker).map(file=>file.uploadId)};
++}
++const draftWrites=new WeakMap();
++function saveDraftEdit(draft){
++ if(!draft.rejected)return;
++ const contents=draftContents(draft,draft.rejected.sessionMarker);
++ const prior=draftWrites.get(draft)||Promise.resolve();
++ const write=prior.catch(()=>{}).then(async()=>{
++  if(draft.rejected){draft.rejected=await submissionStore.updateRejectedDraft(draft.rejected,contents);}
++ });
++ draftWrites.set(draft,write);
++ const finish=()=>{if(draftWrites.get(draft)===write)draftWrites.delete(draft);};
++ write.then(finish,error=>{
++  finish();if(composerDraft.value!==draft)return;
++  submissionNoticeHeld=true;notice.value='草稿修改尚未保存：'+recoveryMessage(error);
++ });
++}
++function removeDraftFile(index){
++ const draft=composerDraft.value;draft.files.splice(index,1);draft.revision++;saveDraftEdit(draft);
+ }
+@@ -93,3 +126,5 @@ function confirmDraft(record,context){
+  const draft=drafts.get(context.draftScope),sent=draft?.submitted;
+- if(!sent||sent.requestId!==record.requestId)return;
++ if(!draft)return;
++ if(!sent||sent.requestId!==record.requestId){syncRejectedDraft();return;}
++ draft.rejected=submissionStore.rejectedDraft(record);
+  if(draft.revision===sent.revision&&draft.text===record.payload.text)draft.text='';
+@@ -156,3 +191,3 @@ async function session(){const epoch=authEpoch;try{
+  const nextRecovery=validSessionRecovery(r.recovery)?{version:1,entryId:r.recovery.entryId,sessionMarker:r.recovery.sessionMarker}:null;
+- if(nextRecovery?.entryId!==recoveryContext.value?.entryId||nextRecovery?.sessionMarker!==recoveryContext.value?.sessionMarker){authEpoch++;clearSharedObservers();historyCache.clear();closeNativeResult();closeAttachment();submissionNoticeHeld=false;acceptedReceipt.value=null;recoveryDetail.value='';}
++ if(nextRecovery?.entryId!==recoveryContext.value?.entryId||nextRecovery?.sessionMarker!==recoveryContext.value?.sessionMarker){authEpoch++;switchDraft('');clearSharedObservers();historyCache.clear();closeNativeResult();closeAttachment();submissionNoticeHeld=false;acceptedReceipt.value=null;recoveryDetail.value='';}
+  sharedFeatures.value=Array.isArray(r.sharedFeatures)?r.sharedFeatures:[];recoveryContext.value=nextRecovery;sharedSpaces.value=(r.sharedPermissions||[]).filter(v=>v.endsWith(':read')).map(v=>({id:v.split(':')[1],config:r.sharedPermissions.includes(v.replace(/:read$/,':config'))}));paired.value=true;online.value=true;server.value=r.server||server.value;serverUrl.value=r.server?.serverUrl||serverUrl.value;
+@@ -238,4 +273,12 @@ async function postPrepared(record,context){
+    const response=await api(conversation+'/execution-request?'+new URLSearchParams({requestId:record.requestId}));
+-   if(!sameView(context)||!await submissionStore.releaseDesktopRejection(record,error,response.executions,context.recovery))throw error;
+-   restoreRejectedDraft(draft,record);
++   if(!sameView(context))throw error;
++   const saved=await submissionStore.releaseDesktopRejection(record,error,response.executions,context.recovery,()=>
++    draft.submitted?.requestId===record.requestId?draftContents(draft,record.sessionMarker):null);
++   if(!saved)throw error;
++   if(draft.submitted?.requestId===record.requestId||draft.revision||draft.files.some(item=>item.file)){
++    restoreRejectedDraft(draft,record);
++   }else{
++    draft.text=saved.text;draft.files=rejectedDraftFiles(saved);
++   }
++   draft.rejected=saved;
+    if(!loadRecovery())throw Error(recoveryError.value);
+@@ -260,3 +303,3 @@ async function submit(submission,kind='message',context=newSubmissionContext()){
+   if(!sameView(context))return;
+-  const record=await submissionStore.prepare({entryId:context.recovery.entryId,sessionMarker:context.recovery.sessionMarker,topicKey:context.topicKey,kind,payload:submission});
++  const record=await submissionStore.prepare({entryId:context.recovery.entryId,sessionMarker:context.recovery.sessionMarker,topicKey:context.topicKey,kind,payload:submission,rejected:context.rejected});
+   if(!loadRecovery())throw Error(recoveryError.value);
+@@ -291,3 +334,3 @@ async function send(){
+  let context;busy.value=true;submissionNoticeHeld=false;
+- try{context=newSubmissionContext();const draft=composerDraft.value,snapshot={text:draft.text,revision:draft.revision,files:[...draft.files]},ids=[];for(const item of snapshot.files){item.error='';try{if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;if(!item.uploadId&&!item.file)throw Error('请移除已上传附件并重新选择原文件');item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n);item.uploadSessionMarker=context.recovery.sessionMarker;ids.push(item.uploadId);}catch(e){item.error=e.message;throw e;}}if(!sameView(context))return;const requestId=crypto.randomUUID();draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};await submit({requestId,text:snapshot.text,attachments:ids},'message',context);}
++ try{context=newSubmissionContext();const draft=composerDraft.value;await draftWrites.get(draft);if(!sameView(context))return;context.rejected=draft.rejected;const snapshot={text:draft.text,revision:draft.revision,files:[...draft.files]},ids=[];for(const item of snapshot.files){item.error='';try{if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;if(!item.uploadId&&!item.file)throw Error('请移除已上传附件并重新选择原文件');item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n);item.uploadSessionMarker=context.recovery.sessionMarker;ids.push(item.uploadId);}catch(e){item.error=e.message;throw e;}}if(!sameView(context))return;const requestId=crypto.randomUUID();draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};await submit({requestId,text:snapshot.text,attachments:ids},'message',context);}
+  catch(error){if(!context||sameView(context)){submissionNoticeHeld=true;notice.value=recoveryMessage(error);}}finally{busy.value=false;}
+@@ -297,3 +340,3 @@ async function refreshRetrySession(context){
+  const nextRecovery=validSessionRecovery(result.recovery)?{version:1,entryId:result.recovery.entryId,sessionMarker:result.recovery.sessionMarker}:null;
+- if(nextRecovery?.entryId!==recoveryContext.value?.entryId||nextRecovery?.sessionMarker!==recoveryContext.value?.sessionMarker){authEpoch++;clearSharedObservers();historyCache.clear();closeNativeResult();closeAttachment();submissionNoticeHeld=false;acceptedReceipt.value=null;recoveryDetail.value='';}
++ if(nextRecovery?.entryId!==recoveryContext.value?.entryId||nextRecovery?.sessionMarker!==recoveryContext.value?.sessionMarker){authEpoch++;switchDraft('');clearSharedObservers();historyCache.clear();closeNativeResult();closeAttachment();submissionNoticeHeld=false;acceptedReceipt.value=null;recoveryDetail.value='';}
+  sharedFeatures.value=Array.isArray(result.sharedFeatures)?result.sharedFeatures:[];recoveryContext.value=nextRecovery;directoryPaged=result.directory?.paged===true;
+@@ -375,3 +418,3 @@ async function deviceVisibilityChanged(){resetHistory({remember:false});if(lastD
+ function clearTransientKey(){pageSuspended=true;refreshing?.abort();refreshing=null;generation++;clearSharedObservers();sharedObserver.suspend();historyCache.clear();accessKey.value='';pairCode.value='';incomingPairing=null;closeAttachment();}
+-function storageChanged(event){if(event.key===SUBMISSION_STORAGE_KEY||event.key===null){loadRecovery();recoveryDetail.value='';}}
++function storageChanged(event){if(event.key===SUBMISSION_STORAGE_KEY||event.key===null){if(loadRecovery())syncRejectedDraft();recoveryDetail.value='';}}
+ async function refreshView(){if(pageSuspended)return;try{await refreshDirectory();}catch{}if(sharedObserver.hasLive()&&historyContextReady.value&&!pendingSubmission.value&&!sharedRefreshPending)return;await refresh();}
+@@ -441,3 +484,3 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
+    </details>
+-   <footer><div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div><div v-if="currentTopic?.attachmentsEnabled" class="upload-area"><label class="attachment-picker">添加图片或文件<input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false"></label><small>最多 8 个，每个 20 MB；断线后可重新选择同一文件续传。</small><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||item.progress+'%'}}</span><button @click="pendingFiles.splice(i,1)" :disabled="busy">移除</button></div></div><small v-else-if="currentTopic?.sharedSpaceId" role="status" class="attachment-unavailable">此共享会话尚未启用附件传输，可继续发送文字；文件不会被静默上传。</small><small class="draft-scope">草稿按话题暂存于本页；刷新或关闭页面会清空。</small><form @submit.prevent="send"><label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" placeholder="输入文字…" rows="2" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form><div class="send-state"><span id="send-state" role="status">{{notice}}</span><button id="retry-last" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
++   <footer><div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div><div v-if="currentTopic?.attachmentsEnabled" class="upload-area"><label class="attachment-picker">添加图片或文件<input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false"></label><small>最多 8 个，每个 20 MB；断线后可重新选择同一文件续传。</small><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||item.progress+'%'}}</span><button @click="removeDraftFile(i)" :disabled="busy">移除</button></div></div><small v-else-if="currentTopic?.sharedSpaceId" role="status" class="attachment-unavailable">此共享会话尚未启用附件传输，可继续发送文字；文件不会被静默上传。</small><small class="draft-scope">普通草稿暂存于本页。已确认被拒绝的草稿保存在此设备的当前会话和话题。</small><form @submit.prevent="send"><label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" placeholder="输入文字…" rows="2" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form><div class="send-state"><span id="send-state" role="status">{{notice}}</span><button id="retry-last" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
+   </template>
+diff --git a/apps/mobile/src/submissionRecovery.js b/apps/mobile/src/submissionRecovery.js
+index 2ba7915..7b20c58 100644
+--- a/apps/mobile/src/submissionRecovery.js
++++ b/apps/mobile/src/submissionRecovery.js
+@@ -1,4 +1,4 @@
+ import {submissionText} from './contracts.generated.js';
+-// This store contains only unconfirmed submissions. It is not a chat cache or
+-// an execution queue: reconnecting can check records, but cannot send them.
++// This store holds unconfirmed submissions and editable drafts from verified
++// rejections. Reconnecting can check records, but cannot send them.
+ export const SUBMISSION_STORAGE_KEY = 'vcp.nativeSync.submissions.v1';
+@@ -8,2 +8,3 @@ const HEX = /^[a-f0-9]{64}$/;
+ const KINDS = new Set(['message', 'invitation']);
++const DRAFT_KEYS = ['origin','entryId','topicKey','sessionMarker','requestId','editVersion','text','attachments'];
+ const RECORD_KEYS = ['version','origin','entryId','topicKey','requestId','kind','payload','sessionMarker','payloadHash','status','createdAt'];
+@@ -49,3 +50,6 @@ export async function submissionPayloadHash({topicKey, kind, payload}, cryptoApi
+ function validRecord(record, origin) {
+-  if (!exactKeys(record, RECORD_KEYS) || record.version !== 1 || record.origin !== origin || !HEX.test(record.entryId) || !HEX.test(record.sessionMarker) || !HEX.test(record.payloadHash) || !boundedString(record.topicKey, 2048) || !KINDS.has(record.kind) || record.status !== 'unconfirmed' || !Number.isSafeInteger(record.createdAt) || record.createdAt < 0) return false;
++  const keys = Object.hasOwn(record || {}, 'draftSource') ? [...RECORD_KEYS, 'draftSource'] : RECORD_KEYS;
++  if (!exactKeys(record, keys) || (keys !== RECORD_KEYS && (record.kind !== 'message' ||
++      !exactKeys(record.draftSource, ['requestId','editVersion']) || !boundedString(record.draftSource.requestId, 80) ||
++      !Number.isSafeInteger(record.draftSource.editVersion) || record.draftSource.editVersion < 0)) || record.version !== 1 || record.origin !== origin || !HEX.test(record.entryId) || !HEX.test(record.sessionMarker) || !HEX.test(record.payloadHash) || !boundedString(record.topicKey, 2048) || !KINDS.has(record.kind) || record.status !== 'unconfirmed' || !Number.isSafeInteger(record.createdAt) || record.createdAt < 0) return false;
+   try { return record.requestId === record.payload.requestId && stable(clonePayload(record.kind, record.payload)) === stable(record.payload); }
+@@ -54,4 +58,18 @@ function validRecord(record, origin) {
+ function sameScope(a, b) { return a.origin === b.origin && a.entryId === b.entryId && a.topicKey === b.topicKey; }
+-function sameRecord(a, b) { return sameScope(a, b) && a.requestId === b.requestId && a.kind === b.kind && a.sessionMarker === b.sessionMarker && a.payloadHash === b.payloadHash && stable(a.payload) === stable(b.payload); }
++function sameRecord(a, b) { return sameScope(a, b) && a.requestId === b.requestId && a.kind === b.kind && a.sessionMarker === b.sessionMarker && a.payloadHash === b.payloadHash && stable(a.payload) === stable(b.payload) && stable(a.draftSource) === stable(b.draftSource); }
+
++function sameDraftScope(a, b) {
++  return sameScope(a, b) && a.sessionMarker === b.sessionMarker;
++}
++function validDraft(draft, origin) {
++  return exactKeys(draft, DRAFT_KEYS) && draft.origin === origin && HEX.test(draft.entryId)
++    && HEX.test(draft.sessionMarker) && boundedString(draft.topicKey, 2048)
++    && boundedString(draft.requestId, 80) && Number.isSafeInteger(draft.editVersion) && draft.editVersion >= 0
++    && typeof draft.text === 'string' && draft.text.length <= 12000
++    && Array.isArray(draft.attachments) && draft.attachments.length <= 8
++    && draft.attachments.every(id => boundedString(id, 256));
++}
++export function rejectedDraftFiles(draft) {
++  return draft.attachments.map(uploadId => ({uploadId, uploadSessionMarker:draft.sessionMarker, progress:100, error:''}));
++}
+ export function restoreRejectedDraft(draft, record) {
+@@ -62,6 +80,4 @@ export function restoreRejectedDraft(draft, record) {
+   if (!draft.revision && !draft.text) draft.text = record.payload.text;
+-  for (const uploadId of record.payload.attachments || []) {
+-    if (!draft.files.some(item => item.uploadId === uploadId)) {
+-      draft.files.push({uploadId, uploadSessionMarker:record.sessionMarker, progress:100, error:''});
+-    }
++  for (const item of rejectedDraftFiles({...record, attachments:record.payload.attachments || []})) {
++    if (!draft.files.some(file => file.uploadId === item.uploadId)) draft.files.push(item);
+   }
+@@ -93,5 +109,5 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+   }
+-  function load() {
++  function readState() {
+     const raw = readRaw();
+-    if (raw === null) return [];
++    if (raw === null) return {records:[], drafts:[]};
+     if (typeof raw !== 'string' || byteLength(raw) > maxBytes) fail('SUBMISSION_STORE_BUDGET');
+@@ -99,9 +115,14 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+     try { data = JSON.parse(raw); } catch { fail('SUBMISSION_STORE_CORRUPT'); }
+-    if (!exactKeys(data, ['version','records']) || data.version !== 1 || !Array.isArray(data.records) || data.records.length > maxRecords || data.records.some(record => !validRecord(record, origin))) fail('SUBMISSION_STORE_CORRUPT');
++    const keys = Object.hasOwn(data || {}, 'drafts') ? ['version','records','drafts'] : ['version','records'];
++    if (!exactKeys(data, keys) || data.version !== 1 || !Array.isArray(data.records) || data.records.length > maxRecords || data.records.some(record => !validRecord(record, origin))) fail('SUBMISSION_STORE_CORRUPT');
+     if (data.records.some((record, index) => data.records.slice(0, index).some(previous => sameScope(record, previous)))) fail('SUBMISSION_STORE_CORRUPT');
+-    return data.records;
++    const drafts = keys.includes('drafts') ? data.drafts : [];
++    if (!Array.isArray(drafts) || drafts.length > maxRecords || drafts.some(draft => !validDraft(draft, origin))
++        || drafts.some((draft, index) => drafts.slice(0, index).some(previous => sameDraftScope(draft, previous)))) fail('SUBMISSION_STORE_CORRUPT');
++    return {records:data.records, drafts};
+   }
+-  function save(records) {
+-    const raw = JSON.stringify({version:1, records});
+-    if (records.length > maxRecords || byteLength(raw) > maxBytes) fail('SUBMISSION_STORE_BUDGET');
++  function load() { return readState().records; }
++  function save({records, drafts}) {
++    const raw = JSON.stringify({version:1, records, ...(drafts.length ? {drafts} : {})});
++    if (records.length > maxRecords || drafts.length > maxRecords || byteLength(raw) > maxBytes) fail('SUBMISSION_STORE_BUDGET');
+     try { getStorage().setItem(SUBMISSION_STORAGE_KEY, raw); }
+@@ -110,2 +131,17 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+   }
++  function rejectedDraft(scope) {
++    return readState().drafts.find(draft => sameDraftScope(draft, {...scope, origin})) || null;
++  }
++  async function updateRejectedDraft(previous, {text, attachments}) {
++    return mutate(() => {
++      const {records, drafts} = readState();
++      const index = drafts.findIndex(draft => sameDraftScope(draft, previous));
++      if (index < 0 || stable(drafts[index]) !== stable(previous)) fail('SUBMISSION_RECORD_CHANGED');
++      const next = {...previous, editVersion:previous.editVersion+1, text, attachments};
++      if (!validDraft(next, origin)) fail('SUBMISSION_INVALID');
++      drafts[index] = next;
++      save({records, drafts});
++      return next;
++    });
++  }
+   function current({entryId, topicKey}) { return load().find(record => sameScope(record, {origin, entryId, topicKey})) || null; }
+@@ -120,3 +156,3 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+   }
+-  async function prepare({entryId, sessionMarker, topicKey, kind, payload}) {
++  async function prepare({entryId, sessionMarker, topicKey, kind, payload, rejected}) {
+     if (!validSessionRecovery({version:1, entryId, sessionMarker})) fail('SUBMISSION_RECOVERY_UNAVAILABLE');
+@@ -126,5 +162,9 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+     return mutate(() => {
+-      const records = load(); // Reread after hashing AND after acquiring the cross-page lock.
++      const {records, drafts} = readState(); // Reread after hashing AND after acquiring the cross-page lock.
+       if (records.some(previous => sameScope(previous, record))) fail('SUBMISSION_PENDING');
+-      save([...records, record]);
++      if (kind === 'message' && rejected && drafts.some(draft => sameDraftScope(draft, record)
++          && draft.requestId === rejected.requestId && draft.editVersion === rejected.editVersion)) {
++        record.draftSource = {requestId:rejected.requestId, editVersion:rejected.editVersion};
++      }
++      save({records:[...records, record], drafts});
+       return requireCurrent(record);
+@@ -150,3 +190,3 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+   }
+-  async function releaseDesktopRejection(record, rejection, executions, session) {
++  async function releaseDesktopRejection(record, rejection, executions, session, readDraft) {
+     if (record.kind !== 'message' || rejection?.status !== 409 || rejection.code !== 'DESKTOP_CONTEXT_REQUIRED'
+@@ -154,6 +194,12 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+     return mutate(() => {
+-      const records = load(), index = records.findIndex(previous => sameScope(previous, record));
++      const {records, drafts} = readState();
++      const index = records.findIndex(previous => sameScope(previous, record));
+       if (index < 0 || !sameRecord(records[index], record)) return false;
+-      save(records.filter((_, at) => at !== index));
+-      return true;
++      const {text, attachments = []} = readDraft?.() || record.payload;
++      const {entryId, topicKey, sessionMarker, requestId} = record;
++      const draft = {origin, entryId, topicKey, sessionMarker, requestId, editVersion:0, text, attachments};
++      if (!validDraft(draft, origin)) fail('SUBMISSION_INVALID');
++      save({records:records.filter((_, at) => at !== index),
++        drafts:[...drafts.filter(previous => !sameDraftScope(previous, draft)), draft]});
++      return draft;
+     });
+@@ -163,6 +209,9 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+     return mutate(() => {
+-      const records = load(), index = records.findIndex(previous => sameScope(previous, record));
++      const {records, drafts} = readState();
++      const index = records.findIndex(previous => sameScope(previous, record));
+       if (index < 0) return false; // Another successful check already cleared this same record.
+       if (!sameRecord(records[index], record)) fail('SUBMISSION_RECORD_CHANGED');
+-      save(records.filter((_, at) => at !== index));
++      save({records:records.filter((_, at) => at !== index),
++        drafts:drafts.filter(draft => !(record.draftSource && sameDraftScope(draft, record)
++          && draft.requestId === record.draftSource.requestId && draft.editVersion === record.draftSource.editVersion))});
+       return true;
+@@ -170,3 +219,3 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+   }
+-  return {load, current, prepare, verify, requireCurrent, inspect, confirm, withSendLock, releaseDesktopRejection};
++  return {load, current, prepare, verify, requireCurrent, inspect, confirm, withSendLock, releaseDesktopRejection, rejectedDraft, updateRejectedDraft};
+ }

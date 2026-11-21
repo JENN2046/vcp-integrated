@@ -1,0 +1,10 @@
+{
+  "baselineRejectedRequest": "60f22826-4ea2-4729-b5bd-6a29d33af52d",
+  "candidateRejectedRequest": "b386a9d3-00bf-4a7d-a077-75f9a125125b",
+  "attachmentWork": "request_d58e9dcef2fb4e8f94f42dd51ee01e79",
+  "attachmentSha256": "a7e8a4d8e373abb0512fb65992a67870a7f6d999feb9b7339a29f32a5613076f",
+  "lostReceiptWork": "request_3a101f7c817e4e949586c4b5e33e6b12",
+  "lostReceiptRequest": "8677d995-f96b-4f3d-a85d-af85323bdfde",
+  "providerRequests": 4,
+  "toolInvocations": 2
+}

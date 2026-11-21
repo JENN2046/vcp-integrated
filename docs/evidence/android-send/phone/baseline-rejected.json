@@ -1,0 +1,23 @@
+{
+  "secure": true,
+  "origin": "https://127.0.0.1:18443",
+  "paired": true,
+  "visible": true,
+  "connection": "已连接",
+  "selectedAgent": "Synthetic lost receipt",
+  "selectedTopic": "shared_bfba871177614547b155e95754bc896a",
+  "progress": null,
+  "text": "PHYSICAL_ATTACHMENT {{VCPChatCanvas}}",
+  "editable": true,
+  "sendEnabled": true,
+  "retryEnabled": false,
+  "files": [
+    "fixture-note.txt · 100%"
+  ],
+  "status": "本轮上下文需要桌面专用内容，请在桌面继续。草稿和附件已保留，可编辑后重新发送。",
+  "attachmentPreview": null,
+  "pending": null,
+  "accepted": null,
+  "jobs": [],
+  "messages": []
+}

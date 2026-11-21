@@ -1,0 +1,61 @@
+{
+  "provider": [],
+  "tools": [],
+  "requests": [
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_bfba871177614547b155e95754bc896a/attachments/uploads",
+      "at": 1795280334801,
+      "status": 201,
+      "requestId": "file_b19259ca5631483970994649d109560af75accdedca9780a7b18d5018cce8d21"
+    },
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_bfba871177614547b155e95754bc896a/attachments/uploads/8059da49-8b10-43c5-b2d0-b7b71cb49986/chunks",
+      "at": 1795280334816,
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_bfba871177614547b155e95754bc896a/attachments/uploads/8059da49-8b10-43c5-b2d0-b7b71cb49986/finish",
+      "at": 1795280334826,
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_bfba871177614547b155e95754bc896a/messages",
+      "at": 1795280334851,
+      "status": 409,
+      "requestId": "60f22826-4ea2-4729-b5bd-6a29d33af52d",
+      "text": "PHYSICAL_ATTACHMENT {{VCPChatCanvas}}",
+      "attachments": [
+        "8059da49-8b10-43c5-b2d0-b7b71cb49986"
+      ],
+      "code": "DESKTOP_CONTEXT_REQUIRED"
+    },
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_bfba871177614547b155e95754bc896a/execution-request",
+      "at": 1795280334865,
+      "status": 200,
+      "matchedExecutions": []
+    }
+  ],
+  "exactLookups": [
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_bfba871177614547b155e95754bc896a/execution-request",
+      "requestId": "60f22826-4ea2-4729-b5bd-6a29d33af52d",
+      "at": 1795280334865,
+      "held": false
+    }
+  ],
+  "work": [],
+  "journal": [],
+  "links": [],
+  "paired": 1,
+  "attachmentFixture": {
+    "name": "fixture-note.txt",
+    "sha256": "a7e8a4d8e373abb0512fb65992a67870a7f6d999feb9b7339a29f32a5613076f"
+  }
+}

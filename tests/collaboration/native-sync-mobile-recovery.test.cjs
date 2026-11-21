@@ -200,9 +200,12 @@ test('invitation context headers replay within one session and reject a new Cook
 
 test('the PWA releases only a verified desktop-only rejection and serializes same-request posts', async () => {
     const {createSubmissionRecovery, restoreRejectedDraft} = await import('../../apps/mobile/src/submissionRecovery.js');
-    let saved = null;
+    let saved = null, failWrite = false;
     const tails = new Map();
-    const storage = {getItem: () => saved, setItem: (_key, value) => { saved = value; }};
+    const storage = {getItem: () => saved, setItem: (_key, value) => {
+        if (failWrite) throw Error('synthetic storage quota');
+        saved = value;
+    }};
     const locks = {request(name, _options, run) {
         const next = (tails.get(name) || Promise.resolve()).catch(() => {}).then(run);
         tails.set(name, next);
@@ -222,6 +225,11 @@ test('the PWA releases only a verified desktop-only rejection and serializes sam
         recovery:{version:1, kind:record.kind, payloadHash:record.payloadHash, sessionMarker:session.sessionMarker}};
     assert.equal(await first.releaseDesktopRejection(record, rejection, [prior], session), false);
     assert.deepEqual(first.current(record), record);
+    failWrite = true;
+    await assert.rejects(first.releaseDesktopRejection(record, rejection, [], session), {code:'SUBMISSION_STORE_UNAVAILABLE'});
+    failWrite = false;
+    assert.deepEqual(otherPage.current(record), record);
+    assert.equal(otherPage.rejectedDraft(record), null);
 
     let settle;
     const waitForResponse = new Promise(resolve => { settle = resolve; });
@@ -232,9 +240,16 @@ test('the PWA releases only a verified desktop-only rejection and serializes sam
     const queuedRetry = otherPage.withSendLock(record, () => assert.fail('released request posted again'));
     const stopped = assert.rejects(queuedRetry, {code:'SUBMISSION_RECORD_CHANGED'});
     settle();
-    assert.equal(await answer, true);
+    const releasedDraft = await answer;
+    assert.equal(releasedDraft.requestId, record.requestId);
     await stopped;
     assert.equal(first.current(record), null);
+    const restored = otherPage.rejectedDraft({...session, topicKey:record.topicKey});
+    assert.equal(restored.text, record.payload.text);
+    assert.deepEqual(restored.attachments, ['ready-upload']);
+    assert.equal(otherPage.rejectedDraft({...session, topicKey:'other'}), null);
+    assert.equal(otherPage.rejectedDraft({...session, entryId:'c'.repeat(64), topicKey:record.topicKey}), null);
+    assert.equal(otherPage.rejectedDraft({...session, sessionMarker:'c'.repeat(64), topicKey:record.topicKey}), null);
     const file = {uploadId:'ready-upload', file:{name:'original.txt'}};
     const liveDraft = {text:'already edited', revision:2, files:[file], submitted:{requestId:record.requestId}};
     restoreRejectedDraft(liveDraft, record);
@@ -243,7 +258,27 @@ test('the PWA releases only a verified desktop-only rejection and serializes sam
     restoreRejectedDraft(reloadedDraft, record);
     assert.equal(reloadedDraft.text, record.payload.text);
     assert.deepEqual(reloadedDraft.files, [{uploadId:'ready-upload', uploadSessionMarker:session.sessionMarker, progress:100, error:''}]);
-    const edited = await first.prepare({...session, topicKey:record.topicKey, kind:record.kind,
+    const editedDraft = await first.updateRejectedDraft(restored, {text:'edited text', attachments:['ready-upload']});
+    assert.deepEqual(otherPage.rejectedDraft(record), editedDraft);
+    await assert.rejects(otherPage.updateRejectedDraft(restored, {text:'stale other tab', attachments:[]}), {code:'SUBMISSION_RECORD_CHANGED'});
+    const edited = await first.prepare({...session, topicKey:record.topicKey, kind:record.kind, rejected:editedDraft,
         payload:{requestId:'edited-request', text:'edited text', attachments:reloadedDraft.files.map(item => item.uploadId)}});
     assert.deepEqual(edited.payload.attachments, ['ready-upload']);
+    assert.deepEqual(otherPage.current(record), edited);
+    assert.deepEqual(otherPage.rejectedDraft(record), editedDraft);
+    assert.equal((await otherPage.inspect(edited, [], session)).state, 'absent');
+    assert.deepEqual(otherPage.current(record), edited);
+    assert.deepEqual(otherPage.rejectedDraft(record), editedDraft);
+    const accepted = {...prior, id:'accepted-edit', requestId:edited.requestId,
+        recovery:{...prior.recovery, payloadHash:edited.payloadHash}};
+    const newerDraft = await otherPage.updateRejectedDraft(editedDraft, {text:'newer unsent edit', attachments:[]});
+    await otherPage.confirm(edited, accepted, session);
+    assert.equal(first.current(record), null);
+    assert.deepEqual(first.rejectedDraft(record), newerDraft);
+    const final = await first.prepare({...session, topicKey:record.topicKey, kind:record.kind, rejected:newerDraft,
+        payload:{requestId:'newest-request', text:newerDraft.text, attachments:newerDraft.attachments}});
+    await otherPage.confirm(final, {...accepted, id:'accepted-newest', requestId:final.requestId,
+        recovery:{...accepted.recovery, payloadHash:final.payloadHash}}, session);
+    assert.equal(first.current(record), null);
+    assert.equal(first.rejectedDraft(record), null);
 });
