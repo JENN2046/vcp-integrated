@@ -1,0 +1,50 @@
+{
+  "result": "PASS",
+  "scope": "Original device A synthetic compaction from compact-cross-device, upgraded component acceptance",
+  "test": "tests/native/shared-compaction-confirmation.test.cjs",
+  "command": "NATIVESYNC_ORIGINAL_COMPACTION_ROOT=<local compact-cross-device fixture> .runs/toolchain/bin/node --test tests/native/shared-compaction-confirmation.test.cjs",
+  "node": "24.22.3",
+  "counts": {
+    "passed": 13,
+    "failed": 0,
+    "originalDeviceACases": 6
+  },
+  "oldPublication": {
+    "prepareLedgerCancelled": true,
+    "commitLedgerPhase": "completed",
+    "hadConfirmationMarker": false,
+    "centralProofHead": 8,
+    "centralTopicHead": 9,
+    "centralCommitSeq": 9,
+    "centralCancelAlreadyCommitted": true,
+    "centralProofHashMatchesOriginalBody": true,
+    "centralCommitRequestHashMatchesOriginalBody": true,
+    "journalAndPhysicalHistoryMatchOriginalBodyAndMetadata": true,
+    "checkpointCountInOriginalPhysicalHistory": 1
+  },
+  "checks": {
+    "freshCentralHeadRequested": true,
+    "rendererRecoveredSameCheckpointAndFullHistory": true,
+    "modelCallsDuringOriginalRecovery": 0,
+    "compactionMutationRequestsDuringOriginalRecovery": 0,
+    "confirmationSurvivesLedgerReopen": true,
+    "newInputUsesFreshCompaction": true,
+    "differentTopicUsesFreshCompaction": true,
+    "editedContentAndValidEditedMetadataRejectRecovery": true,
+    "missingCheckpointRejectsRecovery": true,
+    "restoredHistoryCanStillConfirmAfterConflict": true,
+    "droppedCommitResponseRetryKeepsOriginalIntentWithoutSecondSummary": true,
+    "explicitUnknownOrWrongTopicRetryIdRejected": true
+  },
+  "isolation": {
+    "originalCentralDatabaseOpenedReadOnly": true,
+    "extractedOnly": [
+      "original A compaction preparations and publications",
+      "the single synthetic topic History",
+      "central proof, commit receipt, cancel receipt and Journal checkpoint identity and head"
+    ],
+    "originalFilesUnchangedByBeforeAfterSha256": true,
+    "credentialsAuthenticationStateAndCachesCopied": false
+  },
+  "testBoundary": "Runs the candidate renderer compaction service, SharedRuntime preparation and confirmation, and actual SharedExecution persistence against isolated files. The harness supplies the independently verified central head and file-backed projection reads, and substitutes synthetic fresh prepare/input responses. This run covers the component upgrade path. Live Electron IPC, CDS and network transport are outside this receipt."
+}

@@ -1,0 +1,167 @@
+{
+  "baseline": {
+    "rawSha256": "0d5bacce5b204e368fd5711f09f1551d2cdffdf934e6c4b24c74c1048e0f1933",
+    "events": [
+      {
+        "name": "checkpoint-captured",
+        "mode": "baseline",
+        "time": 1795259466475,
+        "seq": 9,
+        "msgId": "checkpoint_compact_317812a38ab870ad1da2d726b4456dceba49e576"
+      },
+      {
+        "name": "reader-lstat",
+        "mode": "baseline",
+        "time": 1795259466478,
+        "file": "/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/identity-electron.IeQx3G/vcp-integration-7506Cj/compact-cross-device/profile-A/UserData/ns_2dfd1e4d914300f8a4dfb093/topics/ns_8a87359496b4176d3c104254/history.json",
+        "identity": {
+          "dev": 66315,
+          "ino": 10663640,
+          "nlink": 1
+        },
+        "queued": false,
+        "seq": 9
+      },
+      {
+        "name": "checkpoint-captured",
+        "mode": "baseline",
+        "time": 1795259466483,
+        "seq": 9,
+        "msgId": "checkpoint_compact_317812a38ab870ad1da2d726b4456dceba49e576"
+      },
+      {
+        "name": "writer-enqueued",
+        "mode": "baseline",
+        "time": 1795259466483,
+        "queueSize": 1
+      },
+      {
+        "name": "writer-renamed",
+        "mode": "baseline",
+        "time": 1795259466491,
+        "before": {
+          "dev": 66315,
+          "ino": 10661091,
+          "nlink": 1
+        },
+        "after": {
+          "dev": 66315,
+          "ino": 10661154,
+          "nlink": 1
+        },
+        "writer": [
+          "at fsp.rename (/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/identity-electron.IeQx3G/probe.cjs:78:24)",
+          "at async Object.durableJson (/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/modules/utils/durableJson.js:20:19)",
+          "at async #write (/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/modules/services/historyMutationQueue.js:299:17)",
+          "at async /home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/modules/services/historyMutationQueue.js:71:32"
+        ]
+      },
+      {
+        "name": "writer-result",
+        "mode": "baseline",
+        "time": 1795259466494,
+        "state": "captured"
+      },
+      {
+        "name": "reader-fstat",
+        "mode": "baseline",
+        "time": 1795259466494,
+        "identity": {
+          "dev": 66315,
+          "ino": 10661154,
+          "nlink": 1
+        }
+      },
+      {
+        "name": "compact-commit-result",
+        "mode": "baseline",
+        "time": 1795259466496,
+        "success": false,
+        "error": "HISTORY_IDENTITY_CHANGED",
+        "checkpointId": "compact_317812a38ab870ad1da2d726b4456dceba49e576"
+      }
+    ]
+  },
+  "candidate": {
+    "rawSha256": "8156cbb17bbc5b6f971877058711af001b6181aba253d0ccd751e646bbe34090",
+    "events": [
+      {
+        "name": "checkpoint-captured",
+        "mode": "candidate",
+        "time": 1795259488817,
+        "seq": 9,
+        "msgId": "checkpoint_compact_54f1f49eed39981489faa2607fd581b15632eacb"
+      },
+      {
+        "name": "checkpoint-captured",
+        "mode": "candidate",
+        "time": 1795259488830,
+        "seq": 9,
+        "msgId": "checkpoint_compact_54f1f49eed39981489faa2607fd581b15632eacb"
+      },
+      {
+        "name": "reader-lstat",
+        "mode": "candidate",
+        "time": 1795259488832,
+        "file": "/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/identity-electron.IeQx3G/vcp-integration-TVhnKe/compact-cross-device/profile-A/UserData/ns_5cabe6b85b48707d24f7dd21/topics/ns_18e4142212e30fa2973b192b/history.json",
+        "identity": {
+          "dev": 66315,
+          "ino": 15521801,
+          "nlink": 1
+        },
+        "queued": true,
+        "seq": 9
+      },
+      {
+        "name": "writer-enqueued",
+        "mode": "candidate",
+        "time": 1795259488833,
+        "queueSize": 1
+      },
+      {
+        "name": "reader-fstat",
+        "mode": "candidate",
+        "time": 1795259488833,
+        "identity": {
+          "dev": 66315,
+          "ino": 15521801,
+          "nlink": 1
+        }
+      },
+      {
+        "name": "writer-renamed",
+        "mode": "candidate",
+        "time": 1795259488842,
+        "before": {
+          "dev": 66315,
+          "ino": 15521801,
+          "nlink": 1
+        },
+        "after": {
+          "dev": 66315,
+          "ino": 15522481,
+          "nlink": 1
+        },
+        "writer": [
+          "at fsp.rename (/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/identity-electron.IeQx3G/probe.cjs:78:24)",
+          "at async Object.durableJson (/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/modules/utils/durableJson.js:20:19)",
+          "at async #write (/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/modules/services/historyMutationQueue.js:299:17)",
+          "at async /home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/modules/services/historyMutationQueue.js:71:32"
+        ]
+      },
+      {
+        "name": "writer-result",
+        "mode": "candidate",
+        "time": 1795259488846,
+        "state": "captured"
+      },
+      {
+        "name": "compact-commit-result",
+        "mode": "candidate",
+        "time": 1795259488852,
+        "success": true,
+        "checkpointId": "compact_54f1f49eed39981489faa2607fd581b15632eacb"
+      }
+    ]
+  }
+}

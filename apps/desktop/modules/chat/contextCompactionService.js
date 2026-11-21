@@ -116,6 +116,7 @@ export function createContextCompactionService({
     getExecutionAuthority = scope => globalThis.electronAPI?.getTopicExecutionAuthority?.(scope),
 } = {}) {
     const pending = new Map();
+    const retryPublications = new Map();
     let disposed = false;
 
     function isBusy(scope) {
@@ -163,6 +164,7 @@ export function createContextCompactionService({
         let returnedContent;
         let shared;
         let committed = false;
+        let recovered;
         try {
             const decision = getExecutionAuthority(scope);
             authority = typeof decision?.then === 'function' ? await decision : decision;
@@ -179,10 +181,16 @@ export function createContextCompactionService({
             });
             const runRequest = async () => {
                 const preparation = authority.kind === 'shared' && typeof sharedCompaction?.prepareSharedCompaction === 'function'
-                    ? await sharedCompaction.prepareSharedCompaction({descriptor:scope}) : null;
+                    ? await sharedCompaction.prepareSharedCompaction({descriptor:scope, ...(retryPublications.has(key) && {retryId:retryPublications.get(key)})}) : null;
                 if (authority.kind === 'shared' && !preparation?.handled) throw Object.assign(new Error(preparation?.error || '共享压缩协议不可用'), {code: preparation?.error || 'SHARED_COMPACTION_UNAVAILABLE'});
                 if (preparation?.success === false) throw Object.assign(new Error(preparation.error), {code:preparation.error});
                 if (preparation?.handled) {
+                    if (preparation.recovered) {
+                        if (!Array.isArray(preparation.history) || !preparation.message || preparation.message.id !== preparation.messageId)
+                            throw new Error('共享压缩检查点回执不完整');
+                        recovered = preparation;
+                        return;
+                    }
                     shared = preparation;
                     if (disposed || controller.signal.aborted) {
                         await sharedCompaction.cancelSharedCompaction({descriptor:scope,id:shared.id});
@@ -203,10 +211,11 @@ export function createContextCompactionService({
             clearTimeout(timer); // The request deadline must not abort durable history persistence.
             if (disposed || controller.signal.aborted) throw new Error('上下文压缩已取消');
             returnedContent = response;
-            const message = createCheckpointMessage(state, response, settings, shared ? {id:shared.messageId} : {});
+            const message = recovered?.message ?? createCheckpointMessage(state, response, settings, shared ? {id:shared.messageId} : {});
             const original = JSON.stringify(snapshot);
-            const outcome = shared ? await (async () => {
+            const outcome = recovered ?? (shared ? await (async () => {
                 controller.committing = true;
+                retryPublications.set(key,shared.id);
                 const value = await sharedCompaction.commitSharedCompaction({descriptor:scope,id:shared.id,sourceHash:shared.sourceHash,message});
                 if(value?.success === false)throw Object.assign(new Error(value.error),{code:value.error});
                 return value;
@@ -219,8 +228,9 @@ export function createContextCompactionService({
                 // safely be rolled back by aborting the network request.
                 controller.committing = true;
                 return [...current, message];
-            });
+            }));
             committed = true;
+            retryPublications.delete(key);
             // Durable success, not UI rendering, determines whether the heartbeat can resume.
             flowlock?.resumeAfterContextCompaction?.(flowlockLease);
             try { await onCommitted(outcome.history, message); }
@@ -231,7 +241,7 @@ export function createContextCompactionService({
                 const content = responseDiagnostic?.content ?? returnedContent;
                 const raw = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
                 error.compactionDiagnostic = [
-                    '上下文压缩失败诊断（原历史未修改）',
+                    shared && controller.committing ? '共享检查点提交结果待核对，请重试「压缩前文」' : '上下文压缩失败诊断（原历史未修改）',
                     `模型：${responseDiagnostic?.model || compactionSettings(settings).model}`,
                     `服务端结束原因：${responseDiagnostic?.finishReason ?? '未提供'}`,
                     `失败原因：${error.message}`,
@@ -258,6 +268,7 @@ export function createContextCompactionService({
         compact,
         dispose() {
             disposed = true;
+            retryPublications.clear();
             for (const controller of pending.values()) controller.abort();
         },
     });

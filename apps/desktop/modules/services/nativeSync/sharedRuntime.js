@@ -563,8 +563,25 @@ class SharedRuntime {
   }
   for(const [id,prepared]of Object.entries(this.execution.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.activeCompactions.has(id)&&!this.execution.state.compactions?.[id]?.body)await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:this.closed});
  }
- async prepareSharedCompaction({descriptor}){
-  if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(descriptor);if(!this.capabilities.features?.includes('shared-compaction-v1'))throw fail('SHARED_COMPACTION_UPGRADE_REQUIRED');const context=await this.refreshForExecution(descriptor);if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');
+ async prepareSharedCompaction({descriptor,retryId}){
+  if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(descriptor);if(!this.capabilities.features?.includes('shared-compaction-v1'))throw fail('SHARED_COMPACTION_UPGRADE_REQUIRED');const context=await this.refreshForExecution(descriptor,{forceFresh:true});if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');
+  const publications=this.execution.state.compactions||{};
+  if(retryId!==undefined){
+   const preparations=this.execution.state.compactionPreparations||{};
+   const prior=Object.hasOwn(preparations,retryId)&&preparations[retryId];
+   if(!prior||prior.sharedId!==mapping.sharedId||stable(prior.descriptor)!==stable(descriptor))throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
+   const original=publications[retryId];
+   if(original&&original.phase!=='blocked')return this.confirmSharedCompaction(original,true);
+   if(!original&&!prior.cancelled)throw fail('SHARED_CHECKPOINT_PUBLICATION_PENDING');
+  }
+  const pending=Object.values(publications).find(intent=>{
+   if(stable(intent.descriptor)!==stable(descriptor)||intent.phase==='blocked')return false;
+   if(intent.awaitingConfirmation||intent.phase==='publishing')return true;
+   // Older desktops cancelled after a failed readback, even when the original commit had landed.
+   const preparation=this.execution.state.compactionPreparations?.[intent.body.id];
+   return intent.awaitingConfirmation===undefined&&preparation?.cancelled&&intent.phase==='completed'&&intent.receipt?.seq===context.head;
+  });
+  if(pending)return this.confirmSharedCompaction(pending,true);
   const opId='compact_prepare_'+randomUUID(),intent={descriptor:{...descriptor},body:{sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId,opId,expectedHead:context.head},phase:'preparing'};this.execution.state.compactionPrepareRequests||={};this.execution.state.compactionPrepareRequests[opId]=intent;this.activeCompactionPrepares.add(opId);
   try{
    await this.execution.save();if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');const receipt=await this.recoverSharedCompactionPrepare(intent);if(this.closed){await this.cancelSharedCompaction({descriptor,id:receipt.id,closing:true});throw fail('APPLICATION_SHUTTING_DOWN');}
@@ -575,20 +592,39 @@ class SharedRuntime {
 
  async cancelSharedCompaction({descriptor,id,closing=false}){if(this.closed&&!closing)throw fail('APPLICATION_SHUTTING_DOWN');
   const prepared=this.execution.state.compactionPreparations?.[id];if(!prepared||stable(prepared.descriptor)!==stable(descriptor))throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
-  const intent=this.execution.state.compactions?.[id];if(intent?.phase==='publishing'){await this.execution.run('compaction:'+id,()=>this.finishSharedCompaction(intent));return {success:true,alreadyCommitted:true};}
+  const intent=this.execution.state.compactions?.[id];if(intent&&['publishing','completed'].includes(intent.phase)){await this.execution.run('compaction:'+id,()=>this.finishSharedCompaction(intent));return {success:true,alreadyCommitted:true};}
   const result=await this.send(endpoint+'compact-cancel',{body:{sharedSpaceId:this.connection.sharedSpaceId,id,opId:'compact_cancel_'+id}});prepared.cancelled=true;this.activeCompactions.delete(id);await this.execution.save();if(result.alreadyCommitted)await this.syncExecutionTopic(this.execution.mapping(descriptor),{minSeq:result.seq});return result;
  }
  async finishSharedCompaction(intent){
   if(intent.phase==='completed')return;const mapping=this.execution.mapping(intent.descriptor);
   try{intent.receipt=await this.send(endpoint+'compact-commit',{body:intent.body});}catch(error){if(!['NETWORK_UNAVAILABLE','SYNC_HTTP_ERROR'].includes(error.code)){intent.phase='blocked';intent.errorCode=error.code;}await this.execution.save();throw error;}
+  if(intent.receipt?.success!==true||intent.receipt.messageId!==intent.body.message.id||
+   !Number.isSafeInteger(intent.receipt.seq)||intent.receipt.seq<1)throw fail('SHARED_COMPACTION_RESPONSE_INVALID');
   await this.syncExecutionTopic(mapping,{minSeq:intent.receipt.seq});intent.phase='completed';this.activeCompactions.delete(intent.body.id);delete intent.errorCode;await this.execution.save();
+ }
+ async confirmSharedCompaction(intent,recovered=false){
+  const {body,descriptor}=intent,mapping=this.execution.mapping(descriptor);
+  const preparation=this.execution.state.compactionPreparations?.[body.id];
+  if(body.sharedSpaceId!==this.connection.sharedSpaceId||!preparation||
+   preparation?.sourceHash!==body.sourceHash||preparation.messageId!==body.message.id||
+   preparation.sharedId!==mapping.sharedId||stable(preparation.descriptor)!==stable(descriptor))throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
+  return this.execution.run('compaction:'+body.id,async()=>{
+   await this.finishSharedCompaction(intent);
+   const history=await this.replica.queue.read(mapping.shared),message=history.find(row=>row.id===body.message.id);
+   if(intent.receipt?.success!==true||!Number.isSafeInteger(intent.receipt.seq)||intent.receipt.seq<1||
+    intent.receipt.messageId!==body.message.id||!message||messageHash(message)!==messageHash(body.message)||
+    stable(fieldsFrom(message))!==stable(fieldsFrom(body.message)))throw fail('SHARED_CHECKPOINT_PROJECTION_CONFLICT');
+   intent.awaitingConfirmation=false;
+   try{await this.execution.save();}catch(error){intent.awaitingConfirmation=true;throw error;}
+   return {handled:true,success:true,recovered,id:body.id,messageId:message.id,message,history};
+  });
  }
  async commitSharedCompaction({descriptor,id,sourceHash,message}){
   if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(descriptor),body={sharedSpaceId:this.connection.sharedSpaceId,id,sourceHash,opId:'compact_commit_'+id,message:this.adapter.canonical(message,mapping.shared.topicId)};
   const preparation=this.execution.state.compactionPreparations?.[id];if(!preparation||stable(preparation.descriptor)!==stable(descriptor)||preparation.sharedId!==mapping.sharedId||preparation.sourceHash!==sourceHash||preparation.messageId!==message.id)throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
   this.execution.state.compactions||={};let intent=this.execution.state.compactions[id];if(intent&&(stable(intent.body)!==stable(body)||stable(intent.descriptor)!==stable(descriptor)))throw fail('SHARED_CHECKPOINT_INTENT_CHANGED');
-  if(!intent){intent=this.execution.state.compactions[id]={descriptor:{...descriptor},body,phase:'publishing'};await this.execution.save();}
-  await this.execution.run('compaction:'+id,()=>this.finishSharedCompaction(intent));return {handled:true,success:true,history:await this.replica.queue.read(mapping.shared)};
+  if(!intent){intent=this.execution.state.compactions[id]={descriptor:{...descriptor},body,phase:'publishing',awaitingConfirmation:true};await this.execution.save();}
+  return this.confirmSharedCompaction(intent);
  }
 
  async handoffSharedWork({descriptor,workId}){if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.steering.handoff(descriptor,workId);}

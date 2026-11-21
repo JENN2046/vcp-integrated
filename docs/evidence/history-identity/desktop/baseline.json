@@ -1,0 +1,277 @@
+{
+  "revision": "95311dea107fc5e273997ee88e9ae82f789bc05f",
+  "mode": "compact-history-identity",
+  "electron": "44.9.3",
+  "sandbox": true,
+  "failure": "AssertionError [ERR_ASSERTION]: retry must recover the original publication",
+  "A": {
+    "intentId": "compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+    "checkpointId": "checkpoint_compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+    "inodeRace": {
+      "intentId": "compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+      "checkpointId": "checkpoint_compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+      "beforeIno": 111555011,
+      "afterIno": 111555028,
+      "links": 1,
+      "historySha256": "acbc9ee7f62be23aadf2bc25b5d7b2f0a905aca3b8247a76d4840ab03b60421a"
+    },
+    "beforeRetry": {
+      "ipc": {
+        "channel": "native-sync:compact-commit",
+        "error": "HISTORY_IDENTITY_CHANGED",
+        "success": false
+      },
+      "diagnostic": "上下文压缩失败诊断（原历史未修改） 模型：synthetic-summary 服务端结束原因：stop 失败原因：HISTORY_IDENTITY_CHANGED",
+      "localLedger": {
+        "phase": "completed",
+        "awaitingConfirmation": null
+      },
+      "journalHead": 9,
+      "journalCheckpointIds": [
+        "checkpoint_compact_254d170a87a4eb9fe9012623d8d2a3d497958001"
+      ],
+      "physicalCheckpointIds": [
+        "checkpoint_compact_254d170a87a4eb9fe9012623d8d2a3d497958001"
+      ],
+      "summaryProviderCalls": 1,
+      "centralRequests": [
+        {
+          "operation": "compact-prepare",
+          "device": "deviceA",
+          "timestamp": 1795259398533,
+          "status": 200,
+          "intentId": "compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+          "checkpointId": "checkpoint_compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+          "replayed": false,
+          "bodySha256": "f33c81735074595ae7fcfc36984fa047ccb62f8ba2fe33e13d0d24cff8bf5e4a"
+        },
+        {
+          "operation": "compact-commit",
+          "device": "deviceA",
+          "timestamp": 1795259398588,
+          "status": 200,
+          "intentId": "compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+          "checkpointId": "checkpoint_compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+          "seq": 9,
+          "replayed": false,
+          "bodySha256": "7ed86bc92bb9bf5e487c4e6358e40f333ad7c5b11995ee399d76426c4d57e462"
+        },
+        {
+          "operation": "compact-commit",
+          "device": "deviceA",
+          "timestamp": 1795259398622,
+          "status": 200,
+          "intentId": "compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+          "checkpointId": "checkpoint_compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+          "seq": 9,
+          "replayed": true,
+          "bodySha256": "7ed86bc92bb9bf5e487c4e6358e40f333ad7c5b11995ee399d76426c4d57e462"
+        }
+      ]
+    },
+    "afterRetry": {
+      "ipc": {
+        "channel": "native-sync:compact-prepare",
+        "handled": true,
+        "success": true,
+        "intentId": "compact_79d0a9185fafc2ffba085139c0943290a802d1ef",
+        "checkpointId": "checkpoint_compact_79d0a9185fafc2ffba085139c0943290a802d1ef"
+      },
+      "duplicateCommit": {
+        "channel": "native-sync:compact-commit",
+        "handled": true,
+        "success": true
+      },
+      "localLedger": {
+        "phase": "completed",
+        "awaitingConfirmation": null
+      },
+      "journalHead": 10,
+      "journalCheckpointIds": [
+        "checkpoint_compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+        "checkpoint_compact_79d0a9185fafc2ffba085139c0943290a802d1ef"
+      ],
+      "physicalCheckpointIds": [
+        "checkpoint_compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+        "checkpoint_compact_79d0a9185fafc2ffba085139c0943290a802d1ef"
+      ],
+      "summaryProviderCalls": 2,
+      "centralRequests": [
+        {
+          "operation": "compact-prepare",
+          "device": "deviceA",
+          "timestamp": 1795259398533,
+          "status": 200,
+          "intentId": "compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+          "checkpointId": "checkpoint_compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+          "replayed": false,
+          "bodySha256": "f33c81735074595ae7fcfc36984fa047ccb62f8ba2fe33e13d0d24cff8bf5e4a"
+        },
+        {
+          "operation": "compact-commit",
+          "device": "deviceA",
+          "timestamp": 1795259398588,
+          "status": 200,
+          "intentId": "compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+          "checkpointId": "checkpoint_compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+          "seq": 9,
+          "replayed": false,
+          "bodySha256": "7ed86bc92bb9bf5e487c4e6358e40f333ad7c5b11995ee399d76426c4d57e462"
+        },
+        {
+          "operation": "compact-commit",
+          "device": "deviceA",
+          "timestamp": 1795259398622,
+          "status": 200,
+          "intentId": "compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+          "checkpointId": "checkpoint_compact_254d170a87a4eb9fe9012623d8d2a3d497958001",
+          "seq": 9,
+          "replayed": true,
+          "bodySha256": "7ed86bc92bb9bf5e487c4e6358e40f333ad7c5b11995ee399d76426c4d57e462"
+        },
+        {
+          "operation": "compact-prepare",
+          "device": "deviceA",
+          "timestamp": 1795259399516,
+          "status": 200,
+          "intentId": "compact_79d0a9185fafc2ffba085139c0943290a802d1ef",
+          "checkpointId": "checkpoint_compact_79d0a9185fafc2ffba085139c0943290a802d1ef",
+          "replayed": false,
+          "bodySha256": "2ca6dd498f24d76bf40e40406f2d600ff86fb7782ac52f185108a0786cb0030c"
+        },
+        {
+          "operation": "compact-commit",
+          "device": "deviceA",
+          "timestamp": 1795259399555,
+          "status": 200,
+          "intentId": "compact_79d0a9185fafc2ffba085139c0943290a802d1ef",
+          "checkpointId": "checkpoint_compact_79d0a9185fafc2ffba085139c0943290a802d1ef",
+          "seq": 10,
+          "replayed": false,
+          "bodySha256": "1c7ae58b4d9b00e9c36ba9dd4dc9b270aef1296b9b4955bb374046f5abbe9955"
+        }
+      ]
+    },
+    "loaded": {
+      "main": [
+        {
+          "file": "apps/desktop/modules/services/historyMutationQueue.js",
+          "sha256": "d7df64ef7d192278f5e6799b18272af0a8cf559eef418b846b5ae73a92568962"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+          "sha256": "e40e999597c14039f96910fac251b908cce43ae8a427a9f0393f6b079ffd20f5"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedQueue.js",
+          "sha256": "6ea79529825916f8dfe4c9a10132a83cdf3de686e0d9b947a87e29cd6aeff905"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/modules/chat/contextCompactionService.js",
+          "bytes": 14475,
+          "sha256": "b424c5e8704573f4164700df51c4d3f45ac33b4c44d2add930e194dec8a1698e"
+        }
+      ]
+    }
+  },
+  "B": null,
+  "serverSources": [
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+      "sha256": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+      "sha256": "c0be485ee31ed3d50db0e5a7e5e72aa38110434fe63c23606a7855a05ca7d512"
+    }
+  ],
+  "summaryRequests": [
+    {
+      "id": "compaction_1795259398512_3d9lcjzoa7",
+      "model": "synthetic-summary",
+      "stream": true,
+      "timestamp": 1795259398575
+    },
+    {
+      "id": "compaction_1795259399497_qd6rmx49qd",
+      "model": "synthetic-summary",
+      "stream": true,
+      "timestamp": 1795259399539
+    }
+  ],
+  "exits": {
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "earlierNoninjectedObservation": [
+    {
+      "timestamp": 1795258678725,
+      "event": "A:ipc",
+      "channel": "native-sync:compact-commit"
+    },
+    {
+      "timestamp": 1795258678771,
+      "event": "A:renderer-event",
+      "channel": "history-file-updated"
+    },
+    {
+      "timestamp": 1795258678771,
+      "event": "A:renderer-event",
+      "channel": "history-file-updated"
+    },
+    {
+      "timestamp": 1795258678772,
+      "event": "A:ipc",
+      "channel": "native-history:snapshot"
+    },
+    {
+      "timestamp": 1795258678780,
+      "event": "A:ipc-result",
+      "channel": "native-sync:compact-commit",
+      "error": "HISTORY_IDENTITY_CHANGED",
+      "success": false
+    },
+    {
+      "timestamp": 1795258678780,
+      "event": "A:ipc",
+      "channel": "native-sync:compact-cancel"
+    },
+    {
+      "timestamp": 1795258678783,
+      "event": "A:renderer-event",
+      "channel": "history-file-updated"
+    },
+    {
+      "timestamp": 1795258678784,
+      "event": "A:renderer-event",
+      "channel": "history-file-updated"
+    },
+    {
+      "timestamp": 1795258678788,
+      "event": "A:ipc",
+      "channel": "native-history:snapshot"
+    },
+    {
+      "timestamp": 1795258678795,
+      "event": "A:ipc-result",
+      "channel": "native-sync:compact-cancel",
+      "success": true
+    }
+  ]
+}

@@ -159,6 +159,15 @@ class HistoryMutationQueue {
         await this.syncPolicy?.beforeRead?.(d);
         const state = await this.inspect(d); return state.exists ? state.history : [];
     }
+    readSerialized(descriptor) {
+        const d = { ...descriptor }, scope = this.#context.getStore();
+        // Shared projections publish by renaming under this queue. Hold the
+        // same topic slot across the strict path/open identity check.
+        if (scope?.active && scope.key === this.#key(d)) return this.read(d);
+        const read = () => this.run(d, () => this.read(d));
+        const authority = authorityForQueue(this);
+        return authority ? authority.readAfterTransition(read) : read();
+    }
     readSnapshot(d) {
         return this.run(d, async () => { const history = await this.read(d); return { history, revision: this.revision(history), syncEnabled: this.isSyncEnabled(d) }; });
     }

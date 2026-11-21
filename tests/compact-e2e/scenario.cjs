@@ -91,15 +91,18 @@ module.exports = async ({ clients: { A, B }, out, result, service, picture, clic
         assert.equal(callsBefore, 2);
         assert.ok(service.calls.every(row => row.fixtureControlled));
         await waitUntil(async () => (await transcript(A)).includes(fixture.edited), 'visible edit in shared History');
-        const point = await evalJs(A, `(() => {
-            const row = document.querySelector('[data-message-id="${editedTurn.requestId}"]');
-            row.scrollIntoView({block:'center',behavior:'instant'});
-            const rect = row.getBoundingClientRect();
-            return {x:Math.round(rect.left + rect.width / 2), y:Math.round(rect.top + rect.height / 2)};
-        })()`);
-        await A.command('mouse-right', point);
-        await picture(A, 'manual-menu');
-        await click(A, '.context-menu-item', '压缩前文');
+        async function manualCompact(screenshot) {
+            const point = await evalJs(A, `(() => {
+                const row = document.querySelector('[data-message-id="${editedTurn.requestId}"]');
+                row.scrollIntoView({block:'center',behavior:'instant'});
+                const rect = row.getBoundingClientRect();
+                return {x:Math.round(rect.left + rect.width / 2), y:Math.round(rect.top + rect.height / 2)};
+            })()`);
+            await A.command('mouse-right', point);
+            if (screenshot) await picture(A, screenshot);
+            await click(A, '.context-menu-item', '压缩前文');
+        }
+        await manualCompact('manual-menu');
         const committed = await waitUntil(() => intents().find(row => row.state === 'committed'), 'durable checkpoint commit');
         const compacted = await waitUntil(() => history().find(checkpointMessage) && history(), 'physical checkpoint projection');
         const checkpoint = compacted.find(checkpointMessage);
@@ -127,7 +130,13 @@ module.exports = async ({ clients: { A, B }, out, result, service, picture, clic
         assert.equal(summaryCall.model, fixture.summaryModel);
         assert.ok(!summaryCall.messages.some(row => fixture.replies.some(marker => text(row)?.includes(marker))));
         assert.deepEqual(summaryCall.messages.slice(1, -1).map(row => [row.role,text(row)]), prior.map(row => [row.role,text(row)]));
-        await waitUntil(() => compactIpc(A).some(row => row.data.channel.endsWith('compact-commit') && row.data.success), 'commit IPC receipt');
+        if (result.mode === 'compact-history-identity') {
+            const retry = require('./retry.cjs');
+            await retry({ A, result, service, history, journal, intents, compactIpc, compacted, committed, checkpoint,
+                manualCompact, picture, waitUntil, profiles, sha });
+        } else {
+            await waitUntil(() => compactIpc(A).some(row => row.data.channel.endsWith('compact-commit') && row.data.success), 'commit IPC receipt');
+        }
         await waitUntil(() => evalJs(A, 'document.querySelector(".vcp-context-checkpoint")?.checkVisibility()'), 'checkpoint card');
         await picture(A, 'checkpoint-committed');
         await stop('A');

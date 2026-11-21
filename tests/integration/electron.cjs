@@ -18,6 +18,8 @@ const log = (event, data) => console.log('NS_MEASURE', JSON.stringify({event,t:D
 let detailed = false;
 const fs = require('node:fs');
 const path = require('node:path');
+const compactionRace = process.env.NS_COMPACTION_HISTORY_RACE === '1'
+    ? require('../compact-e2e/history-race.cjs').install(process.env.VCPCHAT_APP_DATA_DIR, log) : null;
 app.setAppPath(process.env.NS_HOST);
 const Module = require('node:module');
 const load = Module._load;
@@ -79,11 +81,16 @@ ipcMain.handle = (channel, fn) => {
         if (detailed && channel === 'native-sync:prepare-send') {
             log('desktop-input', {id:args[0]?.message?.id,localOnly:args[0]?.localOnly===true,serverSession:args[0]?.serverSession===true});
         }
-        const result = fn.call(this, event, ...args);
+        const invoke = () => fn.call(this, event, ...args);
+        const result = compactionRace ? compactionRace(channel, args, invoke) : invoke();
         if (detailed && /^(native-sync:|topic-execution:authority|save-avatar$|save-agent-config$|save-agent-group-avatar$|save-agent-group-config$)/.test(channel)) {
             return Promise.resolve(result).then(value => {
                 log('ipc-result', {channel, code:value?.code, error:value?.error, handled:value?.handled,
-                    success:value?.success, refreshError:value?.refreshError, extrasError:value?.extrasError, sharedVersion:value?.sharedVersion, avatarResult:value?.avatarResult, kind:value?.kind, ready:value?.shared?.ready, replyId:value?.replyId });
+                    success:value?.success,
+                    ...(compactionRace && channel.startsWith('native-sync:compact-') && {
+                        recovered:value?.recovered, intentId:value?.id, checkpointId:value?.messageId,
+                    }),
+                    refreshError:value?.refreshError, extrasError:value?.extrasError, sharedVersion:value?.sharedVersion, avatarResult:value?.avatarResult, kind:value?.kind, ready:value?.shared?.ready, replyId:value?.replyId });
                 return value;
             });
         }
@@ -161,6 +168,22 @@ input.on('line', async line => {
                 })`);
             } finally {
                 mobile.destroy();
+            }
+        }
+        if (action === 'dismiss-compaction-diagnostic' && compactionRace) {
+            const viewer = BrowserWindow.getAllWindows().find(candidate => {
+                const url = new URL(candidate.webContents.getURL() || 'about:blank');
+                return url.pathname.endsWith('/text-viewer.html') &&
+                    url.searchParams.get('title') === '上下文压缩失败：模型返回原文';
+            });
+            if (viewer?.isVisible()) {
+                const line = await viewer.webContents.executeJavaScript(
+                    "document.body.innerText.split('\\n').find(line => line.includes('HISTORY_IDENTITY_CHANGED'))");
+                if (line) {
+                    viewer.close();
+                    win.focus();
+                    result = line;
+                }
             }
         }
         if (action === 'eval') {

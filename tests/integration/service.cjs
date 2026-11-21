@@ -174,7 +174,9 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             return res.writeHead(500).end(JSON.stringify({error:{code:'UNEXPECTED_DESKTOP_LOCAL_EXECUTION'}}));
         }
         const relayAction = groupRelay && req.method === 'POST' && /\/mobile\/api\/executions\/[^/]+\/cancel(?:-remaining)?$/.test(route);
-        const relevant = (streamInterrupt && route === '/v1/interrupt') || relayAction || toolHandoff?.observeRequest(req.method, route) || req.method==='POST' && /\/shared\/(session-send|session-cancel|task-stop|admit|complete|config)$/.test(route);
+        const compactionRequest = mode === 'compact-history-identity' && req.method === 'POST' &&
+            /\/shared\/compact-(prepare|commit|cancel)$/.test(route);
+        const relevant = compactionRequest || (streamInterrupt && route === '/v1/interrupt') || relayAction || toolHandoff?.observeRequest(req.method, route) || req.method==='POST' && /\/shared\/(session-send|session-cancel|task-stop|admit|complete|config)$/.test(route);
         const row = {route,method:req.method,at:Date.now(),device:req.headers['x-nativesync-device'],capabilities:req.headers['x-nativesync-capabilities']};
         let body;
         if (relevant) {
@@ -210,7 +212,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             streamInterrupt?.observeSummaryRequest(row);
         }
         if (streamInterrupt && route === '/v1/chatvcp/completions') requests.push(row);
-        const observeRecoveredRequest = mode === 'compact-cross-device' && requestLookup &&
+        const observeRecoveredRequest = ['compact-cross-device', 'compact-history-identity'].includes(mode) && requestLookup &&
             lostRequestId && row.query.requestId === lostRequestId;
         const isLocalChat = route === '/v1/local-chat/completions';
         const upstream = http.request({host:'127.0.0.1',port:backendPort,path:isLocalChat?'/v1/chat/completions':req.url,method:req.method,headers:{...req.headers, 'x-forwarded-proto':'https'}},async response => {

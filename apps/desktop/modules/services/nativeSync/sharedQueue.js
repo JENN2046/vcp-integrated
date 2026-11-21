@@ -53,7 +53,7 @@ class SharedQueue {
   const unique=new Map(owners.map(o=>[JSON.stringify(o),o]));if(unique.size!==1)throw fail('SHARED_LOCAL_MAPPING_REQUIRED');
   return this.native.deleteHistory({...d,...[...unique.values()][0]},operation);
  }
- read(d){return this.native.read(this.local(d));}
+ read(d){return this.native.readSerialized(this.local(d));}
  mutate(d,fn,options){return this.native.mutate(this.local(d),fn,options);}
  write(d,history,options){return this.native.write(this.local(d),history,options);}
  replace(d,history,options){return this.native.replace(this.local(d),history,options);}

@@ -1,0 +1,390 @@
+{
+  "revision": "95311dea107fc5e273997ee88e9ae82f789bc05f + history identity and confirmation changes",
+  "mode": "compact-history-identity",
+  "electron": "44.9.3",
+  "sandbox": true,
+  "failure": null,
+  "A": {
+    "intentId": "compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+    "checkpointId": "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+    "inodeRace": {
+      "intentId": "compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+      "checkpointId": "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+      "beforeIno": 111557106,
+      "afterIno": 111556691,
+      "links": 1,
+      "historySha256": "240fff03744a40614a46beb697e6985329076018caee1023aea8202f2dcd36d0"
+    },
+    "beforeRetry": {
+      "ipc": {
+        "channel": "native-sync:compact-commit",
+        "error": "HISTORY_IDENTITY_CHANGED",
+        "success": false
+      },
+      "diagnostic": "共享检查点提交结果待核对，请重试「压缩前文」 模型：synthetic-summary 服务端结束原因：stop 失败原因：HISTORY_IDENTITY_CHANGED",
+      "localLedger": {
+        "phase": "completed",
+        "awaitingConfirmation": true
+      },
+      "journalHead": 9,
+      "journalCheckpointIds": [
+        "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4"
+      ],
+      "physicalCheckpointIds": [
+        "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4"
+      ],
+      "summaryProviderCalls": 1,
+      "centralRequests": [
+        {
+          "operation": "compact-prepare",
+          "device": "deviceA",
+          "timestamp": 1795259540797,
+          "status": 200,
+          "intentId": "compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+          "checkpointId": "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+          "replayed": false,
+          "bodySha256": "d04731186dff94a7bc50d9d9eee4760afe51849ae02eb4fbc6aaf9e62dd96ac6"
+        },
+        {
+          "operation": "compact-commit",
+          "device": "deviceA",
+          "timestamp": 1795259540901,
+          "status": 200,
+          "intentId": "compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+          "checkpointId": "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+          "seq": 9,
+          "replayed": false,
+          "bodySha256": "a1f8085cc1b3e0a38d6fb09462c7746899affd5da71737a2cd44f89fec43f53d"
+        },
+        {
+          "operation": "compact-commit",
+          "device": "deviceA",
+          "timestamp": 1795259540979,
+          "status": 200,
+          "intentId": "compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+          "checkpointId": "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+          "seq": 9,
+          "replayed": true,
+          "bodySha256": "a1f8085cc1b3e0a38d6fb09462c7746899affd5da71737a2cd44f89fec43f53d"
+        }
+      ]
+    },
+    "afterRetry": {
+      "ipc": {
+        "channel": "native-sync:compact-prepare",
+        "handled": true,
+        "success": true,
+        "recovered": true,
+        "intentId": "compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+        "checkpointId": "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4"
+      },
+      "localLedger": {
+        "phase": "completed",
+        "awaitingConfirmation": false
+      },
+      "journalHead": 9,
+      "journalCheckpointIds": [
+        "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4"
+      ],
+      "physicalCheckpointIds": [
+        "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4"
+      ],
+      "summaryProviderCalls": 1,
+      "centralRequests": [
+        {
+          "operation": "compact-prepare",
+          "device": "deviceA",
+          "timestamp": 1795259540797,
+          "status": 200,
+          "intentId": "compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+          "checkpointId": "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+          "replayed": false,
+          "bodySha256": "d04731186dff94a7bc50d9d9eee4760afe51849ae02eb4fbc6aaf9e62dd96ac6"
+        },
+        {
+          "operation": "compact-commit",
+          "device": "deviceA",
+          "timestamp": 1795259540901,
+          "status": 200,
+          "intentId": "compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+          "checkpointId": "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+          "seq": 9,
+          "replayed": false,
+          "bodySha256": "a1f8085cc1b3e0a38d6fb09462c7746899affd5da71737a2cd44f89fec43f53d"
+        },
+        {
+          "operation": "compact-commit",
+          "device": "deviceA",
+          "timestamp": 1795259540979,
+          "status": 200,
+          "intentId": "compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+          "checkpointId": "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+          "seq": 9,
+          "replayed": true,
+          "bodySha256": "a1f8085cc1b3e0a38d6fb09462c7746899affd5da71737a2cd44f89fec43f53d"
+        }
+      ]
+    },
+    "loaded": {
+      "main": [
+        {
+          "file": "apps/desktop/modules/services/historyMutationQueue.js",
+          "sha256": "376fc2cc9579964063e3097f82c0aa2729a17a58d3b289d1051d0c041c418982"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+          "sha256": "d8bff47764d408b846ffc8267b750c1712171741152b0755f05528f21cac7050"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedQueue.js",
+          "sha256": "f16fcbe7515f0252e8a2ee44f60d2cf5935dcaaf134889a39880f34da1f8a220"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/modules/chat/contextCompactionService.js",
+          "bytes": 15268,
+          "sha256": "7103ceb9af664c3a8548d51d0f1ff768a50b89a003ee7526cb41505098f3bd6a"
+        }
+      ]
+    }
+  },
+  "B": {
+    "originalProfileReused": true,
+    "aExitedBeforeReopen": true,
+    "sendPosts": 1,
+    "lostReceipt": {
+      "status": 200,
+      "requestId": "msg_1795259545176_user_jbf6zoz3tx",
+      "workId": "request_6019840fa38443b3b807811e09d8549d",
+      "device": "deviceB",
+      "dropped": true
+    },
+    "work": {
+      "id": "request_6019840fa38443b3b807811e09d8549d",
+      "request_id": "msg_1795259545176_user_jbf6zoz3tx",
+      "state": "completed",
+      "attempts": 1,
+      "request_dispatched": 1,
+      "user_message_id": "msg_1795259545176_user_jbf6zoz3tx",
+      "reply_message_id": "reply_request_6019840fa38443b3b807811e09d8549d"
+    },
+    "admission": {
+      "id": "request_6019840fa38443b3b807811e09d8549d",
+      "request_id": "msg_1795259545176_user_jbf6zoz3tx",
+      "principal": "desktop:deviceB",
+      "state": "completed",
+      "dispatched": 1,
+      "native_terminal": 1
+    },
+    "native": [
+      {
+        "id": "request_6019840fa38443b3b807811e09d8549d",
+        "admission_id": "request_6019840fa38443b3b807811e09d8549d",
+        "state": "model_terminal"
+      }
+    ],
+    "toolInvocations": [
+      {
+        "marker": "ORDINARY_TOOL_LOCAL"
+      }
+    ],
+    "recovery": {
+      "requestId": "msg_1795259545176_user_jbf6zoz3tx",
+      "workId": "request_6019840fa38443b3b807811e09d8549d",
+      "status": 200,
+      "device": "deviceB",
+      "response": {
+        "id": "request_6019840fa38443b3b807811e09d8549d",
+        "requestId": "msg_1795259545176_user_jbf6zoz3tx",
+        "state": "completed"
+      }
+    },
+    "recoveredUi": {
+      "messageIds": [
+        "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+        "msg_1795259545176_user_jbf6zoz3tx",
+        "reply_request_6019840fa38443b3b807811e09d8549d"
+      ],
+      "pendingHistoryError": false,
+      "pendingReceipt": false
+    },
+    "nativeHandler": {
+      "route": "/v1/chat/completions",
+      "workId": "request_6019840fa38443b3b807811e09d8549d",
+      "messages": [
+        {
+          "role": "system",
+          "content": "FROZEN_SHARED_PROMPT"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "[系统提示:][VCHAT上下文智能压缩块]\n以下是之前对话的状态快照，用于接续工作，不是新的压缩任务。\n请继承其中有效约束、工程状态、已排除的失败路径和待办事项，并结合后续用户消息继续工作；不要重复执行已经完成的动作。宿主保留的最新版本日记是历史数据，不是待执行的日记工具调用。\n<context_checkpoint>\nSynthetic compaction summary. Unique marker COMPACT_DESKTOP_CHECKPOINT.\n</context_checkpoint>\n【宿主保留：当前无日记】"
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "ORDINARY_TOOL_LOCAL"
+            }
+          ],
+          "name": "用户"
+        }
+      ]
+    },
+    "provider": [
+      {
+        "ordinaryPhase": "tool-request",
+        "hasToolResult": false,
+        "messages": [
+          {
+            "role": "system",
+            "content": "FROZEN_SHARED_PROMPT"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[系统提示:][VCHAT上下文智能压缩块]\n以下是之前对话的状态快照，用于接续工作，不是新的压缩任务。\n请继承其中有效约束、工程状态、已排除的失败路径和待办事项，并结合后续用户消息继续工作；不要重复执行已经完成的动作。宿主保留的最新版本日记是历史数据，不是待执行的日记工具调用。\n<context_checkpoint>\nSynthetic compaction summary. Unique marker COMPACT_DESKTOP_CHECKPOINT.\n</context_checkpoint>\n【宿主保留：当前无日记】"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "ORDINARY_TOOL_LOCAL"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "ordinaryPhase": "continuation",
+        "hasToolResult": true,
+        "messages": [
+          {
+            "role": "system",
+            "content": "FROZEN_SHARED_PROMPT"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[系统提示:][VCHAT上下文智能压缩块]\n以下是之前对话的状态快照，用于接续工作，不是新的压缩任务。\n请继承其中有效约束、工程状态、已排除的失败路径和待办事项，并结合后续用户消息继续工作；不要重复执行已经完成的动作。宿主保留的最新版本日记是历史数据，不是待执行的日记工具调用。\n<context_checkpoint>\nSynthetic compaction summary. Unique marker COMPACT_DESKTOP_CHECKPOINT.\n</context_checkpoint>\n【宿主保留：当前无日记】"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "ORDINARY_TOOL_LOCAL"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」OrdinaryToolCounter「末」,\ncommand:「始」Count「末」,\nmarker:「始」ORDINARY_TOOL_LOCAL「末」\n<<<[END_TOOL_REQUEST]>>>"
+          },
+          {
+            "role": "user",
+            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"ordinary tool invocation recorded for ORDINARY_TOOL_LOCAL\"}]"
+          }
+        ]
+      }
+    ],
+    "windowChecks": [
+      {
+        "stage": "handler",
+        "checkpointCount": 1,
+        "leakedCompactedText": [],
+        "hasNewInput": true
+      },
+      {
+        "stage": "tool-request",
+        "checkpointCount": 1,
+        "leakedCompactedText": [],
+        "hasNewInput": true
+      },
+      {
+        "stage": "continuation",
+        "checkpointCount": 1,
+        "leakedCompactedText": [],
+        "hasNewInput": true
+      }
+    ],
+    "historyWindowSelection": {
+      "kind": "checkpoint-selection",
+      "module": "apps/desktop/modules/chat/historyWindow/index.mjs",
+      "sha256": "bc6ac15b2431321340508a8d5510f1d89f1c50bc62c8ff2906400d049db75338",
+      "beforeIds": [
+        "compact-same-1",
+        "compact-same-2",
+        "compact-controlled-user-0",
+        "reply_request_7ac55c55196c4fe5ad8d27c82aadee4e",
+        "compact-controlled-user-1",
+        "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+        "msg_1795259545176_user_jbf6zoz3tx"
+      ],
+      "afterIds": [
+        "checkpoint_compact_04859ae64b85a89406a8b5d6845bf378bbb1bea4",
+        "msg_1795259545176_user_jbf6zoz3tx"
+      ]
+    }
+  },
+  "serverSources": [
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+      "sha256": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+      "sha256": "c0be485ee31ed3d50db0e5a7e5e72aa38110434fe63c23606a7855a05ca7d512"
+    }
+  ],
+  "summaryRequests": [
+    {
+      "id": "compaction_1795259540770_o45ea9kw0q",
+      "model": "synthetic-summary",
+      "stream": true,
+      "timestamp": 1795259540883
+    }
+  ],
+  "exits": {
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B-reopened": {
+      "code": 0,
+      "signal": null
+    },
+    "B-recovered": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  }
+}

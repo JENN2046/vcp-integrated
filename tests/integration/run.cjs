@@ -23,7 +23,8 @@ const streamInterrupt = requested === 'local-stream-interrupt' ? require('../loc
 const toolHandoffModes = ['tool-handoff-baseline', 'tool-handoff', 'tool-handoff-unknown', 'tool-handoff-stream'];
 const toolHandoffMode = toolHandoffModes.includes(requested) ? requested : undefined;
 const toolHandoffFixture = toolHandoffMode && require('../tool-work-handoff/fixture.cjs');
-const crossDeviceCompaction = requested === 'compact-cross-device';
+const compactionRetryMode = 'compact-history-identity';
+const crossDeviceCompaction = ['compact-cross-device', compactionRetryMode].includes(requested);
 const compaction = requested === 'compact-e2e' || crossDeviceCompaction ? require('../compact-e2e/fixture.cjs') : undefined;
 const approvalRestoreModes = { 'approval-restore': 'desktop', 'approval-restore-stale': 'stale' };
 const approvalRestore = Object.hasOwn(approvalRestoreModes, requested) ? approvalRestoreModes[requested] : undefined;
@@ -44,8 +45,8 @@ const ordinaryFixture = ordinaryMode || approvalRestore ? {
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', 'local-stream-interrupt'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|local-stream-interrupt]');
+if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', compactionRetryMode, 'local-stream-interrupt'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|local-stream-interrupt]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -83,6 +84,7 @@ function launch(profile, role, mode) {
         ...(devDisplay && process.env.XAUTHORITY ? { XAUTHORITY: process.env.XAUTHORITY } : {}),
         NS_HOST: host, VCPCHAT_APP_DATA_DIR: profile, VCPCHAT_E2E_TEST: '1',
         NODE_EXTRA_CA_CERTS: cert, NS_CERT_FINGERPRINT: fingerprint,
+        ...(mode === compactionRetryMode && role === 'A' ? { NS_COMPACTION_HISTORY_RACE: '1' } : {}),
         ...(mode === 'idle' ? { NS_METER_PREFIX: path.join(out, role) } : {}),
         ...(mode === 'shutdown-only' ? { NS_CHECK_QUIT_ADMISSION: '1' } : {}) };
     const args = ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1', '--disable-background-networking', '--ozone-platform=x11', '--disable-gpu', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', path.join(here, './electron.cjs')];

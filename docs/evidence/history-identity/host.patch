@@ -1,0 +1,141 @@
+diff --git a/apps/desktop/modules/chat/contextCompactionService.js b/apps/desktop/modules/chat/contextCompactionService.js
+index 9175480..8192258 100644
+--- a/apps/desktop/modules/chat/contextCompactionService.js
++++ b/apps/desktop/modules/chat/contextCompactionService.js
+@@ -118,2 +118,3 @@ export function createContextCompactionService({
+     const pending = new Map();
++    const retryPublications = new Map();
+     let disposed = false;
+@@ -165,2 +166,3 @@ export function createContextCompactionService({
+         let committed = false;
++        let recovered;
+         try {
+@@ -181,3 +183,3 @@ export function createContextCompactionService({
+                 const preparation = authority.kind === 'shared' && typeof sharedCompaction?.prepareSharedCompaction === 'function'
+-                    ? await sharedCompaction.prepareSharedCompaction({descriptor:scope}) : null;
++                    ? await sharedCompaction.prepareSharedCompaction({descriptor:scope, ...(retryPublications.has(key) && {retryId:retryPublications.get(key)})}) : null;
+                 if (authority.kind === 'shared' && !preparation?.handled) throw Object.assign(new Error(preparation?.error || '共享压缩协议不可用'), {code: preparation?.error || 'SHARED_COMPACTION_UNAVAILABLE'});
+@@ -185,2 +187,8 @@ export function createContextCompactionService({
+                 if (preparation?.handled) {
++                    if (preparation.recovered) {
++                        if (!Array.isArray(preparation.history) || !preparation.message || preparation.message.id !== preparation.messageId)
++                            throw new Error('共享压缩检查点回执不完整');
++                        recovered = preparation;
++                        return;
++                    }
+                     shared = preparation;
+@@ -205,6 +213,7 @@ export function createContextCompactionService({
+             returnedContent = response;
+-            const message = createCheckpointMessage(state, response, settings, shared ? {id:shared.messageId} : {});
++            const message = recovered?.message ?? createCheckpointMessage(state, response, settings, shared ? {id:shared.messageId} : {});
+             const original = JSON.stringify(snapshot);
+-            const outcome = shared ? await (async () => {
++            const outcome = recovered ?? (shared ? await (async () => {
+                 controller.committing = true;
++                retryPublications.set(key,shared.id);
+                 const value = await sharedCompaction.commitSharedCompaction({descriptor:scope,id:shared.id,sourceHash:shared.sourceHash,message});
+@@ -221,4 +230,5 @@ export function createContextCompactionService({
+                 return [...current, message];
+-            });
++            }));
+             committed = true;
++            retryPublications.delete(key);
+             // Durable success, not UI rendering, determines whether the heartbeat can resume.
+@@ -233,3 +243,3 @@ export function createContextCompactionService({
+                 error.compactionDiagnostic = [
+-                    '上下文压缩失败诊断（原历史未修改）',
++                    shared && controller.committing ? '共享检查点提交结果待核对，请重试「压缩前文」' : '上下文压缩失败诊断（原历史未修改）',
+                     `模型：${responseDiagnostic?.model || compactionSettings(settings).model}`,
+@@ -260,2 +270,3 @@ export function createContextCompactionService({
+             disposed = true;
++            retryPublications.clear();
+             for (const controller of pending.values()) controller.abort();
+diff --git a/apps/desktop/modules/services/historyMutationQueue.js b/apps/desktop/modules/services/historyMutationQueue.js
+index 8f72d63..04e96f6 100644
+--- a/apps/desktop/modules/services/historyMutationQueue.js
++++ b/apps/desktop/modules/services/historyMutationQueue.js
+@@ -161,2 +161,11 @@ class HistoryMutationQueue {
+     }
++    readSerialized(descriptor) {
++        const d = { ...descriptor }, scope = this.#context.getStore();
++        // Shared projections publish by renaming under this queue. Hold the
++        // same topic slot across the strict path/open identity check.
++        if (scope?.active && scope.key === this.#key(d)) return this.read(d);
++        const read = () => this.run(d, () => this.read(d));
++        const authority = authorityForQueue(this);
++        return authority ? authority.readAfterTransition(read) : read();
++    }
+     readSnapshot(d) {
+diff --git a/apps/desktop/modules/services/nativeSync/sharedQueue.js b/apps/desktop/modules/services/nativeSync/sharedQueue.js
+index 4c277e2..fdc45e0 100644
+--- a/apps/desktop/modules/services/nativeSync/sharedQueue.js
++++ b/apps/desktop/modules/services/nativeSync/sharedQueue.js
+@@ -55,3 +55,3 @@ class SharedQueue {
+  }
+- read(d){return this.native.read(this.local(d));}
++ read(d){return this.native.readSerialized(this.local(d));}
+  mutate(d,fn,options){return this.native.mutate(this.local(d),fn,options);}
+diff --git a/apps/desktop/modules/services/nativeSync/sharedRuntime.js b/apps/desktop/modules/services/nativeSync/sharedRuntime.js
+index 8e498d7..590431c 100644
+--- a/apps/desktop/modules/services/nativeSync/sharedRuntime.js
++++ b/apps/desktop/modules/services/nativeSync/sharedRuntime.js
+@@ -565,4 +565,21 @@ class SharedRuntime {
+  }
+- async prepareSharedCompaction({descriptor}){
+-  if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(descriptor);if(!this.capabilities.features?.includes('shared-compaction-v1'))throw fail('SHARED_COMPACTION_UPGRADE_REQUIRED');const context=await this.refreshForExecution(descriptor);if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');
++ async prepareSharedCompaction({descriptor,retryId}){
++  if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(descriptor);if(!this.capabilities.features?.includes('shared-compaction-v1'))throw fail('SHARED_COMPACTION_UPGRADE_REQUIRED');const context=await this.refreshForExecution(descriptor,{forceFresh:true});if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');
++  const publications=this.execution.state.compactions||{};
++  if(retryId!==undefined){
++   const preparations=this.execution.state.compactionPreparations||{};
++   const prior=Object.hasOwn(preparations,retryId)&&preparations[retryId];
++   if(!prior||prior.sharedId!==mapping.sharedId||stable(prior.descriptor)!==stable(descriptor))throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
++   const original=publications[retryId];
++   if(original&&original.phase!=='blocked')return this.confirmSharedCompaction(original,true);
++   if(!original&&!prior.cancelled)throw fail('SHARED_CHECKPOINT_PUBLICATION_PENDING');
++  }
++  const pending=Object.values(publications).find(intent=>{
++   if(stable(intent.descriptor)!==stable(descriptor)||intent.phase==='blocked')return false;
++   if(intent.awaitingConfirmation||intent.phase==='publishing')return true;
++   // Older desktops cancelled after a failed readback, even when the original commit had landed.
++   const preparation=this.execution.state.compactionPreparations?.[intent.body.id];
++   return intent.awaitingConfirmation===undefined&&preparation?.cancelled&&intent.phase==='completed'&&intent.receipt?.seq===context.head;
++  });
++  if(pending)return this.confirmSharedCompaction(pending,true);
+   const opId='compact_prepare_'+randomUUID(),intent={descriptor:{...descriptor},body:{sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId,opId,expectedHead:context.head},phase:'preparing'};this.execution.state.compactionPrepareRequests||={};this.execution.state.compactionPrepareRequests[opId]=intent;this.activeCompactionPrepares.add(opId);
+@@ -577,3 +594,3 @@ class SharedRuntime {
+   const prepared=this.execution.state.compactionPreparations?.[id];if(!prepared||stable(prepared.descriptor)!==stable(descriptor))throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
+-  const intent=this.execution.state.compactions?.[id];if(intent?.phase==='publishing'){await this.execution.run('compaction:'+id,()=>this.finishSharedCompaction(intent));return {success:true,alreadyCommitted:true};}
++  const intent=this.execution.state.compactions?.[id];if(intent&&['publishing','completed'].includes(intent.phase)){await this.execution.run('compaction:'+id,()=>this.finishSharedCompaction(intent));return {success:true,alreadyCommitted:true};}
+   const result=await this.send(endpoint+'compact-cancel',{body:{sharedSpaceId:this.connection.sharedSpaceId,id,opId:'compact_cancel_'+id}});prepared.cancelled=true;this.activeCompactions.delete(id);await this.execution.save();if(result.alreadyCommitted)await this.syncExecutionTopic(this.execution.mapping(descriptor),{minSeq:result.seq});return result;
+@@ -583,4 +600,23 @@ class SharedRuntime {
+   try{intent.receipt=await this.send(endpoint+'compact-commit',{body:intent.body});}catch(error){if(!['NETWORK_UNAVAILABLE','SYNC_HTTP_ERROR'].includes(error.code)){intent.phase='blocked';intent.errorCode=error.code;}await this.execution.save();throw error;}
++  if(intent.receipt?.success!==true||intent.receipt.messageId!==intent.body.message.id||
++   !Number.isSafeInteger(intent.receipt.seq)||intent.receipt.seq<1)throw fail('SHARED_COMPACTION_RESPONSE_INVALID');
+   await this.syncExecutionTopic(mapping,{minSeq:intent.receipt.seq});intent.phase='completed';this.activeCompactions.delete(intent.body.id);delete intent.errorCode;await this.execution.save();
+  }
++ async confirmSharedCompaction(intent,recovered=false){
++  const {body,descriptor}=intent,mapping=this.execution.mapping(descriptor);
++  const preparation=this.execution.state.compactionPreparations?.[body.id];
++  if(body.sharedSpaceId!==this.connection.sharedSpaceId||!preparation||
++   preparation?.sourceHash!==body.sourceHash||preparation.messageId!==body.message.id||
++   preparation.sharedId!==mapping.sharedId||stable(preparation.descriptor)!==stable(descriptor))throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
++  return this.execution.run('compaction:'+body.id,async()=>{
++   await this.finishSharedCompaction(intent);
++   const history=await this.replica.queue.read(mapping.shared),message=history.find(row=>row.id===body.message.id);
++   if(intent.receipt?.success!==true||!Number.isSafeInteger(intent.receipt.seq)||intent.receipt.seq<1||
++    intent.receipt.messageId!==body.message.id||!message||messageHash(message)!==messageHash(body.message)||
++    stable(fieldsFrom(message))!==stable(fieldsFrom(body.message)))throw fail('SHARED_CHECKPOINT_PROJECTION_CONFLICT');
++   intent.awaitingConfirmation=false;
++   try{await this.execution.save();}catch(error){intent.awaitingConfirmation=true;throw error;}
++   return {handled:true,success:true,recovered,id:body.id,messageId:message.id,message,history};
++  });
++ }
+  async commitSharedCompaction({descriptor,id,sourceHash,message}){
+@@ -589,4 +625,4 @@ class SharedRuntime {
+   this.execution.state.compactions||={};let intent=this.execution.state.compactions[id];if(intent&&(stable(intent.body)!==stable(body)||stable(intent.descriptor)!==stable(descriptor)))throw fail('SHARED_CHECKPOINT_INTENT_CHANGED');
+-  if(!intent){intent=this.execution.state.compactions[id]={descriptor:{...descriptor},body,phase:'publishing'};await this.execution.save();}
+-  await this.execution.run('compaction:'+id,()=>this.finishSharedCompaction(intent));return {handled:true,success:true,history:await this.replica.queue.read(mapping.shared)};
++  if(!intent){intent=this.execution.state.compactions[id]={descriptor:{...descriptor},body,phase:'publishing',awaitingConfirmation:true};await this.execution.save();}
++  return this.confirmSharedCompaction(intent);
+  }
