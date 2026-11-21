@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 const { JSDOM } = require('jsdom');
 
 const originalWindow = global.window;
@@ -749,7 +750,7 @@ test('stream DOM recovery atomically removes a concurrent history duplicate', as
 });
 
 test('thinking and streaming messages opt out of content-visibility clipping', () => {
-    const chatCss = fs.readFileSync('styles/chat.css', 'utf8');
+    const chatCss = fs.readFileSync(path.join(__dirname, '../styles/chat.css'), 'utf8');
     assert.match(
         chatCss,
         /\.message-item\.streaming,\s*\.message-item\.thinking\s*\{[\s\S]*?content-visibility:\s*visible;[\s\S]*?contain-intrinsic-size:\s*auto;[\s\S]*?\}/
@@ -757,8 +758,8 @@ test('thinking and streaming messages opt out of content-visibility clipping', (
 });
 
 test('chat presentation surfaces retain frosted backdrops without nested card captures', () => {
-    const chatCss = fs.readFileSync('styles/chat.css', 'utf8');
-    const messageRendererCss = fs.readFileSync('styles/messageRenderer.css', 'utf8');
+    const chatCss = fs.readFileSync(path.join(__dirname, '../styles/chat.css'), 'utf8');
+    const messageRendererCss = fs.readFileSync(path.join(__dirname, '../styles/messageRenderer.css'), 'utf8');
 
     assert.match(
         chatCss,

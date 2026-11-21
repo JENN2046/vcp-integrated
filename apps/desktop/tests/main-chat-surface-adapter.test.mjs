@@ -142,6 +142,14 @@ test('main Surface renders terminal stream errors with the initial messageId', a
     const dom = new JSDOM('<main><div id="root"></div><textarea></textarea></main>');
     const root = dom.window.document.getElementById('root');
     const rendered = [];
+    const pending = [];
+    let commits = 0;
+    dom.window.chatAPI = {
+        async topicAdmissionUncertain(scope, token, diagnostic) {
+            pending.push({ scope, token, diagnostic });
+            return { success: true };
+        },
+    };
     let projectedFullResponse = null;
     const renderer = {
         initializeMessageRenderer() {},
@@ -161,10 +169,10 @@ test('main Surface renders terminal stream errors with the initial messageId', a
                 appendStreamChunk() {},
                 projectStreamTerminal: async (messageId, finishReason, context, payload) => {
                     projectedFullResponse = payload.fullResponse;
-                    return { messageId, content: payload.fullResponse, history: [] };
+                    return { messageId, finishReason, context, content: payload.fullResponse, history: [] };
                 },
             },
-            historyPersistence: { commit: async projected => projected },
+            historyPersistence: { commit: async projected => { commits++; return projected; } },
             messageRenderer: renderer,
             getSelection: () => ({ id: 'agent-a' }),
             getTopicId: () => 'topic-a',
@@ -172,7 +180,7 @@ test('main Surface renders terminal stream errors with the initial messageId', a
         disposeRenderer: async () => {},
     });
 
-    const context = { agentId: 'agent-a', topicId: 'topic-a' };
+    const context = { agentId: 'agent-a', topicId: 'topic-a', admissionToken: 'admission-42' };
     assert.equal(adapter.acceptStreamEvent({ type: 'start', messageId: 'message-42', context }), true);
     assert.equal(adapter.acceptStreamEvent({
         type: 'data',
@@ -194,7 +202,14 @@ test('main Surface renders terminal stream errors with the initial messageId', a
     assert.doesNotMatch(rendered[0].content, /ID: undefined/);
     assert.equal(rendered[0].id, 'err_message-42');
     assert.match(projectedFullResponse, /^partial/);
-    assert.match(projectedFullResponse, /已保存已接收的部分内容/);
+    assert.match(projectedFullResponse, /已保留收到的部分内容，本轮仍待核实/);
+    assert.doesNotMatch(projectedFullResponse, /已保存/);
+    assert.equal(commits, 0);
+    assert.deepEqual(pending, [{
+        scope: { itemType: 'agent', itemId: 'agent-a', topicId: 'topic-a' },
+        token: 'admission-42',
+        diagnostic: { message: 'MODEL_RESPONSE_INCOMPLETE_REVIEW_REQUIRED', reviewPartial: 'partial' },
+    }]);
 
     await adapter.dispose();
     dom.window.close();
