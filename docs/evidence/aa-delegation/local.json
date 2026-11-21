@@ -1,0 +1,19 @@
+{
+  "cases": [
+    {
+      "taskId": "aa-delegation-1795246016486-6ec72519",
+      "state": "completed",
+      "childRounds": 2,
+      "launches": 1
+    },
+    {
+      "taskId": "aa-delegation-1795246017548-e551a16c",
+      "state": "cancelled",
+      "childRounds": 1,
+      "launches": 1
+    }
+  ],
+  "sharedWorks": 0,
+  "sharedTasks": 0,
+  "sharedToolInvocations": 0
+}

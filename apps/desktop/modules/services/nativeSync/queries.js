@@ -32,7 +32,7 @@ function registerNativeSyncQueries({ipcMain,getRuntime,getMainWindow,queue,proje
             if (stopped) return Promise.resolve({success:false,error:'SYNC_BRIDGE_CLOSED'});
             const operation = Promise.resolve().then(()=>{
                 if (!trusted(args[0])) return {success:false,error:'NATIVE_SYNC_MAIN_WINDOW_REQUIRED'};
-                return ['native-sync:session-cancel','native-sync:prepare-send','native-sync:stage-input','native-sync:continue','native-sync:input-ready','native-sync:retry-input','native-sync:handoff','native-sync:compact-prepare','native-sync:compact-commit','native-sync:compact-cancel','native-sync:model-confirm','native-sync:send-failure','native-sync:steer','native-sync:abandon-send','native-sync:shared-config-request','native-sync-setup:check-opened-attachment'].includes(name)?require('../quitAdmission.cjs').run(()=>action(...args)):action(...args);
+                return ['native-sync:task-stop','native-sync:session-cancel','native-sync:prepare-send','native-sync:stage-input','native-sync:continue','native-sync:input-ready','native-sync:retry-input','native-sync:handoff','native-sync:compact-prepare','native-sync:compact-commit','native-sync:compact-cancel','native-sync:model-confirm','native-sync:send-failure','native-sync:steer','native-sync:abandon-send','native-sync:shared-config-request','native-sync-setup:check-opened-attachment'].includes(name)?require('../quitAdmission.cjs').run(()=>action(...args)):action(...args);
             }).catch(error=>({success:false,error:error.code || fallback}));
             pending.add(operation); operation.finally(()=>pending.delete(operation));
             return operation;
@@ -77,6 +77,11 @@ function registerNativeSyncQueries({ipcMain,getRuntime,getMainWindow,queue,proje
             if (!runtime) return {success:true,enabled:false};
             return {success:true,...await runtime.getExecutionStatus({itemId,itemType,topicId},{refresh})};
         },'EXECUTION_STATUS_UNAVAILABLE');
+        register('native-sync:task-stop', async (_event, payload) => {
+            const runtime = getRuntime();
+            if (!runtime?.stopNativeTask) throw fail('NATIVE_TASK_STOP_UNAVAILABLE');
+            return runtime.stopNativeTask(payload);
+        }, 'NATIVE_TASK_STOP_FAILED');
         register('native-sync:task-result',async (_event,itemId,itemType,topicId,executionId,nativeTaskId)=>{
             if ([executionId,nativeTaskId].some(v=>typeof v!=='string'||!v||v.length>512||/[\x00-\x1f]/.test(v))) throw Object.assign(Error('INVALID_NATIVE_TASK_QUERY'),{code:'INVALID_NATIVE_TASK_QUERY'});
             const runtime=getRuntime();

@@ -61,7 +61,7 @@ class ConversationExecution {
         // Resume queued work, but never automatically repeat uncertain execution.
         this.db.prepare("UPDATE mobile_executions SET state=CASE WHEN cancel_requested=1 AND request_dispatched=0 AND tool_started=0 THEN 'cancelled' ELSE 'review_required' END,error_code=CASE WHEN cancel_requested=1 AND request_dispatched=0 AND tool_started=0 THEN 'EXECUTION_CANCELLED_BEFORE_DISPATCH' ELSE 'EXECUTION_INTERRUPTED_REVIEW_REQUIRED' END,updated_at=? WHERE state IN ('running','cancelling','waiting_approval') AND coalesce(kind,'') NOT IN ('group_message','group_invitation')").run(Date.now());
         for(const row of this.db.prepare("SELECT * FROM mobile_executions WHERE state='review_required'").all())if(this.topics.get(row.topic_key)?.sharedSpaceId)require('./sharedSingle').hold(this,row);
-        for (const task of this.db.prepare("SELECT * FROM mobile_native_tasks WHERE state NOT IN ('completed','failed','cancelled','stopped')").all()) this.nativeTasks.markUnknown(task, 'NATIVE_TASK_RECONCILIATION_REQUIRED');
+        for (const task of this.db.prepare("SELECT * FROM mobile_native_tasks WHERE state NOT IN ('completed','failed','cancelled','stopped','unknown')").all()) this.nativeTasks.markUnknown(task, 'NATIVE_TASK_RECONCILIATION_REQUIRED');
         require('./groupTurn').recover(this);
     }
     get(id) { return this.db.prepare('SELECT rowid AS ordinal,* FROM mobile_executions WHERE id=?').get(id); }

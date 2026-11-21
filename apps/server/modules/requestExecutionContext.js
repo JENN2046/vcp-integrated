@@ -248,9 +248,26 @@ async function acceptNativeTask({ pluginName, nativeTaskId, agentBaseName }) {
     throwIfCancelled();
     const identity = Object.freeze({ ...context.invocation, pluginName, nativeTaskId, agentBaseName });
     await context.bridge.onTaskAccepted(identity);
-    // Keep this confirmed request's closure after the parent model response ends.
+    // The child outlives the parent response. Each new model round still
+    // passes through the original Work's request registry and dispatch fence.
+    const boundary = context.sponsorBoundary || sharedBoundary;
+    if (context.workId && (!boundary || boundary.closed || boundary !== sharedBoundary)) throw Error('SHARED_NATIVE_CLOSED');
+    const actor = context.sharedAuthority?.actor || context.sponsorAuthority?.actor;
+    if (context.workId && !actor) throw Error('SHARED_REQUEST_OWNER_REQUIRED');
+    const binding = context.workId && boundary.taskRequests.binding(context.workId, identity, actor);
     return Object.freeze({ identity, observe: result => context.bridge.onTaskObserved({ ...result, ...identity }),
-        ...(context.canSteer&&context.workId&&sharedBoundary?{control:sharedBoundary.taskRequests.binding(context.workId,identity)}:{}) });
+        ...(binding && { requests: {
+            register: body => binding.registerRequest(body, 0),
+            confirmFinal(requestId) {
+                if (requestId && !['not_started', 'safe'].includes(binding.childState(requestId).state)) {
+                    throw Object.assign(Error('NATIVE_TASK_RESULT_REQUIRES_REVIEW'), { code: 'NATIVE_TASK_RESULT_REQUIRES_REVIEW' });
+                }
+                binding.claimFinal(0);
+                return 0;
+            },
+        } }),
+        ...(context.canSteer && binding && { control: binding }),
+    });
 }
 
 function registerNativeTaskProvider(pluginName, provider) {
@@ -282,6 +299,13 @@ module.exports = {
     requireModelOutcome, recordModelOutcome,
     middleware, events, waitForApproval, throwIfCancelled, register, agentPrompt,setSharedBoundary,
     interruptWork, controlNativeTask,
+    sharedTaskLink(pluginName, nativeTaskId) {
+        if (!sharedBoundary || typeof nativeTaskId !== 'string') return null;
+        const tasks = sharedBoundary.engine.nativeTasks;
+        const row = tasks.get(pluginName, nativeTaskId);
+        if (!row || !sharedBoundary.shared.nativeJob(row.execution_id)) return null;
+        return { workId: row.execution_id, identity: { ...tasks.queryInput(row), pluginName } };
+    },
     runNativeHandler:async fn=>{const scope=local.getStore();if(!scope?.workId)return fn();scope.executionTracked=true;try{return await fn();}finally{scope.executionSettled=true;if(scope.transportEnded)scope.finishNative(scope.transportSuccess);}},
     phase:stage=>local.getStore()?.phase?.(stage),
     assertDispatch,

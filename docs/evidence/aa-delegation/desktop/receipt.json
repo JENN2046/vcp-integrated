@@ -1,0 +1,259 @@
+{
+  "result": "PASS",
+  "desktop": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+    "originalProfileDigest": "435ece77086b98417b80a11c1a7b8ba109cbfa2ad69d386aa1e7484e7eec1c9d",
+    "reopenedProfileDigest": "435ece77086b98417b80a11c1a7b8ba109cbfa2ad69d386aa1e7484e7eec1c9d"
+  },
+  "stop": {
+    "before": {
+      "id": "aa-delegation-1795245931298-c7e5d815",
+      "state": "running",
+      "heading": "AA 运行中 · SYNTHETIC",
+      "work": "request_459c65d31de341dea0dcad7a648de53e",
+      "stop": true
+    },
+    "after": {
+      "id": "aa-delegation-1795245931298-c7e5d815",
+      "state": "running",
+      "heading": "AA 运行中 · SYNTHETIC",
+      "work": "request_459c65d31de341dea0dcad7a648de53e",
+      "stop": true
+    },
+    "cancelling": {
+      "id": "aa-delegation-1795245931298-c7e5d815",
+      "state": "cancelling",
+      "heading": "AA 正在取消 · SYNTHETIC",
+      "work": "request_459c65d31de341dea0dcad7a648de53e",
+      "stop": false
+    },
+    "settled": {
+      "id": "aa-delegation-1795245931298-c7e5d815",
+      "state": "cancelled",
+      "heading": "AA 已取消 · SYNTHETIC",
+      "work": "request_459c65d31de341dea0dcad7a648de53e",
+      "stop": false
+    },
+    "desktopSends": 1,
+    "childLaunches": 1,
+    "parentPlaceholder": "aa-delegation-1795245931298-c7e5d815",
+    "stopRequests": 1
+  },
+  "complete": {
+    "before": {
+      "id": "aa-delegation-1795245938457-11f0c60f",
+      "state": "running",
+      "heading": "AA 运行中 · SYNTHETIC",
+      "work": "request_a2a7f2f058d241d39856899fb84980b0",
+      "stop": true
+    },
+    "after": {
+      "id": "aa-delegation-1795245938457-11f0c60f",
+      "state": "completed",
+      "heading": "AA 已完成 · SYNTHETIC",
+      "work": "request_a2a7f2f058d241d39856899fb84980b0",
+      "stop": false
+    },
+    "desktopSends": 1,
+    "childLaunches": 1,
+    "report": "AA_DELEGATION_CHILD_REPORT"
+  },
+  "observer": {
+    "browser": "Chrome/158.0.8127.36",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "during": {
+      "id": "aa-delegation-1795245931298-c7e5d815",
+      "state": "running",
+      "work": "request_459c65d31de341dea0dcad7a648de53e",
+      "heading": "AA 运行中 · SYNTHETIC",
+      "controls": []
+    },
+    "stopped": {
+      "id": "aa-delegation-1795245931298-c7e5d815",
+      "state": "cancelled",
+      "work": "request_459c65d31de341dea0dcad7a648de53e",
+      "heading": "AA 已取消 · SYNTHETIC",
+      "controls": []
+    },
+    "completed": {
+      "id": "aa-delegation-1795245938457-11f0c60f",
+      "state": "completed",
+      "work": "request_a2a7f2f058d241d39856899fb84980b0",
+      "heading": "AA 已完成 · SYNTHETIC",
+      "controls": []
+    },
+    "report": "AA_DELEGATION_CHILD_REPORT",
+    "unauthorizedControls": 0,
+    "executionWrites": []
+  },
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "A-reopened": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "desktopSources": {
+    "main": [
+      {
+        "file": "apps/desktop/modules/services/nativeSync/queries.js",
+        "sha256": "cf616cc7c251c098fc4652d96012bce5905b8a125cd4a0c6e3d8bd8fd38a49a1"
+      },
+      {
+        "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+        "sha256": "9acff2a2977af6697437c6f8f1f9dd82bfe57a131cdc270c08a4e5bb01724ae5"
+      }
+    ],
+    "renderer": [
+      {
+        "file": "apps/desktop/modules/renderer/nativeExecutionStatus.js",
+        "bytes": 23966,
+        "sha256": "45ab8acc95f0de37168eb33e7bed7acb4a3395894649e800ce79ebee03bcd36d"
+      }
+    ],
+    "preload": {
+      "file": "apps/desktop/preloads/bundled/dist/chat.cjs",
+      "sha256": "4784579532125df77b8f8d1def627201ffb1569555d490a76bcc725ef8287c46"
+    }
+  },
+  "backendSources": [
+    {
+      "file": "apps/server/server.js",
+      "sha256": "3095443182aca5d60dec2f6ee776790906028befa9364496fd8fac5951a096df"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "a4754eea49c9d91e155d1862e40666bf3c77085760e62bded7e2ecf1336faeee"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "9bac35b45ae82bcdd20a23f73c88fad9eadadaad99e4c8fd37fa424e09e20e08"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "3483b635f0b735b80b0f02d6d0ad5ddefdb9bf52988affb6f5f8b2b63f8ca0b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "c6f8731407a364b792d6272f458fce1cb37b9c23479a4f60da08e9e5b98cbfd8"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "946cc2c9160ac58e9e213132091b96e47cb57e5cba5c2dde397b3220345c6828"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+      "sha256": "b16e07afa969e4674a98fe093f4e7c892c3125635b9c63ac0064bafdaf47f17d"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "6a2fb2d95bcbd2e9a13464c03dee24b8b16f03ce432312aff03a136d281ae44e"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+      "sha256": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+      "sha256": "271d75bd6a7e8b621e9da1f60a7acd42e7977bb9ff5ff25ba5ae68449826def9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "7898848cf8b64708689af263992b620347805e27cd6ea6ad565dfb5551ec27f6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+      "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+    },
+    {
+      "file": "apps/server/Plugin/AgentAssistant/AgentAssistant.js",
+      "sha256": "775909dc425b00a364aa3b46044a4ab32071e32e51fe32df1052f644db4d8927"
+    },
+    {
+      "file": "apps/server/Plugin/AgentAssistant/delegationContinuity.js",
+      "sha256": "b7ea27e0304d4da83d8c2f992321bd4f78d71ab5d284b775a3441c5848a241c5"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "200540207a903bb0e7dc342eba36edb271619df7304eb5f433b7d62353a1cc56"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "c135a4ae59741a02cdf07653b7112f7932693f10600f6d4dac76e28a72d4d825"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "e9b47cc89507739a722163d662ab288700cd69fe6587d344d1065ddcbe84c217"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/native-sync.js",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "desktop-aa-before-close.png",
+      "sha256": "272b8c03da3fd433835e070a767906ef56135f8f93ff92c903ec8723745fc2aa"
+    },
+    {
+      "file": "desktop-aa-reopened.png",
+      "sha256": "c33d2ecd9df0f4ce33c79e9b07447de5c657c347e82e55d3c754e18f37e169d3"
+    },
+    {
+      "file": "desktop-aa-report.png",
+      "sha256": "f1fbe071c281898bd148790c212d178ce979ca8d5045c0ea934c394917d443b9"
+    },
+    {
+      "file": "desktop-aa-stopped.png",
+      "sha256": "632fb17374fe864ac5a084879902ddda15e6e84cebe4272c46891a83a0e1a748"
+    },
+    {
+      "file": "pwa-aa-report.png",
+      "sha256": "d5d4862325d53b65afda32ff297d0225979200d45b4aaaf8a56695e36e50ac1a"
+    },
+    {
+      "file": "pwa-aa-running.png",
+      "sha256": "a8f39c7c92423a59984b17bab2a572e21e7679eef03f77f1abbba6e1050574c1"
+    },
+    {
+      "file": "pwa-aa-stopped.png",
+      "sha256": "ea5449db9565b1d13c645b16f79add24315d76b9dea19f20fd0299015592d75a"
+    }
+  ]
+}

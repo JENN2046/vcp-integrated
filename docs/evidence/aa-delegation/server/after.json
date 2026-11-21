@@ -1,0 +1,442 @@
+{
+  "node": "24.22.3",
+  "serverRevision": null,
+  "cases": {
+    "complete": {
+      "workId": "request_1fbe98ec1d344ec8b9d727f4d769fe0b",
+      "nativeTaskId": "aa-delegation-1795245930144-bf866c51",
+      "active": {
+        "state": "dispatched",
+        "replySeq": null,
+        "tasks": [
+          {
+            "id": "aa-delegation-1795245930144-bf866c51",
+            "state": "running",
+            "stopAllowed": true,
+            "stopRequested": false,
+            "reviewRequired": false,
+            "hasResult": false,
+            "errorCode": null
+          }
+        ],
+        "toolInvocations": [
+          {
+            "pluginName": "AgentAssistant",
+            "state": "returned"
+          }
+        ]
+      },
+      "nativeActiveState": "running",
+      "parentNativeState": "model_terminal",
+      "initialProvider": {
+        "parentRounds": [
+          {
+            "requestMatchesWork": true,
+            "stream": false
+          },
+          {
+            "requestMatchesWork": true,
+            "stream": false
+          }
+        ],
+        "launches": 1,
+        "childRounds": [
+          {
+            "requestId": "aa-delegation-1795245930144-bf866c51-round-1",
+            "round": 1
+          }
+        ]
+      },
+      "replayWhileActive": {
+        "sameWork": true,
+        "replayed": true
+      },
+      "after": {
+        "work": {
+          "state": "completed",
+          "replySeq": 2,
+          "tasks": [
+            {
+              "id": "aa-delegation-1795245930144-bf866c51",
+              "state": "completed",
+              "stopAllowed": false,
+              "stopRequested": false,
+              "reviewRequired": false,
+              "hasResult": true,
+              "errorCode": null
+            }
+          ],
+          "toolInvocations": [
+            {
+              "pluginName": "AgentAssistant",
+              "state": "returned"
+            }
+          ]
+        },
+        "attempts": 1,
+        "provider": {
+          "parentRounds": [
+            {
+              "requestMatchesWork": true,
+              "stream": false
+            },
+            {
+              "requestMatchesWork": true,
+              "stream": false
+            }
+          ],
+          "launches": 1,
+          "childRounds": [
+            {
+              "requestId": "aa-delegation-1795245930144-bf866c51-round-1",
+              "round": 1
+            },
+            {
+              "requestId": "aa-delegation-1795245930144-bf866c51-round-2",
+              "round": 2
+            }
+          ]
+        },
+        "journal": [
+          {
+            "action": "upsert",
+            "message": "user"
+          },
+          {
+            "action": "upsert",
+            "message": "assistant"
+          }
+        ]
+      },
+      "nativeFinalState": "completed",
+      "boundResult": {
+        "hasChildReport": true,
+        "resultHash": "261243622218aff6abad4805d8d2f4b273db70d7042ad36e978b613d2c2c5673",
+        "coldReadSameWorkTaskAndHash": true
+      }
+    },
+    "cancel": {
+      "workId": "request_a277cf94adcc4d0eba58009b9fae853d",
+      "nativeTaskId": "aa-delegation-1795245931367-a8a4d954",
+      "active": {
+        "state": "dispatched",
+        "replySeq": null,
+        "tasks": [
+          {
+            "id": "aa-delegation-1795245931367-a8a4d954",
+            "state": "running",
+            "stopAllowed": true,
+            "stopRequested": false,
+            "reviewRequired": false,
+            "hasResult": false,
+            "errorCode": null
+          }
+        ],
+        "toolInvocations": [
+          {
+            "pluginName": "AgentAssistant",
+            "state": "returned"
+          }
+        ]
+      },
+      "nativeActiveState": "running",
+      "parentNativeState": "model_terminal",
+      "initialProvider": {
+        "parentRounds": [
+          {
+            "requestMatchesWork": true,
+            "stream": false
+          },
+          {
+            "requestMatchesWork": true,
+            "stream": false
+          }
+        ],
+        "launches": 1,
+        "childRounds": [
+          {
+            "requestId": "aa-delegation-1795245931367-a8a4d954-round-1",
+            "round": 1
+          }
+        ]
+      },
+      "stop": {
+        "observer": 403,
+        "observerCode": "SHARED_REQUEST_OWNER_REQUIRED",
+        "owner": 200,
+        "ownerObservedState": "cancelling",
+        "repeatedOwnerStop": true
+      },
+      "after": {
+        "work": {
+          "state": "completed",
+          "replySeq": 4,
+          "tasks": [
+            {
+              "id": "aa-delegation-1795245931367-a8a4d954",
+              "state": "cancelled",
+              "stopAllowed": false,
+              "stopRequested": false,
+              "reviewRequired": false,
+              "hasResult": true,
+              "errorCode": null
+            }
+          ],
+          "toolInvocations": [
+            {
+              "pluginName": "AgentAssistant",
+              "state": "returned"
+            }
+          ]
+        },
+        "attempts": 1,
+        "provider": {
+          "parentRounds": [
+            {
+              "requestMatchesWork": true,
+              "stream": false
+            },
+            {
+              "requestMatchesWork": true,
+              "stream": false
+            }
+          ],
+          "launches": 1,
+          "childRounds": [
+            {
+              "requestId": "aa-delegation-1795245931367-a8a4d954-round-1",
+              "round": 1
+            }
+          ]
+        },
+        "journal": [
+          {
+            "action": "upsert",
+            "message": "user"
+          },
+          {
+            "action": "upsert",
+            "message": "assistant"
+          }
+        ]
+      },
+      "nativeFinalState": "cancelled"
+    },
+    "crash": {
+      "workId": "request_14814ae8cfe14905bfedf6f31c97082d",
+      "nativeTaskId": "aa-delegation-1795245931440-e0b8a07c",
+      "active": {
+        "state": "dispatched",
+        "replySeq": null,
+        "tasks": [
+          {
+            "id": "aa-delegation-1795245931440-e0b8a07c",
+            "state": "running",
+            "stopAllowed": true,
+            "stopRequested": false,
+            "reviewRequired": false,
+            "hasResult": false,
+            "errorCode": null
+          }
+        ],
+        "toolInvocations": [
+          {
+            "pluginName": "AgentAssistant",
+            "state": "returned"
+          }
+        ]
+      },
+      "nativeActiveState": "running",
+      "parentNativeState": "model_terminal",
+      "initialProvider": {
+        "parentRounds": [
+          {
+            "requestMatchesWork": true,
+            "stream": true
+          },
+          {
+            "requestMatchesWork": true,
+            "stream": true
+          }
+        ],
+        "launches": 1,
+        "childRounds": [
+          {
+            "requestId": "aa-delegation-1795245931440-e0b8a07c-round-1",
+            "round": 1
+          }
+        ]
+      },
+      "exit": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "originalAdmissionReplay": {
+        "sameWork": true,
+        "replayed": true
+      },
+      "after": {
+        "work": {
+          "state": "review_required",
+          "replySeq": null,
+          "tasks": [
+            {
+              "id": "aa-delegation-1795245931440-e0b8a07c",
+              "state": "unknown",
+              "stopAllowed": false,
+              "stopRequested": false,
+              "reviewRequired": true,
+              "hasResult": false,
+              "errorCode": "NATIVE_TASK_RESULT_UNCONFIRMED"
+            }
+          ],
+          "toolInvocations": [
+            {
+              "pluginName": "AgentAssistant",
+              "state": "returned"
+            }
+          ]
+        },
+        "attempts": 1,
+        "provider": {
+          "parentRounds": [
+            {
+              "requestMatchesWork": true,
+              "stream": true
+            },
+            {
+              "requestMatchesWork": true,
+              "stream": true
+            }
+          ],
+          "launches": 1,
+          "childRounds": [
+            {
+              "requestId": "aa-delegation-1795245931440-e0b8a07c-round-1",
+              "round": 1
+            }
+          ]
+        },
+        "journal": [
+          {
+            "action": "upsert",
+            "message": "user"
+          }
+        ]
+      },
+      "refusedActions": {
+        "report": "NATIVE_TASK_RESULT_UNVERIFIED",
+        "stop": "NATIVE_TASK_STOP_UNAVAILABLE",
+        "newSameTopicSubmission": "DEPENDENCY_REVIEW_REQUIRED"
+      }
+    }
+  },
+  "providerAccounting": {
+    "totalRequests": 10,
+    "parentRounds": 6,
+    "childRounds": 4,
+    "launches": 3
+  },
+  "finalToolBoxExit": {
+    "code": 0,
+    "signal": null
+  },
+  "loadedSources": [
+    {
+      "file": "apps/server/server.js",
+      "sha256": "3095443182aca5d60dec2f6ee776790906028befa9364496fd8fac5951a096df"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "a4754eea49c9d91e155d1862e40666bf3c77085760e62bded7e2ecf1336faeee"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "9bac35b45ae82bcdd20a23f73c88fad9eadadaad99e4c8fd37fa424e09e20e08"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "3483b635f0b735b80b0f02d6d0ad5ddefdb9bf52988affb6f5f8b2b63f8ca0b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "c6f8731407a364b792d6272f458fce1cb37b9c23479a4f60da08e9e5b98cbfd8"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "946cc2c9160ac58e9e213132091b96e47cb57e5cba5c2dde397b3220345c6828"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+      "sha256": "b16e07afa969e4674a98fe093f4e7c892c3125635b9c63ac0064bafdaf47f17d"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "6a2fb2d95bcbd2e9a13464c03dee24b8b16f03ce432312aff03a136d281ae44e"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+      "sha256": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+      "sha256": "271d75bd6a7e8b621e9da1f60a7acd42e7977bb9ff5ff25ba5ae68449826def9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "7898848cf8b64708689af263992b620347805e27cd6ea6ad565dfb5551ec27f6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+      "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+    },
+    {
+      "file": "apps/server/Plugin/AgentAssistant/AgentAssistant.js",
+      "sha256": "775909dc425b00a364aa3b46044a4ab32071e32e51fe32df1052f644db4d8927"
+    },
+    {
+      "file": "apps/server/Plugin/AgentAssistant/delegationContinuity.js",
+      "sha256": "b7ea27e0304d4da83d8c2f992321bd4f78d71ab5d284b775a3441c5848a241c5"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "200540207a903bb0e7dc342eba36edb271619df7304eb5f433b7d62353a1cc56"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "c135a4ae59741a02cdf07653b7112f7932693f10600f6d4dac76e28a72d4d825"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "e9b47cc89507739a722163d662ab288700cd69fe6587d344d1065ddcbe84c217"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/native-sync.js",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    }
+  ]
+}

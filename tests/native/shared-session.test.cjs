@@ -124,6 +124,44 @@ test('a persisted native-terminal result survives backend reopen and only comple
  assert.equal(f.shared.db.prepare('SELECT state FROM shared_admissions WHERE id=?').get(accepted.id).state,'dispatched');
  await f.reopenBackend();assert.equal(f.portal.engine.get(accepted.id).state,'completed');assert.equal(f.calls(),1);assert.equal(f.store.metrics().journalRows,2);
 });
+for (const projected of [false, true]) test('AA recovery publishes one durable parent reply after losing '+(projected?'the terminal flag':'the child projection'),async t=>{
+ const f=await fixture(t),accepted=f.shared.sessionSend(f.actor('A'),submission(f));
+ const taskId='aa-delegation-1000-00000001';
+ let link,archiveAvailable=false;
+ const release=ctx.registerNativeTaskProvider('AgentAssistant',identity=>archiveAvailable?{
+  ...identity,schemaVersion:1,state:'completed',nativeStatus:'Succeed',revision:1,controlRevision:0,
+  resultRef:'synthetic native archive',resultHash:sha256('original AA result'),summary:'original AA result',endTime:1,
+ }:{...identity,state:'running',revision:0});
+ t.after(release);
+ f.control.nativeResponder=async(_req,res)=>{
+  await ctx.runToolInvocation({pluginName:'AgentAssistant'},async()=>{
+   link=await ctx.acceptNativeTask({pluginName:'AgentAssistant',nativeTaskId:taskId,agentBaseName:'Synthetic'});
+   await link.observe({state:'running',revision:0});
+  });
+  res.json({choices:[{message:{role:'assistant',content:'original parent response'},finish_reason:'stop'}]});
+ };
+ await start(f);await wait(()=>f.portal.engine.get(accepted.id).state==='publishing','durable parent reply awaiting AA archive');
+ f.shared.native.taskControls.claimFinal(accepted.id,link.identity,0);
+ if (projected) {
+  // Simulate the process dying after the verified child row committed, before
+  // its completion signal reached the parent. No child is left to poll.
+  const check=f.shared.native.checkTerminal;
+  f.shared.native.checkTerminal=()=>{};
+  archiveAvailable=true;
+  try { await link.observe(await ctx.queryNativeTask('AgentAssistant',link.identity)); }
+  finally { f.shared.native.checkTerminal=check; }
+ }
+ assert.equal(f.shared.active(f.topic.id).native_terminal,0);
+ const {SharedSpace}=require(BOX+'/Plugin/NativeSync/sync/sharedSpace');
+ new SharedSpace(f.store,{NativeSyncSharedSpaces:JSON.stringify([{id:'sharedAB',sources:['sourceA','sourceB']}])});
+ assert.equal(f.shared.active(f.topic.id).state,'dispatched');
+ await f.reopenBackend();
+ assert.equal(f.portal.engine.get(accepted.id).state,'publishing');
+ archiveAvailable=true;
+ await start(f);await completed(f,accepted.id);
+ assert.equal(f.calls(),1);assert.equal(f.store.metrics().journalRows,2);
+ assert.equal(f.shared.workState(f.actor('A'),{sharedSpaceId:'sharedAB',workId:accepted.id}).request.nativeTasks[0].state,'completed');
+});
 test('session execution refuses public native dispatch and completion, preserving the server owner',async t=>{
  const f=await fixture(t),body=submission(f),accepted=f.shared.sessionSend(f.actor('A'),body),packet={requestId:accepted.id};
  assert.throws(()=>f.shared.prepareNative(f.actor('A'),{sharedSpaceId:'sharedAB',admissionId:accepted.id,requestId:accepted.id,bodyHash:sha256(stable(packet))}),rejects('SHARED_SESSION_DISPATCH_ONLY'));

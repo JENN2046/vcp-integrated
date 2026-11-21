@@ -47,7 +47,7 @@ function complete(engine,row){
   engine.db.prepare("UPDATE mobile_executions SET state=?,updated_at=? WHERE id=?").run(row.terminal_state,Date.now(),row.id);
   engine.emitEvent?.(row.id,'state',{state:row.terminal_state});return false;
  }
- if(engine.nativeTasks.needsReview(row.id)||engine.nativeTasks.unsettledTools(row.id)){
+ if(engine.nativeTasks.needsReview(row.id,{deferReconciliation:admission.state==='dispatched'&&!admission.native_terminal})||engine.nativeTasks.unsettledTools(row.id)||shared.native?.taskRequests?.uncertain(row.id)){
   engine.db.prepare("UPDATE mobile_executions SET state='review_required',error_code='NATIVE_SETTLEMENT_REVIEW_REQUIRED' WHERE id=?").run(row.id);
   engine.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE id=? AND state='dispatched'").run(row.id);return false;
  }

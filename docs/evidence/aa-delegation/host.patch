@@ -1,0 +1,1020 @@
+diff --git a/apps/desktop/modules/nativeSyncDesktopRuntime/preloadApi.js b/apps/desktop/modules/nativeSyncDesktopRuntime/preloadApi.js
+index 686aeb3..6a30e4a 100644
+--- a/apps/desktop/modules/nativeSyncDesktopRuntime/preloadApi.js
++++ b/apps/desktop/modules/nativeSyncDesktopRuntime/preloadApi.js
+@@ -10,6 +10,7 @@ module.exports = {
+         getNativeDeletionContext: invoke('native-sync:directory-context', 'scope'),
+         getNativeExecutionStatus: invoke('native-sync:executions', 'itemId', 'itemType', 'topicId', 'refresh'),
+         getNativeTaskResult: invoke('native-sync:task-result', 'itemId', 'itemType', 'topicId', 'executionId', 'nativeTaskId'),
++        stopNativeTask: invoke('native-sync:task-stop', 'payload'),
+         onNativeExecutionStatusChanged: on('native-sync:executions-changed'),
+         onSharedDirectoryChanged:on('native-sync:directory-changed'),
+         sharedConfigContext: invoke('native-sync:shared-config-context'),
+diff --git a/apps/desktop/modules/renderer/nativeExecutionStatus.js b/apps/desktop/modules/renderer/nativeExecutionStatus.js
+index 7f38c3b..41d1199 100644
+--- a/apps/desktop/modules/renderer/nativeExecutionStatus.js
++++ b/apps/desktop/modules/renderer/nativeExecutionStatus.js
+@@ -2,7 +2,7 @@ import {createSharedSessionView} from '../services/nativeSync/sharedSessionView.
+ const key = topic => JSON.stringify([topic?.ownerType, topic?.ownerId, topic?.topicId]);
+ const labels = {
+     preparing: '正在提交，尚未确认接收', queued: '云端已受理，等待执行',
+-    running: '云端执行中', waiting_approval: '等待原生审批', publishing: '回复保存中',
++    running: '云端执行中', dispatched: '云端执行中', waiting_approval: '等待原生审批', publishing: '回复保存中',
+     recovering: '结果恢复中', failed: '执行失败', cancelled: '已取消', cancelling: '正在取消',
+     review_required: '需要核对', blocked_config: '等待配置确认',
+ };
+@@ -50,7 +50,8 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
+     recovery.style.cssText='max-height:110px;overflow:auto;font-size:13px;padding:4px 12px;';
+     const composer=container.parentElement?.querySelector('.chat-input-area');
+     if(composer)composer.prepend(recovery);else container.after(recovery);
+-    let disposed = false, selection = null, generation = 0, resultGeneration = 0, view = null, historyTimer = null;
++    let disposed = false, selection = null, generation = 0, resultGeneration = 0, view = null, historyTimer = null, taskTimer = null;
++    const stopRequests = new Set();
+     const currentTopic = () => {
+         const item = getSelection();
+         return item?.id && getTopicId() && ['agent', 'group'].includes(item.type) ? { ownerType: item.type, ownerId: item.id, topicId: getTopicId() } : null;
+@@ -117,8 +118,8 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
+             return;
+         }
+         const displayed = value.displayJobs ?? (value.executions || []).slice(0, 5);
+-        const hasReports = displayed.some(job => job.nativeTasks?.some(task => task.resultRef));
+-        panel.hidden = !hasReports && !(value.executions || []).some(job => !['completed','cancelled'].includes(job.state)) && !value.local?.pendingOperations && !value.local?.blockedOperations && !value.local?.pendingLocalCommit;
++        const hasTasks = displayed.some(job => job.nativeTasks?.length);
++        panel.hidden = !hasTasks && !(value.executions || []).some(job => !['completed','cancelled'].includes(job.state)) && !value.local?.pendingOperations && !value.local?.blockedOperations && !value.local?.pendingLocalCommit;
+         const freshness = value.freshness === 'current' ? '本次已核对' : value.freshness === 'last-known' ? '最近已知' : '尚未取得状态';
+         const delivery = localDeliveryText(value.local);
+         summary.textContent = `任务状态${value.connection === 'offline' ? ' · 离线' : value.connection === 'error' ? ' · 暂未更新' : ''}`;
+@@ -136,7 +137,7 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
+         }
+         jobs.replaceChildren();
+         for (const job of displayed) {
+-            const row = document.createElement('li');
++            const row = document.createElement('li'); row.dataset.workId = job.id;
+             const completed = job.replyMessageId ? '回复已保存' : '主请求已结束';
+             const state = job.state === 'completed' ? completed : labels[job.state] || `状态：${job.state}`;
+             row.textContent = `${state} · 请求 ${job.requestId}${job.errorCode ? `（${job.errorCode}）` : ''}`;
+@@ -159,9 +160,37 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
+                 retainDetail(item, heading, [job.id, 'task', task.nativeTaskId, task.invocationId, task.stepId || null]);
+                 item.className = 'native-sync-aa-task'; item.dataset.taskId = task.nativeTaskId; item.dataset.state = task.state;
+                 heading.textContent = `${taskLabels[task.state] || 'AA 状态待核对'} · ${task.agentBaseName}`; item.append(heading);
+-                const identity = document.createElement('p'); identity.textContent = `任务 ${task.nativeTaskId} · 调用 ${task.invocationId}${task.stepId ? ` · 群聊步骤 ${task.stepId}` : ''}`; item.append(identity);
++                const identity = document.createElement('p'); identity.textContent = `任务 ${task.nativeTaskId} · 调用 ${task.invocationId}${task.stepId && task.stepId !== job.id ? ` · 群聊步骤 ${task.stepId}` : ''}`; item.append(identity);
+                 if (task.summary) { const preview = document.createElement('p'); preview.textContent = task.summary; item.append(preview); }
+                 if (task.reviewRequired) { const review = document.createElement('p'); review.textContent = task.reviewResolved ? '已人工核对；原生任务状态仍按上方记录显示。' : '需要在原生宿主核对任务与可能的工具副作用。'; item.append(review); }
++                if (job.shared && !value.readOnly && value.connection === 'online' && task.stopAllowed === true && typeof api.stopNativeTask === 'function') {
++                    const stop = document.createElement('button');
++                    stop.type = 'button'; stop.textContent = '请求停止 AA';
++                    stop.dataset.nativeSyncFocusKey = `${item.dataset.nativeSyncKey}:stop`;
++                    const stopKey = stop.dataset.nativeSyncFocusKey;
++                    stop.disabled = stopRequests.has(stopKey);
++                    stop.addEventListener('click', async () => {
++                        const scope = value.topic;
++                        if (disposed || key(scope) !== key(selection) || !stop.isConnected || stopRequests.has(stopKey)) return;
++                        stopRequests.add(stopKey);
++                        stop.disabled = true;
++                        try {
++                            const response = await api.stopNativeTask({
++                                descriptor: {itemType: scope.ownerType, itemId: scope.ownerId, topicId: scope.topicId},
++                                workId: job.id, nativeTaskId: task.nativeTaskId,
++                            });
++                            if (response?.success !== true) throw Error(response?.error || 'NATIVE_TASK_STOP_FAILED');
++                            if (!disposed && key(scope) === key(selection)) await query(true, scope);
++                        } catch (error) {
++                            if (!disposed && key(scope) === key(selection)) observed.textContent = `停止请求尚未确认（${error.message}）`;
++                        } finally {
++                            stopRequests.delete(stopKey);
++                            const shown = [...jobs.querySelectorAll('button[data-native-sync-focus-key]')].find(control => control.dataset.nativeSyncFocusKey === stopKey);
++                            if (shown) shown.disabled = false;
++                        }
++                    });
++                    item.append(stop);
++                }
+                 if (task.resultRef && typeof api.getNativeTaskResult === 'function') {
+                     const read = document.createElement('button'); read.type = 'button'; read.textContent = '查看已核对报告';
+                     read.dataset.nativeSyncFocusKey = `${item.dataset.nativeSyncKey}:report`;
+@@ -182,8 +211,17 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
+         } else if (value.total > 5) {
+             const row = document.createElement('li'); row.textContent = `显示最近 5 项执行${displayed.length > 5 ? '及近期报告' : ''}；执行记录共 ${value.total} 项${value.truncated ? '，本地仅保留最近 128 项状态' : ''}。`; jobs.append(row);
+         }
++        if (displayed.some(job => job.shared && job.nativeTasks?.some(task => ['accepted','running','waiting','cancelling'].includes(task.state)))) scheduleTaskRefresh();
+         if (focused && panel.open) [...jobs.querySelectorAll('[data-native-sync-focus-key]')].find(item => item.dataset.nativeSyncFocusKey === focused)?.focus({ preventScroll: true });
+     }
++    function scheduleTaskRefresh() {
++        if (taskTimer || disposed || !selection) return;
++        const scope = selection;
++        taskTimer = setTimeout(() => {
++            taskTimer = null;
++            if (key(scope) === key(selection)) void query(true, scope);
++        }, 2000);
++    }
+     function clearResult() { resultGeneration += 1; resultPanel.hidden = true; resultStatus.textContent = ''; resultText.textContent = ''; }
+     async function showResult(job, task) {
+         const scope = selection, turn = ++resultGeneration;
+@@ -222,6 +260,7 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
+         const topic = currentTopic();
+         if (key(topic) === key(selection)) return;
+         sharedSessionView.select(topic);
++        clearTimeout(taskTimer); taskTimer = null;
+         selection = topic; generation += 1; render(null);
+         if (topic) void refresh();
+     }
+@@ -231,7 +270,14 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
+         historyTimer = setTimeout(() => { historyTimer = null; void query(false); }, 100);
+     });
+     const offChange = api.onNativeExecutionStatusChanged?.(result => {
+-        if(result?.serverSession){if(!disposed){settleSharedFlowlock(result);sharedSessionView.update(result);}return;}
++        if (result?.serverSession) {
++            if (!disposed) {
++                settleSharedFlowlock(result);
++                sharedSessionView.update(result);
++                if (key(result.topic) === key(selection) && result.serverSession.activity?.type === 'tool') scheduleTaskRefresh();
++            }
++            return;
++        }
+         if (disposed || !selection || key(result?.topic) !== key(selection)) return;
+         // A topic notification without a status snapshot invalidates this view.
+         if (result.enabled === undefined) { void query(false, selection); return; }
+@@ -247,7 +293,7 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
+     return {
+         refresh,
+         dispose() {
+-            disposed = true; generation += 1; clearTimeout(historyTimer);
++            disposed = true; generation += 1; clearTimeout(historyTimer); clearTimeout(taskTimer);
+             offSelection?.(); offHistory?.(); offChange?.();
+             button.removeEventListener('click', recover);
+             ownerWindow?.removeEventListener('focus', recover);
+diff --git a/apps/desktop/modules/services/nativeSync/nativeTasks.js b/apps/desktop/modules/services/nativeSync/nativeTasks.js
+index 0742fda..2efdf1e 100644
+--- a/apps/desktop/modules/services/nativeSync/nativeTasks.js
++++ b/apps/desktop/modules/services/nativeSync/nativeTasks.js
+@@ -34,6 +34,7 @@ function projectTask(value, executionId) {
+         revision: value.revision, resultRef: resultRef ? { kind: 'AgentAssistantArchive', nativeTaskId } : null,
+         resultHash, summary: value.summary ?? null, observedAt: value.observedAt,
+         reviewRequired: value.reviewRequired, reviewResolved: value.reviewResolved, errorCode: errorCode(value.errorCode),
++        ...(value.stopAllowed === true && ['accepted','running','waiting'].includes(value.state) && {stopAllowed:true}),
+     };
+ }
+ function projectNativeWork(row) {
+@@ -52,7 +53,7 @@ function projectNativeWork(row) {
+     const group = row.kind === 'group_message' || row.kind === 'group_invitation';
+     for (const task of nativeTasks) {
+         const call = invocations.get(task.invocationId);
+-        if (!call || call.pluginName !== task.pluginName || call.stepId !== task.stepId || call.recordId !== task.recordId || (!group && task.stepId !== null)) throw fail();
++        if (!call || call.pluginName !== task.pluginName || call.stepId !== task.stepId || call.recordId !== task.recordId || (!group && task.stepId !== null && task.stepId !== row.id)) throw fail();
+     }
+     return { nativeTasks, toolInvocations };
+ }
+diff --git a/apps/desktop/modules/services/nativeSync/queries.js b/apps/desktop/modules/services/nativeSync/queries.js
+index 1e7d46c..78216d3 100644
+--- a/apps/desktop/modules/services/nativeSync/queries.js
++++ b/apps/desktop/modules/services/nativeSync/queries.js
+@@ -32,7 +32,7 @@ function registerNativeSyncQueries({ipcMain,getRuntime,getMainWindow,queue,proje
+             if (stopped) return Promise.resolve({success:false,error:'SYNC_BRIDGE_CLOSED'});
+             const operation = Promise.resolve().then(()=>{
+                 if (!trusted(args[0])) return {success:false,error:'NATIVE_SYNC_MAIN_WINDOW_REQUIRED'};
+-                return ['native-sync:session-cancel','native-sync:prepare-send','native-sync:stage-input','native-sync:continue','native-sync:input-ready','native-sync:retry-input','native-sync:handoff','native-sync:compact-prepare','native-sync:compact-commit','native-sync:compact-cancel','native-sync:model-confirm','native-sync:send-failure','native-sync:steer','native-sync:abandon-send','native-sync:shared-config-request','native-sync-setup:check-opened-attachment'].includes(name)?require('../quitAdmission.cjs').run(()=>action(...args)):action(...args);
++                return ['native-sync:task-stop','native-sync:session-cancel','native-sync:prepare-send','native-sync:stage-input','native-sync:continue','native-sync:input-ready','native-sync:retry-input','native-sync:handoff','native-sync:compact-prepare','native-sync:compact-commit','native-sync:compact-cancel','native-sync:model-confirm','native-sync:send-failure','native-sync:steer','native-sync:abandon-send','native-sync:shared-config-request','native-sync-setup:check-opened-attachment'].includes(name)?require('../quitAdmission.cjs').run(()=>action(...args)):action(...args);
+             }).catch(error=>({success:false,error:error.code || fallback}));
+             pending.add(operation); operation.finally(()=>pending.delete(operation));
+             return operation;
+@@ -77,6 +77,11 @@ function registerNativeSyncQueries({ipcMain,getRuntime,getMainWindow,queue,proje
+             if (!runtime) return {success:true,enabled:false};
+             return {success:true,...await runtime.getExecutionStatus({itemId,itemType,topicId},{refresh})};
+         },'EXECUTION_STATUS_UNAVAILABLE');
++        register('native-sync:task-stop', async (_event, payload) => {
++            const runtime = getRuntime();
++            if (!runtime?.stopNativeTask) throw fail('NATIVE_TASK_STOP_UNAVAILABLE');
++            return runtime.stopNativeTask(payload);
++        }, 'NATIVE_TASK_STOP_FAILED');
+         register('native-sync:task-result',async (_event,itemId,itemType,topicId,executionId,nativeTaskId)=>{
+             if ([executionId,nativeTaskId].some(v=>typeof v!=='string'||!v||v.length>512||/[\x00-\x1f]/.test(v))) throw Object.assign(Error('INVALID_NATIVE_TASK_QUERY'),{code:'INVALID_NATIVE_TASK_QUERY'});
+             const runtime=getRuntime();
+diff --git a/apps/desktop/modules/services/nativeSync/sharedRuntime.js b/apps/desktop/modules/services/nativeSync/sharedRuntime.js
+index c43e0b8..576b07e 100644
+--- a/apps/desktop/modules/services/nativeSync/sharedRuntime.js
++++ b/apps/desktop/modules/services/nativeSync/sharedRuntime.js
+@@ -14,6 +14,8 @@ const {emptyHash,fieldsFrom}=require('./metadata');
+ const {validateConfig,observeConfigVersions}=require('./sharedConfigVersion');
+ const endpoint='/api/v1/sync/shared/';
+ const kindOrder=['agent','group','rules','topic'];
++const inactiveTaskWork = new Set(['completed','cancelled','failed']);
++const activeTaskStates = new Set(['accepted','running','waiting','cancelling']);
+ 
+ function startupFence(sharedSpaceId,error=()=>null){
+  const blocked=async()=>{throw fail(error()||'SHARED_STARTUP_PENDING');};
+@@ -628,12 +630,59 @@ class SharedRuntime {
+  async prepareSharedSend({descriptor,message,localOnly=false,serverSession=false,...options}){if(options.controlMode!==undefined){if(options.controlMode!=='text-only-v1'||!this.capabilities.features?.includes('shared-controlled-text-v1'))throw fail('CONTROLLED_TEXT_UNAVAILABLE');if(serverSession||this.execution.state.requests[message?.id]&&this.execution.state.requests[message.id].body?.controlMode!==options.controlMode)throw fail('CONTROLLED_MODE_IMMUTABLE');}if(localOnly)return this.execution.stageLocal(descriptor,message,options);if(this.readOnly)throw fail('SHARED_READ_ONLY');const mapping=await this.executionMapping(descriptor);this.matching.assert([mapping.sharedId,this.state.objects[mapping.sharedId].parentId]);if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');if(!options.controlMode&&(serverSession||this.execution.state.requests[message?.id]?.serverSession)&&this.sessions?.enabled()){const accepted=await this.sessions.prepare(descriptor,message,options);if(accepted)return accepted;}try{return await this.execution.prepare(descriptor,message,options);}catch(error){if(error.code!=='SHARED_CONTEXT_CHANGED'||error.status!==409||!error.knownAdmissionRejected)throw error;return this.execution.prepare(descriptor,message,options,{forceFresh:true});}}
+  async abandonSharedSend(payload){if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.abandon(payload);}
+  async getExecutionStatus(d,options={}){
+-  if(this.readOnly)return {enabled:true,readOnly:true,configurationError:'SHARED_READ_ONLY',executions:[],connection:'online'};if(!d?.itemId||!d?.topicId)return {enabled:true,readOnly:false};
+-  if(this.capabilities.features?.includes('shared-controlled-text-v1')&&(d.itemType||'agent')==='agent'){await this.execution.steering.active(d);await this.execution.reconcile();}if(this.sessions?.enabled())await this.sessions.observe(d,{refresh:options.refresh!==false});const value=await this.execution.status(d,this.sessions?.enabled()?{...options,refresh:false}:options);if(this.sessions?.enabled())value.serverSessions=this.sessions.values(d);let mapping;try{mapping=this.execution.mapping(d);}catch{this.dirty=true;return value;}
++  if(this.readOnly){this.nativeTaskViews?.clear();return {enabled:true,readOnly:true,configurationError:'SHARED_READ_ONLY',executions:[],connection:'online'};}if(!d?.itemId||!d?.topicId)return {enabled:true,readOnly:false};
++  if(this.capabilities.features?.includes('shared-controlled-text-v1')&&(d.itemType||'agent')==='agent'){await this.execution.steering.active(d);await this.execution.reconcile();}if(this.sessions?.enabled())await this.sessions.observe(d,{refresh:options.refresh!==false});const value=await this.execution.status(d,this.sessions?.enabled()?{...options,refresh:false}:options);if(this.sessions?.enabled()){
++   value.serverSessions=this.sessions.values(d);
++   await this.refreshNativeTaskViews(value,d,options.refresh!==false);
++  }let mapping;try{mapping=this.execution.mapping(d);}catch{this.dirty=true;return value;}
+   if(this.matching.fenced(mapping.sharedId)||this.matching.fenced(this.state.objects[mapping.sharedId].parentId))return {...value,readOnly:true,configurationError:'SHARED_MATCH_PREPARING'};return {...value,controlledTextAvailable:this.capabilities.features?.includes('shared-controlled-text-v1')===true};
+  }
+ 
++ async refreshNativeTaskViews(value, descriptor, refresh) {
++  this.nativeTaskViews ||= new Map();
++  const mapping = this.execution.mapping(descriptor);
++  const owned = value.executions.slice(0, 5).filter(job => {
++   const record = this.sessions.byExecution.get(job.id);
++   return record?.serverSession && !record.remote && record.sharedId === mapping.sharedId;
++  });
++  await Promise.all(owned.map(async job => {
++   let view = this.nativeTaskViews.get(job.id);
++   const linkedActive = (view?.nativeTasks || job.nativeTasks).some(task => activeTaskStates.has(task.state));
++   if (refresh && (linkedActive || !inactiveTaskWork.has(job.state))) {
++    try {
++     const query = new URLSearchParams({sharedSpaceId: this.connection.sharedSpaceId, workId: job.id});
++     const {request} = await this.send(endpoint + 'work?' + query);
++     if (request?.id !== job.id || request.sharedId !== mapping.sharedId) throw fail('NATIVE_TASK_WORK_MISMATCH');
++     view = {...require('./nativeTasks').projectNativeWork(request), verifiedAt: Date.now()};
++    } catch {
++     // Preserve observed status on a failed read. The stop control requires a verified read.
++     view = {nativeTasks: view?.nativeTasks || job.nativeTasks, toolInvocations: view?.toolInvocations || job.toolInvocations};
++    }
++    this.nativeTaskViews.delete(job.id);
++    this.nativeTaskViews.set(job.id, view);
++    if (this.nativeTaskViews.size > 80) this.nativeTaskViews.delete(this.nativeTaskViews.keys().next().value);
++   }
++   const tasks = view?.nativeTasks || job.nativeTasks;
++   const verified = view?.verifiedAt && Date.now() - view.verifiedAt < 5000;
++   job.nativeTasks = verified ? tasks : tasks.map(task => ({...task,stopAllowed:false}));
++   if (view) job.toolInvocations = view.toolInvocations;
++  }));
++  value.displayJobs = require('./sharedTaskList').sharedTaskList(value.executions, value.reportJobs);
++ }
++ async stopNativeTask({descriptor, workId, nativeTaskId} = {}) {
++  if (this.closed || !this.ready) throw fail('APPLICATION_SHUTTING_DOWN');
++  if (this.readOnly) throw fail('SHARED_READ_ONLY');
++  require('./contracts.generated.cjs').sharedIdentity(workId);
++  if (typeof nativeTaskId !== 'string' || !/^[a-zA-Z0-9_.:-]{1,160}$/.test(nativeTaskId)) throw fail('INVALID_NATIVE_TASK_QUERY');
++  const mapping = this.execution.mapping(descriptor);
++  this.matching.assert([mapping.sharedId, this.state.objects[mapping.sharedId].parentId]);
++  const record = this.sessions?.byExecution.get(workId);
++  if (!record?.serverSession || record.remote || record.sharedId !== mapping.sharedId) throw fail('SHARED_REQUEST_OWNER_REQUIRED');
++  const body = {sharedSpaceId: this.connection.sharedSpaceId, workId, nativeTaskId};
++  await this.send(endpoint + 'task-stop', {body});
++  return {success: true};
++ }
+  async getNativeTaskResult(d,workId,nativeTaskId){if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(d);const known=await this.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId}));if(known.request?.sharedId!==mapping.sharedId)throw fail('NATIVE_TASK_RESULT_MISMATCH');const value=await this.send(endpoint+'task-result?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId,nativeTaskId}));return {...value,topic:{ownerType:d.itemType||'agent',ownerId:d.itemId,topicId:d.topicId}};}
+- async close(){if(this.closed)return;this.closed=true;this.waitClient.close();clearInterval(this.timer);await this.sessions?.close();try{await this.recoverSharedCompactionPrepares();}catch{}for(const [id,prepared]of Object.entries(this.execution?.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.execution.state.compactions?.[id]?.body)try{await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:true});}catch{}clearInterval(this.timer);if(this.changed)this.agentConfigEvents?.off?.('agent-config-updated',this.changed);await Promise.allSettled([this.running,this.refreshing,this.attachments?.work?.running,this.coreTail,this.registrationTail,this.registryDisk,this.topicSponsorRecovery]);await this.execution?.close();await this.replica?.close();this.releaseHost?.();}
++ async close(){if(this.closed)return;this.closed=true;this.nativeTaskViews?.clear();this.waitClient.close();clearInterval(this.timer);await this.sessions?.close();try{await this.recoverSharedCompactionPrepares();}catch{}for(const [id,prepared]of Object.entries(this.execution?.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.execution.state.compactions?.[id]?.body)try{await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:true});}catch{}clearInterval(this.timer);if(this.changed)this.agentConfigEvents?.off?.('agent-config-updated',this.changed);await Promise.allSettled([this.running,this.refreshing,this.attachments?.work?.running,this.coreTail,this.registrationTail,this.registryDisk,this.topicSponsorRecovery]);await this.execution?.close();await this.replica?.close();this.releaseHost?.();}
+ }
+ module.exports={SharedRuntime,startupFence};
+diff --git a/apps/mobile/src/App.vue b/apps/mobile/src/App.vue
+index 61f2003..1313139 100644
+--- a/apps/mobile/src/App.vue
++++ b/apps/mobile/src/App.vue
+@@ -376,7 +376,7 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
+      <details v-if="j.toolInvocations.length" class="native-tools"><summary>原生工具调用 {{j.toolInvocations.length}} 项（返回不等于 AA 完成）</summary><ul><li v-for="call in j.toolInvocations" :key="call.invocationId">{{call.pluginName}} · {{toolLabels[call.state]}}<small> · 调用 {{call.invocationId}}</small></li></ul></details>
+      <details v-for="task in j.nativeTasks" :key="task.nativeTaskId" class="native-aa-task" :data-task-id="task.nativeTaskId" :data-state="task.state">
+       <summary>{{nativeTaskLabels[task.state]}} · {{task.agentBaseName}}</summary>
+-      <small>任务 {{task.nativeTaskId}}<br>调用 {{task.invocationId}}<template v-if="task.stepId"><br>群聊步骤 {{task.stepId}}</template></small>
++      <small>任务 {{task.nativeTaskId}}<br>调用 {{task.invocationId}}<template v-if="task.stepId && task.stepId!==j.id"><br>群聊步骤 {{task.stepId}}</template></small>
+       <p v-if="task.summary">{{task.summary}}</p>
+       <p v-if="task.reviewRequired">{{task.reviewResolved?'已记录人工核对；原生任务状态仍按上方记录显示。':'请在原生宿主核对任务与可能的工具副作用。'}}</p>
+       <button v-if="task.resultRef" class="native-result-read" @click="showNativeResult(j,task)">查看已核对报告</button>
+diff --git a/apps/mobile/src/nativeTasks.js b/apps/mobile/src/nativeTasks.js
+index 1b95225..0c20532 100644
+--- a/apps/mobile/src/nativeTasks.js
++++ b/apps/mobile/src/nativeTasks.js
+@@ -50,7 +50,7 @@ function projectNativeWork(row) {
+     const group = row.kind === 'group_message' || row.kind === 'group_invitation';
+     for (const task of nativeTasks) {
+         const call = invocations.get(task.invocationId);
+-        if (!call || call.pluginName !== task.pluginName || call.stepId !== task.stepId || call.recordId !== task.recordId || (!group && task.stepId !== null)) throw fail();
++        if (!call || call.pluginName !== task.pluginName || call.stepId !== task.stepId || call.recordId !== task.recordId || (!group && task.stepId !== null && task.stepId !== row.id)) throw fail();
+     }
+     return { nativeTasks, toolInvocations };
+ }
+diff --git a/apps/server/Plugin/AgentAssistant/AgentAssistant.js b/apps/server/Plugin/AgentAssistant/AgentAssistant.js
+index 3fe8c11..c1223e0 100644
+--- a/apps/server/Plugin/AgentAssistant/AgentAssistant.js
++++ b/apps/server/Plugin/AgentAssistant/AgentAssistant.js
+@@ -4,6 +4,10 @@ const path = require('path');
+ const dotenv = require('dotenv');
+ const axios = require('axios');
+ const { v4: uuidv4 } = require('uuid');
++const nativeExecution = require('../../modules/requestExecutionContext');
++const { createDelegationContinuity, identityOf, sameIdentity } = require('./delegationContinuity');
++const continuity = createDelegationContinuity(path.resolve(__dirname, '../..'));
++let unregisterTaskProvider;
+ const {
+     normalizeReasoningTag,
+     normalizeReasoningModelFilters,
+@@ -71,6 +75,18 @@ function initialize(config, dependencies) {
+ 
+     // 加载配置
+     loadAgentsFromLocalConfig();
++    unregisterTaskProvider?.();
++    unregisterTaskProvider = nativeExecution.registerNativeTaskProvider('AgentAssistant', {
++        read: readNativeDelegation,
++        control(identity, request) {
++            if (request?.action !== 'stop') throw Error('NATIVE_TASK_CONTROL_UNAVAILABLE');
++            const state = activeDelegations.get(identity.nativeTaskId);
++            if (state?.link && sameIdentity(state.link.identity, identity) && !state.finalizing) {
++                cancelDelegation(state.id, '由共享任务发起端请求取消。');
++            }
++            return readNativeDelegation(identity);
++        },
++    });
+ 
+     if (dependencies && dependencies.vcpLogFunctions && typeof dependencies.vcpLogFunctions.pushVcpInfo === 'function') {
+         pushVcpInfo = dependencies.vcpLogFunctions.pushVcpInfo;
+@@ -89,6 +105,8 @@ function initialize(config, dependencies) {
+  * Shuts down the service, clearing any intervals.
+  */
+ function shutdown() {
++    unregisterTaskProvider?.();
++    unregisterTaskProvider = null;
+     if (cleanupInterval) {
+         clearInterval(cleanupInterval);
+         if (DEBUG_MODE) console.error('[AgentAssistant Service] Context cleanup interval stopped.');
+@@ -587,6 +605,26 @@ function getDelegationDetail(delegationId) {
+     return completedDelegations.find(item => item.id === delegationId) || null;
+ }
+ 
++function readNativeDelegation(identity) {
++    const state = activeDelegations.get(identity.nativeTaskId);
++    if (state?.link && sameIdentity(state.link.identity, identity)) {
++        // Native terminal states are published only with the verified archive.
++        const status = state.cancelRequested ? 'cancelling' : state.status === 'waiting' ? 'waiting' : 'running';
++        return { ...state.link.identity, state: status, revision: 0 };
++    }
++    return continuity.read(identity, { includeResult: identity.includeResult === true }) ||
++        { ...identity, state: 'unknown', revision: 0, code: 'NATIVE_TASK_RESULT_UNCONFIRMED' };
++}
++
++function observeDelegation(state, observation) {
++    if (!state?.link) return;
++    try { state.link.observe(observation); }
++    catch (error) {
++        // Reconciliation can read live state or the original durable receipt.
++        console.error('[AgentAssistant] Native task observation pending:', error.code || 'NATIVE_TASK_PROJECTION_FAILED');
++    }
++}
++
+ function cancelDelegation(delegationId, reason = '用户从管理面板请求取消。') {
+     const state = activeDelegations.get(delegationId);
+     if (!state) {
+@@ -595,11 +633,13 @@ function cancelDelegation(delegationId, reason = '用户从管理面板请求取
+     if (state.cancelRequested || state.status === 'cancelling') {
+         return { success: true, message: `委托任务 ${delegationId} 已经在取消中。`, task: createDelegationSnapshot(state) };
+     }
++    if (state.finalizing) return { success: false, message: '委托任务正在提交结果。' };
+     state.cancelRequested = true;
+     state.cancelReason = String(reason || '用户请求取消。');
+     state.status = 'cancelling';
+     state.updatedAt = Date.now();
+     activeDelegations.set(delegationId, state);
++    observeDelegation(state, { state: 'cancelling', revision: 0 });
+     return { success: true, message: `已请求取消委托任务 ${delegationId}。任务会在当前等待/请求结束后尽快退出。`, task: createDelegationSnapshot(state) };
+ }
+ 
+@@ -660,6 +700,23 @@ async function processToolCall(args) {
+ 
+     const { agent_name, prompt, timely_contact, temporary_contact, maid, task_delegation, query_delegation, cancel_delegation, inject_tools, river_context, __vcp_timed_call } = args;
+ 
++    // A model-supplied ID does not carry authority over a shared child task.
++    const targetId = cancel_delegation || query_delegation;
++    if (targetId) {
++        const workId = nativeExecution.currentWork();
++        const target = nativeExecution.sharedTaskLink('AgentAssistant', targetId);
++        if (workId || target) {
++            if (!target || cancel_delegation || workId !== target.workId) {
++                throwToolError('请通过原共享 Work 查看或停止该委托。');
++            }
++            // A shared query needs the same evidence as the shared Work view.
++            // The legacy Markdown archive alone does not prove a task finished.
++            const observed = readNativeDelegation(target.identity);
++            return createTextResult(`委托任务 ${targetId} · ${observed.state}` +
++                (observed.summary ? '\n' + observed.summary : ''));
++        }
++    }
++
+     // Handle cancelling a delegation
+     if (cancel_delegation) {
+         const cancelResult = cancelDelegation(cancel_delegation, maid ? `由 ${maid} 请求取消。` : '用户请求取消。');
+@@ -688,7 +745,7 @@ async function processToolCall(args) {
+                 const docsDir = path.join(__dirname, '..', '..', 'file', 'document', 'AgentTask');
+                 if (fs.existsSync(docsDir)) {
+                     const files = fs.readdirSync(docsDir);
+-                    const matchedFile = files.find(f => f.includes(query_delegation) && f.endsWith('.md'));
++                    const matchedFile = files.find(f => f.endsWith(`_${query_delegation}.md`));
+                     if (matchedFile) {
+                         const mdContent = fs.readFileSync(path.join(docsDir, matchedFile), 'utf-8');
+                         completionMsg = `委托任务 (ID: ${query_delegation}) 已经完成！\n\n文件已永久归档至: \`file/document/AgentTask/${matchedFile}\`\n\n**文档内容速览:**\n\n${mdContent}`;
+@@ -769,8 +826,12 @@ async function processToolCall(args) {
+         const delegationSenderName = maid || "系统任务中心";
+         const temporaryToolsSystemPrompt = buildTemporaryToolsSystemPrompt(inject_tools);
+ 
++        const link = await nativeExecution.acceptNativeTask({
++            pluginName: 'AgentAssistant', nativeTaskId: delegationId, agentBaseName: agentConfig.baseName,
++        });
++        if (link) identityOf(link.identity);
+         activeDelegations.set(delegationId, {
+-            id: delegationId,
++            id: delegationId, link,
+             status: 'running',
+             agentName: agent_name,
+             agentBaseName: agentConfig.baseName,
+@@ -795,19 +856,9 @@ async function processToolCall(args) {
+ 
+         // Launch the background task un-awaited
+         executeDelegation(delegationId, agentConfig, promptWithRiverAttachment, promptTextForStorage, delegationSenderName, temporaryToolsSystemPrompt).catch(async err => {
+-            console.error(`[AgentAssistant Service] Background delegation task ${delegationId} failed:`, err);
+-            const state = activeDelegations.get(delegationId);
+-            const status = err.code === 'DELEGATION_CANCELLED' ? 'Cancelled' : 'Failed';
+-            if (state) {
+-                state.status = status === 'Cancelled' ? 'cancelled' : 'failed';
+-                state.completionStatus = status;
+-                state.finalReportPreview = truncateText(`任务执行过程中发生异常: ${err.message}`);
+-                state.endTime = Date.now();
+-                state.updatedAt = Date.now();
+-                rememberCompletedDelegation(state);
+-            }
+-            await sendDelegationCallback(delegationId, status, `任务执行过程中发生异常: ${err.message}`, agent_name);
++            // Never launch or publish a second result after an uncertain final write.
+             activeDelegations.delete(delegationId);
++            console.error('[AgentAssistant] Background delegation finalization failed:', err.code || 'NATIVE_RESULT_UNCONFIRMED');
+         });
+ 
+         const successMessage = `委托任务 (ID: ${delegationId}) 已成功提交给 ${agent_name} 进行后台处理。\n您可以使用带有 \`query_delegation: "${delegationId}"\` 参数的工具调用来查询其进度。\n这是一个动态上下文占位符，当任务完全完成时，它会被自动替换为实际的最终报告。\n请在你的回复中包含以下占位符原文：{{VCP_ASYNC_RESULT::AgentAssistant::${delegationId}}}`;
+@@ -973,23 +1024,23 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
+     const userSessionId = `agent_${agentConfig.baseName}_delegation_session`;
+     const lockKey = `${agentConfig.baseName}::${userSessionId}`;
+ 
+-    // 我们对于代理任务也是一个持久会话，因此需要占线锁保护
+-    while (activeSessionLocks.has(lockKey)) {
+-        if (DEBUG_MODE) console.error(`[AgentAssistant Delegation] Wait for lock: ${lockKey}`);
+-        await sleepWithDelegationCancel(delegationId, 2000);
+-        const state = activeDelegations.get(delegationId);
+-        if (Date.now() - state.startTime > DELEGATION_TIMEOUT) {
+-            throw new Error("Acquiring session lock timed out");
+-        }
+-    }
+-
+-    activeSessionLocks.add(lockKey);
+-
++    const state = activeDelegations.get(delegationId);
++    let lockHeld = false;
++    let lastChildId;
+     let finalReport = null;
+     let completionStatus = 'Failed';
+-    let taskPromptForSystem = '';
++    let taskPromptForSystem = String(taskPromptText ?? '');
+ 
+     try {
++        while (activeSessionLocks.has(lockKey)) {
++            state.status = 'waiting';
++            observeDelegation(state, { state: 'waiting', revision: 0 });
++            await sleepWithDelegationCancel(delegationId, 2000);
++            if (Date.now() - state.startTime > DELEGATION_TIMEOUT) throw Error('Acquiring session lock timed out');
++        }
++        assertDelegationNotCancelled(delegationId);
++        activeSessionLocks.add(lockKey);
++        lockHeld = true;
+         taskPromptForSystem = String(taskPromptText ?? (
+             typeof taskPromptContent === 'string'
+                 ? taskPromptContent
+@@ -1021,10 +1072,8 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
+             { role: 'user', content: userTaskPromptContent }
+         ];
+ 
+-        let state = activeDelegations.get(delegationId);
+-
+         while (state.currentRound < DELEGATION_MAX_ROUNDS) {
+-            state = assertDelegationNotCancelled(delegationId);
++            assertDelegationNotCancelled(delegationId);
+             if (Date.now() - state.startTime > DELEGATION_TIMEOUT) {
+                 completionStatus = 'Failed';
+                 finalReport = '委托任务执行超时。';
+@@ -1045,10 +1094,20 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
+                 stream: false
+             };
+ 
+-            const responseFromVCP = await axios.post(`${VCP_API_TARGET_URL}/chat/completions`, payloadForVCP, {
+-                headers: { 'Authorization': `Bearer ${VCP_SERVER_ACCESS_KEY}`, 'Content-Type': 'application/json' },
+-                timeout: (parseInt(process.env.PLUGIN_COMMUNICATION_TIMEOUT) || DEFAULT_PLUGIN_COMMUNICATION_TIMEOUT_MS)
+-            });
++            observeDelegation(state, { state: 'running', revision: 0 });
++            let release;
++            if (state.link?.requests) {
++                lastChildId = `${delegationId}-round-${state.currentRound + 1}`;
++                payloadForVCP.requestId = lastChildId;
++                release = state.link.requests.register(payloadForVCP);
++            }
++            let responseFromVCP;
++            try {
++                responseFromVCP = await axios.post(`${VCP_API_TARGET_URL}/chat/completions`, payloadForVCP, {
++                    headers: { 'Authorization': `Bearer ${VCP_SERVER_ACCESS_KEY}`, 'Content-Type': 'application/json', ...release?.headers },
++                    timeout: (parseInt(process.env.PLUGIN_COMMUNICATION_TIMEOUT) || DEFAULT_PLUGIN_COMMUNICATION_TIMEOUT_MS),
++                });
++            } finally { release?.(); }
+ 
+             const assistantResponseContent = responseFromVCP.data?.choices?.[0]?.message?.content;
+             if (typeof assistantResponseContent !== 'string') {
+@@ -1057,7 +1116,7 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
+ 
+             const responseModel = responseFromVCP.data?.model || agentConfig.id;
+             const cleanedAssistantResponse = removeVCPThinkingChain(assistantResponseContent, responseModel);
+-            state = assertDelegationNotCancelled(delegationId);
++            assertDelegationNotCancelled(delegationId);
+             state.lastResponsePreview = truncateText(cleanedAssistantResponse);
+             state.updatedAt = Date.now();
+             activeDelegations.set(delegationId, state);
+@@ -1139,6 +1198,7 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
+ 
+             if (actualDelayMs > 0) {
+                 state.status = 'waiting';
++                observeDelegation(state, { state: 'waiting', revision: 0 });
+                 activeDelegations.set(delegationId, state);
+                 if (DEBUG_MODE) {
+                     console.error(`[AgentAssistant Delegation] Next heartbeat in ${Math.round(actualDelayMs / 1000)}s (${flowlock.hasExplicitHeartbeat ? 'explicit' : 'default'}).`);
+@@ -1164,40 +1224,43 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
+             completionStatus = 'Cancelled';
+             finalReport = `委托任务已取消。原因: ${err.message}`;
+         } else {
+-            throw err;
++            completionStatus = 'Failed';
++            finalReport = `任务执行过程中发生异常: ${err.message}`;
+         }
+     } finally {
+-        activeSessionLocks.delete(lockKey);
+-
+-        const secureReport = finalReport || "未知错误导致无报告";
+-        const finalState = activeDelegations.get(delegationId);
+-        if (finalState) {
+-            finalState.status = completionStatus === 'Succeed'
+-                ? 'completed'
+-                : (completionStatus === 'Cancelled'
+-                    ? 'cancelled'
+-                    : (completionStatus === 'Stopped' ? 'stopped' : 'failed'));
+-            finalState.completionStatus = completionStatus;
+-            finalState.finalReportPreview = truncateText(secureReport);
+-            finalState.endTime = Date.now();
+-            finalState.updatedAt = Date.now();
+-        }
+-
+-        // 给成功完成任务的 Agent 发放积分奖励
+-        if (completionStatus === 'Succeed') {
+-            awardAgentPoints(agentConfig.baseName, agentConfig.name, 5, `成功完成异步委托任务: ${delegationId}`);
+-        }
++        if (lockHeld) activeSessionLocks.delete(lockKey);
++    }
+ 
+-        // Save to AgentTask Document Directory
+-        const archivePath = await archiveDelegationReport(delegationId, agentConfig.baseName, completionStatus, secureReport, taskPromptForSystem);
+-        if (finalState) {
+-            finalState.archivePath = archivePath || null;
+-            rememberCompletedDelegation(finalState);
++    state.finalizing = true;
++    const report = finalReport || '未知错误导致无报告';
++    state.endTime = Date.now();
++    state.updatedAt = state.endTime;
++    let controlRevision;
++    try {
++        controlRevision = state.link?.requests?.confirmFinal(lastChildId);
++        state.archivePath = await archiveDelegationReport(delegationId, agentConfig.baseName, completionStatus, report, taskPromptForSystem);
++        if (state.link) {
++            const proof = continuity.persist(state.link.identity, {
++                nativeStatus: completionStatus, endTime: state.endTime, archivePath: state.archivePath, report, controlRevision,
++            });
++            observeDelegation(state, proof);
+         }
++    } catch (error) {
++        state.status = 'unknown';
++        state.completionStatus = null;
++        state.finalReportPreview = '';
++        rememberCompletedDelegation(state);
+         activeDelegations.delete(delegationId);
+-
+-        await sendDelegationCallback(delegationId, completionStatus, secureReport, agentConfig.baseName);
++        observeDelegation(state, { state: 'unknown', revision: 0, code: 'NATIVE_TASK_RESULT_UNCONFIRMED' });
++        throw error;
+     }
++    state.status = { Succeed: 'completed', Failed: 'failed', Cancelled: 'cancelled', Stopped: 'stopped' }[completionStatus];
++    state.completionStatus = completionStatus;
++    state.finalReportPreview = truncateText(report);
++    rememberCompletedDelegation(state);
++    activeDelegations.delete(delegationId);
++    if (completionStatus === 'Succeed') awardAgentPoints(agentConfig.baseName, agentConfig.name, 5, `成功完成异步委托任务: ${delegationId}`);
++    await sendDelegationCallback(delegationId, completionStatus, report, agentConfig.baseName);
+ }
+ 
+ /**
+diff --git a/apps/server/Plugin/NativeSync/mobile/execution.js b/apps/server/Plugin/NativeSync/mobile/execution.js
+index 98e67f1..aaf6f05 100644
+--- a/apps/server/Plugin/NativeSync/mobile/execution.js
++++ b/apps/server/Plugin/NativeSync/mobile/execution.js
+@@ -61,7 +61,7 @@ class ConversationExecution {
+         // Resume queued work, but never automatically repeat uncertain execution.
+         this.db.prepare("UPDATE mobile_executions SET state=CASE WHEN cancel_requested=1 AND request_dispatched=0 AND tool_started=0 THEN 'cancelled' ELSE 'review_required' END,error_code=CASE WHEN cancel_requested=1 AND request_dispatched=0 AND tool_started=0 THEN 'EXECUTION_CANCELLED_BEFORE_DISPATCH' ELSE 'EXECUTION_INTERRUPTED_REVIEW_REQUIRED' END,updated_at=? WHERE state IN ('running','cancelling','waiting_approval') AND coalesce(kind,'') NOT IN ('group_message','group_invitation')").run(Date.now());
+         for(const row of this.db.prepare("SELECT * FROM mobile_executions WHERE state='review_required'").all())if(this.topics.get(row.topic_key)?.sharedSpaceId)require('./sharedSingle').hold(this,row);
+-        for (const task of this.db.prepare("SELECT * FROM mobile_native_tasks WHERE state NOT IN ('completed','failed','cancelled','stopped')").all()) this.nativeTasks.markUnknown(task, 'NATIVE_TASK_RECONCILIATION_REQUIRED');
++        for (const task of this.db.prepare("SELECT * FROM mobile_native_tasks WHERE state NOT IN ('completed','failed','cancelled','stopped','unknown')").all()) this.nativeTasks.markUnknown(task, 'NATIVE_TASK_RECONCILIATION_REQUIRED');
+         require('./groupTurn').recover(this);
+     }
+     get(id) { return this.db.prepare('SELECT rowid AS ordinal,* FROM mobile_executions WHERE id=?').get(id); }
+diff --git a/apps/server/Plugin/NativeSync/mobile/nativeTasks.js b/apps/server/Plugin/NativeSync/mobile/nativeTasks.js
+index 143c249..102ff3c 100644
+--- a/apps/server/Plugin/NativeSync/mobile/nativeTasks.js
++++ b/apps/server/Plugin/NativeSync/mobile/nativeTasks.js
+@@ -4,6 +4,7 @@ const nativeContext = require('../../../modules/requestExecutionContext');
+ const terminalStates = new Set(['completed', 'failed', 'cancelled', 'stopped']);
+ const nativeTerminalStates = { Succeed: 'completed', Failed: 'failed', Cancelled: 'cancelled', Stopped: 'stopped' };
+ const liveStates = new Set(['accepted', 'running', 'waiting', 'cancelling', 'unknown']);
++const stoppableStates = new Set(['accepted', 'running', 'waiting']);
+ const fail = (code, status = 409) => Object.assign(new Error(code), { code, status });
+ const identifier = value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,160}$/.test(value);
+ const hash = value => createHash('sha256').update(value, 'utf8').digest('hex');
+@@ -172,6 +173,7 @@ class NativeTaskLinks {
+             this.db.prepare("UPDATE mobile_native_tasks SET review_required=1,review_resolved=0,error_code='NATIVE_TASK_OBSERVATION_CONFLICT' WHERE plugin_name=? AND native_task_id=?").run(row.plugin_name, row.native_task_id);
+             throw fail('NATIVE_TASK_OBSERVATION_CONFLICT');
+         }
++        if (row.state === 'cancelling' && stoppableStates.has(data.state)) return this.public(row);
+         const unknown = data.state === 'unknown';
+         const code = unknown ? (/^[A-Z][A-Z0-9_]{0,79}$/.test(data.errorCode || data.code || '') ? (data.errorCode || data.code) : 'NATIVE_TASK_RESULT_UNKNOWN') : null;
+         const resolved = unknown && row.state === 'unknown' ? row.review_resolved : 0;
+@@ -180,6 +182,7 @@ class NativeTaskLinks {
+                 terminal ? data.resultRef : null, terminal ? data.resultHash : null, terminal ? data.summary : null,
+                 Date.now(), code, unknown ? 1 : 0, resolved, row.plugin_name, row.native_task_id);
+         this.engine.fault('native-task-projected');
++        if (terminal) this.engine.store?.shared?.native?.checkTerminal?.(row.execution_id);
+         return this.public(this.get(row.plugin_name, row.native_task_id));
+     }
+     markUnknown(row, code) {
+@@ -193,6 +196,19 @@ class NativeTaskLinks {
+             nativeRequestId: row.native_request_id, invocationId: row.invocation_id,
+             recordId: row.record_id, ...(includeResult ? { includeResult: true } : {}) };
+     }
++    async stop(executionId, nativeTaskId, open) {
++        this.assertOpen();
++        if (!identifier(nativeTaskId)) throw fail('INVALID_NATIVE_TASK', 400);
++        const row = this.get('AgentAssistant', nativeTaskId);
++        if (!row || row.execution_id !== executionId) throw fail('NATIVE_TASK_NOT_FOUND', 404);
++        if (terminalStates.has(row.state) || row.state === 'cancelling') return;
++        if (!open || !stoppableStates.has(row.state)) throw fail('NATIVE_TASK_STOP_UNAVAILABLE');
++        const observed = await nativeContext.controlNativeTask(row.plugin_name, this.queryInput(row), { action: 'stop' });
++        if (!observed || !(observed.state === 'cancelling' || terminalStates.has(observed.state))) throw fail('NATIVE_TASK_STOP_UNVERIFIED');
++        this.observe(this.get(row.plugin_name, nativeTaskId), observed);
++        this.engine.emitEvent?.(executionId, 'tool', { state: 'observed', nativeRequestId: row.native_request_id, invocationId: row.invocation_id, nativeTaskId });
++        this.engine.wake();
++    }
+     async reconcile(force = false) {
+         if (this.closed || this.pending || (!force && Date.now() < this.nextReconcile)) return this.pending;
+         this.nextReconcile = Date.now() + 2000;
+@@ -249,8 +265,9 @@ class NativeTaskLinks {
+     held(topicKey) {
+         return this.db.prepare('SELECT tasks.execution_id AS id FROM mobile_native_tasks tasks JOIN mobile_executions jobs ON jobs.id=tasks.execution_id WHERE jobs.topic_key=? AND tasks.review_required=1 AND tasks.review_resolved=0 LIMIT 1').get(topicKey);
+     }
+-    needsReview(executionId) {
+-        return Boolean(this.db.prepare('SELECT 1 FROM mobile_native_tasks WHERE execution_id=? AND review_required=1 AND review_resolved=0 LIMIT 1').get(executionId));
++    needsReview(executionId, { deferReconciliation = false } = {}) {
++        const condition = deferReconciliation ? " AND coalesce(error_code,'')<>'NATIVE_TASK_RECONCILIATION_REQUIRED'" : '';
++        return Boolean(this.db.prepare('SELECT 1 FROM mobile_native_tasks WHERE execution_id=? AND review_required=1 AND review_resolved=0'+condition+' LIMIT 1').get(executionId));
+     }
+     uncertainTools(executionId) {
+         const job = this.engine.get(executionId)||this.engine.store?.shared?.nativeJob(executionId);
+diff --git a/apps/server/Plugin/NativeSync/mobile/sharedSingle.js b/apps/server/Plugin/NativeSync/mobile/sharedSingle.js
+index 38ef728..231b5b4 100644
+--- a/apps/server/Plugin/NativeSync/mobile/sharedSingle.js
++++ b/apps/server/Plugin/NativeSync/mobile/sharedSingle.js
+@@ -47,7 +47,7 @@ function complete(engine,row){
+   engine.db.prepare("UPDATE mobile_executions SET state=?,updated_at=? WHERE id=?").run(row.terminal_state,Date.now(),row.id);
+   engine.emitEvent?.(row.id,'state',{state:row.terminal_state});return false;
+  }
+- if(engine.nativeTasks.needsReview(row.id)||engine.nativeTasks.unsettledTools(row.id)){
++ if(engine.nativeTasks.needsReview(row.id,{deferReconciliation:admission.state==='dispatched'&&!admission.native_terminal})||engine.nativeTasks.unsettledTools(row.id)||shared.native?.taskRequests?.uncertain(row.id)){
+   engine.db.prepare("UPDATE mobile_executions SET state='review_required',error_code='NATIVE_SETTLEMENT_REVIEW_REQUIRED' WHERE id=?").run(row.id);
+   engine.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE id=? AND state='dispatched'").run(row.id);return false;
+  }
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedHttp.js b/apps/server/Plugin/NativeSync/sync/sharedHttp.js
+index 1ae78dd..8d9ebaa 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedHttp.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedHttp.js
+@@ -21,6 +21,7 @@ gets['compact-input']=['compactInput',['sharedSpaceId','id']];
+ gets['topic-history']=['topicHistory',['sharedSpaceId','sharedId','after','limit']];
+ gets['execution-trace']=['executionTrajectory',['sharedSpaceId','workId','limit']];
+ posts['session-cancel']=['cancelSession',['sharedSpaceId','workId','opId']];
++posts['task-stop']=['stopTask',['sharedSpaceId','workId','nativeTaskId']];
+ gets.active=['activeWork',['sharedSpaceId','sharedId']];
+ gets['task-result']=['taskResult',['sharedSpaceId','workId','nativeTaskId']];
+ gets.work=['workState',['sharedSpaceId','workId']];
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedNative.js b/apps/server/Plugin/NativeSync/sync/sharedNative.js
+index f37e879..03ed8b8 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedNative.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedNative.js
+@@ -21,7 +21,19 @@ class SharedNative {
+   if(!shared.events||shared.events.closed)shared.events=new (require('./sharedEvents').SharedEvents)(shared,engine);
+   this.approvalObserver=event=>{try{const row=this.db.prepare('SELECT admission_id FROM shared_native_requests WHERE id=?').get(event.requestId);if(row)this.engine.emitEvent?.(row.admission_id,'approval',{state:event.waiting?'waiting_approval':'running',nativeRequestId:event.requestId});}catch{/* Observers do not own tool or model execution. */}};
+   require('../../../modules/requestExecutionContext').events.on('approval',this.approvalObserver);
+-  this.taskControls=new (require('./sharedTaskControls').SharedTaskControls)(shared);this.taskRequests=new (require('./sharedTaskRequests').SharedTaskRequests)(this);shared.steering.onInput=(workId)=>{require('../../../modules/requestExecutionContext').interruptWork(workId);return this.taskControls.request(workId);};if(engine?.get&&engine.configs)require('../mobile/groupTurn').recover(engine);
++  this.taskControls=new (require('./sharedTaskControls').SharedTaskControls)(shared);this.taskRequests=new (require('./sharedTaskRequests').SharedTaskRequests)(this);shared.steering.onInput=(workId)=>{require('../../../modules/requestExecutionContext').interruptWork(workId);return this.taskControls.request(workId);};
++  if(engine?.get&&engine.configs){
++   require('../mobile/groupTurn').recover(engine);
++   // A verified AA row can commit just before its parent terminal flag.
++   // Such a child has left the reconcile queue. Recheck the existing reply
++   // intent on startup without scheduling either the parent or the child.
++   const pendingReplies=this.db.prepare(`SELECT a.id FROM shared_admissions a
++    JOIN mobile_executions j ON j.id=a.id AND j.state='publishing' AND j.pending_operation IS NOT NULL
++    JOIN shared_native_requests r ON r.id=a.id AND r.admission_id=a.id AND r.state='model_terminal'
++    WHERE a.state='dispatched' AND a.native_terminal=0 AND EXISTS (
++     SELECT 1 FROM mobile_native_tasks t WHERE t.execution_id=a.id AND t.state IN ('completed','failed','stopped','cancelled'))`).all();
++   for(const row of pendingReplies)this.checkTerminal(row.id);
++  }
+  }
+  prepare(actor,body,{session=false}={}){
+   if(this.draining||this.closed)throw fail('HOST_DRAINING',503);
+@@ -180,14 +192,22 @@ class SharedNative {
+  phase(workId,requestId,stage){const key=requestId+':'+stage;if(this.seenPhases.has(key))return;if(!['native_prepared','native_entered','vcp_preprocessing','provider_attempt','first_model_body','native_settled','final_persisted'].includes(stage))throw fail('INVALID_EXECUTION_PHASE');this.db.prepare('INSERT OR IGNORE INTO shared_request_phases VALUES(?,?,?,?)').run(workId,requestId,stage,Date.now());this.seenPhases.add(key);if(this.seenPhases.size>50000)this.seenPhases.delete(this.seenPhases.values().next().value);}
+  checkTerminal(admissionId){
+   if(this.closed)return;
+-  const admission=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(admissionId),config=JSON.parse(admission.config_json);
+-  if(config.owner.kind==='group'&&this.db.prepare('SELECT count(*) n FROM shared_native_requests WHERE admission_id=?').get(admissionId).n!==require('./sharedTurns').intent(admission).plan.length)return;
++  const admission=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(admissionId);
++  if(!admission||admission.state!=='dispatched')return;
++  const config=JSON.parse(admission.config_json);
+   const pending=this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state IN ('prepared','dispatched','unknown') LIMIT 1").get(admissionId);
+   const native=this.engine.nativeTasks;
+-  if(!pending&&!native.unsettledTools(admissionId)&&!native.needsReview(admissionId)&&native.list(admissionId).every(task=>['completed','failed','cancelled','stopped'].includes(task.state))){this.shared.nativeTerminal(admissionId);if(this.shared.steering.enabled)this.shared.steering.closeIfFinished(admissionId);}
++  if(pending)return;
++  if(this.taskRequests.uncertain(admissionId)){
++   this.db.prepare("UPDATE shared_admissions SET state='review_required',native_terminal=0 WHERE id=? AND state='dispatched'").run(admissionId);
++   this.engine.emitEvent?.(admissionId,'state',{state:'review_required'});
++   return;
++  }
++  if(config.owner.kind==='group'&&this.db.prepare('SELECT count(*) n FROM shared_native_requests WHERE admission_id=?').get(admissionId).n!==require('./sharedTurns').intent(admission).plan.length)return;
++  if(!this.taskRequests.pending(admissionId)&&!native.unsettledTools(admissionId)&&!native.needsReview(admissionId)&&native.list(admissionId).every(task=>['completed','failed','cancelled','stopped'].includes(task.state))){this.shared.nativeTerminal(admissionId);if(this.shared.steering.enabled)this.shared.steering.closeIfFinished(admissionId);}
+  }
+  checkpointProof(workId,requestId,settled){const g=this.shared.steering.requestGeneration(workId,requestId);if(g&&settled.length===0&&this.db.prepare('SELECT 1 FROM shared_native_no_dispatch WHERE work_id=? AND generation=?').get(workId,g.generation))return {requestId,hash:null,settledInvocationIds:[],noDispatch:true};return this.continuations.proof(requestId,workId,settled);}
+- canReview(admissionId){const rows=[...this.db.prepare('SELECT state FROM shared_native_requests WHERE admission_id=?').all(admissionId),...this.db.prepare('SELECT state FROM shared_native_child_requests WHERE work_id=?').all(admissionId)];return rows.length>0&&rows.every(r=>['model_terminal','unknown','prepared'].includes(r.state));}
++ canReview(admissionId){const rows=[...this.db.prepare('SELECT state FROM shared_native_requests WHERE admission_id=?').all(admissionId),...this.db.prepare('SELECT state FROM shared_native_child_requests WHERE work_id=?').all(admissionId)];return rows.length>0&&rows.every(r=>['model_terminal','unknown','prepared','not_dispatched'].includes(r.state));}
+  close(){this.closed=true;require('../../../modules/requestExecutionContext').events.off('approval',this.approvalObserver);this.shared.events?.close?.();}
+  beginDrain(){this.draining=true;this.shared.events?.close?.();}
+  snapshot(){return {accepting:!this.closed&&!this.draining,dispatched:this.db.prepare("SELECT count(*) n FROM shared_native_requests WHERE state='dispatched'").get().n,held:this.db.prepare("SELECT count(*) n FROM shared_admissions WHERE state IN ('preparing','accepted','dispatched','review_required')").get().n};}
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedSpace.js b/apps/server/Plugin/NativeSync/sync/sharedSpace.js
+index ceae68d..2018f4d 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedSpace.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedSpace.js
+@@ -52,9 +52,18 @@ class SharedSpace {
+   this.steering=new (require('./sharedSteering').SharedSteering)(this,{enabled:!configurationOnly&&(policy.sharedSteering===true||policy.sharedControlledText===true)});
+   // The Mobile runtime owns recovery of existing execution state.
+   if(configurationOnly)return;
+-  // A restart cannot prove that an already dispatched request did not execute.
+-  const executions=this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mobile_executions'").get();
+-  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+(executions?" AND NOT (native_terminal=1 AND EXISTS (SELECT 1 FROM mobile_executions e WHERE e.id=shared_admissions.id AND e.state='publishing' AND e.pending_operation IS NOT NULL))":"")).run();
++  // A durable reply intent can wait for AA's final receipt when the parent model
++  // is already settled. A lost parent result still needs review after restart.
++  const tables=new Set(this.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name));
++  const recoverableTask=['shared_native_requests','shared_native_child_requests','shared_native_task_controls'].every(name=>tables.has(name))?`
++   OR (EXISTS (SELECT 1 FROM shared_native_requests r WHERE r.admission_id=shared_admissions.id AND r.state='model_terminal')
++    AND NOT EXISTS (SELECT 1 FROM shared_native_requests r WHERE r.admission_id=shared_admissions.id AND r.state<>'model_terminal')
++    AND NOT EXISTS (SELECT 1 FROM shared_native_child_requests r WHERE r.work_id=shared_admissions.id AND r.state IN ('prepared','dispatched','unknown'))
++    AND EXISTS (SELECT 1 FROM shared_native_task_controls c WHERE c.work_id=shared_admissions.id AND c.final_revision IS NOT NULL))`:'';
++  const publishing=tables.has('mobile_executions')?` AND NOT (EXISTS (SELECT 1 FROM mobile_executions e
++   WHERE e.id=shared_admissions.id AND e.state='publishing' AND e.pending_operation IS NOT NULL)
++   AND (native_terminal=1${recoverableTask}))`:'';
++  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing).run();
+  }
+  atomic(fn){
+   const own=!this.db.isTransaction;
+@@ -297,7 +306,24 @@ class SharedSpace {
+  }
+  publicAdmission(row){const control=this.db.prepare('SELECT * FROM shared_work_controls WHERE work_id=?').get(row.id);return {id:row.id,sharedSpaceId:row.space_id,sharedId:row.topic_id,requestId:row.request_id,state:row.state,configHash:JSON.parse(row.config_json).hash,contextHead:row.context_head,userSeq:row.user_seq,replySeq:row.reply_seq,dispatched:Boolean(row.dispatched),turn:require('./sharedTurns').intent(row),...(require('./sharedTurns').intent(row).steeringCapable&&this.steering&&(this.steering.enabled||control)?{steering:this.steering.public(row,control)}:{})};}
+  async taskResult(actor,{sharedSpaceId,workId,nativeTaskId}){const row=this.admission(actor,sharedSpaceId,workId),topic=this.topic(actor,sharedSpaceId,row.topic_id);if(!this.native)throw fail('SHARED_NATIVE_UNAVAILABLE');return this.native.engine.nativeTasks.result(topic.id,row.id,nativeTaskId);}
+- workState(actor,{sharedSpaceId,workId}){const row=this.admission(actor,sharedSpaceId,workId);this.topic(actor,sharedSpaceId,row.topic_id,'execute');return {request:{...this.publicAdmission(row),nativeRequests:this.nativeStatus(row),nativeTasks:this.native?.engine.nativeTasks.list(row.id)||[],toolInvocations:this.native?.engine.nativeTasks.invocations(row.id)||[]}};}
++ workState(actor,{sharedSpaceId,workId}){const row=this.admission(actor,sharedSpaceId,workId);this.topic(actor,sharedSpaceId,row.topic_id,'execute');return {request:this.publicWork(actor,row)};}
++ publicWork(actor,row){
++  const canStop=!this.readOnly&&row.principal===actor.principal&&row.state==='dispatched'&&!this.native?.closed&&!this.native?.draining;
++  const nativeTasks=(this.native?.engine.nativeTasks.list(row.id)||[]).map(task=>({...task,
++   stopAllowed:canStop&&task.pluginName==='AgentAssistant'&&['accepted','running','waiting'].includes(task.state),
++   stopRequested:task.state==='cancelling',
++  }));
++  return {...this.publicAdmission(row),nativeRequests:this.nativeStatus(row),nativeTasks,toolInvocations:this.native?.engine.nativeTasks.invocations(row.id)||[]};
++ }
++ async stopTask(actor,{sharedSpaceId,workId,nativeTaskId}){
++  const row=this.admission(actor,sharedSpaceId,workId);
++  this.topic(actor,sharedSpaceId,row.topic_id,'execute');
++  if(row.principal!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
++  if(this.readOnly)throw fail('SHARED_READ_ONLY');
++  if(!this.native||this.native.closed||this.native.draining)throw fail('SHARED_NATIVE_UNAVAILABLE');
++  await this.native.engine.nativeTasks.stop(workId,nativeTaskId,row.state==='dispatched');
++  return this.workState(actor,{sharedSpaceId,workId});
++ }
+  activeWork(actor,{sharedSpaceId,sharedId}){const topic=this.topic(actor,sharedSpaceId,sharedId,'execute'),row=this.active(topic.id);return row?this.workState(actor,{sharedSpaceId,workId:row.id}):{request:null};}
+  requestConfig(actor,{sharedSpaceId,admissionId}){
+   this.authorize(actor,sharedSpaceId,'config');
+@@ -309,7 +335,7 @@ class SharedSpace {
+  request(actor,{sharedSpaceId,requestId}){
+   this.authorize(actor,sharedSpaceId,'execute');id(requestId);
+   const row=this.db.prepare('SELECT * FROM shared_admissions WHERE principal=? AND request_id=? AND space_id=?').get(actor.principal,requestId,sharedSpaceId);
+-  return {request:row?{...this.publicAdmission(row),nativeRequests:this.nativeStatus(row),nativeTasks:this.native?.engine.nativeTasks.list(row.id)||[],toolInvocations:this.native?.engine.nativeTasks.invocations(row.id)||[]}:null};
++  return {request:row?this.publicWork(actor,row):null};
+  }
+  admit(actor,body,{session=false,sponsor=null}={}){
+   const sponsored=sponsor===require('./sharedTopicSponsor').dispatchKey&&session;
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedSteering.js b/apps/server/Plugin/NativeSync/sync/sharedSteering.js
+index 0e67fd8..f1ca0a8 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedSteering.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedSteering.js
+@@ -225,7 +225,7 @@ class SharedSteering {
+     closeIfFinished(workId){
+         const row=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(workId),c=row&&this.db.prepare('SELECT * FROM shared_work_controls WHERE work_id=?').get(workId);if(!c||c.revision!==c.consumed_seq)return;
+         const generation=this.generation(workId,c.generation),native=this.shared.native?.engine.nativeTasks;
+-        if(generation?.state!=='completed'||native?.unsettledTools(workId)||native?.needsReview(workId)||native?.uncertainTools(workId)||native?.list(workId).some(t=>!['completed','failed','cancelled','stopped'].includes(t.state)))return;
++        if(generation?.state!=='completed'||this.shared.native?.taskRequests?.pending(workId)||native?.unsettledTools(workId)||native?.needsReview(workId)||native?.uncertainTools(workId)||native?.list(workId).some(t=>!['completed','failed','cancelled','stopped'].includes(t.state)))return;
+         const updated=this.db.prepare("UPDATE shared_admissions SET state='completed',native_terminal=1 WHERE id=? AND state IN ('accepted','dispatched')").run(workId);
+         if(updated.changes)this.notifyCompleted(workId);
+     }
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedTaskControls.js b/apps/server/Plugin/NativeSync/sync/sharedTaskControls.js
+index 8508148..9b0b4b8 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedTaskControls.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedTaskControls.js
+@@ -53,7 +53,9 @@ class SharedTaskControls {
+    if(entry.final_revision!==null){if(entry.final_revision===revision)return true;throw fail('NATIVE_TASK_CONTROL_FINAL_CHANGED');}
+    if(current!==revision||entry.applied_revision!==revision)throw fail('WORK_STEERING_PENDING');
+    if(this.db.prepare("SELECT 1 FROM shared_native_child_requests WHERE work_id=? AND task_id=? AND state IN ('dispatched','unknown')").get(workId,identity.nativeTaskId))throw fail('NATIVE_TASK_RESULT_REQUIRES_REVIEW');
+-   this.db.prepare("UPDATE shared_native_child_requests SET state='model_terminal' WHERE work_id=? AND task_id=? AND state='prepared'").run(workId,identity.nativeTaskId);
++   if(this.db.prepare(`SELECT 1 FROM mobile_native_invocations i JOIN shared_native_child_requests r ON r.id=i.native_request_id
++     WHERE r.work_id=? AND r.task_id=? AND i.execution_id=r.work_id AND i.state<>'returned' AND (i.state<>'error' OR coalesce(i.error_code,'')<>'NATIVE_CANCELLED_BEFORE_EXECUTION')`).get(workId,identity.nativeTaskId))throw fail('NATIVE_TASK_RESULT_REQUIRES_REVIEW');
++   this.db.prepare("UPDATE shared_native_child_requests SET state='not_dispatched' WHERE work_id=? AND task_id=? AND state='prepared'").run(workId,identity.nativeTaskId);
+    if(entry.final_revision!==null&&entry.final_revision!==revision)throw fail('NATIVE_TASK_CONTROL_FINAL_CHANGED');
+    this.db.prepare('UPDATE shared_native_task_controls SET final_revision=? WHERE plugin_name=? AND native_task_id=?').run(revision,identity.pluginName,identity.nativeTaskId);return true;
+   });
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js b/apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js
+index 1ba3da8..2b27380 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js
+@@ -6,18 +6,24 @@ const context=require('../../../modules/requestExecutionContext');
+ /** A trusted AA child request, not a second scheduler or client-supplied authority. */
+ class SharedTaskRequests{
+  constructor(native){this.native=native;this.shared=native.shared;this.db=native.db;this.db.exec(`CREATE TABLE IF NOT EXISTS shared_native_child_requests(id TEXT PRIMARY KEY,work_id TEXT NOT NULL,plugin_name TEXT NOT NULL,task_id TEXT NOT NULL,body_hash TEXT NOT NULL,model TEXT NOT NULL,control_revision INTEGER NOT NULL,state TEXT NOT NULL);`);this.db.prepare("UPDATE shared_native_child_requests SET state='unknown' WHERE state='dispatched'").run();}
++ pending(workId){return Boolean(this.db.prepare("SELECT 1 FROM shared_native_child_requests WHERE work_id=? AND state IN ('prepared','dispatched','unknown') LIMIT 1").get(workId));}
++ uncertain(workId){
++  return Boolean(this.db.prepare(`SELECT 1 FROM shared_native_child_requests r WHERE r.work_id=? AND
++   (r.state='unknown' OR EXISTS (SELECT 1 FROM mobile_native_invocations i WHERE i.native_request_id=r.id AND i.execution_id=r.work_id
++    AND (i.state='error' AND coalesce(i.error_code,'')<>'NATIVE_CANCELLED_BEFORE_EXECUTION' OR i.state='started' AND r.state='model_terminal'))) LIMIT 1`).get(workId));
++ }
+  resumeAllowed(workId){return !this.db.prepare("SELECT 1 FROM shared_admissions WHERE id=? AND state='review_required'").get(workId)&&!this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state='unknown'").get(workId)&&!this.db.prepare("SELECT 1 FROM shared_native_child_requests WHERE work_id=? AND state='unknown'").get(workId)&&!this.db.prepare("SELECT 1 FROM mobile_native_invocations WHERE execution_id=? AND state='error' AND coalesce(error_code,'')<>'NATIVE_CANCELLED_BEFORE_EXECUTION'").get(workId);}
+  fence(workId,identity,revision){
+   if(this.native.closed||this.native.draining)throw fail('HOST_DRAINING');
+   const row=this.native.taskControls.row(workId,identity),control=this.native.taskControls.ensure(workId,identity),work=this.db.prepare('SELECT state FROM shared_admissions WHERE id=?').get(workId),current=this.db.prepare('SELECT revision FROM shared_work_controls WHERE work_id=?').get(workId)?.revision||0;
+-  if(!work||work.state==='abandoned'||['completed','failed','cancelled','stopped'].includes(row.state)||control.final_revision!==null)throw fail('NATIVE_TASK_CONTROL_CLOSED');
++  if(!work||work.state!=='dispatched'||['completed','failed','cancelled','stopped'].includes(row.state)||control.final_revision!==null)throw fail('NATIVE_TASK_CONTROL_CLOSED');
+   if(!this.resumeAllowed(workId))throw fail('NATIVE_TASK_RESULT_REQUIRES_REVIEW');
+   if(current!==revision||control.applied_revision!==revision)throw fail('WORK_STEERING_PENDING');
+  }
+- binding(workId,identity){
++ binding(workId,identity,actor){
+   this.native.taskControls.ensure(workId,identity);
+   return Object.freeze({workId,resumeAllowed:()=>this.resumeAllowed(workId),
+-   registerRequest:(body,revision)=>this.prepare(workId,identity,body,revision),
++   registerRequest:(body,revision)=>this.prepare(workId,identity,body,revision,actor),
+    childState:requestId=>this.childState(workId,identity,requestId),
+    applied:receipt=>this.native.taskControls.observe(this.native.taskControls.row(workId,identity),receipt),
+    workRevision:()=>this.db.prepare('SELECT revision FROM shared_work_controls WHERE work_id=?').get(workId)?.revision||0,
+@@ -27,17 +33,23 @@ class SharedTaskRequests{
+    refresh:()=>this.native.taskControls.request(workId),
+   });
+  }
+- prepare(workId,identity,body,revision){
++ prepare(workId,identity,body,revision,actor){
+   this.fence(workId,identity,revision);
+   if(typeof body.requestId!=='string'||body.requestId.length>256||!Array.isArray(body.messages)||typeof body.model!=='string')throw fail('INVALID_NATIVE_CHILD_REQUEST');
+   const normalized=JSON.parse(JSON.stringify(body)),hash=sha256(stable(normalized));
+   const row=this.native.taskControls.row(workId,identity),admission=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(workId);
+-  const member=this.db.prepare('SELECT source_id,device_id FROM shared_members WHERE space_id=? AND device_id=?').get(admission.space_id,admission.principal.slice(8));
+-  if(!member)throw fail('SHARED_REQUEST_OWNER_REQUIRED');const actor={kind:'desktop',principal:admission.principal,sourceId:member.source_id,deviceId:member.device_id};this.shared.authorize(actor,admission.space_id,'execute');
++  // Older native control handles restored after a restart have no live actor.
++  // Only their recorded desktop admission can rebind through its current membership.
++  if(!actor&&admission.principal.startsWith('desktop:')){
++   const member=this.db.prepare('SELECT source_id,device_id FROM shared_members WHERE space_id=? AND device_id=?').get(admission.space_id,admission.principal.slice(8));
++   if(member)actor={kind:'desktop',principal:admission.principal,sourceId:member.source_id,deviceId:member.device_id};
++  }
++  if(!actor||actor.principal!==admission.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED');
++  this.shared.topic(actor,admission.space_id,admission.topic_id,'execute');
+   this.shared.atomic(()=>{
+    const previous=this.db.prepare('SELECT * FROM shared_native_child_requests WHERE id=?').get(body.requestId);
+    if(previous){if(previous.work_id!==workId||previous.task_id!==identity.nativeTaskId||previous.body_hash!==hash||previous.control_revision!==revision)throw fail('REQUEST_ID_REUSED');if(previous.state!=='prepared')throw fail('SHARED_RESULT_REQUIRES_REVIEW');return;}
+-   this.db.prepare("UPDATE shared_native_child_requests SET state='model_terminal' WHERE work_id=? AND task_id=? AND state='prepared' AND control_revision<?").run(workId,identity.nativeTaskId,revision);
++   this.db.prepare("UPDATE shared_native_child_requests SET state='not_dispatched' WHERE work_id=? AND task_id=? AND state='prepared' AND control_revision<?").run(workId,identity.nativeTaskId,revision);
+    if(this.db.prepare("SELECT 1 FROM shared_native_child_requests WHERE work_id=? AND task_id=? AND state IN ('prepared','dispatched','unknown')").get(workId,identity.nativeTaskId))throw fail('NATIVE_TASK_REQUEST_BUSY');
+    const model=this.db.prepare('SELECT model FROM shared_native_child_requests WHERE work_id=? AND task_id=? LIMIT 1').get(workId,identity.nativeTaskId)?.model;
+    if(model&&model!==body.model)throw fail('NATIVE_TASK_MODEL_CHANGED');
+@@ -50,15 +62,20 @@ class SharedTaskRequests{
+  enter(req,authority){
+   const workId=authority.admissionId,identity=authority.identity,row=this.db.prepare('SELECT * FROM shared_native_child_requests WHERE id=?').get(req.body?.requestId);
+   if(!row||row.work_id!==workId||row.task_id!==identity.nativeTaskId||row.plugin_name!==identity.pluginName||row.control_revision!==authority.controlRevision||row.body_hash!==sha256(stable(req.body))||row.model!==req.body.model)throw fail('NATIVE_TASK_CONTROL_IDENTITY_CHANGED');
+-  this.fence(workId,identity,row.control_revision);this.shared.authorize(authority.actor,this.db.prepare('SELECT space_id FROM shared_admissions WHERE id=?').get(workId).space_id,'execute');
++  this.fence(workId,identity,row.control_revision);
++  const admission=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(workId);
++  if(authority.actor?.principal!==admission.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED');
++  this.shared.topic(authority.actor,admission.space_id,admission.topic_id,'execute');
+   if(row.state!=='prepared')throw fail('SHARED_REQUEST_ALREADY_DISPATCHED');
+   this.native.continuations.begin({workId,requestId:row.id,generation:row.control_revision,controlRevision:row.control_revision},req.body.messages,req.body.vcpchatExtensions||{});
+   this.db.prepare("UPDATE shared_native_child_requests SET state='dispatched' WHERE id=?").run(row.id);
+   const base=this.native.engine.nativeTasks.hooks(workId,row.id),fence=()=>this.fence(workId,identity,row.control_revision);
+-  const bridge={...base,onToolDispatch:event=>{fence();return base.onToolDispatch(event)},onTaskAccepted:event=>{fence();return base.onTaskAccepted(event)}};let ended=false;
+-  return {phase:name=>this.native.phase(workId,row.id,name),steeringEnabled:true,workId,generation:row.control_revision,fence,bridge,continuation:body=>body,
++  const bridge={...base,onToolDispatch:event=>{fence();return base.onToolDispatch(event)},onTaskAccepted:event=>{fence();return base.onTaskAccepted(event)},
++   onToolSettled:event=>{const result=base.onToolSettled(event);this.native.checkTerminal(workId);return result;}};
++  const steeringEnabled=require('./sharedTurns').intent(admission).steeringCapable===true;let ended=false;
++  return {phase:name=>this.native.phase(workId,row.id,name),steeringEnabled,workId,generation:row.control_revision,fence,bridge,continuation:body=>body,
+    checkpoint:{completion:value=>this.native.continuations.completion(row.id,value),assistant:content=>this.native.continuations.assistant(row.id,content),result:(invocation,value)=>this.native.continuations.result(row.id,invocation,value)},
+-   finish:success=>{if(ended)return;ended=true;const current=this.db.prepare('SELECT revision FROM shared_work_controls WHERE work_id=?').get(workId)?.revision||0;this.db.prepare('UPDATE shared_native_child_requests SET state=? WHERE id=?').run(success||current>row.control_revision?'model_terminal':'unknown',row.id);},
++   finish:success=>{if(ended)return;ended=true;const current=this.db.prepare('SELECT revision FROM shared_work_controls WHERE work_id=?').get(workId)?.revision||0;this.db.prepare('UPDATE shared_native_child_requests SET state=? WHERE id=?').run(success||current>row.control_revision?'model_terminal':'unknown',row.id);this.native.checkTerminal(workId);},
+   };
+  }
+  childState(workId,identity,requestId){
+@@ -66,7 +83,7 @@ class SharedTaskRequests{
+   if(!row)return {state:'not_started'};const tasks=this.native.engine.nativeTasks;
+   if(row.state==='unknown'||this.db.prepare("SELECT 1 FROM mobile_native_invocations WHERE native_request_id=? AND state='error' AND coalesce(error_code,'')<>'NATIVE_CANCELLED_BEFORE_EXECUTION'").get(row.id))return {state:'review_required'};
+   if(row.state==='dispatched'||tasks.unsettledTools(workId,row.id))return {state:'waiting_safe_boundary'};
+-  if(row.state==='prepared')return {state:'not_started'};
++  if(['prepared','not_dispatched'].includes(row.state))return {state:'not_started'};
+   const ids=this.db.prepare("SELECT invocation_id FROM mobile_native_invocations WHERE execution_id=? AND native_request_id=? AND (state='returned' OR (state='error' AND error_code='NATIVE_CANCELLED_BEFORE_EXECUTION')) ORDER BY invocation_id").all(workId,row.id).map(v=>v.invocation_id);
+   return {state:'safe',response:this.native.continuations.read(row.id)?.completion||null,messages:this.native.continuations.context(row.id,{workId,settledInvocationIds:ids}),proof:this.native.continuations.proof(row.id,workId,ids)};
+  }
+diff --git a/apps/server/modules/requestExecutionContext.js b/apps/server/modules/requestExecutionContext.js
+index 3b984d5..f1958be 100644
+--- a/apps/server/modules/requestExecutionContext.js
++++ b/apps/server/modules/requestExecutionContext.js
+@@ -34,18 +34,18 @@ function note(type, data) {
+     try { events.emit(type, { requestId: context.requestId, ...data }); }
+     catch { console.warn('[NativeExecution] OBSERVER_FAILED'); }
+ }
+-// Keep a reference to this request's fence when a later approval arrives on
+-// a different socket, outside the request's AsyncLocalStorage context.
+-function approvalOwner() {
+-    const scope = local.getStore();
+-    if (!scope?.workId) return null;
+-    const { workId, signal, fence } = scope;
+-    return { workId, isCurrent() {
+-        if (signal.aborted) return false;
+-        try { fence(); return true; }
+-        catch { return false; }
+-    } };
+-}
++// Keep a reference to this request's fence when a later approval arrives on
++// a different socket, outside the request's AsyncLocalStorage context.
++function approvalOwner() {
++    const scope = local.getStore();
++    if (!scope?.workId) return null;
++    const { workId, signal, fence } = scope;
++    return { workId, isCurrent() {
++        if (signal.aborted) return false;
++        try { fence(); return true; }
++        catch { return false; }
++    } };
++}
+ function cancellation() {
+     return Object.assign(new Error('NATIVE_EXECUTION_CANCELLED'), { code: 'NATIVE_EXECUTION_CANCELLED', name: 'AbortError' });
+ }
+@@ -248,9 +248,26 @@ async function acceptNativeTask({ pluginName, nativeTaskId, agentBaseName }) {
+     throwIfCancelled();
+     const identity = Object.freeze({ ...context.invocation, pluginName, nativeTaskId, agentBaseName });
+     await context.bridge.onTaskAccepted(identity);
+-    // Keep this confirmed request's closure after the parent model response ends.
++    // The child outlives the parent response. Each new model round still
++    // passes through the original Work's request registry and dispatch fence.
++    const boundary = context.sponsorBoundary || sharedBoundary;
++    if (context.workId && (!boundary || boundary.closed || boundary !== sharedBoundary)) throw Error('SHARED_NATIVE_CLOSED');
++    const actor = context.sharedAuthority?.actor || context.sponsorAuthority?.actor;
++    if (context.workId && !actor) throw Error('SHARED_REQUEST_OWNER_REQUIRED');
++    const binding = context.workId && boundary.taskRequests.binding(context.workId, identity, actor);
+     return Object.freeze({ identity, observe: result => context.bridge.onTaskObserved({ ...result, ...identity }),
+-        ...(context.canSteer&&context.workId&&sharedBoundary?{control:sharedBoundary.taskRequests.binding(context.workId,identity)}:{}) });
++        ...(binding && { requests: {
++            register: body => binding.registerRequest(body, 0),
++            confirmFinal(requestId) {
++                if (requestId && !['not_started', 'safe'].includes(binding.childState(requestId).state)) {
++                    throw Object.assign(Error('NATIVE_TASK_RESULT_REQUIRES_REVIEW'), { code: 'NATIVE_TASK_RESULT_REQUIRES_REVIEW' });
++                }
++                binding.claimFinal(0);
++                return 0;
++            },
++        } }),
++        ...(context.canSteer && binding && { control: binding }),
++    });
+ }
+ 
+ function registerNativeTaskProvider(pluginName, provider) {
+@@ -282,6 +299,13 @@ module.exports = {
+     requireModelOutcome, recordModelOutcome,
+     middleware, events, waitForApproval, throwIfCancelled, register, agentPrompt,setSharedBoundary,
+     interruptWork, controlNativeTask,
++    sharedTaskLink(pluginName, nativeTaskId) {
++        if (!sharedBoundary || typeof nativeTaskId !== 'string') return null;
++        const tasks = sharedBoundary.engine.nativeTasks;
++        const row = tasks.get(pluginName, nativeTaskId);
++        if (!row || !sharedBoundary.shared.nativeJob(row.execution_id)) return null;
++        return { workId: row.execution_id, identity: { ...tasks.queryInput(row), pluginName } };
++    },
+     runNativeHandler:async fn=>{const scope=local.getStore();if(!scope?.workId)return fn();scope.executionTracked=true;try{return await fn();}finally{scope.executionSettled=true;if(scope.transportEnded)scope.finishNative(scope.transportSuccess);}},
+     phase:stage=>local.getStore()?.phase?.(stage),
+     assertDispatch,

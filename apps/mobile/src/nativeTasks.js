@@ -50,7 +50,7 @@ function projectNativeWork(row) {
     const group = row.kind === 'group_message' || row.kind === 'group_invitation';
     for (const task of nativeTasks) {
         const call = invocations.get(task.invocationId);
-        if (!call || call.pluginName !== task.pluginName || call.stepId !== task.stepId || call.recordId !== task.recordId || (!group && task.stepId !== null)) throw fail();
+        if (!call || call.pluginName !== task.pluginName || call.stepId !== task.stepId || call.recordId !== task.recordId || (!group && task.stepId !== null && task.stepId !== row.id)) throw fail();
     }
     return { nativeTasks, toolInvocations };
 }

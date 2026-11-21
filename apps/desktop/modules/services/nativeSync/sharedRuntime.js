@@ -14,6 +14,8 @@ const {emptyHash,fieldsFrom}=require('./metadata');
 const {validateConfig,observeConfigVersions}=require('./sharedConfigVersion');
 const endpoint='/api/v1/sync/shared/';
 const kindOrder=['agent','group','rules','topic'];
+const inactiveTaskWork = new Set(['completed','cancelled','failed']);
+const activeTaskStates = new Set(['accepted','running','waiting','cancelling']);
 
 function startupFence(sharedSpaceId,error=()=>null){
  const blocked=async()=>{throw fail(error()||'SHARED_STARTUP_PENDING');};
@@ -628,12 +630,59 @@ class SharedRuntime {
  async prepareSharedSend({descriptor,message,localOnly=false,serverSession=false,...options}){if(options.controlMode!==undefined){if(options.controlMode!=='text-only-v1'||!this.capabilities.features?.includes('shared-controlled-text-v1'))throw fail('CONTROLLED_TEXT_UNAVAILABLE');if(serverSession||this.execution.state.requests[message?.id]&&this.execution.state.requests[message.id].body?.controlMode!==options.controlMode)throw fail('CONTROLLED_MODE_IMMUTABLE');}if(localOnly)return this.execution.stageLocal(descriptor,message,options);if(this.readOnly)throw fail('SHARED_READ_ONLY');const mapping=await this.executionMapping(descriptor);this.matching.assert([mapping.sharedId,this.state.objects[mapping.sharedId].parentId]);if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');if(!options.controlMode&&(serverSession||this.execution.state.requests[message?.id]?.serverSession)&&this.sessions?.enabled()){const accepted=await this.sessions.prepare(descriptor,message,options);if(accepted)return accepted;}try{return await this.execution.prepare(descriptor,message,options);}catch(error){if(error.code!=='SHARED_CONTEXT_CHANGED'||error.status!==409||!error.knownAdmissionRejected)throw error;return this.execution.prepare(descriptor,message,options,{forceFresh:true});}}
  async abandonSharedSend(payload){if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.abandon(payload);}
  async getExecutionStatus(d,options={}){
-  if(this.readOnly)return {enabled:true,readOnly:true,configurationError:'SHARED_READ_ONLY',executions:[],connection:'online'};if(!d?.itemId||!d?.topicId)return {enabled:true,readOnly:false};
-  if(this.capabilities.features?.includes('shared-controlled-text-v1')&&(d.itemType||'agent')==='agent'){await this.execution.steering.active(d);await this.execution.reconcile();}if(this.sessions?.enabled())await this.sessions.observe(d,{refresh:options.refresh!==false});const value=await this.execution.status(d,this.sessions?.enabled()?{...options,refresh:false}:options);if(this.sessions?.enabled())value.serverSessions=this.sessions.values(d);let mapping;try{mapping=this.execution.mapping(d);}catch{this.dirty=true;return value;}
+  if(this.readOnly){this.nativeTaskViews?.clear();return {enabled:true,readOnly:true,configurationError:'SHARED_READ_ONLY',executions:[],connection:'online'};}if(!d?.itemId||!d?.topicId)return {enabled:true,readOnly:false};
+  if(this.capabilities.features?.includes('shared-controlled-text-v1')&&(d.itemType||'agent')==='agent'){await this.execution.steering.active(d);await this.execution.reconcile();}if(this.sessions?.enabled())await this.sessions.observe(d,{refresh:options.refresh!==false});const value=await this.execution.status(d,this.sessions?.enabled()?{...options,refresh:false}:options);if(this.sessions?.enabled()){
+   value.serverSessions=this.sessions.values(d);
+   await this.refreshNativeTaskViews(value,d,options.refresh!==false);
+  }let mapping;try{mapping=this.execution.mapping(d);}catch{this.dirty=true;return value;}
   if(this.matching.fenced(mapping.sharedId)||this.matching.fenced(this.state.objects[mapping.sharedId].parentId))return {...value,readOnly:true,configurationError:'SHARED_MATCH_PREPARING'};return {...value,controlledTextAvailable:this.capabilities.features?.includes('shared-controlled-text-v1')===true};
  }
 
+ async refreshNativeTaskViews(value, descriptor, refresh) {
+  this.nativeTaskViews ||= new Map();
+  const mapping = this.execution.mapping(descriptor);
+  const owned = value.executions.slice(0, 5).filter(job => {
+   const record = this.sessions.byExecution.get(job.id);
+   return record?.serverSession && !record.remote && record.sharedId === mapping.sharedId;
+  });
+  await Promise.all(owned.map(async job => {
+   let view = this.nativeTaskViews.get(job.id);
+   const linkedActive = (view?.nativeTasks || job.nativeTasks).some(task => activeTaskStates.has(task.state));
+   if (refresh && (linkedActive || !inactiveTaskWork.has(job.state))) {
+    try {
+     const query = new URLSearchParams({sharedSpaceId: this.connection.sharedSpaceId, workId: job.id});
+     const {request} = await this.send(endpoint + 'work?' + query);
+     if (request?.id !== job.id || request.sharedId !== mapping.sharedId) throw fail('NATIVE_TASK_WORK_MISMATCH');
+     view = {...require('./nativeTasks').projectNativeWork(request), verifiedAt: Date.now()};
+    } catch {
+     // Preserve observed status on a failed read. The stop control requires a verified read.
+     view = {nativeTasks: view?.nativeTasks || job.nativeTasks, toolInvocations: view?.toolInvocations || job.toolInvocations};
+    }
+    this.nativeTaskViews.delete(job.id);
+    this.nativeTaskViews.set(job.id, view);
+    if (this.nativeTaskViews.size > 80) this.nativeTaskViews.delete(this.nativeTaskViews.keys().next().value);
+   }
+   const tasks = view?.nativeTasks || job.nativeTasks;
+   const verified = view?.verifiedAt && Date.now() - view.verifiedAt < 5000;
+   job.nativeTasks = verified ? tasks : tasks.map(task => ({...task,stopAllowed:false}));
+   if (view) job.toolInvocations = view.toolInvocations;
+  }));
+  value.displayJobs = require('./sharedTaskList').sharedTaskList(value.executions, value.reportJobs);
+ }
+ async stopNativeTask({descriptor, workId, nativeTaskId} = {}) {
+  if (this.closed || !this.ready) throw fail('APPLICATION_SHUTTING_DOWN');
+  if (this.readOnly) throw fail('SHARED_READ_ONLY');
+  require('./contracts.generated.cjs').sharedIdentity(workId);
+  if (typeof nativeTaskId !== 'string' || !/^[a-zA-Z0-9_.:-]{1,160}$/.test(nativeTaskId)) throw fail('INVALID_NATIVE_TASK_QUERY');
+  const mapping = this.execution.mapping(descriptor);
+  this.matching.assert([mapping.sharedId, this.state.objects[mapping.sharedId].parentId]);
+  const record = this.sessions?.byExecution.get(workId);
+  if (!record?.serverSession || record.remote || record.sharedId !== mapping.sharedId) throw fail('SHARED_REQUEST_OWNER_REQUIRED');
+  const body = {sharedSpaceId: this.connection.sharedSpaceId, workId, nativeTaskId};
+  await this.send(endpoint + 'task-stop', {body});
+  return {success: true};
+ }
  async getNativeTaskResult(d,workId,nativeTaskId){if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(d);const known=await this.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId}));if(known.request?.sharedId!==mapping.sharedId)throw fail('NATIVE_TASK_RESULT_MISMATCH');const value=await this.send(endpoint+'task-result?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId,nativeTaskId}));return {...value,topic:{ownerType:d.itemType||'agent',ownerId:d.itemId,topicId:d.topicId}};}
- async close(){if(this.closed)return;this.closed=true;this.waitClient.close();clearInterval(this.timer);await this.sessions?.close();try{await this.recoverSharedCompactionPrepares();}catch{}for(const [id,prepared]of Object.entries(this.execution?.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.execution.state.compactions?.[id]?.body)try{await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:true});}catch{}clearInterval(this.timer);if(this.changed)this.agentConfigEvents?.off?.('agent-config-updated',this.changed);await Promise.allSettled([this.running,this.refreshing,this.attachments?.work?.running,this.coreTail,this.registrationTail,this.registryDisk,this.topicSponsorRecovery]);await this.execution?.close();await this.replica?.close();this.releaseHost?.();}
+ async close(){if(this.closed)return;this.closed=true;this.nativeTaskViews?.clear();this.waitClient.close();clearInterval(this.timer);await this.sessions?.close();try{await this.recoverSharedCompactionPrepares();}catch{}for(const [id,prepared]of Object.entries(this.execution?.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.execution.state.compactions?.[id]?.body)try{await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:true});}catch{}clearInterval(this.timer);if(this.changed)this.agentConfigEvents?.off?.('agent-config-updated',this.changed);await Promise.allSettled([this.running,this.refreshing,this.attachments?.work?.running,this.coreTail,this.registrationTail,this.registryDisk,this.topicSponsorRecovery]);await this.execution?.close();await this.replica?.close();this.releaseHost?.();}
 }
 module.exports={SharedRuntime,startupFence};

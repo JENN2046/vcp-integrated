@@ -225,7 +225,7 @@ class SharedSteering {
     closeIfFinished(workId){
         const row=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(workId),c=row&&this.db.prepare('SELECT * FROM shared_work_controls WHERE work_id=?').get(workId);if(!c||c.revision!==c.consumed_seq)return;
         const generation=this.generation(workId,c.generation),native=this.shared.native?.engine.nativeTasks;
-        if(generation?.state!=='completed'||native?.unsettledTools(workId)||native?.needsReview(workId)||native?.uncertainTools(workId)||native?.list(workId).some(t=>!['completed','failed','cancelled','stopped'].includes(t.state)))return;
+        if(generation?.state!=='completed'||this.shared.native?.taskRequests?.pending(workId)||native?.unsettledTools(workId)||native?.needsReview(workId)||native?.uncertainTools(workId)||native?.list(workId).some(t=>!['completed','failed','cancelled','stopped'].includes(t.state)))return;
         const updated=this.db.prepare("UPDATE shared_admissions SET state='completed',native_terminal=1 WHERE id=? AND state IN ('accepted','dispatched')").run(workId);
         if(updated.changes)this.notifyCompleted(workId);
     }

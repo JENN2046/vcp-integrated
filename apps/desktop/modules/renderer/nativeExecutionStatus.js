@@ -2,7 +2,7 @@ import {createSharedSessionView} from '../services/nativeSync/sharedSessionView.
 const key = topic => JSON.stringify([topic?.ownerType, topic?.ownerId, topic?.topicId]);
 const labels = {
     preparing: '正在提交，尚未确认接收', queued: '云端已受理，等待执行',
-    running: '云端执行中', waiting_approval: '等待原生审批', publishing: '回复保存中',
+    running: '云端执行中', dispatched: '云端执行中', waiting_approval: '等待原生审批', publishing: '回复保存中',
     recovering: '结果恢复中', failed: '执行失败', cancelled: '已取消', cancelling: '正在取消',
     review_required: '需要核对', blocked_config: '等待配置确认',
 };
@@ -50,7 +50,8 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
     recovery.style.cssText='max-height:110px;overflow:auto;font-size:13px;padding:4px 12px;';
     const composer=container.parentElement?.querySelector('.chat-input-area');
     if(composer)composer.prepend(recovery);else container.after(recovery);
-    let disposed = false, selection = null, generation = 0, resultGeneration = 0, view = null, historyTimer = null;
+    let disposed = false, selection = null, generation = 0, resultGeneration = 0, view = null, historyTimer = null, taskTimer = null;
+    const stopRequests = new Set();
     const currentTopic = () => {
         const item = getSelection();
         return item?.id && getTopicId() && ['agent', 'group'].includes(item.type) ? { ownerType: item.type, ownerId: item.id, topicId: getTopicId() } : null;
@@ -117,8 +118,8 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
             return;
         }
         const displayed = value.displayJobs ?? (value.executions || []).slice(0, 5);
-        const hasReports = displayed.some(job => job.nativeTasks?.some(task => task.resultRef));
-        panel.hidden = !hasReports && !(value.executions || []).some(job => !['completed','cancelled'].includes(job.state)) && !value.local?.pendingOperations && !value.local?.blockedOperations && !value.local?.pendingLocalCommit;
+        const hasTasks = displayed.some(job => job.nativeTasks?.length);
+        panel.hidden = !hasTasks && !(value.executions || []).some(job => !['completed','cancelled'].includes(job.state)) && !value.local?.pendingOperations && !value.local?.blockedOperations && !value.local?.pendingLocalCommit;
         const freshness = value.freshness === 'current' ? '本次已核对' : value.freshness === 'last-known' ? '最近已知' : '尚未取得状态';
         const delivery = localDeliveryText(value.local);
         summary.textContent = `任务状态${value.connection === 'offline' ? ' · 离线' : value.connection === 'error' ? ' · 暂未更新' : ''}`;
@@ -136,7 +137,7 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
         }
         jobs.replaceChildren();
         for (const job of displayed) {
-            const row = document.createElement('li');
+            const row = document.createElement('li'); row.dataset.workId = job.id;
             const completed = job.replyMessageId ? '回复已保存' : '主请求已结束';
             const state = job.state === 'completed' ? completed : labels[job.state] || `状态：${job.state}`;
             row.textContent = `${state} · 请求 ${job.requestId}${job.errorCode ? `（${job.errorCode}）` : ''}`;
@@ -159,9 +160,37 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
                 retainDetail(item, heading, [job.id, 'task', task.nativeTaskId, task.invocationId, task.stepId || null]);
                 item.className = 'native-sync-aa-task'; item.dataset.taskId = task.nativeTaskId; item.dataset.state = task.state;
                 heading.textContent = `${taskLabels[task.state] || 'AA 状态待核对'} · ${task.agentBaseName}`; item.append(heading);
-                const identity = document.createElement('p'); identity.textContent = `任务 ${task.nativeTaskId} · 调用 ${task.invocationId}${task.stepId ? ` · 群聊步骤 ${task.stepId}` : ''}`; item.append(identity);
+                const identity = document.createElement('p'); identity.textContent = `任务 ${task.nativeTaskId} · 调用 ${task.invocationId}${task.stepId && task.stepId !== job.id ? ` · 群聊步骤 ${task.stepId}` : ''}`; item.append(identity);
                 if (task.summary) { const preview = document.createElement('p'); preview.textContent = task.summary; item.append(preview); }
                 if (task.reviewRequired) { const review = document.createElement('p'); review.textContent = task.reviewResolved ? '已人工核对；原生任务状态仍按上方记录显示。' : '需要在原生宿主核对任务与可能的工具副作用。'; item.append(review); }
+                if (job.shared && !value.readOnly && value.connection === 'online' && task.stopAllowed === true && typeof api.stopNativeTask === 'function') {
+                    const stop = document.createElement('button');
+                    stop.type = 'button'; stop.textContent = '请求停止 AA';
+                    stop.dataset.nativeSyncFocusKey = `${item.dataset.nativeSyncKey}:stop`;
+                    const stopKey = stop.dataset.nativeSyncFocusKey;
+                    stop.disabled = stopRequests.has(stopKey);
+                    stop.addEventListener('click', async () => {
+                        const scope = value.topic;
+                        if (disposed || key(scope) !== key(selection) || !stop.isConnected || stopRequests.has(stopKey)) return;
+                        stopRequests.add(stopKey);
+                        stop.disabled = true;
+                        try {
+                            const response = await api.stopNativeTask({
+                                descriptor: {itemType: scope.ownerType, itemId: scope.ownerId, topicId: scope.topicId},
+                                workId: job.id, nativeTaskId: task.nativeTaskId,
+                            });
+                            if (response?.success !== true) throw Error(response?.error || 'NATIVE_TASK_STOP_FAILED');
+                            if (!disposed && key(scope) === key(selection)) await query(true, scope);
+                        } catch (error) {
+                            if (!disposed && key(scope) === key(selection)) observed.textContent = `停止请求尚未确认（${error.message}）`;
+                        } finally {
+                            stopRequests.delete(stopKey);
+                            const shown = [...jobs.querySelectorAll('button[data-native-sync-focus-key]')].find(control => control.dataset.nativeSyncFocusKey === stopKey);
+                            if (shown) shown.disabled = false;
+                        }
+                    });
+                    item.append(stop);
+                }
                 if (task.resultRef && typeof api.getNativeTaskResult === 'function') {
                     const read = document.createElement('button'); read.type = 'button'; read.textContent = '查看已核对报告';
                     read.dataset.nativeSyncFocusKey = `${item.dataset.nativeSyncKey}:report`;
@@ -182,7 +211,16 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
         } else if (value.total > 5) {
             const row = document.createElement('li'); row.textContent = `显示最近 5 项执行${displayed.length > 5 ? '及近期报告' : ''}；执行记录共 ${value.total} 项${value.truncated ? '，本地仅保留最近 128 项状态' : ''}。`; jobs.append(row);
         }
+        if (displayed.some(job => job.shared && job.nativeTasks?.some(task => ['accepted','running','waiting','cancelling'].includes(task.state)))) scheduleTaskRefresh();
         if (focused && panel.open) [...jobs.querySelectorAll('[data-native-sync-focus-key]')].find(item => item.dataset.nativeSyncFocusKey === focused)?.focus({ preventScroll: true });
+    }
+    function scheduleTaskRefresh() {
+        if (taskTimer || disposed || !selection) return;
+        const scope = selection;
+        taskTimer = setTimeout(() => {
+            taskTimer = null;
+            if (key(scope) === key(selection)) void query(true, scope);
+        }, 2000);
     }
     function clearResult() { resultGeneration += 1; resultPanel.hidden = true; resultStatus.textContent = ''; resultText.textContent = ''; }
     async function showResult(job, task) {
@@ -222,6 +260,7 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
         const topic = currentTopic();
         if (key(topic) === key(selection)) return;
         sharedSessionView.select(topic);
+        clearTimeout(taskTimer); taskTimer = null;
         selection = topic; generation += 1; render(null);
         if (topic) void refresh();
     }
@@ -231,7 +270,14 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
         historyTimer = setTimeout(() => { historyTimer = null; void query(false); }, 100);
     });
     const offChange = api.onNativeExecutionStatusChanged?.(result => {
-        if(result?.serverSession){if(!disposed){settleSharedFlowlock(result);sharedSessionView.update(result);}return;}
+        if (result?.serverSession) {
+            if (!disposed) {
+                settleSharedFlowlock(result);
+                sharedSessionView.update(result);
+                if (key(result.topic) === key(selection) && result.serverSession.activity?.type === 'tool') scheduleTaskRefresh();
+            }
+            return;
+        }
         if (disposed || !selection || key(result?.topic) !== key(selection)) return;
         // A topic notification without a status snapshot invalidates this view.
         if (result.enabled === undefined) { void query(false, selection); return; }
@@ -247,7 +293,7 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
     return {
         refresh,
         dispose() {
-            disposed = true; generation += 1; clearTimeout(historyTimer);
+            disposed = true; generation += 1; clearTimeout(historyTimer); clearTimeout(taskTimer);
             offSelection?.(); offHistory?.(); offChange?.();
             button.removeEventListener('click', recover);
             ownerWindow?.removeEventListener('focus', recover);

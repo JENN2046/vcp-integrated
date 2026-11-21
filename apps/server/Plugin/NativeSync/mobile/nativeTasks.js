@@ -4,6 +4,7 @@ const nativeContext = require('../../../modules/requestExecutionContext');
 const terminalStates = new Set(['completed', 'failed', 'cancelled', 'stopped']);
 const nativeTerminalStates = { Succeed: 'completed', Failed: 'failed', Cancelled: 'cancelled', Stopped: 'stopped' };
 const liveStates = new Set(['accepted', 'running', 'waiting', 'cancelling', 'unknown']);
+const stoppableStates = new Set(['accepted', 'running', 'waiting']);
 const fail = (code, status = 409) => Object.assign(new Error(code), { code, status });
 const identifier = value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,160}$/.test(value);
 const hash = value => createHash('sha256').update(value, 'utf8').digest('hex');
@@ -172,6 +173,7 @@ class NativeTaskLinks {
             this.db.prepare("UPDATE mobile_native_tasks SET review_required=1,review_resolved=0,error_code='NATIVE_TASK_OBSERVATION_CONFLICT' WHERE plugin_name=? AND native_task_id=?").run(row.plugin_name, row.native_task_id);
             throw fail('NATIVE_TASK_OBSERVATION_CONFLICT');
         }
+        if (row.state === 'cancelling' && stoppableStates.has(data.state)) return this.public(row);
         const unknown = data.state === 'unknown';
         const code = unknown ? (/^[A-Z][A-Z0-9_]{0,79}$/.test(data.errorCode || data.code || '') ? (data.errorCode || data.code) : 'NATIVE_TASK_RESULT_UNKNOWN') : null;
         const resolved = unknown && row.state === 'unknown' ? row.review_resolved : 0;
@@ -180,6 +182,7 @@ class NativeTaskLinks {
                 terminal ? data.resultRef : null, terminal ? data.resultHash : null, terminal ? data.summary : null,
                 Date.now(), code, unknown ? 1 : 0, resolved, row.plugin_name, row.native_task_id);
         this.engine.fault('native-task-projected');
+        if (terminal) this.engine.store?.shared?.native?.checkTerminal?.(row.execution_id);
         return this.public(this.get(row.plugin_name, row.native_task_id));
     }
     markUnknown(row, code) {
@@ -192,6 +195,19 @@ class NativeTaskLinks {
         return { nativeTaskId: row.native_task_id, agentBaseName: row.agent_base_name,
             nativeRequestId: row.native_request_id, invocationId: row.invocation_id,
             recordId: row.record_id, ...(includeResult ? { includeResult: true } : {}) };
+    }
+    async stop(executionId, nativeTaskId, open) {
+        this.assertOpen();
+        if (!identifier(nativeTaskId)) throw fail('INVALID_NATIVE_TASK', 400);
+        const row = this.get('AgentAssistant', nativeTaskId);
+        if (!row || row.execution_id !== executionId) throw fail('NATIVE_TASK_NOT_FOUND', 404);
+        if (terminalStates.has(row.state) || row.state === 'cancelling') return;
+        if (!open || !stoppableStates.has(row.state)) throw fail('NATIVE_TASK_STOP_UNAVAILABLE');
+        const observed = await nativeContext.controlNativeTask(row.plugin_name, this.queryInput(row), { action: 'stop' });
+        if (!observed || !(observed.state === 'cancelling' || terminalStates.has(observed.state))) throw fail('NATIVE_TASK_STOP_UNVERIFIED');
+        this.observe(this.get(row.plugin_name, nativeTaskId), observed);
+        this.engine.emitEvent?.(executionId, 'tool', { state: 'observed', nativeRequestId: row.native_request_id, invocationId: row.invocation_id, nativeTaskId });
+        this.engine.wake();
     }
     async reconcile(force = false) {
         if (this.closed || this.pending || (!force && Date.now() < this.nextReconcile)) return this.pending;
@@ -249,8 +265,9 @@ class NativeTaskLinks {
     held(topicKey) {
         return this.db.prepare('SELECT tasks.execution_id AS id FROM mobile_native_tasks tasks JOIN mobile_executions jobs ON jobs.id=tasks.execution_id WHERE jobs.topic_key=? AND tasks.review_required=1 AND tasks.review_resolved=0 LIMIT 1').get(topicKey);
     }
-    needsReview(executionId) {
-        return Boolean(this.db.prepare('SELECT 1 FROM mobile_native_tasks WHERE execution_id=? AND review_required=1 AND review_resolved=0 LIMIT 1').get(executionId));
+    needsReview(executionId, { deferReconciliation = false } = {}) {
+        const condition = deferReconciliation ? " AND coalesce(error_code,'')<>'NATIVE_TASK_RECONCILIATION_REQUIRED'" : '';
+        return Boolean(this.db.prepare('SELECT 1 FROM mobile_native_tasks WHERE execution_id=? AND review_required=1 AND review_resolved=0'+condition+' LIMIT 1').get(executionId));
     }
     uncertainTools(executionId) {
         const job = this.engine.get(executionId)||this.engine.store?.shared?.nativeJob(executionId);

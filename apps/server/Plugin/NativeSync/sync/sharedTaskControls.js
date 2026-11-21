@@ -53,7 +53,9 @@ class SharedTaskControls {
    if(entry.final_revision!==null){if(entry.final_revision===revision)return true;throw fail('NATIVE_TASK_CONTROL_FINAL_CHANGED');}
    if(current!==revision||entry.applied_revision!==revision)throw fail('WORK_STEERING_PENDING');
    if(this.db.prepare("SELECT 1 FROM shared_native_child_requests WHERE work_id=? AND task_id=? AND state IN ('dispatched','unknown')").get(workId,identity.nativeTaskId))throw fail('NATIVE_TASK_RESULT_REQUIRES_REVIEW');
-   this.db.prepare("UPDATE shared_native_child_requests SET state='model_terminal' WHERE work_id=? AND task_id=? AND state='prepared'").run(workId,identity.nativeTaskId);
+   if(this.db.prepare(`SELECT 1 FROM mobile_native_invocations i JOIN shared_native_child_requests r ON r.id=i.native_request_id
+     WHERE r.work_id=? AND r.task_id=? AND i.execution_id=r.work_id AND i.state<>'returned' AND (i.state<>'error' OR coalesce(i.error_code,'')<>'NATIVE_CANCELLED_BEFORE_EXECUTION')`).get(workId,identity.nativeTaskId))throw fail('NATIVE_TASK_RESULT_REQUIRES_REVIEW');
+   this.db.prepare("UPDATE shared_native_child_requests SET state='not_dispatched' WHERE work_id=? AND task_id=? AND state='prepared'").run(workId,identity.nativeTaskId);
    if(entry.final_revision!==null&&entry.final_revision!==revision)throw fail('NATIVE_TASK_CONTROL_FINAL_CHANGED');
    this.db.prepare('UPDATE shared_native_task_controls SET final_revision=? WHERE plugin_name=? AND native_task_id=?').run(revision,identity.pluginName,identity.nativeTaskId);return true;
   });

@@ -21,6 +21,7 @@ gets['compact-input']=['compactInput',['sharedSpaceId','id']];
 gets['topic-history']=['topicHistory',['sharedSpaceId','sharedId','after','limit']];
 gets['execution-trace']=['executionTrajectory',['sharedSpaceId','workId','limit']];
 posts['session-cancel']=['cancelSession',['sharedSpaceId','workId','opId']];
+posts['task-stop']=['stopTask',['sharedSpaceId','workId','nativeTaskId']];
 gets.active=['activeWork',['sharedSpaceId','sharedId']];
 gets['task-result']=['taskResult',['sharedSpaceId','workId','nativeTaskId']];
 gets.work=['workState',['sharedSpaceId','workId']];

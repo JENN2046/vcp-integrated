@@ -376,7 +376,7 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
      <details v-if="j.toolInvocations.length" class="native-tools"><summary>原生工具调用 {{j.toolInvocations.length}} 项（返回不等于 AA 完成）</summary><ul><li v-for="call in j.toolInvocations" :key="call.invocationId">{{call.pluginName}} · {{toolLabels[call.state]}}<small> · 调用 {{call.invocationId}}</small></li></ul></details>
      <details v-for="task in j.nativeTasks" :key="task.nativeTaskId" class="native-aa-task" :data-task-id="task.nativeTaskId" :data-state="task.state">
       <summary>{{nativeTaskLabels[task.state]}} · {{task.agentBaseName}}</summary>
-      <small>任务 {{task.nativeTaskId}}<br>调用 {{task.invocationId}}<template v-if="task.stepId"><br>群聊步骤 {{task.stepId}}</template></small>
+      <small>任务 {{task.nativeTaskId}}<br>调用 {{task.invocationId}}<template v-if="task.stepId && task.stepId!==j.id"><br>群聊步骤 {{task.stepId}}</template></small>
       <p v-if="task.summary">{{task.summary}}</p>
       <p v-if="task.reviewRequired">{{task.reviewResolved?'已记录人工核对；原生任务状态仍按上方记录显示。':'请在原生宿主核对任务与可能的工具副作用。'}}</p>
       <button v-if="task.resultRef" class="native-result-read" @click="showNativeResult(j,task)">查看已核对报告</button>

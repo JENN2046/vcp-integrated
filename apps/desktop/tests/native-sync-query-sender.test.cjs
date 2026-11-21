@@ -7,7 +7,12 @@ function fixture({missingWindowProvider=false}={}){
  const ipcMain={handle:(name,fn)=>handlers.set(name,fn),removeHandler:name=>handlers.delete(name)};
  const runtime=new Proxy({},{get:()=>async()=>({success:true,guarded:true})});
  const service=registerNativeSyncQueries({ipcMain,getRuntime:()=>{calls++;return runtime;},...(!missingWindowProvider?{getMainWindow:()=>current}:{})});
- const args=(name,event)=>name==='native-sync:executions'?[event,'owner','agent','topic',true]:name==='native-sync:task-result'?[event,'owner','agent','topic','work','task']:[event,{}];
+ const args=(name,event)=>{
+  if(name==='native-sync:executions')return [event,'owner','agent','topic',true];
+  if(name==='native-sync:task-result')return [event,'owner','agent','topic','work','task'];
+  if(name==='native-sync-setup:check-opened-attachment')return [event,{itemId:'owner',itemType:'agent',topicId:'topic'}];
+  return [event,{}];
+ };
  return {url,frame,contents,win,handlers,service,args,event:{sender:contents,senderFrame:frame},calls:()=>calls,setWindow:next=>{current=next;}};
 }
 test('every NativeSync control and sensitive query rejects auxiliary, child, old frame, wrong URL and absent sender before reading runtime',async()=>{
@@ -17,7 +22,8 @@ test('every NativeSync control and sensitive query rejects auxiliary, child, old
  }
  assert.equal(f.calls(),0);
  for(const [name,fn]of f.handlers){const value=await fn(...f.args(name,f.event));assert.equal(value.success,true,name);}
- assert.equal(f.calls(),f.handlers.size);await f.service.close();assert.equal(f.handlers.size,0);
+ assert.equal(f.calls(),f.handlers.size-1);
+ await f.service.close();assert.equal(f.handlers.size,0);
 });
 test('current main frame must still have the exact main.html URL and revoked window/frame identity never authorizes queued work',async()=>{
  const f=fixture(),call=()=>f.handlers.get('native-sync:handoff')(f.event,{}),deny={success:false,error:'NATIVE_SYNC_MAIN_WINDOW_REQUIRED'};

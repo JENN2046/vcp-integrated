@@ -22,7 +22,7 @@ async function jsonBody(req) {
     for await (const chunk of req) chunks.push(chunk);
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, serverRevision}) {
+async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision}) {
     const sourceApp = path.join(candidate, 'apps/server');
     const box = path.join(out, 'runtime-box');
     fs.mkdirSync(box);
@@ -39,7 +39,8 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         const rel = entry.slice('apps/server/'.length);
         if (excluded.test(rel)) continue;
         if (rel.startsWith('Plugin/') && !rel.startsWith('Plugin/NativeSync/') &&
-            !/^Plugin\/(?:VCPSleep|AgentAssistant)\/(?!plugin-manifest)/.test(rel)) continue;
+            !/^Plugin\/(?:VCPSleep|AgentAssistant)\/(?!plugin-manifest)/.test(rel) &&
+            !(delegation && rel === 'Plugin/AgentAssistant/plugin-manifest.json.example')) continue;
         const file = path.join(sourceApp, rel);
         if (!serverRevision && (!fs.existsSync(file) || !fs.lstatSync(file).isFile())) continue;
         const staged = path.join(box, rel);
@@ -70,6 +71,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     }));
 
     ordinaryTools?.stage(box);
+    delegation?.stage(box);
 
     const cleanup = [];
     const seed = path.join(out, 'seed');
@@ -124,6 +126,11 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             const which=Object.entries(contract.cases).find(([,content])=>input===content)?.[0];
             const row={case:which,id:body.requestId,stream:Boolean(body.stream),at:Date.now()};
             const ordinaryReply = ordinaryTools?.reply(body, row, calls);
+            if (delegation?.classify(body, row)) {
+                calls.push(row);
+                trace('provider', row);
+                return await delegation.reply(body, row, res);
+            }
             calls.push(row);trace('provider',row);
             observedContext?.recordProvider(req.url, body);
             if(which==='lostAck')await lostGate;
@@ -160,7 +167,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             req.resume();
             return res.writeHead(500).end(JSON.stringify({error:{code:'UNEXPECTED_DESKTOP_LOCAL_EXECUTION'}}));
         }
-        const relevant = req.method==='POST' && /\/shared\/(session-send|session-cancel|admit|complete|config)$/.test(route);
+        const relevant = req.method==='POST' && /\/shared\/(session-send|session-cancel|task-stop|admit|complete|config)$/.test(route);
         const row = {route,method:req.method,at:Date.now(),device:req.headers['x-nativesync-device'],capabilities:req.headers['x-nativesync-capabilities']};
         let body;
         if (relevant) {
@@ -243,6 +250,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 KNOWLEDGEBASE_FULL_SCAN_ON_STARTUP:'false',TDB_KNOWLEDGE_ENABLED:'false',
                 NativeSyncEnabled:'true',NativeSyncDataDir:data,NativeMobileEnabled:'true',
                 NativeMobileOrigin:'https://127.0.0.1:'+proxyPort,NativeMobileStartDelayMs:'0',
+                ...(delegation ? { AdminUsername:'synthetic-admin', AdminPassword:'synthetic-admin-only' } : {}),
                 ...(observedContext ? { NativeMobileConfigSync:'true', NativeMobileAttachments:'true' } : {}),
                 ...(hardwareStream ? { NativeMobileExecutionTimeoutMs:'300000', NativeMobileGroupIdleTimeoutMs:'300000' } : {}),
                 NativeSyncFullSources:JSON.stringify(['A','B','C','D'].map(x=>({sourceId:'source'+x,deviceId:'device'+x,executionMode:'all-supported'}))),
@@ -322,7 +330,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         return { htmlStatus: page.status, bundleStatus: bundle.status, connectionStatus: connection.status };
     }
     return { checkMobile, get backendPid(){return backend.pid;},
-        ...(ordinaryTools && { async restartAfterCrash() {
+        ...((ordinaryTools || delegation) && { async restartAfterCrash() {
             const crashed = await stopBackend('SIGKILL');
             assert.deepEqual(crashed, {code:null,signal:'SIGKILL'});
             await startBackend();

@@ -4,6 +4,10 @@ const path = require('path');
 const dotenv = require('dotenv');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const nativeExecution = require('../../modules/requestExecutionContext');
+const { createDelegationContinuity, identityOf, sameIdentity } = require('./delegationContinuity');
+const continuity = createDelegationContinuity(path.resolve(__dirname, '../..'));
+let unregisterTaskProvider;
 const {
     normalizeReasoningTag,
     normalizeReasoningModelFilters,
@@ -71,6 +75,18 @@ function initialize(config, dependencies) {
 
     // 加载配置
     loadAgentsFromLocalConfig();
+    unregisterTaskProvider?.();
+    unregisterTaskProvider = nativeExecution.registerNativeTaskProvider('AgentAssistant', {
+        read: readNativeDelegation,
+        control(identity, request) {
+            if (request?.action !== 'stop') throw Error('NATIVE_TASK_CONTROL_UNAVAILABLE');
+            const state = activeDelegations.get(identity.nativeTaskId);
+            if (state?.link && sameIdentity(state.link.identity, identity) && !state.finalizing) {
+                cancelDelegation(state.id, '由共享任务发起端请求取消。');
+            }
+            return readNativeDelegation(identity);
+        },
+    });
 
     if (dependencies && dependencies.vcpLogFunctions && typeof dependencies.vcpLogFunctions.pushVcpInfo === 'function') {
         pushVcpInfo = dependencies.vcpLogFunctions.pushVcpInfo;
@@ -89,6 +105,8 @@ function initialize(config, dependencies) {
  * Shuts down the service, clearing any intervals.
  */
 function shutdown() {
+    unregisterTaskProvider?.();
+    unregisterTaskProvider = null;
     if (cleanupInterval) {
         clearInterval(cleanupInterval);
         if (DEBUG_MODE) console.error('[AgentAssistant Service] Context cleanup interval stopped.');
@@ -587,6 +605,26 @@ function getDelegationDetail(delegationId) {
     return completedDelegations.find(item => item.id === delegationId) || null;
 }
 
+function readNativeDelegation(identity) {
+    const state = activeDelegations.get(identity.nativeTaskId);
+    if (state?.link && sameIdentity(state.link.identity, identity)) {
+        // Native terminal states are published only with the verified archive.
+        const status = state.cancelRequested ? 'cancelling' : state.status === 'waiting' ? 'waiting' : 'running';
+        return { ...state.link.identity, state: status, revision: 0 };
+    }
+    return continuity.read(identity, { includeResult: identity.includeResult === true }) ||
+        { ...identity, state: 'unknown', revision: 0, code: 'NATIVE_TASK_RESULT_UNCONFIRMED' };
+}
+
+function observeDelegation(state, observation) {
+    if (!state?.link) return;
+    try { state.link.observe(observation); }
+    catch (error) {
+        // Reconciliation can read live state or the original durable receipt.
+        console.error('[AgentAssistant] Native task observation pending:', error.code || 'NATIVE_TASK_PROJECTION_FAILED');
+    }
+}
+
 function cancelDelegation(delegationId, reason = '用户从管理面板请求取消。') {
     const state = activeDelegations.get(delegationId);
     if (!state) {
@@ -595,11 +633,13 @@ function cancelDelegation(delegationId, reason = '用户从管理面板请求取
     if (state.cancelRequested || state.status === 'cancelling') {
         return { success: true, message: `委托任务 ${delegationId} 已经在取消中。`, task: createDelegationSnapshot(state) };
     }
+    if (state.finalizing) return { success: false, message: '委托任务正在提交结果。' };
     state.cancelRequested = true;
     state.cancelReason = String(reason || '用户请求取消。');
     state.status = 'cancelling';
     state.updatedAt = Date.now();
     activeDelegations.set(delegationId, state);
+    observeDelegation(state, { state: 'cancelling', revision: 0 });
     return { success: true, message: `已请求取消委托任务 ${delegationId}。任务会在当前等待/请求结束后尽快退出。`, task: createDelegationSnapshot(state) };
 }
 
@@ -660,6 +700,23 @@ async function processToolCall(args) {
 
     const { agent_name, prompt, timely_contact, temporary_contact, maid, task_delegation, query_delegation, cancel_delegation, inject_tools, river_context, __vcp_timed_call } = args;
 
+    // A model-supplied ID does not carry authority over a shared child task.
+    const targetId = cancel_delegation || query_delegation;
+    if (targetId) {
+        const workId = nativeExecution.currentWork();
+        const target = nativeExecution.sharedTaskLink('AgentAssistant', targetId);
+        if (workId || target) {
+            if (!target || cancel_delegation || workId !== target.workId) {
+                throwToolError('请通过原共享 Work 查看或停止该委托。');
+            }
+            // A shared query needs the same evidence as the shared Work view.
+            // The legacy Markdown archive alone does not prove a task finished.
+            const observed = readNativeDelegation(target.identity);
+            return createTextResult(`委托任务 ${targetId} · ${observed.state}` +
+                (observed.summary ? '\n' + observed.summary : ''));
+        }
+    }
+
     // Handle cancelling a delegation
     if (cancel_delegation) {
         const cancelResult = cancelDelegation(cancel_delegation, maid ? `由 ${maid} 请求取消。` : '用户请求取消。');
@@ -688,7 +745,7 @@ async function processToolCall(args) {
                 const docsDir = path.join(__dirname, '..', '..', 'file', 'document', 'AgentTask');
                 if (fs.existsSync(docsDir)) {
                     const files = fs.readdirSync(docsDir);
-                    const matchedFile = files.find(f => f.includes(query_delegation) && f.endsWith('.md'));
+                    const matchedFile = files.find(f => f.endsWith(`_${query_delegation}.md`));
                     if (matchedFile) {
                         const mdContent = fs.readFileSync(path.join(docsDir, matchedFile), 'utf-8');
                         completionMsg = `委托任务 (ID: ${query_delegation}) 已经完成！\n\n文件已永久归档至: \`file/document/AgentTask/${matchedFile}\`\n\n**文档内容速览:**\n\n${mdContent}`;
@@ -769,8 +826,12 @@ async function processToolCall(args) {
         const delegationSenderName = maid || "系统任务中心";
         const temporaryToolsSystemPrompt = buildTemporaryToolsSystemPrompt(inject_tools);
 
+        const link = await nativeExecution.acceptNativeTask({
+            pluginName: 'AgentAssistant', nativeTaskId: delegationId, agentBaseName: agentConfig.baseName,
+        });
+        if (link) identityOf(link.identity);
         activeDelegations.set(delegationId, {
-            id: delegationId,
+            id: delegationId, link,
             status: 'running',
             agentName: agent_name,
             agentBaseName: agentConfig.baseName,
@@ -795,19 +856,9 @@ async function processToolCall(args) {
 
         // Launch the background task un-awaited
         executeDelegation(delegationId, agentConfig, promptWithRiverAttachment, promptTextForStorage, delegationSenderName, temporaryToolsSystemPrompt).catch(async err => {
-            console.error(`[AgentAssistant Service] Background delegation task ${delegationId} failed:`, err);
-            const state = activeDelegations.get(delegationId);
-            const status = err.code === 'DELEGATION_CANCELLED' ? 'Cancelled' : 'Failed';
-            if (state) {
-                state.status = status === 'Cancelled' ? 'cancelled' : 'failed';
-                state.completionStatus = status;
-                state.finalReportPreview = truncateText(`任务执行过程中发生异常: ${err.message}`);
-                state.endTime = Date.now();
-                state.updatedAt = Date.now();
-                rememberCompletedDelegation(state);
-            }
-            await sendDelegationCallback(delegationId, status, `任务执行过程中发生异常: ${err.message}`, agent_name);
+            // Never launch or publish a second result after an uncertain final write.
             activeDelegations.delete(delegationId);
+            console.error('[AgentAssistant] Background delegation finalization failed:', err.code || 'NATIVE_RESULT_UNCONFIRMED');
         });
 
         const successMessage = `委托任务 (ID: ${delegationId}) 已成功提交给 ${agent_name} 进行后台处理。\n您可以使用带有 \`query_delegation: "${delegationId}"\` 参数的工具调用来查询其进度。\n这是一个动态上下文占位符，当任务完全完成时，它会被自动替换为实际的最终报告。\n请在你的回复中包含以下占位符原文：{{VCP_ASYNC_RESULT::AgentAssistant::${delegationId}}}`;
@@ -973,23 +1024,23 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
     const userSessionId = `agent_${agentConfig.baseName}_delegation_session`;
     const lockKey = `${agentConfig.baseName}::${userSessionId}`;
 
-    // 我们对于代理任务也是一个持久会话，因此需要占线锁保护
-    while (activeSessionLocks.has(lockKey)) {
-        if (DEBUG_MODE) console.error(`[AgentAssistant Delegation] Wait for lock: ${lockKey}`);
-        await sleepWithDelegationCancel(delegationId, 2000);
-        const state = activeDelegations.get(delegationId);
-        if (Date.now() - state.startTime > DELEGATION_TIMEOUT) {
-            throw new Error("Acquiring session lock timed out");
-        }
-    }
-
-    activeSessionLocks.add(lockKey);
-
+    const state = activeDelegations.get(delegationId);
+    let lockHeld = false;
+    let lastChildId;
     let finalReport = null;
     let completionStatus = 'Failed';
-    let taskPromptForSystem = '';
+    let taskPromptForSystem = String(taskPromptText ?? '');
 
     try {
+        while (activeSessionLocks.has(lockKey)) {
+            state.status = 'waiting';
+            observeDelegation(state, { state: 'waiting', revision: 0 });
+            await sleepWithDelegationCancel(delegationId, 2000);
+            if (Date.now() - state.startTime > DELEGATION_TIMEOUT) throw Error('Acquiring session lock timed out');
+        }
+        assertDelegationNotCancelled(delegationId);
+        activeSessionLocks.add(lockKey);
+        lockHeld = true;
         taskPromptForSystem = String(taskPromptText ?? (
             typeof taskPromptContent === 'string'
                 ? taskPromptContent
@@ -1021,10 +1072,8 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
             { role: 'user', content: userTaskPromptContent }
         ];
 
-        let state = activeDelegations.get(delegationId);
-
         while (state.currentRound < DELEGATION_MAX_ROUNDS) {
-            state = assertDelegationNotCancelled(delegationId);
+            assertDelegationNotCancelled(delegationId);
             if (Date.now() - state.startTime > DELEGATION_TIMEOUT) {
                 completionStatus = 'Failed';
                 finalReport = '委托任务执行超时。';
@@ -1045,10 +1094,20 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
                 stream: false
             };
 
-            const responseFromVCP = await axios.post(`${VCP_API_TARGET_URL}/chat/completions`, payloadForVCP, {
-                headers: { 'Authorization': `Bearer ${VCP_SERVER_ACCESS_KEY}`, 'Content-Type': 'application/json' },
-                timeout: (parseInt(process.env.PLUGIN_COMMUNICATION_TIMEOUT) || DEFAULT_PLUGIN_COMMUNICATION_TIMEOUT_MS)
-            });
+            observeDelegation(state, { state: 'running', revision: 0 });
+            let release;
+            if (state.link?.requests) {
+                lastChildId = `${delegationId}-round-${state.currentRound + 1}`;
+                payloadForVCP.requestId = lastChildId;
+                release = state.link.requests.register(payloadForVCP);
+            }
+            let responseFromVCP;
+            try {
+                responseFromVCP = await axios.post(`${VCP_API_TARGET_URL}/chat/completions`, payloadForVCP, {
+                    headers: { 'Authorization': `Bearer ${VCP_SERVER_ACCESS_KEY}`, 'Content-Type': 'application/json', ...release?.headers },
+                    timeout: (parseInt(process.env.PLUGIN_COMMUNICATION_TIMEOUT) || DEFAULT_PLUGIN_COMMUNICATION_TIMEOUT_MS),
+                });
+            } finally { release?.(); }
 
             const assistantResponseContent = responseFromVCP.data?.choices?.[0]?.message?.content;
             if (typeof assistantResponseContent !== 'string') {
@@ -1057,7 +1116,7 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
 
             const responseModel = responseFromVCP.data?.model || agentConfig.id;
             const cleanedAssistantResponse = removeVCPThinkingChain(assistantResponseContent, responseModel);
-            state = assertDelegationNotCancelled(delegationId);
+            assertDelegationNotCancelled(delegationId);
             state.lastResponsePreview = truncateText(cleanedAssistantResponse);
             state.updatedAt = Date.now();
             activeDelegations.set(delegationId, state);
@@ -1139,6 +1198,7 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
 
             if (actualDelayMs > 0) {
                 state.status = 'waiting';
+                observeDelegation(state, { state: 'waiting', revision: 0 });
                 activeDelegations.set(delegationId, state);
                 if (DEBUG_MODE) {
                     console.error(`[AgentAssistant Delegation] Next heartbeat in ${Math.round(actualDelayMs / 1000)}s (${flowlock.hasExplicitHeartbeat ? 'explicit' : 'default'}).`);
@@ -1164,40 +1224,43 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
             completionStatus = 'Cancelled';
             finalReport = `委托任务已取消。原因: ${err.message}`;
         } else {
-            throw err;
+            completionStatus = 'Failed';
+            finalReport = `任务执行过程中发生异常: ${err.message}`;
         }
     } finally {
-        activeSessionLocks.delete(lockKey);
-
-        const secureReport = finalReport || "未知错误导致无报告";
-        const finalState = activeDelegations.get(delegationId);
-        if (finalState) {
-            finalState.status = completionStatus === 'Succeed'
-                ? 'completed'
-                : (completionStatus === 'Cancelled'
-                    ? 'cancelled'
-                    : (completionStatus === 'Stopped' ? 'stopped' : 'failed'));
-            finalState.completionStatus = completionStatus;
-            finalState.finalReportPreview = truncateText(secureReport);
-            finalState.endTime = Date.now();
-            finalState.updatedAt = Date.now();
-        }
-
-        // 给成功完成任务的 Agent 发放积分奖励
-        if (completionStatus === 'Succeed') {
-            awardAgentPoints(agentConfig.baseName, agentConfig.name, 5, `成功完成异步委托任务: ${delegationId}`);
-        }
-
-        // Save to AgentTask Document Directory
-        const archivePath = await archiveDelegationReport(delegationId, agentConfig.baseName, completionStatus, secureReport, taskPromptForSystem);
-        if (finalState) {
-            finalState.archivePath = archivePath || null;
-            rememberCompletedDelegation(finalState);
-        }
-        activeDelegations.delete(delegationId);
-
-        await sendDelegationCallback(delegationId, completionStatus, secureReport, agentConfig.baseName);
+        if (lockHeld) activeSessionLocks.delete(lockKey);
     }
+
+    state.finalizing = true;
+    const report = finalReport || '未知错误导致无报告';
+    state.endTime = Date.now();
+    state.updatedAt = state.endTime;
+    let controlRevision;
+    try {
+        controlRevision = state.link?.requests?.confirmFinal(lastChildId);
+        state.archivePath = await archiveDelegationReport(delegationId, agentConfig.baseName, completionStatus, report, taskPromptForSystem);
+        if (state.link) {
+            const proof = continuity.persist(state.link.identity, {
+                nativeStatus: completionStatus, endTime: state.endTime, archivePath: state.archivePath, report, controlRevision,
+            });
+            observeDelegation(state, proof);
+        }
+    } catch (error) {
+        state.status = 'unknown';
+        state.completionStatus = null;
+        state.finalReportPreview = '';
+        rememberCompletedDelegation(state);
+        activeDelegations.delete(delegationId);
+        observeDelegation(state, { state: 'unknown', revision: 0, code: 'NATIVE_TASK_RESULT_UNCONFIRMED' });
+        throw error;
+    }
+    state.status = { Succeed: 'completed', Failed: 'failed', Cancelled: 'cancelled', Stopped: 'stopped' }[completionStatus];
+    state.completionStatus = completionStatus;
+    state.finalReportPreview = truncateText(report);
+    rememberCompletedDelegation(state);
+    activeDelegations.delete(delegationId);
+    if (completionStatus === 'Succeed') awardAgentPoints(agentConfig.baseName, agentConfig.name, 5, `成功完成异步委托任务: ${delegationId}`);
+    await sendDelegationCallback(delegationId, completionStatus, report, agentConfig.baseName);
 }
 
 /**

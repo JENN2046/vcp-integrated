@@ -17,6 +17,7 @@ const modes = ['lost-only', 'transport-only', 'pre-only', 'local-only', 'config-
 const requested = process.argv[2] || 'all';
 const ordinaryModes = { 'ordinary-shared': 'pre-only', 'ordinary-local': 'local-only' };
 const ordinaryMode = Object.hasOwn(ordinaryModes, requested) ? ordinaryModes[requested] : undefined;
+const aaDesktop = requested === 'aa-desktop';
 const approvalRestoreModes = { 'approval-restore': 'desktop', 'approval-restore-stale': 'stale' };
 const approvalRestore = Object.hasOwn(approvalRestoreModes, requested) ? approvalRestoreModes[requested] : undefined;
 const serverRevision = ordinaryMode || approvalRestore ? process.env.NS_BASELINE_SERVER_REVISION : undefined;
@@ -34,8 +35,8 @@ const ordinaryFixture = ordinaryMode || approvalRestore ? {
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale]');
+if (![...modes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -150,19 +151,23 @@ const { restoreProfile }=require('./profile.cjs');
 async function runCase(root, mode) {
     out = path.join(root, mode);
     fs.mkdirSync(out, { mode: 0o700 });
-    cert = path.join(out, 'loopback-cert.pem');
-    const key = path.join(out, 'loopback-key.pem');
-    execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
-        '-subj', '/CN=NativeSync isolated fixture', '-addext', 'subjectAltName=IP:127.0.0.1',
-        '-keyout', key, '-out', cert], { env: { PATH: '/usr/bin:/bin' }, stdio: 'ignore' });
-    fingerprint = new X509Certificate(fs.readFileSync(cert)).fingerprint256;
-    let service;
-    try {
-        service = await require('./service.cjs').start({
-            out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision,
-        });
+    let service, aa;
+    if (aaDesktop) {
+        aa = await require('../aa-delegation/fixture.cjs').startFixture({out, candidate, trace, mode: 'pre-only'});
+        ({service, cert} = aa);
+    } else {
+        cert = path.join(out, 'loopback-cert.pem');
+        const key = path.join(out, 'loopback-key.pem');
+        execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
+            '-subj', '/CN=NativeSync isolated fixture', '-addext', 'subjectAltName=IP:127.0.0.1',
+            '-keyout', key, '-out', cert], { env: { PATH: '/usr/bin:/bin' }, stdio: 'ignore' });
+        try {
+            service = await require('./service.cjs').start({
+                out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision,
+            });
+        } finally { fs.rmSync(key, { force: true }); }
     }
-    finally { fs.rmSync(key, { force: true }); }
+    fingerprint = new X509Certificate(fs.readFileSync(cert)).fingerprint256;
     const clients = {};
     const profiles = {};
     const result = { candidate, mode, ...(serverRevision && {serverRevision}), origin: service.origin, exits:{}, failures:[] };
@@ -238,7 +243,7 @@ async function runCase(root, mode) {
         }
     };
     try {
-        const roles = approvalRestore ? ['A'] : ['A', 'B'];
+        const roles = approvalRestore || aaDesktop ? ['A'] : ['A', 'B'];
         for(const role of roles){
             const profile=profiles[role]=path.join(out,'profile-'+role);
             if (mode==='local-only' && role==='A') {
@@ -268,10 +273,11 @@ async function runCase(root, mode) {
         } else if (mode === 'idle') {
             result.idle = await require('./idle.cjs').measure({out, waitUntil, pids:{ A:A.proc.pid, B:B.proc.pid, backend:service.backendPid }});
         } else if (mode !== 'ready') {
-            const runScenario = approvalRestore ? require('../approval-restore/' + approvalRestore + '.cjs')
+            const runScenario = aaDesktop ? require('../aa-desktop/scenario.cjs')
+                : approvalRestore ? require('../approval-restore/' + approvalRestore + '.cjs')
                 : ordinaryMode ? require('../ordinary-desktop/scenario.cjs')
                 : mode === 'config-only' ? require('./configuration.cjs') : scenario;
-            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash});
+            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash,aa});
         }
     } catch(error) {
         result.failures.push(error.stack);
@@ -286,7 +292,7 @@ async function runCase(root, mode) {
         }
         result.provider=service.calls;
         result.requests=service.requests;
-        result.exits.backend = await service.close();
+        result.exits.backend = await (aa ? aa.close() : service.close());
         try { assert.deepEqual(result.exits.backend, {code:0,signal:null}); }
         catch (error) { result.failures.push(error.stack); }
         try {

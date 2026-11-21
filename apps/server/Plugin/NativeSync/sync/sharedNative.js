@@ -21,7 +21,19 @@ class SharedNative {
   if(!shared.events||shared.events.closed)shared.events=new (require('./sharedEvents').SharedEvents)(shared,engine);
   this.approvalObserver=event=>{try{const row=this.db.prepare('SELECT admission_id FROM shared_native_requests WHERE id=?').get(event.requestId);if(row)this.engine.emitEvent?.(row.admission_id,'approval',{state:event.waiting?'waiting_approval':'running',nativeRequestId:event.requestId});}catch{/* Observers do not own tool or model execution. */}};
   require('../../../modules/requestExecutionContext').events.on('approval',this.approvalObserver);
-  this.taskControls=new (require('./sharedTaskControls').SharedTaskControls)(shared);this.taskRequests=new (require('./sharedTaskRequests').SharedTaskRequests)(this);shared.steering.onInput=(workId)=>{require('../../../modules/requestExecutionContext').interruptWork(workId);return this.taskControls.request(workId);};if(engine?.get&&engine.configs)require('../mobile/groupTurn').recover(engine);
+  this.taskControls=new (require('./sharedTaskControls').SharedTaskControls)(shared);this.taskRequests=new (require('./sharedTaskRequests').SharedTaskRequests)(this);shared.steering.onInput=(workId)=>{require('../../../modules/requestExecutionContext').interruptWork(workId);return this.taskControls.request(workId);};
+  if(engine?.get&&engine.configs){
+   require('../mobile/groupTurn').recover(engine);
+   // A verified AA row can commit just before its parent terminal flag.
+   // Such a child has left the reconcile queue. Recheck the existing reply
+   // intent on startup without scheduling either the parent or the child.
+   const pendingReplies=this.db.prepare(`SELECT a.id FROM shared_admissions a
+    JOIN mobile_executions j ON j.id=a.id AND j.state='publishing' AND j.pending_operation IS NOT NULL
+    JOIN shared_native_requests r ON r.id=a.id AND r.admission_id=a.id AND r.state='model_terminal'
+    WHERE a.state='dispatched' AND a.native_terminal=0 AND EXISTS (
+     SELECT 1 FROM mobile_native_tasks t WHERE t.execution_id=a.id AND t.state IN ('completed','failed','stopped','cancelled'))`).all();
+   for(const row of pendingReplies)this.checkTerminal(row.id);
+  }
  }
  prepare(actor,body,{session=false}={}){
   if(this.draining||this.closed)throw fail('HOST_DRAINING',503);
@@ -180,14 +192,22 @@ class SharedNative {
  phase(workId,requestId,stage){const key=requestId+':'+stage;if(this.seenPhases.has(key))return;if(!['native_prepared','native_entered','vcp_preprocessing','provider_attempt','first_model_body','native_settled','final_persisted'].includes(stage))throw fail('INVALID_EXECUTION_PHASE');this.db.prepare('INSERT OR IGNORE INTO shared_request_phases VALUES(?,?,?,?)').run(workId,requestId,stage,Date.now());this.seenPhases.add(key);if(this.seenPhases.size>50000)this.seenPhases.delete(this.seenPhases.values().next().value);}
  checkTerminal(admissionId){
   if(this.closed)return;
-  const admission=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(admissionId),config=JSON.parse(admission.config_json);
-  if(config.owner.kind==='group'&&this.db.prepare('SELECT count(*) n FROM shared_native_requests WHERE admission_id=?').get(admissionId).n!==require('./sharedTurns').intent(admission).plan.length)return;
+  const admission=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(admissionId);
+  if(!admission||admission.state!=='dispatched')return;
+  const config=JSON.parse(admission.config_json);
   const pending=this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state IN ('prepared','dispatched','unknown') LIMIT 1").get(admissionId);
   const native=this.engine.nativeTasks;
-  if(!pending&&!native.unsettledTools(admissionId)&&!native.needsReview(admissionId)&&native.list(admissionId).every(task=>['completed','failed','cancelled','stopped'].includes(task.state))){this.shared.nativeTerminal(admissionId);if(this.shared.steering.enabled)this.shared.steering.closeIfFinished(admissionId);}
+  if(pending)return;
+  if(this.taskRequests.uncertain(admissionId)){
+   this.db.prepare("UPDATE shared_admissions SET state='review_required',native_terminal=0 WHERE id=? AND state='dispatched'").run(admissionId);
+   this.engine.emitEvent?.(admissionId,'state',{state:'review_required'});
+   return;
+  }
+  if(config.owner.kind==='group'&&this.db.prepare('SELECT count(*) n FROM shared_native_requests WHERE admission_id=?').get(admissionId).n!==require('./sharedTurns').intent(admission).plan.length)return;
+  if(!this.taskRequests.pending(admissionId)&&!native.unsettledTools(admissionId)&&!native.needsReview(admissionId)&&native.list(admissionId).every(task=>['completed','failed','cancelled','stopped'].includes(task.state))){this.shared.nativeTerminal(admissionId);if(this.shared.steering.enabled)this.shared.steering.closeIfFinished(admissionId);}
  }
  checkpointProof(workId,requestId,settled){const g=this.shared.steering.requestGeneration(workId,requestId);if(g&&settled.length===0&&this.db.prepare('SELECT 1 FROM shared_native_no_dispatch WHERE work_id=? AND generation=?').get(workId,g.generation))return {requestId,hash:null,settledInvocationIds:[],noDispatch:true};return this.continuations.proof(requestId,workId,settled);}
- canReview(admissionId){const rows=[...this.db.prepare('SELECT state FROM shared_native_requests WHERE admission_id=?').all(admissionId),...this.db.prepare('SELECT state FROM shared_native_child_requests WHERE work_id=?').all(admissionId)];return rows.length>0&&rows.every(r=>['model_terminal','unknown','prepared'].includes(r.state));}
+ canReview(admissionId){const rows=[...this.db.prepare('SELECT state FROM shared_native_requests WHERE admission_id=?').all(admissionId),...this.db.prepare('SELECT state FROM shared_native_child_requests WHERE work_id=?').all(admissionId)];return rows.length>0&&rows.every(r=>['model_terminal','unknown','prepared','not_dispatched'].includes(r.state));}
  close(){this.closed=true;require('../../../modules/requestExecutionContext').events.off('approval',this.approvalObserver);this.shared.events?.close?.();}
  beginDrain(){this.draining=true;this.shared.events?.close?.();}
  snapshot(){return {accepting:!this.closed&&!this.draining,dispatched:this.db.prepare("SELECT count(*) n FROM shared_native_requests WHERE state='dispatched'").get().n,held:this.db.prepare("SELECT count(*) n FROM shared_admissions WHERE state IN ('preparing','accepted','dispatched','review_required')").get().n};}

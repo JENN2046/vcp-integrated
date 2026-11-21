@@ -52,9 +52,18 @@ class SharedSpace {
   this.steering=new (require('./sharedSteering').SharedSteering)(this,{enabled:!configurationOnly&&(policy.sharedSteering===true||policy.sharedControlledText===true)});
   // The Mobile runtime owns recovery of existing execution state.
   if(configurationOnly)return;
-  // A restart cannot prove that an already dispatched request did not execute.
-  const executions=this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mobile_executions'").get();
-  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+(executions?" AND NOT (native_terminal=1 AND EXISTS (SELECT 1 FROM mobile_executions e WHERE e.id=shared_admissions.id AND e.state='publishing' AND e.pending_operation IS NOT NULL))":"")).run();
+  // A durable reply intent can wait for AA's final receipt when the parent model
+  // is already settled. A lost parent result still needs review after restart.
+  const tables=new Set(this.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name));
+  const recoverableTask=['shared_native_requests','shared_native_child_requests','shared_native_task_controls'].every(name=>tables.has(name))?`
+   OR (EXISTS (SELECT 1 FROM shared_native_requests r WHERE r.admission_id=shared_admissions.id AND r.state='model_terminal')
+    AND NOT EXISTS (SELECT 1 FROM shared_native_requests r WHERE r.admission_id=shared_admissions.id AND r.state<>'model_terminal')
+    AND NOT EXISTS (SELECT 1 FROM shared_native_child_requests r WHERE r.work_id=shared_admissions.id AND r.state IN ('prepared','dispatched','unknown'))
+    AND EXISTS (SELECT 1 FROM shared_native_task_controls c WHERE c.work_id=shared_admissions.id AND c.final_revision IS NOT NULL))`:'';
+  const publishing=tables.has('mobile_executions')?` AND NOT (EXISTS (SELECT 1 FROM mobile_executions e
+   WHERE e.id=shared_admissions.id AND e.state='publishing' AND e.pending_operation IS NOT NULL)
+   AND (native_terminal=1${recoverableTask}))`:'';
+  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing).run();
  }
  atomic(fn){
   const own=!this.db.isTransaction;
@@ -297,7 +306,24 @@ class SharedSpace {
  }
  publicAdmission(row){const control=this.db.prepare('SELECT * FROM shared_work_controls WHERE work_id=?').get(row.id);return {id:row.id,sharedSpaceId:row.space_id,sharedId:row.topic_id,requestId:row.request_id,state:row.state,configHash:JSON.parse(row.config_json).hash,contextHead:row.context_head,userSeq:row.user_seq,replySeq:row.reply_seq,dispatched:Boolean(row.dispatched),turn:require('./sharedTurns').intent(row),...(require('./sharedTurns').intent(row).steeringCapable&&this.steering&&(this.steering.enabled||control)?{steering:this.steering.public(row,control)}:{})};}
  async taskResult(actor,{sharedSpaceId,workId,nativeTaskId}){const row=this.admission(actor,sharedSpaceId,workId),topic=this.topic(actor,sharedSpaceId,row.topic_id);if(!this.native)throw fail('SHARED_NATIVE_UNAVAILABLE');return this.native.engine.nativeTasks.result(topic.id,row.id,nativeTaskId);}
- workState(actor,{sharedSpaceId,workId}){const row=this.admission(actor,sharedSpaceId,workId);this.topic(actor,sharedSpaceId,row.topic_id,'execute');return {request:{...this.publicAdmission(row),nativeRequests:this.nativeStatus(row),nativeTasks:this.native?.engine.nativeTasks.list(row.id)||[],toolInvocations:this.native?.engine.nativeTasks.invocations(row.id)||[]}};}
+ workState(actor,{sharedSpaceId,workId}){const row=this.admission(actor,sharedSpaceId,workId);this.topic(actor,sharedSpaceId,row.topic_id,'execute');return {request:this.publicWork(actor,row)};}
+ publicWork(actor,row){
+  const canStop=!this.readOnly&&row.principal===actor.principal&&row.state==='dispatched'&&!this.native?.closed&&!this.native?.draining;
+  const nativeTasks=(this.native?.engine.nativeTasks.list(row.id)||[]).map(task=>({...task,
+   stopAllowed:canStop&&task.pluginName==='AgentAssistant'&&['accepted','running','waiting'].includes(task.state),
+   stopRequested:task.state==='cancelling',
+  }));
+  return {...this.publicAdmission(row),nativeRequests:this.nativeStatus(row),nativeTasks,toolInvocations:this.native?.engine.nativeTasks.invocations(row.id)||[]};
+ }
+ async stopTask(actor,{sharedSpaceId,workId,nativeTaskId}){
+  const row=this.admission(actor,sharedSpaceId,workId);
+  this.topic(actor,sharedSpaceId,row.topic_id,'execute');
+  if(row.principal!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
+  if(this.readOnly)throw fail('SHARED_READ_ONLY');
+  if(!this.native||this.native.closed||this.native.draining)throw fail('SHARED_NATIVE_UNAVAILABLE');
+  await this.native.engine.nativeTasks.stop(workId,nativeTaskId,row.state==='dispatched');
+  return this.workState(actor,{sharedSpaceId,workId});
+ }
  activeWork(actor,{sharedSpaceId,sharedId}){const topic=this.topic(actor,sharedSpaceId,sharedId,'execute'),row=this.active(topic.id);return row?this.workState(actor,{sharedSpaceId,workId:row.id}):{request:null};}
  requestConfig(actor,{sharedSpaceId,admissionId}){
   this.authorize(actor,sharedSpaceId,'config');
@@ -309,7 +335,7 @@ class SharedSpace {
  request(actor,{sharedSpaceId,requestId}){
   this.authorize(actor,sharedSpaceId,'execute');id(requestId);
   const row=this.db.prepare('SELECT * FROM shared_admissions WHERE principal=? AND request_id=? AND space_id=?').get(actor.principal,requestId,sharedSpaceId);
-  return {request:row?{...this.publicAdmission(row),nativeRequests:this.nativeStatus(row),nativeTasks:this.native?.engine.nativeTasks.list(row.id)||[],toolInvocations:this.native?.engine.nativeTasks.invocations(row.id)||[]}:null};
+  return {request:row?this.publicWork(actor,row):null};
  }
  admit(actor,body,{session=false,sponsor=null}={}){
   const sponsored=sponsor===require('./sharedTopicSponsor').dispatchKey&&session;
