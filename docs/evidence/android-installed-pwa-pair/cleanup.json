@@ -1,0 +1,12 @@
+{
+  "foregroundAndroidUserAfterCleanup": 0,
+  "temporaryUserId": 10,
+  "temporaryUserRemoved": true,
+  "temporaryUserApplicationDataAndCaRemovedWithUser": true,
+  "firefoxPackageAbsent": true,
+  "deviceScreenshotAndUiDumpOnlyDuringTemporaryUser": true,
+  "adbForwardPortsRemoved": [18444, 18446],
+  "adbReversePortsRemoved": [18443, 18445],
+  "temporaryDownloadServiceStopped": true,
+  "temporaryDownloadFilesRemoved": true
+}

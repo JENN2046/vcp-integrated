@@ -1,0 +1,20 @@
+✔ recovery fingerprints use canonical original payload, preserve attachment order and separate kind/topic/request identity (2.6389ms)
+✔ authenticated recovery marker survives valid token rotation and SQLite reopen without exposing a credential (103.953001ms)
+✔ expired reauthentication and a fresh pairing change markers without changing the protected entry identity (25.490615ms)
+✔ same-session accepted submission replays after reopen with the same fingerprint, job and journal row (22.62495ms)
+✔ a new session may reconcile old execution identity but cannot acquire submission or cancel authority (23.698166ms)
+✔ recovery metadata grants no authentication or additional topic scopes (20.084515ms)
+✔ legacy and malformed durable payloads never receive guessed recovery evidence (12.93579ms)
+✔ submission context headers accept and replay the original message across valid Cookie rotation (15.517372ms)
+✔ a Cookie changed after context observation cannot accept an old-context message under a new session (18.581771ms)
+✔ partial or malformed context fails closed after the original Cookie, Origin and Topic authorization (26.686102ms)
+✔ invitation context headers replay within one session and reject a new Cookie before any new group step (19.667191ms)
+✔ the PWA releases only a verified desktop-only rejection and serializes same-request posts (8.720018ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 421.3588

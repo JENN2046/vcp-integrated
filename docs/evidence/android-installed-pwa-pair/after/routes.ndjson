@@ -1,0 +1,8 @@
+{"at":"2026-11-21T18:39:58.555Z","method":"GET","path":"/mobile/api/session","status":401}
+{"at":"2026-11-21T18:39:59.384Z","method":"POST","path":"/mobile/api/pair","status":200}
+{"at":"2026-11-21T18:39:59.396Z","method":"GET","path":"/mobile/api/session","status":200}
+{"at":"2026-11-21T18:40:32.740Z","method":"GET","path":"/mobile/api/session","status":401}
+{"at":"2026-11-21T18:40:32.833Z","method":"POST","path":"/mobile/api/pair/challenge","status":200}
+{"at":"2026-11-21T18:40:32.839Z","method":"POST","path":"/mobile/api/pair/recover","status":200}
+{"at":"2026-11-21T18:40:32.849Z","method":"GET","path":"/mobile/api/session","status":200}
+{"at":"2026-11-21T18:40:33.214Z","method":"GET","path":"/mobile/api/session","status":200}

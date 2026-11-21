@@ -1,0 +1,15 @@
+{
+  "browser": "Chrome/157.0.8103.78",
+  "histogram": {
+    "name": "WebApk.Install.InstallResult",
+    "sum": 12,
+    "count": 2,
+    "buckets": [
+      {
+        "low": 6,
+        "high": 7,
+        "count": 2
+      }
+    ]
+  }
+}

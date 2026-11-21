@@ -1,0 +1,17 @@
+{
+  "pid": "27914",
+  "focus": "  mCurrentFocus=Window{4a33d6b u10 org.mozilla.firefox/org.mozilla.fenix.customtabs.ExternalAppBrowserActivity}",
+  "secure": true,
+  "visible": true,
+  "standalone": true,
+  "origin": "https://127.0.0.1:18443",
+  "connection": "已连接",
+  "bundle": "/mobile/assets/index-iPv5fQP8.js",
+  "workerControlled": true,
+  "isPrivate": false,
+  "browsingContextID": 2,
+  "readback": {
+    "status": 200,
+    "sessionMarker": "0033c1eb7f0a3c67dbc2f1700e9ee85f038bc1a1a8bad6ace19d3fa2184293c9"
+  }
+}

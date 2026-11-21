@@ -1,0 +1,17 @@
+{
+  "focus": "  mCurrentFocus=Window{ac7e0b5 u10 org.mozilla.firefox/org.mozilla.fenix.customtabs.ExternalAppBrowserActivity}",
+  "pid": "23371",
+  "siteTargets": [
+    {
+      "secure": true,
+      "visible": true,
+      "standalone": true,
+      "origin": "https://127.0.0.1:18443",
+      "connection": "服务可达",
+      "bundle": "/mobile/assets/index-iPv5fQP8.js",
+      "workerControlled": true,
+      "isPrivate": false,
+      "browsingContextID": 2
+    }
+  ]
+}

@@ -1,0 +1,420 @@
+diff --git a/apps/mobile/src/App.vue b/apps/mobile/src/App.vue
+index a743cc7..98cf39d 100644
+--- a/apps/mobile/src/App.vue
++++ b/apps/mobile/src/App.vue
+@@ -12,0 +13 @@ import {consumePairingLink} from './pairingLink.js';
++import {createPairRecovery} from './pairRecovery.js';
+@@ -31 +32 @@ const pairingLinkOpen=ref(false);
+-const paired=ref(false),pairCode=ref(''),topics=ref([]),selected=ref(''),agentId=ref(''),messages=ref([]),jobs=ref([]),busy=ref(false),notice=ref('正在连接…'),online=ref(false),history=ref(null);
++const paired=ref(false),pairCode=ref(''),topics=ref([]),selected=ref(''),agentId=ref(''),messages=ref([]),jobs=ref([]),busy=ref(true),notice=ref('正在连接…'),online=ref(false),history=ref(null);
+@@ -57,0 +59,3 @@ const browserOrigin=window.location.origin;
++const pairingRecovery=createPairRecovery({origin:browserOrigin,indexedDB:window.indexedDB,crypto:window.crypto,locks:navigator.locks,secureContext:window.isSecureContext});
++const pairRecoveryNotice=ref('');
++let startupSessionController=null;
+@@ -151 +155 @@ const errors={SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保
+-async function api(route,body,requestHeaders={},signal){
++async function api(route,body,requestHeaders={},signal,suppressPairRequired=false){
+@@ -154 +158 @@ async function api(route,body,requestHeaders={},signal){
+- const result=await r.json();if(!r.ok){if(r.status===401&&result.error?.code==='PAIR_REQUIRED'&&requestEpoch===authEpoch){paired.value=false;invalidateSession();notice.value=errors.PAIR_REQUIRED+'；本地待确认提交继续保留。';}throw Object.assign(Error(errors[result.error?.code]||'请求未完成，请检查连接'),{code:result.error?.code,status:r.status});}return result;
++ const result=await r.json();if(!r.ok){if(!suppressPairRequired&&r.status===401&&result.error?.code==='PAIR_REQUIRED'&&requestEpoch===authEpoch){paired.value=false;invalidateSession();notice.value=errors.PAIR_REQUIRED+'；本地待确认提交继续保留。';}throw Object.assign(Error(errors[result.error?.code]||'请求未完成，请检查连接'),{code:result.error?.code,status:r.status});}return result;
+@@ -189,2 +193,5 @@ async function refreshDirectory(force=false,{adjustSelection=true}={}){
+-async function session(){const epoch=authEpoch;try{
+- const r=await api('session');if(epoch!==authEpoch)return;
++async function session({startupSignal}={}){const epoch=authEpoch;try{
++ const r=startupSignal
++  ? await pairingRecovery.openSession((route,body)=>api(route,body,{},startupSignal,true))
++  : await api('session');
++ if(epoch!==authEpoch||startupSignal?.aborted||r.authenticated!==true)return;
+@@ -197 +204 @@ async function session(){const epoch=authEpoch;try{
+- }catch(e){notice.value=e.message;}}
++ }catch(e){if(!startupSignal?.aborted)notice.value=e.message;}}
+@@ -199 +206,14 @@ async function session(){const epoch=authEpoch;try{
+-async function pair(){busy.value=true;invalidateSession();try{await api('pair',{code:pairCode.value});pairCode.value='';resetHistory();await session();settingsOpen.value=false;}catch(e){notice.value=e.message;}finally{busy.value=false;}}
++async function pair(){
++ if(busy.value)return;
++ busy.value=true;invalidateSession();
++ try{
++  await pairingRecovery.withSessionLock(async()=>{
++   if(!pairCode.value||pageSuspended)return;
++   const enrolled=await pairingRecovery.pair(api,pairCode.value);
++   pairCode.value='';
++   pairRecoveryNotice.value=enrolled?'':'此浏览器或服务端未启用设备恢复。若浏览器丢失会话，请重新配对。';
++   resetHistory();await session();settingsOpen.value=false;
++  });
++ }catch(e){notice.value=e.message;}
++ finally{busy.value=false;}
++}
+@@ -202,2 +222,28 @@ async function testConnection(){busy.value=true;tested.value=false;accessKey.val
+-async function connect(){if(!keyAllowed.value||!tested.value)return;busy.value=true;const key=accessKey.value;accessKey.value='';invalidateSession();try{await api('connection/authenticate',{serverUrl:serverUrl.value,apiKey:key});resetHistory();await session();settingsOpen.value=false;notice.value='已保存服务器连接，使用受限设备会话；待确认提交继续保留。';}catch(e){notice.value=e.message;}finally{busy.value=false;}}
+-async function disconnect(){busy.value=true;accessKey.value='';try{await api('connection/disconnect',{});paired.value=false;invalidateSession();topics.value=[];directoryAgents.value=null;sourceProgress.value=[];directoryRevision='';resetHistory();tested.value=false;settingsOpen.value=true;notice.value='此设备会话已撤销，待确认提交继续保留，可重新认证核对。';}catch(e){notice.value=e.message;}finally{busy.value=false;}}
++async function connect(){
++ if(busy.value||!keyAllowed.value||!tested.value)return;
++ busy.value=true;const key=accessKey.value;accessKey.value='';invalidateSession();
++ try{
++  await pairingRecovery.withSessionLock(async()=>{
++   if(pageSuspended)return;
++   await pairingRecovery.changeSession(()=>api('connection/authenticate',{serverUrl:serverUrl.value,apiKey:key}));
++   pairRecoveryNotice.value='';
++   resetHistory();await session();settingsOpen.value=false;
++   if(paired.value)notice.value='已保存服务器连接，使用受限设备会话；待确认提交继续保留。';
++  });
++ }catch(e){notice.value=e.message;}
++ finally{busy.value=false;}
++}
++async function disconnect(){
++ if(busy.value)return;
++ busy.value=true;accessKey.value='';
++ try{
++  await pairingRecovery.withSessionLock(async()=>{
++   if(pageSuspended)return;
++   await pairingRecovery.changeSession(()=>api('connection/disconnect',{}));
++   pairRecoveryNotice.value='';
++   paired.value=false;invalidateSession();topics.value=[];directoryAgents.value=null;sourceProgress.value=[];directoryRevision='';resetHistory();tested.value=false;settingsOpen.value=true;
++   notice.value='此设备会话已撤销，待确认提交继续保留，可重新认证核对。';
++  });
++ }catch(e){notice.value=e.message;}
++ finally{busy.value=false;}
++}
+@@ -418 +464 @@ async function deviceVisibilityChanged(){resetHistory({remember:false});if(lastD
+-function clearTransientKey(){pageSuspended=true;refreshing?.abort();refreshing=null;generation++;clearSharedObservers();sharedObserver.suspend();historyCache.clear();accessKey.value='';pairCode.value='';incomingPairing=null;closeAttachment();}
++function clearTransientKey(){pageSuspended=true;startupSessionController?.abort();refreshing?.abort();refreshing=null;generation++;clearSharedObservers();sharedObserver.suspend();historyCache.clear();accessKey.value='';pairCode.value='';incomingPairing=null;closeAttachment();}
+@@ -421,3 +467,18 @@ async function refreshView(){if(pageSuspended)return;try{await refreshDirectory(
+-async function reconnect(){if(pageSuspended)return;clearSharedObservers();sharedObserver.resume();loadRecovery();await session();}
+-async function pageShown(){pageSuspended=false;sharedObserver.resume();await session();}
+-onMounted(async()=>{loadRecovery();window.addEventListener('hashchange',pairingHashChanged);window.addEventListener('pagehide',clearTransientKey);window.addEventListener('pageshow',pageShown);window.addEventListener('storage',storageChanged);window.addEventListener('online',reconnect);await connectionInfo();await session();connectionInitialized=true;applyPairingLink(incomingPairing);incomingPairing=null;timer=setInterval(refreshView,2000);});
++async function reconnect(){if(pageSuspended||!connectionInitialized)return;clearSharedObservers();sharedObserver.resume();loadRecovery();await session();}
++async function pageShown(){pageSuspended=false;sharedObserver.resume();if(connectionInitialized)await session();}
++onMounted(async()=>{
++ loadRecovery();
++ window.addEventListener('hashchange',pairingHashChanged);
++ window.addEventListener('pagehide',clearTransientKey);
++ window.addEventListener('pageshow',pageShown);
++ window.addEventListener('storage',storageChanged);
++ window.addEventListener('online',reconnect);
++ const controller=new AbortController();
++ startupSessionController=controller;
++ await connectionInfo();
++ if(!controller.signal.aborted)await session({startupSignal:controller.signal});
++ startupSessionController=null;
++ connectionInitialized=true;busy.value=false;
++ if(controller.signal.aborted&&!pageSuspended)await session();
++ applyPairingLink(incomingPairing);incomingPairing=null;timer=setInterval(refreshView,2000);
++});
+@@ -446 +507 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
+-   <p v-if="recoveryRecords.length" id="saved-submissions">此设备保留 {{recoveryRecords.length}} 条待确认提交。重新连接后会核对原记录，不会自动重发。</p><p v-if="recoveryError" role="alert">{{recoveryError}}</p><p role="status">{{notice}}</p>
++   <p v-if="recoveryRecords.length" id="saved-submissions">此设备保留 {{recoveryRecords.length}} 条待确认提交。重新连接后会核对原记录，不会自动重发。</p><p v-if="recoveryError" role="alert">{{recoveryError}}</p><p v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</p><p role="status">{{notice}}</p>
+@@ -485 +546 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
+-   <footer><div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div><div v-if="currentTopic?.attachmentsEnabled" class="upload-area"><label class="attachment-picker">添加图片或文件<input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false"></label><small>最多 8 个，每个 20 MB；断线后可重新选择同一文件续传。</small><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||item.progress+'%'}}</span><button @click="removeDraftFile(i)" :disabled="busy">移除</button></div></div><small v-else-if="currentTopic?.sharedSpaceId" role="status" class="attachment-unavailable">此共享会话尚未启用附件传输，可继续发送文字；文件不会被静默上传。</small><small class="draft-scope">普通草稿暂存于本页。已确认被拒绝的草稿保存在此设备的当前会话和话题。</small><form @submit.prevent="send"><label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" placeholder="输入文字…" rows="2" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form><div class="send-state"><span id="send-state" role="status">{{notice}}</span><button id="retry-last" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
++   <footer><div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div><div v-if="currentTopic?.attachmentsEnabled" class="upload-area"><label class="attachment-picker">添加图片或文件<input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false"></label><small>最多 8 个，每个 20 MB；断线后可重新选择同一文件续传。</small><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||item.progress+'%'}}</span><button @click="removeDraftFile(i)" :disabled="busy">移除</button></div></div><small v-else-if="currentTopic?.sharedSpaceId" role="status" class="attachment-unavailable">此共享会话尚未启用附件传输，可继续发送文字；文件不会被静默上传。</small><small class="draft-scope">普通草稿暂存于本页。已确认被拒绝的草稿保存在此设备的当前会话和话题。</small><form @submit.prevent="send"><label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" placeholder="输入文字…" rows="2" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form><div class="send-state"><span id="send-state" role="status">{{notice}}</span><span v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</span><button id="retry-last" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
+diff --git a/apps/mobile/src/pairRecovery.js b/apps/mobile/src/pairRecovery.js
+new file mode 100644
+index 0000000..be9a261
+--- /dev/null
++++ b/apps/mobile/src/pairRecovery.js
+@@ -0,0 +1,141 @@
++const DB_NAME = 'vcp-mobile-pair-recovery';
++const STORE = 'credentials';
++const SLOT = 'paired-device';
++const LOCK = 'vcp-mobile-device-session';
++const REJECTED_SESSION_CHANGES = new Set([
++ 'INVALID_PAIRING','INVALID_CONNECTION','INVALID_SERVER_ADDRESS','AUTH_FAILED',
++ 'AUTH_RATE_LIMIT','SERVER_NOT_APPROVED','PROTECTED_HOST_NOT_READY','HOST_DRAINING','PAIR_REQUIRED',
++]);
++
++function base64url(bytes) {
++ return btoa(String.fromCharCode(...new Uint8Array(bytes))).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');
++}
++
++function pairRequired(error) {
++ return error.status===401 && error.code==='PAIR_REQUIRED';
++}
++
++function alreadyAuthenticated(error) {
++ return error.status===409 && error.code==='MOBILE_SESSION_ALREADY_AUTHENTICATED';
++}
++
++export function createPairRecovery({origin, indexedDB, crypto, locks, secureContext}) {
++ const supported = Boolean(secureContext && indexedDB && crypto?.subtle && locks);
++ const withSessionLock = (operation) => locks ? locks.request(LOCK,operation) : operation();
++
++ async function useStore(mode, action) {
++  const db = await new Promise((resolve,reject)=>{
++   const request = indexedDB.open(DB_NAME,1);
++   request.onupgradeneeded = ()=>request.result.createObjectStore(STORE);
++   request.onsuccess = ()=>resolve(request.result);
++   request.onerror = ()=>reject(request.error);
++  });
++  try {
++   return await new Promise((resolve,reject)=>{
++    const transaction = mode==='readwrite'
++     ? db.transaction(STORE,mode,{durability:'strict'})
++     : db.transaction(STORE,mode);
++    transaction.onabort = ()=>reject(transaction.error || Error('无法保存设备恢复设置，请检查浏览器存储后重试。'));
++    if (mode==='readwrite' && transaction.durability!=='strict') {
++     transaction.abort();
++     return;
++    }
++    const request = action(transaction.objectStore(STORE));
++    // A request can succeed before its transaction commits.
++    transaction.oncomplete = ()=>resolve(request.result);
++   });
++  } finally {
++   db.close();
++  }
++ }
++
++ const read = ()=>useStore('readonly',store=>store.get(SLOT));
++ const write = value=>useStore('readwrite',store=>store.put(value,SLOT));
++ const clear = ()=>indexedDB ? useStore('readwrite',store=>store.delete(SLOT)) : Promise.resolve();
++
++ async function readForChange() {
++  if (!supported) return undefined;
++  try {
++   return await read();
++  } catch {
++   throw Error('无法核对设备恢复设置，请检查浏览器存储后重试。');
++  }
++ }
++
++ async function changeSession(operation) {
++  const previous = await readForChange();
++  // Retire the previous proof before changing identity. On an ambiguous
++  // response, this prevents signing into the previous identity.
++  if (previous?.credential) await clear();
++  try {
++   return await operation();
++  } catch (error) {
++   if (previous?.credential && REJECTED_SESSION_CHANGES.has(error.code)) await write(previous);
++   throw error;
++  }
++ }
++
++ async function pair(api,code) {
++  const previous = await readForChange();
++  let key;
++  if (supported) {
++   try {
++    const {publicKey,privateKey} = await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},false,['sign','verify']);
++    key = {publicKey:base64url(await crypto.subtle.exportKey('raw',publicKey)),privateKey};
++    await write({credential:key});
++   } catch {
++    key = undefined;
++   }
++  }
++
++  if (!key) {
++   await changeSession(()=>api('pair',{code}));
++   return false;
++  }
++
++  let result;
++  try {
++   result = await api('pair',{code,recoveryPublicKey:key.publicKey});
++  } catch (error) {
++   if (REJECTED_SESSION_CHANGES.has(error.code)) await (previous ? write(previous) : clear());
++   throw error;
++  }
++
++  if (result.recoveryEnrolled===true) return true;
++  await clear().catch(()=>{});
++  return false;
++ }
++
++ async function recover(api) {
++  const key = (await read())?.credential;
++  if (!key || key.privateKey?.extractable!==false) return false;
++  const recoveryPublicKey = key.publicKey;
++  const {challenge} = await api('pair/challenge',{recoveryPublicKey});
++  if (typeof challenge!=='string' || !/^[A-Za-z0-9_-]{43}$/.test(challenge)) throw Error('设备恢复校验失败。');
++  const payload = new TextEncoder().encode(JSON.stringify(['vcp-mobile-pair-recovery-v1',origin,challenge]));
++  const signature = base64url(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key.privateKey,payload));
++  await api('pair/recover',{recoveryPublicKey,challenge,signature});
++  return true;
++ }
++
++ async function openSession(api) {
++  // Other tabs share the cookie jar. Read it inside the same lock used for
++  // pairing, connection changes and disconnect before considering recovery.
++  return withSessionLock(async()=>{
++   try {
++    return await api('session');
++   } catch (error) {
++    if (!supported || !pairRequired(error)) throw error;
++    try {
++     if (!await recover(api)) throw error;
++    } catch (failure) {
++     if (pairRequired(failure) || failure.status===404) throw error;
++     if (!alreadyAuthenticated(failure)) throw failure;
++    }
++   }
++   return api('session');
++  });
++ }
++
++ return {withSessionLock,pair,changeSession,openSession};
++}
+diff --git a/apps/server/Plugin/NativeSync/mobile/pairRecovery.js b/apps/server/Plugin/NativeSync/mobile/pairRecovery.js
+new file mode 100644
+index 0000000..6aa59c2
+--- /dev/null
++++ b/apps/server/Plugin/NativeSync/mobile/pairRecovery.js
+@@ -0,0 +1,104 @@
++'use strict';
++
++const { createPublicKey, randomBytes, verify } = require('node:crypto');
++const { error } = require('./execution');
++
++const challengeLifetimeMs = 60_000;
++const proofContext = 'vcp-mobile-pair-recovery-v1';
++
++function canonicalBytes(value, size) {
++    if (typeof value !== 'string' || value.length !== Math.ceil(size * 8 / 6) || !/^[A-Za-z0-9_-]+$/.test(value)) return null;
++    const bytes = Buffer.from(value, 'base64url');
++    return bytes.length === size && bytes.toString('base64url') === value ? bytes : null;
++}
++
++function recoveryPublicKey(value) {
++    const bytes = canonicalBytes(value, 65);
++    if (!bytes || bytes[0] !== 4) return null;
++    try {
++        return createPublicKey({
++            format: 'jwk',
++            key: {
++                kty: 'EC', crv: 'P-256',
++                x: bytes.subarray(1, 33).toString('base64url'),
++                y: bytes.subarray(33).toString('base64url')
++            }
++        });
++    } catch {
++        return null;
++    }
++}
++
++const pairRequired = () => error('PAIR_REQUIRED', 401);
++
++class PairRecovery {
++    constructor(db, origin) {
++        this.db = db;
++        this.origin = origin;
++        const columns = db.prepare('PRAGMA table_info(mobile_sessions)').all();
++        for (const [name, type] of [
++            ['recovery_public_key', 'TEXT'],
++            ['recovery_challenge', 'TEXT'],
++            ['recovery_challenge_expires', 'INTEGER']
++        ]) {
++            if (!columns.some(column => column.name === name)) {
++                db.exec(`ALTER TABLE mobile_sessions ADD COLUMN ${name} ${type}`);
++            }
++        }
++        db.exec('CREATE UNIQUE INDEX IF NOT EXISTS mobile_sessions_recovery_key ON mobile_sessions(recovery_public_key) WHERE recovery_public_key IS NOT NULL');
++    }
++
++    hasKey(key) {
++        return Boolean(this.db.prepare('SELECT 1 FROM mobile_sessions WHERE recovery_public_key=?').get(key));
++    }
++
++    clear(sessionId) {
++        this.db.prepare(`UPDATE mobile_sessions
++            SET recovery_public_key=NULL, recovery_challenge=NULL, recovery_challenge_expires=NULL
++            WHERE id=? AND recovery_public_key IS NOT NULL`).run(sessionId);
++    }
++
++    challenge(body) {
++        const key = body?.recoveryPublicKey;
++        if (!canonicalBytes(key, 65)) throw pairRequired();
++        const now = Date.now();
++        // A request using only the public key can reuse a live challenge but
++        // cannot invalidate one that another caller is already signing.
++        const read = this.db.prepare(`SELECT recovery_challenge, recovery_challenge_expires FROM mobile_sessions
++            WHERE recovery_public_key=? AND expires>?`);
++        const current = read.get(key, now);
++        if (!current) throw pairRequired();
++        if (current.recovery_challenge_expires > now) return current.recovery_challenge;
++
++        const row = this.db.prepare(`UPDATE mobile_sessions
++            SET recovery_challenge=?, recovery_challenge_expires=min(expires, ?)
++            WHERE recovery_public_key=? AND expires>? AND coalesce(recovery_challenge_expires, 0)<=?
++            RETURNING recovery_challenge`).get(randomBytes(32).toString('base64url'), now + challengeLifetimeMs, key, now, now);
++        const challenge = row?.recovery_challenge ?? read.get(key, now)?.recovery_challenge;
++        if (!challenge) throw pairRequired();
++        return challenge;
++    }
++
++    recover(body, cookieHash) {
++        const { recoveryPublicKey: key, challenge, signature } = body ?? {};
++        const proof = canonicalBytes(signature, 64);
++        if (!proof || !canonicalBytes(challenge, 32) || !canonicalBytes(key, 65)) throw pairRequired();
++        const startedAt = Date.now();
++        const row = this.db.prepare(`SELECT id FROM mobile_sessions
++            WHERE recovery_public_key=? AND recovery_challenge=? AND expires>? AND recovery_challenge_expires>?`)
++            .get(key, challenge, startedAt, startedAt);
++        if (!row) throw pairRequired();
++        const publicKey = recoveryPublicKey(key);
++        const message = Buffer.from(JSON.stringify([proofContext, this.origin, challenge]));
++        if (!publicKey || !verify('sha256', message, { key: publicKey, dsaEncoding: 'ieee-p1363' }, proof)) throw pairRequired();
++        const now = Date.now();
++        const recovered = this.db.prepare(`UPDATE mobile_sessions
++            SET hash=?, recovery_challenge=NULL, recovery_challenge_expires=NULL
++            WHERE id=? AND recovery_public_key=? AND recovery_challenge=? AND expires>? AND recovery_challenge_expires>?
++            RETURNING expires`).get(cookieHash, row.id, key, challenge, now, now);
++        if (!recovered) throw pairRequired();
++        return recovered.expires;
++    }
++}
++
++module.exports = { PairRecovery, recoveryPublicKey };
+diff --git a/apps/server/Plugin/NativeSync/mobile/portal.js b/apps/server/Plugin/NativeSync/mobile/portal.js
+index d724c55..6fe0d52 100644
+--- a/apps/server/Plugin/NativeSync/mobile/portal.js
++++ b/apps/server/Plugin/NativeSync/mobile/portal.js
+@@ -10,0 +11 @@ const { entryId, sessionMarker } = require('./submissionRecovery');
++const { PairRecovery, recoveryPublicKey } = require('./pairRecovery');
+@@ -11,0 +13 @@ const cookieName = '__Secure-vcp_mobile';
++const mobileCookies = req => String(req.headers.cookie || '').split(';').map(value => value.trim()).filter(value => value.startsWith(cookieName + '='));
+@@ -45,0 +48 @@ class MobilePortal {
++        this.pairRecovery = new PairRecovery(this.db, this.origin);
+@@ -80,0 +84,15 @@ class MobilePortal {
++        this.router.post('/api/pair/challenge', (req, res, next) => {
++            try {
++                this.requireMissingSession(req);
++                res.json({ challenge: this.pairRecovery.challenge(req.body) });
++            } catch (e) { next(e); }
++        });
++        this.router.post('/api/pair/recover', (req, res, next) => {
++            try {
++                this.requireMissingSession(req);
++                const token = randomBytes(32).toString('base64url');
++                const expires = this.pairRecovery.recover(req.body, digest(token));
++                this.setSessionCookie(res, token, Math.max(1, Math.ceil((expires - Date.now()) / 1000)));
++                res.json({ authenticated: true });
++            } catch (e) { next(e); }
++        });
+@@ -297 +315 @@ class MobilePortal {
+-        const values=String(req.headers.cookie||'').split(';').map(s=>s.trim()).filter(s=>s.startsWith(cookieName+'='));if(values.length!==1)return null;
++        const values=mobileCookies(req);if(values.length!==1)return null;
+@@ -300,0 +319,6 @@ class MobilePortal {
++    requireMissingSession(req) {
++        if (mobileCookies(req).length > 1 || this.currentSession(req)) throw error('MOBILE_SESSION_ALREADY_AUTHENTICATED', 409);
++    }
++    setSessionCookie(res, token, maxAge = this.sessionSeconds) {
++        res.setHeader('Set-Cookie',`${cookieName}=${token}; Path=/mobile; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`);
++    }
+@@ -305 +329 @@ class MobilePortal {
+-        res.setHeader('Set-Cookie',`${cookieName}=${token}; Path=/mobile; HttpOnly; Secure; SameSite=Strict; Max-Age=${this.sessionSeconds}`);res.json({authenticated:true,server:this.connection.information()});
++        this.setSessionCookie(res, token);res.json({authenticated:true,server:this.connection.information()});
+@@ -354,0 +379,2 @@ class MobilePortal {
++        const key = req.body.recoveryPublicKey;
++        if (key !== undefined && !recoveryPublicKey(key)) throw error('INVALID_PAIR_RECOVERY_KEY', 400);
+@@ -359 +385,6 @@ class MobilePortal {
+-            this.db.prepare('INSERT INTO mobile_sessions(hash,id,expires,scopes) VALUES(?,?,?,?)').run(digest(token),id,now+this.sessionSeconds*1000,this.db.prepare('SELECT scopes FROM mobile_pairings WHERE hash=?').get(hash).scopes);this.db.exec('COMMIT');
++            if (key !== undefined && this.pairRecovery.hasKey(key)) throw error('PAIR_RECOVERY_KEY_ALREADY_BOUND', 409);
++            const previous = this.currentSession(req);
++            if (previous) this.pairRecovery.clear(previous.id);
++            const scopes = this.db.prepare('SELECT scopes FROM mobile_pairings WHERE hash=?').get(hash).scopes;
++            this.db.prepare('INSERT INTO mobile_sessions(hash,id,expires,scopes,recovery_public_key) VALUES(?,?,?,?,?)').run(digest(token),id,now+this.sessionSeconds*1000,scopes,key ?? null);
++            this.db.exec('COMMIT');
+@@ -361,2 +392,2 @@ class MobilePortal {
+-        res.setHeader('Set-Cookie',`${cookieName}=${token}; Path=/mobile; HttpOnly; Secure; SameSite=Strict; Max-Age=${this.sessionSeconds}`);
+-        res.json({authenticated:true});
++        this.setSessionCookie(res, token);
++        res.json({ authenticated: true, ...(key !== undefined ? { recoveryEnrolled: true } : {}) });

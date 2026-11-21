@@ -1,0 +1,11 @@
+✔ WebCrypto proof restores the original scoped session once after missing cookie (124.887229ms)
+✔ enrollment rejects malformed and duplicate keys and expires challenges and authority (27.030305ms)
+✔ reauthentication removes the existing recovery key and outstanding proof (16.537921ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 293.461266
