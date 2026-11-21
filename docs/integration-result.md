@@ -25,10 +25,10 @@
 - Node 24、CDS、Vexus、Electron preload 与手机静态资源均从锁定输入安装或构建。上游完整普通插件目录未作为默认可发现插件启用。本次另构建了普通管理 UI 和日记检索程序，验证管理服务的回环入口。日用、验收及生产实例未安装。
 - Linux 用户的 inotify watches 上限从 65,536 临时调至 262,144；实例数上限仍为 128。独立 fs.watch 以及真实后端 Vexus 监听启动通过。该修改未写入开机配置。测试 Profile 的 CDS 文件通知与全文索引开关沿用了夹具设置。
 
-## 验收边界
+## 设备验收进度
 
-Linux 本机用两份 Electron Profile、真实 ToolBox 与回环合成 Provider 联验。手机界面由 Chromium 以 390 像素宽度和独立会话验证。最终候选的 **Windows 桌面、实体 Android、手机真实锁屏或系统杀进程后的接续**仍待同版设备验收。本次 ADB 查询返回 0 台在线设备，没有识别到可用的隔离 Windows 实例。
+初次 Linux 联验使用两个隔离 Electron Profile 和独立的 Chromium 手机会话。后续在 Android 16 实体手机上完成同一 Work 的运行中观察、锁屏、断开测试通道、强停临时 WebView 和重开后的终态核对。手机与 Linux 的输入、回复及中央 Journal 的 ID 一致，Provider 共调用一次。临时手机应用已经卸载。Linux 草稿保留；实体联验期间记录到一次终态刷新后选区变空，独立 pointer 选区用例未稳定复现。[实体 Android 回执与截图](evidence/android-device/README.md)
 
-本机开发仓保留已构建的桌面、服务端、PWA 与声明过的 Node/Xvfb 工具链。验证副本中的重建产物可回收，后续通过本仓锁文件复跑。脱敏回执与 8 张合成窗口截图随交付提交。
+已找到本机 Windows 11 QEMU 基盘。从独立写入层开机并挂载同版桌面、锁定依赖、Win x64 CDS、公共测试证书和合成 B Profile 的只读光盘。Windows 普通账户尚未确认登录，本次仍缺 Windows 端实际启动、同一 Work 的 History ID 及恢复进度。已编译的 Windows 二进制不计入来宾运行验收。
 
-设备可用时，使用新建测试 Profile 与独立配对会话，在同一 Work 上记录 Windows、Linux 和 Android 的输入 ID、回复 ID、Journal 序号与各端恢复进度。让手机锁屏并断网，再重开观察；同时核对桌面草稿和阅读位置、Provider 调用次数以及未确认回复。以这一轮结果补齐实体三端回执。
+本机开发仓保留已构建的桌面、服务端、PWA 和 Node/Xvfb 工具链。Linux 干净检出的重建产物已回收；脱敏回执与截图随提交保留。
