@@ -11,8 +11,8 @@ const { fixture } = require('./seedFixture.cjs');
 const contract=require('./seed-contract.json');
 const auth='synthetic-only';
 
-function listen(server) {
-    return new Promise((resolve, reject) => server.once('error', reject).listen(0, '127.0.0.1', () => resolve(server.address().port)));
+function listen(server, port = 0) {
+    return new Promise((resolve, reject) => server.once('error', reject).listen(port, '127.0.0.1', () => resolve(server.address().port)));
 }
 function closeServer(server) {
     return new Promise(resolve => { server.closeAllConnections?.(); server.close(resolve); });
@@ -22,7 +22,7 @@ async function jsonBody(req) {
     for await (const chunk of req) chunks.push(chunk);
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function start({out, candidate, cert, key, trace, waitUntil, mode}) {
+async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest}) {
     const sourceApp = path.join(candidate, 'apps/server');
     const box = path.join(out, 'runtime-box');
     fs.mkdirSync(box);
@@ -134,6 +134,7 @@ async function start({out, candidate, cert, key, trace, waitUntil, mode}) {
     const proxy = https.createServer({key:fs.readFileSync(key),cert:fs.readFileSync(cert)},async (req,res) => {
         const url=new URL(req.url,'https://127.0.0.1');
         const route=url.pathname;
+        if (handleFixtureRequest && await handleFixtureRequest(req, res, route)) return;
         if (mode!=='local-only' && req.method==='POST' && route==='/v1/local-chat/completions') {
             calls.push({phase:'unexpected-desktop-local-provider'});
             req.resume();
@@ -197,7 +198,12 @@ async function start({out, candidate, cert, key, trace, waitUntil, mode}) {
         res.on('close',() => upstream.destroy());
         if (body) upstream.end(body); else req.pipe(upstream);
     });
-    const proxyPort = await listen(proxy);
+    let proxyPort;
+    try { proxyPort = await listen(proxy, httpsPort); }
+    catch (error) {
+        await closeServer(provider);
+        throw error;
+    }
     const node = process.execPath;
     const log=fs.openSync(path.join(out,'backend.log'),'wx');
     const backend = spawn(node, ['--require',path.join(__dirname,'loopback.cjs'),'server.js'], {
@@ -245,7 +251,7 @@ async function start({out, candidate, cert, key, trace, waitUntil, mode}) {
     } catch (error) { await close(); throw error; }
     const origin = 'https://127.0.0.1:' + proxyPort;
     const requestMobile = route => new Promise((resolve, reject) => {
-        const request = https.get(origin + route, { ca: fs.readFileSync(cert), timeout: 2000 }, response => {
+        const request = https.get(origin + route, { ca: fs.readFileSync(ca), timeout: 2000 }, response => {
             const chunks = [];
             response.on('data', chunk => chunks.push(chunk));
             response.on('error', reject);
