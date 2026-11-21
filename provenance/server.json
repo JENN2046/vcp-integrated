@@ -1687,8 +1687,10 @@
       "sha256": "409d96be650818ea92956c45832a1fc4ab1538c6b41f0c7cbe8174e1f10534b3"
     },
     "Plugin/NativeSync/mobile/effectiveContext.js": {
-      "source": "candidate",
-      "sha256": "4fa6da25971543a6a04e7838af0958f55fda91666717c98c04c56854b436fb9a"
+      "source": "monorepo-adapted",
+      "sha256": "2e25ba638f79970ee8eef1f55ff3c941f13be1fed200d8075bfcf3baf4c7e3c2",
+      "integratedBaselineSha256": "4fa6da25971543a6a04e7838af0958f55fda91666717c98c04c56854b436fb9a",
+      "adaptation": "Delegate the outgoing history window to the native VCPChat selector."
     },
     "Plugin/NativeSync/mobile/execution.js": {
       "source": "candidate",
@@ -1807,10 +1809,6 @@
       "sha256": "428dff8b67021353b9688c0d3fc2cec01a129c321abfa6561c1a395253a09794",
       "integratedBaselineSha256": "139d1b568ba40264a740c636cf65bf7e2dc20f8ba2e6d85d8bf68c8092efec60",
       "adaptation": "Use the native hosts’ shared core-rules package."
-    },
-    "Plugin/NativeSync/nativeRules/modules/chat/contextCompactionState.js": {
-      "source": "candidate",
-      "sha256": "ca2a2e8b9fd59445dd986a6cfcae47dafebdcb6bb4dc27fb616e3a5f3116906f"
     },
     "Plugin/NativeSync/nativeRules/modules/chat/requestEnvelope.js": {
       "source": "candidate",
@@ -2598,15 +2596,15 @@
     },
     "package-lock.json": {
       "source": "monorepo-adapted",
-      "sha256": "b557972b0b764f1098b6e524093a955645220f61bd127c172c9e7984204a57b7",
+      "sha256": "a4780596f6d0c8053104ec6632dfb8cb1918510ad842e9f71a1720e0a0c3e87f",
       "integratedBaselineSha256": "bff93d5630e43b7013007dfc8f5ada2ef5f096e2e9be90c7ec9b64ebf57a2917",
-      "adaptation": "Use the native hosts’ shared core-rules package."
+      "adaptation": "Resolve shared core rules and the native VCPChat history window from this checkout."
     },
     "package.json": {
       "source": "monorepo-adapted",
-      "sha256": "b67adf6ee8084bf26b5b6f43b6e89bf329b42d8c6f83c3d758d96d94506ab8d3",
+      "sha256": "68bd7286b77413ccb5aec979af82aa88c257861631b22d68b363b411da796890",
       "integratedBaselineSha256": "63831e161477b3c44a9db10703d53fefc7b3925129a7a3ce1315634c064a540d",
-      "adaptation": "Use the native hosts’ shared core-rules package."
+      "adaptation": "Resolve shared core rules and the native VCPChat history window from this checkout."
     },
     "pluginStoreSources.json": {
       "source": "upstream",

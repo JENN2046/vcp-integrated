@@ -1,0 +1,53 @@
+{
+  "syntheticOnly": true,
+  "knownRefusal": {
+    "code": "SHARED_CONTEXT_CHANGED",
+    "reopened": {
+      "phase": "local_pending",
+      "rejected": "SHARED_CONTEXT_CHANGED",
+      "bodyId": "msg_1795238256559_user_zkj4z6v26i",
+      "admitStarted": false,
+      "content": "Send-recovery compare 01: keep this draft."
+    },
+    "workCount": 0,
+    "journalRows": 0,
+    "providerCalls": 0
+  },
+  "lostAcceptedResponse": {
+    "request": "msg_1795238273211_user_d79b5urc38",
+    "work": "request_413b22d13dce464782805e193e887597",
+    "lookupStatus": 200,
+    "providerCallsForOriginal": 1,
+    "journalIds": [
+      "msg_1795238273211_user_d79b5urc38",
+      "reply_request_413b22d13dce464782805e193e887597"
+    ]
+  },
+  "truncatedStream": {
+    "counts": {
+      "sessionPosts": 1,
+      "cancelPosts": 0,
+      "providerAttempts": 1
+    },
+    "workId": "request_1cd0abcee5d5440293f6284dddbec79d",
+    "reopened": {
+      "work": "review_required",
+      "native": "unknown",
+      "assistantHistoryRows": 0,
+      "journalIds": [
+        "msg_1795238292797_user_43q72uuh4o"
+      ],
+      "ui": {
+        "partialShown": true,
+        "finalShown": false,
+        "reviewShown": true,
+        "composer": {
+          "mode": "send",
+          "label": "发送消息",
+          "disabled": false,
+          "text": ""
+        }
+      }
+    }
+  }
+}

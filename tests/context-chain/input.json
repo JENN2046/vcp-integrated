@@ -1,0 +1,20 @@
+{
+  "agentName": "Context Fixture",
+  "model": "synthetic",
+  "agent": {"temperature":0.5,"maxOutputTokens":128,"contextTokenLimit":32000},
+  "systemPrompt": "CTX_SYSTEM_V1",
+  "input": "CTX_CURRENT: read the attached sample.",
+  "reply": "CTX_COMPLETE",
+  "attachment": {"name":"context-note.txt","type":"text/plain","text":"CTX_ATTACHMENT_BODY_V1"},
+  "rules": [
+    {"id":"ctx-system-rule","name":"system suffix","type":"system_suffix","scope":"agent","enabled":true,"wrap":false,"content":"CTX_SYSTEM_SUFFIX"},
+    {"id":"ctx-user-rule","name":"user suffix","type":"user_suffix","scope":"agent","enabled":true,"wrap":false,"content":"CTX_USER_SUFFIX"},
+    {"id":"ctx-inject-rule","name":"depth one","type":"context_inject","scope":"agent","enabled":true,"wrap":false,"role":"user","depth":1,"content":"CTX_DEPTH_ONE"}
+  ],
+  "history": [
+    {"id":"ctx-before-checkpoint","role":"user","timestamp":1700000000000,"content":"CTX_BEFORE_CHECKPOINT"},
+    {"id":"ctx-checkpoint","role":"user","timestamp":1700000001000,"content":"CTX_CHECKPOINT_V1","contextCompaction":{"kind":"vchat-context-checkpoint","version":1,"checkpoint":"CTX_CHECKPOINT_V1","sourceCount":1}},
+    {"id":"ctx-retained-user","role":"user","timestamp":1700000002000,"content":"CTX_RETAINED_INPUT"},
+    {"id":"ctx-retained-answer","role":"assistant","timestamp":1700000003000,"content":"CTX_RETAINED_REPLY"}
+  ]
+}

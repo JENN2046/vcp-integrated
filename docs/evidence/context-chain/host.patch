@@ -1,0 +1,137 @@
+diff --git a/apps/desktop/modules/chat/contextCompactionState.js b/apps/desktop/modules/chat/contextCompactionState.js
+index 41fa24e063c344e4a9b8f311f06380e90f6d2fd7..7744b80a2019251df89e4fb7c31f30c45fe6a6f2 100644
+--- a/apps/desktop/modules/chat/contextCompactionState.js
++++ b/apps/desktop/modules/chat/contextCompactionState.js
+@@ -2,27 +2,9 @@ import { readToolRequestField, replaceToolRequestBlocks, findUnclosedToolRequest
+ import { collectToolResultRanges, collectCodeDomainsOutsideToolResults, isToolResultHidden } from '../renderer/toolResultRegions.js';
+ import { extractAnchors, flattenContent } from './contextCompactionFidelity.js';
+ import { extractOpenIssueWindows } from './contextCompactionContinuity.js';
++import { COMPACTION_KIND, effectiveContextHistory, isContextCheckpoint } from './historyWindow/index.mjs';
+
+-export const COMPACTION_KIND = 'vchat-context-checkpoint';
+-
+-export function isContextCheckpoint(message) {
+-    return message?.role === 'user'
+-        && message.contextCompaction?.kind === COMPACTION_KIND
+-        && message.contextCompaction?.version === 1
+-        && typeof message.contextCompaction.checkpoint === 'string';
+-}
+-
+-/** UI history remains complete; only outbound history starts at the newest checkpoint. */
+-export function effectiveContextHistory(history = []) {
+-    let start = 0;
+-    for (let index = history.length - 1; index >= 0; index--) {
+-        if (isContextCheckpoint(history[index])) {
+-            start = index;
+-            break;
+-        }
+-    }
+-    return history.slice(start).filter(message => message && !message.isThinking);
+-}
++export { COMPACTION_KIND, effectiveContextHistory, isContextCheckpoint };
+
+ function removeRanges(text, ranges) {
+     let output = '';
+diff --git a/apps/server/Plugin/NativeSync/nativeRules/modules/chat/contextCompactionState.js b/apps/desktop/modules/chat/historyWindow/index.mjs
+similarity index 71%
+rename from apps/server/Plugin/NativeSync/nativeRules/modules/chat/contextCompactionState.js
+rename to apps/desktop/modules/chat/historyWindow/index.mjs
+index 6b1744f736292829732df8bd2ad89b64df2ad47f..a02aff5368032a9576651f4df416c3ffd3569dae 100644
+--- a/apps/server/Plugin/NativeSync/nativeRules/modules/chat/contextCompactionState.js
++++ b/apps/desktop/modules/chat/historyWindow/index.mjs
+@@ -1,7 +1,6 @@
+-'use strict';
+-const COMPACTION_KIND = 'vchat-context-checkpoint';
++export const COMPACTION_KIND = 'vchat-context-checkpoint';
+
+-function isContextCheckpoint(message) {
++export function isContextCheckpoint(message) {
+     return message?.role === 'user'
+         && message.contextCompaction?.kind === COMPACTION_KIND
+         && message.contextCompaction?.version === 1
+@@ -9,7 +8,7 @@ function isContextCheckpoint(message) {
+ }
+
+ /** UI history remains complete; only outbound history starts at the newest checkpoint. */
+-function effectiveContextHistory(history = []) {
++export function effectiveContextHistory(history = []) {
+     let start = 0;
+     for (let index = history.length - 1; index >= 0; index--) {
+         if (isContextCheckpoint(history[index])) {
+@@ -19,5 +18,3 @@ function effectiveContextHistory(history = []) {
+     }
+     return history.slice(start).filter(message => message && !message.isThinking);
+ }
+-
+-module.exports={COMPACTION_KIND,isContextCheckpoint,effectiveContextHistory};
+diff --git a/apps/desktop/modules/chat/historyWindow/package.json b/apps/desktop/modules/chat/historyWindow/package.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..a253d16bd8050f6e10f54406d3bc876a9ee117f8
+--- /dev/null
++++ b/apps/desktop/modules/chat/historyWindow/package.json
+@@ -0,0 +1,7 @@
++{
++  "name": "@vcp/native-history-window",
++  "version": "1.0.0",
++  "private": true,
++  "license": "CC-BY-NC-SA-4.0",
++  "exports": "./index.mjs"
++}
+diff --git a/apps/server/Plugin/NativeSync/mobile/effectiveContext.js b/apps/server/Plugin/NativeSync/mobile/effectiveContext.js
+index ad803660b6579cfecb2a31a4f4a0c599b7d3ec30..481d8828ac0fd4052701e3aa409a52fdde282b5c 100644
+--- a/apps/server/Plugin/NativeSync/mobile/effectiveContext.js
++++ b/apps/server/Plugin/NativeSync/mobile/effectiveContext.js
+@@ -1,5 +1,5 @@
+ 'use strict';
+-const {effectiveContextHistory,isContextCheckpoint}=require('../nativeRules/modules/chat/contextCompactionState');
++const {effectiveContextHistory,isContextCheckpoint}=require('@vcp/native-history-window');
+ const {attachTimestampMetadata}=require('../nativeRules/modules/chat/requestMetadata');
+ const {stripHiddenToolResults}=require('../nativeRules/modules/renderer/toolResultRegions');
+ const tavern=require('../nativeRules/modules/tavernRulesEngine');
+diff --git a/apps/server/package-lock.json b/apps/server/package-lock.json
+index 7f8149bf5be1dee342ea01daefdb9fbb769282c7..eee1a9f28614bab423437265eef285e1f72fba95 100644
+--- a/apps/server/package-lock.json
++++ b/apps/server/package-lock.json
+@@ -14,6 +14,7 @@
+         "@node-rs/jieba": "^2.0.1",
+         "@tavily/core": "^0.7.6",
+         "@vcp/core-rules": "file:../../packages/core-rules",
++        "@vcp/native-history-window": "file:../desktop/modules/chat/historyWindow",
+         "axios": "^1.6.0",
+         "basic-auth": "^2.0.1",
+         "better-sqlite3": "^12.4.1",
+@@ -75,6 +76,11 @@
+       "version": "0.1.2",
+       "license": "CC-BY-NC-SA-4.0"
+     },
++    "../desktop/modules/chat/historyWindow": {
++      "name": "@vcp/native-history-window",
++      "version": "1.0.0",
++      "license": "CC-BY-NC-SA-4.0"
++    },
+     "node_modules/@asamuzakjp/css-color": {
+       "version": "3.2.0",
+       "resolved": "https://registry.npmjs.org/@asamuzakjp/css-color/-/css-color-3.2.0.tgz",
+@@ -1830,6 +1836,10 @@
+       "resolved": "../../packages/core-rules",
+       "link": true
+     },
++    "node_modules/@vcp/native-history-window": {
++      "resolved": "../desktop/modules/chat/historyWindow",
++      "link": true
++    },
+     "node_modules/@xmldom/xmldom": {
+       "version": "0.8.15",
+       "resolved": "https://registry.npmjs.org/@xmldom/xmldom/-/xmldom-0.8.15.tgz",
+diff --git a/apps/server/package.json b/apps/server/package.json
+index 4104f607ad1c5cde5e285ad697ad495471764bad..535fd9f7cfc1d5453ffb15380435525701169549 100644
+--- a/apps/server/package.json
++++ b/apps/server/package.json
+@@ -23,6 +23,7 @@
+     "@node-rs/jieba": "^2.0.1",
+     "@tavily/core": "^0.7.6",
+     "@vcp/core-rules": "file:../../packages/core-rules",
++    "@vcp/native-history-window": "file:../desktop/modules/chat/historyWindow",
+     "axios": "^1.6.0",
+     "basic-auth": "^2.0.1",
+     "better-sqlite3": "^12.4.1",

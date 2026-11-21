@@ -1,0 +1,530 @@
+{
+  "baselineCommit": "f73493e11b8ba32111d1fe094b2474dd5a164cff",
+  "inputSha256": "d2a92cc4cece56ab46eb55ad62e94ce388a301d13825fa7054e310983374f63d",
+  "measurement": "after",
+  "paths": {
+    "native": {
+      "handler": {
+        "route": "/v1/chat/completions",
+        "workId": null,
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "当前聊天记录文件路径: /tmp/vcp-context-native-eIpv8v/profile/UserData/context-native-agent\\topics\\context-native-topic\\history.json\n当前话题创建于: 1970-01-01 08:00\n\nCTX_SYSTEM_V1\n\nCTX_SYSTEM_SUFFIX"
+            },
+            {
+              "role": "user",
+              "content": "CTX_CHECKPOINT_V1"
+            },
+            {
+              "role": "user",
+              "content": "CTX_RETAINED_INPUT\n\n[附加文件: file:///tmp/vcp-context-native-eIpv8v/profile/UserData/attachments/ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+            },
+            {
+              "role": "assistant",
+              "content": "CTX_RETAINED_REPLY"
+            },
+            {
+              "role": "user",
+              "content": "CTX_DEPTH_ONE"
+            },
+            {
+              "role": "user",
+              "content": "CTX_CURRENT: read the attached sample.\n\nCTX_USER_SUFFIX",
+              "name": "用户"
+            }
+          ],
+          "model": "synthetic",
+          "temperature": 0.5,
+          "max_tokens": 128,
+          "contextTokenLimit": 32000,
+          "stream": false,
+          "requestId": "admission_330e2a51-2b2b-446c-9f23-b92c667db21a",
+          "vcpchatExtensions": {
+            "schemaVersion": 1,
+            "messageMetadataMode": "hash_only",
+            "messageTimestampBindings": [
+              {
+                "messageId": "ctx-checkpoint",
+                "role": "user",
+                "timestamp": 1700000001000,
+                "timestampIso": "2023-11-14T22:13:21.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:84838c56a7fc04e620306c65a80dc6e31c52d396c64bf6a2b6464b7c03d4cabf",
+                "sentMessageIndex": 1
+              },
+              {
+                "messageId": "ctx-retained-user",
+                "role": "user",
+                "timestamp": 1700000002000,
+                "timestampIso": "2023-11-14T22:13:22.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:96d60e80023dd9530c300434f57b8e4cfb50c4010d98c384aecace037e3d46ce",
+                "sentMessageIndex": 2
+              },
+              {
+                "messageId": "ctx-retained-answer",
+                "role": "assistant",
+                "timestamp": 1700000003000,
+                "timestampIso": "2023-11-14T22:13:23.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:accaeb7a8cc6e4f3dc006764f9c4351f37a668b3e63ebd593fe753d907554051",
+                "sentMessageIndex": 3
+              },
+              {
+                "messageId": "msg_1795238196363_user_s60nf0wod9",
+                "role": "user",
+                "timestamp": 1795238196396,
+                "timestampIso": "2026-11-21T05:16:36.396Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:59c5cce84bf901f25c53c1b7cfb9a95880a787a2c97aa125cc783e150e73f24e",
+                "sentMessageIndex": 5
+              }
+            ],
+            "requestContext": {
+              "requestId": "admission_330e2a51-2b2b-446c-9f23-b92c667db21a",
+              "agentId": "context-native-agent",
+              "agentName": "Context Fixture",
+              "topicId": "context-native-topic",
+              "ownerType": "agent",
+              "isGroupMessage": false
+            }
+          }
+        }
+      },
+      "provider": {
+        "route": "/v1/chat/completions",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "当前聊天记录文件路径: /tmp/vcp-context-native-eIpv8v/profile/UserData/context-native-agent\\topics\\context-native-topic\\history.json\n当前话题创建于: 1970-01-01 08:00\n\nCTX_SYSTEM_V1\n\nCTX_SYSTEM_SUFFIX"
+            },
+            {
+              "role": "user",
+              "content": "CTX_CHECKPOINT_V1"
+            },
+            {
+              "role": "user",
+              "content": "CTX_RETAINED_INPUT\n\n[附加文件: file:///tmp/vcp-context-native-eIpv8v/profile/UserData/attachments/ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+            },
+            {
+              "role": "assistant",
+              "content": "CTX_RETAINED_REPLY"
+            },
+            {
+              "role": "user",
+              "content": "CTX_DEPTH_ONE"
+            },
+            {
+              "role": "user",
+              "content": "CTX_CURRENT: read the attached sample.\n\nCTX_USER_SUFFIX"
+            }
+          ],
+          "model": "synthetic",
+          "temperature": 0.5,
+          "max_tokens": 128,
+          "stream": false,
+          "requestId": "admission_330e2a51-2b2b-446c-9f23-b92c667db21a"
+        }
+      },
+      "attachment": {
+        "name": "context-note.txt",
+        "bytes": 22,
+        "sha256": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+        "storedAt": "ctx-retained-user",
+        "realFileManager": true
+      },
+      "observedCalls": [
+        {
+          "file": "modules/chat/chatContextPipeline.js",
+          "hits": {
+            "appendAttachmentContext": 1,
+            "applySystemRules": 1,
+            "applyUserRules": 1,
+            "applyContextRules": 1,
+            "assembleRequestMessages": 1
+          }
+        },
+        {
+          "file": "modules/chat/historyWindow/index.mjs",
+          "hits": {
+            "isContextCheckpoint": 32,
+            "effectiveContextHistory": 2
+          }
+        },
+        {
+          "file": "modules/chat/singleChatRequestOrchestrator.js",
+          "hits": {
+            "buildRequest": 1,
+            "sendPrepared": 1
+          }
+        }
+      ],
+      "persistedHistory": [
+        {
+          "id": "ctx-before-checkpoint",
+          "role": "user",
+          "timestamp": 1700000000000,
+          "content": "CTX_BEFORE_CHECKPOINT"
+        },
+        {
+          "id": "ctx-checkpoint",
+          "role": "user",
+          "timestamp": 1700000001000,
+          "content": "CTX_CHECKPOINT_V1",
+          "contextCompaction": {
+            "kind": "vchat-context-checkpoint",
+            "version": 1,
+            "checkpoint": "CTX_CHECKPOINT_V1",
+            "sourceCount": 1
+          }
+        },
+        {
+          "id": "ctx-retained-user",
+          "role": "user",
+          "timestamp": 1700000002000,
+          "content": "CTX_RETAINED_INPUT",
+          "attachments": [
+            {
+              "id": "attachment_ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+              "name": "context-note.txt",
+              "type": "text/plain",
+              "size": 22,
+              "hash": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+              "extractedText": "CTX_ATTACHMENT_BODY_V1"
+            }
+          ]
+        },
+        {
+          "id": "ctx-retained-answer",
+          "role": "assistant",
+          "timestamp": 1700000003000,
+          "content": "CTX_RETAINED_REPLY"
+        },
+        {
+          "id": "msg_1795238196363_user_s60nf0wod9",
+          "role": "user",
+          "timestamp": 1795238196396,
+          "content": "CTX_CURRENT: read the attached sample."
+        },
+        {
+          "id": "admission_330e2a51-2b2b-446c-9f23-b92c667db21a",
+          "role": "assistant",
+          "timestamp": 1795238196511,
+          "content": "CTX_COMPLETE"
+        }
+      ]
+    },
+    "shared": {
+      "handler": {
+        "route": "/v1/chat/completions",
+        "workId": "request_74ffc8c4675945e6b1b3f5561bd86d76",
+        "body": {
+          "model": "synthetic",
+          "contextTokenLimit": 32000,
+          "temperature": 0.5,
+          "max_tokens": 128,
+          "stream": false,
+          "requestId": "request_74ffc8c4675945e6b1b3f5561bd86d76",
+          "messages": [
+            {
+              "role": "system",
+              "content": "CTX_SYSTEM_V1\n\nCTX_SYSTEM_SUFFIX"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "CTX_CHECKPOINT_V1"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "CTX_RETAINED_INPUT\n\n[附加文件: context-note.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+                }
+              ]
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "CTX_RETAINED_REPLY"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "CTX_DEPTH_ONE"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "CTX_CURRENT: read the attached sample.\n\nCTX_USER_SUFFIX"
+                }
+              ]
+            }
+          ],
+          "vcpchatExtensions": {
+            "schemaVersion": 1,
+            "messageMetadataMode": "hash_only",
+            "messageTimestampBindings": [
+              {
+                "messageId": "ctx-checkpoint",
+                "role": "user",
+                "timestamp": 1700000001000,
+                "timestampIso": "2023-11-14T22:13:21.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:84838c56a7fc04e620306c65a80dc6e31c52d396c64bf6a2b6464b7c03d4cabf",
+                "sentMessageIndex": 1
+              },
+              {
+                "messageId": "ctx-retained-user",
+                "role": "user",
+                "timestamp": 1700000002000,
+                "timestampIso": "2023-11-14T22:13:22.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:20e06411d2352545c96ba9cbf82c6a9c4159f987dbb0014e06452b2bec47f683",
+                "sentMessageIndex": 2
+              },
+              {
+                "messageId": "ctx-retained-answer",
+                "role": "assistant",
+                "timestamp": 1700000003000,
+                "timestampIso": "2023-11-14T22:13:23.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:accaeb7a8cc6e4f3dc006764f9c4351f37a668b3e63ebd593fe753d907554051",
+                "sentMessageIndex": 3
+              },
+              {
+                "messageId": "ctx-current-shared",
+                "role": "user",
+                "timestamp": 1700000004000,
+                "timestampIso": "2023-11-14T22:13:24.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:59c5cce84bf901f25c53c1b7cfb9a95880a787a2c97aa125cc783e150e73f24e",
+                "sentMessageIndex": 5
+              }
+            ],
+            "requestContext": {
+              "requestId": "request_74ffc8c4675945e6b1b3f5561bd86d76",
+              "agentId": "shared_7e7930ac46b2426e83ef6638db3a42c8",
+              "agentName": "Context Fixture",
+              "topicId": "shared_3f447f9959af4da3b81ea8826b985bf0",
+              "ownerType": "agent",
+              "isGroupMessage": false
+            }
+          }
+        }
+      },
+      "provider": {
+        "route": "/v1/chat/completions",
+        "body": {
+          "model": "synthetic",
+          "temperature": 0.5,
+          "max_tokens": 128,
+          "stream": false,
+          "requestId": "request_74ffc8c4675945e6b1b3f5561bd86d76",
+          "messages": [
+            {
+              "role": "system",
+              "content": "CTX_SYSTEM_V1\n\nCTX_SYSTEM_SUFFIX"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "CTX_CHECKPOINT_V1"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "CTX_RETAINED_INPUT\n\n[附加文件: context-note.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+                }
+              ]
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "CTX_RETAINED_REPLY"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "CTX_DEPTH_ONE"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "CTX_CURRENT: read the attached sample.\n\nCTX_USER_SUFFIX"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "attachment": {
+        "messageId": "ctx-retained-user",
+        "attachmentId": "attachment_ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+        "digest": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+        "bytes": 22,
+        "uploadState": "uploading",
+        "chunkOffset": 22,
+        "finishState": "ready",
+        "claimHash": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+        "boundBlobHash": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b"
+      },
+      "selector": {
+        "kind": "checkpoint-selection",
+        "module": "../../../../../apps/desktop/modules/chat/historyWindow/index.mjs",
+        "sha256": "bc6ac15b2431321340508a8d5510f1d89f1c50bc62c8ff2906400d049db75338",
+        "beforeIds": [
+          "ctx-before-checkpoint",
+          "ctx-checkpoint",
+          "ctx-retained-user",
+          "ctx-retained-answer",
+          "ctx-current-shared"
+        ],
+        "afterIds": [
+          "ctx-checkpoint",
+          "ctx-retained-user",
+          "ctx-retained-answer",
+          "ctx-current-shared"
+        ]
+      },
+      "work": [
+        {
+          "id": "request_74ffc8c4675945e6b1b3f5561bd86d76",
+          "request_id": "ctx-current-shared",
+          "state": "completed",
+          "attempts": 1,
+          "request_dispatched": 1,
+          "user_message_id": "ctx-current-shared",
+          "user_seq": 5,
+          "reply_message_id": "reply_request_74ffc8c4675945e6b1b3f5561bd86d76"
+        }
+      ],
+      "replay": {
+        "requestId": "ctx-current-shared",
+        "workId": "request_74ffc8c4675945e6b1b3f5561bd86d76",
+        "replayed": true,
+        "state": "completed"
+      },
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "ctx-before-checkpoint",
+          "action": "upsert"
+        },
+        {
+          "seq": 2,
+          "msg_id": "ctx-checkpoint",
+          "action": "upsert"
+        },
+        {
+          "seq": 3,
+          "msg_id": "ctx-retained-user",
+          "action": "upsert"
+        },
+        {
+          "seq": 4,
+          "msg_id": "ctx-retained-answer",
+          "action": "upsert"
+        },
+        {
+          "seq": 5,
+          "msg_id": "ctx-current-shared",
+          "action": "upsert"
+        },
+        {
+          "seq": 6,
+          "msg_id": "reply_request_74ffc8c4675945e6b1b3f5561bd86d76",
+          "action": "upsert"
+        }
+      ],
+      "persistedJournalMessages": [
+        {
+          "id": "ctx-before-checkpoint",
+          "role": "user",
+          "timestamp": 1700000000000,
+          "content": "CTX_BEFORE_CHECKPOINT"
+        },
+        {
+          "id": "ctx-checkpoint",
+          "role": "user",
+          "timestamp": 1700000001000,
+          "content": "CTX_CHECKPOINT_V1",
+          "contextCompaction": {
+            "kind": "vchat-context-checkpoint",
+            "version": 1,
+            "checkpoint": "CTX_CHECKPOINT_V1",
+            "sourceCount": 1
+          }
+        },
+        {
+          "id": "ctx-retained-user",
+          "role": "user",
+          "timestamp": 1700000002000,
+          "content": "CTX_RETAINED_INPUT",
+          "attachments": [
+            {
+              "id": "attachment_ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+              "name": "context-note.txt",
+              "type": "text/plain",
+              "size": 22,
+              "hash": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+              "extractedText": "CTX_ATTACHMENT_BODY_V1"
+            }
+          ]
+        },
+        {
+          "id": "ctx-retained-answer",
+          "role": "assistant",
+          "timestamp": 1700000003000,
+          "content": "CTX_RETAINED_REPLY"
+        },
+        {
+          "id": "ctx-current-shared",
+          "role": "user",
+          "timestamp": 1700000004000,
+          "content": "CTX_CURRENT: read the attached sample."
+        },
+        {
+          "id": "reply_request_74ffc8c4675945e6b1b3f5561bd86d76",
+          "role": "assistant",
+          "timestamp": 1795238187022,
+          "content": "CTX_COMPLETE"
+        }
+      ]
+    }
+  }
+}

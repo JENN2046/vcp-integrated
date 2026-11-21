@@ -1,0 +1,54 @@
+'use strict';
+const fs = require('node:fs');
+const Module = require('node:module');
+const path = require('node:path');
+const { createHash } = require('node:crypto');
+
+const file = process.env.NS_CONTEXT_HANDLER_LOG;
+const input = process.env.NS_CONTEXT_INPUT;
+if (!file || !input) throw Error('Context fixture capture requires its isolated log and synthetic input marker');
+
+const original = Module._load;
+const observed = new WeakSet();
+const selectors = new WeakSet();
+Module._load = function (request, parent, isMain) {
+    const loaded = original.call(this, request, parent, isMain);
+    if (parent?.filename?.endsWith('/mobile/effectiveContext.js') && typeof loaded?.effectiveContextHistory === 'function' && !selectors.has(loaded)) {
+        selectors.add(loaded);
+        const select = loaded.effectiveContextHistory;
+        const resolved = Module._resolveFilename(request, parent);
+        const sha256 = createHash('sha256').update(fs.readFileSync(resolved)).digest('hex');
+        // Some generated rule facades use getters. Return a fixture-only view
+        // to this one caller and preserve the original implementation/function.
+        return { ...loaded, effectiveContextHistory(history) {
+            const selected = select(history);
+            fs.appendFileSync(file, JSON.stringify({ kind:'checkpoint-selection', module:path.relative(process.cwd(),resolved),
+                sha256,
+                beforeIds:history.map(row=>row.id), afterIds:selected.map(row=>row.id) }) + '\n', {mode:0o600});
+            return selected;
+        } };
+    }
+    if (request !== './modules/chatCompletionHandler.js' || path.basename(parent?.filename || '') !== 'server.js' ||
+        typeof loaded?.prototype?.handle !== 'function' || observed.has(loaded)) return loaded;
+    observed.add(loaded);
+    const handle = loaded.prototype.handle;
+    const execution = original.call(this, './modules/requestExecutionContext', parent, false);
+    loaded.prototype.handle = function (req, res, forceShowVCP) {
+        const rows=req.body?.messages;
+        const current=Array.isArray(rows)?rows.findLast(row=>row.role==='user')?.content:null;
+        const text=typeof current==='string'?current:Array.isArray(current)?current.map(part=>part?.text||'').join(''):null;
+        if (text?.startsWith(input)) {
+            const { messages, model, requestId, stream, temperature, max_tokens, tools, tool_choice, vcpchatExtensions } = req.body;
+            fs.appendFileSync(file, JSON.stringify({
+                kind:'handler-input', route: req.path, workId: execution.currentWork() ?? null, messages,
+                model, requestId, stream, temperature, max_tokens, tools, tool_choice,
+                requestContext: vcpchatExtensions?.requestContext,
+                timestampBindingCount: vcpchatExtensions?.messageTimestampBindings?.length ?? 0,
+                forceShowVCP: Boolean(forceShowVCP),
+                body: req.body,
+            }) + '\n', { mode: 0o600 });
+        }
+        return handle.call(this, req, res, forceShowVCP);
+    };
+    return loaded;
+};

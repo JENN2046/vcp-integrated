@@ -23,6 +23,7 @@
     "@node-rs/jieba": "^2.0.1",
     "@tavily/core": "^0.7.6",
     "@vcp/core-rules": "file:../../packages/core-rules",
+    "@vcp/native-history-window": "file:../desktop/modules/chat/historyWindow",
     "axios": "^1.6.0",
     "basic-auth": "^2.0.1",
     "better-sqlite3": "^12.4.1",

@@ -1,5 +1,6 @@
 'use strict';
 const {app, ipcMain, BrowserWindow} = require('electron');
+const hooks = require('./electron-fixture-hooks.cjs').get();
 const { isLoopback, restrictNodeNetwork } = require('./restrict-network.cjs');
 restrictNodeNetwork();
 if (process.env.NS_METER_PREFIX) require('./meter.cjs');
@@ -73,6 +74,7 @@ ipcMain.on('lifecycle:renderer-ready', event => log('renderer-ready', { sender: 
 const handler = ipcMain.handle.bind(ipcMain);
 ipcMain.handle = (channel, fn) => {
     return handler(channel, function (event, ...args) {
+        hooks?.onIpc?.(channel, args);
         if (detailed) log('ipc', { channel, sender: event.sender.id });
         if (detailed && channel === 'native-sync:prepare-send') {
             log('desktop-input', {id:args[0]?.message?.id,localOnly:args[0]?.localOnly===true,serverSession:args[0]?.serverSession===true});
@@ -212,6 +214,7 @@ input.on('line', async line => {
             result = {url: win.webContents.getURL(), main, renderer};
         }
         if (action === 'trace') detailed = true;
+        if (hooks?.commands && Object.hasOwn(hooks.commands, action)) result = await hooks.commands[action](win, script);
         log('answer', { id, result });
     } catch (error) {
         log('answer', { id, error: error.message });

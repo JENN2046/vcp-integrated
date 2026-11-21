@@ -1,5 +1,5 @@
 'use strict';
-const {effectiveContextHistory,isContextCheckpoint}=require('../nativeRules/modules/chat/contextCompactionState');
+const {effectiveContextHistory,isContextCheckpoint}=require('@vcp/native-history-window');
 const {attachTimestampMetadata}=require('../nativeRules/modules/chat/requestMetadata');
 const {stripHiddenToolResults}=require('../nativeRules/modules/renderer/toolResultRegions');
 const tavern=require('../nativeRules/modules/tavernRulesEngine');

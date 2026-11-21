@@ -22,7 +22,7 @@ async function jsonBody(req) {
     for await (const chunk of req) chunks.push(chunk);
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream}) {
+async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext}) {
     const sourceApp = path.join(candidate, 'apps/server');
     const box = path.join(out, 'runtime-box');
     fs.mkdirSync(box);
@@ -79,6 +79,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         const stopAgent = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-agent',kind:'agent',localId:'stop-agent',config:{...f.owner.config,name:'Synthetic interrupted single',systemPrompt:'SYNTHETIC_PARTIAL',streamOutput:true}}).object;
         stopTopic = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-topic',kind:'topic',parentId:stopAgent.id,localId:'stop-topic',localParent:'stop-agent',config:{name:'Partial single existing topic'}}).object;
         if (hardwareStream) hardwareStream.seedHistory(f.store, stopTopic.topic);
+        if (observedContext) await observedContext.seed(f, source, out);
         for (const p of ['A','B']) {
             const desktop = await f.desktop(p);
             const boundTarget = desktop.runtime.localFor(target.id);
@@ -89,7 +90,8 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             for (const [subject, descriptor] of Object.entries(descriptors[p])) {
                 await desktop.queue.initializeIfMissing(descriptor, []);
                 const seeded=await desktop.queue.read(descriptor);
-                const expected = hardwareStream && subject === 'interrupted' ? hardwareStream.seedCount : 0;
+                const expected = observedContext && subject === 'preSubmit' ? observedContext.seedCount
+                    : hardwareStream && subject === 'interrupted' ? hardwareStream.seedCount : 0;
                 assert.equal(seeded.length, expected, 'seeded synthetic History count');
             }
         }
@@ -98,7 +100,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     }
     fs.writeFileSync(path.join(out,'fixture-descriptors.json'), JSON.stringify({source,target,stopTopic,descriptors},null,2));
     const data = path.join(out, 'data');
-    fs.mkdirSync(data);
+    fs.mkdirSync(data, {recursive:Boolean(observedContext)});
     fs.copyFileSync(path.join(seed,'central.sqlite'), path.join(data,'central.sqlite'));
     const calls=[], requests=[];
     const gates={partialClosed:false};
@@ -114,6 +116,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             const which=Object.entries(contract.cases).find(([,content])=>input===content)?.[0];
             const row={case:which,id:body.requestId,stream:Boolean(body.stream),at:Date.now()};
             calls.push(row);trace('provider',row);
+            observedContext?.recordProvider(req.url, body);
             if(which==='lostAck')await lostGate;
             if(which==='interrupted'){
                 if(!body.stream)throw Error('Partial fixture expected streaming provider input');
@@ -125,7 +128,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 res.write('data: '+JSON.stringify({choices:[{index:0,delta:{role:'assistant',content:contract.partialText},finish_reason:null}]})+'\n\n');
                 return;
             }
-            const payload={id:'fixture-'+calls.length,object:'chat.completion',created:1,model:'synthetic',choices:[{index:0,message:{role:'assistant',content:contract.completeText},finish_reason:'stop'}],usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2}};
+            const payload={id:'fixture-'+calls.length,object:'chat.completion',created:1,model:'synthetic',choices:[{index:0,message:{role:'assistant',content:observedContext?.reply ?? contract.completeText},finish_reason:'stop'}],usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2}};
             res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify(payload));
         } catch(e) { calls.push({case:'fixtureError',error:e.message}); if(!res.headersSent)res.writeHead(500);res.end(); }
     });
@@ -214,16 +217,19 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     }
     const node = process.execPath;
     const log=fs.openSync(path.join(out,'backend.log'),'wx');
-    const backend = spawn(node, ['--require',path.join(__dirname,'loopback.cjs'),'server.js'], {
+    const backend = spawn(node, ['--require',path.join(__dirname,'loopback.cjs'),
+        ...(observedContext ? ['--require',observedContext.preload] : []),'server.js'], {
         cwd:box,stdio:['ignore',log,log],env:{
             PATH:'/usr/bin:/bin',HOME:out,LANG:'C.UTF-8',TZ:'UTC',NS_LOADED_REPORT:path.join(out,'backend-loaded.json'),
             ...(mode === 'idle' ? { NS_METER_BACKEND:'1', NS_METER_PREFIX:path.join(out,'backend') } : {}),
+            ...(observedContext ? { NS_CONTEXT_HANDLER_LOG: observedContext.handlerLog, NS_CONTEXT_INPUT: observedContext.input } : {}),
             PORT:String(backendPort),VCP_LOCAL_LISTEN_HOST:'127.0.0.1',Key:auth,API_Key:'synthetic-provider',VCP_Key:'synthetic-sponsor-ws',
             API_URL:'http://127.0.0.1:'+providerPort,...(mode==='transport-only'?{}:{ApiRetries:'1'}),MaxVCPLoopNonStream:'4',MaxVCPLoopStream:'4',
             KNOWLEDGEBASE_ROOT_PATH:path.join(out,'empty-diaries'),KNOWLEDGEBASE_STORE_PATH:path.join(data,'vectors'),
             KNOWLEDGEBASE_FULL_SCAN_ON_STARTUP:'false',TDB_KNOWLEDGE_ENABLED:'false',
             NativeSyncEnabled:'true',NativeSyncDataDir:data,NativeMobileEnabled:'true',
             NativeMobileOrigin:'https://127.0.0.1:'+proxyPort,NativeMobileStartDelayMs:'0',
+            ...(observedContext ? { NativeMobileConfigSync:'true', NativeMobileAttachments:'true' } : {}),
             ...(hardwareStream ? { NativeMobileExecutionTimeoutMs:'300000', NativeMobileGroupIdleTimeoutMs:'300000' } : {}),
             NativeSyncFullSources:JSON.stringify(['A','B','C','D'].map(x=>({sourceId:'source'+x,deviceId:'device'+x,executionMode:'all-supported'}))),
             NativeSyncSharedSpaces:JSON.stringify([{id:'sharedAB',sources:['sourceA','sourceB','sourceC']},{id:'foreignSpace',sources:['sourceD']}])
