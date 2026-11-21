@@ -113,6 +113,15 @@ class StreamHandler {
     // Most requests already have the exact visible text in the native stream
     // accumulator. Track transformed deltas only when this Work exposes them.
     const displayParts = publishFinalReply && reasoningToContentEnabled ? [] : null;
+    const workerDelta = publishFinalReply?.readStreamDelta;
+    const workerParts = workerDelta ? [] : null;
+    let workerFrameInvalid = false;
+    const appendWorkerDelta = packet => {
+      if (!workerParts) return;
+      if (Object.hasOwn(packet, 'nativeFailure')) workerFrameInvalid = true;
+      const text = workerDelta(packet);
+      if (text) workerParts.push(text);
+    };
     const id = originalBody.requestId || originalBody.messageId;
     const residentProposalFramingActive = hasResidentProposalSurface(originalBody.messages);
     const residentPresentationChannel = createPresentationChannel(res, residentProposalFramingActive);
@@ -219,6 +228,7 @@ class StreamHandler {
         let clientReasoningBlockOpen = false;
         let clientReasoningEndsWithNewline = false;
         let deferredClientWrites = [];
+        const workerTurnStart = workerParts?.length;
         const writeProviderClientChunk = (chunk, encodingOrCallback, maybeCallback) => {
           const keepalive = typeof chunk === 'string' && chunk.startsWith(': vcp-keepalive');
           if (!residentProposalFramingActive || keepalive) {
@@ -238,7 +248,10 @@ class StreamHandler {
           }
           deferredClientWrites = [];
         };
-        const discardDeferredClientWrites = () => { deferredClientWrites = []; };
+        const discardDeferredClientWrites = () => {
+          deferredClientWrites = [];
+          if (workerParts) workerParts.length = workerTurnStart;
+        };
         const invalidResidentFrame = Object.freeze({
           clientContent: '',
           kind: 'INVALID',
@@ -262,6 +275,7 @@ class StreamHandler {
             model: originalBody.model || 'unknown',
             choices: [{ index: 0, delta: { content }, finish_reason: null }]
           };
+          workerParts?.push(content);
           res.write(`data: ${JSON.stringify(payload)}
 
 `);
@@ -368,14 +382,19 @@ class StreamHandler {
             }]
           };
           displayParts?.push(closePayload.choices[0].delta.content);
+          appendWorkerDelta(closePayload);
           writeProviderClientChunk(`data: ${JSON.stringify(closePayload)}\n\n`);
         };
         const writeClientLine = (line, parsedData, isDoneLine) => {
           if (isDoneLine) return writeClientReasoningCloseChunk();
           const nativeStop = publishFinalReply && parsedData?.choices?.[0]?.finish_reason === 'stop';
-          if (!parsedData || (!reasoningToContentEnabled && !nativeStop)) return writeProviderClientChunk(line + '\n');
+          if (!parsedData || (!reasoningToContentEnabled && !nativeStop)) {
+            if (parsedData) appendWorkerDelta(parsedData);
+            return writeProviderClientChunk(line + '\n');
+          }
           const packet = transformParsedDataForClient(parsedData);
           const choice = packet.choices?.[0];
+          appendWorkerDelta(packet);
           if (displayParts && typeof choice?.delta?.content === 'string') displayParts.push(choice.delta.content);
           // ToolBox emits the formal stop below, after the native receipt is durable.
           if (nativeStop) choice.finish_reason = null;
@@ -631,8 +650,8 @@ class StreamHandler {
       }
       if (toolCalls.length === 0) {
         if (DEBUG_MODE) console.log('[VCP Stream Loop] No tool calls found. Exiting loop.');
-        if (publishFinalReply && validUpstreamTurns && !abortController?.signal.aborted) {
-          publishFinalReply({ content: displayParts ? displayParts.join('') : currentAIContentForLoop, finishReason: 'stop' });
+        if (publishFinalReply && !workerFrameInvalid && validUpstreamTurns && !abortController?.signal.aborted) {
+          publishFinalReply({ content: workerParts ? workerParts.join('') : displayParts ? displayParts.join('') : currentAIContentForLoop, finishReason: 'stop' });
         }
         if (!res.writableEnded) {
           const finalChunkPayload = {
@@ -662,6 +681,7 @@ class StreamHandler {
         if (res.writableEnded || res.destroyed || abortController?.signal.aborted) return;
         const content = formatToolResultBatch(visibleToolResults, enableRoleDivider);
         if (!content) return;
+        workerParts?.push(content);
         res.write(`data: ${JSON.stringify({
           id: `chatcmpl-vcp-batch-${Date.now()}`,
           object: 'chat.completion.chunk',
@@ -712,6 +732,7 @@ class StreamHandler {
               visibleToolResults.push(`\n[本轮工具调用摘要:]\n${archeryStatusSummaryItems.join('；')}。\n[本轮工具调用摘要结束]\n`);
             }
             emitToolBatch();
+            workerParts?.push('\n');
             res.write(`data: ${JSON.stringify({
               id: `chatcmpl-VCP-separator-${Date.now()}`,
               object: 'chat.completion.chunk',
@@ -769,7 +790,11 @@ class StreamHandler {
 
       if (normalCalls.length === 0) {
         emitToolBatch();
+        completed = validUpstreamTurns && archeryErrorContents.length === 0;
         if (!res.writableEnded && !res.destroyed) {
+          if (workerParts && !workerFrameInvalid && completed && !abortController?.signal.aborted) {
+            publishFinalReply({ content: workerParts.join(''), finishReason: 'stop' });
+          }
           try {
             res.write(`data: ${JSON.stringify({
               id: `chatcmpl-VCP-final-stop-${Date.now()}`,
@@ -779,7 +804,6 @@ class StreamHandler {
             res.end('data: [DONE]\n\n');
           } catch (e) { }
         }
-        completed = validUpstreamTurns && archeryErrorContents.length === 0;
         break;
       }
 
@@ -880,6 +904,7 @@ class StreamHandler {
 
       if (!res.writableEnded && !res.destroyed) {
         try {
+          workerParts?.push('\n');
           res.write(`data: ${JSON.stringify({
             id: `chatcmpl-VCP-separator-${Date.now()}`,
             object: 'chat.completion.chunk',

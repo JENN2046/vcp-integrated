@@ -43,6 +43,7 @@ class ConversationExecution {
         // be upgraded to "not dispatched" merely by installing this schema.
         if (!executionColumns.some(c=>c.name==='request_dispatched')) this.db.exec('ALTER TABLE mobile_executions ADD COLUMN request_dispatched INTEGER');
         if (!executionColumns.some(c=>c.name==='accepted_actor')) this.db.exec('ALTER TABLE mobile_executions ADD COLUMN accepted_actor TEXT');
+        if (!executionColumns.some(c=>c.name==='native_final_operation')) this.db.exec('ALTER TABLE mobile_executions ADD COLUMN native_final_operation TEXT');
         require('./groupTurn').schema(this);
         this.nativeTasks = new (require('./nativeTasks').NativeTaskLinks)(this);
         this.db.exec('CREATE INDEX IF NOT EXISTS idx_mobile_execution_topic ON mobile_executions(topic_key); CREATE INDEX IF NOT EXISTS idx_mobile_execution_request ON mobile_executions(topic_key,request_id)');
@@ -50,6 +51,10 @@ class ConversationExecution {
         this.timer = setInterval(() => this.tick(), 100); this.timer.unref();
     }
     recover() {
+        const sharedSingle = require('./sharedSingle');
+        if (this.store.shared) {
+            for (const row of this.db.prepare("SELECT * FROM mobile_executions WHERE state='running' AND native_final_operation IS NOT NULL").all()) sharedSingle.promoteNativeFinal(this,row);
+        }
         for (const row of this.db.prepare("SELECT * FROM mobile_executions WHERE state IN ('preparing','publishing') ORDER BY created_at").all()) {
             try { this.completeIntent(row); }
             catch(failure) { if(!this.topics.get(row.topic_key)?.sharedSpaceId)throw failure;require('./sharedSingle').hold(this,row);this.db.prepare("UPDATE mobile_executions SET state='review_required',error_code=? WHERE id=?").run(failure.code||'SHARED_COMPLETION_REVIEW_REQUIRED',row.id); }
@@ -218,7 +223,13 @@ class ConversationExecution {
             const prepared=published?require('./groupRequest').sanitize(requestMessages,published.executionPolicy,true):requestMessages;
             if(published)require('./groupRequest').assertPortableContext(prepared);
             const packet=require('./nativePacket').nativePacket(prepared,published?{agentId:topic.ownerId,agentName:published.name||topic.agentName,topicId:topic.topicId}:null,row.id,{model:topic.model,contextTokenLimit:Number(topic.contextTokenLimit)||32000,...(Number.isFinite(topic.temperature)?{temperature:topic.temperature}:{}),...(Number.isFinite(topic.maxOutputTokens)?{max_tokens:topic.maxOutputTokens}:{}),stream:published?.streamOutput===true});
-            if(topic.sharedSpaceId)releaseContext=require('./sharedSingle').register(this,row,packet,published);
+            const replyOperation=(content)=>{
+                const msgId='reply_'+row.id;
+                const op={ownerType:topic.ownerType,ownerId:topic.ownerId,topicId:topic.topicId,msgId,deviceId:'server:native-execution',opId:'reply:'+row.id,action:'upsert',baseHash:null,message:{id:msgId,role:'assistant',content,timestamp:Date.now(),agentId:topic.ownerId,name:topic.agentName}};
+                require('../sync/messageCausality').annotateOperation(op,{requestId:row.request_id,executionId:row.id,parents:ordered.map(m=>m.id),known:true});
+                return op;
+            };
+            if(topic.sharedSpaceId)releaseContext=require('./sharedSingle').register(this,row,packet,published,replyOperation);
             let content,modelResult;
             if (this.quiescing && !this.draining) { this.db.prepare("UPDATE mobile_executions SET state='queued',updated_at=? WHERE id=? AND request_dispatched=0").run(Date.now(),row.id); return; }
             if (this.draining) throw error('HOST_DRAINING');
@@ -238,9 +249,9 @@ class ConversationExecution {
             const latest = this.get(row.id);
             if (this.draining) throw error('HOST_DRAINING');
             if (latest.cancel_requested) throw error('EXECUTION_CANCELLED');
-            const msgId = 'reply_' + row.id;
-            const op = { ownerType: topic.ownerType, ownerId: topic.ownerId, topicId: topic.topicId, msgId, deviceId: 'server:native-execution', opId: 'reply:' + row.id, action: 'upsert', baseHash: null, message: { id: msgId, role: 'assistant', content, timestamp: Date.now(), agentId: topic.ownerId, name: topic.agentName } };
-            require('../sync/messageCausality').annotateOperation(op,{requestId:row.request_id,executionId:row.id,parents:ordered.map(m=>m.id),known:true});
+            const op = latest.native_final_operation ? require('./sharedSingle').nativeFinalOperation(this,latest) : replyOperation(content);
+            const msgId=op.msgId;
+            if(latest.native_final_operation&&(modelResult?.finishReason!=='stop'||op.message.content!==content))throw error('NATIVE_FINAL_CONTENT_CHANGED_REVIEW_REQUIRED');
             if(modelResult?.finishReason==='length'){
                 const proof=modelResult.terminalEvidence;
                 if(proof?.version!==1||proof.nativeRequestId!==row.id||proof.finishReason!=='length'||!['sse','json'].includes(proof.transport)||proof.contentHash!==digest(content))throw Object.assign(error('MODEL_PARTIAL_PROOF_REVIEW_REQUIRED'),{partialContent:content});

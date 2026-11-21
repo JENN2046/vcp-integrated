@@ -71,7 +71,7 @@ function middleware(req, res, next) {
     if(sharedBoundary&&/^\/v1\/(?:chat\/completions(?:-no-vcp)?|chatvcp\/completions)\/?$/i.test(req.path||req.url||'')){
         try{const authority=snapshot?.sharedAuthority;
             if(authority&&req.headers?.['x-nativesync-native-proof']!==snapshot.nativeProof)throw Object.assign(Error('SHARED_NATIVE_ADMISSION_REQUIRED'),{code:'SHARED_NATIVE_ADMISSION_REQUIRED'});
-            shared=authority?.kind==='native-task'?sharedBoundary.taskRequests.enter(req,authority):sharedBoundary.enter(req,authority?.actor);}
+            shared=authority?.kind==='native-task'?sharedBoundary.taskRequests.enter(req,authority):sharedBoundary.enter(req,authority?.actor,authority?.replyOperation);}
         catch(e){return res.status(e.status||409).json({error:{code:e.code||'SHARED_NATIVE_ADMISSION_REQUIRED'}});}
     }
     if (!snapshot&&!shared) return next();
@@ -96,7 +96,7 @@ function middleware(req, res, next) {
     const finishNative=success=>{if(!scope)return;scope.transportEnded=true;scope.transportSuccess=success;outcome.check();};
     res.once('finish', () => { releaseContext();finishNative(res.statusCode>=200&&res.statusCode<300);req.removeListener('aborted', abort); res.removeListener('close', abort); });
     if(shared)res.once('close',()=>{if(!res.writableFinished)finishNative(false);});
-    scope={ toolRun: { waiting: 0 },finishNative,requestId, signal: controller.signal, ...snapshot,...(shared?{bridge:shared.bridge,sponsorAuthority:shared.sponsorAuthority,sponsorBoundary:sharedBoundary,textOnly:shared.textOnly===true,safeTools:shared.safeTools,settleToolPause:shared.settleToolPause,canSteer:shared.steeringEnabled===true,workId:shared.workId,generation:shared.generation,phase:shared.phase,fence:shared.fence,applied:shared.applied,continuation:shared.continuation,checkpoint:shared.checkpoint}:{}) };
+    scope={ toolRun: { waiting: 0 },finishNative,requestId, signal: controller.signal, ...snapshot,...(shared?{bridge:shared.bridge,sponsorAuthority:shared.sponsorAuthority,sponsorBoundary:sharedBoundary,textOnly:shared.textOnly===true,safeTools:shared.safeTools,settleToolPause:shared.settleToolPause,canSteer:shared.steeringEnabled===true,workId:shared.workId,generation:shared.generation,phase:shared.phase,fence:shared.fence,applied:shared.applied,continuation:shared.continuation,checkpoint:shared.checkpoint,sessionFinalReply:shared.sessionFinalReply}:{}) };
     return local.run(scope,next);
 }
 async function waitForApproval(promise, onCancel) {
@@ -335,7 +335,7 @@ module.exports = {
         const row=boundary.taskControls.row(workId,identity),base=boundary.engine.nativeTasks.hooks(workId,row.step_id);
         return Object.freeze({identity,control:boundary.taskRequests.binding(workId,identity),observe:result=>base.onTaskObserved({...result,...identity})});
     },
-    finalReplyPublisher: () => local.getStore()?.checkpoint?.finalReply,
+    finalReplyPublisher: () => { const scope=local.getStore(); return scope?.checkpoint?.finalReply||scope?.sessionFinalReply; },
     checkpointCompletion:value=>local.getStore()?.checkpoint?.completion?.(value),
     checkpointAssistant: content => local.getStore()?.checkpoint?.assistant(content),
     markModelTerminal: () => { const scope=local.getStore();if(scope)scope.modelTerminalKnown=true; },

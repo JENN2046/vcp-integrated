@@ -1,0 +1,272 @@
+diff --git a/apps/server/Plugin/NativeSync/mobile/execution.js b/apps/server/Plugin/NativeSync/mobile/execution.js
+index dc11f95..c2e426a 100644
+--- a/apps/server/Plugin/NativeSync/mobile/execution.js
++++ b/apps/server/Plugin/NativeSync/mobile/execution.js
+@@ -45,2 +45,3 @@ class ConversationExecution {
+         if (!executionColumns.some(c=>c.name==='accepted_actor')) this.db.exec('ALTER TABLE mobile_executions ADD COLUMN accepted_actor TEXT');
++        if (!executionColumns.some(c=>c.name==='native_final_operation')) this.db.exec('ALTER TABLE mobile_executions ADD COLUMN native_final_operation TEXT');
+         require('./groupTurn').schema(this);
+@@ -52,2 +53,6 @@ class ConversationExecution {
+     recover() {
++        const sharedSingle = require('./sharedSingle');
++        if (this.store.shared) {
++            for (const row of this.db.prepare("SELECT * FROM mobile_executions WHERE state='running' AND native_final_operation IS NOT NULL").all()) sharedSingle.promoteNativeFinal(this,row);
++        }
+         for (const row of this.db.prepare("SELECT * FROM mobile_executions WHERE state IN ('preparing','publishing') ORDER BY created_at").all()) {
+@@ -220,3 +225,9 @@ class ConversationExecution {
+             const packet=require('./nativePacket').nativePacket(prepared,published?{agentId:topic.ownerId,agentName:published.name||topic.agentName,topicId:topic.topicId}:null,row.id,{model:topic.model,contextTokenLimit:Number(topic.contextTokenLimit)||32000,...(Number.isFinite(topic.temperature)?{temperature:topic.temperature}:{}),...(Number.isFinite(topic.maxOutputTokens)?{max_tokens:topic.maxOutputTokens}:{}),stream:published?.streamOutput===true});
+-            if(topic.sharedSpaceId)releaseContext=require('./sharedSingle').register(this,row,packet,published);
++            const replyOperation=(content)=>{
++                const msgId='reply_'+row.id;
++                const op={ownerType:topic.ownerType,ownerId:topic.ownerId,topicId:topic.topicId,msgId,deviceId:'server:native-execution',opId:'reply:'+row.id,action:'upsert',baseHash:null,message:{id:msgId,role:'assistant',content,timestamp:Date.now(),agentId:topic.ownerId,name:topic.agentName}};
++                require('../sync/messageCausality').annotateOperation(op,{requestId:row.request_id,executionId:row.id,parents:ordered.map(m=>m.id),known:true});
++                return op;
++            };
++            if(topic.sharedSpaceId)releaseContext=require('./sharedSingle').register(this,row,packet,published,replyOperation);
+             let content,modelResult;
+@@ -240,5 +251,5 @@ class ConversationExecution {
+             if (latest.cancel_requested) throw error('EXECUTION_CANCELLED');
+-            const msgId = 'reply_' + row.id;
+-            const op = { ownerType: topic.ownerType, ownerId: topic.ownerId, topicId: topic.topicId, msgId, deviceId: 'server:native-execution', opId: 'reply:' + row.id, action: 'upsert', baseHash: null, message: { id: msgId, role: 'assistant', content, timestamp: Date.now(), agentId: topic.ownerId, name: topic.agentName } };
+-            require('../sync/messageCausality').annotateOperation(op,{requestId:row.request_id,executionId:row.id,parents:ordered.map(m=>m.id),known:true});
++            const op = latest.native_final_operation ? require('./sharedSingle').nativeFinalOperation(this,latest) : replyOperation(content);
++            const msgId=op.msgId;
++            if(latest.native_final_operation&&(modelResult?.finishReason!=='stop'||op.message.content!==content))throw error('NATIVE_FINAL_CONTENT_CHANGED_REVIEW_REQUIRED');
+             if(modelResult?.finishReason==='length'){
+diff --git a/apps/server/Plugin/NativeSync/mobile/sharedSingle.js b/apps/server/Plugin/NativeSync/mobile/sharedSingle.js
+index 231b5b4..aeafa82 100644
+--- a/apps/server/Plugin/NativeSync/mobile/sharedSingle.js
++++ b/apps/server/Plugin/NativeSync/mobile/sharedSingle.js
+@@ -7,3 +7,3 @@ function acceptedActor(engine,row){
+  const admission=shared?.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(row.id);
+- if(!topic?.sharedSpaceId||!admission||admission.space_id!==topic.sharedSpaceId||admission.principal!=='mobile:'+row.session_id)throw fail('SHARED_REQUEST_OWNER_REQUIRED');
++ if(!topic?.sharedSpaceId||!admission||admission.topic_id!==row.topic_key||admission.space_id!==topic.sharedSpaceId||admission.principal!=='mobile:'+row.session_id)throw fail('SHARED_REQUEST_OWNER_REQUIRED');
+  // This is the server's durable accepted request, not a renewed public grant.
+@@ -34,6 +34,40 @@ function accept(engine,sessionId,{topicKey,requestId,text,attachments=[]}){
+ }
+-function register(engine,row,packet,published){
++function register(engine,row,packet,published,replyOperation){
+  const shared=engine.store.shared,topic=engine.topics.get(row.topic_key),actor=acceptedActor(engine,row);
+  shared.native.prepare(actor,{sharedSpaceId:topic.sharedSpaceId,admissionId:row.id,requestId:row.id,bodyHash:sha256(stable(JSON.parse(JSON.stringify(packet))))},{session:row.kind==='shared_session'});
+- return require('../../../modules/requestExecutionContext').register(row.id,published,engine.nativeTasks.hooks(row.id),{actor,admissionId:row.id});
++ return require('../../../modules/requestExecutionContext').register(row.id,published,engine.nativeTasks.hooks(row.id),{actor,admissionId:row.id,replyOperation});
++}
++function sealNativeFinal(request,admission,operation){
++ const proof={version:1,executionId:admission.id,nativeRequestId:request.id,principal:request.principal,
++  bodyHash:request.body_hash,finishReason:'stop',operation:JSON.parse(JSON.stringify(operation))};
++ return JSON.stringify({...proof,digest:sha256(stable(proof))});
++}
++function nativeFinalOperation(engine,row){
++ const request=engine.db.prepare('SELECT * FROM shared_native_requests WHERE id=? AND admission_id=?').get(row.id,row.id);
++ const topic=engine.topics.get(row.topic_key);
++ let record;
++ try{record=JSON.parse(row.native_final_operation);}catch{throw fail('NATIVE_FINAL_PROOF_INVALID_REVIEW_REQUIRED');}
++ const {digest,...proof}=record||{},op=proof.operation,m=op?.message;
++ if(proof.version!==1||proof.finishReason!=='stop'||proof.executionId!==row.id||proof.nativeRequestId!==row.id||
++  !request||request.state!=='model_terminal'||request.principal!==proof.principal||request.body_hash!==proof.bodyHash||
++  acceptedActor(engine,row).principal!==proof.principal||digest!==sha256(stable(proof))||
++  op?.ownerType!==topic?.ownerType||op?.ownerId!==topic?.ownerId||op?.topicId!==topic?.topicId||
++  op?.msgId!=='reply_'+row.id||op.opId!=='reply:'+row.id||op.action!=='upsert'||
++  m?.id!==op.msgId||m.role!=='assistant'||typeof m.content!=='string'||!m.content||
++  m.continuity?.executionId!==row.id||m.continuity.requestId!==row.request_id){
++  throw fail('NATIVE_FINAL_PROOF_INVALID_REVIEW_REQUIRED');
++ }
++ return op;
++}
++function promoteNativeFinal(engine,row){
++ if((row.kind!=null&&row.kind!=='shared_session')||row.cancel_requested||engine.nativeTasks.uncertainTools(row.id)||engine.nativeTasks.needsReview(row.id))return;
++ const admission=engine.db.prepare("SELECT state,dispatched,native_terminal FROM shared_admissions WHERE id=?").get(row.id);
++ if(admission?.state!=='dispatched'||!admission.dispatched||!admission.native_terminal)return;
++ let operation;
++ try{operation=nativeFinalOperation(engine,row);}catch{return;}
++ // This only recreates the existing write-ahead publication intent. The
++ // scheduler never re-enters ToolBox for a final already sealed by ToolBox.
++ engine.db.prepare(`UPDATE mobile_executions SET state='publishing',pending_operation=?,updated_at=?
++  WHERE id=? AND state='running' AND request_dispatched=1 AND cancel_requested=0
++   AND pending_operation IS NULL AND native_final_operation=?`).run(JSON.stringify(operation),Date.now(),row.id,row.native_final_operation);
+ }
+@@ -55,3 +89,3 @@ function complete(engine,row){
+  shared.complete(actor,{sharedSpaceId:topic.sharedSpaceId,admissionId:row.id,opId:'mobile-complete_'+row.id,message:op.message},{session:row.kind==='shared_session'});
+- engine.db.prepare("UPDATE mobile_executions SET state='completed',reply_message_id=?,pending_operation=NULL,updated_at=? WHERE id=?").run(op.msgId,Date.now(),row.id);engine.emitEvent?.(row.id,'completed',{});return true;
++ engine.db.prepare("UPDATE mobile_executions SET state='completed',reply_message_id=?,pending_operation=NULL,native_final_operation=NULL,updated_at=? WHERE id=?").run(op.msgId,Date.now(),row.id);engine.emitEvent?.(row.id,'completed',{});return true;
+ }
+@@ -65,2 +99,2 @@ function abandon(engine,row){
+ }
+-module.exports={accept,register,complete,hold,abandon,acceptedActor};
++module.exports={accept,register,complete,hold,abandon,acceptedActor,promoteNativeFinal,sealNativeFinal,nativeFinalOperation};
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedNative.js b/apps/server/Plugin/NativeSync/sync/sharedNative.js
+index feb6e30..d900492 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedNative.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedNative.js
+@@ -149,7 +149,7 @@ class SharedNative {
+  }
+- enter(req,trustedActor=null){
+-  if(req.headers?.['x-nativesync-register']==='v1')return this.shared.atomic(()=>this.enterChecked(req,trustedActor));
+-  return this.enterChecked(req,trustedActor);
++ enter(req,trustedActor=null,replyOperation){
++  if(req.headers?.['x-nativesync-register']==='v1')return this.shared.atomic(()=>this.enterChecked(req,trustedActor,replyOperation));
++  return this.enterChecked(req,trustedActor,replyOperation);
+  }
+- enterChecked(req,trustedActor=null){
++ enterChecked(req,trustedActor=null,replyOperation){
+   const ticket=req.headers?.['x-nativesync-admission'];
+@@ -248,3 +248,3 @@ class SharedNative {
+   const ownsFinalReply=safeToolWork&&generation?.generation===1;
+-  const finalReply=ownsFinalReply?value=>{
++  const controlledFinalReply=ownsFinalReply?value=>{
+    if(ended||this.closed)throw fail('SHARED_REQUEST_FENCED');
+@@ -257,2 +257,19 @@ class SharedNative {
+   }:undefined;
++  const sessionFinalReply=trustedActor&&row.id===admission.id&&typeof replyOperation==='function'?value=>{
++   if(ended||this.closed)throw fail('SHARED_REQUEST_FENCED');
++   if(value?.finishReason!=='stop'||typeof value.content!=='string'||!value.content||Buffer.byteLength(value.content)>4*1024*1024)return;
++   fence();
++   if(this.engine.nativeTasks.uncertainTools(admission.id))return;
++   this.shared.atomic(()=>{
++    const sealed=this.db.prepare(`UPDATE mobile_executions SET native_final_operation=?
++     WHERE id=? AND (kind IS NULL OR kind='shared_session') AND state='running' AND request_dispatched=1 AND cancel_requested=0
++      AND pending_operation IS NULL AND native_final_operation IS NULL`).run(require('../mobile/sharedSingle').sealNativeFinal(row,admission,replyOperation(value.content)),row.id);
++    if(!sealed.changes)return;
++    if(!this.db.prepare("UPDATE shared_native_requests SET state='model_terminal' WHERE id=? AND state='dispatched'").run(row.id).changes)throw fail('SHARED_REQUEST_FENCED');
++    this.phase(admission.id,row.id,'final_persisted');
++    this.checkTerminal(admission.id);
++   });
++  }:undefined;
++  if(sessionFinalReply)sessionFinalReply.readStreamDelta=require('../nativeRules/Groupmodules/streamDelta').groupStreamDelta;
++  const finalReply=controlledFinalReply||sessionFinalReply;
+   if(generation)this.db.prepare("UPDATE shared_work_generations SET state='preprocessing' WHERE work_id=? AND generation=?").run(admission.id,generation.generation);
+@@ -285,2 +302,6 @@ class SharedNative {
+    }
++   if(sessionFinalReply&&this.engine.get(row.id)?.native_final_operation){
++    this.checkTerminal(admission.id);
++    return;
++   }
+    if(pausedAtFence){
+@@ -305,3 +326,3 @@ class SharedNative {
+   };
+-  return {textOnly,safeTools,observeAssistantText,sponsorAuthority:{actor,admissionId:admission.id,spaceId:admission.space_id,routeHash:JSON.parse(admission.user_op||'{}').sponsorRouteHash},phase:name=>this.phase(admission.id,row.id,name),steeringEnabled,workId:admission.id,generation:generation?.generation||0,fence,applied,continuation:()=>continuedBody,checkpoint:steeringEnabled?{finalReply,completion:value=>this.continuations.completion(row.id,value),assistant:content=>this.continuations.assistant(row.id,content),result:(invocation,value)=>this.continuations.result(row.id,invocation,value)}:null,bridge:hooks,finish,
++  return {textOnly,safeTools,observeAssistantText,sponsorAuthority:{actor,admissionId:admission.id,spaceId:admission.space_id,routeHash:JSON.parse(admission.user_op||'{}').sponsorRouteHash},phase:name=>this.phase(admission.id,row.id,name),steeringEnabled,workId:admission.id,generation:generation?.generation||0,fence,applied,continuation:()=>continuedBody,checkpoint:steeringEnabled?{finalReply,completion:value=>this.continuations.completion(row.id,value),assistant:content=>this.continuations.assistant(row.id,content),result:(invocation,value)=>this.continuations.result(row.id,invocation,value)}:null,sessionFinalReply,bridge:hooks,finish,
+    settleToolPause:()=>{
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedSpace.js b/apps/server/Plugin/NativeSync/sync/sharedSpace.js
+index 92696ff..8137d9b 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedSpace.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedSpace.js
+@@ -88,3 +88,7 @@ class SharedSpace {
+    ))`:'';
+-  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing+safePause+nativeFinal).run();
++  const sessionFinal=tables.has('mobile_executions')&&this.db.prepare('PRAGMA table_info(mobile_executions)').all().some(c=>c.name==='native_final_operation')?`
++   AND NOT (native_terminal=1 AND EXISTS (SELECT 1 FROM mobile_executions e
++     WHERE e.id=shared_admissions.id AND (e.kind IS NULL OR e.kind='shared_session') AND e.state='running'
++      AND e.cancel_requested=0 AND e.native_final_operation IS NOT NULL))`:'';
++  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing+safePause+nativeFinal+sessionFinal).run();
+  }
+diff --git a/apps/server/modules/handlers/nonStreamHandler.js b/apps/server/modules/handlers/nonStreamHandler.js
+index 14cba62..1057ba5 100644
+--- a/apps/server/modules/handlers/nonStreamHandler.js
++++ b/apps/server/modules/handlers/nonStreamHandler.js
+@@ -631,4 +631,6 @@ class NonStreamHandler {
+     // Seal the same client-facing text before the response can be lost in transport.
+-    if (completed && !abortController?.signal.aborted && finalJsonResponse.choices[0].finish_reason === 'stop') {
+-      require('../requestExecutionContext').finalReplyPublisher()?.({ content: finalContentForClient, finishReason: 'stop' });
++    const publishFinalReply = require('../requestExecutionContext').finalReplyPublisher();
++    if (completed && !abortController?.signal.aborted && finalJsonResponse.choices[0].finish_reason === 'stop'
++        && !(publishFinalReply?.readStreamDelta && Object.hasOwn(finalJsonResponse, 'nativeFailure'))) {
++      publishFinalReply?.({ content: finalContentForClient, finishReason: 'stop' });
+     }
+diff --git a/apps/server/modules/handlers/streamHandler.js b/apps/server/modules/handlers/streamHandler.js
+index 9eb8c45..85f45c6 100644
+--- a/apps/server/modules/handlers/streamHandler.js
++++ b/apps/server/modules/handlers/streamHandler.js
+@@ -115,2 +115,11 @@ class StreamHandler {
+     const displayParts = publishFinalReply && reasoningToContentEnabled ? [] : null;
++    const workerDelta = publishFinalReply?.readStreamDelta;
++    const workerParts = workerDelta ? [] : null;
++    let workerFrameInvalid = false;
++    const appendWorkerDelta = packet => {
++      if (!workerParts) return;
++      if (Object.hasOwn(packet, 'nativeFailure')) workerFrameInvalid = true;
++      const text = workerDelta(packet);
++      if (text) workerParts.push(text);
++    };
+     const id = originalBody.requestId || originalBody.messageId;
+@@ -221,2 +230,3 @@ class StreamHandler {
+         let deferredClientWrites = [];
++        const workerTurnStart = workerParts?.length;
+         const writeProviderClientChunk = (chunk, encodingOrCallback, maybeCallback) => {
+@@ -240,3 +250,6 @@ class StreamHandler {
+         };
+-        const discardDeferredClientWrites = () => { deferredClientWrites = []; };
++        const discardDeferredClientWrites = () => {
++          deferredClientWrites = [];
++          if (workerParts) workerParts.length = workerTurnStart;
++        };
+         const invalidResidentFrame = Object.freeze({
+@@ -264,2 +277,3 @@ class StreamHandler {
+           };
++          workerParts?.push(content);
+           res.write(`data: ${JSON.stringify(payload)}
+@@ -370,2 +384,3 @@ class StreamHandler {
+           displayParts?.push(closePayload.choices[0].delta.content);
++          appendWorkerDelta(closePayload);
+           writeProviderClientChunk(`data: ${JSON.stringify(closePayload)}\n\n`);
+@@ -375,5 +390,9 @@ class StreamHandler {
+           const nativeStop = publishFinalReply && parsedData?.choices?.[0]?.finish_reason === 'stop';
+-          if (!parsedData || (!reasoningToContentEnabled && !nativeStop)) return writeProviderClientChunk(line + '\n');
++          if (!parsedData || (!reasoningToContentEnabled && !nativeStop)) {
++            if (parsedData) appendWorkerDelta(parsedData);
++            return writeProviderClientChunk(line + '\n');
++          }
+           const packet = transformParsedDataForClient(parsedData);
+           const choice = packet.choices?.[0];
++          appendWorkerDelta(packet);
+           if (displayParts && typeof choice?.delta?.content === 'string') displayParts.push(choice.delta.content);
+@@ -633,4 +652,4 @@ class StreamHandler {
+         if (DEBUG_MODE) console.log('[VCP Stream Loop] No tool calls found. Exiting loop.');
+-        if (publishFinalReply && validUpstreamTurns && !abortController?.signal.aborted) {
+-          publishFinalReply({ content: displayParts ? displayParts.join('') : currentAIContentForLoop, finishReason: 'stop' });
++        if (publishFinalReply && !workerFrameInvalid && validUpstreamTurns && !abortController?.signal.aborted) {
++          publishFinalReply({ content: workerParts ? workerParts.join('') : displayParts ? displayParts.join('') : currentAIContentForLoop, finishReason: 'stop' });
+         }
+@@ -664,2 +683,3 @@ class StreamHandler {
+         if (!content) return;
++        workerParts?.push(content);
+         res.write(`data: ${JSON.stringify({
+@@ -714,2 +734,3 @@ class StreamHandler {
+             emitToolBatch();
++            workerParts?.push('\n');
+             res.write(`data: ${JSON.stringify({
+@@ -771,3 +792,7 @@ class StreamHandler {
+         emitToolBatch();
++        completed = validUpstreamTurns && archeryErrorContents.length === 0;
+         if (!res.writableEnded && !res.destroyed) {
++          if (workerParts && !workerFrameInvalid && completed && !abortController?.signal.aborted) {
++            publishFinalReply({ content: workerParts.join(''), finishReason: 'stop' });
++          }
+           try {
+@@ -781,3 +806,2 @@ class StreamHandler {
+         }
+-        completed = validUpstreamTurns && archeryErrorContents.length === 0;
+         break;
+@@ -882,2 +906,3 @@ class StreamHandler {
+         try {
++          workerParts?.push('\n');
+           res.write(`data: ${JSON.stringify({
+diff --git a/apps/server/modules/requestExecutionContext.js b/apps/server/modules/requestExecutionContext.js
+index e1c3339..d6e7f3b 100644
+--- a/apps/server/modules/requestExecutionContext.js
++++ b/apps/server/modules/requestExecutionContext.js
+@@ -73,3 +73,3 @@ function middleware(req, res, next) {
+             if(authority&&req.headers?.['x-nativesync-native-proof']!==snapshot.nativeProof)throw Object.assign(Error('SHARED_NATIVE_ADMISSION_REQUIRED'),{code:'SHARED_NATIVE_ADMISSION_REQUIRED'});
+-            shared=authority?.kind==='native-task'?sharedBoundary.taskRequests.enter(req,authority):sharedBoundary.enter(req,authority?.actor);}
++            shared=authority?.kind==='native-task'?sharedBoundary.taskRequests.enter(req,authority):sharedBoundary.enter(req,authority?.actor,authority?.replyOperation);}
+         catch(e){return res.status(e.status||409).json({error:{code:e.code||'SHARED_NATIVE_ADMISSION_REQUIRED'}});}
+@@ -98,3 +98,3 @@ function middleware(req, res, next) {
+     if(shared)res.once('close',()=>{if(!res.writableFinished)finishNative(false);});
+-    scope={ toolRun: { waiting: 0 },finishNative,requestId, signal: controller.signal, ...snapshot,...(shared?{bridge:shared.bridge,sponsorAuthority:shared.sponsorAuthority,sponsorBoundary:sharedBoundary,textOnly:shared.textOnly===true,safeTools:shared.safeTools,settleToolPause:shared.settleToolPause,canSteer:shared.steeringEnabled===true,workId:shared.workId,generation:shared.generation,phase:shared.phase,fence:shared.fence,applied:shared.applied,continuation:shared.continuation,checkpoint:shared.checkpoint}:{}) };
++    scope={ toolRun: { waiting: 0 },finishNative,requestId, signal: controller.signal, ...snapshot,...(shared?{bridge:shared.bridge,sponsorAuthority:shared.sponsorAuthority,sponsorBoundary:sharedBoundary,textOnly:shared.textOnly===true,safeTools:shared.safeTools,settleToolPause:shared.settleToolPause,canSteer:shared.steeringEnabled===true,workId:shared.workId,generation:shared.generation,phase:shared.phase,fence:shared.fence,applied:shared.applied,continuation:shared.continuation,checkpoint:shared.checkpoint,sessionFinalReply:shared.sessionFinalReply}:{}) };
+     return local.run(scope,next);
+@@ -337,3 +337,3 @@ module.exports = {
+     },
+-    finalReplyPublisher: () => local.getStore()?.checkpoint?.finalReply,
++    finalReplyPublisher: () => { const scope=local.getStore(); return scope?.checkpoint?.finalReply||scope?.sessionFinalReply; },
+     checkpointCompletion:value=>local.getStore()?.checkpoint?.completion?.(value),

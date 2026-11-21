@@ -1,0 +1,2532 @@
+{
+  "base": "d8f2a5296cc861693b2439908258f5598e9389b2",
+  "node": "v24.22.1",
+  "cases": [
+    {
+      "entry": "mobile-messages",
+      "mode": "before-final-seal",
+      "transport": "json",
+      "requestId": "ordinary-review-mobile-messages-before-final-seal-json",
+      "workId": "request_f04e618e3f684a7aae8da950f3f5ebeb",
+      "cut": {
+        "requestId": "request_f04e618e3f684a7aae8da950f3f5ebeb",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/nonStreamHandler.js": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "c001feb702770e759146610a5fd87d7be4bb1f2c6c4471d481a1f5e0f21ffd6f"
+      },
+      "before": {
+        "work": {
+          "kind": null,
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "mobile_984b66740514314aaa7596dc87dd1ed4",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_f04e618e3f684a7aae8da950f3f5ebeb",
+            "state": "dispatched"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "74a07657-f899-44a0-85ae-93d4c1d4e548",
+            "native_request_id": "request_f04e618e3f684a7aae8da950f3f5ebeb",
+            "record_id": "tcr-1795271814571-6765a48e-c71b-42a6-9642-3feab8cfd3d9",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": null,
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "mobile_984b66740514314aaa7596dc87dd1ed4",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_f04e618e3f684a7aae8da950f3f5ebeb",
+            "state": "unknown"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "74a07657-f899-44a0-85ae-93d4c1d4e548",
+            "native_request_id": "request_f04e618e3f684a7aae8da950f3f5ebeb",
+            "record_id": "tcr-1795271814571-6765a48e-c71b-42a6-9642-3feab8cfd3d9",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": null,
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "mobile_984b66740514314aaa7596dc87dd1ed4",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_f04e618e3f684a7aae8da950f3f5ebeb",
+            "state": "unknown"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "74a07657-f899-44a0-85ae-93d4c1d4e548",
+            "native_request_id": "request_f04e618e3f684a7aae8da950f3f5ebeb",
+            "record_id": "tcr-1795271814571-6765a48e-c71b-42a6-9642-3feab8cfd3d9",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "mobile-messages",
+      "mode": "before-final-seal",
+      "transport": "sse",
+      "requestId": "ordinary-review-mobile-messages-before-final-seal-sse",
+      "workId": "request_c7af4f05a0144c5db2851c11ace5a2a2",
+      "cut": {
+        "requestId": "request_c7af4f05a0144c5db2851c11ace5a2a2",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/streamHandler.js": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "aeb10ae336aa24fa0d2e4ff2a645ce7328e88d4f89c74622e17242ab159fd545"
+      },
+      "before": {
+        "work": {
+          "kind": null,
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "mobile_8c47d232170fac0b73535d35afe561fa",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_c7af4f05a0144c5db2851c11ace5a2a2",
+            "state": "dispatched"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "c6b127c4-24c7-4572-ad30-d59491296f26",
+            "native_request_id": "request_c7af4f05a0144c5db2851c11ace5a2a2",
+            "record_id": "tcr-1795271820362-db0214dd-72c9-4e37-bb1a-249626045c78",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": null,
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "mobile_8c47d232170fac0b73535d35afe561fa",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_c7af4f05a0144c5db2851c11ace5a2a2",
+            "state": "unknown"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "c6b127c4-24c7-4572-ad30-d59491296f26",
+            "native_request_id": "request_c7af4f05a0144c5db2851c11ace5a2a2",
+            "record_id": "tcr-1795271820362-db0214dd-72c9-4e37-bb1a-249626045c78",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": null,
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "mobile_8c47d232170fac0b73535d35afe561fa",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_c7af4f05a0144c5db2851c11ace5a2a2",
+            "state": "unknown"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "c6b127c4-24c7-4572-ad30-d59491296f26",
+            "native_request_id": "request_c7af4f05a0144c5db2851c11ace5a2a2",
+            "record_id": "tcr-1795271820362-db0214dd-72c9-4e37-bb1a-249626045c78",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "mobile-messages",
+      "mode": "after-final-seal",
+      "transport": "json",
+      "requestId": "ordinary-review-mobile-messages-after-final-seal-json",
+      "workId": "request_a80f3d92266d4f66b42a74b69423d0a0",
+      "cut": {
+        "requestId": "request_a80f3d92266d4f66b42a74b69423d0a0",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/nonStreamHandler.js": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "68051cf79d046e48d1bb12e529b125c19ccb162b226eb2c5101dac864a19c711"
+      },
+      "before": {
+        "work": {
+          "kind": null,
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "mobile_19c6610b006ee82841a4405b5a80da51",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "d881c708a2632d3ade5b66465aa4f338f75c80ed7ae2418aecf2989285f8089a",
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_a80f3d92266d4f66b42a74b69423d0a0",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "169e0f9f-a1fb-4984-9e26-ba762a1dd5d0",
+            "native_request_id": "request_a80f3d92266d4f66b42a74b69423d0a0",
+            "record_id": "tcr-1795271825447-2633339d-fba1-415f-8be8-675bb8a19d98",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": null,
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "mobile_19c6610b006ee82841a4405b5a80da51",
+          "reply_message_id": "reply_request_a80f3d92266d4f66b42a74b69423d0a0",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_a80f3d92266d4f66b42a74b69423d0a0",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "169e0f9f-a1fb-4984-9e26-ba762a1dd5d0",
+            "native_request_id": "request_a80f3d92266d4f66b42a74b69423d0a0",
+            "record_id": "tcr-1795271825447-2633339d-fba1-415f-8be8-675bb8a19d98",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_a80f3d92266d4f66b42a74b69423d0a0",
+            "action": "upsert",
+            "contentHash": "68051cf79d046e48d1bb12e529b125c19ccb162b226eb2c5101dac864a19c711"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": null,
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "mobile_19c6610b006ee82841a4405b5a80da51",
+          "reply_message_id": "reply_request_a80f3d92266d4f66b42a74b69423d0a0",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_a80f3d92266d4f66b42a74b69423d0a0",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "169e0f9f-a1fb-4984-9e26-ba762a1dd5d0",
+            "native_request_id": "request_a80f3d92266d4f66b42a74b69423d0a0",
+            "record_id": "tcr-1795271825447-2633339d-fba1-415f-8be8-675bb8a19d98",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_a80f3d92266d4f66b42a74b69423d0a0",
+            "action": "upsert",
+            "contentHash": "68051cf79d046e48d1bb12e529b125c19ccb162b226eb2c5101dac864a19c711"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "mobile-messages",
+      "mode": "after-final-seal",
+      "transport": "sse",
+      "requestId": "ordinary-review-mobile-messages-after-final-seal-sse",
+      "workId": "request_ce6158e4637748dea76beaf1a8d16162",
+      "cut": {
+        "requestId": "request_ce6158e4637748dea76beaf1a8d16162",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/streamHandler.js": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "a043fd89ed12b96d3b5acafbe36442c3edcfcd43982d586b5bd28921c89ad748"
+      },
+      "before": {
+        "work": {
+          "kind": null,
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "mobile_0bba211911e6d02d0be5a7a7b860d896",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "c898470b3bde273b41c829edaa27b185da716e0f480de6d981880b959f7cdaae",
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_ce6158e4637748dea76beaf1a8d16162",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "cbd5731a-8720-4a9d-a65e-34e5d29e69bf",
+            "native_request_id": "request_ce6158e4637748dea76beaf1a8d16162",
+            "record_id": "tcr-1795271831065-913f88a4-ea2a-4d28-86f2-730865be7911",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": null,
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "mobile_0bba211911e6d02d0be5a7a7b860d896",
+          "reply_message_id": "reply_request_ce6158e4637748dea76beaf1a8d16162",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_ce6158e4637748dea76beaf1a8d16162",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "cbd5731a-8720-4a9d-a65e-34e5d29e69bf",
+            "native_request_id": "request_ce6158e4637748dea76beaf1a8d16162",
+            "record_id": "tcr-1795271831065-913f88a4-ea2a-4d28-86f2-730865be7911",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_ce6158e4637748dea76beaf1a8d16162",
+            "action": "upsert",
+            "contentHash": "a043fd89ed12b96d3b5acafbe36442c3edcfcd43982d586b5bd28921c89ad748"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": null,
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "mobile_0bba211911e6d02d0be5a7a7b860d896",
+          "reply_message_id": "reply_request_ce6158e4637748dea76beaf1a8d16162",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_ce6158e4637748dea76beaf1a8d16162",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "cbd5731a-8720-4a9d-a65e-34e5d29e69bf",
+            "native_request_id": "request_ce6158e4637748dea76beaf1a8d16162",
+            "record_id": "tcr-1795271831065-913f88a4-ea2a-4d28-86f2-730865be7911",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_ce6158e4637748dea76beaf1a8d16162",
+            "action": "upsert",
+            "contentHash": "a043fd89ed12b96d3b5acafbe36442c3edcfcd43982d586b5bd28921c89ad748"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "desktop-session-send",
+      "mode": "dispatch-only",
+      "transport": "json",
+      "requestId": "ordinary-review-desktop-session-send-dispatch-only-json",
+      "workId": "request_c3bcf8f3a64f4e2f9f65922a20f7a3dc",
+      "cut": {
+        "requestId": "request_c3bcf8f3a64f4e2f9f65922a20f7a3dc",
+        "dispatchedWithoutProviderResponse": true,
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/nonStreamHandler.js": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "before": {
+        "work": {
+          "kind": "shared_session",
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-dispatch-only-json",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_c3bcf8f3a64f4e2f9f65922a20f7a3dc",
+            "state": "dispatched"
+          }
+        ],
+        "invocations": [],
+        "finalRows": [],
+        "counter": 0,
+        "providerPhases": [],
+        "providerStreams": []
+      },
+      "after": {
+        "work": {
+          "kind": "shared_session",
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-dispatch-only-json",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_c3bcf8f3a64f4e2f9f65922a20f7a3dc",
+            "state": "unknown"
+          }
+        ],
+        "invocations": [],
+        "finalRows": [],
+        "counter": 0,
+        "providerPhases": [],
+        "providerStreams": []
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": "shared_session",
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-dispatch-only-json",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_c3bcf8f3a64f4e2f9f65922a20f7a3dc",
+            "state": "unknown"
+          }
+        ],
+        "invocations": [],
+        "finalRows": [],
+        "counter": 0,
+        "providerPhases": [],
+        "providerStreams": []
+      },
+      "replayed": true
+    },
+    {
+      "entry": "desktop-session-send",
+      "mode": "dispatch-only",
+      "transport": "sse",
+      "requestId": "ordinary-review-desktop-session-send-dispatch-only-sse",
+      "workId": "request_b5d18449639343b7b8c7fddfe126c197",
+      "cut": {
+        "requestId": "request_b5d18449639343b7b8c7fddfe126c197",
+        "dispatchedWithoutProviderResponse": true,
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/streamHandler.js": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "before": {
+        "work": {
+          "kind": "shared_session",
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-dispatch-only-sse",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_b5d18449639343b7b8c7fddfe126c197",
+            "state": "dispatched"
+          }
+        ],
+        "invocations": [],
+        "finalRows": [],
+        "counter": 0,
+        "providerPhases": [],
+        "providerStreams": []
+      },
+      "after": {
+        "work": {
+          "kind": "shared_session",
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-dispatch-only-sse",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_b5d18449639343b7b8c7fddfe126c197",
+            "state": "unknown"
+          }
+        ],
+        "invocations": [],
+        "finalRows": [],
+        "counter": 0,
+        "providerPhases": [],
+        "providerStreams": []
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": "shared_session",
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-dispatch-only-sse",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_b5d18449639343b7b8c7fddfe126c197",
+            "state": "unknown"
+          }
+        ],
+        "invocations": [],
+        "finalRows": [],
+        "counter": 0,
+        "providerPhases": [],
+        "providerStreams": []
+      },
+      "replayed": true
+    },
+    {
+      "entry": "desktop-session-send",
+      "mode": "before-final-seal",
+      "transport": "json",
+      "requestId": "ordinary-review-desktop-session-send-before-final-seal-json",
+      "workId": "request_893cf405976b4b8f8ac5254412b46db4",
+      "cut": {
+        "requestId": "request_893cf405976b4b8f8ac5254412b46db4",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/nonStreamHandler.js": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "1d60fbb9bb084dc2ab186ee4078a3559177dbea84c01b8c1964d31f79e93dfe7"
+      },
+      "before": {
+        "work": {
+          "kind": "shared_session",
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-before-final-seal-json",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_893cf405976b4b8f8ac5254412b46db4",
+            "state": "dispatched"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "3465ef99-4942-4f05-ab26-bcfa3aa644f8",
+            "native_request_id": "request_893cf405976b4b8f8ac5254412b46db4",
+            "record_id": "tcr-1795271847305-121e1e6c-df67-4686-b9f6-a7d3bea18a46",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": "shared_session",
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-before-final-seal-json",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_893cf405976b4b8f8ac5254412b46db4",
+            "state": "unknown"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "3465ef99-4942-4f05-ab26-bcfa3aa644f8",
+            "native_request_id": "request_893cf405976b4b8f8ac5254412b46db4",
+            "record_id": "tcr-1795271847305-121e1e6c-df67-4686-b9f6-a7d3bea18a46",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": "shared_session",
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-before-final-seal-json",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_893cf405976b4b8f8ac5254412b46db4",
+            "state": "unknown"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "3465ef99-4942-4f05-ab26-bcfa3aa644f8",
+            "native_request_id": "request_893cf405976b4b8f8ac5254412b46db4",
+            "record_id": "tcr-1795271847305-121e1e6c-df67-4686-b9f6-a7d3bea18a46",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "desktop-session-send",
+      "mode": "before-final-seal",
+      "transport": "sse",
+      "requestId": "ordinary-review-desktop-session-send-before-final-seal-sse",
+      "workId": "request_4f384144b5514573b1b83e84c8d5f3a9",
+      "cut": {
+        "requestId": "request_4f384144b5514573b1b83e84c8d5f3a9",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/streamHandler.js": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "ba3fde488625c54deff82c9b7b8c5533cdf4a62cad03367ba1f03795989c0e8c"
+      },
+      "before": {
+        "work": {
+          "kind": "shared_session",
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-before-final-seal-sse",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_4f384144b5514573b1b83e84c8d5f3a9",
+            "state": "dispatched"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "157445fa-ba12-45af-a23a-d8b46775e3f7",
+            "native_request_id": "request_4f384144b5514573b1b83e84c8d5f3a9",
+            "record_id": "tcr-1795271851279-988c3f8d-169a-48b1-bb09-e271020a9926",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": "shared_session",
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-before-final-seal-sse",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_4f384144b5514573b1b83e84c8d5f3a9",
+            "state": "unknown"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "157445fa-ba12-45af-a23a-d8b46775e3f7",
+            "native_request_id": "request_4f384144b5514573b1b83e84c8d5f3a9",
+            "record_id": "tcr-1795271851279-988c3f8d-169a-48b1-bb09-e271020a9926",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": "shared_session",
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-before-final-seal-sse",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_4f384144b5514573b1b83e84c8d5f3a9",
+            "state": "unknown"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "157445fa-ba12-45af-a23a-d8b46775e3f7",
+            "native_request_id": "request_4f384144b5514573b1b83e84c8d5f3a9",
+            "record_id": "tcr-1795271851279-988c3f8d-169a-48b1-bb09-e271020a9926",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "desktop-session-send",
+      "mode": "after-final-seal",
+      "transport": "json",
+      "requestId": "ordinary-review-desktop-session-send-after-final-seal-json",
+      "workId": "request_0581102234b549c2b1a78c6e6abe7645",
+      "cut": {
+        "requestId": "request_0581102234b549c2b1a78c6e6abe7645",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/nonStreamHandler.js": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "d707c0aadd0b94c847495529b47bf5d94d456a92b9efaf394284012710debafd"
+      },
+      "before": {
+        "work": {
+          "kind": "shared_session",
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-after-final-seal-json",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "dc92027993b42d65b3d19dd7c0a4d2efbae904c5b66b9821fe13cac962c9c06b",
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_0581102234b549c2b1a78c6e6abe7645",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "c9bb4a9e-6e6b-42cf-bd2a-215d8d80ad7a",
+            "native_request_id": "request_0581102234b549c2b1a78c6e6abe7645",
+            "record_id": "tcr-1795271856190-42c7a8be-1b9b-4f0d-8dff-c99cdb917944",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": "shared_session",
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-after-final-seal-json",
+          "reply_message_id": "reply_request_0581102234b549c2b1a78c6e6abe7645",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_0581102234b549c2b1a78c6e6abe7645",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "c9bb4a9e-6e6b-42cf-bd2a-215d8d80ad7a",
+            "native_request_id": "request_0581102234b549c2b1a78c6e6abe7645",
+            "record_id": "tcr-1795271856190-42c7a8be-1b9b-4f0d-8dff-c99cdb917944",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_0581102234b549c2b1a78c6e6abe7645",
+            "action": "upsert",
+            "contentHash": "d707c0aadd0b94c847495529b47bf5d94d456a92b9efaf394284012710debafd"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": "shared_session",
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-after-final-seal-json",
+          "reply_message_id": "reply_request_0581102234b549c2b1a78c6e6abe7645",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_0581102234b549c2b1a78c6e6abe7645",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "c9bb4a9e-6e6b-42cf-bd2a-215d8d80ad7a",
+            "native_request_id": "request_0581102234b549c2b1a78c6e6abe7645",
+            "record_id": "tcr-1795271856190-42c7a8be-1b9b-4f0d-8dff-c99cdb917944",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_0581102234b549c2b1a78c6e6abe7645",
+            "action": "upsert",
+            "contentHash": "d707c0aadd0b94c847495529b47bf5d94d456a92b9efaf394284012710debafd"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "desktop-session-send",
+      "mode": "after-final-seal",
+      "transport": "sse",
+      "requestId": "ordinary-review-desktop-session-send-after-final-seal-sse",
+      "workId": "request_79cd0fa0af4144698185f65d9cb3d20f",
+      "cut": {
+        "requestId": "request_79cd0fa0af4144698185f65d9cb3d20f",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/streamHandler.js": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "55452c4aca8ec0426d46974f754122f94ce6d884633e2a449ba28c24e802335e"
+      },
+      "before": {
+        "work": {
+          "kind": "shared_session",
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-after-final-seal-sse",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "33626992adf52a5f47a478d454a5917c7dd3d62781e150a3490ce34b144eaec6",
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_79cd0fa0af4144698185f65d9cb3d20f",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "710e3c34-c23d-41b5-b965-0aca3c3000cf",
+            "native_request_id": "request_79cd0fa0af4144698185f65d9cb3d20f",
+            "record_id": "tcr-1795271859827-50c486bb-d461-46c4-92da-b704087bbdb2",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": "shared_session",
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-after-final-seal-sse",
+          "reply_message_id": "reply_request_79cd0fa0af4144698185f65d9cb3d20f",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_79cd0fa0af4144698185f65d9cb3d20f",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "710e3c34-c23d-41b5-b965-0aca3c3000cf",
+            "native_request_id": "request_79cd0fa0af4144698185f65d9cb3d20f",
+            "record_id": "tcr-1795271859827-50c486bb-d461-46c4-92da-b704087bbdb2",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_79cd0fa0af4144698185f65d9cb3d20f",
+            "action": "upsert",
+            "contentHash": "55452c4aca8ec0426d46974f754122f94ce6d884633e2a449ba28c24e802335e"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": "shared_session",
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-after-final-seal-sse",
+          "reply_message_id": "reply_request_79cd0fa0af4144698185f65d9cb3d20f",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_79cd0fa0af4144698185f65d9cb3d20f",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "710e3c34-c23d-41b5-b965-0aca3c3000cf",
+            "native_request_id": "request_79cd0fa0af4144698185f65d9cb3d20f",
+            "record_id": "tcr-1795271859827-50c486bb-d461-46c4-92da-b704087bbdb2",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_79cd0fa0af4144698185f65d9cb3d20f",
+            "action": "upsert",
+            "contentHash": "55452c4aca8ec0426d46974f754122f94ce6d884633e2a449ba28c24e802335e"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "desktop-session-send",
+      "mode": "before-intent",
+      "transport": "json",
+      "requestId": "ordinary-review-desktop-session-send-before-intent-json",
+      "workId": "request_9501bae1acfb425896eab23197ecc36c",
+      "cut": {
+        "requestId": "request_9501bae1acfb425896eab23197ecc36c",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/nonStreamHandler.js": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "2826e4aade708fb6861fd80e023e6d6e71bf412e6503788cda779a2b9a7f9978"
+      },
+      "before": {
+        "work": {
+          "kind": "shared_session",
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-before-intent-json",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "e14ba30d9bb3625011e0290e46495b5f85485d1483d3b7747dc1e3ee0ca38442",
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_9501bae1acfb425896eab23197ecc36c",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "4bd54c2b-0096-4bdf-b3f6-b1e073e48c61",
+            "native_request_id": "request_9501bae1acfb425896eab23197ecc36c",
+            "record_id": "tcr-1795271863459-5520cfe5-45ce-4a89-b2ae-7c5583d2bde6",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": "shared_session",
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-before-intent-json",
+          "reply_message_id": "reply_request_9501bae1acfb425896eab23197ecc36c",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_9501bae1acfb425896eab23197ecc36c",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "4bd54c2b-0096-4bdf-b3f6-b1e073e48c61",
+            "native_request_id": "request_9501bae1acfb425896eab23197ecc36c",
+            "record_id": "tcr-1795271863459-5520cfe5-45ce-4a89-b2ae-7c5583d2bde6",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_9501bae1acfb425896eab23197ecc36c",
+            "action": "upsert",
+            "contentHash": "2826e4aade708fb6861fd80e023e6d6e71bf412e6503788cda779a2b9a7f9978"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": "shared_session",
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-before-intent-json",
+          "reply_message_id": "reply_request_9501bae1acfb425896eab23197ecc36c",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_9501bae1acfb425896eab23197ecc36c",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "4bd54c2b-0096-4bdf-b3f6-b1e073e48c61",
+            "native_request_id": "request_9501bae1acfb425896eab23197ecc36c",
+            "record_id": "tcr-1795271863459-5520cfe5-45ce-4a89-b2ae-7c5583d2bde6",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_9501bae1acfb425896eab23197ecc36c",
+            "action": "upsert",
+            "contentHash": "2826e4aade708fb6861fd80e023e6d6e71bf412e6503788cda779a2b9a7f9978"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "desktop-session-send",
+      "mode": "before-intent",
+      "transport": "sse",
+      "requestId": "ordinary-review-desktop-session-send-before-intent-sse",
+      "workId": "request_afc4a7e0e90c4d5da1d2676248121c5b",
+      "cut": {
+        "requestId": "request_afc4a7e0e90c4d5da1d2676248121c5b",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/streamHandler.js": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "f81012eb08c56b9ddcca288a1a78683a6fd6a6a315dd6f3a6b88108e05a61594"
+      },
+      "before": {
+        "work": {
+          "kind": "shared_session",
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-before-intent-sse",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "872f1532d6b4b1a832c51e7561dd5d950b67c864752c7ed64d7b72562e940bbb",
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_afc4a7e0e90c4d5da1d2676248121c5b",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "216b3858-57ce-46df-8de7-7da26ccbe5f7",
+            "native_request_id": "request_afc4a7e0e90c4d5da1d2676248121c5b",
+            "record_id": "tcr-1795271867081-2fbe662e-6da9-4c5e-b247-9df13a6654b6",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": "shared_session",
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-before-intent-sse",
+          "reply_message_id": "reply_request_afc4a7e0e90c4d5da1d2676248121c5b",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_afc4a7e0e90c4d5da1d2676248121c5b",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "216b3858-57ce-46df-8de7-7da26ccbe5f7",
+            "native_request_id": "request_afc4a7e0e90c4d5da1d2676248121c5b",
+            "record_id": "tcr-1795271867081-2fbe662e-6da9-4c5e-b247-9df13a6654b6",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_afc4a7e0e90c4d5da1d2676248121c5b",
+            "action": "upsert",
+            "contentHash": "f81012eb08c56b9ddcca288a1a78683a6fd6a6a315dd6f3a6b88108e05a61594"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": "shared_session",
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-before-intent-sse",
+          "reply_message_id": "reply_request_afc4a7e0e90c4d5da1d2676248121c5b",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_afc4a7e0e90c4d5da1d2676248121c5b",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "216b3858-57ce-46df-8de7-7da26ccbe5f7",
+            "native_request_id": "request_afc4a7e0e90c4d5da1d2676248121c5b",
+            "record_id": "tcr-1795271867081-2fbe662e-6da9-4c5e-b247-9df13a6654b6",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_afc4a7e0e90c4d5da1d2676248121c5b",
+            "action": "upsert",
+            "contentHash": "f81012eb08c56b9ddcca288a1a78683a6fd6a6a315dd6f3a6b88108e05a61594"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "desktop-session-send",
+      "mode": "after-intent",
+      "transport": "json",
+      "requestId": "ordinary-review-desktop-session-send-after-intent-json",
+      "workId": "request_219ae47ee7444c1585dab4b6008cc023",
+      "cut": {
+        "requestId": "request_219ae47ee7444c1585dab4b6008cc023",
+        "intentTerminalState": "completed",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/nonStreamHandler.js": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "9cbe1a10aed1cd14027df9c0ae1aba4e6ff01f86e31ddbf63b4573b3b7486a1d"
+      },
+      "before": {
+        "work": {
+          "kind": "shared_session",
+          "state": "publishing",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-after-intent-json",
+          "reply_message_id": null,
+          "replyIntent": 1,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "2fdede4902f23b6f713b392f1b11c4007e9dcc820987532ef735f5fed8f0099f",
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_219ae47ee7444c1585dab4b6008cc023",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "787ddc56-ef11-426f-aba9-0a5e57bca19d",
+            "native_request_id": "request_219ae47ee7444c1585dab4b6008cc023",
+            "record_id": "tcr-1795271870761-72dc9ed1-ac21-4c8b-95f5-2fe5a296a459",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": "shared_session",
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-after-intent-json",
+          "reply_message_id": "reply_request_219ae47ee7444c1585dab4b6008cc023",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_219ae47ee7444c1585dab4b6008cc023",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "787ddc56-ef11-426f-aba9-0a5e57bca19d",
+            "native_request_id": "request_219ae47ee7444c1585dab4b6008cc023",
+            "record_id": "tcr-1795271870761-72dc9ed1-ac21-4c8b-95f5-2fe5a296a459",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_219ae47ee7444c1585dab4b6008cc023",
+            "action": "upsert",
+            "contentHash": "9cbe1a10aed1cd14027df9c0ae1aba4e6ff01f86e31ddbf63b4573b3b7486a1d"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": "shared_session",
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-after-intent-json",
+          "reply_message_id": "reply_request_219ae47ee7444c1585dab4b6008cc023",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_219ae47ee7444c1585dab4b6008cc023",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "787ddc56-ef11-426f-aba9-0a5e57bca19d",
+            "native_request_id": "request_219ae47ee7444c1585dab4b6008cc023",
+            "record_id": "tcr-1795271870761-72dc9ed1-ac21-4c8b-95f5-2fe5a296a459",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_219ae47ee7444c1585dab4b6008cc023",
+            "action": "upsert",
+            "contentHash": "9cbe1a10aed1cd14027df9c0ae1aba4e6ff01f86e31ddbf63b4573b3b7486a1d"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "desktop-session-send",
+      "mode": "after-intent",
+      "transport": "sse",
+      "requestId": "ordinary-review-desktop-session-send-after-intent-sse",
+      "workId": "request_0af9369343e9432b98d6a73dbe5cc8f6",
+      "cut": {
+        "requestId": "request_0af9369343e9432b98d6a73dbe5cc8f6",
+        "intentTerminalState": "completed",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/streamHandler.js": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "2c47225abd009cb5f68f405a7f0b370ea2a3669d204558311bc147acba83bcab"
+      },
+      "before": {
+        "work": {
+          "kind": "shared_session",
+          "state": "publishing",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-after-intent-sse",
+          "reply_message_id": null,
+          "replyIntent": 1,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "49adbd443e2582d3a846fa08b32d96a688562b2770a34c1b496d827651042393",
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_0af9369343e9432b98d6a73dbe5cc8f6",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "3de202dc-34a4-486b-a556-ce845a3fea75",
+            "native_request_id": "request_0af9369343e9432b98d6a73dbe5cc8f6",
+            "record_id": "tcr-1795271874360-e20d3a0c-b920-4a65-bdb5-5fa650116583",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": "shared_session",
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-after-intent-sse",
+          "reply_message_id": "reply_request_0af9369343e9432b98d6a73dbe5cc8f6",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_0af9369343e9432b98d6a73dbe5cc8f6",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "3de202dc-34a4-486b-a556-ce845a3fea75",
+            "native_request_id": "request_0af9369343e9432b98d6a73dbe5cc8f6",
+            "record_id": "tcr-1795271874360-e20d3a0c-b920-4a65-bdb5-5fa650116583",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_0af9369343e9432b98d6a73dbe5cc8f6",
+            "action": "upsert",
+            "contentHash": "2c47225abd009cb5f68f405a7f0b370ea2a3669d204558311bc147acba83bcab"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": "shared_session",
+          "state": "completed",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-after-intent-sse",
+          "reply_message_id": "reply_request_0af9369343e9432b98d6a73dbe5cc8f6",
+          "replyIntent": 0,
+          "nativeFinal": 0
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": null,
+        "admission": {
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": 2
+        },
+        "native": [
+          {
+            "id": "request_0af9369343e9432b98d6a73dbe5cc8f6",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "3de202dc-34a4-486b-a556-ce845a3fea75",
+            "native_request_id": "request_0af9369343e9432b98d6a73dbe5cc8f6",
+            "record_id": "tcr-1795271874360-e20d3a0c-b920-4a65-bdb5-5fa650116583",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [
+          {
+            "seq": 2,
+            "id": "reply_request_0af9369343e9432b98d6a73dbe5cc8f6",
+            "action": "upsert",
+            "contentHash": "2c47225abd009cb5f68f405a7f0b370ea2a3669d204558311bc147acba83bcab"
+          }
+        ],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "desktop-session-send",
+      "mode": "corrupt-final",
+      "transport": "json",
+      "requestId": "ordinary-review-desktop-session-send-corrupt-final-json",
+      "workId": "request_f945ed5a0515475ead21fb6f85d603fd",
+      "cut": {
+        "requestId": "request_f945ed5a0515475ead21fb6f85d603fd",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/nonStreamHandler.js": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "fca10e8a02807e60f65e5bbc339a7b27a92865c9cc6e34fe4a170700285c0a91"
+      },
+      "before": {
+        "work": {
+          "kind": "shared_session",
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-corrupt-final-json",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "94af8a43ce4b1637206a691a6fe94cfae5334a7de7a7b89a52637e809f949219",
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_f945ed5a0515475ead21fb6f85d603fd",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "5b6ab0a9-40df-414d-b220-46bd77162da1",
+            "native_request_id": "request_f945ed5a0515475ead21fb6f85d603fd",
+            "record_id": "tcr-1795271878851-c4590afe-b109-49db-bd2b-adf71408d1a3",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": "shared_session",
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-corrupt-final-json",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "47eca29b4a7850a5ddc23dfa128e3a82cee59cc2e4c4101ca7cee89f2e9cf670",
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_f945ed5a0515475ead21fb6f85d603fd",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "5b6ab0a9-40df-414d-b220-46bd77162da1",
+            "native_request_id": "request_f945ed5a0515475ead21fb6f85d603fd",
+            "record_id": "tcr-1795271878851-c4590afe-b109-49db-bd2b-adf71408d1a3",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": "shared_session",
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-corrupt-final-json",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "47eca29b4a7850a5ddc23dfa128e3a82cee59cc2e4c4101ca7cee89f2e9cf670",
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_f945ed5a0515475ead21fb6f85d603fd",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "5b6ab0a9-40df-414d-b220-46bd77162da1",
+            "native_request_id": "request_f945ed5a0515475ead21fb6f85d603fd",
+            "record_id": "tcr-1795271878851-c4590afe-b109-49db-bd2b-adf71408d1a3",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          false,
+          false
+        ]
+      },
+      "replayed": true
+    },
+    {
+      "entry": "desktop-session-send",
+      "mode": "corrupt-final",
+      "transport": "sse",
+      "requestId": "ordinary-review-desktop-session-send-corrupt-final-sse",
+      "workId": "request_2c1e010fbe28406d850472f462ae551c",
+      "cut": {
+        "requestId": "request_2c1e010fbe28406d850472f462ae551c",
+        "handlerFinishReason": "stop",
+        "loaded": {
+          "apps/server/modules/chatCompletionHandler.js": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6",
+          "apps/server/modules/handlers/streamHandler.js": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec",
+          "apps/server/Plugin/NativeSync/mobile/nativeResponse.js": "05cb2acdea0c7dd40bf818a652630f473988310574e6bd3a2f9da7bea4311317",
+          "apps/server/modules/requestExecutionContext.js": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6",
+          "apps/server/Plugin/NativeSync/mobile/execution.js": "d3152069f6754f62e9fe18fb0802751158157a4b5da99cabb9dd13a1c25790c4",
+          "apps/server/Plugin/NativeSync/mobile/sharedSingle.js": "571bb8abed676015c38bb2a36cf733bae2bf6f9b3b01b73ac0e170b128e3bedc",
+          "apps/server/Plugin/NativeSync/sync/sharedSession.js": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2",
+          "apps/server/Plugin/NativeSync/sync/sharedNative.js": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f",
+          "apps/server/Plugin/NativeSync/sync/sharedSpace.js": "c943877a537ca8b77b206904726e454090cb8960b4eca847610e2a0c1f067e9b"
+        },
+        "contentHash": "d77f8fdf64c926a49071af085692d6e064ddb49d90b9eac06eb3b6b99e983d60"
+      },
+      "before": {
+        "work": {
+          "kind": "shared_session",
+          "state": "running",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-corrupt-final-sse",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "7891753a10b86ade7b51da1707d741abbbb4182c36336967850b5e38375bbbe8",
+        "admission": {
+          "state": "dispatched",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_2c1e010fbe28406d850472f462ae551c",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "9501939e-7073-4d1c-b602-ea7c2af06bb4",
+            "native_request_id": "request_2c1e010fbe28406d850472f462ae551c",
+            "record_id": "tcr-1795271882529-50d515c7-9d33-48e2-ace1-bcc8d22ff61d",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "after": {
+        "work": {
+          "kind": "shared_session",
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-corrupt-final-sse",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "a990afe6c6663ea4070f129d2ffe4378681c177ab9a7890b2949f47ffadfdcca",
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_2c1e010fbe28406d850472f462ae551c",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "9501939e-7073-4d1c-b602-ea7c2af06bb4",
+            "native_request_id": "request_2c1e010fbe28406d850472f462ae551c",
+            "record_id": "tcr-1795271882529-50d515c7-9d33-48e2-ace1-bcc8d22ff61d",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "afterSecondRestart": {
+        "work": {
+          "kind": "shared_session",
+          "state": "review_required",
+          "attempts": 1,
+          "user_message_id": "ordinary-review-desktop-session-send-corrupt-final-sse",
+          "reply_message_id": null,
+          "replyIntent": 0,
+          "nativeFinal": 1
+        },
+        "workCount": 1,
+        "userMessageCount": 1,
+        "nativeFinalHash": "a990afe6c6663ea4070f129d2ffe4378681c177ab9a7890b2949f47ffadfdcca",
+        "admission": {
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "reply_seq": null
+        },
+        "native": [
+          {
+            "id": "request_2c1e010fbe28406d850472f462ae551c",
+            "state": "model_terminal"
+          }
+        ],
+        "invocations": [
+          {
+            "invocation_id": "9501939e-7073-4d1c-b602-ea7c2af06bb4",
+            "native_request_id": "request_2c1e010fbe28406d850472f462ae551c",
+            "record_id": "tcr-1795271882529-50d515c7-9d33-48e2-ace1-bcc8d22ff61d",
+            "state": "returned"
+          }
+        ],
+        "finalRows": [],
+        "counter": 1,
+        "providerPhases": [
+          "tool-request",
+          "continuation"
+        ],
+        "providerStreams": [
+          true,
+          true
+        ]
+      },
+      "replayed": true
+    }
+  ]
+}

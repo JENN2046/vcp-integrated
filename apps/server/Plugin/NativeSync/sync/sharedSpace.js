@@ -86,7 +86,11 @@ class SharedSpace {
     WHERE g.work_id=shared_admissions.id AND g.generation=1 AND g.state='running'
       AND r.state IN ('dispatched','model_terminal')
    ))`:'';
-  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing+safePause+nativeFinal).run();
+  const sessionFinal=tables.has('mobile_executions')&&this.db.prepare('PRAGMA table_info(mobile_executions)').all().some(c=>c.name==='native_final_operation')?`
+   AND NOT (native_terminal=1 AND EXISTS (SELECT 1 FROM mobile_executions e
+     WHERE e.id=shared_admissions.id AND (e.kind IS NULL OR e.kind='shared_session') AND e.state='running'
+      AND e.cancel_requested=0 AND e.native_final_operation IS NOT NULL))`:'';
+  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing+safePause+nativeFinal+sessionFinal).run();
  }
  atomic(fn){
   const own=!this.db.isTransaction;

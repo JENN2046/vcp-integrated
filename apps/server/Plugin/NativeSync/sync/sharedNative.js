@@ -147,11 +147,11 @@ class SharedNative {
   }
   return Boolean(this.db.prepare("SELECT 1 FROM shared_local_bindings WHERE kind='topic' AND local_id=? AND local_parent=? LIMIT 1").get(context.topicId,context.agentId));
  }
- enter(req,trustedActor=null){
-  if(req.headers?.['x-nativesync-register']==='v1')return this.shared.atomic(()=>this.enterChecked(req,trustedActor));
-  return this.enterChecked(req,trustedActor);
+ enter(req,trustedActor=null,replyOperation){
+  if(req.headers?.['x-nativesync-register']==='v1')return this.shared.atomic(()=>this.enterChecked(req,trustedActor,replyOperation));
+  return this.enterChecked(req,trustedActor,replyOperation);
  }
- enterChecked(req,trustedActor=null){
+ enterChecked(req,trustedActor=null,replyOperation){
   const ticket=req.headers?.['x-nativesync-admission'];
   if(!ticket){if(this.knownContext(req.body?.vcpchatExtensions?.requestContext))throw fail('SHARED_NATIVE_ADMISSION_REQUIRED');return null;}
   if(this.draining)throw fail('HOST_DRAINING',503);
@@ -246,7 +246,7 @@ class SharedNative {
   };
   let ended=false;
   const ownsFinalReply=safeToolWork&&generation?.generation===1;
-  const finalReply=ownsFinalReply?value=>{
+  const controlledFinalReply=ownsFinalReply?value=>{
    if(ended||this.closed)throw fail('SHARED_REQUEST_FENCED');
    if(value?.finishReason!=='stop'||typeof value.content!=='string'||!value.content.trim())throw fail('NATIVE_COMPLETION_INVALID');
    const timestamp=this.continuations.read(row.id)?.completion?.timestamp??Date.now();
@@ -255,6 +255,23 @@ class SharedNative {
    this.continuations.completion(row.id,{...record,digest:sha256(stable(record))});
    this.tryFinalReply(admission.id,row.id);
   }:undefined;
+  const sessionFinalReply=trustedActor&&row.id===admission.id&&typeof replyOperation==='function'?value=>{
+   if(ended||this.closed)throw fail('SHARED_REQUEST_FENCED');
+   if(value?.finishReason!=='stop'||typeof value.content!=='string'||!value.content||Buffer.byteLength(value.content)>4*1024*1024)return;
+   fence();
+   if(this.engine.nativeTasks.uncertainTools(admission.id))return;
+   this.shared.atomic(()=>{
+    const sealed=this.db.prepare(`UPDATE mobile_executions SET native_final_operation=?
+     WHERE id=? AND (kind IS NULL OR kind='shared_session') AND state='running' AND request_dispatched=1 AND cancel_requested=0
+      AND pending_operation IS NULL AND native_final_operation IS NULL`).run(require('../mobile/sharedSingle').sealNativeFinal(row,admission,replyOperation(value.content)),row.id);
+    if(!sealed.changes)return;
+    if(!this.db.prepare("UPDATE shared_native_requests SET state='model_terminal' WHERE id=? AND state='dispatched'").run(row.id).changes)throw fail('SHARED_REQUEST_FENCED');
+    this.phase(admission.id,row.id,'final_persisted');
+    this.checkTerminal(admission.id);
+   });
+  }:undefined;
+  if(sessionFinalReply)sessionFinalReply.readStreamDelta=require('../nativeRules/Groupmodules/streamDelta').groupStreamDelta;
+  const finalReply=controlledFinalReply||sessionFinalReply;
   if(generation)this.db.prepare("UPDATE shared_work_generations SET state='preprocessing' WHERE work_id=? AND generation=?").run(admission.id,generation.generation);
   this.phase(admission.id,row.id,'native_entered');this.engine.emitEvent?.(admission.id,'state',{state:'dispatched'});
   let previewStopped=false;
@@ -283,6 +300,10 @@ class SharedNative {
     if(held)this.engine.emitEvent?.(admission.id,'state',{state:'review_required'});
     return;
    }
+   if(sessionFinalReply&&this.engine.get(row.id)?.native_final_operation){
+    this.checkTerminal(admission.id);
+    return;
+   }
    if(pausedAtFence){
     try{
      this.shared.atomic(()=>{
@@ -303,7 +324,7 @@ class SharedNative {
    if(!success&&!steered){this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE id=? AND state='dispatched'").run(admission.id);this.engine.emitEvent?.(admission.id,'state',{state:'review_required'});}
    else this.checkTerminal(admission.id);
   };
-  return {textOnly,safeTools,observeAssistantText,sponsorAuthority:{actor,admissionId:admission.id,spaceId:admission.space_id,routeHash:JSON.parse(admission.user_op||'{}').sponsorRouteHash},phase:name=>this.phase(admission.id,row.id,name),steeringEnabled,workId:admission.id,generation:generation?.generation||0,fence,applied,continuation:()=>continuedBody,checkpoint:steeringEnabled?{finalReply,completion:value=>this.continuations.completion(row.id,value),assistant:content=>this.continuations.assistant(row.id,content),result:(invocation,value)=>this.continuations.result(row.id,invocation,value)}:null,bridge:hooks,finish,
+  return {textOnly,safeTools,observeAssistantText,sponsorAuthority:{actor,admissionId:admission.id,spaceId:admission.space_id,routeHash:JSON.parse(admission.user_op||'{}').sponsorRouteHash},phase:name=>this.phase(admission.id,row.id,name),steeringEnabled,workId:admission.id,generation:generation?.generation||0,fence,applied,continuation:()=>continuedBody,checkpoint:steeringEnabled?{finalReply,completion:value=>this.continuations.completion(row.id,value),assistant:content=>this.continuations.assistant(row.id,content),result:(invocation,value)=>this.continuations.result(row.id,invocation,value)}:null,sessionFinalReply,bridge:hooks,finish,
    settleToolPause:()=>{
     if(!pausedAtFence)return false;
     finish(false);

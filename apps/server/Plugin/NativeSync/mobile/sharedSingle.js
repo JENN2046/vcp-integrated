@@ -5,7 +5,7 @@ function acceptedActor(engine,row){
  if(row.kind==='shared_session')return require('../sync/sharedSession').acceptedActor(engine,row);
  const topic=engine.topics.get(row.topic_key),shared=engine.store.shared;
  const admission=shared?.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(row.id);
- if(!topic?.sharedSpaceId||!admission||admission.space_id!==topic.sharedSpaceId||admission.principal!=='mobile:'+row.session_id)throw fail('SHARED_REQUEST_OWNER_REQUIRED');
+ if(!topic?.sharedSpaceId||!admission||admission.topic_id!==row.topic_key||admission.space_id!==topic.sharedSpaceId||admission.principal!=='mobile:'+row.session_id)throw fail('SHARED_REQUEST_OWNER_REQUIRED');
  // This is the server's durable accepted request, not a renewed public grant.
  return {kind:'mobile',principal:admission.principal,spaceId:admission.space_id,permissions:['execute']};
 }
@@ -32,10 +32,44 @@ function accept(engine,sessionId,{topicKey,requestId,text,attachments=[]}){
   engine.wake();return {...engine.public(engine.get(admitted.id),sessionId),replayed:false};
  });
 }
-function register(engine,row,packet,published){
+function register(engine,row,packet,published,replyOperation){
  const shared=engine.store.shared,topic=engine.topics.get(row.topic_key),actor=acceptedActor(engine,row);
  shared.native.prepare(actor,{sharedSpaceId:topic.sharedSpaceId,admissionId:row.id,requestId:row.id,bodyHash:sha256(stable(JSON.parse(JSON.stringify(packet))))},{session:row.kind==='shared_session'});
- return require('../../../modules/requestExecutionContext').register(row.id,published,engine.nativeTasks.hooks(row.id),{actor,admissionId:row.id});
+ return require('../../../modules/requestExecutionContext').register(row.id,published,engine.nativeTasks.hooks(row.id),{actor,admissionId:row.id,replyOperation});
+}
+function sealNativeFinal(request,admission,operation){
+ const proof={version:1,executionId:admission.id,nativeRequestId:request.id,principal:request.principal,
+  bodyHash:request.body_hash,finishReason:'stop',operation:JSON.parse(JSON.stringify(operation))};
+ return JSON.stringify({...proof,digest:sha256(stable(proof))});
+}
+function nativeFinalOperation(engine,row){
+ const request=engine.db.prepare('SELECT * FROM shared_native_requests WHERE id=? AND admission_id=?').get(row.id,row.id);
+ const topic=engine.topics.get(row.topic_key);
+ let record;
+ try{record=JSON.parse(row.native_final_operation);}catch{throw fail('NATIVE_FINAL_PROOF_INVALID_REVIEW_REQUIRED');}
+ const {digest,...proof}=record||{},op=proof.operation,m=op?.message;
+ if(proof.version!==1||proof.finishReason!=='stop'||proof.executionId!==row.id||proof.nativeRequestId!==row.id||
+  !request||request.state!=='model_terminal'||request.principal!==proof.principal||request.body_hash!==proof.bodyHash||
+  acceptedActor(engine,row).principal!==proof.principal||digest!==sha256(stable(proof))||
+  op?.ownerType!==topic?.ownerType||op?.ownerId!==topic?.ownerId||op?.topicId!==topic?.topicId||
+  op?.msgId!=='reply_'+row.id||op.opId!=='reply:'+row.id||op.action!=='upsert'||
+  m?.id!==op.msgId||m.role!=='assistant'||typeof m.content!=='string'||!m.content||
+  m.continuity?.executionId!==row.id||m.continuity.requestId!==row.request_id){
+  throw fail('NATIVE_FINAL_PROOF_INVALID_REVIEW_REQUIRED');
+ }
+ return op;
+}
+function promoteNativeFinal(engine,row){
+ if((row.kind!=null&&row.kind!=='shared_session')||row.cancel_requested||engine.nativeTasks.uncertainTools(row.id)||engine.nativeTasks.needsReview(row.id))return;
+ const admission=engine.db.prepare("SELECT state,dispatched,native_terminal FROM shared_admissions WHERE id=?").get(row.id);
+ if(admission?.state!=='dispatched'||!admission.dispatched||!admission.native_terminal)return;
+ let operation;
+ try{operation=nativeFinalOperation(engine,row);}catch{return;}
+ // This only recreates the existing write-ahead publication intent. The
+ // scheduler never re-enters ToolBox for a final already sealed by ToolBox.
+ engine.db.prepare(`UPDATE mobile_executions SET state='publishing',pending_operation=?,updated_at=?
+  WHERE id=? AND state='running' AND request_dispatched=1 AND cancel_requested=0
+   AND pending_operation IS NULL AND native_final_operation=?`).run(JSON.stringify(operation),Date.now(),row.id,row.native_final_operation);
 }
 function complete(engine,row){
  const shared=engine.store.shared,topic=engine.topics.get(row.topic_key),actor=acceptedActor(engine,row),op=JSON.parse(row.pending_operation);
@@ -53,7 +87,7 @@ function complete(engine,row){
  }
  if(!admission.native_terminal)return false;
  shared.complete(actor,{sharedSpaceId:topic.sharedSpaceId,admissionId:row.id,opId:'mobile-complete_'+row.id,message:op.message},{session:row.kind==='shared_session'});
- engine.db.prepare("UPDATE mobile_executions SET state='completed',reply_message_id=?,pending_operation=NULL,updated_at=? WHERE id=?").run(op.msgId,Date.now(),row.id);engine.emitEvent?.(row.id,'completed',{});return true;
+ engine.db.prepare("UPDATE mobile_executions SET state='completed',reply_message_id=?,pending_operation=NULL,native_final_operation=NULL,updated_at=? WHERE id=?").run(op.msgId,Date.now(),row.id);engine.emitEvent?.(row.id,'completed',{});return true;
 }
 function hold(engine,row){
  const shared=engine.store.shared;if(!shared)return;
@@ -63,4 +97,4 @@ function abandon(engine,row){
  const shared=engine.store.shared,topic=engine.topics.get(row.topic_key),actor=acceptedActor(engine,row);
  return shared.abandon(actor,{sharedSpaceId:topic.sharedSpaceId,admissionId:row.id,opId:'mobile-abandon_'+row.id,confirm:true});
 }
-module.exports={accept,register,complete,hold,abandon,acceptedActor};
+module.exports={accept,register,complete,hold,abandon,acceptedActor,promoteNativeFinal,sealNativeFinal,nativeFinalOperation};

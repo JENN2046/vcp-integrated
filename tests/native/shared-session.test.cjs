@@ -240,15 +240,23 @@ test('session execution refuses public native dispatch and completion, preservin
  assert.throws(()=>f.shared.complete(f.actor('A'),{sharedSpaceId:'sharedAB',admissionId:accepted.id,opId:'forged-session-result',message:{id:'reply_'+accepted.id,role:'assistant',content:'forged'}}),rejects('SHARED_SESSION_COMPLETION_ONLY'));
  f.shared.catalog.grants.delete('sourceA');await start(f);await wait(()=>f.portal.engine.get(accepted.id).state==='review_required','revoked source held');assert.equal(f.calls(),0);
 });
-test('actual process exits before wake and after durable native result recover without another provider request',async t=>{
+test('actual process exits recover the accepted request or durable native result without duplicate dispatch',async t=>{
  const {spawnSync}=require('node:child_process'),path=require('node:path'),fs=require('node:fs/promises'),http=require('node:http');
  const express=require(BOX+'/node_modules/express'),ctx=require(BOX+'/modules/requestExecutionContext');
  const {CentralStore}=require(BOX+'/Plugin/NativeSync/sync/centralStore'),{SourceCatalog}=require(BOX+'/Plugin/NativeSync/sync/sourceCatalog'),{SharedSpace}=require(BOX+'/Plugin/NativeSync/sync/sharedSpace'),{SharedNative}=require(BOX+'/Plugin/NativeSync/sync/sharedNative'),{MobilePortal}=require(BOX+'/Plugin/NativeSync/mobile/portal');
- for(const stage of ['session-accepted-committed','reply-intent']){
-  const program=`const {fixture}=require(${JSON.stringify(path.resolve(__dirname,'fixtures/sharedSingleHarness.cjs'))});
+ for(const stage of ['session-accepted-committed','reply-intent','mobile-message-native-final','mobile-session-native-final']){
+  const program=`const assert=require('node:assert/strict'),{fixture,ctx}=require(${JSON.stringify(path.resolve(__dirname,'fixtures/sharedSingleHarness.cjs'))});
    (async()=>{const f=await fixture({diagnostic:()=>{},after:()=>{}}),c=f.shared.executionConfig(f.actor('A'),{sharedSpaceId:'sharedAB',sharedId:f.topic.id}),body={sharedSpaceId:'sharedAB',sharedId:f.topic.id,requestId:'actual-crash-request',expectedHead:c.head,configHash:c.hash,message:{id:'actual-crash-user',role:'user',content:'synthetic crash input',timestamp:1}};
-   let id;f.portal.engine.fault=point=>{if(point===${JSON.stringify(stage)}){const row=f.portal.engine.db.prepare('SELECT id FROM mobile_executions').get();process.stdout.write('SESSION_CRASH '+JSON.stringify({root:f.root,id:row.id,calls:f.calls()})+'\\n');process.exit(71);}};
-   const a=f.shared.sessionSend(f.actor('A'),body);f.portal.engine.db.prepare('UPDATE mobile_executions SET not_before=0').run();f.portal.engine.setEndpoint({url:f.url+'/v1/chat/completions',key:'synthetic-only'});setTimeout(()=>process.exit(72),5000);})().catch(()=>process.exit(73));`;
+   const stage=${JSON.stringify(stage)};
+   const exit=()=>{const row=f.portal.engine.db.prepare('SELECT id,kind,state,pending_operation,native_final_operation FROM mobile_executions').get();process.stdout.write('SESSION_CRASH '+JSON.stringify({root:f.root,id:row.id,calls:f.calls(),kind:row.kind,state:row.state,pending:Boolean(row.pending_operation),sealed:Boolean(row.native_final_operation)})+'\\n');process.exit(71);};
+   f.portal.engine.fault=point=>{if(point===stage)exit();};
+   if(stage.startsWith('mobile-')){
+    const phone=await f.phone();
+    f.control.nativeResponder=()=>{ctx.assertDispatch();const publish=ctx.finalReplyPublisher();assert.equal(typeof publish,'function');publish({content:'original native mobile final',finishReason:'stop'});exit();};
+    if(stage==='mobile-message-native-final')await phone.call('/conversations/'+f.topic.id+'/messages',{requestId:body.requestId,text:body.message.content},202);
+    else{const session=f.shared.db.prepare('SELECT id,scopes FROM mobile_sessions').get();f.shared.sessionSend(f.shared.mobile({id:session.id,scopes:JSON.parse(session.scopes)},'sharedAB','execute'),body);}
+   }else f.shared.sessionSend(f.actor('A'),body);
+   f.portal.engine.db.prepare('UPDATE mobile_executions SET not_before=0').run();f.portal.engine.setEndpoint({url:f.url+'/v1/chat/completions',key:'synthetic-only'});setTimeout(()=>process.exit(72),5000);})().catch(()=>process.exit(73));`;
   const child=spawnSync(process.execPath,['-e',program],{encoding:'utf8',timeout:10000,env:{PATH:process.env.PATH,HOME:process.env.HOME,TMPDIR:process.env.TMPDIR,VCP_TEST_SERVER:process.env.VCP_TEST_SERVER}});
   assert.equal(child.status,71,child.stdout+child.stderr);const info=JSON.parse(child.stdout.split('\n').find(s=>s.startsWith('SESSION_CRASH ')).slice(14));
   const store=new CentralStore(info.root+'/central.sqlite'),config={NativeSyncFullSources:JSON.stringify(['A','B'].map(x=>({sourceId:'source'+x,deviceId:'device'+x,executionMode:'all-supported'}))),NativeSyncSharedSpaces:JSON.stringify([{id:'sharedAB',sources:['sourceA','sourceB']}]),NativeMobileOrigin:'https://synthetic-shared.invalid',NativeMobileConfigSync:true,NativeMobileTopics:'[]',NativeMobileStartDelayMs:10000};
@@ -258,6 +266,14 @@ test('actual process exits before wake and after durable native result recover w
   try{
    if(stage==='session-accepted-committed'){assert.equal(info.calls,0);assert.equal(portal.engine.get(info.id).state,'queued');portal.engine.db.prepare('UPDATE mobile_executions SET not_before=0').run();portal.engine.setEndpoint({url:'http://127.0.0.1:'+server.address().port+'/v1/chat/completions',key:'synthetic-only'});await wait(()=>portal.engine.get(info.id).state==='completed','real crash recovery');assert.equal(calls,1);}
    else{assert.equal(info.calls,1);assert.equal(portal.engine.get(info.id).state,'completed');assert.equal(calls,0);}
+   if(stage.startsWith('mobile-')){
+    assert.equal(info.kind,stage==='mobile-message-native-final'?null:'shared_session');
+    assert.equal(info.state,'running');assert.equal(info.pending,false);assert.equal(info.sealed,true);
+    const row=portal.engine.get(info.id);
+    assert.equal(row.attempts,1);assert.equal(row.native_final_operation,null);assert.equal(row.reply_message_id,'reply_'+info.id);
+    const reply=store.db.prepare('SELECT message_json FROM journal WHERE msg_id=?').get(row.reply_message_id);
+    assert.equal(JSON.parse(reply.message_json).content,'original native mobile final');
+   }
    assert.equal(store.metrics().journalRows,2);
   }finally{release();native.close();await portal.close();server.closeAllConnections();await new Promise(r=>server.close(r));store.close();await fs.rm(info.root,{recursive:true,force:true});}
  }
