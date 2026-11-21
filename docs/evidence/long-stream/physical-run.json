@@ -1,0 +1,103 @@
+{
+  "work": {
+    "id": "request_343b404a3bef4261b975f2cc9af9fb78",
+    "request_id": "msg_1795235272698_user_27y5tmsp28",
+    "state": "completed",
+    "attempts": 1,
+    "request_dispatched": 1,
+    "user_message_id": "msg_1795235272698_user_27y5tmsp28",
+    "user_seq": 33,
+    "reply_message_id": "reply_request_343b404a3bef4261b975f2cc9af9fb78"
+  },
+  "seedCount": 32,
+  "providerCalls": 1,
+  "feed": {
+    "stage": "finish",
+    "frames": 21,
+    "characters": 1974,
+    "ended": true
+  },
+  "userJournalSeq": 33,
+  "replyJournalSeq": 34,
+  "contentSHA256": "cd28f31d692275ef1a5f3a56cea3e4ca1386e5a60a598d99d4f7a11ab00f2a02",
+  "contentUTF8Bytes": 5670,
+  "historyIdDigest": "22d0380677d2b42d7e0dd906678e364304fce923f6d985049edba590f0668207",
+  "journalMessageCount": 34,
+  "linux": {
+    "work": "request_343b404a3bef4261b975f2cc9af9fb78",
+    "providerCalls": 1,
+    "requestAttempts": 1,
+    "journalTail": [
+      {
+        "seq": 33,
+        "msg_id": "msg_1795235272698_user_27y5tmsp28",
+        "action": "upsert"
+      },
+      {
+        "seq": 34,
+        "msg_id": "reply_request_343b404a3bef4261b975f2cc9af9fb78",
+        "action": "upsert"
+      }
+    ],
+    "seedCount": 32,
+    "historyCount": 34,
+    "contentCharacters": 1974,
+    "contentSha256": "cd28f31d692275ef1a5f3a56cea3e4ca1386e5a60a598d99d4f7a11ab00f2a02",
+    "markers": [
+      "1.1",
+      "1.2",
+      "1.3",
+      "1.4",
+      "1.5",
+      "1.6",
+      "1.7",
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.4",
+      "3.5",
+      "3.6",
+      "3.7"
+    ]
+  },
+  "android": {
+    "physical": true,
+    "secure": true,
+    "viewport": [
+      394,
+      853
+    ],
+    "firstInViewport": true,
+    "firstBytes": 1890,
+    "firstSHA256": "b05626420ea38cbf848330f1ce9920c15b2fb1042b442dafabf90c197a0c3da4",
+    "lock": "mWakefulness=Dozing",
+    "bridgeRemovedAndProcessStopped": true,
+    "offlineAt": "2026-11-21T04:28:32Z",
+    "stateWhileOffline": "running",
+    "completedWhileOfflineAt": "2026-11-21T04:29:34Z",
+    "restoredSameReadOnlySession": true,
+    "idsMatchAllJournalRows": true,
+    "final": {
+      "id": "reply_request_343b404a3bef4261b975f2cc9af9fb78",
+      "role": "assistant",
+      "bytes": 5670,
+      "sha256": "cd28f31d692275ef1a5f3a56cea3e4ca1386e5a60a598d99d4f7a11ab00f2a02",
+      "sample": "【首段 1.1】这是跨端实时观察的合成文本。共享会话按照同一条执行记录显示更新。观察端可以停在旧消息，继续查看选区或保留输入。此段的编号只用于核对顺序，不代表新的输入、任务或模型调用。\n\n【首"
+    },
+    "actualVisibilityAtReadback": "visible",
+    "testPackageUninstalled": true,
+    "adbBridgeRemoved": true
+  },
+  "windows": {
+    "role": "B",
+    "userReportedManualScroll": true,
+    "selectionAndReadingPositionConclusion": "Inconclusive for automatic displacement; user reported manually scrolling."
+  }
+}

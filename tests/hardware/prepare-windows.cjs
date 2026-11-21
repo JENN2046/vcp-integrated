@@ -5,9 +5,13 @@ const path = require('node:path');
 const { restoreProfile } = require('../integration/profile.cjs');
 
 async function main() {
-    const [snapshot, target] = process.argv.slice(2);
-    if (process.platform !== 'win32' || !snapshot || !target || process.argv.length !== 4) {
-        throw Error('Use native Windows Node with: node tests/hardware/prepare-windows.cjs <desktopB seed> <new isolated profile>');
+    const [snapshot, target, origin = 'https://127.0.0.1:18443'] = process.argv.slice(2);
+    if (process.platform !== 'win32' || !snapshot || !target || process.argv.length > 5) {
+        throw Error('Use native Windows Node with: node tests/hardware/prepare-windows.cjs <desktopB seed> <new isolated profile> [https://127.0.0.1:PORT]');
+    }
+    const url = new URL(origin);
+    if (url.origin !== origin || url.protocol !== 'https:' || url.hostname !== '127.0.0.1' || !url.port) {
+        throw Error('Use the isolated HTTPS loopback origin');
     }
     const profile = path.resolve(target);
     if (fs.existsSync(profile)) throw Error('The Windows test profile must be new');
@@ -17,7 +21,7 @@ async function main() {
         connection.sharedSpaceId !== 'sharedAB' || connection.serverUrl !== 'https://synthetic-shared.invalid') {
         throw Error('Seed is not from this synthetic fixture');
     }
-    await restoreProfile(source, profile, 'https://127.0.0.1:18443', 'B');
+    await restoreProfile(source, profile, origin, 'B');
     const settings = path.join(profile, 'settings.json');
     const settingsData = JSON.parse(fs.readFileSync(settings,'utf8'));
     fs.writeFileSync(settings, JSON.stringify({ ...settingsData, disableUpdateCheck:true }));

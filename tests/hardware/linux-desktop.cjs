@@ -129,6 +129,7 @@ async function main() {
     assert.equal(selected.itemId,ready.desktopDescriptor.itemId);
     assert.equal(selected.topicId,ready.desktopDescriptor.topicId);
     reply('linux-ready',selected);
+    const requireReaderProof = process.argv[3] === '--require-reader-proof';
     let attempted=false;
     const terminal=readline.createInterface({input:process.stdin,terminal:false});
     terminal.on('line',async line=>{
@@ -139,6 +140,12 @@ async function main() {
             if(line==='capture') { await command('picture',path.join(run,'linux-topic.png')); reply('linux-captured',true); }
             if(line==='send'){
                 assert.equal(attempted,false,'the original send can be attempted only once');
+                if (requireReaderProof) {
+                    const proof = JSON.parse(fs.readFileSync(path.join(run,'windows-pin-pass.json'),'utf8'));
+                    assert.ok(proof.pass && proof.runId === path.basename(run) &&
+                        proof.sharedTopicId === ready.sharedTopicId && proof.topicId === ready.windowsDescriptor.topicId,
+                        'Windows baseline must be verified for this run before sending');
+                }
                 attempted=true;
                 const state=JSON.parse(fs.readFileSync(path.join(run,'status.json'),'utf8'));
                 assert.equal(state.work.length,0);

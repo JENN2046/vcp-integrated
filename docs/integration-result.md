@@ -32,3 +32,5 @@
 原 Windows 11 虚拟机上的同版联验已完成。使用原基盘的独立写入层，以 R16Limited 正常登录。Windows B 在 Work 完成后加入，在真实窗口读到输入和回复；已落盘 History 的两个 ID 和正文与 Linux、实体 Android 及中央 Journal 一致，Provider 共调用一次。Windows 使用测试进程专用的 HTTPS 信任配置。三端分别在运行中或完成后观察了同一 Work，三端同时观察流式正文仍属此次用例之外。[Windows 与三端汇总回执](evidence/windows-device/README.md)
 
 本机开发仓保留已构建的桌面、服务端、PWA 和 Node/Xvfb 工具链。Linux 干净检出的重建产物已回收；脱敏回执与截图随提交保留。
+
+后续长回复实测覆盖了实体手机首段观察、锁屏恢复及 Windows 阅读位置独立对照，见[长回复联验记录](evidence/long-stream/README.md)。

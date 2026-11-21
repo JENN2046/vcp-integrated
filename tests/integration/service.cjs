@@ -22,7 +22,7 @@ async function jsonBody(req) {
     for await (const chunk of req) chunks.push(chunk);
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest}) {
+async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream}) {
     const sourceApp = path.join(candidate, 'apps/server');
     const box = path.join(out, 'runtime-box');
     fs.mkdirSync(box);
@@ -78,6 +78,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         target = f.shared.create(actor, {sharedSpaceId:'sharedAB',opId:'sponsor-target-topic',kind:'topic',parentId:targetAgent.id,localId:'sponsor-target-topic',localParent:'sponsor-target-agent',config:{name:'Sponsor target existing topic'}}).object;
         const stopAgent = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-agent',kind:'agent',localId:'stop-agent',config:{...f.owner.config,name:'Synthetic interrupted single',systemPrompt:'SYNTHETIC_PARTIAL',streamOutput:true}}).object;
         stopTopic = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-topic',kind:'topic',parentId:stopAgent.id,localId:'stop-topic',localParent:'stop-agent',config:{name:'Partial single existing topic'}}).object;
+        if (hardwareStream) hardwareStream.seedHistory(f.store, stopTopic.topic);
         for (const p of ['A','B']) {
             const desktop = await f.desktop(p);
             const boundTarget = desktop.runtime.localFor(target.id);
@@ -85,10 +86,11 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             descriptors[p] = {preSubmit:desktop.descriptor,
                 lostAck:{itemType:'agent',itemId:boundTargetAgent.localId,topicId:boundTarget.localId},
                 interrupted:{itemType:'agent',itemId:desktop.runtime.localFor(stopAgent.id).localId,topicId:desktop.runtime.localFor(stopTopic.id).localId}};
-            for (const descriptor of Object.values(descriptors[p])) {
+            for (const [subject, descriptor] of Object.entries(descriptors[p])) {
                 await desktop.queue.initializeIfMissing(descriptor, []);
                 const seeded=await desktop.queue.read(descriptor);
-                if (!Array.isArray(seeded)||seeded.length) throw Error('Empty synthetic History expected');
+                const expected = hardwareStream && subject === 'interrupted' ? hardwareStream.seedCount : 0;
+                assert.equal(seeded.length, expected, 'seeded synthetic History count');
             }
         }
     } finally {
@@ -115,6 +117,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             if(which==='lostAck')await lostGate;
             if(which==='interrupted'){
                 if(!body.stream)throw Error('Partial fixture expected streaming provider input');
+                if (hardwareStream) { hardwareStream.provider.accept(res); return; }
                 res.writeHead(200,{'content-type':'text/event-stream'});
                 res.once('close',()=>{gates.partialClosed=true;trace('partial-provider-closed',{});});
                 row.providerFrames=[{type:'delta',content:contract.partialText}];
@@ -135,6 +138,11 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         const url=new URL(req.url,'https://127.0.0.1');
         const route=url.pathname;
         if (handleFixtureRequest && await handleFixtureRequest(req, res, route)) return;
+        if (hardwareStream && req.method === 'POST' && route.endsWith('/session-send') &&
+            req.headers['x-nativesync-device'] !== 'deviceA') {
+            requests.push({route,method:req.method,status:403,injected:true,observerSendRejected:true});
+            return res.writeHead(403,{'content-type':'application/json'}).end(JSON.stringify({error:{code:'OBSERVATION_ONLY'}}));
+        }
         if (mode!=='local-only' && req.method==='POST' && route==='/v1/local-chat/completions') {
             calls.push({phase:'unexpected-desktop-local-provider'});
             req.resume();
@@ -216,6 +224,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             KNOWLEDGEBASE_FULL_SCAN_ON_STARTUP:'false',TDB_KNOWLEDGE_ENABLED:'false',
             NativeSyncEnabled:'true',NativeSyncDataDir:data,NativeMobileEnabled:'true',
             NativeMobileOrigin:'https://127.0.0.1:'+proxyPort,NativeMobileStartDelayMs:'0',
+            ...(hardwareStream ? { NativeMobileExecutionTimeoutMs:'300000', NativeMobileGroupIdleTimeoutMs:'300000' } : {}),
             NativeSyncFullSources:JSON.stringify(['A','B','C','D'].map(x=>({sourceId:'source'+x,deviceId:'device'+x,executionMode:'all-supported'}))),
             NativeSyncSharedSpaces:JSON.stringify([{id:'sharedAB',sources:['sourceA','sourceB','sourceC']},{id:'foreignSpace',sources:['sourceD']}])
         }
@@ -228,6 +237,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     });
     async function close() {
         releaseLost();
+        hardwareStream?.provider.close();
         if (activePartial && !activePartial.destroyed) activePartial.destroy();
         backend.kill('SIGTERM');
         const outcome = await Promise.race([exit,new Promise(r=>setTimeout(r,4500))]);

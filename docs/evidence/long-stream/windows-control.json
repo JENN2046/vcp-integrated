@@ -1,0 +1,172 @@
+{
+  "source": "c9e18b100555",
+  "run": "run-p5lXM8",
+  "scope": "independent Linux sender and Windows observer only; no Android in this control",
+  "controls": "View-only local viewer, trusted Windows renderer pointer drag before send. No later wheel or keyboard-scroll events observed.",
+  "work": {
+    "id": "request_885621e1947146f98a92a27c17ca1255",
+    "request_id": "msg_1795236854740_user_0br0hx5aae",
+    "state": "completed",
+    "attempts": 1,
+    "request_dispatched": 1,
+    "user_message_id": "msg_1795236854740_user_0br0hx5aae",
+    "user_seq": 33,
+    "reply_message_id": "reply_request_885621e1947146f98a92a27c17ca1255"
+  },
+  "principal": "desktop:deviceA",
+  "providerCalls": 1,
+  "stream": {
+    "stage": "finish",
+    "frames": 21,
+    "characters": 1974,
+    "ended": true
+  },
+  "journalTail": [
+    {
+      "seq": 33,
+      "msg_id": "msg_1795236854740_user_0br0hx5aae",
+      "action": "upsert"
+    },
+    {
+      "seq": 34,
+      "msg_id": "reply_request_885621e1947146f98a92a27c17ca1255",
+      "action": "upsert"
+    }
+  ],
+  "windowsHistory": {
+    "platform": "win32",
+    "arch": "x64",
+    "exit": {
+      "code": 0,
+      "signal": null
+    },
+    "cds": {
+      "pid": 4848,
+      "sha256": "0bccf38d13b864cee490f64176d10151c4c96af4e38cc10b3f6b7e9e0683694f"
+    },
+    "cdsExited": true,
+    "rowCount": 34,
+    "lastRows": [
+      {
+        "id": "msg_1795236854740_user_0br0hx5aae",
+        "role": "user",
+        "bytes": 53,
+        "characters": 53,
+        "sha256": "13241ea74048af67addb5467f21cfa5b513ea8b49591ceb747d428b0df9c1d8a"
+      },
+      {
+        "id": "reply_request_885621e1947146f98a92a27c17ca1255",
+        "role": "assistant",
+        "bytes": 5670,
+        "characters": 1974,
+        "sha256": "cd28f31d692275ef1a5f3a56cea3e4ca1386e5a60a598d99d4f7a11ab00f2a02"
+      }
+    ]
+  },
+  "baseline": {
+    "providerCallsAtPin": 0,
+    "journalRowsAtPin": 32,
+    "observer": {
+      "platform": "win32",
+      "arch": "x64",
+      "cds": {
+        "pid": 4848,
+        "sha256": "0bccf38d13b864cee490f64176d10151c4c96af4e38cc10b3f6b7e9e0683694f"
+      }
+    },
+    "sourceMarkerSha256": "ee016d9a9b1fed55706e39aa3b90119911c62e2398fe7d0a65cc0dcee402cefe"
+  },
+  "samples": 512,
+  "sampleDurationSeconds": 130.85,
+  "maxAbsAnchorDisplacementCssPx": 0,
+  "draftAndSelectionMatchedEverySample": true,
+  "originalSelectionNodesRetainedEverySample": true,
+  "stages": [
+    {
+      "stage": "pinned",
+      "markerSamples": 258,
+      "readingAnchorId": "hardware-seed-27",
+      "anchorTopCssPx": -42.78125,
+      "scrollTopCssPx": 3427,
+      "maxScrollTopCssPx": 3978,
+      "selection": {
+        "collapsed": false,
+        "anchorId": "hardware-seed-30",
+        "focusId": "hardware-seed-30",
+        "anchorOffset": 1,
+        "focusOffset": 12,
+        "length": 11,
+        "hash": "fb01c1a041482bbb9aea3bce0b021ea073daf7a499d38bf7a9ae16c0be3fc4a3"
+      },
+      "draft": {
+        "length": 48,
+        "hash": "5ff2356350119b554969af4f728e543a1ff4946445f43cfd889fcbdd243823f4"
+      }
+    },
+    {
+      "stage": "first",
+      "markerSamples": 44,
+      "readingAnchorId": "hardware-seed-27",
+      "anchorTopCssPx": -42.78125,
+      "scrollTopCssPx": 3427,
+      "maxScrollTopCssPx": 4419,
+      "selection": {
+        "collapsed": false,
+        "anchorId": "hardware-seed-30",
+        "focusId": "hardware-seed-30",
+        "anchorOffset": 1,
+        "focusOffset": 12,
+        "length": 11,
+        "hash": "fb01c1a041482bbb9aea3bce0b021ea073daf7a499d38bf7a9ae16c0be3fc4a3"
+      },
+      "draft": {
+        "length": 48,
+        "hash": "5ff2356350119b554969af4f728e543a1ff4946445f43cfd889fcbdd243823f4"
+      }
+    },
+    {
+      "stage": "middle",
+      "markerSamples": 50,
+      "readingAnchorId": "hardware-seed-27",
+      "anchorTopCssPx": -42.78125,
+      "scrollTopCssPx": 3427,
+      "maxScrollTopCssPx": 4713,
+      "selection": {
+        "collapsed": false,
+        "anchorId": "hardware-seed-30",
+        "focusId": "hardware-seed-30",
+        "anchorOffset": 1,
+        "focusOffset": 12,
+        "length": 11,
+        "hash": "fb01c1a041482bbb9aea3bce0b021ea073daf7a499d38bf7a9ae16c0be3fc4a3"
+      },
+      "draft": {
+        "length": 48,
+        "hash": "5ff2356350119b554969af4f728e543a1ff4946445f43cfd889fcbdd243823f4"
+      }
+    },
+    {
+      "stage": "terminal",
+      "markerSamples": 159,
+      "readingAnchorId": "hardware-seed-27",
+      "anchorTopCssPx": -42.78125,
+      "scrollTopCssPx": 3427,
+      "maxScrollTopCssPx": 4828,
+      "selection": {
+        "collapsed": false,
+        "anchorId": "hardware-seed-30",
+        "focusId": "hardware-seed-30",
+        "anchorOffset": 1,
+        "focusOffset": 12,
+        "length": 11,
+        "hash": "fb01c1a041482bbb9aea3bce0b021ea073daf7a499d38bf7a9ae16c0be3fc4a3"
+      },
+      "draft": {
+        "length": 48,
+        "hash": "5ff2356350119b554969af4f728e543a1ff4946445f43cfd889fcbdd243823f4"
+      }
+    }
+  ],
+  "streamEvidenceSource": "Actual Windows transcript DOM contained each stage marker. Off-bottom reader was not required to scroll to the new text.",
+  "rawTraceSha256": "de1444f21a5dec32ef8a2926cc46d23b0943318d502e2a9d92017e0cfe810d80"
+}

@@ -42,3 +42,15 @@ Windows 正式打开候选前，用与该进程相同的 CA 对回环 HTTPS 发�
 2. Linux 终端输入 `mark` 记录独立草稿、消息选区、滚动状态和本机持久 History。手机确认同一在途 Work 后，可按验收计划锁屏、移除本次回环桥或结束本次测试应用。
 3. 在协调终端输入 `release`。协调器只会放行仍在执行的一份 Work。现成夹具为非流式，测试的是在途状态与持久终态。默认后端时限为 120 秒，离线步骤应在这个窗口内完成。协调器保存 `work-held.json` 与 `work-completed.json`，Linux 端 `record`、`capture` 可留存完成态。检查各观察端原消息、回复和 Journal 序号。
 4. 如需留证，先拷贝经过核对的合成观察摘要或截图。退出 Windows 测试 Profile，移除本次 Android 转发与测试 WebView，在 Linux 终端输入 `stop` 后再在协调终端输入 `stop`。协调器关闭 ToolBox 和 Provider，并回收本次 `.runs/hardware/run-*` 中的合成数据库、证书、Profile 和运行日志。
+
+## 三段长流式观察
+
+用 `node tests/hardware/coordinator.cjs --stream` 开启流式用例。使用本次生成的公共 CA 和叶证书。CA 与叶证书的起始时间为宿主 UTC 前 24 小时，以容纳有时钟偏差的来宾。
+
+用例通过中央原生 History 入口预填 32 条历史消息，Provider 调用为 0。Linux 与 Windows 打开 `Synthetic interrupted single` 的 `Partial single existing topic`，Android 打开相同话题。先验证两端能看到旧历史，让 Windows 滚到旧消息并准备真实指针选区和一条未发送草稿。三端确认就位后，从 Linux 发送一次。
+
+在协调终端按顺序输入 `first`、`middle`、`finish`。每个命令放行同一 Provider 连接上的一段正文，每段分七个 SSE delta。只有 `finish` 发送终态。原生移动执行的等待配置为 300 秒，ToolBox 上游无数据超时为 90 秒，因此在提交后和各段之间应在 90 秒内推进。阶段文件 `work-before-*.json`、`work-after-*.json` 含当时的 Work、Journal、Provider 调用数及已发送 delta 计数。终态检查同一请求和 Work、一次 Provider 调用、一条新增用户消息与一条新增助手回复。
+
+Windows 单独对照可用 `--port` 指定新的回环端口。先记录真实滚轮和指针拖选后的消息 ID、UTF-16 偏移、文本与草稿的哈希，并连续读取两份快照，确认旧消息节点、选区和相对视口的锚点稳定。用 `validate-reader-pin.cjs RUN_DIR B-PIN.JSON WINDOWS_CDS_EXE` 在主机校验来宾回执，再用 `linux-desktop.cjs RUN_DIR --require-reader-proof` 点击发送。首、中、终段分别记录实际 DOM 已出现的段尾标记。滚动位置用同一旧消息到可视区域顶部的 CSS 像素距离衡量；视口外的流式正文可以更新，不要求读者滚到底部。
+
+这组流式夹具只允许 A 提交。需要给 Windows 启停采集器时，仅在确认系统运行对话框及目标命令后点击该对话框的确定按钮。保留意外输入的诊断记录。

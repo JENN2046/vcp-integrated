@@ -1,0 +1,27 @@
+{
+  "stage": "observer setup before pin approval",
+  "intendedRequestSent": false,
+  "work": [
+    {
+      "id": "request_9724fc5fe4f044b4bb8d5423981a285f",
+      "state": "review_required",
+      "attempts": 1,
+      "request_dispatched": 1,
+      "error_code": "STREAM_INCOMPLETE_REVIEW_REQUIRED"
+    }
+  ],
+  "admission": [
+    {
+      "id": "request_9724fc5fe4f044b4bb8d5423981a285f",
+      "principal": "desktop:deviceB",
+      "state": "review_required"
+    }
+  ],
+  "native": [
+    {
+      "id": "request_9724fc5fe4f044b4bb8d5423981a285f",
+      "state": "model_terminal"
+    }
+  ],
+  "longStreamFrames": 0
+}

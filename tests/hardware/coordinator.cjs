@@ -12,6 +12,15 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
 const integration = path.join(root, 'tests/integration');
 const { start, contract } = require(path.join(integration, 'service.cjs'));
+const args = process.argv.slice(2);
+const hardware = args[0] === '--stream' ? (args.shift(), require('./stream.cjs')) : null;
+const portText = args[0] === '--port' && args.length === 2 ? args[1] : null;
+if ((args.length && !portText) || (portText && (!/^\d{4,5}$/.test(portText) || Number(portText) > 65535))) {
+    throw Error('Usage: node tests/hardware/coordinator.cjs [--stream] [--port <loopback port>]');
+}
+const httpsPort = Number(portText || 18443);
+const hardwareStream = hardware ? { seedCount:hardware.seedCount, seedHistory:hardware.seedHistory, provider:hardware.createStream() } : null;
+const subject = hardware ? 'interrupted' : 'lostAck';
 const runs = path.join(root, '.runs', 'hardware');
 fs.mkdirSync(runs, { recursive:true, mode:0o700 });
 const out = fs.mkdtempSync(path.join(runs, 'run-'));
@@ -19,7 +28,6 @@ const cert = path.join(out, 'loopback-cert.pem');
 const key = path.join(out, 'loopback-key.pem');
 const ca = path.join(out, 'hardware-ca.pem');
 const caKey = path.join(out, 'hardware-ca.key');
-const httpsPort = 18443;
 const pairRoute = '/__hardware/pair';
 const expectedHost = '127.0.0.1:' + httpsPort;
 const pairWindowMs = 90000;
@@ -68,13 +76,19 @@ async function main() {
         const csr = path.join(out,'leaf.csr');
         const extent = path.join(out,'leaf.ext');
         fs.writeFileSync(extent,'basicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=IP:127.0.0.1,DNS:localhost\n');
+        const opensslDate = milliseconds => new Date(milliseconds).toISOString().slice(0,19).replace(/[^0-9]/g,'') + 'Z';
+        const now = Date.now();
+        const dates = hardware
+            ? ['-not_before',opensslDate(now-24*3600000),'-not_after',opensslDate(now+48*3600000)]
+            : ['-days','1'];
         const openssl = args => execFileSync('openssl', args, { stdio:'ignore' });
-        openssl(['req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=VCP hardware test CA',
+        openssl(['req','-x509','-newkey','rsa:2048','-nodes',...dates,'-subj','/CN=VCP hardware test CA',
             '-addext','basicConstraints=critical,CA:TRUE,pathlen:0','-addext','keyUsage=critical,keyCertSign,cRLSign','-out',ca,'-keyout',caKey]);
         openssl(['req','-new','-newkey','rsa:2048','-nodes','-subj','/CN=VCP hardware fixture','-out',csr,'-keyout',key]);
-        openssl(['x509','-req','-in',csr,'-CA',ca,'-CAkey',caKey,'-set_serial','1','-days','1','-out',cert,'-extfile',extent]);
+        openssl(['x509','-req','-in',csr,'-CA',ca,'-CAkey',caKey,'-set_serial','1',...dates,'-out',cert,'-extfile',extent]);
         openssl(['x509','-in',ca,'-outform','der','-out',path.join(out,'hardware-ca.der')]);
         fs.rmSync(caKey);
+        say('trust-ready',{ publicCa:ca, publicCaDer:path.join(out,'hardware-ca.der'), publicLeaf:cert });
         const handleFixtureRequest = async (req, response, route) => {
             if (route !== pairRoute) return false;
             if (req.method !== 'GET' || req.headers.host !== expectedHost ||
@@ -100,20 +114,23 @@ async function main() {
             }
             return true;
         };
-        service = await start({ out, candidate:root, cert, key, ca, trace(){}, waitUntil, mode:'hardware', httpsPort, handleFixtureRequest });
+        service = await start({ out, candidate:root, cert, key, ca, trace(){}, waitUntil, mode:'hardware', httpsPort, handleFixtureRequest, hardwareStream });
         fs.rmSync(key);
         service.disarmDrop();
         database = new DatabaseSync(path.join(service.data,'central.sqlite'), { readOnly:true });
-        const descriptor = service.descriptors.A.lostAck;
+        const descriptor = service.descriptors.A[subject];
         const snapshot = () => {
             const work = database.prepare('SELECT id,request_id,state,attempts,request_dispatched,user_message_id,user_seq,reply_message_id FROM mobile_executions WHERE topic_key=? ORDER BY rowid')
-                .all(service.topics.lostAck.id);
-            const journal = database.prepare('SELECT seq,msg_id,action FROM journal WHERE topic_id=? ORDER BY seq').all(service.topics.lostAck.id);
+                .all(service.topics[subject].id);
+            const journal = database.prepare('SELECT seq,msg_id,action FROM journal WHERE topic_id=? ORDER BY seq').all(service.topics[subject].id);
             const paired = database.prepare('SELECT count(*) AS count FROM mobile_pairings WHERE used=1').get().count;
-            const providerCalls = service.calls.filter(call=>call.case==='lostAck').length;
-            return { work, journal, paired, providerCalls, released };
+            const providerCalls = service.calls.filter(call=>call.case===subject).length;
+            return { work, journal, paired, providerCalls, totalProviderRequests:service.calls.filter(row=>Object.hasOwn(row,'stream') && Number.isFinite(row.at)).length, observerSendRejections:service.requests.filter(row=>row.observerSendRejected).length, released, ...(hardwareStream ? { stream:hardwareStream.provider.view(), seedCount:hardware.seedCount } : {}) };
         };
         await service.checkMobile();
+        assert.equal(database.prepare('SELECT count(*) AS n FROM mobile_executions').get().n,0);
+        assert.equal(snapshot().journal.length, hardware?.seedCount || 0);
+        assert.equal(snapshot().providerCalls,0);
         const statusFile = path.join(out, 'status.json');
         let recordedCompletion = false;
         function writeSnapshot(file, value) {
@@ -132,8 +149,10 @@ async function main() {
         statusTimer = setInterval(writeStatus, 300).unref();
         const ready = { url:service.origin + '/mobile/', pairUrl:service.origin + pairRoute, publicLeaf:cert,
             publicCa:ca, publicCaDer:path.join(out,'hardware-ca.der'), status:path.join(out,'status.json'),
-            windowsSeed:path.join(out,'seed','desktopB'), agent:'Synthetic lost receipt',
-            topic:'Sponsor target existing topic', desktopDescriptor:descriptor, input:contract.cases.lostAck };
+            windowsSeed:path.join(out,'seed','desktopB'), agent:hardware ? 'Synthetic interrupted single' : 'Synthetic lost receipt',
+            topic:hardware ? 'Partial single existing topic' : 'Sponsor target existing topic', desktopDescriptor:descriptor,
+            windowsDescriptor:service.descriptors.B[subject], sharedTopicId:service.topics[subject].id,
+            input:contract.cases[subject], ...(hardware ? { stageCommands:hardware.stages, seedCount:hardware.seedCount } : {}) };
         fs.writeFileSync(path.join(out,'ready.json'), JSON.stringify(ready)+'\n', { mode:0o600 });
         writeStatus();
         say('ready', ready);
@@ -146,7 +165,18 @@ async function main() {
                         pairUntil = Date.now() + pairWindowMs;
                         say('pair-armed', { expiresInSeconds:pairWindowMs/1000 });
                     }
-                    if (line === 'release') {
+                    if (hardware && hardware.stages.includes(line)) {
+                        const before = snapshot();
+                        assert.equal(before.work.length,1);
+                        assert.equal(before.providerCalls,1);
+                        assert.equal(before.work[0].state,'running');
+                        const view = await hardwareStream.provider.advance(line);
+                        writeSnapshot(path.join(out,'work-before-'+line+'.json'),before);
+                        if (line === 'finish') released = true;
+                        writeSnapshot(path.join(out,'work-after-'+line+'.json'),snapshot());
+                        say('stage-advanced',view);
+                    }
+                    if (!hardware && line === 'release') {
                         const view = snapshot();
                         assert.equal(released,false);
                         assert.equal(view.providerCalls,1);

@@ -75,7 +75,7 @@ async function fixture(t, { syntheticRoot: root }) {
     const url = 'http://127.0.0.1:' + server.address().port;
     const baseSettings = { vcpServerUrl: config.NativeMobileOrigin + '/v1/chat/completions', vcpApiKey: 'synthetic-only', userName: '用户' };
     return {
-        shared, actor, owner, topic,
+        store, shared, actor, owner, topic,
         async desktop(id) {
             const data = path.join(root, 'desktop' + id);
             const syncData = path.join(data, '.native-sync');
