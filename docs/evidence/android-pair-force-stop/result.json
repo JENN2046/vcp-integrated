@@ -1,0 +1,131 @@
+{
+  "device": {
+    "android": "16",
+    "apiLevel": 36,
+    "webView": "157.0.8103.50"
+  },
+  "pwa": {
+    "asset": "index-CEYqWIUX.js",
+    "sha256": "5d53b27dca6f3e1864a5e03776ee5adbff976ac8488254acd4a962823ba252ed"
+  },
+  "baseline": {
+    "forceStop": {
+      "observed": "first connected indicator",
+      "stopMs": 83,
+      "processStopped": true
+    },
+    "coldOpen": {
+      "bundle": "/mobile/assets/index-CEYqWIUX.js",
+      "paired": false,
+      "connection": "服务可达",
+      "secure": true,
+      "visible": true
+    },
+    "coldHttpSession": {
+      "status": 401,
+      "sessionMarker": null
+    },
+    "centralAfterColdOpen": {
+      "pairingCodes": 1,
+      "consumedPairings": 1,
+      "sessions": 1,
+      "sessionMarkers": [
+        "61e37af6afe1ee2b94af2f694846b915df40e7c13eb4849ec8544c213fddefa6"
+      ],
+      "work": 0,
+      "providerRequests": 0
+    }
+  },
+  "candidates": [
+    {
+      "forceStop": {
+        "observed": "first connected indicator",
+        "stopMs": 75,
+        "processStopped": true
+      },
+      "webViewBeforeColdOpen": [
+        "3114992.297 14156 19854 I NativeSyncFixture: session_probe_cookie_flush_completed",
+        "3114992.303 14156 19832 I NativeSyncFixture: session_probe_cookie_flush_completed",
+        "3114992.846 14156 19832 I NativeSyncFixture: session_probe_cookie_flush_completed",
+        "3114992.850 14156 19832 I NativeSyncFixture: session_probe_cookie_flush_completed",
+        "3114993.305 14156 19832 I NativeSyncFixture: session_probe_cookie_flush_completed"
+      ],
+      "centralAtStop": {
+        "pairingCodes": 1,
+        "consumedPairings": 1,
+        "sessions": 1,
+        "sessionMarkers": [
+          "d57949538b9613fa70da7e4c745f45f43713170f17245435dfd551d4de8108f6"
+        ],
+        "work": 0,
+        "providerRequests": 0
+      },
+      "coldOpen": {
+        "bundle": "/mobile/assets/index-CEYqWIUX.js",
+        "paired": true,
+        "connection": "已连接",
+        "secure": true,
+        "visible": true
+      },
+      "coldHttpSession": {
+        "status": 200,
+        "sessionMarker": "d57949538b9613fa70da7e4c745f45f43713170f17245435dfd551d4de8108f6"
+      },
+      "centralAfterColdOpen": {
+        "pairingCodes": 1,
+        "consumedPairings": 1,
+        "sessions": 1,
+        "sessionMarkers": [
+          "d57949538b9613fa70da7e4c745f45f43713170f17245435dfd551d4de8108f6"
+        ],
+        "work": 0,
+        "providerRequests": 0
+      }
+    },
+    {
+      "forceStop": {
+        "observed": "first connected indicator",
+        "stopMs": 48,
+        "processStopped": true
+      },
+      "webViewBeforeColdOpen": [
+        "3115004.206 18391 23045 I NativeSyncFixture: session_probe_cookie_flush_completed",
+        "3115004.207 18391 23035 I NativeSyncFixture: session_probe_cookie_flush_completed",
+        "3115004.646 18391 23034 I NativeSyncFixture: session_probe_cookie_flush_completed",
+        "3115004.656 18391 23031 I NativeSyncFixture: session_probe_cookie_flush_completed",
+        "3115005.158 18391 23031 I NativeSyncFixture: session_probe_cookie_flush_completed"
+      ],
+      "centralAtStop": {
+        "pairingCodes": 1,
+        "consumedPairings": 1,
+        "sessions": 1,
+        "sessionMarkers": [
+          "c7aa0ae172db2942e99d2b64c70823e4f6fc04d21db4b42bc0b81c96a446f653"
+        ],
+        "work": 0,
+        "providerRequests": 0
+      },
+      "coldOpen": {
+        "bundle": "/mobile/assets/index-CEYqWIUX.js",
+        "paired": true,
+        "connection": "已连接",
+        "secure": true,
+        "visible": true
+      },
+      "coldHttpSession": {
+        "status": 200,
+        "sessionMarker": "c7aa0ae172db2942e99d2b64c70823e4f6fc04d21db4b42bc0b81c96a446f653"
+      },
+      "centralAfterColdOpen": {
+        "pairingCodes": 1,
+        "consumedPairings": 1,
+        "sessions": 1,
+        "sessionMarkers": [
+          "c7aa0ae172db2942e99d2b64c70823e4f6fc04d21db4b42bc0b81c96a446f653"
+        ],
+        "work": 0,
+        "providerRequests": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "testApkUninstalled": true,
+  "adbReverse18443Absent": true,
+  "temporaryCdpForwardAbsent": true,
+  "loopbackListener18443Closed": true,
+  "fixtureBackendProcessesExited": true,
+  "temporaryTlsLeafKeysRemoved": true,
+  "syntheticRuntimeDirectoryMovedToTrash": true
+}

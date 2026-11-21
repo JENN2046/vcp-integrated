@@ -2,6 +2,7 @@ package dev.nativesync.qa.send;
 import android.app.Activity;
 import android.content.Intent;
 import android.provider.DocumentsContract;
+import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.os.Bundle;
@@ -32,7 +33,16 @@ public final class TestWindow extends Activity {
     page.setWebViewClient(new WebViewClient() {
       @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest r) { return !allow(r.getUrl()); }
       @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest r) {
-        return allow(r.getUrl()) ? null : new WebResourceResponse("text/plain","utf-8",new ByteArrayInputStream(new byte[0]));
+        if (!allow(r.getUrl())) {
+          return new WebResourceResponse("text/plain","utf-8",new ByteArrayInputStream(new byte[0]));
+        }
+        // The PWA displays Connected after this session probe succeeds. Finish
+        // persisting WebView cookies before allowing the probe onto the wire.
+        if ("GET".equals(r.getMethod()) && "/mobile/api/session".equals(r.getUrl().getPath())) {
+          CookieManager.getInstance().flush();
+          android.util.Log.i("NativeSyncFixture", "session_probe_cookie_flush_completed");
+        }
+        return null;
       }
     });
     page.setWebChromeClient(new WebChromeClient() {

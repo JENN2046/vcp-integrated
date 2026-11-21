@@ -12,6 +12,8 @@ Android 以只读会话加入 Linux 和 Windows 观察的共享话题 `shared_66
 
 独立发送夹具使用全新 WebView Profile。首次出现「已连接」后 108 毫秒内完成强停，确认临时进程退出。中央一次性配对已经消耗，尚无任何 Work 或 Provider 调用；冷开及稍后复查均显示待配对。公共话题只读会话也在刚配对不久的快速冷开后回到待配对。此结果限于 Android 测试 WebView 的快速强停窗口；本轮未测量日用浏览器的持久化时间，也未定位会话丢失的内部原因。
 
+后续在原手机复现并修复了隔离 WebView 的 Cookie 持久化时序。[后续对照](../../android-pair-force-stop/README.md)
+
 [强停时间](first-pair-stop.json) · [冷开](first-pair-reopened.json) · [中央状态](first-pair-server.json) · [公共会话快速冷开](shared-rapid-reopen.json)
 
 ## 系统选档、冷开改发与丢回执
