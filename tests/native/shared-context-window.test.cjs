@@ -5,7 +5,7 @@ const path = require('node:path');
 const test = require('node:test');
 const server = createRequire(path.join(process.env.VCP_TEST_SERVER || path.resolve(__dirname, '../../apps/server'), 'package.json'));
 const kernel = server('@vcp/native-history-window');
-const { effectiveRequest } = server('./Plugin/NativeSync/mobile/effectiveContext');
+const { effectiveRequest, journalOrder } = server('./Plugin/NativeSync/mobile/effectiveContext');
 
 test('the desktop compaction API and the worker resolve the native history window', async () => {
     const desktop = await import('../../apps/desktop/modules/chat/contextCompactionState.js');
@@ -31,6 +31,23 @@ test('shared assembly reads content only for retained non-checkpoint rows and le
     assert.deepEqual(readIds, ['retained','unsupported-version','current']);
     assert.deepEqual(packet.slice(1).map(message => message.content[0].text), ['latest','reply','unsupported-version','hello']);
     assert.deepEqual(history, before);
+});
+
+test('a late edit keeps its original side of the checkpoint and the retained tail uses the edited body', async () => {
+    const archived = {id:'archived', role:'user', content:'{{VCPChatCanvas}}', desktopReferences:[{id:'old-reference'}]};
+    const checkpoint = {id:'checkpoint', role:'user', content:'summary',
+        contextCompaction:{kind:kernel.COMPACTION_KIND, version:1, checkpoint:'summary'}};
+    const retained = {id:'retained', role:'assistant', content:'edited reply'};
+    const current = {id:'current', role:'user', content:'current'};
+    const journal = journalOrder([
+        {row:{first_seq:2},message:checkpoint}, {row:{first_seq:4},message:current},
+        {row:{first_seq:3},message:retained}, {row:{first_seq:1},message:archived},
+    ]);
+    const history = [retained, checkpoint, archived, current];
+    const packet = await effectiveRequest(history, {systemPrompt:'prompt'}, current.id, undefined, journal);
+    assert.deepEqual(packet.slice(1).map(message => message.content[0].text), ['summary','edited reply','current']);
+    await assert.rejects(effectiveRequest(history, {systemPrompt:'prompt'}, current.id, undefined,
+        [checkpoint, archived, retained, current]), {code:'DESKTOP_CONTEXT_REQUIRED'});
 });
 
 test('a historical system message does not consume single-chat Tavern injection depth', async () => {

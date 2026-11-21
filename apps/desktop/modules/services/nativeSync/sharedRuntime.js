@@ -507,19 +507,19 @@ class SharedRuntime {
   if(!this.capabilities.features?.includes('shared-topic-history-v1')){await this.replica.sync();await this.verifyHistory(mapping);return {legacy:true};}
   const result=await this.replica.syncTopic(mapping,{after:this.state.baselines[mapping.sharedId]?.remote?.watermark||0,minSeq});await this.verifyHistory(mapping);return result;
  }
- async refreshForExecution(d,{forceFresh=false}={}){
+ async refreshForExecution(d,{forceFresh=false,sharedSessionHistory=false}={}){
   if(this.closed||!this.ready)throw fail('SHARED_STARTUP_PENDING');
-  if(!this.capabilities.features?.includes('shared-topic-history-v1')){await this.serialCore(()=>this.tickCore({forceLocal:true}));const mapping=this.execution.mapping(d),context=await this.send(endpoint+'context?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId}));return {...context,model:this.configs.state.objects[this.state.objects[mapping.sharedId].parentId]?.config.model,legacy:true};}
+  if(!this.capabilities.features?.includes('shared-topic-history-v1')){await this.serialCore(()=>this.tickCore({forceLocal:true}));const mapping=this.execution.mapping(d),context=await this.send(endpoint+'context?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId}),{sharedSessionHistory});return {...context,model:this.configs.state.objects[this.state.objects[mapping.sharedId].parentId]?.config.model,legacy:true};}
   const mapping=this.execution.mapping(d);this.matching.assert([mapping.sharedId,this.state.objects[mapping.sharedId].parentId]);
   const snapshot=this.execution.state.executionSnapshots?.[mapping.sharedId],adapter=this.adapter;
-  if(this.optimisticEnabled&&!forceFresh&&(d.itemType||'agent')==='agent'&&this.capabilities.features?.includes('shared-inline-receipts-v1')&&snapshot&&Array.isArray(snapshot.dependencies)&&this.state.baselines[mapping.sharedId]?.complete){
+  if(this.optimisticEnabled&&!forceFresh&&!sharedSessionHistory&&(d.itemType||'agent')==='agent'&&this.capabilities.features?.includes('shared-inline-receipts-v1')&&snapshot&&Array.isArray(snapshot.dependencies)&&this.state.baselines[mapping.sharedId]?.complete){
    for(const dependency of snapshot.dependencies){const metadata=this.state.objects[dependency.id];if(!metadata)continue;if(this.matching.fenced(dependency.id))throw fail('SHARED_MATCH_PREPARING');await this.configs.scanNative(metadata);if(require('./sharedExecution').blocksExecution(this,dependency.id))throw fail('SHARED_CONFIG_CONFLICT');}
    const history=await this.replica.queue.read(mapping.shared);
    if(this.replica.queue.revision(history)===snapshot.localRevision&&!adapter.state.outbox.some(e=>adapter.sameTopic(e,mapping.shared))&&!adapter.state.inbox.some(e=>adapter.sameTopic(e.event,mapping.shared))&&!(adapter.state.pending&&adapter.sameTopic(adapter.state.pending.event,mapping.shared))){
     const executionHistory=await this.verifyHistory(mapping);return {head:snapshot.head,hash:snapshot.hash,model:snapshot.model,dependencies:snapshot.dependencies,optimistic:true,executionHistory};
    }
   }
-  const context=await this.send(endpoint+'context?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId}));
+  const context=await this.send(endpoint+'context?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId}),{sharedSessionHistory});
   if(!Array.isArray(context.dependencies))throw fail('SHARED_TOPIC_HISTORY_UPGRADE_REQUIRED');
   // Detect native edits only in configurations used by this send. Admission
   // independently freezes and checks the server hash, including newly added rules.
@@ -530,7 +530,9 @@ class SharedRuntime {
    await this.configs.scanNative(metadata);
    if(require('./sharedExecution').blocksExecution(this,dependency.id))throw fail('SHARED_CONFIG_CONFLICT');
   }
-  await this.syncExecutionTopic(mapping,{minSeq:context.head});const executionHistory=await this.verifyHistory(mapping);return {...context,executionHistory};
+  const projection=await this.syncExecutionTopic(mapping,{minSeq:context.head});
+  if(sharedSessionHistory&&context.desktopHistoryRequired!==undefined&&projection.head!==context.head)throw fail('SHARED_CONTEXT_CHANGED');
+  const executionHistory=await this.verifyHistory(mapping);return {...context,executionHistory};
  }
 
  async executionMapping(d){

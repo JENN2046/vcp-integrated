@@ -323,7 +323,17 @@ class SharedSpace {
    if(configs&&!config.execution&&[config.owner,...config.members].some(o=>configs.hasAgentReference(o.config.systemPrompt||'').length))throw fail('SHARED_CONFIG_PENDING');
   return config;
  }
- executionConfig(actor,{sharedSpaceId,sharedId}){const row=this.topic(actor,sharedSpaceId,sharedId,'execute');return {...this.freeze(row),head:this.head(row)};}
+ executionConfig(actor,{sharedSpaceId,sharedId,sharedSessionHistory=false}){
+  const row=this.topic(actor,sharedSpaceId,sharedId,'execute');
+  return this.store.readSnapshot(()=>{
+   const result={...this.freeze(row),head:this.head(row)};
+   if(sharedSessionHistory&&row.owner_type==='agent'){
+    const context=require('../mobile/effectiveContext');
+    result.desktopHistoryRequired=context.requiresDesktopContext(context.admissionHistory(this.store,tuple(row),result.head));
+   }
+   return result;
+  });
+ }
  sessionSend(actor,body){return require('./sharedSession').send(this,actor,body);}
  active(topicId){return this.db.prepare("SELECT * FROM shared_admissions WHERE topic_id=? AND state IN ('preparing','accepted','dispatched','review_required')").get(topicId);}
  admission(actor,space,admissionId){

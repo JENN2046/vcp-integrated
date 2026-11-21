@@ -76,17 +76,23 @@ async function sharedRequest(store,req,url,mobileActor,signal){
   if(query.limit!==undefined)query.limit=Number(query.limit);
   if(query.after!==undefined&&!['directory','matches'].includes(name))query.after=Number(query.after);
   if(name==='config')return {object:shared.get(actor,query.sharedSpaceId,query.sharedId),readOnly:shared.readOnly};
+  const sharedSessionHistory=name==='context'&&actor.kind==='desktop'&&String(req.headers?.['x-nativesync-capabilities']||'').split(',').includes('shared-session-history-v1');
+  let desktopConfigRequired=false;
   if(name==='context'&&shared.native?.engine.configs){
    shared.topic(actor,query.sharedSpaceId,query.sharedId,'execute');
    if(actor.kind==='desktop'&&!String(req.headers?.['x-nativesync-capabilities']||'').split(',').includes('shared-context-v1'))throw fail('SHARED_CONTEXT_CLIENT_UPGRADE_REQUIRED',409);
    const configs=shared.native.engine.configs,topic=configs.topics.find(t=>t.key===query.sharedId&&t.sharedSpaceId===query.sharedSpaceId);
    if(!topic)throw fail('SHARED_CONFIG_PENDING',409);
-   await require('../mobile/sharedConfiguration').prepareSharedConfiguration(configs,topic,{desktopContext:actor.kind==='desktop'});
+   const execution=await require('../mobile/sharedConfiguration').prepareSharedConfiguration(configs,topic,{desktopContext:actor.kind==='desktop'});
+   if(sharedSessionHistory&&execution&&topic.ownerType==='agent'){
+    try{configs.verify(topic,execution);}catch(error){if(error.code!=='DESKTOP_CONTEXT_REQUIRED')throw error;desktopConfigRequired=true;}
+   }
   }
+  if(sharedSessionHistory)query.sharedSessionHistory=true;
   const result=shared[route[0]](actor,query);
   if(name==='directory')result.readOnly=shared.readOnly;
   // Execute permission does not expose the private configuration template.
-  if(name==='context')return {hash:result.hash,head:result.head,model:result.owner.config.model,dependencies:[result.owner,...result.members,...result.rules].map(v=>({id:v.id,kind:v.kind,version:v.version,configHash:v.configHash}))};
+  if(name==='context')return {hash:result.hash,head:result.head,model:result.owner.config.model,...(desktopConfigRequired?{desktopConfigRequired:true}:{}),...(result.desktopHistoryRequired===undefined?{}:{desktopHistoryRequired:result.desktopHistoryRequired}),dependencies:[result.owner,...result.members,...result.rules].map(v=>({id:v.id,kind:v.kind,version:v.version,configHash:v.configHash}))};
   return result;
  }
  if(req.method==='POST'){

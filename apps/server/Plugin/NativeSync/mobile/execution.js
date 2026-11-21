@@ -185,12 +185,8 @@ class ConversationExecution {
             // after this user message was accepted. No new state/schema needed.
             const {predecessors,records}=this.store.readSnapshot(()=>{
             const predecessors = this.db.prepare("SELECT user_message_id,reply_message_id FROM mobile_executions WHERE topic_key=? AND user_seq<? AND state='completed' AND reply_message_id IS NOT NULL ORDER BY user_seq").all(row.topic_key,row.user_seq);
-            const records = this.store.readProjected(()=>this.db.prepare(`SELECT * FROM (
-                SELECT *,row_number() OVER(PARTITION BY msg_id ORDER BY seq DESC) AS r,
-                    min(seq) OVER(PARTITION BY msg_id) AS first_seq
-                FROM journal WHERE owner_type=? AND owner_id=? AND topic_id=? AND
-                (seq<=? OR msg_id IN (SELECT value FROM json_each(?))))
-                WHERE r=1 AND action='upsert' ORDER BY seq`).all(topic.ownerType, topic.ownerId, topic.topicId, row.user_seq,JSON.stringify(predecessors.map(p=>p.reply_message_id))));
+            const records = require('./effectiveContext').readJournalHistory(this.store,
+                [topic.ownerType,topic.ownerId,topic.topicId],row.user_seq,predecessors.map(p=>p.reply_message_id));
             return {predecessors,records};
             });
             const history=records.map(r=>r.message).sort((a,b)=>a.timestamp-b.timestamp);
@@ -203,14 +199,14 @@ class ConversationExecution {
                 ordered.push(m);if(replyAfter.has(m.id))ordered.push(replyAfter.get(m.id));
             }
             if(byId.has(row.user_message_id))ordered.push(byId.get(row.user_message_id));
-            if(ordered.some(m=>m.desktopReferences?.length))throw error('DESKTOP_CONTEXT_REQUIRED',409);
+            if(!(topic.sharedSpaceId&&published)&&ordered.some(m=>m.desktopReferences?.length))throw error('DESKTOP_CONTEXT_REQUIRED',409);
             const messages = ordered.filter(m => ['user', 'assistant'].includes(m.role)).map(m => {
                 if (typeof m.content !== 'string') throw error('TEXT_MESSAGES_REQUIRED');
                 return { role: m.role, content: m.content };
             });
             const attachmentBudget={bytes:0};
             const journalHistory=topic.sharedSpaceId&&published
-                ? records.sort((a,b)=>a.row.first_seq-b.row.first_seq).map(record=>record.message)
+                ? require('./effectiveContext').journalOrder(records)
                 : undefined;
             const requestMessages=published?await require('./effectiveContext').effectiveRequest(ordered,published,row.user_message_id,async m=>m.attachments?.length?(this.attachments?this.attachments.content(row.topic_key,m,published.imageSupported,attachmentBudget):(()=>{throw error('ATTACHMENTS_NOT_ENABLED');})()):[{type:'text',text:m.content}],journalHistory):[{role:'system',content:prompt},...messages];
             // Context budgeting remains in the existing ToolBox handler. The

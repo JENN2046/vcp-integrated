@@ -196,3 +196,54 @@ test('invitation context headers replay within one session and reject a new Cook
     assert.deepEqual({ jobs: f.portal.engine.snapshot(), metrics: f.store.metrics(), steps: f.store.db.prepare('SELECT * FROM mobile_execution_steps').all() }, before);
     assert.equal(before.jobs.length, 1); assert.equal(before.steps.length, 1); assert.equal(before.metrics.journalRows, 0); assert.equal(before.jobs[0].attempts, 0);
 });
+
+
+test('the PWA releases only a verified desktop-only rejection and serializes same-request posts', async () => {
+    const {createSubmissionRecovery, restoreRejectedDraft} = await import('../../apps/mobile/src/submissionRecovery.js');
+    let saved = null;
+    const tails = new Map();
+    const storage = {getItem: () => saved, setItem: (_key, value) => { saved = value; }};
+    const locks = {request(name, _options, run) {
+        const next = (tails.get(name) || Promise.resolve()).catch(() => {}).then(run);
+        tails.set(name, next);
+        return next;
+    }};
+    const session = {version:1, entryId:'a'.repeat(64), sessionMarker:'b'.repeat(64)};
+    const first = createSubmissionRecovery({origin, getStorage:() => storage, getLocks:() => locks});
+    const otherPage = createSubmissionRecovery({origin, getStorage:() => storage, getLocks:() => locks});
+    const record = await first.prepare({...session, topicKey:'shared-single', kind:'message',
+        payload:{requestId:'desktop-only', text:'{{VCPChatCanvas}}', attachments:['ready-upload']}});
+    const rejection = {status:409, code:'DESKTOP_CONTEXT_REQUIRED'};
+    assert.equal(await first.releaseDesktopRejection(record, {status:409, code:'SHARED_TOPIC_BUSY'}, [], session), false);
+    assert.equal(await first.releaseDesktopRejection(record, {code:'NETWORK_UNAVAILABLE'}, [], session), false);
+    assert.equal(await first.releaseDesktopRejection(record, rejection, [], {...session, sessionMarker:'c'.repeat(64)}), false);
+    assert.equal(await first.releaseDesktopRejection(record, rejection, undefined, session), false);
+    const prior = {id:'accepted-earlier', state:'queued', topicKey:record.topicKey, requestId:record.requestId,
+        recovery:{version:1, kind:record.kind, payloadHash:record.payloadHash, sessionMarker:session.sessionMarker}};
+    assert.equal(await first.releaseDesktopRejection(record, rejection, [prior], session), false);
+    assert.deepEqual(first.current(record), record);
+
+    let settle;
+    const waitForResponse = new Promise(resolve => { settle = resolve; });
+    const answer = first.withSendLock(record, async () => {
+        await waitForResponse;
+        return first.releaseDesktopRejection(record, rejection, [], session);
+    });
+    const queuedRetry = otherPage.withSendLock(record, () => assert.fail('released request posted again'));
+    const stopped = assert.rejects(queuedRetry, {code:'SUBMISSION_RECORD_CHANGED'});
+    settle();
+    assert.equal(await answer, true);
+    await stopped;
+    assert.equal(first.current(record), null);
+    const file = {uploadId:'ready-upload', file:{name:'original.txt'}};
+    const liveDraft = {text:'already edited', revision:2, files:[file], submitted:{requestId:record.requestId}};
+    restoreRejectedDraft(liveDraft, record);
+    assert.deepEqual(liveDraft, {text:'already edited', revision:2, files:[file]});
+    const reloadedDraft = {text:'', revision:0, files:[]};
+    restoreRejectedDraft(reloadedDraft, record);
+    assert.equal(reloadedDraft.text, record.payload.text);
+    assert.deepEqual(reloadedDraft.files, [{uploadId:'ready-upload', uploadSessionMarker:session.sessionMarker, progress:100, error:''}]);
+    const edited = await first.prepare({...session, topicKey:record.topicKey, kind:record.kind,
+        payload:{requestId:'edited-request', text:'edited text', attachments:reloadedDraft.files.map(item => item.uploadId)}});
+    assert.deepEqual(edited.payload.attachments, ['ready-upload']);
+});

@@ -26,7 +26,11 @@ function accept(engine,sessionId,{topicKey,requestId,text,attachments=[]}){
   const config=engine.configs.snapshot(topic);engine.configs.assertRunnable(topic,config);
   const now=Date.now(),msgId='mobile_'+sha256(sessionId+'\0'+requestId).slice(0,32),row=shared.topic(actor,topic.sharedSpaceId,topic.key,'execute');
   const files=attachments.length?(engine.attachments?engine.attachments.claim(actor.principal,topicKey,attachments):(()=>{throw fail('ATTACHMENTS_NOT_ENABLED');})()):[];
-  const admitted=shared.admit(actor,{sharedSpaceId:topic.sharedSpaceId,sharedId:topic.key,requestId,expectedHead:shared.head(row),configHash:config.sharedTemplateHash,message:{id:msgId,role:'user',content:text,timestamp:now,...(files.length?{attachments:files}:{})}});
+  const message={id:msgId,role:'user',content:text,timestamp:now,...(files.length?{attachments:files}:{})};
+  const context=require('./effectiveContext'),head=shared.head(row);
+  const history=context.admissionHistory(engine.store,[topic.ownerType,topic.ownerId,topic.topicId],head);
+  context.assertPortableHistory([...history,message]);
+  const admitted=shared.admit(actor,{sharedSpaceId:topic.sharedSpaceId,sharedId:topic.key,requestId,expectedHead:head,configHash:config.sharedTemplateHash,message});
   engine.db.prepare("INSERT INTO mobile_executions(id,session_id,request_id,topic_key,request_hash,user_message_id,user_seq,state,created_at,updated_at,not_before,config_snapshot,request_payload) VALUES(?,?,?,?,?,?,?,'queued',?,?,?,?,?)").run(admitted.id,sessionId,requestId,topicKey,requestHash,msgId,admitted.userSeq,now,now,now+engine.startDelayMs,JSON.stringify(config),JSON.stringify({requestId,text,...(attachments.length?{attachments}:{})}));
   if(files.length)engine.attachments.bindExecution(actor.principal,topicKey,attachments,admitted.id,msgId);
   engine.wake();return {...engine.public(engine.get(admitted.id),sessionId),replayed:false};

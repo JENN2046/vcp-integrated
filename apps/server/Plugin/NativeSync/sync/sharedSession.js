@@ -26,10 +26,9 @@ function portable(shared,topic,config,message){
  const engine=shared.native.engine,descriptor=engine.topics.get(topic.id);
  if(!descriptor||descriptor.ownerType!=='agent'||!config.execution)throw fail('SHARED_CONFIG_PENDING');
  engine.configs.verify(descriptor,config.execution);engine.configs.assertRunnable(descriptor,config.execution);
- const records=shared.store.readProjected(()=>shared.db.prepare('SELECT * FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND deleted=0 ORDER BY last_seq').all(topic.owner_type,topic.owner_id,topic.topic_id));
- const messages=[...records.map(r=>r.message),message];
- if(messages.some(m=>m.desktopReferences?.length))throw fail('DESKTOP_CONTEXT_REQUIRED');
- require('../mobile/groupRequest').assertPortableContext(messages);
+ const context=require('../mobile/effectiveContext');
+ const history=context.admissionHistory(shared.store,[topic.owner_type,topic.owner_id,topic.topic_id],shared.head(topic));
+ context.assertPortableHistory([...history,message]);
 }
 function result(shared,row,replayed){
  return {...shared.publicAdmission(shared.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(row.id)),workId:row.id,replayed,execution:shared.native.engine.public(row,null)};

@@ -12,7 +12,7 @@ import {createHistoryCache,historyCacheKey} from './historyCache.js';
 import {consumePairingLink} from './pairingLink.js';
 import {uploadAttachment} from './attachmentUpload.js';
 import {readAttachment,saveAttachment} from './attachmentRead.js';
-import {createSubmissionRecovery,validSessionRecovery,SUBMISSION_STORAGE_KEY} from './submissionRecovery.js';
+import {createSubmissionRecovery,restoreRejectedDraft,validSessionRecovery,SUBMISSION_STORAGE_KEY} from './submissionRecovery.js';
 import {projectNativeWork,verifyNativeResult,nativeTaskLabels,toolLabels,resultHash} from './nativeTasks.js';
 import {createSharedSessionObservers,sharedSessionPreviews} from './sharedSessions.js';
 const attachmentPager=createAttachmentStatusPager(),historyCache=createHistoryCache();
@@ -81,7 +81,7 @@ const visibleAgents=computed(()=>agents.value.filter(sourceMatches));
 const topicSearch=ref('');
 const visibleTopics=computed(()=>topics.value.filter(t=>sourceMatches(t)&&ownerKey(t)===agentId.value));
 const searchedTopics=computed(()=>{const query=topicSearch.value.trim().toLocaleLowerCase();return query?visibleTopics.value.filter(t=>[t.topicName,t.topicId].some(value=>String(value||'').toLocaleLowerCase().includes(query))):visibleTopics.value;});
-const currentTopic=computed(()=>{const topic=topics.value.find(t=>t.key===selected.value);if(topic&&!historyContextReady.value)return{...topic,executable:false,unavailableReason:'HISTORY_CONTEXT_LOADING'};return topic&&historyKey===selected.value&&messages.value.some(m=>m.desktopReferences?.length)?{...topic,executable:false,unavailableReason:'DESKTOP_CONTEXT_REQUIRED'}:topic;});
+const currentTopic=computed(()=>{const topic=topics.value.find(t=>t.key===selected.value);if(topic&&!historyContextReady.value)return{...topic,executable:false,unavailableReason:'HISTORY_CONTEXT_LOADING'};return topic&&!(topic.sharedSpaceId&&topic.ownerType==='agent')&&historyKey===selected.value&&messages.value.some(m=>m.desktopReferences?.length)?{...topic,executable:false,unavailableReason:'DESKTOP_CONTEXT_REQUIRED'}:topic;});
 function draftScope(){const topic=currentTopic.value;return paired.value&&validSessionRecovery(recoveryContext.value)&&topic?JSON.stringify([recoveryContext.value.entryId,ownerKey(topic),topic.topicId,topic.key]):'';}
 function switchDraft(){
  const next=draftScope();if(next===composerScope)return;
@@ -112,7 +112,7 @@ function invalidateSession(){clearSharedObservers();sharedFeatures.value=[];last
 function captureContext(){if(!paired.value||!selected.value||!validSessionRecovery(recoveryContext.value))throw Object.assign(Error(recoveryMessages.SUBMISSION_RECOVERY_UNAVAILABLE),{code:'SUBMISSION_RECOVERY_UNAVAILABLE'});return {topicKey:selected.value,recovery:{...recoveryContext.value},generation,authEpoch,draftScope:draftScope()};}
 function sameView(context){return context.topicKey===selected.value&&context.generation===generation&&context.authEpoch===authEpoch&&context.recovery?.entryId===recoveryContext.value?.entryId&&context.recovery?.sessionMarker===recoveryContext.value?.sessionMarker;}
 function newSubmissionContext(){if(!loadRecovery())throw Error(recoveryError.value);const context=captureContext();if(!historyContextReady.value)throw Object.assign(Error('正在载入历史并核对上下文'),{code:'HISTORY_CONTEXT_LOADING'});if(!currentTopic.value)throw Object.assign(Error(recoveryMessages.SUBMISSION_TOPIC_UNAVAILABLE),{code:'SUBMISSION_TOPIC_UNAVAILABLE'});if(submissionStore.current({entryId:context.recovery.entryId,topicKey:context.topicKey}))throw Object.assign(Error(recoveryMessages.SUBMISSION_PENDING),{code:'SUBMISSION_PENDING'});return context;}
-const errors={SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保留；完成后请显式重试',SHARED_GROUP_EXECUTION_NOT_READY:'共享群聊暂为只读，发送接线尚未完成',SHARED_CONFIG_PENDING:'共享配置正在核对，请稍后显式发送',SHARED_CONFIG_CONFLICT:'共享配置存在冲突，请先选择采用的版本',SHARED_EXECUTION_PERMISSION_REQUIRED:'本会话尚未授予共享执行权限',ATTACHMENTS_NOT_ENABLED:'当前服务器尚未启用附件传输，已选择的文件和消息草稿仍保留',SHARED_ATTACHMENTS_NOT_READY:'共享附件发送尚未接通，原文件保留',HISTORY_CONTEXT_LOADING:'正在载入历史并核对上下文',DESKTOP_REFERENCE_CLIENT_UPGRADE_REQUIRED:'此历史包含桌面引用，请更新应用后重开',GROUP_MODE_REQUIRES_DESKTOP:'此群聊模式请在桌面执行',GROUP_MEMBER_UNAVAILABLE:'此成员配置暂不可用',DEPENDENCY_REVIEW_REQUIRED:'同一话题有待核对的执行，请先处理暂停任务',DESKTOP_CONTEXT_REQUIRED:'此消息引用了仅在桌面可用的上下文',CONFIG_SNAPSHOT_CORRUPT:'执行配置校验失败，请在桌面重新发布',GROUP_CONTEXT_UNAVAILABLE:'有效上下文暂不可用',ATTACHMENT_BLOB_MISSING:'附件暂未同步，请等待电脑补齐',ATTACHMENT_BLOB_CORRUPT:'附件完整性校验失败，请重新同步',ATTACHMENT_TEXT_UNAVAILABLE:'此文件的文本尚不可用',ATTACHMENT_TYPE_REJECTED:'支持 PNG、JPEG、WebP、PDF 和 UTF-8 文本文件',ATTACHMENT_STORAGE_BUDGET:'附件空间已达到上限',ATTACHMENT_REQUEST_BUDGET:'附件请求过多，请稍后重试',MODEL_IMAGE_UNSUPPORTED:'当前模型不支持图片，请在电脑端选择支持图片的模型并发布配置',EXECUTION_CONFIG_REQUIRED:'请先在电脑端发布有效 Agent 配置',PAIR_REQUIRED:'输入你的 Key 连接会话',HTTPS_REQUIRED:'当前入口尚未启用 HTTPS，不能提交 Key',SERVER_NOT_APPROVED:'此地址尚未由服务端批准，请使用已获授权的服务器',PROTECTED_HOST_NOT_READY:'安全链路或服务端接入尚未就绪，暂不接收访问凭据',AUTH_FAILED:'访问凭据不正确',AUTH_RATE_LIMIT:'尝试过于频繁，请稍后重试',AGENT_NOT_EXECUTABLE:'此 Agent 尚未配置服务端执行能力',EXECUTION_INTERRUPTED_REVIEW_REQUIRED:'执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑'};
+const errors={SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保留；完成后请显式重试',SHARED_GROUP_EXECUTION_NOT_READY:'共享群聊暂为只读，发送接线尚未完成',SHARED_CONFIG_PENDING:'共享配置正在核对，请稍后显式发送',SHARED_CONFIG_CONFLICT:'共享配置存在冲突，请先选择采用的版本',SHARED_EXECUTION_PERMISSION_REQUIRED:'本会话尚未授予共享执行权限',ATTACHMENTS_NOT_ENABLED:'当前服务器尚未启用附件传输，已选择的文件和消息草稿仍保留',SHARED_ATTACHMENTS_NOT_READY:'共享附件发送尚未接通，原文件保留',HISTORY_CONTEXT_LOADING:'正在载入历史并核对上下文',DESKTOP_REFERENCE_CLIENT_UPGRADE_REQUIRED:'此历史包含桌面引用，请更新应用后重开',GROUP_MODE_REQUIRES_DESKTOP:'此群聊模式请在桌面执行',GROUP_MEMBER_UNAVAILABLE:'此成员配置暂不可用',DEPENDENCY_REVIEW_REQUIRED:'同一话题有待核对的执行，请先处理暂停任务',DESKTOP_CONTEXT_REQUIRED:'本轮上下文需要桌面专用内容，请在桌面继续',CONFIG_SNAPSHOT_CORRUPT:'执行配置校验失败，请在桌面重新发布',GROUP_CONTEXT_UNAVAILABLE:'有效上下文暂不可用',ATTACHMENT_BLOB_MISSING:'附件暂未同步，请等待电脑补齐',ATTACHMENT_BLOB_CORRUPT:'附件完整性校验失败，请重新同步',ATTACHMENT_TEXT_UNAVAILABLE:'此文件的文本尚不可用',ATTACHMENT_TYPE_REJECTED:'支持 PNG、JPEG、WebP、PDF 和 UTF-8 文本文件',ATTACHMENT_STORAGE_BUDGET:'附件空间已达到上限',ATTACHMENT_REQUEST_BUDGET:'附件请求过多，请稍后重试',MODEL_IMAGE_UNSUPPORTED:'当前模型不支持图片，请在电脑端选择支持图片的模型并发布配置',EXECUTION_CONFIG_REQUIRED:'请先在电脑端发布有效 Agent 配置',PAIR_REQUIRED:'输入你的 Key 连接会话',HTTPS_REQUIRED:'当前入口尚未启用 HTTPS，不能提交 Key',SERVER_NOT_APPROVED:'此地址尚未由服务端批准，请使用已获授权的服务器',PROTECTED_HOST_NOT_READY:'安全链路或服务端接入尚未就绪，暂不接收访问凭据',AUTH_FAILED:'访问凭据不正确',AUTH_RATE_LIMIT:'尝试过于频繁，请稍后重试',AGENT_NOT_EXECUTABLE:'此 Agent 尚未配置服务端执行能力',EXECUTION_INTERRUPTED_REVIEW_REQUIRED:'执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑'};
 async function api(route,body,requestHeaders={},signal){
  const requestEpoch=authEpoch;
  const r=await fetch('/mobile/api/'+route,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'X-NativeSync-Capabilities':'desktop-references-v1,source-data-v2,shared-space-v1',...(body?{'Content-Type':'application/json'}:{}),...requestHeaders},body:body?JSON.stringify(body):undefined,signal});
@@ -221,16 +221,38 @@ async function reconcileSubmission(record,executions,context){
  return result;
 }
 async function postPrepared(record,context){
- await submissionStore.verify(record);submissionStore.requireCurrent(record);
- if(!sameView(context))return;
- notice.value='本地已保存 · 正在等待云端确认…';
- const accepted=await api('conversations/'+encodeURIComponent(record.topicKey)+(record.kind==='invitation'?'/invitations':'/messages'),record.payload,{'X-NativeSync-Entry-Id':record.entryId,'X-NativeSync-Session-Marker':record.sessionMarker});
- const result=await reconcileSubmission(record,[accepted],context);
- if(result.state!=='confirmed')throw Object.assign(Error(recoveryMessages.SUBMISSION_RECEIPT_UNVERIFIED),{code:'SUBMISSION_RECEIPT_UNVERIFIED'});
- if(sameView(context)){
-  notice.value='云端已接受 · '+(labels[accepted.state]||accepted.state);
-  await refresh();
- }
+ await submissionStore.verify(record);
+ return submissionStore.withSendLock(record,async()=>{
+  if(!sameView(context))return;
+  notice.value='本地已保存 · 正在等待云端确认…';
+  const conversation='conversations/'+encodeURIComponent(record.topicKey);
+  let accepted;
+  try{
+   accepted=await api(conversation+(record.kind==='invitation'?'/invitations':'/messages'),record.payload,{'X-NativeSync-Entry-Id':record.entryId,'X-NativeSync-Session-Marker':record.sessionMarker});
+  }catch(error){
+   const topic=currentTopic.value;
+   if(error.status!==409||error.code!=='DESKTOP_CONTEXT_REQUIRED'||record.kind!=='message'||!sameView(context)
+      ||!topic?.sharedSpaceId||topic.ownerType!=='agent'||topic.executionProtocol!==2)throw error;
+   const draft=drafts.get(context.draftScope);
+   if(!draft)throw error;
+   const response=await api(conversation+'/execution-request?'+new URLSearchParams({requestId:record.requestId}));
+   if(!sameView(context)||!await submissionStore.releaseDesktopRejection(record,error,response.executions,context.recovery))throw error;
+   restoreRejectedDraft(draft,record);
+   if(!loadRecovery())throw Error(recoveryError.value);
+   if(sameView(context)){
+    submissionNoticeHeld=true;
+    recoveryDetail.value='';acceptedReceipt.value=null;
+    notice.value=recoveryMessage(error)+'。草稿和附件已保留，可编辑后重新发送。';
+   }
+   return;
+  }
+  const result=await reconcileSubmission(record,[accepted],context);
+  if(result.state!=='confirmed')throw Object.assign(Error(recoveryMessages.SUBMISSION_RECEIPT_UNVERIFIED),{code:'SUBMISSION_RECEIPT_UNVERIFIED'});
+  if(sameView(context)){
+   notice.value='云端已接受 · '+(labels[accepted.state]||accepted.state);
+   await refresh();
+  }
+ });
 }
 async function submit(submission,kind='message',context=newSubmissionContext()){
  busy.value=true;submissionNoticeHeld=false;
@@ -243,7 +265,7 @@ async function submit(submission,kind='message',context=newSubmissionContext()){
  }catch(error){loadRecovery();if(sameView(context)){submissionNoticeHeld=true;notice.value='尚未完成提交确认：'+recoveryMessage(error);}}
  finally{busy.value=false;}
 }
-function selectFiles(event){for(const file of event.target.files||[]){if(pendingFiles.value.length>=8)break;if(file.size>20*1024*1024){notice.value='单个附件需在 20 MB 以内';continue;}if(!pendingFiles.value.some(f=>f.file.name===file.name&&f.file.size===file.size&&f.file.lastModified===file.lastModified))pendingFiles.value.push({file,progress:0,error:'',uploadId:null});}event.target.value='';}
+function selectFiles(event){for(const file of event.target.files||[]){if(pendingFiles.value.length>=8)break;if(file.size>20*1024*1024){notice.value='单个附件需在 20 MB 以内';continue;}if(!pendingFiles.value.some(f=>f.file?.name===file.name&&f.file.size===file.size&&f.file.lastModified===file.lastModified))pendingFiles.value.push({file,progress:0,error:'',uploadId:null});}event.target.value='';}
 function attachmentUrl(message,attachment){return '/mobile/api/conversations/'+encodeURIComponent(selected.value)+'/attachments/messages/'+encodeURIComponent(message.id)+'/'+encodeURIComponent(attachment.id);}
 function closeAttachment(){
  attachmentReadRequest++;attachmentReadController?.abort();attachmentReadController=null;
@@ -267,7 +289,7 @@ function downloadAttachment(){const item=attachmentPreview.value;if(item?.blob)s
 async function send(){
  if((!text.value.trim()&&!pendingFiles.value.length)||busy.value||currentTopic.value?.executable===false)return;
  let context;busy.value=true;submissionNoticeHeld=false;
- try{context=newSubmissionContext();const draft=composerDraft.value,snapshot={text:draft.text,revision:draft.revision,files:[...draft.files]},ids=[];for(const item of snapshot.files){item.error='';try{if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n);item.uploadSessionMarker=context.recovery.sessionMarker;ids.push(item.uploadId);}catch(e){item.error=e.message;throw e;}}if(!sameView(context))return;const requestId=crypto.randomUUID();draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};await submit({requestId,text:snapshot.text,attachments:ids},'message',context);}
+ try{context=newSubmissionContext();const draft=composerDraft.value,snapshot={text:draft.text,revision:draft.revision,files:[...draft.files]},ids=[];for(const item of snapshot.files){item.error='';try{if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;if(!item.uploadId&&!item.file)throw Error('请移除已上传附件并重新选择原文件');item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n);item.uploadSessionMarker=context.recovery.sessionMarker;ids.push(item.uploadId);}catch(e){item.error=e.message;throw e;}}if(!sameView(context))return;const requestId=crypto.randomUUID();draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};await submit({requestId,text:snapshot.text,attachments:ids},'message',context);}
  catch(error){if(!context||sameView(context)){submissionNoticeHeld=true;notice.value=recoveryMessage(error);}}finally{busy.value=false;}
 }
 async function refreshRetrySession(context){
@@ -417,7 +439,7 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
    <SharedDirectoryView v-for="space in sharedSpaces" :key="space.id" :space="space" :context="recoveryContext" :api="api" :on-device-visibility="deviceVisibilityChanged" />
    <SharedConfigEditor v-if="currentTopic?.sharedSpaceId&&sharedSpaces.some(s=>s.id===currentTopic.sharedSpaceId&&s.config)" :key="currentTopic.sharedOwnerId" :topic="currentTopic" :context="recoveryContext" :api="api" />
    </details>
-   <footer><div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div><div v-if="currentTopic?.attachmentsEnabled" class="upload-area"><label class="attachment-picker">添加图片或文件<input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false"></label><small>最多 8 个，每个 20 MB；断线后可重新选择同一文件续传。</small><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file.name}} · {{item.error||item.progress+'%'}}</span><button @click="pendingFiles.splice(i,1)" :disabled="busy">移除</button></div></div><small v-else-if="currentTopic?.sharedSpaceId" role="status" class="attachment-unavailable">此共享会话尚未启用附件传输，可继续发送文字；文件不会被静默上传。</small><small class="draft-scope">草稿按话题暂存于本页；刷新或关闭页面会清空。</small><form @submit.prevent="send"><label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" placeholder="输入文字…" rows="2" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form><div class="send-state"><span id="send-state" role="status">{{notice}}</span><button id="retry-last" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
+   <footer><div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div><div v-if="currentTopic?.attachmentsEnabled" class="upload-area"><label class="attachment-picker">添加图片或文件<input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false"></label><small>最多 8 个，每个 20 MB；断线后可重新选择同一文件续传。</small><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||item.progress+'%'}}</span><button @click="pendingFiles.splice(i,1)" :disabled="busy">移除</button></div></div><small v-else-if="currentTopic?.sharedSpaceId" role="status" class="attachment-unavailable">此共享会话尚未启用附件传输，可继续发送文字；文件不会被静默上传。</small><small class="draft-scope">草稿按话题暂存于本页；刷新或关闭页面会清空。</small><form @submit.prevent="send"><label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" placeholder="输入文字…" rows="2" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form><div class="send-state"><span id="send-state" role="status">{{notice}}</span><button id="retry-last" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
   </template>
  </div>
 </template>

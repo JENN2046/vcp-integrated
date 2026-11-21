@@ -54,7 +54,7 @@ class SharedSessionClient{
   if(!this.enabled()||this.closed||this.runtime.readOnly)return;
   const r=this.runtime,mapping=r.execution.mapping(descriptor);if(mapping.shared.itemType!=='agent')return;
   if(this.warming.has(mapping.sharedId))return this.warming.get(mapping.sharedId);
-  const task=(async()=>{const context=await r.refreshForExecution(descriptor,{forceFresh});const history=context.executionHistory||await r.verifyHistory(mapping);this.contexts.set(mapping.sharedId,{...context,history,revision:r.replica.queue.revision(history)});return context;})();
+  const task=(async()=>{const context=await r.refreshForExecution(descriptor,{forceFresh,sharedSessionHistory:true});const history=context.executionHistory||await r.verifyHistory(mapping);this.contexts.set(mapping.sharedId,{...context,history,revision:r.replica.queue.revision(history)});return context;})();
   this.warming.set(mapping.sharedId,task);try{return await task;}finally{this.warming.delete(mapping.sharedId);}
  }
  async context(descriptor,mapping){
@@ -78,7 +78,12 @@ class SharedSessionClient{
    const resuming=existing?.serverSession&&existing.admitStarted&&!existing.rejected;
    const context=resuming?null:await this.context(descriptor,mapping);
    const desktopOnly=value=>/\{\{VCPChat(?:Canvas|WorkSpace)(?::[^{}]*)?\}\}/.test(value||'');
-   if(context&&(context.history.some(m=>m.desktopReferences?.length||desktopOnly(m.content))||desktopOnly(message.content)||context.dependencies.some(dep=>desktopOnly(r.configs.state.objects[dep.id]?.config?.systemPrompt))))return null;
+   if(context){
+    // The physical History stays whole. Only the server knows each message's
+    // first Journal position, including messages edited after the checkpoint.
+    const desktopHistory=context.desktopHistoryRequired??context.history.some(m=>m.desktopReferences?.length||desktopOnly(m.content));
+    if(desktopHistory||context.desktopConfigRequired||message.desktopReferences?.length||desktopOnly(message.content)||context.dependencies.some(dep=>desktopOnly(r.configs.state.objects[dep.id]?.config?.systemPrompt)))return null;
+   }
    let record=existing;
    if(!record?.serverSession||record.rejected){
     const body={sharedSpaceId:r.connection.sharedSpaceId,sharedId:mapping.sharedId,...require('./sharedTopicSponsor').topicSponsorRouteBinding(r,mapping),requestId:message.id,expectedHead:context.head,configHash:context.hash,message:r.adapter.canonical(message,mapping.shared.topicId),...Object.fromEntries(['modelSaveRef','modelSaveResolutionRef'].filter(key=>options[key]).map(key=>[key,options[key]]))};

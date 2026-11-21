@@ -5,19 +5,53 @@ const {attachTimestampMetadata}=require('../nativeRules/modules/chat/requestMeta
 const {stripHiddenToolResults}=require('../nativeRules/modules/renderer/toolResultRegions');
 const tavern=require('../nativeRules/modules/tavernRulesEngine');
 
+function readJournalHistory(store,topic,throughSeq,predecessorReplies=[]){
+    return store.readProjected(db=>db.prepare(`SELECT * FROM (
+        SELECT *,row_number() OVER(PARTITION BY msg_id ORDER BY seq DESC) AS r,
+            min(seq) OVER(PARTITION BY msg_id) AS first_seq
+        FROM journal WHERE owner_type=? AND owner_id=? AND topic_id=? AND
+        (seq<=? OR msg_id IN (SELECT value FROM json_each(?))))
+        WHERE r=1 AND action='upsert' ORDER BY seq`).all(...topic,throughSeq,JSON.stringify(predecessorReplies)));
+}
+
+function journalOrder(records){
+    // Editing a message changes its body without moving its checkpoint position.
+    return [...records].sort((a,b)=>a.row.first_seq-b.row.first_seq).map(record=>record.message);
+}
+
+function selectHistory(history,currentId,journalHistory){
+    if(!journalHistory)return effectiveContextHistory(history);
+    const current=history.find(message=>message.id===currentId);
+    const selected=effectiveContextHistory(journalHistory.filter(message=>message.id!==currentId));
+    const checkpoint=isContextCheckpoint(selected[0])?selected[0]:null;
+    const retained=new Set(selected.map(message=>message.id));
+    // Preserve the worker's conversation order within the Journal-selected tail.
+    const ordered=history.filter(message=>retained.has(message.id)&&message.id!==checkpoint?.id);
+    if(checkpoint)ordered.unshift(checkpoint);
+    if(current&&!current.isThinking)ordered.push(current);
+    return ordered;
+}
+
+function requiresDesktopContext(messages){
+    const {requiresDesktopPlaceholder}=require('./groupRequest');
+    return messages.some(message=>message.desktopReferences?.length)||requiresDesktopPlaceholder(messages);
+}
+
+function assertPortableHistory(messages){
+    if(requiresDesktopContext(messages))throw Object.assign(Error('DESKTOP_CONTEXT_REQUIRED'),{code:'DESKTOP_CONTEXT_REQUIRED',status:409});
+}
+
+function admissionHistory(store,topic,head){
+    const history=journalOrder(readJournalHistory(store,topic,head));
+    return selectHistory(history,undefined,history);
+}
+
 // IO is supplied by the CAS adapter; context selection and Tavern semantics
 // remain the author's locally deployed pure rules.
 async function effectiveRequest(history,config,currentId,buildContent=async m=>[{type:'text',text:stripHiddenToolResults(m.content)}],journalHistory){
     const rules=config.tavernRules||[],messages=[];
-    let selected=effectiveContextHistory(journalHistory||history);
-    if(journalHistory){
-        // Journal identity order defines the covered prefix. Preserve the
-        // existing conversation order within the native window's retained tail.
-        const checkpoint=isContextCheckpoint(selected[0])?selected[0]:null;
-        const retained=new Set(selected.map(message=>message.id));
-        selected=history.filter(message=>retained.has(message.id)&&message.id!==checkpoint?.id);
-        if(checkpoint)selected.unshift(checkpoint);
-    }
+    const selected=selectHistory(history,currentId,journalHistory);
+    if(journalHistory)assertPortableHistory(selected);
     const transform=require('../sync/contracts.generated.cjs').sharedContextTransform(selected,config.stripRegexes,currentId);
     for(const message of selected){
         const checkpoint=isContextCheckpoint(message);
@@ -31,4 +65,4 @@ async function effectiveRequest(history,config,currentId,buildContent=async m=>[
     if(prompt.trim())messages.unshift({role:'system',content:prompt});
     return applyContextRules(messages,rules,tavern);
 }
-module.exports={effectiveRequest};
+module.exports={effectiveRequest,readJournalHistory,journalOrder,admissionHistory,requiresDesktopContext,assertPortableHistory};

@@ -6,7 +6,8 @@ const sanitizer=require('../nativeRules/modules/contextSanitizer');
 const tavern=require('../nativeRules/modules/tavernRulesEngine');
 const {nativePacket}=require('./nativePacket');
 const fail=code=>Object.assign(new Error(code),{code,status:409});
-function assertPortableContext(messages){for(const message of messages){const texts=typeof message.content==='string'?[message.content]:(Array.isArray(message.content)?message.content.filter(p=>p.type==='text').map(p=>p.text):[]);if(texts.some(text=>/\{\{VCPChat(?:Canvas|WorkSpace)(?::[^{}]*)?\}\}/.test(text||'')))throw fail('DESKTOP_CONTEXT_REQUIRED');}}
+function requiresDesktopPlaceholder(messages){return messages.some(message=>{const texts=typeof message.content==='string'?[message.content]:(Array.isArray(message.content)?message.content.filter(p=>p.type==='text').map(p=>p.text):[]);return texts.some(text=>/\{\{VCPChat(?:Canvas|WorkSpace)(?::[^{}]*)?\}\}/.test(text||''));});}
+function assertPortableContext(messages){if(requiresDesktopPlaceholder(messages))throw fail('DESKTOP_CONTEXT_REQUIRED');}
 
 function sanitize(messages,policy={},preserveCheckpoint=false){
  const mapText=(m,fn)=>preserveCheckpoint&&m.__vcpContextCheckpoint?m:{...m,content:typeof m.content==='string'?fn(m.content):Array.isArray(m.content)?m.content.map(p=>p.type==='text'&&typeof p.text==='string'?{...p,text:fn(p.text)}:p):m.content};
@@ -59,4 +60,4 @@ async function groupRequest({topic,config,member,history,currentUserId,requestId
  const params={model:resolution.effectiveModel,...(Number.isFinite(member.temperature)?{temperature:member.temperature}:{}),...(Number.isFinite(member.maxOutputTokens)?{max_tokens:member.maxOutputTokens}:{}),stream:member.streamOutput===true};
  return {body:nativePacket(prepared,{agentId:member.id,agentName:name,topicId:topic.topicId,isGroupMessage:true},requestId,params),resolution,causality};
 }
-module.exports={groupRequest,sanitize,assertPortableContext};
+module.exports={groupRequest,sanitize,assertPortableContext,requiresDesktopPlaceholder};

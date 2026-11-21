@@ -54,18 +54,31 @@ function validRecord(record, origin) {
 function sameScope(a, b) { return a.origin === b.origin && a.entryId === b.entryId && a.topicKey === b.topicKey; }
 function sameRecord(a, b) { return sameScope(a, b) && a.requestId === b.requestId && a.kind === b.kind && a.sessionMarker === b.sessionMarker && a.payloadHash === b.payloadHash && stable(a.payload) === stable(b.payload); }
 
+export function restoreRejectedDraft(draft, record) {
+  if (draft.submitted?.requestId === record.requestId) {
+    delete draft.submitted;
+    return;
+  }
+  if (!draft.revision && !draft.text) draft.text = record.payload.text;
+  for (const uploadId of record.payload.attachments || []) {
+    if (!draft.files.some(item => item.uploadId === uploadId)) {
+      draft.files.push({uploadId, uploadSessionMarker:record.sessionMarker, progress:100, error:''});
+    }
+  }
+}
+
 export function createSubmissionRecovery({origin, getStorage = () => globalThis.localStorage, getLocks = () => globalThis.navigator?.locks, cryptoApi = globalThis.crypto, maxRecords = MAX_PENDING_SUBMISSIONS, maxBytes = MAX_PENDING_BYTES, now = Date.now} = {}) {
   if (!boundedString(origin, 2048) || origin === 'null') fail('SUBMISSION_INVALID');
   // Every page writes the same origin-wide record array, including different
   // entries/topics. Keep the entire read/modify/write/readback in one native
   // Web Lock; a per-page mutex or storage event cannot prevent lost updates.
-  async function mutate(update) {
+  async function mutate(update, lockName = SUBMISSION_STORAGE_KEY) {
     let locks;
     try { locks = getLocks(); } catch { fail('SUBMISSION_LOCK_UNAVAILABLE'); }
     if (typeof locks?.request !== 'function') fail('SUBMISSION_LOCK_UNAVAILABLE');
     let entered = false;
     try {
-      return await locks.request(SUBMISSION_STORAGE_KEY, {mode:'exclusive'}, () => {
+      return await locks.request(lockName, {mode:'exclusive'}, () => {
         entered = true;
         return update();
       });
@@ -131,6 +144,20 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
     if (recovery.sessionMarker !== record.sessionMarker || recovery.payloadHash !== record.payloadHash || recovery.kind !== record.kind) return {state:'review', reason:'conflict'};
     return {state:'confirmed', execution};
   }
+  function withSendLock(record, submit) {
+    const lockName = SUBMISSION_STORAGE_KEY + ':send:' + record.entryId + ':' + record.requestId;
+    return mutate(() => submit(requireCurrent(record)), lockName);
+  }
+  async function releaseDesktopRejection(record, rejection, executions, session) {
+    if (record.kind !== 'message' || rejection?.status !== 409 || rejection.code !== 'DESKTOP_CONTEXT_REQUIRED'
+        || (await inspect(record, executions, session)).state !== 'absent') return false;
+    return mutate(() => {
+      const records = load(), index = records.findIndex(previous => sameScope(previous, record));
+      if (index < 0 || !sameRecord(records[index], record)) return false;
+      save(records.filter((_, at) => at !== index));
+      return true;
+    });
+  }
   async function confirm(record, execution, session) {
     if ((await inspect(record, [execution], session)).state !== 'confirmed') fail('SUBMISSION_RECEIPT_UNVERIFIED');
     return mutate(() => {
@@ -141,5 +168,5 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
       return true;
     });
   }
-  return {load, current, prepare, verify, requireCurrent, inspect, confirm};
+  return {load, current, prepare, verify, requireCurrent, inspect, confirm, withSendLock, releaseDesktopRejection};
 }

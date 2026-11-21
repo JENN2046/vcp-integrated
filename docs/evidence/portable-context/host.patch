@@ -1,0 +1,367 @@
+diff --git a/apps/desktop/modules/services/nativeSync/sharedRuntime.js b/apps/desktop/modules/services/nativeSync/sharedRuntime.js
+index 590431c..c97ab18 100644
+--- a/apps/desktop/modules/services/nativeSync/sharedRuntime.js
++++ b/apps/desktop/modules/services/nativeSync/sharedRuntime.js
+@@ -509,8 +509,8 @@ class SharedRuntime {
+  }
+- async refreshForExecution(d,{forceFresh=false}={}){
++ async refreshForExecution(d,{forceFresh=false,sharedSessionHistory=false}={}){
+   if(this.closed||!this.ready)throw fail('SHARED_STARTUP_PENDING');
+-  if(!this.capabilities.features?.includes('shared-topic-history-v1')){await this.serialCore(()=>this.tickCore({forceLocal:true}));const mapping=this.execution.mapping(d),context=await this.send(endpoint+'context?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId}));return {...context,model:this.configs.state.objects[this.state.objects[mapping.sharedId].parentId]?.config.model,legacy:true};}
++  if(!this.capabilities.features?.includes('shared-topic-history-v1')){await this.serialCore(()=>this.tickCore({forceLocal:true}));const mapping=this.execution.mapping(d),context=await this.send(endpoint+'context?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId}),{sharedSessionHistory});return {...context,model:this.configs.state.objects[this.state.objects[mapping.sharedId].parentId]?.config.model,legacy:true};}
+   const mapping=this.execution.mapping(d);this.matching.assert([mapping.sharedId,this.state.objects[mapping.sharedId].parentId]);
+   const snapshot=this.execution.state.executionSnapshots?.[mapping.sharedId],adapter=this.adapter;
+-  if(this.optimisticEnabled&&!forceFresh&&(d.itemType||'agent')==='agent'&&this.capabilities.features?.includes('shared-inline-receipts-v1')&&snapshot&&Array.isArray(snapshot.dependencies)&&this.state.baselines[mapping.sharedId]?.complete){
++  if(this.optimisticEnabled&&!forceFresh&&!sharedSessionHistory&&(d.itemType||'agent')==='agent'&&this.capabilities.features?.includes('shared-inline-receipts-v1')&&snapshot&&Array.isArray(snapshot.dependencies)&&this.state.baselines[mapping.sharedId]?.complete){
+    for(const dependency of snapshot.dependencies){const metadata=this.state.objects[dependency.id];if(!metadata)continue;if(this.matching.fenced(dependency.id))throw fail('SHARED_MATCH_PREPARING');await this.configs.scanNative(metadata);if(require('./sharedExecution').blocksExecution(this,dependency.id))throw fail('SHARED_CONFIG_CONFLICT');}
+@@ -521,3 +521,3 @@ class SharedRuntime {
+   }
+-  const context=await this.send(endpoint+'context?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId}));
++  const context=await this.send(endpoint+'context?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId}),{sharedSessionHistory});
+   if(!Array.isArray(context.dependencies))throw fail('SHARED_TOPIC_HISTORY_UPGRADE_REQUIRED');
+@@ -532,3 +532,5 @@ class SharedRuntime {
+   }
+-  await this.syncExecutionTopic(mapping,{minSeq:context.head});const executionHistory=await this.verifyHistory(mapping);return {...context,executionHistory};
++  const projection=await this.syncExecutionTopic(mapping,{minSeq:context.head});
++  if(sharedSessionHistory&&context.desktopHistoryRequired!==undefined&&projection.head!==context.head)throw fail('SHARED_CONTEXT_CHANGED');
++  const executionHistory=await this.verifyHistory(mapping);return {...context,executionHistory};
+  }
+diff --git a/apps/desktop/modules/services/nativeSync/sharedSessionClient.js b/apps/desktop/modules/services/nativeSync/sharedSessionClient.js
+index 5101fc6..f3dfd96 100644
+--- a/apps/desktop/modules/services/nativeSync/sharedSessionClient.js
++++ b/apps/desktop/modules/services/nativeSync/sharedSessionClient.js
+@@ -56,3 +56,3 @@ class SharedSessionClient{
+   if(this.warming.has(mapping.sharedId))return this.warming.get(mapping.sharedId);
+-  const task=(async()=>{const context=await r.refreshForExecution(descriptor,{forceFresh});const history=context.executionHistory||await r.verifyHistory(mapping);this.contexts.set(mapping.sharedId,{...context,history,revision:r.replica.queue.revision(history)});return context;})();
++  const task=(async()=>{const context=await r.refreshForExecution(descriptor,{forceFresh,sharedSessionHistory:true});const history=context.executionHistory||await r.verifyHistory(mapping);this.contexts.set(mapping.sharedId,{...context,history,revision:r.replica.queue.revision(history)});return context;})();
+   this.warming.set(mapping.sharedId,task);try{return await task;}finally{this.warming.delete(mapping.sharedId);}
+@@ -80,3 +80,8 @@ class SharedSessionClient{
+    const desktopOnly=value=>/\{\{VCPChat(?:Canvas|WorkSpace)(?::[^{}]*)?\}\}/.test(value||'');
+-   if(context&&(context.history.some(m=>m.desktopReferences?.length||desktopOnly(m.content))||desktopOnly(message.content)||context.dependencies.some(dep=>desktopOnly(r.configs.state.objects[dep.id]?.config?.systemPrompt))))return null;
++   if(context){
++    // The physical History stays whole. Only the server knows each message's
++    // first Journal position, including messages edited after the checkpoint.
++    const desktopHistory=context.desktopHistoryRequired??context.history.some(m=>m.desktopReferences?.length||desktopOnly(m.content));
++    if(desktopHistory||context.desktopConfigRequired||message.desktopReferences?.length||desktopOnly(message.content)||context.dependencies.some(dep=>desktopOnly(r.configs.state.objects[dep.id]?.config?.systemPrompt)))return null;
++   }
+    let record=existing;
+diff --git a/apps/desktop/modules/services/nativeSync/syncRequest.js b/apps/desktop/modules/services/nativeSync/syncRequest.js
+index 90c2550..96ae3ba 100644
+--- a/apps/desktop/modules/services/nativeSync/syncRequest.js
++++ b/apps/desktop/modules/services/nativeSync/syncRequest.js
+@@ -9,3 +9,3 @@ function createSyncRequest(connection,timeoutMs=8000) {
+     const {url,token}=connection;let referencesSupported=false,sourceDataV2Support=null;
+-    const send=async(route,{body,signal}={})=>{
++    const send=async(route,{body,signal,sharedSessionHistory=false}={})=>{
+         const serialized=body?JSON.stringify(body):undefined,size=serialized?Buffer.byteLength(serialized):0;
+@@ -29,3 +29,3 @@ function createSyncRequest(connection,timeoutMs=8000) {
+         try {
+-            response=await fetch(url+route,{method:body?'POST':'GET',headers:{...syncHeaders(connection),Authorization:`Bearer ${token}`,'Content-Type':'application/json','X-NativeSync-Protocol':'2','X-NativeSync-Capabilities':'attachments-v1,message-intents-v1,desktop-references-v1,source-data-v2'+(connection.sharedSpaceId?',shared-space-v1,shared-merge-v1,shared-attachments-v1,shared-context-v1,shared-steering-v1,shared-controlled-text-v1,shared-controlled-tools-v1,shared-model-save-v1,shared-inline-receipts-v1,shared-native-inline-v1,shared-session-v1,shared-events-v1,shared-topic-sponsor-v1':'')},body:serialized,redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(deadline)]):AbortSignal.timeout(deadline)});
++            response=await fetch(url+route,{method:body?'POST':'GET',headers:{...syncHeaders(connection),Authorization:`Bearer ${token}`,'Content-Type':'application/json','X-NativeSync-Protocol':'2','X-NativeSync-Capabilities':'attachments-v1,message-intents-v1,desktop-references-v1,source-data-v2'+(connection.sharedSpaceId?',shared-space-v1,shared-merge-v1,shared-attachments-v1,shared-context-v1,shared-steering-v1,shared-controlled-text-v1,shared-controlled-tools-v1,shared-model-save-v1,shared-inline-receipts-v1,shared-native-inline-v1,shared-session-v1,shared-events-v1,shared-topic-sponsor-v1':'')+(sharedSessionHistory?',shared-session-history-v1':'')},body:serialized,redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(deadline)]):AbortSignal.timeout(deadline)});
+         } catch { throw fail('NETWORK_UNAVAILABLE'); }
+diff --git a/apps/mobile/src/App.vue b/apps/mobile/src/App.vue
+index eb214d7..c92f02f 100644
+--- a/apps/mobile/src/App.vue
++++ b/apps/mobile/src/App.vue
+@@ -14,3 +14,3 @@ import {uploadAttachment} from './attachmentUpload.js';
+ import {readAttachment,saveAttachment} from './attachmentRead.js';
+-import {createSubmissionRecovery,validSessionRecovery,SUBMISSION_STORAGE_KEY} from './submissionRecovery.js';
++import {createSubmissionRecovery,restoreRejectedDraft,validSessionRecovery,SUBMISSION_STORAGE_KEY} from './submissionRecovery.js';
+ import {projectNativeWork,verifyNativeResult,nativeTaskLabels,toolLabels,resultHash} from './nativeTasks.js';
+@@ -83,3 +83,3 @@ const visibleTopics=computed(()=>topics.value.filter(t=>sourceMatches(t)&&ownerK
+ const searchedTopics=computed(()=>{const query=topicSearch.value.trim().toLocaleLowerCase();return query?visibleTopics.value.filter(t=>[t.topicName,t.topicId].some(value=>String(value||'').toLocaleLowerCase().includes(query))):visibleTopics.value;});
+-const currentTopic=computed(()=>{const topic=topics.value.find(t=>t.key===selected.value);if(topic&&!historyContextReady.value)return{...topic,executable:false,unavailableReason:'HISTORY_CONTEXT_LOADING'};return topic&&historyKey===selected.value&&messages.value.some(m=>m.desktopReferences?.length)?{...topic,executable:false,unavailableReason:'DESKTOP_CONTEXT_REQUIRED'}:topic;});
++const currentTopic=computed(()=>{const topic=topics.value.find(t=>t.key===selected.value);if(topic&&!historyContextReady.value)return{...topic,executable:false,unavailableReason:'HISTORY_CONTEXT_LOADING'};return topic&&!(topic.sharedSpaceId&&topic.ownerType==='agent')&&historyKey===selected.value&&messages.value.some(m=>m.desktopReferences?.length)?{...topic,executable:false,unavailableReason:'DESKTOP_CONTEXT_REQUIRED'}:topic;});
+ function draftScope(){const topic=currentTopic.value;return paired.value&&validSessionRecovery(recoveryContext.value)&&topic?JSON.stringify([recoveryContext.value.entryId,ownerKey(topic),topic.topicId,topic.key]):'';}
+@@ -114,3 +114,3 @@ function sameView(context){return context.topicKey===selected.value&&context.gen
+ function newSubmissionContext(){if(!loadRecovery())throw Error(recoveryError.value);const context=captureContext();if(!historyContextReady.value)throw Object.assign(Error('正在载入历史并核对上下文'),{code:'HISTORY_CONTEXT_LOADING'});if(!currentTopic.value)throw Object.assign(Error(recoveryMessages.SUBMISSION_TOPIC_UNAVAILABLE),{code:'SUBMISSION_TOPIC_UNAVAILABLE'});if(submissionStore.current({entryId:context.recovery.entryId,topicKey:context.topicKey}))throw Object.assign(Error(recoveryMessages.SUBMISSION_PENDING),{code:'SUBMISSION_PENDING'});return context;}
+-const errors={SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保留；完成后请显式重试',SHARED_GROUP_EXECUTION_NOT_READY:'共享群聊暂为只读，发送接线尚未完成',SHARED_CONFIG_PENDING:'共享配置正在核对，请稍后显式发送',SHARED_CONFIG_CONFLICT:'共享配置存在冲突，请先选择采用的版本',SHARED_EXECUTION_PERMISSION_REQUIRED:'本会话尚未授予共享执行权限',ATTACHMENTS_NOT_ENABLED:'当前服务器尚未启用附件传输，已选择的文件和消息草稿仍保留',SHARED_ATTACHMENTS_NOT_READY:'共享附件发送尚未接通，原文件保留',HISTORY_CONTEXT_LOADING:'正在载入历史并核对上下文',DESKTOP_REFERENCE_CLIENT_UPGRADE_REQUIRED:'此历史包含桌面引用，请更新应用后重开',GROUP_MODE_REQUIRES_DESKTOP:'此群聊模式请在桌面执行',GROUP_MEMBER_UNAVAILABLE:'此成员配置暂不可用',DEPENDENCY_REVIEW_REQUIRED:'同一话题有待核对的执行，请先处理暂停任务',DESKTOP_CONTEXT_REQUIRED:'此消息引用了仅在桌面可用的上下文',CONFIG_SNAPSHOT_CORRUPT:'执行配置校验失败，请在桌面重新发布',GROUP_CONTEXT_UNAVAILABLE:'有效上下文暂不可用',ATTACHMENT_BLOB_MISSING:'附件暂未同步，请等待电脑补齐',ATTACHMENT_BLOB_CORRUPT:'附件完整性校验失败，请重新同步',ATTACHMENT_TEXT_UNAVAILABLE:'此文件的文本尚不可用',ATTACHMENT_TYPE_REJECTED:'支持 PNG、JPEG、WebP、PDF 和 UTF-8 文本文件',ATTACHMENT_STORAGE_BUDGET:'附件空间已达到上限',ATTACHMENT_REQUEST_BUDGET:'附件请求过多，请稍后重试',MODEL_IMAGE_UNSUPPORTED:'当前模型不支持图片，请在电脑端选择支持图片的模型并发布配置',EXECUTION_CONFIG_REQUIRED:'请先在电脑端发布有效 Agent 配置',PAIR_REQUIRED:'输入你的 Key 连接会话',HTTPS_REQUIRED:'当前入口尚未启用 HTTPS，不能提交 Key',SERVER_NOT_APPROVED:'此地址尚未由服务端批准，请使用已获授权的服务器',PROTECTED_HOST_NOT_READY:'安全链路或服务端接入尚未就绪，暂不接收访问凭据',AUTH_FAILED:'访问凭据不正确',AUTH_RATE_LIMIT:'尝试过于频繁，请稍后重试',AGENT_NOT_EXECUTABLE:'此 Agent 尚未配置服务端执行能力',EXECUTION_INTERRUPTED_REVIEW_REQUIRED:'执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑'};
++const errors={SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保留；完成后请显式重试',SHARED_GROUP_EXECUTION_NOT_READY:'共享群聊暂为只读，发送接线尚未完成',SHARED_CONFIG_PENDING:'共享配置正在核对，请稍后显式发送',SHARED_CONFIG_CONFLICT:'共享配置存在冲突，请先选择采用的版本',SHARED_EXECUTION_PERMISSION_REQUIRED:'本会话尚未授予共享执行权限',ATTACHMENTS_NOT_ENABLED:'当前服务器尚未启用附件传输，已选择的文件和消息草稿仍保留',SHARED_ATTACHMENTS_NOT_READY:'共享附件发送尚未接通，原文件保留',HISTORY_CONTEXT_LOADING:'正在载入历史并核对上下文',DESKTOP_REFERENCE_CLIENT_UPGRADE_REQUIRED:'此历史包含桌面引用，请更新应用后重开',GROUP_MODE_REQUIRES_DESKTOP:'此群聊模式请在桌面执行',GROUP_MEMBER_UNAVAILABLE:'此成员配置暂不可用',DEPENDENCY_REVIEW_REQUIRED:'同一话题有待核对的执行，请先处理暂停任务',DESKTOP_CONTEXT_REQUIRED:'本轮上下文需要桌面专用内容，请在桌面继续',CONFIG_SNAPSHOT_CORRUPT:'执行配置校验失败，请在桌面重新发布',GROUP_CONTEXT_UNAVAILABLE:'有效上下文暂不可用',ATTACHMENT_BLOB_MISSING:'附件暂未同步，请等待电脑补齐',ATTACHMENT_BLOB_CORRUPT:'附件完整性校验失败，请重新同步',ATTACHMENT_TEXT_UNAVAILABLE:'此文件的文本尚不可用',ATTACHMENT_TYPE_REJECTED:'支持 PNG、JPEG、WebP、PDF 和 UTF-8 文本文件',ATTACHMENT_STORAGE_BUDGET:'附件空间已达到上限',ATTACHMENT_REQUEST_BUDGET:'附件请求过多，请稍后重试',MODEL_IMAGE_UNSUPPORTED:'当前模型不支持图片，请在电脑端选择支持图片的模型并发布配置',EXECUTION_CONFIG_REQUIRED:'请先在电脑端发布有效 Agent 配置',PAIR_REQUIRED:'输入你的 Key 连接会话',HTTPS_REQUIRED:'当前入口尚未启用 HTTPS，不能提交 Key',SERVER_NOT_APPROVED:'此地址尚未由服务端批准，请使用已获授权的服务器',PROTECTED_HOST_NOT_READY:'安全链路或服务端接入尚未就绪，暂不接收访问凭据',AUTH_FAILED:'访问凭据不正确',AUTH_RATE_LIMIT:'尝试过于频繁，请稍后重试',AGENT_NOT_EXECUTABLE:'此 Agent 尚未配置服务端执行能力',EXECUTION_INTERRUPTED_REVIEW_REQUIRED:'执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑'};
+ async function api(route,body,requestHeaders={},signal){
+@@ -223,12 +223,34 @@ async function reconcileSubmission(record,executions,context){
+ async function postPrepared(record,context){
+- await submissionStore.verify(record);submissionStore.requireCurrent(record);
+- if(!sameView(context))return;
+- notice.value='本地已保存 · 正在等待云端确认…';
+- const accepted=await api('conversations/'+encodeURIComponent(record.topicKey)+(record.kind==='invitation'?'/invitations':'/messages'),record.payload,{'X-NativeSync-Entry-Id':record.entryId,'X-NativeSync-Session-Marker':record.sessionMarker});
+- const result=await reconcileSubmission(record,[accepted],context);
+- if(result.state!=='confirmed')throw Object.assign(Error(recoveryMessages.SUBMISSION_RECEIPT_UNVERIFIED),{code:'SUBMISSION_RECEIPT_UNVERIFIED'});
+- if(sameView(context)){
+-  notice.value='云端已接受 · '+(labels[accepted.state]||accepted.state);
+-  await refresh();
+- }
++ await submissionStore.verify(record);
++ return submissionStore.withSendLock(record,async()=>{
++  if(!sameView(context))return;
++  notice.value='本地已保存 · 正在等待云端确认…';
++  const conversation='conversations/'+encodeURIComponent(record.topicKey);
++  let accepted;
++  try{
++   accepted=await api(conversation+(record.kind==='invitation'?'/invitations':'/messages'),record.payload,{'X-NativeSync-Entry-Id':record.entryId,'X-NativeSync-Session-Marker':record.sessionMarker});
++  }catch(error){
++   const topic=currentTopic.value;
++   if(error.status!==409||error.code!=='DESKTOP_CONTEXT_REQUIRED'||record.kind!=='message'||!sameView(context)
++      ||!topic?.sharedSpaceId||topic.ownerType!=='agent'||topic.executionProtocol!==2)throw error;
++   const draft=drafts.get(context.draftScope);
++   if(!draft)throw error;
++   const response=await api(conversation+'/execution-request?'+new URLSearchParams({requestId:record.requestId}));
++   if(!sameView(context)||!await submissionStore.releaseDesktopRejection(record,error,response.executions,context.recovery))throw error;
++   restoreRejectedDraft(draft,record);
++   if(!loadRecovery())throw Error(recoveryError.value);
++   if(sameView(context)){
++    submissionNoticeHeld=true;
++    recoveryDetail.value='';acceptedReceipt.value=null;
++    notice.value=recoveryMessage(error)+'。草稿和附件已保留，可编辑后重新发送。';
++   }
++   return;
++  }
++  const result=await reconcileSubmission(record,[accepted],context);
++  if(result.state!=='confirmed')throw Object.assign(Error(recoveryMessages.SUBMISSION_RECEIPT_UNVERIFIED),{code:'SUBMISSION_RECEIPT_UNVERIFIED'});
++  if(sameView(context)){
++   notice.value='云端已接受 · '+(labels[accepted.state]||accepted.state);
++   await refresh();
++  }
++ });
+ }
+@@ -245,3 +267,3 @@ async function submit(submission,kind='message',context=newSubmissionContext()){
+ }
+-function selectFiles(event){for(const file of event.target.files||[]){if(pendingFiles.value.length>=8)break;if(file.size>20*1024*1024){notice.value='单个附件需在 20 MB 以内';continue;}if(!pendingFiles.value.some(f=>f.file.name===file.name&&f.file.size===file.size&&f.file.lastModified===file.lastModified))pendingFiles.value.push({file,progress:0,error:'',uploadId:null});}event.target.value='';}
++function selectFiles(event){for(const file of event.target.files||[]){if(pendingFiles.value.length>=8)break;if(file.size>20*1024*1024){notice.value='单个附件需在 20 MB 以内';continue;}if(!pendingFiles.value.some(f=>f.file?.name===file.name&&f.file.size===file.size&&f.file.lastModified===file.lastModified))pendingFiles.value.push({file,progress:0,error:'',uploadId:null});}event.target.value='';}
+ function attachmentUrl(message,attachment){return '/mobile/api/conversations/'+encodeURIComponent(selected.value)+'/attachments/messages/'+encodeURIComponent(message.id)+'/'+encodeURIComponent(attachment.id);}
+@@ -269,3 +291,3 @@ async function send(){
+  let context;busy.value=true;submissionNoticeHeld=false;
+- try{context=newSubmissionContext();const draft=composerDraft.value,snapshot={text:draft.text,revision:draft.revision,files:[...draft.files]},ids=[];for(const item of snapshot.files){item.error='';try{if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n);item.uploadSessionMarker=context.recovery.sessionMarker;ids.push(item.uploadId);}catch(e){item.error=e.message;throw e;}}if(!sameView(context))return;const requestId=crypto.randomUUID();draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};await submit({requestId,text:snapshot.text,attachments:ids},'message',context);}
++ try{context=newSubmissionContext();const draft=composerDraft.value,snapshot={text:draft.text,revision:draft.revision,files:[...draft.files]},ids=[];for(const item of snapshot.files){item.error='';try{if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;if(!item.uploadId&&!item.file)throw Error('请移除已上传附件并重新选择原文件');item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n);item.uploadSessionMarker=context.recovery.sessionMarker;ids.push(item.uploadId);}catch(e){item.error=e.message;throw e;}}if(!sameView(context))return;const requestId=crypto.randomUUID();draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};await submit({requestId,text:snapshot.text,attachments:ids},'message',context);}
+  catch(error){if(!context||sameView(context)){submissionNoticeHeld=true;notice.value=recoveryMessage(error);}}finally{busy.value=false;}
+@@ -419,3 +441,3 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
+    </details>
+-   <footer><div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div><div v-if="currentTopic?.attachmentsEnabled" class="upload-area"><label class="attachment-picker">添加图片或文件<input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false"></label><small>最多 8 个，每个 20 MB；断线后可重新选择同一文件续传。</small><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file.name}} · {{item.error||item.progress+'%'}}</span><button @click="pendingFiles.splice(i,1)" :disabled="busy">移除</button></div></div><small v-else-if="currentTopic?.sharedSpaceId" role="status" class="attachment-unavailable">此共享会话尚未启用附件传输，可继续发送文字；文件不会被静默上传。</small><small class="draft-scope">草稿按话题暂存于本页；刷新或关闭页面会清空。</small><form @submit.prevent="send"><label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" placeholder="输入文字…" rows="2" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form><div class="send-state"><span id="send-state" role="status">{{notice}}</span><button id="retry-last" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
++   <footer><div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div><div v-if="currentTopic?.attachmentsEnabled" class="upload-area"><label class="attachment-picker">添加图片或文件<input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false"></label><small>最多 8 个，每个 20 MB；断线后可重新选择同一文件续传。</small><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||item.progress+'%'}}</span><button @click="pendingFiles.splice(i,1)" :disabled="busy">移除</button></div></div><small v-else-if="currentTopic?.sharedSpaceId" role="status" class="attachment-unavailable">此共享会话尚未启用附件传输，可继续发送文字；文件不会被静默上传。</small><small class="draft-scope">草稿按话题暂存于本页；刷新或关闭页面会清空。</small><form @submit.prevent="send"><label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" placeholder="输入文字…" rows="2" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form><div class="send-state"><span id="send-state" role="status">{{notice}}</span><button id="retry-last" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
+   </template>
+diff --git a/apps/mobile/src/submissionRecovery.js b/apps/mobile/src/submissionRecovery.js
+index be8fc73..2ba7915 100644
+--- a/apps/mobile/src/submissionRecovery.js
++++ b/apps/mobile/src/submissionRecovery.js
+@@ -56,2 +56,15 @@ function sameRecord(a, b) { return sameScope(a, b) && a.requestId === b.requestI
+
++export function restoreRejectedDraft(draft, record) {
++  if (draft.submitted?.requestId === record.requestId) {
++    delete draft.submitted;
++    return;
++  }
++  if (!draft.revision && !draft.text) draft.text = record.payload.text;
++  for (const uploadId of record.payload.attachments || []) {
++    if (!draft.files.some(item => item.uploadId === uploadId)) {
++      draft.files.push({uploadId, uploadSessionMarker:record.sessionMarker, progress:100, error:''});
++    }
++  }
++}
++
+ export function createSubmissionRecovery({origin, getStorage = () => globalThis.localStorage, getLocks = () => globalThis.navigator?.locks, cryptoApi = globalThis.crypto, maxRecords = MAX_PENDING_SUBMISSIONS, maxBytes = MAX_PENDING_BYTES, now = Date.now} = {}) {
+@@ -61,3 +74,3 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+   // Web Lock; a per-page mutex or storage event cannot prevent lost updates.
+-  async function mutate(update) {
++  async function mutate(update, lockName = SUBMISSION_STORAGE_KEY) {
+     let locks;
+@@ -67,3 +80,3 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+     try {
+-      return await locks.request(SUBMISSION_STORAGE_KEY, {mode:'exclusive'}, () => {
++      return await locks.request(lockName, {mode:'exclusive'}, () => {
+         entered = true;
+@@ -133,2 +146,16 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+   }
++  function withSendLock(record, submit) {
++    const lockName = SUBMISSION_STORAGE_KEY + ':send:' + record.entryId + ':' + record.requestId;
++    return mutate(() => submit(requireCurrent(record)), lockName);
++  }
++  async function releaseDesktopRejection(record, rejection, executions, session) {
++    if (record.kind !== 'message' || rejection?.status !== 409 || rejection.code !== 'DESKTOP_CONTEXT_REQUIRED'
++        || (await inspect(record, executions, session)).state !== 'absent') return false;
++    return mutate(() => {
++      const records = load(), index = records.findIndex(previous => sameScope(previous, record));
++      if (index < 0 || !sameRecord(records[index], record)) return false;
++      save(records.filter((_, at) => at !== index));
++      return true;
++    });
++  }
+   async function confirm(record, execution, session) {
+@@ -143,3 +170,3 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
+   }
+-  return {load, current, prepare, verify, requireCurrent, inspect, confirm};
++  return {load, current, prepare, verify, requireCurrent, inspect, confirm, withSendLock, releaseDesktopRejection};
+ }
+diff --git a/apps/server/Plugin/NativeSync/mobile/effectiveContext.js b/apps/server/Plugin/NativeSync/mobile/effectiveContext.js
+index 0b0f48f..bcb910d 100644
+--- a/apps/server/Plugin/NativeSync/mobile/effectiveContext.js
++++ b/apps/server/Plugin/NativeSync/mobile/effectiveContext.js
+@@ -7,2 +7,43 @@ const tavern=require('../nativeRules/modules/tavernRulesEngine');
+
++function readJournalHistory(store,topic,throughSeq,predecessorReplies=[]){
++    return store.readProjected(db=>db.prepare(`SELECT * FROM (
++        SELECT *,row_number() OVER(PARTITION BY msg_id ORDER BY seq DESC) AS r,
++            min(seq) OVER(PARTITION BY msg_id) AS first_seq
++        FROM journal WHERE owner_type=? AND owner_id=? AND topic_id=? AND
++        (seq<=? OR msg_id IN (SELECT value FROM json_each(?))))
++        WHERE r=1 AND action='upsert' ORDER BY seq`).all(...topic,throughSeq,JSON.stringify(predecessorReplies)));
++}
++
++function journalOrder(records){
++    // Editing a message changes its body without moving its checkpoint position.
++    return [...records].sort((a,b)=>a.row.first_seq-b.row.first_seq).map(record=>record.message);
++}
++
++function selectHistory(history,currentId,journalHistory){
++    if(!journalHistory)return effectiveContextHistory(history);
++    const current=history.find(message=>message.id===currentId);
++    const selected=effectiveContextHistory(journalHistory.filter(message=>message.id!==currentId));
++    const checkpoint=isContextCheckpoint(selected[0])?selected[0]:null;
++    const retained=new Set(selected.map(message=>message.id));
++    // Preserve the worker's conversation order within the Journal-selected tail.
++    const ordered=history.filter(message=>retained.has(message.id)&&message.id!==checkpoint?.id);
++    if(checkpoint)ordered.unshift(checkpoint);
++    if(current&&!current.isThinking)ordered.push(current);
++    return ordered;
++}
++
++function requiresDesktopContext(messages){
++    const {requiresDesktopPlaceholder}=require('./groupRequest');
++    return messages.some(message=>message.desktopReferences?.length)||requiresDesktopPlaceholder(messages);
++}
++
++function assertPortableHistory(messages){
++    if(requiresDesktopContext(messages))throw Object.assign(Error('DESKTOP_CONTEXT_REQUIRED'),{code:'DESKTOP_CONTEXT_REQUIRED',status:409});
++}
++
++function admissionHistory(store,topic,head){
++    const history=journalOrder(readJournalHistory(store,topic,head));
++    return selectHistory(history,undefined,history);
++}
++
+ // IO is supplied by the CAS adapter; context selection and Tavern semantics
+@@ -11,11 +52,4 @@ async function effectiveRequest(history,config,currentId,buildContent=async m=>[
+     const rules=config.tavernRules||[],messages=[];
+-    let selected=effectiveContextHistory(journalHistory||history);
+-    if(journalHistory){
+-        // Journal identity order defines the covered prefix. Preserve the
+-        // existing conversation order within the native window's retained tail.
+-        const checkpoint=isContextCheckpoint(selected[0])?selected[0]:null;
+-        const retained=new Set(selected.map(message=>message.id));
+-        selected=history.filter(message=>retained.has(message.id)&&message.id!==checkpoint?.id);
+-        if(checkpoint)selected.unshift(checkpoint);
+-    }
++    const selected=selectHistory(history,currentId,journalHistory);
++    if(journalHistory)assertPortableHistory(selected);
+     const transform=require('../sync/contracts.generated.cjs').sharedContextTransform(selected,config.stripRegexes,currentId);
+@@ -33,2 +67,2 @@ async function effectiveRequest(history,config,currentId,buildContent=async m=>[
+ }
+-module.exports={effectiveRequest};
++module.exports={effectiveRequest,readJournalHistory,journalOrder,admissionHistory,requiresDesktopContext,assertPortableHistory};
+diff --git a/apps/server/Plugin/NativeSync/mobile/execution.js b/apps/server/Plugin/NativeSync/mobile/execution.js
+index c2e426a..3402bd6 100644
+--- a/apps/server/Plugin/NativeSync/mobile/execution.js
++++ b/apps/server/Plugin/NativeSync/mobile/execution.js
+@@ -187,8 +187,4 @@ class ConversationExecution {
+             const predecessors = this.db.prepare("SELECT user_message_id,reply_message_id FROM mobile_executions WHERE topic_key=? AND user_seq<? AND state='completed' AND reply_message_id IS NOT NULL ORDER BY user_seq").all(row.topic_key,row.user_seq);
+-            const records = this.store.readProjected(()=>this.db.prepare(`SELECT * FROM (
+-                SELECT *,row_number() OVER(PARTITION BY msg_id ORDER BY seq DESC) AS r,
+-                    min(seq) OVER(PARTITION BY msg_id) AS first_seq
+-                FROM journal WHERE owner_type=? AND owner_id=? AND topic_id=? AND
+-                (seq<=? OR msg_id IN (SELECT value FROM json_each(?))))
+-                WHERE r=1 AND action='upsert' ORDER BY seq`).all(topic.ownerType, topic.ownerId, topic.topicId, row.user_seq,JSON.stringify(predecessors.map(p=>p.reply_message_id))));
++            const records = require('./effectiveContext').readJournalHistory(this.store,
++                [topic.ownerType,topic.ownerId,topic.topicId],row.user_seq,predecessors.map(p=>p.reply_message_id));
+             return {predecessors,records};
+@@ -205,3 +201,3 @@ class ConversationExecution {
+             if(byId.has(row.user_message_id))ordered.push(byId.get(row.user_message_id));
+-            if(ordered.some(m=>m.desktopReferences?.length))throw error('DESKTOP_CONTEXT_REQUIRED',409);
++            if(!(topic.sharedSpaceId&&published)&&ordered.some(m=>m.desktopReferences?.length))throw error('DESKTOP_CONTEXT_REQUIRED',409);
+             const messages = ordered.filter(m => ['user', 'assistant'].includes(m.role)).map(m => {
+@@ -212,3 +208,3 @@ class ConversationExecution {
+             const journalHistory=topic.sharedSpaceId&&published
+-                ? records.sort((a,b)=>a.row.first_seq-b.row.first_seq).map(record=>record.message)
++                ? require('./effectiveContext').journalOrder(records)
+                 : undefined;
+diff --git a/apps/server/Plugin/NativeSync/mobile/groupRequest.js b/apps/server/Plugin/NativeSync/mobile/groupRequest.js
+index e31cd17..8b45798 100644
+--- a/apps/server/Plugin/NativeSync/mobile/groupRequest.js
++++ b/apps/server/Plugin/NativeSync/mobile/groupRequest.js
+@@ -8,3 +8,4 @@ const {nativePacket}=require('./nativePacket');
+ const fail=code=>Object.assign(new Error(code),{code,status:409});
+-function assertPortableContext(messages){for(const message of messages){const texts=typeof message.content==='string'?[message.content]:(Array.isArray(message.content)?message.content.filter(p=>p.type==='text').map(p=>p.text):[]);if(texts.some(text=>/\{\{VCPChat(?:Canvas|WorkSpace)(?::[^{}]*)?\}\}/.test(text||'')))throw fail('DESKTOP_CONTEXT_REQUIRED');}}
++function requiresDesktopPlaceholder(messages){return messages.some(message=>{const texts=typeof message.content==='string'?[message.content]:(Array.isArray(message.content)?message.content.filter(p=>p.type==='text').map(p=>p.text):[]);return texts.some(text=>/\{\{VCPChat(?:Canvas|WorkSpace)(?::[^{}]*)?\}\}/.test(text||''));});}
++function assertPortableContext(messages){if(requiresDesktopPlaceholder(messages))throw fail('DESKTOP_CONTEXT_REQUIRED');}
+
+@@ -61,2 +62,2 @@ async function groupRequest({topic,config,member,history,currentUserId,requestId
+ }
+-module.exports={groupRequest,sanitize,assertPortableContext};
++module.exports={groupRequest,sanitize,assertPortableContext,requiresDesktopPlaceholder};
+diff --git a/apps/server/Plugin/NativeSync/mobile/sharedSingle.js b/apps/server/Plugin/NativeSync/mobile/sharedSingle.js
+index aeafa82..0815134 100644
+--- a/apps/server/Plugin/NativeSync/mobile/sharedSingle.js
++++ b/apps/server/Plugin/NativeSync/mobile/sharedSingle.js
+@@ -28,3 +28,7 @@ function accept(engine,sessionId,{topicKey,requestId,text,attachments=[]}){
+   const files=attachments.length?(engine.attachments?engine.attachments.claim(actor.principal,topicKey,attachments):(()=>{throw fail('ATTACHMENTS_NOT_ENABLED');})()):[];
+-  const admitted=shared.admit(actor,{sharedSpaceId:topic.sharedSpaceId,sharedId:topic.key,requestId,expectedHead:shared.head(row),configHash:config.sharedTemplateHash,message:{id:msgId,role:'user',content:text,timestamp:now,...(files.length?{attachments:files}:{})}});
++  const message={id:msgId,role:'user',content:text,timestamp:now,...(files.length?{attachments:files}:{})};
++  const context=require('./effectiveContext'),head=shared.head(row);
++  const history=context.admissionHistory(engine.store,[topic.ownerType,topic.ownerId,topic.topicId],head);
++  context.assertPortableHistory([...history,message]);
++  const admitted=shared.admit(actor,{sharedSpaceId:topic.sharedSpaceId,sharedId:topic.key,requestId,expectedHead:head,configHash:config.sharedTemplateHash,message});
+   engine.db.prepare("INSERT INTO mobile_executions(id,session_id,request_id,topic_key,request_hash,user_message_id,user_seq,state,created_at,updated_at,not_before,config_snapshot,request_payload) VALUES(?,?,?,?,?,?,?,'queued',?,?,?,?,?)").run(admitted.id,sessionId,requestId,topicKey,requestHash,msgId,admitted.userSeq,now,now,now+engine.startDelayMs,JSON.stringify(config),JSON.stringify({requestId,text,...(attachments.length?{attachments}:{})}));
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedHttp.js b/apps/server/Plugin/NativeSync/sync/sharedHttp.js
+index 9ea1dd3..3e2703c 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedHttp.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedHttp.js
+@@ -78,2 +78,4 @@ async function sharedRequest(store,req,url,mobileActor,signal){
+   if(name==='config')return {object:shared.get(actor,query.sharedSpaceId,query.sharedId),readOnly:shared.readOnly};
++  const sharedSessionHistory=name==='context'&&actor.kind==='desktop'&&String(req.headers?.['x-nativesync-capabilities']||'').split(',').includes('shared-session-history-v1');
++  let desktopConfigRequired=false;
+   if(name==='context'&&shared.native?.engine.configs){
+@@ -83,4 +85,8 @@ async function sharedRequest(store,req,url,mobileActor,signal){
+    if(!topic)throw fail('SHARED_CONFIG_PENDING',409);
+-   await require('../mobile/sharedConfiguration').prepareSharedConfiguration(configs,topic,{desktopContext:actor.kind==='desktop'});
++   const execution=await require('../mobile/sharedConfiguration').prepareSharedConfiguration(configs,topic,{desktopContext:actor.kind==='desktop'});
++   if(sharedSessionHistory&&execution&&topic.ownerType==='agent'){
++    try{configs.verify(topic,execution);}catch(error){if(error.code!=='DESKTOP_CONTEXT_REQUIRED')throw error;desktopConfigRequired=true;}
++   }
+   }
++  if(sharedSessionHistory)query.sharedSessionHistory=true;
+   const result=shared[route[0]](actor,query);
+@@ -88,3 +94,3 @@ async function sharedRequest(store,req,url,mobileActor,signal){
+   // Execute permission does not expose the private configuration template.
+-  if(name==='context')return {hash:result.hash,head:result.head,model:result.owner.config.model,dependencies:[result.owner,...result.members,...result.rules].map(v=>({id:v.id,kind:v.kind,version:v.version,configHash:v.configHash}))};
++  if(name==='context')return {hash:result.hash,head:result.head,model:result.owner.config.model,...(desktopConfigRequired?{desktopConfigRequired:true}:{}),...(result.desktopHistoryRequired===undefined?{}:{desktopHistoryRequired:result.desktopHistoryRequired}),dependencies:[result.owner,...result.members,...result.rules].map(v=>({id:v.id,kind:v.kind,version:v.version,configHash:v.configHash}))};
+   return result;
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedSession.js b/apps/server/Plugin/NativeSync/sync/sharedSession.js
+index f398286..f27d4aa 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedSession.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedSession.js
+@@ -28,6 +28,5 @@ function portable(shared,topic,config,message){
+  engine.configs.verify(descriptor,config.execution);engine.configs.assertRunnable(descriptor,config.execution);
+- const records=shared.store.readProjected(()=>shared.db.prepare('SELECT * FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND deleted=0 ORDER BY last_seq').all(topic.owner_type,topic.owner_id,topic.topic_id));
+- const messages=[...records.map(r=>r.message),message];
+- if(messages.some(m=>m.desktopReferences?.length))throw fail('DESKTOP_CONTEXT_REQUIRED');
+- require('../mobile/groupRequest').assertPortableContext(messages);
++ const context=require('../mobile/effectiveContext');
++ const history=context.admissionHistory(shared.store,[topic.owner_type,topic.owner_id,topic.topic_id],shared.head(topic));
++ context.assertPortableHistory([...history,message]);
+ }
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedSpace.js b/apps/server/Plugin/NativeSync/sync/sharedSpace.js
+index 8137d9b..6d54feb 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedSpace.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedSpace.js
+@@ -325,3 +325,13 @@ class SharedSpace {
+  }
+- executionConfig(actor,{sharedSpaceId,sharedId}){const row=this.topic(actor,sharedSpaceId,sharedId,'execute');return {...this.freeze(row),head:this.head(row)};}
++ executionConfig(actor,{sharedSpaceId,sharedId,sharedSessionHistory=false}){
++  const row=this.topic(actor,sharedSpaceId,sharedId,'execute');
++  return this.store.readSnapshot(()=>{
++   const result={...this.freeze(row),head:this.head(row)};
++   if(sharedSessionHistory&&row.owner_type==='agent'){
++    const context=require('../mobile/effectiveContext');
++    result.desktopHistoryRequired=context.requiresDesktopContext(context.admissionHistory(this.store,tuple(row),result.head));
++   }
++   return result;
++  });
++ }
+  sessionSend(actor,body){return require('./sharedSession').send(this,actor,body);}
