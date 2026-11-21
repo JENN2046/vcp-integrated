@@ -1,0 +1,222 @@
+{
+  "baseline": "c837e2a7f26453b99b67996b6eb79db94a72c62e",
+  "revision": "7829b83ccb634c397caa6a168d9fe0d8663cb12e",
+  "initial": {
+    "modelCalls": 1,
+    "cursor": 0,
+    "topicCursors": {
+      "shared_abc1c4be98d6440ab1d379ea97a1302f": 2
+    },
+    "historyIds": [
+      "upgrade-committed-message",
+      "reply_request_21a6b7cb3e0e4ee48fae3f20b94a1c68"
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "upgrade-committed-message"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_request_21a6b7cb3e0e4ee48fae3f20b94a1c68"
+      }
+    ],
+    "native": [
+      {
+        "id": "request_21a6b7cb3e0e4ee48fae3f20b94a1c68",
+        "state": "model_terminal"
+      }
+    ],
+    "jobs": [
+      {
+        "request_id": "upgrade-committed-message",
+        "state": "completed",
+        "attempts": 1,
+        "dispatched": 1
+      }
+    ],
+    "ackCount": 2
+  },
+  "crash": {
+    "modelCalls": 1,
+    "pending": {
+      "requestId": "upgrade-interrupted-message",
+      "inputId": "upgrade-interrupted-message",
+      "phase": "preparing",
+      "admitStarted": true
+    },
+    "cursor": 2,
+    "topicCursors": {
+      "shared_abc1c4be98d6440ab1d379ea97a1302f": 2
+    },
+    "historyIds": [
+      "upgrade-committed-message",
+      "reply_request_21a6b7cb3e0e4ee48fae3f20b94a1c68"
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "upgrade-committed-message"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_request_21a6b7cb3e0e4ee48fae3f20b94a1c68"
+      },
+      {
+        "seq": 3,
+        "msg_id": "upgrade-interrupted-message"
+      }
+    ],
+    "native": [
+      {
+        "id": "request_21a6b7cb3e0e4ee48fae3f20b94a1c68",
+        "state": "model_terminal"
+      },
+      {
+        "id": "request_74d875b69ef146dcb7882d96a83fbe79",
+        "state": "dispatched"
+      }
+    ],
+    "jobs": [
+      {
+        "request_id": "upgrade-committed-message",
+        "state": "completed",
+        "attempts": 1,
+        "dispatched": 1
+      },
+      {
+        "request_id": "upgrade-interrupted-message",
+        "state": "running",
+        "attempts": 1,
+        "dispatched": 1
+      }
+    ],
+    "ackCount": 2
+  },
+  "upgraded": {
+    "modelCalls": 0,
+    "pending": {
+      "requestId": "upgrade-interrupted-message",
+      "inputId": "upgrade-interrupted-message",
+      "acceptedId": "request_74d875b69ef146dcb7882d96a83fbe79",
+      "phase": "review_required",
+      "admitStarted": true
+    },
+    "cursor": 3,
+    "topicCursors": {
+      "shared_abc1c4be98d6440ab1d379ea97a1302f": 3
+    },
+    "historyIds": [
+      "upgrade-committed-message",
+      "reply_request_21a6b7cb3e0e4ee48fae3f20b94a1c68",
+      "upgrade-interrupted-message"
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "upgrade-committed-message"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_request_21a6b7cb3e0e4ee48fae3f20b94a1c68"
+      },
+      {
+        "seq": 3,
+        "msg_id": "upgrade-interrupted-message"
+      }
+    ],
+    "native": [
+      {
+        "id": "request_21a6b7cb3e0e4ee48fae3f20b94a1c68",
+        "state": "model_terminal"
+      },
+      {
+        "id": "request_74d875b69ef146dcb7882d96a83fbe79",
+        "state": "unknown"
+      }
+    ],
+    "jobs": [
+      {
+        "request_id": "upgrade-committed-message",
+        "state": "completed",
+        "attempts": 1,
+        "dispatched": 1
+      },
+      {
+        "request_id": "upgrade-interrupted-message",
+        "state": "review_required",
+        "attempts": 1,
+        "dispatched": 1
+      }
+    ],
+    "ackCount": 3
+  },
+  "rolledBack": {
+    "modelCalls": 0,
+    "pending": {
+      "requestId": "upgrade-interrupted-message",
+      "inputId": "upgrade-interrupted-message",
+      "acceptedId": "request_74d875b69ef146dcb7882d96a83fbe79",
+      "phase": "review_required",
+      "admitStarted": true
+    },
+    "cursor": 3,
+    "topicCursors": {
+      "shared_abc1c4be98d6440ab1d379ea97a1302f": 3
+    },
+    "historyIds": [
+      "upgrade-committed-message",
+      "reply_request_21a6b7cb3e0e4ee48fae3f20b94a1c68",
+      "upgrade-interrupted-message"
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "upgrade-committed-message"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_request_21a6b7cb3e0e4ee48fae3f20b94a1c68"
+      },
+      {
+        "seq": 3,
+        "msg_id": "upgrade-interrupted-message"
+      }
+    ],
+    "native": [
+      {
+        "id": "request_21a6b7cb3e0e4ee48fae3f20b94a1c68",
+        "state": "model_terminal"
+      },
+      {
+        "id": "request_74d875b69ef146dcb7882d96a83fbe79",
+        "state": "unknown"
+      }
+    ],
+    "jobs": [
+      {
+        "request_id": "upgrade-committed-message",
+        "state": "completed",
+        "attempts": 1,
+        "dispatched": 1
+      },
+      {
+        "request_id": "upgrade-interrupted-message",
+        "state": "review_required",
+        "attempts": 1,
+        "dispatched": 1
+      }
+    ],
+    "ackCount": 3
+  },
+  "identicalOnRollback": [
+    "journal",
+    "history",
+    "ack",
+    "topicCursors",
+    "cursor",
+    "pending",
+    "jobs",
+    "native"
+  ]
+}

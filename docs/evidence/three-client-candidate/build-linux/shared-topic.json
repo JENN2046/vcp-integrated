@@ -1,0 +1,17 @@
+{
+  "url": "https://127.0.0.1:18443/mobile/",
+  "agent": "Synthetic lost receipt",
+  "topic": "Sponsor target existing topic",
+  "desktopDescriptor": {
+    "itemType": "agent",
+    "itemId": "ns_1e5526cb00246180dcb1af7f",
+    "topicId": "ns_8ef648d91ffd008045a59972"
+  },
+  "windowsDescriptor": {
+    "itemType": "agent",
+    "itemId": "ns_1e5526cb00246180dcb1af7f",
+    "topicId": "ns_8ef648d91ffd008045a59972"
+  },
+  "sharedTopicId": "shared_66704ea21249484487b9b697f9eca89c",
+  "input": "Send-recovery compare 02: accept exactly once."
+}

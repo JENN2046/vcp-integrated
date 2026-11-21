@@ -1,0 +1,37 @@
+{
+  "status": "PASS",
+  "candidate": "7829b83ccb634c397caa6a168d9fe0d8663cb12e",
+  "sharedTopicId": "shared_66704ea21249484487b9b697f9eca89c",
+  "workId": "request_36f6c924891e4df7a383a27762534321",
+  "providerCalls": 1,
+  "journal": [
+    {
+      "seq": 1,
+      "msg_id": "msg_1795283101406_user_dk6efpn05i",
+      "action": "upsert"
+    },
+    {
+      "seq": 2,
+      "msg_id": "reply_request_36f6c924891e4df7a383a27762534321",
+      "action": "upsert"
+    }
+  ],
+  "rows": [
+    {
+      "id": "msg_1795283101406_user_dk6efpn05i",
+      "role": "user",
+      "bytes": 46,
+      "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "id": "reply_request_36f6c924891e4df7a383a27762534321",
+      "role": "assistant",
+      "bytes": 21,
+      "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "windowsPids": {
+    "first": 9348,
+    "reopened": 5180
+  }
+}

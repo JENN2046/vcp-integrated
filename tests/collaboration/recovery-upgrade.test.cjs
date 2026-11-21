@@ -9,7 +9,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { BOX, CHAT } = require('./fixtures/paths.cjs');
 
-const baseline = 'c837e2a7f26453b99b67996b6eb79db94a72c62e';
+const baseline = process.env.VCP_UPGRADE_BASE || 'c837e2a7f26453b99b67996b6eb79db94a72c62e';
+assert.match(baseline, /^[a-f0-9]{40}$/);
 const repo = path.resolve(__dirname, '../..');
 const worker = path.join(__dirname, 'recovery-worker.cjs');
 
@@ -92,5 +93,17 @@ test('the baseline and candidate preserve interrupted execution and sync progres
     assert.deepEqual(rolledBack.jobs, upgraded.jobs);
     assert.deepEqual(rolledBack.native, upgraded.native);
     assert.equal(upgraded.modelCalls + rolledBack.modelCalls, 0);
+    if (process.env.VCP_UPGRADE_EVIDENCE) {
+        const revision = spawnSync('git', ['rev-parse', 'HEAD'], {cwd:repo, encoding:'utf8'}).stdout.trim();
+        const summary = state => ({
+            modelCalls:state.modelCalls, pending:state.pending, cursor:state.cursor, topicCursors:state.topicCursors,
+            historyIds:state.history.map(m=>m.id), journal:state.journal.map(({seq,msg_id})=>({seq,msg_id})),
+            native:state.native, jobs:state.jobs, ackCount:Object.keys(state.ack).length,
+        });
+        fs.writeFileSync(process.env.VCP_UPGRADE_EVIDENCE, JSON.stringify({
+            baseline,revision,initial:summary(initial),crash:summary(crash),upgraded:summary(upgraded),rolledBack:summary(rolledBack),
+            identicalOnRollback:['journal','history','ack','topicCursors','cursor','pending','jobs','native'],
+        }, null, 2) + '\n');
+    }
     t.diagnostic('Baseline normal exit → baseline SIGKILL after native dispatch → candidate recovery → baseline rollback. Original pending input and unknown native work retained, no repeat dispatch.');
 });

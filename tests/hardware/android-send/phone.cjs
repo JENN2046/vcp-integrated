@@ -8,6 +8,7 @@ const WebSocket = require('../../../apps/server/node_modules/ws');
 
 const packageName = 'dev.nativesync.qa.send';
 const activity = packageName + '/.TestWindow';
+const pickerPackages = ['com.google.android.documentsui', 'com.android.documentsui'];
 const [port, action, ...args] = process.argv.slice(2);
 assert.match(port ?? '', /^\d{4,5}$/);
 const origin = 'https://127.0.0.1:' + port;
@@ -24,9 +25,18 @@ async function waitFor(check, description) {
   throw Error(description);
 }
 
-function isForeground() {
+function focusedWindow() {
   const dump = adbText('shell', 'dumpsys', 'window');
-  return dump.split('\n').some((row) => row.includes('mCurrentFocus=') && row.includes(packageName));
+  return dump.split('\n').find((row) => row.includes('mCurrentFocus=')) ?? '';
+}
+
+function isForeground() {
+  return focusedWindow().includes(packageName);
+}
+
+function isSystemPicker() {
+  const focus = focusedWindow();
+  return pickerPackages.some((name) => focus.includes(' ' + name + '/')) && focus.includes('PickActivity');
 }
 
 function assertForeground() {
@@ -162,18 +172,43 @@ async function main() {
       }, selector, name), 'Fixture selection unavailable ' + selector);
     }
 
-    if (action === 'pair') {
+    if (action === 'pair' || action === 'pair-stop') {
       await call('Page.navigate', { url: origin + '/__hardware/pair' });
       await waitFor(() => evaluate(() => document.querySelector('#pair-code')?.value.length === 32),
         'One-time pairing form did not appear');
       await click('#pair-submit');
-      await waitFor(() => evaluate(() => Boolean(document.querySelector('#agent-select'))), 'Pairing did not connect');
-    } else if (action === 'select') {
+      if (action === 'pair-stop') {
+        await evaluate(() => new Promise(resolve => {
+          const check = () => {
+            if (document.querySelector('.connection')?.textContent === '已连接') resolve(true);
+            else requestAnimationFrame(check);
+          };
+          check();
+        }));
+        const observedAt = performance.now();
+        adb('shell', 'am', 'force-stop', packageName);
+        const stopMs = Math.round(performance.now() - observedAt);
+        assert.equal(adbText('shell', 'pidof', packageName + ' || true'), '');
+        console.log(JSON.stringify({ observed: 'first connected indicator', stopMs, processStopped: true }));
+      } else {
+        await waitFor(() => evaluate(() => Boolean(document.querySelector('#agent-select'))), 'Pairing did not connect');
+      }
+    } else if (action === 'select' || action === 'select-readonly') {
       assert.equal(args.length, 2);
       await select('#agent-select', args[0]);
       await select('#topic-select', args[1]);
-      await waitFor(() => evaluate(() => document.querySelector('#message-text')?.disabled === false && !document.querySelector('.history-progress')),
-        'Selected conversation history did not load');
+      await waitFor(() => evaluate((readonly) => {
+        const composer = document.querySelector('#message-text');
+        return composer && (readonly || !composer.disabled) && !document.querySelector('.history-progress');
+      }, action === 'select-readonly'), 'Selected conversation history did not load');
+    } else if (action === 'open-picker') {
+      await click('input[type=file]');
+      await waitFor(isSystemPicker, 'The system DocumentsUI picker did not take focus');
+      const hierarchy = adbText('exec-out', 'uiautomator', 'dump', '/proc/self/fd/1');
+      assert(isSystemPicker(), 'The system picker lost focus');
+      assert(hierarchy.includes('text="NativeSync synthetic fixtures"'), 'The synthetic DocumentsProvider directory did not open');
+      assert(hierarchy.includes('text="fixture-note.txt"'), 'Expected the one synthetic text file in DocumentsUI');
+      console.log(JSON.stringify({ picker: 'Android DocumentsUI', directory: 'NativeSync synthetic fixtures', file: 'fixture-note.txt' }));
     } else if (action === 'compose') {
       assert(args.length === 1 || args.length === 2);
       if (args[1]) {

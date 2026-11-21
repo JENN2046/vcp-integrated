@@ -1,0 +1,213 @@
+{
+  "mode": "local-only",
+  "A": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cds": {
+      "pid": 226373,
+      "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    },
+    "profileDigest": "a35891203983c1416d515610e6de5ea5e1457e53d5766a140e1c383350b20fe8"
+  },
+  "B": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cds": {
+      "pid": 226404,
+      "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    },
+    "profileDigest": "643846b906743ba85a14d67904f943a14c116ac5998df5c2cebf290f564a6427"
+  },
+  "loaded": {
+    "url": "file:///tmp/nativesync-three-client-7829b83/apps/desktop/main.html",
+    "main": [
+      {
+        "file": "apps/desktop/modules/ipc/chatHandlers.js",
+        "sha256": "6eb541cf4d16f62b108784f496a4dc2163dbbbae00b16771b51f26268cf464cb"
+      },
+      {
+        "file": "apps/desktop/modules/services/topicExecutionAuthority.js",
+        "sha256": "d95be8d511db7d830cc582cc65f4bef59a718a6e56c69c07c28a8cf014f47486"
+      }
+    ],
+    "renderer": [
+      {
+        "file": "apps/desktop/modules/event-listeners.js",
+        "bytes": 72357,
+        "sha256": "b1b0d975beba491eec9193a17f63d71d232de15ae16f44ac9ac543603d43b6ea"
+      },
+      {
+        "file": "apps/desktop/modules/renderer/nativeExecutionStatus.js",
+        "bytes": 24298,
+        "sha256": "11000b421265d9d6a79b80adbe644da30ffae0a21747a1aab2b218b320e3b3b2"
+      },
+      {
+        "file": "apps/desktop/modules/renderer/mainChatSendOwner.js",
+        "bytes": 9043,
+        "sha256": "b1c8836bbeb62dc96db5e81439a01ee28d69c36382b441663e7707928ddea0ef"
+      }
+    ]
+  },
+  "backendSources": [
+    {
+      "file": "apps/server/server.js",
+      "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "5fe109606e02b4101c8da15c5a810cd2d83a1796117dfcac91979491c52d3339"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "3efd8bf1b4c4411d7f8ec5c648ded72bc19f8e836058c644aa8050684baed133"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+      "sha256": "8601d3070ba9c92ac5288560ed6d4890d2bc308633363a70e1e3046aca180672"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "2e637687e88f05d3ae23cb19e663b3a0e5998f424df4101cb7663f9fb41e5481"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+      "sha256": "3d7e244833f4ae60c30e6b932752f2cdf9b09f06df628604792bda0078197218"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+      "sha256": "3bdd9fba3596f59ecf8a823303cd2b9dc4a44d0ab071203fa5e91f797010557d"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "6bd45ec5f20ab1f35db82145467e2569745b641daed4ffec5bed79c747fc260b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+      "sha256": "a1b166d894a7e697a54a226b78d381388e1fffe39c0984bf20441069beba4fa3"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+      "sha256": "c0be485ee31ed3d50db0e5a7e5e72aa38110434fe63c23606a7855a05ca7d512"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+      "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "072cf520ebb2638b85ea2bfe84b0226a216d9996748697c9e1324b3f88156793"
+    },
+    {
+      "file": "apps/server/modules/nativeContinuationStore.cjs",
+      "sha256": "f6774df34bdcc60346f4ed49f5dccaa2e0da5645b5b60ea29f364f89a5090ee6"
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "635c94f249a0f67cb085ae51f1a53e08dc49ddf2aaadb30e434fe6a9a36900f3"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "299fc48e0a1a0687a59f8c19adb91398ea61e40115f5a482a89caadf6d1d03a5"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/groupTurn.js",
+      "sha256": "7d37337452fd8428aff74a40f621631a70b7f1bf9584ef6bd3538bac0de3d3f7"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/portal.js",
+      "sha256": "3088ccf0e10e0b912164ad2f6e89ec97e19fd5249daa0965947cd7101e5ce95b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedEvents.js",
+      "sha256": "62e81d32e6e963554cdce3343ba3942a62414e91cc723170356b54cda7ed3a81"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/native-sync.js",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    }
+  ],
+  "local": {
+    "history": [
+      {
+        "role": "user",
+        "name": "用户",
+        "content": "Send-recovery compare 02: accept exactly once.",
+        "timestamp": 1795283059181,
+        "id": "msg_1795283059149_user_nt3554exjo",
+        "attachments": []
+      },
+      {
+        "id": "admission_50c9d7cd-b89e-4786-93e6-47168b2eb7c8",
+        "role": "assistant",
+        "name": "Synthetic local",
+        "agentId": "local-agent",
+        "admissionTerminal": true,
+        "avatarUrl": null,
+        "content": "合成回复完成。",
+        "timestamp": 1795283059262,
+        "finishReason": "completed",
+        "isThinking": false
+      }
+    ],
+    "provider": 1,
+    "localPosts": 1,
+    "sharedPosts": 0,
+    "workCount": 0,
+    "journalCount": 0
+  },
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "failures": []
+}

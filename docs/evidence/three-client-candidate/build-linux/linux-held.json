@@ -1,0 +1,23 @@
+{
+  "context": {
+    "itemId": "ns_1e5526cb00246180dcb1af7f",
+    "itemType": "agent",
+    "topicId": "ns_8ef648d91ffd008045a59972",
+    "historyRevision": 16
+  },
+  "text": "用户\n2026-11-22 01:45\n\nSend-recovery compare 02: accept exactly once.",
+  "composer": "Synthetic draft retained during shared observation.",
+  "selectionText": "Send-recovery compare 02: accept exactly once.",
+  "selectionInTranscript": true,
+  "reading": {
+    "scrollTop": 52,
+    "height": 680,
+    "scrollHeight": 732
+  },
+  "history": [
+    {
+      "id": "msg_1795283101406_user_dk6efpn05i",
+      "role": "user"
+    }
+  ]
+}

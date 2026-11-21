@@ -1,0 +1,3 @@
+backend pid 224500
+1c5f1c653acb0cb8481220213adfd7c99b2e59d1b0c3f335241b22a9a82aa95c  /tmp/nativesync-three-client-7829b83/.runs/hardware/run-Oh1ijV/runtime-box/rust-vexus-lite/vexus-lite.linux-x64-gnu.node
+90c27dc0d431feef669795799271448d5d9fa4da6dab88724edfb43ad3a85221  /tmp/nativesync-three-client-7829b83/apps/server/node_modules/better-sqlite3/build/Release/better_sqlite3.node

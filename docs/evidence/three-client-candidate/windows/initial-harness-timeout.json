@@ -1,0 +1,33 @@
+{
+  "status": "FAIL",
+  "candidate": "7829b83ccb634c397caa6a168d9fe0d8663cb12e",
+  "sharedTopicId": "shared_66704ea21249484487b9b697f9eca89c",
+  "workId": "request_36f6c924891e4df7a383a27762534321",
+  "platform": "win32",
+  "arch": "x64",
+  "osRelease": "10.0.22631",
+  "ordinaryTestAccount": true,
+  "https": {
+    "strict": true,
+    "statusCode": 200,
+    "observedUtc": "2026-11-21T17:49:28.180Z",
+    "validFrom": "2026-11-21T17:43:44.000Z",
+    "validTo": "2026-11-22T17:43:44.000Z"
+  },
+  "electron": {
+    "pid": 8200,
+    "version": "44.9.3",
+    "sandbox": true
+  },
+  "nativeSync": {
+    "ready": true,
+    "readOnly": false
+  },
+  "rendererReady": true,
+  "code": "Error",
+  "reason": "Windows Electron command timed out",
+  "exit": {
+    "code": null,
+    "signal": "SIGTERM"
+  }
+}

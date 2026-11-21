@@ -1,0 +1,34 @@
+{
+  "secure": true,
+  "origin": "https://127.0.0.1:18443",
+  "bundle": "/mobile/assets/index-CEYqWIUX.js",
+  "paired": true,
+  "visible": true,
+  "connection": "已连接",
+  "selectedAgent": "Synthetic lost receipt",
+  "selectedTopic": "shared_66704ea21249484487b9b697f9eca89c",
+  "progress": null,
+  "text": "",
+  "editable": false,
+  "sendEnabled": false,
+  "retryEnabled": false,
+  "files": [],
+  "status": "中央会话已更新",
+  "attachmentPreview": null,
+  "pending": null,
+  "accepted": null,
+  "jobs": [
+    {
+      "id": "request_36f6c924891e4df7a383a27762534321",
+      "state": "running"
+    }
+  ],
+  "messages": [
+    {
+      "id": "msg_1795283101406_user_dk6efpn05i",
+      "role": "user",
+      "text": "Send-recovery compare 02: accept exactly once.",
+      "attachments": []
+    }
+  ]
+}

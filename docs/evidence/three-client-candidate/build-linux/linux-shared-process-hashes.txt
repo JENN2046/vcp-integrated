@@ -1,0 +1,4 @@
+/tmp/nativesync-three-client-7829b83/apps/desktop/node_modules/electron/dist/electron
+7b7916ef94fa3380de130f8f1bff79fb339b9caafe134cd9dcb52d83b39ed299  /proc/225759/exe
+/tmp/nativesync-three-client-7829b83/apps/desktop/modules/services/chatDataService/bin/linux-x64/vcp_chat_data_service
+ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce  /proc/225883/exe

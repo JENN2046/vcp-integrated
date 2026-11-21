@@ -1,0 +1,36 @@
+{
+  "encoding": "UTF-8 exact decoded raw content",
+  "sharedTopicId": "shared_66704ea21249484487b9b697f9eca89c",
+  "sources": {
+    "linuxAHistory": [
+      {
+        "topicId": "ns_8ef648d91ffd008045a59972",
+        "msgId": "msg_1795283101406_user_dk6efpn05i",
+        "role": "user",
+        "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+      },
+      {
+        "topicId": "ns_8ef648d91ffd008045a59972",
+        "msgId": "reply_request_36f6c924891e4df7a383a27762534321",
+        "role": "assistant",
+        "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+      }
+    ],
+    "centralJournal": [
+      {
+        "topicId": "shared_66704ea21249484487b9b697f9eca89c",
+        "msgId": "msg_1795283101406_user_dk6efpn05i",
+        "role": "user",
+        "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480",
+        "sequence": 1
+      },
+      {
+        "topicId": "shared_66704ea21249484487b9b697f9eca89c",
+        "msgId": "reply_request_36f6c924891e4df7a383a27762534321",
+        "role": "assistant",
+        "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d",
+        "sequence": 2
+      }
+    ]
+  }
+}

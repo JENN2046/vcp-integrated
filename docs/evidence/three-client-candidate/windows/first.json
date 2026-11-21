@@ -1,0 +1,63 @@
+{
+  "status": "PASS",
+  "phase": "first",
+  "candidate": "7829b83ccb634c397caa6a168d9fe0d8663cb12e",
+  "sharedTopicId": "shared_66704ea21249484487b9b697f9eca89c",
+  "workId": "request_36f6c924891e4df7a383a27762534321",
+  "platform": "win32",
+  "arch": "x64",
+  "osRelease": "10.0.22631",
+  "ordinaryTestAccount": true,
+  "https": {
+    "strict": true,
+    "statusCode": 200,
+    "observedUtc": "2026-11-21T17:52:06.543Z",
+    "validFrom": "2026-11-21T17:43:44.000Z",
+    "validTo": "2026-11-22T17:43:44.000Z"
+  },
+  "electron": {
+    "pid": 9348,
+    "version": "44.9.3",
+    "sandbox": true
+  },
+  "nativeSync": {
+    "ready": true,
+    "readOnly": false
+  },
+  "rendererReady": true,
+  "desktopTopic": {
+    "itemId": "ns_1e5526cb00246180dcb1af7f",
+    "itemType": "agent",
+    "topicId": "ns_8ef648d91ffd008045a59972",
+    "historyRevision": 9
+  },
+  "visible": true,
+  "rows": [
+    {
+      "id": "msg_1795283101406_user_dk6efpn05i",
+      "role": "user",
+      "bytes": 46,
+      "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "id": "reply_request_36f6c924891e4df7a383a27762534321",
+      "role": "assistant",
+      "bytes": 21,
+      "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "cdsSha256": "0bccf38d13b864cee490f64176d10151c4c96af4e38cc10b3f6b7e9e0683694f",
+  "processesWhileVisible": {
+    "electron": 5,
+    "cds": 1
+  },
+  "electronQuit": true,
+  "exit": {
+    "code": 0,
+    "signal": null
+  },
+  "processesAfterQuit": {
+    "electron": 0,
+    "cds": 0
+  }
+}

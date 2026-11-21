@@ -25,7 +25,7 @@ sed "s/FIXTURE_PORT/$port/g" "$source_dir/TestWindow.java" > TestWindow.java
 
 "$build_tools/aapt2" compile --dir resources -o resources.zip
 "$build_tools/aapt2" link -I "$platform" --manifest "$source_dir/AndroidManifest.xml" -o unsigned.apk resources.zip
-javac --release 8 -cp "$platform" -d classes TestWindow.java
+javac --release 8 -cp "$platform" -d classes TestWindow.java "$source_dir/FixtureDocuments.java"
 "$build_tools/d8" --lib "$platform" --min-api 29 --output dex classes/dev/nativesync/qa/send/*.class
 (cd dex && zip -q ../unsigned.apk classes.dex)
 "$build_tools/zipalign" -f 4 unsigned.apk aligned.apk

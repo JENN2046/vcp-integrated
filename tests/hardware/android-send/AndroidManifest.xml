@@ -1,7 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.nativesync.qa.send" android:versionCode="1" android:versionName="1">
   <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="35"/>
   <uses-permission android:name="android.permission.INTERNET"/>
+  <queries>
+    <package android:name="com.google.android.documentsui"/>
+    <package android:name="com.android.documentsui"/>
+  </queries>
   <application android:label="NativeSync 发送验收" android:allowBackup="false" android:usesCleartextTraffic="false" android:networkSecurityConfig="@xml/test_network" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    <provider android:name=".FixtureDocuments" android:authorities="dev.nativesync.qa.send.documents" android:exported="true"
+      android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS">
+      <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER"/></intent-filter>
+    </provider>
     <activity android:name=".TestWindow" android:exported="true">
       <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
     </activity>
