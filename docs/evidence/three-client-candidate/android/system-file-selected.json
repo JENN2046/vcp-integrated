@@ -1,0 +1,24 @@
+{
+  "secure": true,
+  "origin": "https://127.0.0.1:19443",
+  "bundle": "/mobile/assets/index-CEYqWIUX.js",
+  "paired": true,
+  "visible": true,
+  "connection": "离线",
+  "selectedAgent": "Synthetic lost receipt",
+  "selectedTopic": "shared_d00cec9c09f34646bc1a8776e5832160",
+  "progress": null,
+  "text": "",
+  "editable": false,
+  "sendEnabled": false,
+  "retryEnabled": false,
+  "files": [
+    "fixture-note.txt · 0%"
+  ],
+  "status": "Failed to fetch",
+  "attachmentPreview": null,
+  "pending": null,
+  "accepted": null,
+  "jobs": [],
+  "messages": []
+}

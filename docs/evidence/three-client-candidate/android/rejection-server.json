@@ -1,0 +1,65 @@
+{
+  "bundleSha256": "6db3def8d6836bd703b909885d54f4657d1fcebba9596b68d453a5541967b3ff",
+  "provider": [],
+  "tools": [],
+  "requests": [
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_d00cec9c09f34646bc1a8776e5832160/attachments/uploads",
+      "at": 1795284120039,
+      "status": 201,
+      "requestId": "file_dd605c7676109b2d08fc9d752591739ced694eeed4fa5afdc43aa9c413f2f919",
+      "sha256": "a7e8a4d8e373abb0512fb65992a67870a7f6d999feb9b7339a29f32a5613076f"
+    },
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_d00cec9c09f34646bc1a8776e5832160/attachments/uploads/f0ca05eb-13ad-47ad-b855-b9b5921fd2a6/chunks",
+      "at": 1795284120068,
+      "status": 200,
+      "sha256": null
+    },
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_d00cec9c09f34646bc1a8776e5832160/attachments/uploads/f0ca05eb-13ad-47ad-b855-b9b5921fd2a6/finish",
+      "at": 1795284120096,
+      "status": 200,
+      "sha256": "a7e8a4d8e373abb0512fb65992a67870a7f6d999feb9b7339a29f32a5613076f"
+    },
+    {
+      "method": "POST",
+      "route": "/mobile/api/conversations/shared_d00cec9c09f34646bc1a8776e5832160/messages",
+      "at": 1795284120138,
+      "status": 409,
+      "requestId": "511f54fb-eb98-4cfa-bb59-40a186d35c06",
+      "text": "PHYSICAL_ATTACHMENT {{VCPChatCanvas}}",
+      "attachments": [
+        "f0ca05eb-13ad-47ad-b855-b9b5921fd2a6"
+      ],
+      "code": "DESKTOP_CONTEXT_REQUIRED"
+    },
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_d00cec9c09f34646bc1a8776e5832160/execution-request",
+      "at": 1795284120155,
+      "status": 200,
+      "matchedExecutions": []
+    }
+  ],
+  "exactLookups": [
+    {
+      "method": "GET",
+      "route": "/mobile/api/conversations/shared_d00cec9c09f34646bc1a8776e5832160/execution-request",
+      "requestId": "511f54fb-eb98-4cfa-bb59-40a186d35c06",
+      "at": 1795284120155,
+      "held": false
+    }
+  ],
+  "work": [],
+  "journal": [],
+  "links": [],
+  "paired": 4,
+  "attachmentFixture": {
+    "name": "fixture-note.txt",
+    "sha256": "a7e8a4d8e373abb0512fb65992a67870a7f6d999feb9b7339a29f32a5613076f"
+  }
+}

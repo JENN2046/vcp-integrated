@@ -82,3 +82,5 @@ PWA 普通共享单聊在可证明尚未派发时按原 Work 回到队列；派�
 Android 16 实机已验证共享发送的两个恢复入口：明确 409 后冷开可编辑原草稿并复用原上传；成功 202 被截断后冷开核对原 Work，模型及工具调用数保持不变。[实机前后对照、截图与清理回执](evidence/android-send/phone/README.md)
 
 已支持原生终稿发布的显式工具 Work，其 B 末代现凭原 Work、代次、回复 ID 和 Journal 水位只读收尾。新组合完成补交为零，旧组合保留兼容补交，编辑和墓碑均经实际窗口复验。[B 末代终稿读回](evidence/final-readback/README.md)
+
+固定候选 `7829b83ccb63` 完成 Linux、原 Windows 虚拟机及 Android 16 的同一 Work 核对。Android 系统选档、拒绝后保留附件改发、丢回执后找回原 Work 均已实测。首次配对显示已连接后 108 毫秒内强停，冷开仍需重新配对。[本轮差异、回执与截图](evidence/three-client-candidate/README.md)

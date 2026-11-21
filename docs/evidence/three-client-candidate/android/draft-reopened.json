@@ -1,0 +1,24 @@
+{
+  "secure": true,
+  "origin": "https://127.0.0.1:19443",
+  "bundle": "/mobile/assets/index-CEYqWIUX.js",
+  "paired": true,
+  "visible": true,
+  "connection": "已连接",
+  "selectedAgent": "Synthetic lost receipt",
+  "selectedTopic": "shared_d00cec9c09f34646bc1a8776e5832160",
+  "progress": null,
+  "text": "PHYSICAL_ATTACHMENT {{VCPChatCanvas}}",
+  "editable": true,
+  "sendEnabled": true,
+  "retryEnabled": false,
+  "files": [
+    "已上传附件 1 · 100%"
+  ],
+  "status": "中央会话已更新",
+  "attachmentPreview": null,
+  "pending": null,
+  "accepted": null,
+  "jobs": [],
+  "messages": []
+}

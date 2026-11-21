@@ -1,0 +1,9 @@
+{
+  "testApkInstalled": false,
+  "sharedReversePresent": false,
+  "physicalReversePresent": false,
+  "testCdpForwardPresent": false,
+  "physicalLoopbackListening": false,
+  "temporaryRuntimeMovedToTrash": true,
+  "temporaryTlsLeafKeyRemoved": true
+}
