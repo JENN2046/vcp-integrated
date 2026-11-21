@@ -35,5 +35,5 @@ $env:NS_CERT_FINGERPRINT = node -e "const fs=require('node:fs'); const {X509Cert
 
 1. 确认每端到场后，在 Linux 终端输入 `send` 一次。协调终端的 `status` 与磁盘 `status.json` 给出 Work、原消息 ID、Journal 和 Provider 调用数。
 2. Linux 终端输入 `mark` 记录独立草稿、消息选区、滚动状态和本机持久 History。手机确认同一在途 Work 后，可按验收计划锁屏、移除本次回环桥或结束本次测试应用。
-3. 在协调终端输入 `release`。协调器只会放行仍在执行的一份 Work。现成夹具为非流式，测试的是在途状态与持久终态。默认后端时限为 120 秒，离线步骤应在这个窗口内完成。Linux 端 `record`、`capture` 可留存完成态。检查各观察端原消息、回复和 Journal 序号。
+3. 在协调终端输入 `release`。协调器只会放行仍在执行的一份 Work。现成夹具为非流式，测试的是在途状态与持久终态。默认后端时限为 120 秒，离线步骤应在这个窗口内完成。协调器保存 `work-held.json` 与 `work-completed.json`，Linux 端 `record`、`capture` 可留存完成态。检查各观察端原消息、回复和 Journal 序号。
 4. 如需留证，先拷贝经过核对的合成观察摘要或截图。退出 Windows 测试 Profile，移除本次 Android 转发与测试 WebView，在 Linux 终端输入 `stop` 后再在协调终端输入 `stop`。协调器关闭 ToolBox 和 Provider，并回收本次 `.runs/hardware/run-*` 中的合成数据库、证书、Profile 和运行日志。

@@ -115,10 +115,19 @@ async function main() {
         };
         await service.checkMobile();
         const statusFile = path.join(out, 'status.json');
+        let recordedCompletion = false;
+        function writeSnapshot(file, value) {
+            const temporary = file + '.tmp';
+            fs.writeFileSync(temporary, JSON.stringify(value) + '\n', { mode:0o600 });
+            fs.renameSync(temporary, file);
+        }
         function writeStatus() {
-            const next = statusFile + '.tmp';
-            fs.writeFileSync(next, JSON.stringify(snapshot()) + '\n', { mode:0o600 });
-            fs.renameSync(next, statusFile);
+            const value = snapshot();
+            writeSnapshot(statusFile, value);
+            if (!recordedCompletion && value.work.length === 1 && value.work[0].state === 'completed') {
+                writeSnapshot(path.join(out,'work-completed.json'), value);
+                recordedCompletion = true;
+            }
         }
         statusTimer = setInterval(writeStatus, 300).unref();
         const ready = { url:service.origin + '/mobile/', pairUrl:service.origin + pairRoute, publicLeaf:cert,
@@ -143,6 +152,7 @@ async function main() {
                         assert.equal(view.providerCalls,1);
                         assert.equal(view.work.length,1);
                         assert.equal(view.work[0].state,'running');
+                        writeSnapshot(path.join(out,'work-held.json'), view);
                         released=true;
                         service.releaseLost();
                         say('provider-released');
