@@ -1,0 +1,771 @@
+{
+  "revision": "f00aa6d256a2bb7ef7fbc65fb2002728be7fea5c",
+  "node": "24.22.3",
+  "parentTerminalBeforeCrash": false,
+  "result": "PASS",
+  "browser": "Chrome/158.0.8127.36",
+  "pwaBundle": {
+    "file": "/mobile/assets/index-osJBDX72.js",
+    "sha256": "0aaa7a62f4d2b50ec27a6f4544fe377369c24745dcfb0cc8e3a4511c2d17724a"
+  },
+  "workId": "request_55b20eda6d7c48958808b78849e263ef",
+  "requestId": "4cd359e0-2d20-499f-b32c-6e191710062f",
+  "beforeApproval": {
+    "work": {
+      "id": "request_55b20eda6d7c48958808b78849e263ef",
+      "request_id": "4cd359e0-2d20-499f-b32c-6e191710062f",
+      "state": "waiting_approval",
+      "error_code": null,
+      "cancel_requested": 0,
+      "group_stop_index": null
+    },
+    "steps": [
+      {
+        "id": "gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "error_code": null
+      },
+      {
+        "id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "waiting_approval",
+        "attempts": 1,
+        "reply_message_id": null,
+        "error_code": null
+      },
+      {
+        "id": "gstep_d170d92a534b9c5f079637a2535f26c555f5d60f",
+        "state": "queued",
+        "attempts": 0,
+        "reply_message_id": null,
+        "error_code": null
+      }
+    ],
+    "childSteps": [],
+    "tasks": [],
+    "invocations": [],
+    "native": [
+      {
+        "id": "gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "state": "model_terminal",
+        "ordinal": 0
+      },
+      {
+        "id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "dispatched",
+        "ordinal": 1
+      }
+    ],
+    "counts": {
+      "A": 1,
+      "B": 1,
+      "C": 0,
+      "childRequests": []
+    },
+    "history": [
+      {
+        "id": "mobile_job_2d7d722a3c9b590ba942252b621fc64c",
+        "role": "user",
+        "content": "Synthetic cross-batch audit group round."
+      },
+      {
+        "id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      }
+    ],
+    "journal": [
+      {
+        "msg_id": "mobile_job_2d7d722a3c9b590ba942252b621fc64c",
+        "action": "upsert"
+      },
+      {
+        "msg_id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "action": "upsert"
+      }
+    ]
+  },
+  "approval": {
+    "approvalId": "approve-1795250912578-820rk4v",
+    "allowResponsesSent": 1,
+    "transport": "native VCPLog WebSocket"
+  },
+  "beforeCancel": {
+    "work": {
+      "id": "request_55b20eda6d7c48958808b78849e263ef",
+      "request_id": "4cd359e0-2d20-499f-b32c-6e191710062f",
+      "state": "running",
+      "error_code": null,
+      "cancel_requested": 0,
+      "group_stop_index": null
+    },
+    "steps": [
+      {
+        "id": "gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "error_code": null
+      },
+      {
+        "id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "running",
+        "attempts": 1,
+        "reply_message_id": null,
+        "error_code": null
+      },
+      {
+        "id": "gstep_d170d92a534b9c5f079637a2535f26c555f5d60f",
+        "state": "queued",
+        "attempts": 0,
+        "reply_message_id": null,
+        "error_code": null
+      }
+    ],
+    "childSteps": [
+      {
+        "id": "aa-delegation-1795250912622-94e70e9f-round-1",
+        "state": "pending",
+        "attempts": 0,
+        "error_code": null
+      }
+    ],
+    "tasks": [
+      {
+        "native_task_id": "aa-delegation-1795250912622-94e70e9f",
+        "step_id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "running",
+        "native_status": null,
+        "result_ref": null,
+        "error_code": null,
+        "review_required": 0
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "96570cad-046f-4489-a2f2-fa60241482b2",
+        "step_id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "plugin_name": "AgentAssistant",
+        "record_id": "tcr-1795250912576-7affede7-25cf-448d-a32d-3625d4731df9",
+        "state": "returned",
+        "error_code": null
+      }
+    ],
+    "native": [
+      {
+        "id": "gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "state": "model_terminal",
+        "ordinal": 0
+      },
+      {
+        "id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "dispatched",
+        "ordinal": 1
+      }
+    ],
+    "counts": {
+      "A": 1,
+      "B": 2,
+      "C": 0,
+      "childRequests": [
+        {
+          "id": "aa-delegation-1795250912622-94e70e9f-round-1",
+          "launch": true
+        }
+      ]
+    },
+    "history": [
+      {
+        "id": "mobile_job_2d7d722a3c9b590ba942252b621fc64c",
+        "role": "user",
+        "content": "Synthetic cross-batch audit group round."
+      },
+      {
+        "id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      }
+    ],
+    "journal": [
+      {
+        "msg_id": "mobile_job_2d7d722a3c9b590ba942252b621fc64c",
+        "action": "upsert"
+      },
+      {
+        "msg_id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "action": "upsert"
+      }
+    ]
+  },
+  "afterCancel": {
+    "work": {
+      "id": "request_55b20eda6d7c48958808b78849e263ef",
+      "request_id": "4cd359e0-2d20-499f-b32c-6e191710062f",
+      "state": "running",
+      "error_code": null,
+      "cancel_requested": 0,
+      "group_stop_index": 2
+    },
+    "steps": [
+      {
+        "id": "gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "error_code": null
+      },
+      {
+        "id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "running",
+        "attempts": 1,
+        "reply_message_id": null,
+        "error_code": null
+      },
+      {
+        "id": "gstep_d170d92a534b9c5f079637a2535f26c555f5d60f",
+        "state": "cancelled",
+        "attempts": 0,
+        "reply_message_id": null,
+        "error_code": null
+      }
+    ],
+    "childSteps": [
+      {
+        "id": "aa-delegation-1795250912622-94e70e9f-round-1",
+        "state": "pending",
+        "attempts": 0,
+        "error_code": null
+      }
+    ],
+    "tasks": [
+      {
+        "native_task_id": "aa-delegation-1795250912622-94e70e9f",
+        "step_id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "running",
+        "native_status": null,
+        "result_ref": null,
+        "error_code": null,
+        "review_required": 0
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "96570cad-046f-4489-a2f2-fa60241482b2",
+        "step_id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "plugin_name": "AgentAssistant",
+        "record_id": "tcr-1795250912576-7affede7-25cf-448d-a32d-3625d4731df9",
+        "state": "returned",
+        "error_code": null
+      }
+    ],
+    "native": [
+      {
+        "id": "gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "state": "model_terminal",
+        "ordinal": 0
+      },
+      {
+        "id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "dispatched",
+        "ordinal": 1
+      }
+    ],
+    "counts": {
+      "A": 1,
+      "B": 2,
+      "C": 0,
+      "childRequests": [
+        {
+          "id": "aa-delegation-1795250912622-94e70e9f-round-1",
+          "launch": true
+        }
+      ]
+    },
+    "history": [
+      {
+        "id": "mobile_job_2d7d722a3c9b590ba942252b621fc64c",
+        "role": "user",
+        "content": "Synthetic cross-batch audit group round."
+      },
+      {
+        "id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      }
+    ],
+    "journal": [
+      {
+        "msg_id": "mobile_job_2d7d722a3c9b590ba942252b621fc64c",
+        "action": "upsert"
+      },
+      {
+        "msg_id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "action": "upsert"
+      }
+    ]
+  },
+  "beforeCrash": {
+    "work": {
+      "id": "request_55b20eda6d7c48958808b78849e263ef",
+      "request_id": "4cd359e0-2d20-499f-b32c-6e191710062f",
+      "state": "running",
+      "error_code": null,
+      "cancel_requested": 0,
+      "group_stop_index": 2
+    },
+    "steps": [
+      {
+        "id": "gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "error_code": null
+      },
+      {
+        "id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "running",
+        "attempts": 1,
+        "reply_message_id": null,
+        "error_code": null
+      },
+      {
+        "id": "gstep_d170d92a534b9c5f079637a2535f26c555f5d60f",
+        "state": "cancelled",
+        "attempts": 0,
+        "reply_message_id": null,
+        "error_code": null
+      }
+    ],
+    "childSteps": [
+      {
+        "id": "aa-delegation-1795250912622-94e70e9f-round-1",
+        "state": "pending",
+        "attempts": 0,
+        "error_code": null
+      }
+    ],
+    "tasks": [
+      {
+        "native_task_id": "aa-delegation-1795250912622-94e70e9f",
+        "step_id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "running",
+        "native_status": null,
+        "result_ref": null,
+        "error_code": null,
+        "review_required": 0
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "96570cad-046f-4489-a2f2-fa60241482b2",
+        "step_id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "plugin_name": "AgentAssistant",
+        "record_id": "tcr-1795250912576-7affede7-25cf-448d-a32d-3625d4731df9",
+        "state": "returned",
+        "error_code": null
+      }
+    ],
+    "native": [
+      {
+        "id": "gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "state": "model_terminal",
+        "ordinal": 0
+      },
+      {
+        "id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "dispatched",
+        "ordinal": 1
+      }
+    ],
+    "counts": {
+      "A": 1,
+      "B": 2,
+      "C": 0,
+      "childRequests": [
+        {
+          "id": "aa-delegation-1795250912622-94e70e9f-round-1",
+          "launch": true
+        }
+      ]
+    },
+    "history": [
+      {
+        "id": "mobile_job_2d7d722a3c9b590ba942252b621fc64c",
+        "role": "user",
+        "content": "Synthetic cross-batch audit group round."
+      },
+      {
+        "id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      }
+    ],
+    "journal": [
+      {
+        "msg_id": "mobile_job_2d7d722a3c9b590ba942252b621fc64c",
+        "action": "upsert"
+      },
+      {
+        "msg_id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "action": "upsert"
+      }
+    ]
+  },
+  "nativeActiveBeforeCrash": true,
+  "crash": {
+    "code": null,
+    "signal": "SIGKILL"
+  },
+  "recovered": {
+    "work": {
+      "id": "request_55b20eda6d7c48958808b78849e263ef",
+      "request_id": "4cd359e0-2d20-499f-b32c-6e191710062f",
+      "state": "review_required",
+      "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+      "cancel_requested": 0,
+      "group_stop_index": 2
+    },
+    "steps": [
+      {
+        "id": "gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "error_code": null
+      },
+      {
+        "id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "interrupted",
+        "attempts": 1,
+        "reply_message_id": null,
+        "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED"
+      },
+      {
+        "id": "gstep_d170d92a534b9c5f079637a2535f26c555f5d60f",
+        "state": "cancelled",
+        "attempts": 0,
+        "reply_message_id": null,
+        "error_code": null
+      }
+    ],
+    "childSteps": [
+      {
+        "id": "aa-delegation-1795250912622-94e70e9f-round-1",
+        "state": "pending",
+        "attempts": 0,
+        "error_code": null
+      }
+    ],
+    "tasks": [
+      {
+        "native_task_id": "aa-delegation-1795250912622-94e70e9f",
+        "step_id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "unknown",
+        "native_status": null,
+        "result_ref": null,
+        "error_code": "NATIVE_TASK_RESULT_UNCONFIRMED",
+        "review_required": 1
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "96570cad-046f-4489-a2f2-fa60241482b2",
+        "step_id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "plugin_name": "AgentAssistant",
+        "record_id": "tcr-1795250912576-7affede7-25cf-448d-a32d-3625d4731df9",
+        "state": "returned",
+        "error_code": null
+      }
+    ],
+    "native": [
+      {
+        "id": "gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "state": "model_terminal",
+        "ordinal": 0
+      },
+      {
+        "id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "unknown",
+        "ordinal": 1
+      }
+    ],
+    "counts": {
+      "A": 1,
+      "B": 2,
+      "C": 0,
+      "childRequests": [
+        {
+          "id": "aa-delegation-1795250912622-94e70e9f-round-1",
+          "launch": true
+        }
+      ]
+    },
+    "history": [
+      {
+        "id": "mobile_job_2d7d722a3c9b590ba942252b621fc64c",
+        "role": "user",
+        "content": "Synthetic cross-batch audit group round."
+      },
+      {
+        "id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      }
+    ],
+    "journal": [
+      {
+        "msg_id": "mobile_job_2d7d722a3c9b590ba942252b621fc64c",
+        "action": "upsert"
+      },
+      {
+        "msg_id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "action": "upsert"
+      }
+    ]
+  },
+  "retries": {
+    "sameWorkStatus": "review_required",
+    "submit": {
+      "status": 202,
+      "id": "request_55b20eda6d7c48958808b78849e263ef"
+    },
+    "cancelRemaining": {
+      "status": 202,
+      "id": "request_55b20eda6d7c48958808b78849e263ef",
+      "remainingCancelled": true
+    }
+  },
+  "childResult": {
+    "status": 409,
+    "error": "NATIVE_TASK_RESULT_UNVERIFIED"
+  },
+  "nativeActiveAfterRestart": 0,
+  "final": {
+    "work": {
+      "id": "request_55b20eda6d7c48958808b78849e263ef",
+      "request_id": "4cd359e0-2d20-499f-b32c-6e191710062f",
+      "state": "review_required",
+      "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+      "cancel_requested": 0,
+      "group_stop_index": 2
+    },
+    "steps": [
+      {
+        "id": "gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "error_code": null
+      },
+      {
+        "id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "interrupted",
+        "attempts": 1,
+        "reply_message_id": null,
+        "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED"
+      },
+      {
+        "id": "gstep_d170d92a534b9c5f079637a2535f26c555f5d60f",
+        "state": "cancelled",
+        "attempts": 0,
+        "reply_message_id": null,
+        "error_code": null
+      }
+    ],
+    "childSteps": [
+      {
+        "id": "aa-delegation-1795250912622-94e70e9f-round-1",
+        "state": "pending",
+        "attempts": 0,
+        "error_code": null
+      }
+    ],
+    "tasks": [
+      {
+        "native_task_id": "aa-delegation-1795250912622-94e70e9f",
+        "step_id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "unknown",
+        "native_status": null,
+        "result_ref": null,
+        "error_code": "NATIVE_TASK_RESULT_UNCONFIRMED",
+        "review_required": 1
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "96570cad-046f-4489-a2f2-fa60241482b2",
+        "step_id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "plugin_name": "AgentAssistant",
+        "record_id": "tcr-1795250912576-7affede7-25cf-448d-a32d-3625d4731df9",
+        "state": "returned",
+        "error_code": null
+      }
+    ],
+    "native": [
+      {
+        "id": "gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "state": "model_terminal",
+        "ordinal": 0
+      },
+      {
+        "id": "gstep_5b165085acdb3d73cafbbc59cd2289acdd2cd84e",
+        "state": "unknown",
+        "ordinal": 1
+      }
+    ],
+    "counts": {
+      "A": 1,
+      "B": 2,
+      "C": 0,
+      "childRequests": [
+        {
+          "id": "aa-delegation-1795250912622-94e70e9f-round-1",
+          "launch": true
+        }
+      ]
+    },
+    "history": [
+      {
+        "id": "mobile_job_2d7d722a3c9b590ba942252b621fc64c",
+        "role": "user",
+        "content": "Synthetic cross-batch audit group round."
+      },
+      {
+        "id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      }
+    ],
+    "journal": [
+      {
+        "msg_id": "mobile_job_2d7d722a3c9b590ba942252b621fc64c",
+        "action": "upsert"
+      },
+      {
+        "msg_id": "reply_gstep_2be5e964a206c22e2c393e30193c2c21cd8672a0",
+        "action": "upsert"
+      }
+    ]
+  },
+  "phone": {
+    "groupRemainingCancelled": true,
+    "aaUnknown": true,
+    "memberB": "interrupted",
+    "memberC": "cancelled"
+  },
+  "finalToolBoxExit": {
+    "code": 0,
+    "signal": null
+  },
+  "loadedSources": [
+    {
+      "file": "apps/server/server.js",
+      "sha256": "3095443182aca5d60dec2f6ee776790906028befa9364496fd8fac5951a096df"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "a4754eea49c9d91e155d1862e40666bf3c77085760e62bded7e2ecf1336faeee"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "9bac35b45ae82bcdd20a23f73c88fad9eadadaad99e4c8fd37fa424e09e20e08"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "3483b635f0b735b80b0f02d6d0ad5ddefdb9bf52988affb6f5f8b2b63f8ca0b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "6eb7600e0f6212d5fb6569dafa257d28713b1adaea346236adbd8d8a4da88529"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "946cc2c9160ac58e9e213132091b96e47cb57e5cba5c2dde397b3220345c6828"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+      "sha256": "b16e07afa969e4674a98fe093f4e7c892c3125635b9c63ac0064bafdaf47f17d"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "94a2517a153ec8f343ed69ce9c09c2fccd593d441949e5ea8d295106042d91e2"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "c7777a89d9a2b461f1f562764d075d47437473932ae2ecf62985d5d54f01d4d9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+      "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+    },
+    {
+      "file": "apps/server/Plugin/AgentAssistant/AgentAssistant.js",
+      "sha256": "775909dc425b00a364aa3b46044a4ab32071e32e51fe32df1052f644db4d8927"
+    },
+    {
+      "file": "apps/server/Plugin/AgentAssistant/delegationContinuity.js",
+      "sha256": "b7ea27e0304d4da83d8c2f992321bd4f78d71ab5d284b775a3441c5848a241c5"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "200540207a903bb0e7dc342eba36edb271619df7304eb5f433b7d62353a1cc56"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "c135a4ae59741a02cdf07653b7112f7932693f10600f6d4dac76e28a72d4d825"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "a3047f7951e3b6030ca1ea6d3163172171bd1c14ef9ff3d29bb234dd24f76e12"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/groupTurn.js",
+      "sha256": "1d159c4a38d0b8247a59b8bec1318bc06ed25bb9ca0e6811392827049ff5bed7"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedGroups.js",
+      "sha256": "68704fc589a6ad43ce33df4c7f2100a57c0242ad36638e195ec96b58e6f0e8be"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/portal.js",
+      "sha256": "3088ccf0e10e0b912164ad2f6e89ec97e19fd5249daa0965947cd7101e5ce95b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTurns.js",
+      "sha256": "023986b7c439261fb2287809543b63a3ba962cf02c1c93197404c71eff4a6025"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedEvents.js",
+      "sha256": "43ce2e77a98be68657b91078dd9fcbcae9382a51baccd2faca6816786d51c915"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/native-sync.js",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    }
+  ]
+}

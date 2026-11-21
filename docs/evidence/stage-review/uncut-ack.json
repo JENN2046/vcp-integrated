@@ -1,0 +1,161 @@
+{
+  "scenario": "owner-ack",
+  "node": "v24.22.3",
+  "browser": "Chrome/158.0.8127.36",
+  "workId": "request_1a6e758532d54a51be05664e7e178c57",
+  "requestId": "4cea5420-0819-433d-9ac2-8765ad9d7828",
+  "revision": "f00aa6d256a2bb7ef7fbc65fb2002728be7fea5c",
+  "sourceHashes": {
+    "mobile/groupTurn.js": "1d159c4a38d0b8247a59b8bec1318bc06ed25bb9ca0e6811392827049ff5bed7",
+    "sync/sharedTurns.js": "023986b7c439261fb2287809543b63a3ba962cf02c1c93197404c71eff4a6025",
+    "sync/sharedNative.js": "6eb7600e0f6212d5fb6569dafa257d28713b1adaea346236adbd8d8a4da88529",
+    "sync/sharedTaskRequests.js": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+  },
+  "whileChildRunning": {
+    "job": {
+      "state": "blocked_config",
+      "error_code": "SHARED_NATIVE_TERMINAL_REQUIRED",
+      "group_stop_index": null,
+      "review_resolved": 0
+    },
+    "admission": {
+      "state": "review_required",
+      "native_terminal": 0,
+      "reply_seq": 4
+    },
+    "task": {
+      "native_task_id": "aa-delegation-1795251122136-f3586ca6",
+      "state": "running",
+      "review_required": 0,
+      "error_code": null
+    },
+    "childRequests": [
+      {
+        "id": "aa-delegation-1795251122136-f3586ca6-round-1",
+        "state": "dispatched"
+      }
+    ],
+    "speakerRequests": [
+      {
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "ordinal": 1,
+        "state": "model_terminal"
+      },
+      {
+        "ordinal": 2,
+        "state": "model_terminal"
+      }
+    ],
+    "ledger": [
+      {
+        "step_index": -1,
+        "state": "pending",
+        "attempts": 0,
+        "reply_message_id": null
+      },
+      {
+        "step_index": 0,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_5d6ec7e5e70dc9b84a49db94f8a5bcaf5c7afe59"
+      },
+      {
+        "step_index": 1,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_200e5930a65e6a965e9c6504070f4d4c3025e036"
+      },
+      {
+        "step_index": 2,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_7984dbc7766da1fcd0ce3775df461678825db021"
+      }
+    ],
+    "provider": [
+      {
+        "member": "A"
+      },
+      {
+        "member": "B"
+      },
+      {
+        "role": "parent",
+        "round": 1
+      },
+      {
+        "role": "parent",
+        "round": 2
+      },
+      {
+        "role": "child",
+        "round": 1
+      }
+    ],
+    "pwa": {
+      "state": "blocked_config",
+      "stepCount": 3
+    },
+    "history": [
+      {
+        "id": "mobile_job_f1b3faec1c3859e24e211638f6ded014",
+        "role": "user"
+      },
+      {
+        "id": "reply_gstep_5d6ec7e5e70dc9b84a49db94f8a5bcaf5c7afe59",
+        "role": "assistant"
+      },
+      {
+        "id": "reply_gstep_200e5930a65e6a965e9c6504070f4d4c3025e036",
+        "role": "assistant"
+      },
+      {
+        "id": "reply_gstep_7984dbc7766da1fcd0ce3775df461678825db021",
+        "role": "assistant"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "mobile_job_f1b3faec1c3859e24e211638f6ded014",
+        "action": "upsert"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_gstep_5d6ec7e5e70dc9b84a49db94f8a5bcaf5c7afe59",
+        "action": "upsert"
+      },
+      {
+        "seq": 3,
+        "msg_id": "reply_gstep_200e5930a65e6a965e9c6504070f4d4c3025e036",
+        "action": "upsert"
+      },
+      {
+        "seq": 4,
+        "msg_id": "reply_gstep_7984dbc7766da1fcd0ce3775df461678825db021",
+        "action": "upsert"
+      }
+    ]
+  },
+  "acknowledgement": {
+    "http": 200,
+    "state": "cancelled",
+    "reviewResolved": true
+  },
+  "nextAdmission": {
+    "http": 202,
+    "workId": "request_22dc645210cc491ea64f90549d8fe583",
+    "originalAdmission": "abandoned",
+    "originalTask": "running",
+    "originalChildRequest": "dispatched"
+  },
+  "finalTask": {
+    "native_task_id": "aa-delegation-1795251122136-f3586ca6",
+    "state": "completed",
+    "review_required": 0,
+    "error_code": null
+  }
+}

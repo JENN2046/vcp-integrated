@@ -1,0 +1,44 @@
+{
+  "workId": "request_d8e7139a29f8401b85c38f738746da66",
+  "requestId": "reply_request_d8e7139a29f8401b85c38f738746da66",
+  "workState": "completed",
+  "contentSha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d",
+  "sources": {
+    "Plugin/NativeSync/sync/sharedCompaction.js": "c6244b099f9c17ad1c9a6844f73b6f383a38ce86785f462864145a84448c47ef",
+    "modules/nativeContinuationStore.cjs": "7fc167f26565cf1c4e76caf3ad804042a7a3f0ad85959ead8ce3f091b725dbe0"
+  },
+  "journalTombstone": {
+    "seq": 4,
+    "msg_id": "reply_request_d8e7139a29f8401b85c38f738746da66",
+    "action": "delete"
+  },
+  "beforeEdit": [
+    {
+      "id": "reply_request_d8e7139a29f8401b85c38f738746da66",
+      "role": "assistant",
+      "textVersion": "original"
+    }
+  ],
+  "afterEdit": [
+    {
+      "id": "reply_request_d8e7139a29f8401b85c38f738746da66",
+      "role": "assistant",
+      "textVersion": "edited"
+    },
+    {
+      "id": "native_evidence_dc376fd20a2d8c5287c81fa979f6580f",
+      "role": "assistant",
+      "textVersion": "original"
+    }
+  ],
+  "afterDelete": [
+    {
+      "id": "native_evidence_dc376fd20a2d8c5287c81fa979f6580f",
+      "role": "assistant",
+      "textVersion": "original"
+    }
+  ],
+  "deletedContentOfferedToCompactor": true,
+  "revision": "f00aa6d256a2bb7ef7fbc65fb2002728be7fea5c",
+  "providerCalls": 1
+}

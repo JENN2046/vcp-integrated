@@ -1,0 +1,289 @@
+{
+  "scenario": "late",
+  "node": "v24.22.3",
+  "browser": "Chrome/158.0.8127.36",
+  "workId": "request_f90bcb286bfb4c8e92c6f32311e98f15",
+  "requestId": "286c9e74-7204-4ed8-8501-a6e4c41f0d75",
+  "revision": "f00aa6d256a2bb7ef7fbc65fb2002728be7fea5c",
+  "sourceHashes": {
+    "mobile/groupTurn.js": "1d159c4a38d0b8247a59b8bec1318bc06ed25bb9ca0e6811392827049ff5bed7",
+    "sync/sharedTurns.js": "023986b7c439261fb2287809543b63a3ba962cf02c1c93197404c71eff4a6025",
+    "sync/sharedNative.js": "6eb7600e0f6212d5fb6569dafa257d28713b1adaea346236adbd8d8a4da88529",
+    "sync/sharedTaskRequests.js": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+  },
+  "whileChildRunning": {
+    "job": {
+      "state": "blocked_config",
+      "error_code": "SHARED_NATIVE_TERMINAL_REQUIRED",
+      "group_stop_index": null,
+      "review_resolved": 0
+    },
+    "admission": {
+      "state": "review_required",
+      "native_terminal": 0,
+      "reply_seq": 4
+    },
+    "task": {
+      "native_task_id": "aa-delegation-1795251098410-daabd69b",
+      "state": "running",
+      "review_required": 0,
+      "error_code": null
+    },
+    "childRequests": [
+      {
+        "id": "aa-delegation-1795251098410-daabd69b-round-1",
+        "state": "dispatched"
+      }
+    ],
+    "speakerRequests": [
+      {
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "ordinal": 1,
+        "state": "model_terminal"
+      },
+      {
+        "ordinal": 2,
+        "state": "model_terminal"
+      }
+    ],
+    "ledger": [
+      {
+        "step_index": -1,
+        "state": "pending",
+        "attempts": 0,
+        "reply_message_id": null
+      },
+      {
+        "step_index": 0,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_e102bdc43cc6a819676906fa20cd7ed943ffac26"
+      },
+      {
+        "step_index": 1,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_952b56b90a4fbb3054d58317ee4bdae935a7bc79"
+      },
+      {
+        "step_index": 2,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_b5b278eebc4a20726e07f2c9566bd000ce4a1d96"
+      }
+    ],
+    "provider": [
+      {
+        "member": "A"
+      },
+      {
+        "member": "B"
+      },
+      {
+        "role": "parent",
+        "round": 1
+      },
+      {
+        "role": "parent",
+        "round": 2
+      },
+      {
+        "role": "child",
+        "round": 1
+      }
+    ],
+    "pwa": {
+      "state": "blocked_config",
+      "stepCount": 3
+    },
+    "history": [
+      {
+        "id": "mobile_job_7cbc41f48050041318477f8a14035650",
+        "role": "user"
+      },
+      {
+        "id": "reply_gstep_e102bdc43cc6a819676906fa20cd7ed943ffac26",
+        "role": "assistant"
+      },
+      {
+        "id": "reply_gstep_952b56b90a4fbb3054d58317ee4bdae935a7bc79",
+        "role": "assistant"
+      },
+      {
+        "id": "reply_gstep_b5b278eebc4a20726e07f2c9566bd000ce4a1d96",
+        "role": "assistant"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "mobile_job_7cbc41f48050041318477f8a14035650",
+        "action": "upsert"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_gstep_e102bdc43cc6a819676906fa20cd7ed943ffac26",
+        "action": "upsert"
+      },
+      {
+        "seq": 3,
+        "msg_id": "reply_gstep_952b56b90a4fbb3054d58317ee4bdae935a7bc79",
+        "action": "upsert"
+      },
+      {
+        "seq": 4,
+        "msg_id": "reply_gstep_b5b278eebc4a20726e07f2c9566bd000ce4a1d96",
+        "action": "upsert"
+      }
+    ]
+  },
+  "observationDelayAfterChildTerminalMs": 4400,
+  "afterChildReturns": {
+    "job": {
+      "state": "blocked_config",
+      "error_code": "SHARED_NATIVE_TERMINAL_REQUIRED",
+      "group_stop_index": null,
+      "review_resolved": 0
+    },
+    "admission": {
+      "state": "review_required",
+      "native_terminal": 0,
+      "reply_seq": 4
+    },
+    "task": {
+      "native_task_id": "aa-delegation-1795251098410-daabd69b",
+      "state": "completed",
+      "review_required": 0,
+      "error_code": null
+    },
+    "childRequests": [
+      {
+        "id": "aa-delegation-1795251098410-daabd69b-round-1",
+        "state": "model_terminal"
+      }
+    ],
+    "speakerRequests": [
+      {
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "ordinal": 1,
+        "state": "model_terminal"
+      },
+      {
+        "ordinal": 2,
+        "state": "model_terminal"
+      }
+    ],
+    "ledger": [
+      {
+        "step_index": -1,
+        "state": "pending",
+        "attempts": 0,
+        "reply_message_id": null
+      },
+      {
+        "step_index": 0,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_e102bdc43cc6a819676906fa20cd7ed943ffac26"
+      },
+      {
+        "step_index": 1,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_952b56b90a4fbb3054d58317ee4bdae935a7bc79"
+      },
+      {
+        "step_index": 2,
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_b5b278eebc4a20726e07f2c9566bd000ce4a1d96"
+      }
+    ],
+    "provider": [
+      {
+        "member": "A"
+      },
+      {
+        "member": "B"
+      },
+      {
+        "role": "parent",
+        "round": 1
+      },
+      {
+        "role": "parent",
+        "round": 2
+      },
+      {
+        "role": "child",
+        "round": 1
+      }
+    ],
+    "pwa": {
+      "state": "blocked_config",
+      "stepCount": 3
+    },
+    "history": [
+      {
+        "id": "mobile_job_7cbc41f48050041318477f8a14035650",
+        "role": "user"
+      },
+      {
+        "id": "reply_gstep_e102bdc43cc6a819676906fa20cd7ed943ffac26",
+        "role": "assistant"
+      },
+      {
+        "id": "reply_gstep_952b56b90a4fbb3054d58317ee4bdae935a7bc79",
+        "role": "assistant"
+      },
+      {
+        "id": "reply_gstep_b5b278eebc4a20726e07f2c9566bd000ce4a1d96",
+        "role": "assistant"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "mobile_job_7cbc41f48050041318477f8a14035650",
+        "action": "upsert"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_gstep_e102bdc43cc6a819676906fa20cd7ed943ffac26",
+        "action": "upsert"
+      },
+      {
+        "seq": 3,
+        "msg_id": "reply_gstep_952b56b90a4fbb3054d58317ee4bdae935a7bc79",
+        "action": "upsert"
+      },
+      {
+        "seq": 4,
+        "msg_id": "reply_gstep_b5b278eebc4a20726e07f2c9566bd000ce4a1d96",
+        "action": "upsert"
+      }
+    ]
+  },
+  "nextAdmission": {
+    "http": 409,
+    "code": "DEPENDENCY_REVIEW_REQUIRED"
+  },
+  "replay": {
+    "http": 202,
+    "replayed": true,
+    "sameWork": true
+  },
+  "afterRestart": {
+    "nativeSyncReady": false,
+    "nativeSyncErrors": [
+      "[PluginManager] Error initializing module for NativeSync: SHARED_NATIVE_TERMINAL_REQUIRED",
+      "at Object.recover (<isolated-runtime>/runtime-box/Plugin/NativeSync/mobile/groupTurn.js:154:84)"
+    ]
+  }
+}

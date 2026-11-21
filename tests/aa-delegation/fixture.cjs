@@ -55,7 +55,10 @@ function writeCompletion(body, res, content) {
     }));
 }
 
-async function startFixture({ out, candidate, trace = () => {}, serverRevision, ...serviceOptions }) {
+async function startFixture({
+    out, candidate, trace = () => {}, serverRevision, selectParent = () => true,
+    singleChildRound = false, beforeParentFinal, ...serviceOptions
+}) {
     const cert = path.join(out, 'loopback-cert.pem');
     const key = path.join(out, 'loopback-key.pem');
     execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
@@ -69,6 +72,7 @@ async function startFixture({ out, candidate, trace = () => {}, serverRevision, 
     const delegation = {
         stage,
         classify(body, row) {
+            if (body.model !== childModel && !selectParent(body)) return false;
             const users = body.messages.filter(message => message.role === 'user')
                 .map(message => JSON.stringify(message.content));
             const marker = users.map(user => Object.values(markers).find(value => user.includes(value)))
@@ -85,8 +89,9 @@ async function startFixture({ out, candidate, trace = () => {}, serverRevision, 
             if (row.role === 'child') {
                 row.launch = row.round === 1 || !body.messages.some(message => message.role === 'assistant');
                 if (row.round === 1) {
-                    // The second child round demonstrates a heartbeat on the same launch.
                     await Promise.race([gates.get(row.marker).ready, new Promise(resolve => res.once('close', resolve))]);
+                    if (singleChildRound) return writeCompletion(body, res, '[[Flowlock::Complete]]\n' + childReport);
+                    // The second child round demonstrates a heartbeat on the same launch.
                     return writeCompletion(body, res, '[[Flowlock::Start]][[Flowlock::NextHeartbeat::1]]');
                 }
                 return writeCompletion(body, res, '[[Flowlock::Complete]]\n' + childReport);
@@ -95,6 +100,9 @@ async function startFixture({ out, candidate, trace = () => {}, serverRevision, 
                 message.role === 'user' && JSON.stringify(message.content).includes(row.marker)) + 1);
             const placeholders = toolMessages.flatMap(message => [...JSON.stringify(message.content).matchAll(placeholderPattern)]);
             if (placeholders.length) {
+                await beforeParentFinal?.({
+                    waitForChildDispatch: () => waitUntil(() => gates.get(row.marker).childRounds > 0, 'AA child provider dispatch'),
+                });
                 row.delegationId = placeholders.at(-1)[1];
                 return writeCompletion(body, res, parentText + '\n' + placeholders.at(-1)[0]);
             }
