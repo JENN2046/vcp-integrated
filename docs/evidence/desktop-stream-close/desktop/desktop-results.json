@@ -1,0 +1,623 @@
+{
+  "mode": "desktop-stream-close",
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "A-reopened": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "B-reopened": {
+      "code": 0,
+      "signal": null
+    },
+    "C": {
+      "code": 0,
+      "signal": null
+    },
+    "C-reopened": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "failures": [],
+  "B": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cds": {
+      "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    }
+  },
+  "A": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cds": {
+      "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    }
+  },
+  "C": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cds": {
+      "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    }
+  },
+  "desktopStreamClose": {
+    "revision": "95cc27e18198a848622e50992c4fb4d8a2be3969",
+    "streams": {
+      "A": {
+        "requestId": "admission_0f957571-3d2c-414a-8137-ebf014d68b5f",
+        "attempts": 1,
+        "at": 1795278347949,
+        "frames": [
+          {
+            "kind": "delta",
+            "text": "合成终稿：收到 DONE 后连接仍打开。"
+          },
+          {
+            "kind": "done",
+            "at": 1795278348516
+          }
+        ],
+        "closedAt": 1795278348521,
+        "serverEnded": false
+      },
+      "B": {
+        "requestId": "admission_25dda1c6-200e-440c-8969-eb1465602964",
+        "attempts": 1,
+        "at": 1795278352342,
+        "frames": [
+          {
+            "kind": "delta",
+            "text": "合成可见正文：随后连接断开。"
+          }
+        ],
+        "cutAt": 1795278352992,
+        "closedAt": 1795278352993,
+        "serverEnded": false
+      },
+      "C": {
+        "requestId": "admission_3ceb4cab-7c04-4369-b508-27c76fb1787d",
+        "attempts": 1,
+        "at": 1795278356666,
+        "frames": [
+          {
+            "kind": "delta",
+            "text": "合成可见正文：随后点击停止。"
+          }
+        ],
+        "closedAt": 1795278357185,
+        "serverEnded": false
+      }
+    },
+    "receipts": [
+      {
+        "requestId": "admission_3ceb4cab-7c04-4369-b508-27c76fb1787d",
+        "at": 1795278357183,
+        "acceptedStatus": 200,
+        "ackTruncated": true
+      }
+    ],
+    "windows": {
+      "A": {
+        "loaded": {
+          "url": "file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/main.html",
+          "main": [
+            {
+              "file": "apps/desktop/modules/services/senderTaskRegistry.js",
+              "sha256": "d353a51d9b2cff7417db3b4618ba082b4ed771f206a8eaca77ae23480abf55f3"
+            },
+            {
+              "file": "apps/desktop/modules/ipc/chatHandlers.js",
+              "sha256": "6eb541cf4d16f62b108784f496a4dc2163dbbbae00b16771b51f26268cf464cb"
+            }
+          ],
+          "renderer": [
+            {
+              "file": "apps/desktop/modules/renderer/mainChatStreamConsumer.js",
+              "bytes": 9303,
+              "sha256": "72936e1a8b27a91326102ea5a07d44fb9e254e72ef0b71adb8132ba4c57d90dd"
+            }
+          ]
+        },
+        "liveHistory": [
+          {
+            "role": "user",
+            "name": "用户",
+            "content": "SYNTHETIC_DONE_OPEN",
+            "timestamp": 1795278347897,
+            "id": "msg_1795278347863_user_ubj7609my7",
+            "attachments": []
+          }
+        ],
+        "history": [
+          {
+            "role": "user",
+            "name": "用户",
+            "content": "SYNTHETIC_DONE_OPEN",
+            "timestamp": 1795278347897,
+            "id": "msg_1795278347863_user_ubj7609my7",
+            "attachments": []
+          },
+          {
+            "id": "admission_0f957571-3d2c-414a-8137-ebf014d68b5f",
+            "role": "assistant",
+            "name": "Synthetic local",
+            "agentId": "local-agent",
+            "topicId": "local-topic",
+            "admissionToken": "0f957571-3d2c-414a-8137-ebf014d68b5f",
+            "context": {
+              "agentId": "local-agent",
+              "topicId": "local-topic",
+              "itemType": "agent",
+              "agentName": "Synthetic local",
+              "avatarUrl": null,
+              "admissionToken": "0f957571-3d2c-414a-8137-ebf014d68b5f",
+              "nativeCausalContext": {
+                "version": 1,
+                "known": true,
+                "dependsOnMessageIds": [
+                  "msg_1795278347863_user_ubj7609my7"
+                ]
+              },
+              "isGroupMessage": false
+            },
+            "avatarUrl": null,
+            "content": "合成终稿：收到 DONE 后连接仍打开。",
+            "isThinking": false,
+            "timestamp": 1795278347953,
+            "streamOperationId": "admission_0f957571-3d2c-414a-8137-ebf014d68b5f:mwqmdiua:wk50ai9s",
+            "isGroupMessage": false,
+            "finishReason": "completed",
+            "admissionTerminal": true
+          }
+        ],
+        "admission": {
+          "version": 2,
+          "entries": [],
+          "standaloneLeases": []
+        },
+        "rendererTerminals": [
+          {
+            "type": "completed",
+            "messageId": "admission_0f957571-3d2c-414a-8137-ebf014d68b5f"
+          }
+        ],
+        "reader": [
+          {
+            "event": "desktop-stream-reader",
+            "t": 1795278348521,
+            "data": {
+              "method": "cancel",
+              "requestId": "admission_0f957571-3d2c-414a-8137-ebf014d68b5f",
+              "locked": true
+            }
+          },
+          {
+            "event": "desktop-stream-reader",
+            "t": 1795278348522,
+            "data": {
+              "method": "releaseLock",
+              "requestId": "admission_0f957571-3d2c-414a-8137-ebf014d68b5f",
+              "locked": false
+            }
+          }
+        ],
+        "tasks": [
+          {
+            "event": "desktop-stream-task",
+            "t": 1795278347938,
+            "data": {
+              "method": "begin",
+              "requestId": "admission_0f957571-3d2c-414a-8137-ebf014d68b5f",
+              "active": [
+                {
+                  "senderId": 1,
+                  "requestId": "admission_0f957571-3d2c-414a-8137-ebf014d68b5f",
+                  "operation": "chat:stream",
+                  "state": "running",
+                  "cancelOnNavigation": true,
+                  "ageMs": 0
+                }
+              ]
+            }
+          },
+          {
+            "event": "desktop-stream-task",
+            "t": 1795278348519,
+            "data": {
+              "method": "finish",
+              "requestId": "admission_0f957571-3d2c-414a-8137-ebf014d68b5f",
+              "active": []
+            }
+          }
+        ],
+        "stopResults": [],
+        "desktopTerminals": [
+          {
+            "event": "renderer-event",
+            "t": 1795278348519,
+            "data": {
+              "channel": "vcp-stream-event",
+              "sender": 1,
+              "type": "end",
+              "messageId": "admission_0f957571-3d2c-414a-8137-ebf014d68b5f",
+              "modelFinishReason": null
+            }
+          }
+        ],
+        "transcript": "话题创建于 1970-01-01 08:00\n用户\n2026-11-22 00:25\n\nSYNTHETIC_DONE_OPEN\n\nSynthetic local\n2026-11-22 00:25\n\n合成终稿：收到 DONE 后连接仍打开。",
+        "composer": {
+          "disabled": false,
+          "label": "发送消息",
+          "mode": "send"
+        },
+        "reopened": {
+          "textVisible": true,
+          "historyUnchanged": true,
+          "admissionUnchanged": true
+        }
+      },
+      "B": {
+        "loaded": {
+          "url": "file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/main.html",
+          "main": [
+            {
+              "file": "apps/desktop/modules/services/senderTaskRegistry.js",
+              "sha256": "d353a51d9b2cff7417db3b4618ba082b4ed771f206a8eaca77ae23480abf55f3"
+            },
+            {
+              "file": "apps/desktop/modules/ipc/chatHandlers.js",
+              "sha256": "6eb541cf4d16f62b108784f496a4dc2163dbbbae00b16771b51f26268cf464cb"
+            }
+          ],
+          "renderer": [
+            {
+              "file": "apps/desktop/modules/renderer/mainChatStreamConsumer.js",
+              "bytes": 9303,
+              "sha256": "72936e1a8b27a91326102ea5a07d44fb9e254e72ef0b71adb8132ba4c57d90dd"
+            }
+          ]
+        },
+        "liveHistory": [
+          {
+            "role": "user",
+            "name": "用户",
+            "content": "SYNTHETIC_TRANSPORT_CUT",
+            "timestamp": 1795278352288,
+            "id": "msg_1795278352260_user_w8grknr9pl",
+            "attachments": []
+          }
+        ],
+        "history": [
+          {
+            "role": "user",
+            "name": "用户",
+            "content": "SYNTHETIC_TRANSPORT_CUT",
+            "timestamp": 1795278352288,
+            "id": "msg_1795278352260_user_w8grknr9pl",
+            "attachments": []
+          }
+        ],
+        "admission": {
+          "version": 2,
+          "entries": [
+            {
+              "entryId": "ed6c1616-f4cb-471a-930c-4616cfae4ad4",
+              "scope": {
+                "itemId": "local-agent",
+                "itemType": "agent",
+                "topicId": "local-topic"
+              },
+              "message": {
+                "role": "user",
+                "name": "用户",
+                "content": "SYNTHETIC_TRANSPORT_CUT",
+                "timestamp": 1795278352268,
+                "id": "msg_1795278352260_user_w8grknr9pl",
+                "attachments": []
+              },
+              "requestId": "msg_1795278352260_user_w8grknr9pl",
+              "triggerPolicy": "reply",
+              "invitePrompt": "",
+              "enqueuedAt": 1795278352282,
+              "state": "uncertain",
+              "error": "MODEL_RESPONSE_INCOMPLETE_REVIEW_REQUIRED",
+              "deferred": false,
+              "commitStarted": true,
+              "committed": true,
+              "leaseToken": "25dda1c6-200e-440c-8969-eb1465602964",
+              "reviewPartial": {
+                "text": "合成可见正文：随后连接断开。",
+                "truncated": false
+              }
+            }
+          ],
+          "standaloneLeases": []
+        },
+        "rendererTerminals": [
+          {
+            "type": "error",
+            "messageId": "admission_25dda1c6-200e-440c-8969-eb1465602964"
+          }
+        ],
+        "reader": [
+          {
+            "event": "desktop-stream-reader",
+            "t": 1795278352995,
+            "data": {
+              "method": "cancel",
+              "requestId": "admission_25dda1c6-200e-440c-8969-eb1465602964",
+              "locked": true
+            }
+          },
+          {
+            "event": "desktop-stream-reader",
+            "t": 1795278352996,
+            "data": {
+              "method": "releaseLock",
+              "requestId": "admission_25dda1c6-200e-440c-8969-eb1465602964",
+              "locked": false
+            }
+          }
+        ],
+        "tasks": [
+          {
+            "event": "desktop-stream-task",
+            "t": 1795278352332,
+            "data": {
+              "method": "begin",
+              "requestId": "admission_25dda1c6-200e-440c-8969-eb1465602964",
+              "active": [
+                {
+                  "senderId": 1,
+                  "requestId": "admission_25dda1c6-200e-440c-8969-eb1465602964",
+                  "operation": "chat:stream",
+                  "state": "running",
+                  "cancelOnNavigation": true,
+                  "ageMs": 0
+                }
+              ]
+            }
+          },
+          {
+            "event": "desktop-stream-task",
+            "t": 1795278352995,
+            "data": {
+              "method": "finish",
+              "requestId": "admission_25dda1c6-200e-440c-8969-eb1465602964",
+              "active": []
+            }
+          }
+        ],
+        "stopResults": [],
+        "desktopTerminals": [
+          {
+            "event": "renderer-event",
+            "t": 1795278352995,
+            "data": {
+              "channel": "vcp-stream-event",
+              "sender": 1,
+              "type": "error",
+              "messageId": "admission_25dda1c6-200e-440c-8969-eb1465602964",
+              "code": "STREAM_READ_ERROR"
+            }
+          }
+        ],
+        "transcript": "话题创建于 1970-01-01 08:00\n用户\n2026-11-22 00:25\n\nSYNTHETIC_TRANSPORT_CUT\n\nSynthetic local\n2026-11-22 00:25\n\n合成可见正文：随后连接断开。\n\n[!WARNING]\n流式响应中断: terminated。已保留收到的部分内容，本轮仍待核实。\n\n流错误: terminated",
+        "composer": {
+          "disabled": false,
+          "label": "发送消息",
+          "mode": "send"
+        },
+        "reopened": {
+          "textVisible": true,
+          "historyUnchanged": true,
+          "admissionUnchanged": true
+        }
+      },
+      "C": {
+        "loaded": {
+          "url": "file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/main.html",
+          "main": [
+            {
+              "file": "apps/desktop/modules/services/senderTaskRegistry.js",
+              "sha256": "d353a51d9b2cff7417db3b4618ba082b4ed771f206a8eaca77ae23480abf55f3"
+            },
+            {
+              "file": "apps/desktop/modules/ipc/chatHandlers.js",
+              "sha256": "6eb541cf4d16f62b108784f496a4dc2163dbbbae00b16771b51f26268cf464cb"
+            }
+          ],
+          "renderer": [
+            {
+              "file": "apps/desktop/modules/renderer/mainChatStreamConsumer.js",
+              "bytes": 9303,
+              "sha256": "72936e1a8b27a91326102ea5a07d44fb9e254e72ef0b71adb8132ba4c57d90dd"
+            }
+          ]
+        },
+        "liveHistory": [
+          {
+            "role": "user",
+            "name": "用户",
+            "content": "SYNTHETIC_STOP_ACK_LOST",
+            "timestamp": 1795278356615,
+            "id": "msg_1795278356588_user_pr5dzp7u8s",
+            "attachments": []
+          }
+        ],
+        "history": [
+          {
+            "role": "user",
+            "name": "用户",
+            "content": "SYNTHETIC_STOP_ACK_LOST",
+            "timestamp": 1795278356615,
+            "id": "msg_1795278356588_user_pr5dzp7u8s",
+            "attachments": []
+          }
+        ],
+        "admission": {
+          "version": 2,
+          "entries": [
+            {
+              "entryId": "70257f64-a8e9-4e21-a609-14ebde90e944",
+              "scope": {
+                "itemId": "local-agent",
+                "itemType": "agent",
+                "topicId": "local-topic"
+              },
+              "message": {
+                "role": "user",
+                "name": "用户",
+                "content": "SYNTHETIC_STOP_ACK_LOST",
+                "timestamp": 1795278356597,
+                "id": "msg_1795278356588_user_pr5dzp7u8s",
+                "attachments": []
+              },
+              "requestId": "msg_1795278356588_user_pr5dzp7u8s",
+              "triggerPolicy": "reply",
+              "invitePrompt": "",
+              "enqueuedAt": 1795278356611,
+              "state": "uncertain",
+              "error": "MODEL_RESPONSE_INCOMPLETE_REVIEW_REQUIRED",
+              "deferred": false,
+              "commitStarted": true,
+              "committed": true,
+              "leaseToken": "3ceb4cab-7c04-4369-b508-27c76fb1787d",
+              "reviewPartial": {
+                "text": "合成可见正文：随后点击停止。",
+                "truncated": false
+              }
+            }
+          ],
+          "standaloneLeases": []
+        },
+        "rendererTerminals": [
+          {
+            "type": "failed",
+            "messageId": "admission_3ceb4cab-7c04-4369-b508-27c76fb1787d"
+          }
+        ],
+        "reader": [
+          {
+            "event": "desktop-stream-reader",
+            "t": 1795278357186,
+            "data": {
+              "method": "cancel",
+              "requestId": "admission_3ceb4cab-7c04-4369-b508-27c76fb1787d",
+              "locked": true
+            }
+          },
+          {
+            "event": "desktop-stream-reader",
+            "t": 1795278357187,
+            "data": {
+              "method": "releaseLock",
+              "requestId": "admission_3ceb4cab-7c04-4369-b508-27c76fb1787d",
+              "locked": false
+            }
+          }
+        ],
+        "tasks": [
+          {
+            "event": "desktop-stream-task",
+            "t": 1795278356655,
+            "data": {
+              "method": "begin",
+              "requestId": "admission_3ceb4cab-7c04-4369-b508-27c76fb1787d",
+              "active": [
+                {
+                  "senderId": 1,
+                  "requestId": "admission_3ceb4cab-7c04-4369-b508-27c76fb1787d",
+                  "operation": "chat:stream",
+                  "state": "running",
+                  "cancelOnNavigation": true,
+                  "ageMs": 0
+                }
+              ]
+            }
+          },
+          {
+            "event": "desktop-stream-task",
+            "t": 1795278357185,
+            "data": {
+              "method": "cancel",
+              "requestId": "admission_3ceb4cab-7c04-4369-b508-27c76fb1787d",
+              "active": [
+                {
+                  "senderId": 1,
+                  "requestId": "admission_3ceb4cab-7c04-4369-b508-27c76fb1787d",
+                  "operation": "chat:stream",
+                  "state": "cancelling",
+                  "cancelOnNavigation": true,
+                  "ageMs": 530
+                }
+              ],
+              "reason": "interrupt-local-fallback"
+            }
+          },
+          {
+            "event": "desktop-stream-task",
+            "t": 1795278357186,
+            "data": {
+              "method": "finish",
+              "requestId": "admission_3ceb4cab-7c04-4369-b508-27c76fb1787d",
+              "active": []
+            }
+          }
+        ],
+        "stopResults": [
+          {
+            "event": "desktop-stop-receipt",
+            "t": 1795278357187,
+            "data": {
+              "requestId": "admission_3ceb4cab-7c04-4369-b508-27c76fb1787d",
+              "success": false,
+              "error": "terminated"
+            }
+          }
+        ],
+        "desktopTerminals": [],
+        "transcript": "话题创建于 1970-01-01 08:00\n用户\n2026-11-22 00:25\n\nSYNTHETIC_STOP_ACK_LOST\n\nSynthetic local\n2026-11-22 00:25\n\n合成可见正文：随后点击停止。\n\n流错误: MODEL_RESPONSE_INCOMPLETE_REVIEW_REQUIRED",
+        "composer": {
+          "disabled": false,
+          "label": "发送消息",
+          "mode": "send"
+        },
+        "reopened": {
+          "textVisible": true,
+          "historyUnchanged": true,
+          "admissionUnchanged": true
+        }
+      }
+    }
+  },
+  "A-reopened": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cds": {
+      "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    }
+  },
+  "B-reopened": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cds": {
+      "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    }
+  },
+  "C-reopened": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cds": {
+      "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    }
+  }
+}

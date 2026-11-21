@@ -1,0 +1,38 @@
+diff --git a/apps/desktop/modules/ipc/chatHandlers.js b/apps/desktop/modules/ipc/chatHandlers.js
+index 85486cd..ae19412 100644
+--- a/apps/desktop/modules/ipc/chatHandlers.js
++++ b/apps/desktop/modules/ipc/chatHandlers.js
+@@ -1519,7 +1519,6 @@ function initialize(mainWindow, context) {
+                 console.log(`VCP响应: 开始流式处理 for ${messageId} on channel ${streamChannel}`);
+                 const reader = response.body.getReader();
+-                const decoder = new TextDecoder();
+
+-                async function processStream(reader, decoder) {
++                async function processStream() {
+                     let bodyReachedEOF = false;
+                     try {
+@@ -1556,6 +1555,15 @@ function initialize(mainWindow, context) {
+                     } finally {
+                         finishStreamTask();
+-                        if (!bodyReachedEOF) void Promise.resolve(reader.cancel()).catch(() => {});
+-                        try { reader.releaseLock(); } catch (_) {}
++                        const reportCancelFailure = error => {
++                            console.warn(`[Main - sendToVCP] Failed to cancel response body for ${messageId}:`, String(error));
++                        };
++                        try {
++                            // An upstream cancel promise can outlive this request. Release the local reader immediately.
++                            if (!bodyReachedEOF) void Promise.resolve(reader.cancel()).catch(reportCancelFailure);
++                        } catch (error) {
++                            reportCancelFailure(error);
++                        } finally {
++                            try { reader.releaseLock(); } catch (_) {}
++                        }
+                     }
+                 }
+@@ -1564,5 +1572,5 @@ function initialize(mainWindow, context) {
+                 // terminal delivery and response cleanup.
+                 streamTaskDetached = true;
+-                processStream(reader, decoder).then(() => {
++                processStream().then(() => {
+                     console.log(`[Main - sendToVCP] 流处理函数 processStream 已正常结束 for ${messageId}`);
+                 }).catch(err => {

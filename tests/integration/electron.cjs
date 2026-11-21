@@ -18,6 +18,9 @@ const log = (event, data) => console.log('NS_MEASURE', JSON.stringify({event,t:D
 let detailed = false;
 const fs = require('node:fs');
 const path = require('node:path');
+if (process.env.NS_DESKTOP_STREAM_CLOSE === '1') {
+    require('../desktop-stream-close/observe.cjs').install(ipcMain, process.env.NS_HOST, log);
+}
 const compactionRace = process.env.NS_COMPACTION_HISTORY_RACE === '1'
     ? require('../compact-e2e/history-race.cjs').install(process.env.VCPCHAT_APP_DATA_DIR, log) : null;
 app.setAppPath(process.env.NS_HOST);
@@ -112,6 +115,7 @@ app.on('web-contents-created', (_event, contents) => {
             const session = payload?.serverSession;
             log('renderer-event', { channel, sender:contents.id,
                 type:channel === 'vcp-stream-event' ? payload?.type : undefined,
+                messageId:process.env.NS_DESKTOP_STREAM_CLOSE === '1' && channel === 'vcp-stream-event' ? payload?.messageId : undefined,
                 modelFinishReason:channel === 'vcp-stream-event' ? payload?.modelFinishReason : undefined,
                 code:channel === 'vcp-stream-event' ? payload?.code : undefined,
                 textLength:typeof session?.text === 'string' ? session.text.length : undefined,

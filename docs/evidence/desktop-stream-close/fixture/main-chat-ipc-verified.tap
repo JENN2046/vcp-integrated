@@ -1,0 +1,121 @@
+TAP version 13
+# (node:97050) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: failed interruption (rejected) releases the caller's HTTP reader without a duplicate terminal
+ok 1 - failed interruption (rejected) releases the caller's HTTP reader without a duplicate terminal
+  ---
+  duration_ms: 38.355559
+  type: 'test'
+  ...
+# Subtest: failed interruption (transport-error) releases the caller's HTTP reader without a duplicate terminal
+ok 2 - failed interruption (transport-error) releases the caller's HTTP reader without a duplicate terminal
+  ---
+  duration_ms: 12.305851
+  type: 'test'
+  ...
+# Subtest: failed interruption (missing-settings) releases the caller's HTTP reader without a duplicate terminal
+ok 3 - failed interruption (missing-settings) releases the caller's HTTP reader without a duplicate terminal
+  ---
+  duration_ms: 11.944976
+  type: 'test'
+  ...
+# Subtest: failed interruption (hung) releases the caller's HTTP reader without a duplicate terminal
+ok 4 - failed interruption (hung) releases the caller's HTTP reader without a duplicate terminal
+  ---
+  duration_ms: 33.213593
+  type: 'test'
+  ...
+# Subtest: accepted interruption retains producer terminal delivery and its received content
+ok 5 - accepted interruption retains producer terminal delivery and its received content
+  ---
+  duration_ms: 23.47636
+  type: 'test'
+  ...
+# Subtest: failed interruption from another IPC window cannot abort the original HTTP reader
+ok 6 - failed interruption from another IPC window cannot abort the original HTTP reader
+  ---
+  duration_ms: 1.719523
+  type: 'test'
+  ...
+# Subtest: DONE before EOF cancels the actual response body and retains a single end event
+ok 7 - DONE before EOF cancels the actual response body and retains a single end event
+  ---
+  duration_ms: 11.815525
+  type: 'test'
+  ...
+# Subtest: normal EOF preserves a final partial SSE line and does not cancel a completed body
+ok 8 - normal EOF preserves a final partial SSE line and does not cancel a completed body
+  ---
+  duration_ms: 11.334356
+  type: 'test'
+  ...
+# Subtest: read failure remains the primary terminal error when cancellation also rejects
+ok 9 - read failure remains the primary terminal error when cancellation also rejects
+  ---
+  duration_ms: 12.23061
+  type: 'test'
+  ...
+# Subtest: rejected cancellation is reported without duplicating the successful terminal event
+ok 10 - rejected cancellation is reported without duplicating the successful terminal event
+  ---
+  duration_ms: 12.77148
+  type: 'test'
+  ...
+# Subtest: pending old cancellation does not retain its reader or finish a reused message task
+ok 11 - pending old cancellation does not retain its reader or finish a reused message task
+  ---
+  duration_ms: 23.601906
+  type: 'test'
+  ...
+# Subtest: a synchronous reader cancellation failure still releases ownership and the lock
+ok 12 - a synchronous reader cancellation failure still releases ownership and the lock
+  ---
+  duration_ms: 11.89396
+  type: 'test'
+  ...
+# Subtest: a non-Error cancellation rejection cannot throw from the cleanup reporter
+ok 13 - a non-Error cancellation rejection cannot throw from the cleanup reporter
+  ---
+  duration_ms: 11.272501
+  type: 'test'
+  ...
+# Subtest: DONE closes a real local HTTP response which the server deliberately leaves open
+ok 14 - DONE closes a real local HTTP response which the server deliberately leaves open
+  ---
+  duration_ms: 34.053592
+  type: 'test'
+  ...
+# Subtest: a real HTTP disconnect after a data chunk emits one read error and releases the task
+ok 15 - a real HTTP disconnect after a data chunk emits one read error and releases the task
+  ---
+  duration_ms: 26.368224
+  type: 'test'
+  ...
+# [ContextSanitizer] Processed 1 AI messages out of 2 total messages
+# Subtest: sender navigation aborts the real HTTP stream without delivering into the next document
+ok 16 - sender navigation aborts the real HTTP stream without delivering into the next document
+  ---
+  duration_ms: 24.972987
+  type: 'test'
+  ...
+# Subtest: checkpoint text survives sanitizers and its private protection flag stays local
+ok 17 - checkpoint text survives sanitizers and its private protection flag stays local
+  ---
+  duration_ms: 12.871979
+  type: 'test'
+  ...
+# Subtest: the streamed request body does not ask the server for stream usage
+ok 18 - the streamed request body does not ask the server for stream usage
+  ---
+  duration_ms: 12.047328
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2156.769899

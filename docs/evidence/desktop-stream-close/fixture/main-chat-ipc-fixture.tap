@@ -1,0 +1,169 @@
+TAP version 13
+# (node:95245) ExperimentalWarning: vm.USE_MAIN_CONTEXT_DEFAULT_LOADER is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: failed interruption (rejected) releases the caller's HTTP reader without a duplicate terminal
+ok 1 - failed interruption (rejected) releases the caller's HTTP reader without a duplicate terminal
+  ---
+  duration_ms: 42.486462
+  type: 'test'
+  ...
+# Subtest: failed interruption (transport-error) releases the caller's HTTP reader without a duplicate terminal
+ok 2 - failed interruption (transport-error) releases the caller's HTTP reader without a duplicate terminal
+  ---
+  duration_ms: 11.702352
+  type: 'test'
+  ...
+# Subtest: failed interruption (missing-settings) releases the caller's HTTP reader without a duplicate terminal
+ok 3 - failed interruption (missing-settings) releases the caller's HTTP reader without a duplicate terminal
+  ---
+  duration_ms: 11.845048
+  type: 'test'
+  ...
+# Subtest: failed interruption (hung) releases the caller's HTTP reader without a duplicate terminal
+ok 4 - failed interruption (hung) releases the caller's HTTP reader without a duplicate terminal
+  ---
+  duration_ms: 32.27207
+  type: 'test'
+  ...
+# Subtest: accepted interruption retains producer terminal delivery and its received content
+ok 5 - accepted interruption retains producer terminal delivery and its received content
+  ---
+  duration_ms: 24.914084
+  type: 'test'
+  ...
+# Subtest: failed interruption from another IPC window cannot abort the original HTTP reader
+ok 6 - failed interruption from another IPC window cannot abort the original HTTP reader
+  ---
+  duration_ms: 3.287742
+  type: 'test'
+  ...
+# Subtest: DONE before EOF cancels the actual response body and retains a single end event
+ok 7 - DONE before EOF cancels the actual response body and retains a single end event
+  ---
+  duration_ms: 12.529658
+  type: 'test'
+  ...
+# Subtest: normal EOF preserves a final partial SSE line and does not cancel a completed body
+ok 8 - normal EOF preserves a final partial SSE line and does not cancel a completed body
+  ---
+  duration_ms: 11.404135
+  type: 'test'
+  ...
+# Subtest: read failure remains the primary terminal error when cancellation also rejects
+ok 9 - read failure remains the primary terminal error when cancellation also rejects
+  ---
+  duration_ms: 11.521584
+  type: 'test'
+  ...
+# Subtest: rejected cancellation is reported without duplicating the successful terminal event
+not ok 10 - rejected cancellation is reported without duplicating the successful terminal event
+  ---
+  duration_ms: 13.993442
+  type: 'test'
+  location: '/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/tests/main-chat-response-body.test.mjs:199:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    0 !== 1
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/tests/main-chat-response-body.test.mjs:208:16)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: pending old cancellation does not retain its reader or finish a reused message task
+ok 11 - pending old cancellation does not retain its reader or finish a reused message task
+  ---
+  duration_ms: 23.96438
+  type: 'test'
+  ...
+# Subtest: a synchronous reader cancellation failure still releases ownership and the lock
+not ok 12 - a synchronous reader cancellation failure still releases ownership and the lock
+  ---
+  duration_ms: 12.055942
+  type: 'test'
+  location: '/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/tests/main-chat-response-body.test.mjs:244:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    0 !== 1
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/tests/main-chat-response-body.test.mjs:251:16)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a non-Error cancellation rejection cannot throw from the cleanup reporter
+not ok 13 - a non-Error cancellation rejection cannot throw from the cleanup reporter
+  ---
+  duration_ms: 11.595052
+  type: 'test'
+  location: '/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/tests/main-chat-response-body.test.mjs:257:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    0 !== 1
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/tests/main-chat-response-body.test.mjs:263:16)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: DONE closes a real local HTTP response which the server deliberately leaves open
+ok 14 - DONE closes a real local HTTP response which the server deliberately leaves open
+  ---
+  duration_ms: 39.130493
+  type: 'test'
+  ...
+# Subtest: a real HTTP disconnect after a data chunk emits one read error and releases the task
+ok 15 - a real HTTP disconnect after a data chunk emits one read error and releases the task
+  ---
+  duration_ms: 27.109044
+  type: 'test'
+  ...
+# [ContextSanitizer] Processed 1 AI messages out of 2 total messages
+# Subtest: sender navigation aborts the real HTTP stream without delivering into the next document
+ok 16 - sender navigation aborts the real HTTP stream without delivering into the next document
+  ---
+  duration_ms: 26.590706
+  type: 'test'
+  ...
+# Subtest: checkpoint text survives sanitizers and its private protection flag stays local
+ok 17 - checkpoint text survives sanitizers and its private protection flag stays local
+  ---
+  duration_ms: 12.696009
+  type: 'test'
+  ...
+# Subtest: the streamed request body does not ask the server for stream usage
+ok 18 - the streamed request body does not ask the server for stream usage
+  ---
+  duration_ms: 12.643771
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 15
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2168.05573

@@ -76,3 +76,5 @@ AgentAssistant 长委托已接入共享单聊的 Work。桌面重开、发起端
 普通共享单聊的桌面路由、中央准入和 worker 现按同一 Journal 检查点窗口核对桌面依赖。已归档的 Canvas 和文件引用不再阻塞后端；有效依赖仍走桌面路径，PWA 在接纳前得到拒绝。[窗口对照回执](evidence/portable-context/README.md)
 
 PWA 普通共享单聊在可证明尚未派发时按原 Work 回到队列；派发意图已写、结果未知或身份不符时保留待核对。取消记录保持终态。[强停、两次重启和原请求重放回执](evidence/mobile-undispatched/README.md)
+
+桌面 Main Chat IPC 的 18 项流式验证已修复。真实 Electron 核对了 DONE 后连接保持打开、部分正文后断流及 Stop 回执丢失时的唯一收尾、reader 解锁与重开后的持久记录。[差异和三窗口回执](evidence/desktop-stream-close/README.md)

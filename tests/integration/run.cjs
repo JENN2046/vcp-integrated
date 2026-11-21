@@ -19,6 +19,7 @@ const ordinaryModes = { 'ordinary-shared': 'pre-only', 'ordinary-local': 'local-
 const ordinaryMode = Object.hasOwn(ordinaryModes, requested) ? ordinaryModes[requested] : undefined;
 const nativeQueue = requested === 'native-local-queue' ? require('../group-extra/local.cjs') : undefined;
 const aaDesktop = requested === 'aa-desktop';
+const desktopStreamClose = requested === 'desktop-stream-close' ? require('../desktop-stream-close/fixture.cjs').create() : undefined;
 const streamInterrupt = requested === 'local-stream-interrupt' ? require('../local-stream-interrupt/fixture.cjs') : undefined;
 const finalReceiptModes = { 'tool-final-receipt-lost': 'terminal', 'tool-final-receipt-unknown': 'unknown' };
 const toolHandoffModes = ['tool-handoff-baseline', 'tool-handoff', 'tool-handoff-unknown', 'tool-handoff-stream', 'tool-final-publication-ack', ...Object.keys(finalReceiptModes)];
@@ -46,8 +47,8 @@ const ordinaryFixture = ordinaryMode || approvalRestore ? {
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', compactionRetryMode, 'local-stream-interrupt'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|tool-final-receipt-lost|tool-final-receipt-unknown|tool-final-publication-ack|local-stream-interrupt]');
+if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', compactionRetryMode, 'local-stream-interrupt', 'desktop-stream-close'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|tool-final-receipt-lost|tool-final-receipt-unknown|tool-final-publication-ack|local-stream-interrupt|desktop-stream-close]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -87,7 +88,8 @@ function launch(profile, role, mode) {
         NODE_EXTRA_CA_CERTS: cert, NS_CERT_FINGERPRINT: fingerprint,
         ...(mode === compactionRetryMode && role === 'A' ? { NS_COMPACTION_HISTORY_RACE: '1' } : {}),
         ...(mode === 'idle' ? { NS_METER_PREFIX: path.join(out, role) } : {}),
-        ...(mode === 'shutdown-only' ? { NS_CHECK_QUIT_ADMISSION: '1' } : {}) };
+        ...(mode === 'shutdown-only' ? { NS_CHECK_QUIT_ADMISSION: '1' } : {}),
+        ...(desktopStreamClose ? { NS_DESKTOP_STREAM_CLOSE: '1' } : {}) };
     const args = ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1', '--disable-background-networking', '--ozone-platform=x11', '--disable-gpu', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', path.join(here, './electron.cjs')];
     const proc = spawn(executable, args, { cwd: host, env, detached: true, stdio: ['pipe','pipe','pipe'] });
     const log = fs.createWriteStream(path.join(out, role + '.log'));
@@ -183,7 +185,7 @@ async function runCase(root, mode) {
             '-subj', '/CN=NativeSync isolated fixture', '-addext', 'subjectAltName=IP:127.0.0.1',
             '-keyout', key, '-out', cert], { env: { PATH: '/usr/bin:/bin' }, stdio: 'ignore' });
         try {
-            service = await require('./service.cjs').start({
+            service = await (desktopStreamClose || require('./service.cjs')).start({
                 out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision, groupRelay, toolHandoff,
                 observedContext: toolHandoff?.observed || compaction?.observe(out, crossDeviceCompaction), streamInterrupt: streamInterrupt?.observe(out),
             });
@@ -269,7 +271,7 @@ async function runCase(root, mode) {
         }
         result.exits[role] = value;
         delete clients[role];
-        if(mode!=='local-only'||role==='B') assert(client.events.some(event=>event.event==='runtime-close-end'),'NativeSync normal close');
+        if(!desktopStreamClose && (mode!=='local-only'||role==='B')) assert(client.events.some(event=>event.event==='runtime-close-end'),'NativeSync normal close');
         assert(client.events.some(event=>event.event==='electron-quit'),'Electron normal quit hook');
         if (result[role]?.cds) assert.equal(fs.existsSync(path.join('/proc',String(result[role].cds.pid))),false,'C1 CDS child exited');
         assert.deepEqual(result.exits[role],{code:0,signal:null});
@@ -281,13 +283,13 @@ async function runCase(root, mode) {
     };
     try {
         if (compaction) result.controlledTurns = await compaction.stage(service, out, crossDeviceCompaction);
-        const roles = approvalRestore || aaDesktop || nativeQueue || (compaction && !crossDeviceCompaction) || streamInterrupt ? ['A'] : ['A', 'B'];
+        const roles = desktopStreamClose ? ['A', 'B', 'C'] : approvalRestore || aaDesktop || nativeQueue || (compaction && !crossDeviceCompaction) || streamInterrupt ? ['A'] : ['A', 'B'];
         for(const role of roles){
             const profile=profiles[role]=path.join(out,'profile-'+role);
-            if (mode==='local-only' && role==='A') {
+            if (desktopStreamClose || mode==='local-only' && role==='A') {
                 const write=(rel,obj)=>{const file=path.join(profile,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,json(obj));};
                 write('settings.json',{vcpApiKey:'synthetic-only',disableAsana:true,disableUpdateCheck:true});
-                write('Agents/local-agent/config.json',{id:'local-agent',name:'Synthetic local',model:'synthetic',systemPrompt:'Synthetic test',streamOutput:false,...streamInterrupt?.agent,topics:[{id:'local-topic',name:'Local topic',createdAt:1}],current_topic_id:'local-topic'});
+                write('Agents/local-agent/config.json',{id:'local-agent',name:'Synthetic local',model:'synthetic',systemPrompt:'Synthetic test',streamOutput:Boolean(desktopStreamClose),...streamInterrupt?.agent,topics:[{id:'local-topic',name:'Local topic',createdAt:1}],current_topic_id:'local-topic'});
                 write('UserData/local-agent/topics/local-topic/history.json',[]);
                 for (const speaker of nativeQueue?.agents || []) {
                     const id = 'local-group-' + speaker.toLowerCase();
@@ -299,10 +301,10 @@ async function runCase(root, mode) {
             } else await restoreProfile(path.join(out,'seed','desktop'+role),profile,service.origin,role);
             const settingsFile=path.join(profile,'settings.json');
             fs.writeFileSync(settingsFile,json({...read(settingsFile),ChatDataServiceEnabled:true,ChatDataServiceNotifyEnabled:false,ChatDataServiceTantivyEnabled:false,vcpServerUrl:service.origin+((compaction || toolHandoff)?'/v1/chat/completions':'/v1/local-chat/completions'),
-                ...compaction?.settings,...toolHandoffFixture?.settings,...streamInterrupt?.settings,userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
+                ...compaction?.settings,...toolHandoffFixture?.settings,...streamInterrupt?.settings,...(desktopStreamClose && { enableVcpToolInjection:false, enableContextCompaction:false }),userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
         }
         const [A,B] = await Promise.all(roles.map(role => start(role)));
-        if (!approvalRestore && !compaction && !streamInterrupt && !toolHandoff) {
+        if (!approvalRestore && !compaction && !streamInterrupt && !toolHandoff && !desktopStreamClose) {
             result.mobile = await service.checkMobile();
             if (mode !== 'idle') result.mobile.chromium = await A.command('mobile', service.origin + '/mobile/');
         }
@@ -319,7 +321,7 @@ async function runCase(root, mode) {
         } else if (mode === 'idle') {
             result.idle = await require('./idle.cjs').measure({out, waitUntil, pids:{ A:A.proc.pid, B:B.proc.pid, backend:service.backendPid }});
         } else if (mode !== 'ready') {
-            const runScenario = toolHandoff ? require('../tool-work-handoff/scenario.cjs')
+            const runScenario = desktopStreamClose ? require('../desktop-stream-close/scenario.cjs') : toolHandoff ? require('../tool-work-handoff/scenario.cjs')
                 : compaction ? require('../compact-e2e/scenario.cjs')
                 : streamInterrupt ? require('../local-stream-interrupt/scenario.cjs')
                 : aaDesktop ? require('../aa-desktop/scenario.cjs')
@@ -327,7 +329,7 @@ async function runCase(root, mode) {
                 : nativeQueue ? nativeQueue.scenario
                 : ordinaryMode ? require('../ordinary-desktop/scenario.cjs')
                 : mode === 'config-only' ? require('./configuration.cjs') : scenario;
-            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash,quitBeforeFinalReceipt,aa,groupRelay,toolHandoff});
+            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash,quitBeforeFinalReceipt,aa,groupRelay,toolHandoff,desktopStreamClose});
         }
     } catch(error) {
         result.failures.push(error.stack);
@@ -340,26 +342,31 @@ async function runCase(root, mode) {
         for (const role of Object.keys(clients)) {
             try { await stop(role); } catch(error) { result.failures.push(error.stack); }
         }
-        result.provider=service.calls;
-        result.requests=service.requests;
-        result.exits.backend = await (aa ? aa.close() : service.close());
-        try { assert.deepEqual(result.exits.backend, {code:0,signal:null}); }
-        catch (error) { result.failures.push(error.stack); }
-        try {
-            const loaded=read(path.join(out,'backend-loaded.json'));
-            for (const row of loaded) {
-                const expectedSha = serverRevision
-                    ? createHash('sha256').update(execFileSync('git', ['show', serverRevision + ':' + row.file], { cwd: candidate })).digest('hex')
-                    : sha(path.join(candidate, row.file));
-                assert.equal(row.sha256, expectedSha, row.file);
-            }
-            assert.ok(loaded.length >= 9, 'required loaded backend source files');
-            result.backendSources=loaded;
-        } catch(error) { result.failures.push(error.stack); }
-        try {
-            assert.equal(result.provider.filter(call => call.case === 'fixtureError' ||
-                call.phase === 'unexpected-desktop-local-provider').length, 0);
-        } catch (error) { result.failures.push(error.stack); }
+        if (desktopStreamClose) {
+            await service.close();
+            result.failures.push(...service.errors);
+        } else {
+            result.provider=service.calls;
+            result.requests=service.requests;
+            result.exits.backend = await (aa ? aa.close() : service.close());
+            try { assert.deepEqual(result.exits.backend, {code:0,signal:null}); }
+            catch (error) { result.failures.push(error.stack); }
+            try {
+                const loaded=read(path.join(out,'backend-loaded.json'));
+                for (const row of loaded) {
+                    const expectedSha = serverRevision
+                        ? createHash('sha256').update(execFileSync('git', ['show', serverRevision + ':' + row.file], { cwd: candidate })).digest('hex')
+                        : sha(path.join(candidate, row.file));
+                    assert.equal(row.sha256, expectedSha, row.file);
+                }
+                assert.ok(loaded.length >= 9, 'required loaded backend source files');
+                result.backendSources=loaded;
+            } catch(error) { result.failures.push(error.stack); }
+            try {
+                assert.equal(result.provider.filter(call => call.case === 'fixtureError' ||
+                    call.phase === 'unexpected-desktop-local-provider').length, 0);
+            } catch (error) { result.failures.push(error.stack); }
+        }
         fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify(result,null,2)+'\n');
         const disposable = mode === 'idle'
             ? fs.readdirSync(out).filter(name => name !== 'evidence.json')

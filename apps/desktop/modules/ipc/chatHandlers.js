@@ -1518,9 +1518,8 @@ function initialize(mainWindow, context) {
             if (modelConfig.stream === true) {
                 console.log(`VCP响应: 开始流式处理 for ${messageId} on channel ${streamChannel}`);
                 const reader = response.body.getReader();
-                const decoder = new TextDecoder();
 
-                async function processStream(reader, decoder) {
+                async function processStream() {
                     let bodyReachedEOF = false;
                     try {
                         const { createSseDecoder } = await import('../chat/sseProtocol.mjs');
@@ -1555,15 +1554,24 @@ function initialize(mainWindow, context) {
                         sendStreamPayload({ type: 'error', error: streamError.message, code: streamError.code || 'STREAM_READ_ERROR', messageId, context });
                     } finally {
                         finishStreamTask();
-                        if (!bodyReachedEOF) void Promise.resolve(reader.cancel()).catch(() => {});
-                        try { reader.releaseLock(); } catch (_) {}
+                        const reportCancelFailure = error => {
+                            console.warn(`[Main - sendToVCP] Failed to cancel response body for ${messageId}:`, String(error));
+                        };
+                        try {
+                            // An upstream cancel promise can outlive this request. Release the local reader immediately.
+                            if (!bodyReachedEOF) void Promise.resolve(reader.cancel()).catch(reportCancelFailure);
+                        } catch (error) {
+                            reportCancelFailure(error);
+                        } finally {
+                            try { reader.releaseLock(); } catch (_) {}
+                        }
                     }
                 }
 
                 // IPC returns when streaming starts; the detached reader owns
                 // terminal delivery and response cleanup.
                 streamTaskDetached = true;
-                processStream(reader, decoder).then(() => {
+                processStream().then(() => {
                     console.log(`[Main - sendToVCP] 流处理函数 processStream 已正常结束 for ${messageId}`);
                 }).catch(err => {
                     console.error(`[Main - sendToVCP] processStream 内部抛出未捕获的错误 for ${messageId}:`, err);

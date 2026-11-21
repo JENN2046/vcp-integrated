@@ -1,0 +1,58 @@
+{
+  "baseline": "95cc27e18198",
+  "node": "24.22.3",
+  "cwd": "integration repository root",
+  "runs": {
+    "old": {
+      "tests": 18,
+      "pass": 0,
+      "fail": 18,
+      "failedCases": [
+        "failed interruption (rejected) releases the caller's HTTP reader without a duplicate terminal",
+        "failed interruption (transport-error) releases the caller's HTTP reader without a duplicate terminal",
+        "failed interruption (missing-settings) releases the caller's HTTP reader without a duplicate terminal",
+        "failed interruption (hung) releases the caller's HTTP reader without a duplicate terminal",
+        "accepted interruption retains producer terminal delivery and its received content",
+        "failed interruption from another IPC window cannot abort the original HTTP reader",
+        "DONE before EOF cancels the actual response body and retains a single end event",
+        "normal EOF preserves a final partial SSE line and does not cancel a completed body",
+        "read failure remains the primary terminal error when cancellation also rejects",
+        "rejected cancellation is reported without duplicating the successful terminal event",
+        "pending old cancellation does not retain its reader or finish a reused message task",
+        "a synchronous reader cancellation failure still releases ownership and the lock",
+        "a non-Error cancellation rejection cannot throw from the cleanup reporter",
+        "DONE closes a real local HTTP response which the server deliberately leaves open",
+        "a real HTTP disconnect after a data chunk emits one read error and releases the task",
+        "sender navigation aborts the real HTTP stream without delivering into the next document",
+        "checkpoint text survives sanitizers and its private protection flag stays local",
+        "the streamed request body does not ask the server for stream usage"
+      ]
+    },
+    "fixed-fixture": {
+      "tests": 18,
+      "pass": 15,
+      "fail": 3,
+      "failedCases": [
+        "rejected cancellation is reported without duplicating the successful terminal event",
+        "a synchronous reader cancellation failure still releases ownership and the lock",
+        "a non-Error cancellation rejection cannot throw from the cleanup reporter"
+      ]
+    },
+    "target": {
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "failedCases": []
+    },
+    "desktop": {
+      "tests": 130,
+      "pass": 127,
+      "fail": 3,
+      "failedCases": [
+        "main Surface renders terminal stream errors with the initial messageId",
+        "thinking and streaming messages opt out of content-visibility clipping",
+        "chat presentation surfaces retain frosted backdrops without nested card captures"
+      ]
+    }
+  }
+}

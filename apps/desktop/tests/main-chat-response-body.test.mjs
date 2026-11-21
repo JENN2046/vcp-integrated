@@ -5,10 +5,19 @@ import http from 'node:http';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const source = fs.readFileSync(new URL('../modules/ipc/chatHandlers.js', import.meta.url), 'utf8');
+const filename = fileURLToPath(new URL('../modules/ipc/chatHandlers.js', import.meta.url));
+const source = fs.readFileSync(filename, 'utf8');
+const chatHandlers = new vm.Script('(function(require,module,exports){' + source + '\n})', {
+    filename,
+    importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER,
+});
 const encode = text => new TextEncoder().encode(text);
+const contentFrame = (content, finishReason = null) =>
+    'data: ' + JSON.stringify({ choices: [{ delta: { content }, finish_reason: finishReason }] });
+const doneFrame = contentFrame('complete', 'stop') + '\n\ndata: [DONE]\n\n';
 const tick = () => new Promise(resolve => setImmediate(resolve));
 async function waitFor(predicate) {
     const deadline = Date.now() + 3000;
@@ -22,6 +31,7 @@ async function waitFor(predicate) {
 // No source rewriting or test-only access to its private stream function.
 function route(fetchResponse, { settings = null, abortSignal = AbortSignal } = {}) {
     const handlers = new Map(), module = { exports: {} }, sent = [], warnings = [];
+    const context = { agentId: 'fixture-agent', topicId: 'fixture-topic' };
     const dependencies = new Map([
         ['electron', { ipcMain: { handle: (name, fn) => handlers.set(name, fn), on() {} }, dialog: {}, BrowserWindow: {} }],
         ['fs-extra', { pathExists: async () => settings !== null, readJson: async () => settings }],
@@ -35,18 +45,29 @@ function route(fetchResponse, { settings = null, abortSignal = AbortSignal } = {
         // 真实的心情模块：没有配置时 observe 是空操作
         ['../agentMood', require('../modules/agentMood.js')],
         ['../services/attachmentDialogState', {}], ['../../Groupmodules/topicTitleManager', {}],
+        ['../services/topicExecutionAuthority', require('../modules/services/topicExecutionAuthority.js')],
         ['../services/historyMutationQueue', {}], ['./workspaceHandlers', {}], ['./sideChatHandlers', {}],
         // 桌宠没打开时这些钩子全是空操作，用真实模块。
         ['../hostHooks', require('../modules/hostHooks.js')],
     ]);
     const load = name => { assert.ok(dependencies.has(name), 'unreviewed fixture dependency: ' + name); return dependencies.get(name); };
-    vm.runInNewContext('(function(require,module,exports){' + source + '\n})', {
+    chatHandlers.runInNewContext({
         console: { log() {}, warn: (...args) => warnings.push(args.join(' ')), error() {} },
         TextDecoder, URL, fetch: fetchResponse, AbortSignal: abortSignal,
     })(load, module, module.exports);
-    module.exports.initialize(null, { USER_DATA_DIR: 'unused-isolated-fixture', APP_DATA_ROOT_IN_PROJECT: 'unused-isolated-fixture', historyMutationQueue: {} });
+    module.exports.initialize(null, {
+        USER_DATA_DIR: 'unused-isolated-fixture',
+        APP_DATA_ROOT_IN_PROJECT: 'unused-isolated-fixture',
+        historyMutationQueue: {},
+        topicExecutionAuthority: {
+            async classifyNativeRequest(request) {
+                assert.equal(request?.agentId, context.agentId);
+                assert.equal(request?.topicId, context.topicId);
+                return { success: true, kind: 'local' };
+            },
+        },
+    });
     const sender = Object.assign(new EventEmitter(), { id: 501, isDestroyed: () => false, send: (channel, event) => sent.push({ channel, event }) });
-    const context = { agentId: 'fixture-agent', topicId: 'fixture-topic' };
     return { sent, warnings, sender, context, tasks: () => module.exports.getVcpStreamTaskSnapshot(),
         start: (url = 'http://controlled.invalid/v1/chat/completions', messages = []) => handlers.get('send-to-vcp')({ sender }, url, '', messages, { stream: true }, 'same-message', false, context),
         interrupt: (caller = sender) => handlers.get('interrupt-vcp-request')({ sender: caller }, { messageId: 'same-message' }),
@@ -135,14 +156,14 @@ test('DONE before EOF cancels the actual response body and retains a single end 
     const body = new ReadableStream({ start(value) { controller = value; }, cancel() { cancelled++; } });
     const f = route(async () => ({ ok: true, body }));
     try {
-        controller.enqueue(encode('data: [DONE]\n\n'));
+        controller.enqueue(encode(doneFrame));
         assert.equal((await f.start()).streamingStarted, true);
-        await waitFor(() => f.sent.length === 1 && f.tasks().length === 0); await tick();
+        await waitFor(() => f.sent.length === 2 && f.tasks().length === 0); await tick();
         assert.equal(cancelled, 1, 'releaseLock alone leaves the response open');
         assert.equal(body.locked, false);
         assert.throws(() => controller.enqueue(encode('late bytes')), /closed/);
-        assert.deepEqual(f.sent.map(item => item.event.type), ['end']);
-        assert.equal(f.sent[0].event.context, f.context);
+        assert.deepEqual(f.sent.map(item => item.event.type), ['data', 'end']);
+        assert.equal(f.sent[1].event.context, f.context);
         assert.equal(f.sender.eventNames().length, 0, 'terminal task releases sender listeners');
         assert.deepEqual(f.warnings, []);
     } finally { if (!body.locked) await body.cancel().catch(() => {}); f.close(); }
@@ -151,7 +172,7 @@ test('DONE before EOF cancels the actual response body and retains a single end 
 test('normal EOF preserves a final partial SSE line and does not cancel a completed body', async () => {
     let cancelled = 0;
     const body = new ReadableStream({ start(controller) {
-        controller.enqueue(encode('data: {"choices":[{"delta":{"content":"last"}}]}')); controller.close();
+        controller.enqueue(encode(contentFrame('last', 'stop'))); controller.close();
     }, cancel() { cancelled++; } });
     const f = route(async () => ({ ok: true, body }));
     try {
@@ -177,13 +198,13 @@ test('read failure remains the primary terminal error when cancellation also rej
 
 test('rejected cancellation is reported without duplicating the successful terminal event', async () => {
     let cancelled = 0;
-    const body = new ReadableStream({ start(controller) { controller.enqueue(encode('data: [DONE]\n\n')); },
+    const body = new ReadableStream({ start(controller) { controller.enqueue(encode(doneFrame)); },
         cancel() { cancelled++; return Promise.reject(new Error('controlled cancel failure')); } });
     const f = route(async () => ({ ok: true, body }));
     try {
-        await f.start(); await waitFor(() => f.sent.length === 1 && !f.tasks().length); await tick();
+        await f.start(); await waitFor(() => f.sent.length === 2 && !f.tasks().length); await tick();
         assert.equal(cancelled, 1); assert.equal(body.locked, false);
-        assert.deepEqual(f.sent.map(item => item.event.type), ['end']);
+        assert.deepEqual(f.sent.map(item => item.event.type), ['data', 'end']);
         assert.equal(f.warnings.filter(message => message.includes('controlled cancel failure')).length, 1);
     } finally { if (!body.locked) await body.cancel().catch(() => {}); f.close(); }
 });
@@ -197,17 +218,17 @@ test('pending old cancellation does not retain its reader or finish a reused mes
     let request = 0;
     const f = route(async () => ({ ok: true, body: ++request === 1 ? oldBody : newBody }));
     try {
-        oldController.enqueue(encode('data: [DONE]\n\n'));
-        await f.start(); await waitFor(() => f.sent.length === 1 && !f.tasks().length); await tick();
+        oldController.enqueue(encode(doneFrame));
+        await f.start(); await waitFor(() => f.sent.length === 2 && !f.tasks().length); await tick();
         assert.equal(cancelStarted, true); assert.equal(oldBody.locked, false, 'local detach does not await remote cleanup');
         await f.start(); assert.equal(f.tasks().length, 1);
         rejectCancel(new Error('old cancellation rejected')); await tick();
         assert.equal(f.tasks().length, 1, 'late old cleanup cannot finish the replacement task');
-        newController.enqueue(encode('data: {"value":"new"}\n\n')); newController.close();
-        await waitFor(() => f.sent.length === 3 && !f.tasks().length);
-        assert.deepEqual(f.sent.map(item => item.event.type), ['end', 'data', 'end']);
-        assert.notEqual(f.sent[0].event.streamOperationId, f.sent[1].event.streamOperationId);
-        assert.equal(f.sent[1].event.chunk.value, 'new');
+        newController.enqueue(encode(contentFrame('new', 'stop') + '\n\n')); newController.close();
+        await waitFor(() => f.sent.length === 4 && !f.tasks().length);
+        assert.deepEqual(f.sent.map(item => item.event.type), ['data', 'end', 'data', 'end']);
+        assert.notEqual(f.sent[1].event.streamOperationId, f.sent[2].event.streamOperationId);
+        assert.equal(f.sent[2].event.chunk.choices[0].delta.content, 'new');
         assert.equal(newBody.locked, false);
     } finally {
         rejectCancel?.(new Error('fixture cleanup'));
@@ -222,25 +243,25 @@ test('pending old cancellation does not retain its reader or finish a reused mes
 
 test('a synchronous reader cancellation failure still releases ownership and the lock', async () => {
     let released = 0;
-    const reader = { read: async () => ({ done: false, value: encode('data: [DONE]\n\n') }),
+    const reader = { read: async () => ({ done: false, value: encode(doneFrame) }),
         cancel() { throw new Error('synchronous cancel failure'); }, releaseLock() { released++; } };
     const f = route(async () => ({ ok: true, body: { getReader: () => reader } }));
     try {
-        await f.start(); await waitFor(() => f.sent.length === 1 && !f.tasks().length); await tick();
+        await f.start(); await waitFor(() => f.sent.length === 2 && !f.tasks().length); await tick();
         assert.equal(released, 1);
         assert.equal(f.warnings.filter(message => message.includes('synchronous cancel failure')).length, 1);
-        assert.deepEqual(f.sent.map(item => item.event.type), ['end']);
+        assert.deepEqual(f.sent.map(item => item.event.type), ['data', 'end']);
     } finally { f.close(); }
 });
 
 test('a non-Error cancellation rejection cannot throw from the cleanup reporter', async () => {
-    const body = new ReadableStream({ start(controller) { controller.enqueue(encode('data: [DONE]\n\n')); }, cancel() { return Promise.reject(null); } });
+    const body = new ReadableStream({ start(controller) { controller.enqueue(encode(doneFrame)); }, cancel() { return Promise.reject(null); } });
     const f = route(async () => ({ ok: true, body }));
     try {
-        await f.start(); await waitFor(() => f.sent.length === 1 && !f.tasks().length); await tick();
+        await f.start(); await waitFor(() => f.sent.length === 2 && !f.tasks().length); await tick();
         assert.equal(body.locked, false);
         assert.equal(f.warnings.filter(message => message.includes('Failed to cancel') && message.endsWith('null')).length, 1);
-        assert.deepEqual(f.sent.map(item => item.event.type), ['end']);
+        assert.deepEqual(f.sent.map(item => item.event.type), ['data', 'end']);
     } finally { if (!body.locked) await body.cancel().catch(() => {}); f.close(); }
 });
 
@@ -259,18 +280,18 @@ async function serverFixture(writeResponse) {
 }
 
 test('DONE closes a real local HTTP response which the server deliberately leaves open', { timeout: 10000 }, async t => {
-    const server = await serverFixture(response => response.write('data: [DONE]\n\n'));
+    const server = await serverFixture(response => response.write(doneFrame));
     t.after(() => server.close());
     const f = route(fetch);
     try {
-        await f.start(server.url); await waitFor(() => f.sent.length === 1 && !f.tasks().length);
+        await f.start(server.url); await waitFor(() => f.sent.length === 2 && !f.tasks().length);
         await waitFor(server.closed);
-        assert.deepEqual(f.sent.map(item => item.event.type), ['end']);
+        assert.deepEqual(f.sent.map(item => item.event.type), ['data', 'end']);
     } finally { f.close(); }
 });
 
 test('a real HTTP disconnect after a data chunk emits one read error and releases the task', { timeout: 10000 }, async t => {
-    const server = await serverFixture(response => response.write('data: {"value":"partial"}\n\n'));
+    const server = await serverFixture(response => response.write(contentFrame('partial') + '\n\n'));
     t.after(() => server.close());
     const f = route(fetch);
     try {
@@ -278,13 +299,13 @@ test('a real HTTP disconnect after a data chunk emits one read error and release
         server.disconnect();
         await waitFor(() => f.sent.some(item => item.event.type === 'error') && !f.tasks().length);
         assert.deepEqual(f.sent.map(item => item.event.type), ['data', 'error']);
-        assert.equal(f.sent[0].event.chunk.value, 'partial');
+        assert.equal(f.sent[0].event.chunk.choices[0].delta.content, 'partial');
         assert.equal(f.sender.eventNames().length, 0);
     } finally { f.close(); }
 });
 
 test('sender navigation aborts the real HTTP stream without delivering into the next document', { timeout: 10000 }, async t => {
-    const server = await serverFixture(response => response.write('data: {"value":"before navigation"}\n\n'));
+    const server = await serverFixture(response => response.write(contentFrame('before navigation') + '\n\n'));
     t.after(() => server.close());
     const f = route(fetch);
     try {
@@ -305,7 +326,7 @@ test('checkpoint text survives sanitizers and its private protection flag stays 
     const f = route(async (_url, options) => {
         requestBody = JSON.parse(options.body);
         return { ok: true, body: new ReadableStream({ start(controller) {
-            controller.enqueue(encode('data: [DONE]\n\n')); controller.close();
+            controller.enqueue(encode(doneFrame)); controller.close();
         } }) };
     }, { settings: { enableContextSanitizer: true, contextSanitizerDepth: 0 } });
     try {
@@ -313,7 +334,7 @@ test('checkpoint text survives sanitizers and its private protection flag stays 
             { role: 'user', content: text, __vcpContextCheckpoint: true },
             { role: 'assistant', content: 'ordinary response' },
         ]);
-        await waitFor(() => f.sent.length === 1 && !f.tasks().length);
+        await waitFor(() => f.sent.length === 2 && !f.tasks().length);
         assert.equal(requestBody.messages[0].content, text);
         assert.equal('__vcpContextCheckpoint' in requestBody.messages[0], false);
     } finally { f.close(); }
@@ -324,10 +345,10 @@ test('the streamed request body does not ask the server for stream usage', async
     let requestBody = null;
     const f = route(async (url, options) => {
         requestBody = JSON.parse(options.body);
-        return { ok: true, body: new ReadableStream({ start(controller) { controller.enqueue(encode('data: [DONE]\n\n')); controller.close(); } }) };
+        return { ok: true, body: new ReadableStream({ start(controller) { controller.enqueue(encode(doneFrame)); controller.close(); } }) };
     });
     try {
-        await f.start(); await waitFor(() => f.sent.length === 1 && !f.tasks().length);
+        await f.start(); await waitFor(() => f.sent.length === 2 && !f.tasks().length);
         assert.equal(requestBody.stream, true);
         assert.equal(requestBody.requestId, 'same-message');
         assert.equal('stream_options' in requestBody, false);
