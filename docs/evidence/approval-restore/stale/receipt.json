@@ -1,0 +1,498 @@
+{
+  "candidate-cancel": {
+    "result": "PASS",
+    "toolBoxRevision": "candidate with loaded-source hashes",
+    "electron": "44.9.3",
+    "electronSandbox": true,
+    "desktopSameProfile": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+    "cleanExits": true,
+    "provider": [
+      {
+        "id": "request_06d8921537be426d80395793a59cd5ba",
+        "ordinaryPhase": "tool-request",
+        "hasToolResult": false,
+        "at": 1795243732094
+      }
+    ],
+    "backendSources": [
+      {
+        "file": "apps/server/Plugin.js",
+        "sha256": "a4754eea49c9d91e155d1862e40666bf3c77085760e62bded7e2ecf1336faeee"
+      },
+      {
+        "file": "apps/server/WebSocketServer.js",
+        "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+      },
+      {
+        "file": "apps/server/modules/requestExecutionContext.js",
+        "sha256": "ebcfbae8ad5533395beb0560b7ae8500d987bc758570b95e050c77914c4a9b05"
+      }
+    ],
+    "trigger": "owner-cancel",
+    "originalApprovalId": "approve-1795243732107-cg20pud",
+    "loaded": {
+      "url": "file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/main.html",
+      "main": [
+        {
+          "file": "apps/desktop/main.js",
+          "sha256": "e7b6f8c0154e22abf235312c3c036a68d6215a3f1e1b7d5d38c7e9e14e068902"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/modules/notificationRenderer.js",
+          "bytes": 100018,
+          "sha256": "5db1236cc09a0a7da0389c8153ae5478d7b68be725b956db61cba67170f118da"
+        }
+      ]
+    },
+    "waiting": {
+      "id": "request_06d8921537be426d80395793a59cd5ba",
+      "request_id": "msg_1795243731881_user_98c4trda4u",
+      "state": "waiting_approval",
+      "attempts": 1,
+      "cancel_requested": 0
+    },
+    "initialNative": [
+      {
+        "id": "request_06d8921537be426d80395793a59cd5ba",
+        "admission_id": "request_06d8921537be426d80395793a59cd5ba",
+        "state": "dispatched"
+      }
+    ],
+    "terminal": {
+      "id": "request_06d8921537be426d80395793a59cd5ba",
+      "request_id": "msg_1795243731881_user_98c4trda4u",
+      "state": "review_required",
+      "attempts": 1,
+      "cancel_requested": 1
+    },
+    "finalNative": [
+      {
+        "id": "request_06d8921537be426d80395793a59cd5ba",
+        "admission_id": "request_06d8921537be426d80395793a59cd5ba",
+        "state": "unknown"
+      }
+    ],
+    "lateResponse": {
+      "success": true,
+      "queued": true
+    },
+    "terminalCards": [],
+    "finalJournal": [
+      {
+        "id": "msg_1795243731881_user_98c4trda4u",
+        "role": "user"
+      }
+    ],
+    "providerCalls": 1,
+    "toolInvocations": 0,
+    "toolAudit": [
+      {
+        "status": "failure",
+        "success": false,
+        "durationMs": 1338,
+        "nativeApprovalTimedOut": false
+      }
+    ],
+    "onlyOneApprovalCapableDesktop": true,
+    "offlineUntilTerminalMs": 13,
+    "terminalReachedWhileDesktopOffline": true,
+    "readOnlyPwa": {
+      "browser": "Chrome/158.0.8127.36",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "pendingControls": {
+        "composerDisabled": true,
+        "executionButtons": []
+      },
+      "observedTerminal": true,
+      "normalUiExecutionWrites": 0,
+      "permissions": [
+        "shared:sharedAB:read"
+      ],
+      "rawApprovalIdVisible": false,
+      "toolNameVisible": false
+    }
+  },
+  "candidate-timeout": {
+    "result": "PASS",
+    "toolBoxRevision": "candidate with loaded-source hashes",
+    "electron": "44.9.3",
+    "electronSandbox": true,
+    "desktopSameProfile": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+    "cleanExits": true,
+    "provider": [
+      {
+        "id": "request_a505c25b052441c4b527ffdf80f4b69f",
+        "ordinaryPhase": "tool-request",
+        "hasToolResult": false,
+        "at": 1795243731896
+      },
+      {
+        "id": "request_a505c25b052441c4b527ffdf80f4b69f",
+        "ordinaryPhase": "continuation",
+        "hasToolResult": false,
+        "at": 1795243749932
+      }
+    ],
+    "backendSources": [
+      {
+        "file": "apps/server/Plugin.js",
+        "sha256": "a4754eea49c9d91e155d1862e40666bf3c77085760e62bded7e2ecf1336faeee"
+      },
+      {
+        "file": "apps/server/WebSocketServer.js",
+        "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+      },
+      {
+        "file": "apps/server/modules/requestExecutionContext.js",
+        "sha256": "ebcfbae8ad5533395beb0560b7ae8500d987bc758570b95e050c77914c4a9b05"
+      }
+    ],
+    "trigger": "native-timeout",
+    "originalApprovalId": "approve-1795243731927-gkdta08",
+    "loaded": {
+      "url": "file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/main.html",
+      "main": [
+        {
+          "file": "apps/desktop/main.js",
+          "sha256": "e7b6f8c0154e22abf235312c3c036a68d6215a3f1e1b7d5d38c7e9e14e068902"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/modules/notificationRenderer.js",
+          "bytes": 100018,
+          "sha256": "5db1236cc09a0a7da0389c8153ae5478d7b68be725b956db61cba67170f118da"
+        }
+      ]
+    },
+    "waiting": {
+      "id": "request_a505c25b052441c4b527ffdf80f4b69f",
+      "request_id": "msg_1795243731709_user_cbih1ixjzg",
+      "state": "waiting_approval",
+      "attempts": 1,
+      "cancel_requested": 0
+    },
+    "initialNative": [
+      {
+        "id": "request_a505c25b052441c4b527ffdf80f4b69f",
+        "admission_id": "request_a505c25b052441c4b527ffdf80f4b69f",
+        "state": "dispatched"
+      }
+    ],
+    "terminal": {
+      "id": "request_a505c25b052441c4b527ffdf80f4b69f",
+      "request_id": "msg_1795243731709_user_cbih1ixjzg",
+      "state": "completed",
+      "attempts": 1,
+      "cancel_requested": 0
+    },
+    "finalNative": [
+      {
+        "id": "request_a505c25b052441c4b527ffdf80f4b69f",
+        "admission_id": "request_a505c25b052441c4b527ffdf80f4b69f",
+        "state": "model_terminal"
+      }
+    ],
+    "lateResponse": {
+      "success": true,
+      "queued": true
+    },
+    "terminalCards": [],
+    "finalJournal": [
+      {
+        "id": "msg_1795243731709_user_cbih1ixjzg",
+        "role": "user"
+      },
+      {
+        "id": "reply_request_a505c25b052441c4b527ffdf80f4b69f",
+        "role": "assistant"
+      }
+    ],
+    "providerCalls": 2,
+    "toolInvocations": 0,
+    "toolAudit": [
+      {
+        "status": "failure",
+        "success": false,
+        "durationMs": 18006,
+        "nativeApprovalTimedOut": true
+      }
+    ],
+    "onlyOneApprovalCapableDesktop": true,
+    "offlineUntilTerminalMs": 16767,
+    "terminalReachedWhileDesktopOffline": true,
+    "readOnlyPwa": {
+      "browser": "Chrome/158.0.8127.36",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "pendingControls": {
+        "composerDisabled": true,
+        "executionButtons": []
+      },
+      "observedTerminal": true,
+      "normalUiExecutionWrites": 0,
+      "permissions": [
+        "shared:sharedAB:read"
+      ],
+      "rawApprovalIdVisible": false,
+      "toolNameVisible": false
+    }
+  },
+  "baseline-cancel": {
+    "result": "PASS",
+    "toolBoxRevision": "fb742edb8513eded7bd46d78124c4800edb9fda1",
+    "electron": "44.9.3",
+    "electronSandbox": true,
+    "desktopSameProfile": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+    "cleanExits": true,
+    "provider": [
+      {
+        "id": "request_ba1428636e7949b7983387b67b20ac59",
+        "ordinaryPhase": "tool-request",
+        "hasToolResult": false,
+        "at": 1795243736053
+      }
+    ],
+    "backendSources": [
+      {
+        "file": "apps/server/Plugin.js",
+        "sha256": "8470ce924639021ba124fb2e445654d206f5e23fe61faae53fdf89336f143a62"
+      },
+      {
+        "file": "apps/server/WebSocketServer.js",
+        "sha256": "208b07470ed449c14eecdbf91c97baa64a7461adb64338e80c60b56b82894532"
+      },
+      {
+        "file": "apps/server/modules/requestExecutionContext.js",
+        "sha256": "300fcdad73a819267fb65a288079e540a36a846613aa09a86dd9ea511b2e69e2"
+      }
+    ],
+    "trigger": "owner-cancel",
+    "originalApprovalId": "approve-1795243736064-mfly9vr",
+    "loaded": {
+      "url": "file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/main.html",
+      "main": [
+        {
+          "file": "apps/desktop/main.js",
+          "sha256": "e7b6f8c0154e22abf235312c3c036a68d6215a3f1e1b7d5d38c7e9e14e068902"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/modules/notificationRenderer.js",
+          "bytes": 100018,
+          "sha256": "5db1236cc09a0a7da0389c8153ae5478d7b68be725b956db61cba67170f118da"
+        }
+      ]
+    },
+    "waiting": {
+      "id": "request_ba1428636e7949b7983387b67b20ac59",
+      "request_id": "msg_1795243735840_user_1jtzm7v852",
+      "state": "waiting_approval",
+      "attempts": 1,
+      "cancel_requested": 0
+    },
+    "initialNative": [
+      {
+        "id": "request_ba1428636e7949b7983387b67b20ac59",
+        "admission_id": "request_ba1428636e7949b7983387b67b20ac59",
+        "state": "dispatched"
+      }
+    ],
+    "terminal": {
+      "id": "request_ba1428636e7949b7983387b67b20ac59",
+      "request_id": "msg_1795243735840_user_1jtzm7v852",
+      "state": "review_required",
+      "attempts": 1,
+      "cancel_requested": 1
+    },
+    "finalNative": [
+      {
+        "id": "request_ba1428636e7949b7983387b67b20ac59",
+        "admission_id": "request_ba1428636e7949b7983387b67b20ac59",
+        "state": "unknown"
+      }
+    ],
+    "lateResponse": {
+      "success": true,
+      "queued": true
+    },
+    "terminalCards": [],
+    "finalJournal": [
+      {
+        "id": "msg_1795243735840_user_1jtzm7v852",
+        "role": "user"
+      }
+    ],
+    "providerCalls": 1,
+    "toolInvocations": 0,
+    "toolAudit": [
+      {
+        "status": "failure",
+        "success": false,
+        "durationMs": 1236,
+        "nativeApprovalTimedOut": false
+      }
+    ],
+    "onlyOneApprovalCapableDesktop": true,
+    "offlineUntilTerminalMs": 12,
+    "terminalReachedWhileDesktopOffline": true,
+    "readOnlyPwa": {
+      "browser": "Chrome/158.0.8127.36",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "pendingControls": {
+        "composerDisabled": true,
+        "executionButtons": []
+      },
+      "observedTerminal": true,
+      "normalUiExecutionWrites": 0,
+      "permissions": [
+        "shared:sharedAB:read"
+      ],
+      "rawApprovalIdVisible": false,
+      "toolNameVisible": false
+    }
+  },
+  "baseline-timeout": {
+    "result": "PASS",
+    "toolBoxRevision": "fb742edb8513eded7bd46d78124c4800edb9fda1",
+    "electron": "44.9.3",
+    "electronSandbox": true,
+    "desktopSameProfile": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+    "cleanExits": true,
+    "provider": [
+      {
+        "id": "request_5e22bb7898944a809990f4fd079dbbf2",
+        "ordinaryPhase": "tool-request",
+        "hasToolResult": false,
+        "at": 1795243736317
+      },
+      {
+        "id": "request_5e22bb7898944a809990f4fd079dbbf2",
+        "ordinaryPhase": "continuation",
+        "hasToolResult": false,
+        "at": 1795243754337
+      }
+    ],
+    "backendSources": [
+      {
+        "file": "apps/server/Plugin.js",
+        "sha256": "8470ce924639021ba124fb2e445654d206f5e23fe61faae53fdf89336f143a62"
+      },
+      {
+        "file": "apps/server/WebSocketServer.js",
+        "sha256": "208b07470ed449c14eecdbf91c97baa64a7461adb64338e80c60b56b82894532"
+      },
+      {
+        "file": "apps/server/modules/requestExecutionContext.js",
+        "sha256": "300fcdad73a819267fb65a288079e540a36a846613aa09a86dd9ea511b2e69e2"
+      }
+    ],
+    "trigger": "native-timeout",
+    "originalApprovalId": "approve-1795243736331-wggrvxw",
+    "loaded": {
+      "url": "file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/main.html",
+      "main": [
+        {
+          "file": "apps/desktop/main.js",
+          "sha256": "e7b6f8c0154e22abf235312c3c036a68d6215a3f1e1b7d5d38c7e9e14e068902"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/modules/notificationRenderer.js",
+          "bytes": 100018,
+          "sha256": "5db1236cc09a0a7da0389c8153ae5478d7b68be725b956db61cba67170f118da"
+        }
+      ]
+    },
+    "waiting": {
+      "id": "request_5e22bb7898944a809990f4fd079dbbf2",
+      "request_id": "msg_1795243736130_user_zqn82x4oc2",
+      "state": "waiting_approval",
+      "attempts": 1,
+      "cancel_requested": 0
+    },
+    "initialNative": [
+      {
+        "id": "request_5e22bb7898944a809990f4fd079dbbf2",
+        "admission_id": "request_5e22bb7898944a809990f4fd079dbbf2",
+        "state": "dispatched"
+      }
+    ],
+    "terminal": {
+      "id": "request_5e22bb7898944a809990f4fd079dbbf2",
+      "request_id": "msg_1795243736130_user_zqn82x4oc2",
+      "state": "completed",
+      "attempts": 1,
+      "cancel_requested": 0
+    },
+    "finalNative": [
+      {
+        "id": "request_5e22bb7898944a809990f4fd079dbbf2",
+        "admission_id": "request_5e22bb7898944a809990f4fd079dbbf2",
+        "state": "model_terminal"
+      }
+    ],
+    "lateResponse": {
+      "success": true,
+      "queued": true
+    },
+    "terminalCards": [],
+    "finalJournal": [
+      {
+        "id": "msg_1795243736130_user_zqn82x4oc2",
+        "role": "user"
+      },
+      {
+        "id": "reply_request_5e22bb7898944a809990f4fd079dbbf2",
+        "role": "assistant"
+      }
+    ],
+    "providerCalls": 2,
+    "toolInvocations": 0,
+    "toolAudit": [
+      {
+        "status": "failure",
+        "success": false,
+        "durationMs": 18006,
+        "nativeApprovalTimedOut": true
+      }
+    ],
+    "onlyOneApprovalCapableDesktop": true,
+    "offlineUntilTerminalMs": 16973,
+    "terminalReachedWhileDesktopOffline": true,
+    "readOnlyPwa": {
+      "browser": "Chrome/158.0.8127.36",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "pendingControls": {
+        "composerDisabled": true,
+        "executionButtons": []
+      },
+      "observedTerminal": true,
+      "normalUiExecutionWrites": 0,
+      "permissions": [
+        "shared:sharedAB:read"
+      ],
+      "rawApprovalIdVisible": false,
+      "toolNameVisible": false
+    }
+  }
+}

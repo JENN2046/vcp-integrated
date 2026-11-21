@@ -1,0 +1,171 @@
+diff --git a/apps/desktop/modules/notificationRenderer.js b/apps/desktop/modules/notificationRenderer.js
+index 0b71754..74a57f3 100644
+--- a/apps/desktop/modules/notificationRenderer.js
++++ b/apps/desktop/modules/notificationRenderer.js
+@@ -1006,6 +1006,12 @@ function renderVCPLogNotification(logData, originalRawMessage = null, notificati
+             const approvalDetails = document.createElement('div');
+             approvalDetails.classList.add('notification-approval-details');
+ 
++            if (logData.data.workId) {
++                const work = document.createElement('div');
++                work.className = 'notification-approval-row';
++                work.textContent = `共享 Work · ${logData.data.workId}`;
++                approvalDetails.appendChild(work);
++            }
+             const filePath = logData.data.filePath || logData.data.path || logData.data.args?.filePath || logData.data.args?.path;
+             if (filePath) {
+                 const pathRow = document.createElement('div');
+diff --git a/apps/server/Plugin.js b/apps/server/Plugin.js
+index c7962ae..d13980b 100644
+--- a/apps/server/Plugin.js
++++ b/apps/server/Plugin.js
+@@ -1914,8 +1914,10 @@ class PluginManager extends EventEmitter {
+                 );
+             }
+ 
++            const owner = nativeExecution.approvalOwner();
++            const timeoutDuration = this.toolApprovalManager.getTimeoutMs();
++            const expiresAt = Date.now() + timeoutDuration;
+             const approvalPromise = new Promise((resolve, reject) => {
+-                const timeoutDuration = this.toolApprovalManager.getTimeoutMs();
+                 const timeoutId = setTimeout(() => {
+                     if (this._takePendingApproval(requestId)) {
+                         reject(new Error(JSON.stringify({ plugin_error: `Manual approval for "${toolName}" timed out after ${timeoutDuration / 60000} minutes.` })));
+@@ -1926,6 +1928,8 @@ class PluginManager extends EventEmitter {
+                     resolve,
+                     reject,
+                     timeoutId,
++                    expiresAt,
++                    owner,
+                     notifyAiOnReject: approvalDecision.notifyAiOnReject !== false,
+                     trustedAuthorization: approvalDecision.requiresTrustedHumanAuthorization === true
+                         ? Object.freeze({ requestId, toolName,
+@@ -1937,12 +1941,12 @@ class PluginManager extends EventEmitter {
+ 
+             // 发送审核请求到管理面板
+             if (this.webSocketServer) {
+-                const approvalTtlMs = this.toolApprovalManager.getTimeoutMs();
+                 const changePreview = buildToolChangePreview(pluginSpecificArgs);
+                 const approvalRequest = {
+                     type: 'tool_approval_request',
+                     data: {
+                         requestId,
++                        ...(owner && { workId: owner.workId }),
+                         toolName,
+                         maid: maidNameFromArgs,
+                         args: pluginSpecificArgs,
+@@ -1950,9 +1954,10 @@ class PluginManager extends EventEmitter {
+                         ...(changePreview ? { changePreview } : {}),
+                         timestamp: getFormattedLocalTimestamp(),
+                         ...(approvalDecision.requiresTrustedHumanAuthorization === true ? { requiresTrustedHumanAuthorization: true } : {}),
+-                        approvalTtlMs // 同步给 VCPLog 补发缓存使用,确保超时后能自动清除
++                        approvalTtlMs: timeoutDuration
+                     }
+                 };
++                if (owner) this.pendingApprovals.get(requestId).request = approvalRequest;
+                 this.webSocketServer.broadcast(approvalRequest, 'VCPLog');
+                 console.log(`[PluginManager] 🔔 正在等待工具调用人工审核: ${toolName} (ID: ${requestId})`);
+             } else {
+@@ -2520,9 +2525,24 @@ class PluginManager extends EventEmitter {
+         });
+     }
+ 
++    _canAnswerApproval(approval) {
++        return Boolean(approval && Date.now() < approval.expiresAt && (!approval.owner || approval.owner.isCurrent()));
++    }
++
++    pendingWorkApprovals() {
++        const requests = [];
++        for (const approval of this.pendingApprovals.values()) {
++            if (!approval.request || !this._canAnswerApproval(approval)) continue;
++            const remaining = approval.expiresAt - Date.now();
++            if (remaining > 0) requests.push({ ...approval.request, data: { ...approval.request.data, approvalTtlMs: remaining } });
++        }
++        return requests;
++    }
++
+     handleApprovalResponse(requestId, approved, reason) {
+         const approval = this.pendingApprovals.get(requestId);
+-        if (!approval?.trustedAuthorization) return this._settleApprovalResponse(requestId, approved, reason);
++        if (typeof approved !== 'boolean' || !this._canAnswerApproval(approval)) return false;
++        if (!approval.trustedAuthorization) return this._settleApprovalResponse(requestId, approved, reason);
+         return this._verifyTrustedMutationApproval(requestId, approved, reason, approval);
+     }
+ 
+@@ -2540,7 +2560,7 @@ class PluginManager extends EventEmitter {
+                 .finally(() => { approval.trustedDecisionCheck = null; });
+         }
+         const proof = await approval.trustedDecisionCheck;
+-        if (this.pendingApprovals.get(requestId) !== approval
++        if (this.pendingApprovals.get(requestId) !== approval || !this._canAnswerApproval(approval)
+             || proof?.schemaVersion !== 'suvei.mutation.grant.decision.v1'
+             || proof.requestId !== requestId || proof.projectId !== target.projectId || proof.intentId !== target.intentId
+             || !Number.isInteger(proof.revision) || proof.revision < 1
+diff --git a/apps/server/WebSocketServer.js b/apps/server/WebSocketServer.js
+index da6e9a2..d35374b 100644
+--- a/apps/server/WebSocketServer.js
++++ b/apps/server/WebSocketServer.js
+@@ -398,6 +398,9 @@ function initialize(httpServer, config) {
+         // 发送连接确认消息给特定类型的客户端
+         if (ws.clientType === 'VCPLog') {
+             ws.send(JSON.stringify({ type: 'connection_ack', message: 'WebSocket connection successful for VCPLog.' }));
++            for (const request of pluginManager?.pendingWorkApprovals?.() || []) {
++                ws.send(JSON.stringify(request));
++            }
+         } else if (ws.clientType === 'VCPInfo') { // 新增 VCPInfo 确认消息
+             ws.send(JSON.stringify({ type: 'connection_ack', message: 'WebSocket connection successful for VCPInfo.' }));
+         } else if (ws.clientType === 'DistributedServer') {
+@@ -544,7 +547,8 @@ function initialize(httpServer, config) {
+                             ws.send(JSON.stringify({ type: 'command_result', data: { requestId: parsedMessage.data.requestId, status: 'error', error: 'No active Chrome browser extension found.' }}));
+                         }
+                     }
+-                } else if (parsedMessage.type === 'tool_approval_response') {
++                } else if (parsedMessage.type === 'tool_approval_response' &&
++                    (ws.clientType === 'VCPLog' || ws.clientType === 'AdminPanel')) {
+                     const { requestId, approved, reason } = parsedMessage.data || {};
+                     if (pluginManager) {
+                         const success = await pluginManager.handleApprovalResponse(requestId, approved, reason);
+@@ -662,7 +666,10 @@ function broadcast(data, targetClientType = null, abortController = null, sensit
+     // VCPLog 通道:进入离线补发缓存(只对 targetClientType === 'VCPLog' 的广播缓存,
+     //              其它通道维持原行为不变,避免影响 VCPInfo / 通用广播)
+     let cacheEntryId = null;
+-    if (targetClientType === 'VCPLog' && data && typeof data === 'object') {
++    // Live Work approvals are restored from PluginManager's pending promises.
++    // Cached notifications can outlive cancellation or be evicted while a Work waits.
++    const workApproval = data?.type === 'tool_approval_request' && data.data?.workId;
++    if (targetClientType === 'VCPLog' && data && typeof data === 'object' && !workApproval) {
+         try {
+             const entry = vcpLogReplayManager.enqueue(data);
+             cacheEntryId = entry ? entry.id : null;
+diff --git a/apps/server/modules/requestExecutionContext.js b/apps/server/modules/requestExecutionContext.js
+index 4a406d3..3b984d5 100644
+--- a/apps/server/modules/requestExecutionContext.js
++++ b/apps/server/modules/requestExecutionContext.js
+@@ -34,6 +34,18 @@ function note(type, data) {
+     try { events.emit(type, { requestId: context.requestId, ...data }); }
+     catch { console.warn('[NativeExecution] OBSERVER_FAILED'); }
+ }
++// Keep a reference to this request's fence when a later approval arrives on
++// a different socket, outside the request's AsyncLocalStorage context.
++function approvalOwner() {
++    const scope = local.getStore();
++    if (!scope?.workId) return null;
++    const { workId, signal, fence } = scope;
++    return { workId, isCurrent() {
++        if (signal.aborted) return false;
++        try { fence(); return true; }
++        catch { return false; }
++    } };
++}
+ function cancellation() {
+     return Object.assign(new Error('NATIVE_EXECUTION_CANCELLED'), { code: 'NATIVE_EXECUTION_CANCELLED', name: 'AbortError' });
+ }
+@@ -284,7 +296,7 @@ module.exports = {
+     markModelTerminal: () => { const scope=local.getStore();if(scope)scope.modelTerminalKnown=true; },
+     currentSignal: () => local.getStore()?.signal, currentWork: () => local.getStore()?.workId || null,
+     assertToolsAllowed, trackToolInvocation,
+-    currentTopicSponsorCall,
++    currentTopicSponsorCall, approvalOwner,
+     runToolInvocation, acceptNativeTask, registerNativeTaskProvider, queryNativeTask,
+     toolStarted: () => note('tool', { started: true }),
+     run: (requestId, signal, fn) => local.run({ toolRun: { waiting: 0 }, requestId, signal, ...registered.get(requestId) }, fn)

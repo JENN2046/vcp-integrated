@@ -70,6 +70,9 @@ module.exports = async function openReadOnlyPwa({ service, out, cert, request, p
                 return { viewport: { width: 390, height: 844 }, browser: await browser.version(),
                     observedTerminalResult: true, normalUiExecutionWrites: writes.length, pageErrors: errors };
             },
+            async inspect() {
+                return { page, readOnlyControls, writes: [...writes], errors: [...errors], browser: await browser.version() };
+            },
             close: () => browser.close(),
         };
     } catch (error) {

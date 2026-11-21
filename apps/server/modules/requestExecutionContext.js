@@ -34,6 +34,18 @@ function note(type, data) {
     try { events.emit(type, { requestId: context.requestId, ...data }); }
     catch { console.warn('[NativeExecution] OBSERVER_FAILED'); }
 }
+// Keep a reference to this request's fence when a later approval arrives on
+// a different socket, outside the request's AsyncLocalStorage context.
+function approvalOwner() {
+    const scope = local.getStore();
+    if (!scope?.workId) return null;
+    const { workId, signal, fence } = scope;
+    return { workId, isCurrent() {
+        if (signal.aborted) return false;
+        try { fence(); return true; }
+        catch { return false; }
+    } };
+}
 function cancellation() {
     return Object.assign(new Error('NATIVE_EXECUTION_CANCELLED'), { code: 'NATIVE_EXECUTION_CANCELLED', name: 'AbortError' });
 }
@@ -284,7 +296,7 @@ module.exports = {
     markModelTerminal: () => { const scope=local.getStore();if(scope)scope.modelTerminalKnown=true; },
     currentSignal: () => local.getStore()?.signal, currentWork: () => local.getStore()?.workId || null,
     assertToolsAllowed, trackToolInvocation,
-    currentTopicSponsorCall,
+    currentTopicSponsorCall, approvalOwner,
     runToolInvocation, acceptNativeTask, registerNativeTaskProvider, queryNativeTask,
     toolStarted: () => note('tool', { started: true }),
     run: (requestId, signal, fn) => local.run({ toolRun: { waiting: 0 }, requestId, signal, ...registered.get(requestId) }, fn)

@@ -398,6 +398,9 @@ function initialize(httpServer, config) {
         // 发送连接确认消息给特定类型的客户端
         if (ws.clientType === 'VCPLog') {
             ws.send(JSON.stringify({ type: 'connection_ack', message: 'WebSocket connection successful for VCPLog.' }));
+            for (const request of pluginManager?.pendingWorkApprovals?.() || []) {
+                ws.send(JSON.stringify(request));
+            }
         } else if (ws.clientType === 'VCPInfo') { // 新增 VCPInfo 确认消息
             ws.send(JSON.stringify({ type: 'connection_ack', message: 'WebSocket connection successful for VCPInfo.' }));
         } else if (ws.clientType === 'DistributedServer') {
@@ -544,7 +547,8 @@ function initialize(httpServer, config) {
                             ws.send(JSON.stringify({ type: 'command_result', data: { requestId: parsedMessage.data.requestId, status: 'error', error: 'No active Chrome browser extension found.' }}));
                         }
                     }
-                } else if (parsedMessage.type === 'tool_approval_response') {
+                } else if (parsedMessage.type === 'tool_approval_response' &&
+                    (ws.clientType === 'VCPLog' || ws.clientType === 'AdminPanel')) {
                     const { requestId, approved, reason } = parsedMessage.data || {};
                     if (pluginManager) {
                         const success = await pluginManager.handleApprovalResponse(requestId, approved, reason);
@@ -662,7 +666,10 @@ function broadcast(data, targetClientType = null, abortController = null, sensit
     // VCPLog 通道:进入离线补发缓存(只对 targetClientType === 'VCPLog' 的广播缓存,
     //              其它通道维持原行为不变,避免影响 VCPInfo / 通用广播)
     let cacheEntryId = null;
-    if (targetClientType === 'VCPLog' && data && typeof data === 'object') {
+    // Live Work approvals are restored from PluginManager's pending promises.
+    // Cached notifications can outlive cancellation or be evicted while a Work waits.
+    const workApproval = data?.type === 'tool_approval_request' && data.data?.workId;
+    if (targetClientType === 'VCPLog' && data && typeof data === 'object' && !workApproval) {
         try {
             const entry = vcpLogReplayManager.enqueue(data);
             cacheEntryId = entry ? entry.id : null;

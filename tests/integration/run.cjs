@@ -17,17 +17,25 @@ const modes = ['lost-only', 'transport-only', 'pre-only', 'local-only', 'config-
 const requested = process.argv[2] || 'all';
 const ordinaryModes = { 'ordinary-shared': 'pre-only', 'ordinary-local': 'local-only' };
 const ordinaryMode = Object.hasOwn(ordinaryModes, requested) ? ordinaryModes[requested] : undefined;
-const serverRevision = ordinaryMode ? process.env.NS_BASELINE_SERVER_REVISION : undefined;
+const approvalRestoreModes = { 'approval-restore': 'desktop', 'approval-restore-stale': 'stale' };
+const approvalRestore = Object.hasOwn(approvalRestoreModes, requested) ? approvalRestoreModes[requested] : undefined;
+const serverRevision = ordinaryMode || approvalRestore ? process.env.NS_BASELINE_SERVER_REVISION : undefined;
 if (serverRevision && !/^[a-f0-9]{40}$/.test(serverRevision)) throw Error('Expected full Git revision for baseline server');
-const ordinaryFixture = ordinaryMode ? {
-    ...require('../ordinary-tools/fixture.cjs'),
+const ordinaryTools = require('../ordinary-tools/fixture.cjs');
+const ordinaryFixture = ordinaryMode || approvalRestore ? {
+    ...ordinaryTools,
+    ...(approvalRestore === 'stale' && process.env.NS_EXPIRE_APPROVAL === '1' && { stage(box) {
+        ordinaryTools.stage(box);
+        const file = path.join(box, 'toolApprovalConfig.json');
+        fs.writeFileSync(file, JSON.stringify({ ...read(file), timeoutMinutes: 0.3 }));
+    } }),
     ...(process.env.NS_DROP_APPROVAL_RECEIPT === '1' && { lostReceiptMarker: 'ORDINARY_TOOL_APPROVE' }),
 } : undefined;
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, ...Object.keys(ordinaryModes), 'all', 'ready', '--dev', 'idle'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local]');
+if (![...modes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -230,7 +238,8 @@ async function runCase(root, mode) {
         }
     };
     try {
-        for(const role of ['A','B']){
+        const roles = approvalRestore ? ['A'] : ['A', 'B'];
+        for(const role of roles){
             const profile=profiles[role]=path.join(out,'profile-'+role);
             if (mode==='local-only' && role==='A') {
                 const write=(rel,obj)=>{const file=path.join(profile,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,json(obj));};
@@ -241,9 +250,11 @@ async function runCase(root, mode) {
             const settingsFile=path.join(profile,'settings.json');
             fs.writeFileSync(settingsFile,json({...read(settingsFile),ChatDataServiceEnabled:true,ChatDataServiceNotifyEnabled:false,ChatDataServiceTantivyEnabled:false,vcpServerUrl:service.origin+'/v1/local-chat/completions',userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
         }
-        const [A,B] = await Promise.all(['A','B'].map(role=>start(role)));
-        result.mobile = await service.checkMobile();
-        if (mode !== 'idle') result.mobile.chromium = await A.command('mobile', service.origin + '/mobile/');
+        const [A,B] = await Promise.all(roles.map(role => start(role)));
+        if (!approvalRestore) {
+            result.mobile = await service.checkMobile();
+            if (mode !== 'idle') result.mobile.chromium = await A.command('mobile', service.origin + '/mobile/');
+        }
         if (mode === '--dev' || mode === 'ready') {
             console.log('Isolated VCP ready at ' + service.origin + '/mobile/');
         }
@@ -257,9 +268,10 @@ async function runCase(root, mode) {
         } else if (mode === 'idle') {
             result.idle = await require('./idle.cjs').measure({out, waitUntil, pids:{ A:A.proc.pid, B:B.proc.pid, backend:service.backendPid }});
         } else if (mode !== 'ready') {
-            const runScenario = ordinaryMode ? require('../ordinary-desktop/scenario.cjs')
+            const runScenario = approvalRestore ? require('../approval-restore/' + approvalRestore + '.cjs')
+                : ordinaryMode ? require('../ordinary-desktop/scenario.cjs')
                 : mode === 'config-only' ? require('./configuration.cjs') : scenario;
-            await runScenario({clients:{A,B},out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash});
+            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash});
         }
     } catch(error) {
         result.failures.push(error.stack);

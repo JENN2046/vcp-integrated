@@ -1006,6 +1006,12 @@ function renderVCPLogNotification(logData, originalRawMessage = null, notificati
             const approvalDetails = document.createElement('div');
             approvalDetails.classList.add('notification-approval-details');
 
+            if (logData.data.workId) {
+                const work = document.createElement('div');
+                work.className = 'notification-approval-row';
+                work.textContent = `共享 Work · ${logData.data.workId}`;
+                approvalDetails.appendChild(work);
+            }
             const filePath = logData.data.filePath || logData.data.path || logData.data.args?.filePath || logData.data.args?.path;
             if (filePath) {
                 const pathRow = document.createElement('div');

@@ -1914,8 +1914,10 @@ class PluginManager extends EventEmitter {
                 );
             }
 
+            const owner = nativeExecution.approvalOwner();
+            const timeoutDuration = this.toolApprovalManager.getTimeoutMs();
+            const expiresAt = Date.now() + timeoutDuration;
             const approvalPromise = new Promise((resolve, reject) => {
-                const timeoutDuration = this.toolApprovalManager.getTimeoutMs();
                 const timeoutId = setTimeout(() => {
                     if (this._takePendingApproval(requestId)) {
                         reject(new Error(JSON.stringify({ plugin_error: `Manual approval for "${toolName}" timed out after ${timeoutDuration / 60000} minutes.` })));
@@ -1926,6 +1928,8 @@ class PluginManager extends EventEmitter {
                     resolve,
                     reject,
                     timeoutId,
+                    expiresAt,
+                    owner,
                     notifyAiOnReject: approvalDecision.notifyAiOnReject !== false,
                     trustedAuthorization: approvalDecision.requiresTrustedHumanAuthorization === true
                         ? Object.freeze({ requestId, toolName,
@@ -1937,12 +1941,12 @@ class PluginManager extends EventEmitter {
 
             // 发送审核请求到管理面板
             if (this.webSocketServer) {
-                const approvalTtlMs = this.toolApprovalManager.getTimeoutMs();
                 const changePreview = buildToolChangePreview(pluginSpecificArgs);
                 const approvalRequest = {
                     type: 'tool_approval_request',
                     data: {
                         requestId,
+                        ...(owner && { workId: owner.workId }),
                         toolName,
                         maid: maidNameFromArgs,
                         args: pluginSpecificArgs,
@@ -1950,9 +1954,10 @@ class PluginManager extends EventEmitter {
                         ...(changePreview ? { changePreview } : {}),
                         timestamp: getFormattedLocalTimestamp(),
                         ...(approvalDecision.requiresTrustedHumanAuthorization === true ? { requiresTrustedHumanAuthorization: true } : {}),
-                        approvalTtlMs // 同步给 VCPLog 补发缓存使用,确保超时后能自动清除
+                        approvalTtlMs: timeoutDuration
                     }
                 };
+                if (owner) this.pendingApprovals.get(requestId).request = approvalRequest;
                 this.webSocketServer.broadcast(approvalRequest, 'VCPLog');
                 console.log(`[PluginManager] 🔔 正在等待工具调用人工审核: ${toolName} (ID: ${requestId})`);
             } else {
@@ -2520,9 +2525,24 @@ class PluginManager extends EventEmitter {
         });
     }
 
+    _canAnswerApproval(approval) {
+        return Boolean(approval && Date.now() < approval.expiresAt && (!approval.owner || approval.owner.isCurrent()));
+    }
+
+    pendingWorkApprovals() {
+        const requests = [];
+        for (const approval of this.pendingApprovals.values()) {
+            if (!approval.request || !this._canAnswerApproval(approval)) continue;
+            const remaining = approval.expiresAt - Date.now();
+            if (remaining > 0) requests.push({ ...approval.request, data: { ...approval.request.data, approvalTtlMs: remaining } });
+        }
+        return requests;
+    }
+
     handleApprovalResponse(requestId, approved, reason) {
         const approval = this.pendingApprovals.get(requestId);
-        if (!approval?.trustedAuthorization) return this._settleApprovalResponse(requestId, approved, reason);
+        if (typeof approved !== 'boolean' || !this._canAnswerApproval(approval)) return false;
+        if (!approval.trustedAuthorization) return this._settleApprovalResponse(requestId, approved, reason);
         return this._verifyTrustedMutationApproval(requestId, approved, reason, approval);
     }
 
@@ -2540,7 +2560,7 @@ class PluginManager extends EventEmitter {
                 .finally(() => { approval.trustedDecisionCheck = null; });
         }
         const proof = await approval.trustedDecisionCheck;
-        if (this.pendingApprovals.get(requestId) !== approval
+        if (this.pendingApprovals.get(requestId) !== approval || !this._canAnswerApproval(approval)
             || proof?.schemaVersion !== 'suvei.mutation.grant.decision.v1'
             || proof.requestId !== requestId || proof.projectId !== target.projectId || proof.intentId !== target.intentId
             || !Number.isInteger(proof.revision) || proof.revision < 1
