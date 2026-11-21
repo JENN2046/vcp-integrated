@@ -1,0 +1,504 @@
+{
+  "endpoint": "webapk.googleapis.com",
+  "matchedRequests": 1,
+  "requests": [
+    {
+      "method": "GET",
+      "elapsedMs": 0,
+      "events": [
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_JOB",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_JOB_REQUEST_ATTACH",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_JOB_STARTED",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_DNS_TASK",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_REQUEST",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_IPV6_REACHABILITY_CHECK",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_TASK_SEQUENCE_CREATED",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_CREATE_JOB",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_JOB_ATTACH",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION_QUERY",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -15,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION_ATTEMPT",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -14,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -14,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -14,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -14,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION_QUERY",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -14,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION_ATTEMPT",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -14,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -14,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION_QUERY",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -14,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION_ATTEMPT",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -3,
+          "scope": "dependency",
+          "type": "QUIC_SESSION_POOL_JOB",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -3,
+          "scope": "dependency",
+          "type": "QUIC_SESSION_POOL_JOB_BOUND_TO",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -3,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_REQUEST",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -3,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_IPV6_REACHABILITY_CHECK",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -3,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_TASK_SEQUENCE_CREATED",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -3,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_WAITING",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -3,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_WAITING",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": -3,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_INIT_CONNECTION",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": -1,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_JOB_ATTACH",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": -1,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_JOB_REQUEST_ATTACH",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 0,
+          "scope": "request",
+          "type": "URL_REQUEST_START_JOB",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 0,
+          "scope": "request",
+          "type": "HTTP_STREAM_REQUEST",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 0,
+          "scope": "request",
+          "type": "HTTP_STREAM_JOB_CONTROLLER_BOUND",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 0,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_CONTROLLER",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 0,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_CONTROLLER_BOUND",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 0,
+          "scope": "dependency",
+          "type": "PROXY_RESOLUTION_SERVICE",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 0,
+          "scope": "dependency",
+          "type": "PROXY_RESOLUTION_SERVICE_RESOLVED_PROXY_LIST",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 0,
+          "scope": "dependency",
+          "type": "PROXY_RESOLUTION_SERVICE",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 0,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_CONTROLLER_PROXY_SERVER_RESOLVED",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 1,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_REQUEST_STARTED_JOB",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 1,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_REQUEST_STARTED_JOB",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 1,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 1,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_WAITING",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 1,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_WAITING",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 1,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_INIT_CONNECTION",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 1,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 1,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_WAITING",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 1,
+          "scope": "dependency",
+          "type": "QUIC_SESSION_POOL_JOB_BOUND_TO",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 13,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_JOB_REQUEST_ATTACH",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 13,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_REQUEST",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 13,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_IPV6_REACHABILITY_CHECK",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 13,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_TASK_SEQUENCE_CREATED",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 13,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_JOB_ATTACH",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 60,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION_RESPONSE",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 60,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION_QUERY",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 60,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 61,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_DNS_TASK_EXTRACTION_RESULTS",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 65,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_DNS_TASK_EXTRACTION_RESULTS",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 65,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_SERVICE_ENDPOINTS_RESOLUTION_DELAY",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 65,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_DNS_TASK_EXTRACTION_RESULTS",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 65,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION_RESPONSE",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 65,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION_QUERY",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 65,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 65,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION_RESPONSE",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 65,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION_QUERY",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 65,
+          "scope": "dependency",
+          "type": "DNS_TRANSACTION",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_DELAYED",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_INIT_CONNECTION",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_RESUMED",
+          "phase": "PHASE_NONE"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_WAITING",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_INIT_CONNECTION",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "SOCKET_POOL",
+          "phase": "PHASE_BEGIN"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_REQUEST",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "QUIC_SESSION_POOL_JOB",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB_INIT_CONNECTION",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_DNS_TASK",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_SERVICE_ENDPOINTS_RESOLUTION_DELAY",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_JOB",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_REQUEST",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 71,
+          "scope": "dependency",
+          "type": "HOST_RESOLVER_MANAGER_REQUEST",
+          "phase": "PHASE_END"
+        },
+        {
+          "elapsedMs": 72,
+          "scope": "dependency",
+          "type": "HTTP_STREAM_JOB",
+          "phase": "PHASE_END"
+        }
+      ]
+    }
+  ]
+}
