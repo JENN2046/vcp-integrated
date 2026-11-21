@@ -20,7 +20,8 @@ const ordinaryMode = Object.hasOwn(ordinaryModes, requested) ? ordinaryModes[req
 const nativeQueue = requested === 'native-local-queue' ? require('../group-extra/local.cjs') : undefined;
 const aaDesktop = requested === 'aa-desktop';
 const streamInterrupt = requested === 'local-stream-interrupt' ? require('../local-stream-interrupt/fixture.cjs') : undefined;
-const compaction = requested === 'compact-e2e' ? require('../compact-e2e/fixture.cjs') : undefined;
+const crossDeviceCompaction = requested === 'compact-cross-device';
+const compaction = requested === 'compact-e2e' || crossDeviceCompaction ? require('../compact-e2e/fixture.cjs') : undefined;
 const approvalRestoreModes = { 'approval-restore': 'desktop', 'approval-restore-stale': 'stale' };
 const approvalRestore = Object.hasOwn(approvalRestoreModes, requested) ? approvalRestoreModes[requested] : undefined;
 const serverRevision = ordinaryMode || approvalRestore ? process.env.NS_BASELINE_SERVER_REVISION : undefined;
@@ -34,12 +35,14 @@ const ordinaryFixture = ordinaryMode || approvalRestore ? {
         fs.writeFileSync(file, JSON.stringify({ ...read(file), timeoutMinutes: 0.3 }));
     } }),
     ...(process.env.NS_DROP_APPROVAL_RECEIPT === '1' && { lostReceiptMarker: 'ORDINARY_TOOL_APPROVE' }),
+} : crossDeviceCompaction ? {
+    stage: ordinaryTools.stage, reply: ordinaryTools.reply, lostReceiptMarker: compaction.toolInput,
 } : undefined;
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'local-stream-interrupt'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|local-stream-interrupt]');
+if (![...modes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', 'local-stream-interrupt'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|local-stream-interrupt]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -168,7 +171,7 @@ async function runCase(root, mode) {
         try {
             service = await require('./service.cjs').start({
                 out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision, groupRelay,
-                observedContext: compaction?.observe(out), streamInterrupt: streamInterrupt?.observe(out),
+                observedContext: compaction?.observe(out, crossDeviceCompaction), streamInterrupt: streamInterrupt?.observe(out),
             });
         } finally { fs.rmSync(key, { force: true }); }
     }
@@ -248,8 +251,8 @@ async function runCase(root, mode) {
         }
     };
     try {
-        if (compaction) result.controlledTurns = await compaction.stage(service, out);
-        const roles = approvalRestore || aaDesktop || nativeQueue || compaction || streamInterrupt ? ['A'] : ['A', 'B'];
+        if (compaction) result.controlledTurns = await compaction.stage(service, out, crossDeviceCompaction);
+        const roles = approvalRestore || aaDesktop || nativeQueue || (compaction && !crossDeviceCompaction) || streamInterrupt ? ['A'] : ['A', 'B'];
         for(const role of roles){
             const profile=profiles[role]=path.join(out,'profile-'+role);
             if (mode==='local-only' && role==='A') {

@@ -5,7 +5,7 @@ function deferred() { let resolve; const promise = new Promise(r => { resolve = 
 function fixture(deriveProtection = async () => ({})) {
     const events = [], queue = { ownerDirectories: {}, drainForAuthority: async () => {}, isOperationActive: () => false, settledNativeDeletions: () => [] };
     const lifecycle = { isReady: true, prepareHistoryAdmission: async d => { assert.equal(d.protectAll, true); events.push('protect-all'); }, activateHistoryAdmission: async () => events.push('activate') };
-    return { events, lifecycle, authority: new HistoryAuthority({ queue, lifecycle, deriveProtection }) };
+    return { events, queue, lifecycle, authority: new HistoryAuthority({ queue, lifecycle, deriveProtection }) };
 }
 test('close waits for an in-flight refresh and its final all-writer fence cannot be overwritten', async () => {
     const entered = deferred(), hold = deferred(), x = fixture(async () => { entered.resolve(); await hold.promise; return {}; });
@@ -34,4 +34,47 @@ test('failed close keeps admission closed and can retry its final fence', async 
     assert.throws(() => x.authority.assertNativeAdmission(), { code: 'HISTORY_AUTHORITY_PENDING' });
     await assert.rejects(x.authority.refresh(), { code: 'HISTORY_AUTHORITY_PENDING' });
     fail = false; await x.authority.close(); assert.deepEqual(x.events, ['closed']);
+});
+
+test('a shared topic opened during authority recovery reads its projection after activation', async () => {
+    const entered = deferred(), hold = deferred();
+    const { authority, queue, events } = fixture(async () => { entered.resolve(); await hold.promise; return {}; });
+    const handlers = new Map();
+    const history = [{ id: 'checkpoint-A' }, { id: 'input-B' }, { id: 'reply-B' }];
+    queue.isSyncEnabled = () => true;
+    queue.syncPolicy = { sharedExecution: { waitProjection: () => events.push('projection') } };
+    queue.readSnapshot = () => {
+        authority.assertNativeAdmission();
+        events.push('snapshot');
+        return { history };
+    };
+    require('../modules/ipc/nativeHistoryHandlers').initialize({
+        ipcMain: { handle: (name, handler) => handlers.set(name, handler) }, historyMutationQueue: queue,
+    });
+    const refresh = authority.refresh();
+    await entered.promise;
+    const snapshot = () => handlers.get('native-history:snapshot')(null, 'agent', 'agent', 'topic');
+    const opening = snapshot();
+    assert.throws(() => authority.assertNativeAdmission(), { code: 'HISTORY_AUTHORITY_PENDING' });
+    assert.deepEqual(events, ['protect-all']);
+    hold.resolve();
+    await refresh;
+    assert.deepEqual(await opening, { history });
+    assert.deepEqual(events, ['protect-all', 'activate', 'projection', 'snapshot']);
+    await authority.close();
+    assert.deepEqual(await snapshot(), { success: false, error: 'HISTORY_AUTHORITY_PENDING' });
+});
+
+test('a failed authority transition never publishes a snapshot to the waiting reader', async () => {
+    const entered = deferred(), hold = deferred();
+    const { authority } = fixture(async () => { entered.resolve(); await hold.promise; throw Error('synthetic protection failure'); });
+    const refresh = authority.refresh();
+    await entered.promise;
+    let reads = 0;
+    const opening = authority.readAfterTransition(() => { reads++; });
+    const rejected = Promise.all([refresh, opening].map(result => assert.rejects(result, /synthetic protection failure/)));
+    hold.resolve();
+    await rejected;
+    assert.equal(reads, 0);
+    assert.throws(() => authority.assertNativeAdmission(), { code: 'HISTORY_AUTHORITY_PENDING' });
 });

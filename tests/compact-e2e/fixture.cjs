@@ -10,6 +10,7 @@ const seed = [
     { id:'compact-same-2', role:'user', content:'SYNTHETIC SAME TEXT', timestamp:1700000000002 },
 ];
 const input = 'SYNTHETIC REOPENED COMPACTION';
+const toolInput = 'ORDINARY_TOOL_LOCAL';
 const tail = input + ' FIRST SEND';
 const next = input + ' NEXT SEND';
 const reply = '合成桌面回复完成。';
@@ -17,12 +18,12 @@ const checkpoint = '<context_checkpoint>\nSynthetic compaction summary. Unique m
 const summaryModel = 'synthetic-summary';
 const capturePath = out => path.join(out, 'compaction-handler.jsonl');
 
-function observe(out) {
+function observe(out, crossDevice = false) {
     return {
         seedCount: seed.length,
         preload: require.resolve('../context-chain/server-capture.cjs'),
         handlerLog: capturePath(out),
-        input,
+        input: crossDevice ? toolInput : input,
         reply,
         seed(f, source) {
             const actor = f.actor('C');
@@ -57,6 +58,6 @@ async function respond(body, row, res) {
 }
 
 module.exports = {
-    priorRows: seed, edited, tail, next, reply, checkpoint, summaryModel, capturePath, observe, stage, inputs, replies,
+    priorRows: seed, edited, tail, next, toolInput, reply, checkpoint, summaryModel, capturePath, observe, stage, inputs, replies,
     settings:{enableContextCompaction:true,contextCompactionModel:summaryModel},
 };

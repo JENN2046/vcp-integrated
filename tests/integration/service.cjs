@@ -196,7 +196,8 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 lostRequestId = row.body.requestId;
             }
         }
-        if(req.method==='GET'&&route.endsWith('/shared/request')){
+        const requestLookup = req.method === 'GET' && route.endsWith('/shared/request');
+        if(requestLookup){
             row.query=Object.fromEntries(url.searchParams);requests.push(row);
             if(drop&&lostRequestId&&url.searchParams.get('requestId')===lostRequestId){
                 row.status=503;row.injected=true;
@@ -208,14 +209,22 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             streamInterrupt?.observeSummaryRequest(row);
         }
         if (streamInterrupt && route === '/v1/chatvcp/completions') requests.push(row);
+        const observeRecoveredRequest = mode === 'compact-cross-device' && requestLookup &&
+            lostRequestId && row.query.requestId === lostRequestId;
         const isLocalChat = route === '/v1/local-chat/completions';
         const upstream = http.request({host:'127.0.0.1',port:backendPort,path:isLocalChat?'/v1/chat/completions':req.url,method:req.method,headers:{...req.headers, 'x-forwarded-proto':'https'}},async response => {
-            if (relevant) {
+            if (relevant || observeRecoveredRequest) {
                 const chunks=[];
                 for await (const chunk of response) chunks.push(chunk);
                 const payload=Buffer.concat(chunks);
                 row.status=response.statusCode;
-                try { row.response=JSON.parse(payload); } catch {}
+                try {
+                    const value = JSON.parse(payload);
+                    if (observeRecoveredRequest) {
+                        const request = value.request;
+                        row.response = { request:request && { id:request.id, requestId:request.requestId, state:request.state } };
+                    } else row.response = value;
+                } catch {}
                 if (relayAction && groupRelay.dropResponse?.(row)) {
                     row.dropped = true;
                     // Send only a prefix of the accepted response so the client cannot

@@ -1,0 +1,104 @@
+diff --git a/apps/desktop/modules/ipc/nativeHistoryHandlers.js b/apps/desktop/modules/ipc/nativeHistoryHandlers.js
+index 76afbe7..8c79fd0 100644
+--- a/apps/desktop/modules/ipc/nativeHistoryHandlers.js
++++ b/apps/desktop/modules/ipc/nativeHistoryHandlers.js
+@@ -1,3 +1,4 @@
+ 'use strict';
++const { authorityForQueue } = require('../services/historyAuthority');
+ const { mergeTerminal } = require('../services/nativeSync/mergeTerminal');
+ function initialize({ ipcMain, historyMutationQueue: queue }) {
+@@ -19,6 +20,11 @@ function initialize({ ipcMain, historyMutationQueue: queue }) {
+             const d = { itemId, itemType, topicId };
+             if (!queue.isSyncEnabled(d)) return { syncEnabled: false };
+-            await queue.syncPolicy?.sharedExecution?.waitProjection?.(d);
+-            return await queue.readSnapshot(d);
++            const read = async () => {
++                if (!queue.isSyncEnabled(d)) return { syncEnabled: false };
++                await queue.syncPolicy?.sharedExecution?.waitProjection?.(d);
++                return queue.readSnapshot(d);
++            };
++            const authority = authorityForQueue(queue);
++            return await (authority ? authority.readAfterTransition(read) : read());
+         }
+         catch (error) { return { success: false, error: error.code || error.message }; }
+diff --git a/apps/desktop/modules/services/historyAuthority.js b/apps/desktop/modules/services/historyAuthority.js
+index 5aefa81..f115989 100644
+--- a/apps/desktop/modules/services/historyAuthority.js
++++ b/apps/desktop/modules/services/historyAuthority.js
+@@ -45,4 +45,20 @@ class HistoryAuthority {
+         if (!this.singleInstance || ((this.blocked || this.closing) && !this.inChange)) throw pending('HISTORY_AUTHORITY_PENDING');
+     }
++    async readAfterTransition(readSnapshot) {
++        // A renderer can open a shared topic while recovery is publishing its
++        // protection descriptor. Re-read through the same gate after that work.
++        let waited;
++        for (;;) {
++            try {
++                this.assertNativeAdmission();
++                return await readSnapshot();
++            } catch (error) {
++                if (error.code !== 'HISTORY_AUTHORITY_PENDING' || this.closing || !this.singleInstance ||
++                    this.inChange || this.queue.isOperationActive() || waited === this.#tail) throw error;
++                waited = this.#tail;
++                await waited;
++            }
++        }
++    }
+     async derive() {
+         const descriptor = { ...empty(), ...structuredClone(await this.deriveProtection()) };
+diff --git a/apps/server/Plugin/NativeSync/mobile/effectiveContext.js b/apps/server/Plugin/NativeSync/mobile/effectiveContext.js
+index 2a60fc5..0b0f48f 100644
+--- a/apps/server/Plugin/NativeSync/mobile/effectiveContext.js
++++ b/apps/server/Plugin/NativeSync/mobile/effectiveContext.js
+@@ -8,6 +8,15 @@ const tavern=require('../nativeRules/modules/tavernRulesEngine');
+ // IO is supplied by the CAS adapter; context selection and Tavern semantics
+ // remain the author's locally deployed pure rules.
+-async function effectiveRequest(history,config,currentId,buildContent=async m=>[{type:'text',text:stripHiddenToolResults(m.content)}]){
+-    const rules=config.tavernRules||[],messages=[],selected=effectiveContextHistory(history);
++async function effectiveRequest(history,config,currentId,buildContent=async m=>[{type:'text',text:stripHiddenToolResults(m.content)}],journalHistory){
++    const rules=config.tavernRules||[],messages=[];
++    let selected=effectiveContextHistory(journalHistory||history);
++    if(journalHistory){
++        // Journal identity order defines the covered prefix. Preserve the
++        // existing conversation order within the native window's retained tail.
++        const checkpoint=isContextCheckpoint(selected[0])?selected[0]:null;
++        const retained=new Set(selected.map(message=>message.id));
++        selected=history.filter(message=>retained.has(message.id)&&message.id!==checkpoint?.id);
++        if(checkpoint)selected.unshift(checkpoint);
++    }
+     const transform=require('../sync/contracts.generated.cjs').sharedContextTransform(selected,config.stripRegexes,currentId);
+     for(const message of selected){
+diff --git a/apps/server/Plugin/NativeSync/mobile/execution.js b/apps/server/Plugin/NativeSync/mobile/execution.js
+index cf7229f..dc11f95 100644
+--- a/apps/server/Plugin/NativeSync/mobile/execution.js
++++ b/apps/server/Plugin/NativeSync/mobile/execution.js
+@@ -179,14 +179,15 @@ class ConversationExecution {
+             // replies from completed predecessor jobs even if they published
+             // after this user message was accepted. No new state/schema needed.
+-            const {predecessors,history}=this.store.readSnapshot(()=>{
++            const {predecessors,records}=this.store.readSnapshot(()=>{
+             const predecessors = this.db.prepare("SELECT user_message_id,reply_message_id FROM mobile_executions WHERE topic_key=? AND user_seq<? AND state='completed' AND reply_message_id IS NOT NULL ORDER BY user_seq").all(row.topic_key,row.user_seq);
+             const records = this.store.readProjected(()=>this.db.prepare(`SELECT * FROM (
+-                SELECT *,row_number() OVER(PARTITION BY msg_id ORDER BY seq DESC) AS r
++                SELECT *,row_number() OVER(PARTITION BY msg_id ORDER BY seq DESC) AS r,
++                    min(seq) OVER(PARTITION BY msg_id) AS first_seq
+                 FROM journal WHERE owner_type=? AND owner_id=? AND topic_id=? AND
+                 (seq<=? OR msg_id IN (SELECT value FROM json_each(?))))
+                 WHERE r=1 AND action='upsert' ORDER BY seq`).all(topic.ownerType, topic.ownerId, topic.topicId, row.user_seq,JSON.stringify(predecessors.map(p=>p.reply_message_id))));
+-            const history=records.map(r=>r.message).sort((a,b)=>a.timestamp-b.timestamp);
+-            return {predecessors,history};
++            return {predecessors,records};
+             });
++            const history=records.map(r=>r.message).sort((a,b)=>a.timestamp-b.timestamp);
+             const byId=new Map(history.map(m=>[m.id,m])),replyAfter=new Map(),relocated=new Set();
+             for(const p of predecessors)if(byId.has(p.user_message_id)&&byId.has(p.reply_message_id)){
+@@ -204,5 +205,8 @@ class ConversationExecution {
+             });
+             const attachmentBudget={bytes:0};
+-            const requestMessages=published?await require('./effectiveContext').effectiveRequest(ordered,published,row.user_message_id,async m=>m.attachments?.length?(this.attachments?this.attachments.content(row.topic_key,m,published.imageSupported,attachmentBudget):(()=>{throw error('ATTACHMENTS_NOT_ENABLED');})()):[{type:'text',text:m.content}]):[{role:'system',content:prompt},...messages];
++            const journalHistory=topic.sharedSpaceId&&published
++                ? records.sort((a,b)=>a.row.first_seq-b.row.first_seq).map(record=>record.message)
++                : undefined;
++            const requestMessages=published?await require('./effectiveContext').effectiveRequest(ordered,published,row.user_message_id,async m=>m.attachments?.length?(this.attachments?this.attachments.content(row.topic_key,m,published.imageSupported,attachmentBudget):(()=>{throw error('ATTACHMENTS_NOT_ENABLED');})()):[{type:'text',text:m.content}],journalHistory):[{role:'system',content:prompt},...messages];
+             // Context budgeting remains in the existing ToolBox handler. The
+             // complete central history is retained, including histories >200 rows.

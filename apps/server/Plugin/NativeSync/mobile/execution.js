@@ -178,16 +178,17 @@ class ConversationExecution {
             // Keep later submissions outside this task's snapshot, but include
             // replies from completed predecessor jobs even if they published
             // after this user message was accepted. No new state/schema needed.
-            const {predecessors,history}=this.store.readSnapshot(()=>{
+            const {predecessors,records}=this.store.readSnapshot(()=>{
             const predecessors = this.db.prepare("SELECT user_message_id,reply_message_id FROM mobile_executions WHERE topic_key=? AND user_seq<? AND state='completed' AND reply_message_id IS NOT NULL ORDER BY user_seq").all(row.topic_key,row.user_seq);
             const records = this.store.readProjected(()=>this.db.prepare(`SELECT * FROM (
-                SELECT *,row_number() OVER(PARTITION BY msg_id ORDER BY seq DESC) AS r
+                SELECT *,row_number() OVER(PARTITION BY msg_id ORDER BY seq DESC) AS r,
+                    min(seq) OVER(PARTITION BY msg_id) AS first_seq
                 FROM journal WHERE owner_type=? AND owner_id=? AND topic_id=? AND
                 (seq<=? OR msg_id IN (SELECT value FROM json_each(?))))
                 WHERE r=1 AND action='upsert' ORDER BY seq`).all(topic.ownerType, topic.ownerId, topic.topicId, row.user_seq,JSON.stringify(predecessors.map(p=>p.reply_message_id))));
-            const history=records.map(r=>r.message).sort((a,b)=>a.timestamp-b.timestamp);
-            return {predecessors,history};
+            return {predecessors,records};
             });
+            const history=records.map(r=>r.message).sort((a,b)=>a.timestamp-b.timestamp);
             const byId=new Map(history.map(m=>[m.id,m])),replyAfter=new Map(),relocated=new Set();
             for(const p of predecessors)if(byId.has(p.user_message_id)&&byId.has(p.reply_message_id)){
                 replyAfter.set(p.user_message_id,byId.get(p.reply_message_id));relocated.add(p.reply_message_id);
@@ -203,7 +204,10 @@ class ConversationExecution {
                 return { role: m.role, content: m.content };
             });
             const attachmentBudget={bytes:0};
-            const requestMessages=published?await require('./effectiveContext').effectiveRequest(ordered,published,row.user_message_id,async m=>m.attachments?.length?(this.attachments?this.attachments.content(row.topic_key,m,published.imageSupported,attachmentBudget):(()=>{throw error('ATTACHMENTS_NOT_ENABLED');})()):[{type:'text',text:m.content}]):[{role:'system',content:prompt},...messages];
+            const journalHistory=topic.sharedSpaceId&&published
+                ? records.sort((a,b)=>a.row.first_seq-b.row.first_seq).map(record=>record.message)
+                : undefined;
+            const requestMessages=published?await require('./effectiveContext').effectiveRequest(ordered,published,row.user_message_id,async m=>m.attachments?.length?(this.attachments?this.attachments.content(row.topic_key,m,published.imageSupported,attachmentBudget):(()=>{throw error('ATTACHMENTS_NOT_ENABLED');})()):[{type:'text',text:m.content}],journalHistory):[{role:'system',content:prompt},...messages];
             // Context budgeting remains in the existing ToolBox handler. The
             // complete central history is retained, including histories >200 rows.
             if(!topic.sharedSpaceId)releaseContext=require('../../../modules/requestExecutionContext').register(row.id,published,this.nativeTasks.hooks(row.id));

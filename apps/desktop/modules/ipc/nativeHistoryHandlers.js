@@ -1,4 +1,5 @@
 'use strict';
+const { authorityForQueue } = require('../services/historyAuthority');
 const { mergeTerminal } = require('../services/nativeSync/mergeTerminal');
 function initialize({ ipcMain, historyMutationQueue: queue }) {
     ipcMain.handle('native-history:status', () => queue.syncPolicy?.diagnostics() || { enabled: false });
@@ -18,8 +19,13 @@ function initialize({ ipcMain, historyMutationQueue: queue }) {
         try {
             const d = { itemId, itemType, topicId };
             if (!queue.isSyncEnabled(d)) return { syncEnabled: false };
-            await queue.syncPolicy?.sharedExecution?.waitProjection?.(d);
-            return await queue.readSnapshot(d);
+            const read = async () => {
+                if (!queue.isSyncEnabled(d)) return { syncEnabled: false };
+                await queue.syncPolicy?.sharedExecution?.waitProjection?.(d);
+                return queue.readSnapshot(d);
+            };
+            const authority = authorityForQueue(queue);
+            return await (authority ? authority.readAfterTransition(read) : read());
         }
         catch (error) { return { success: false, error: error.code || error.message }; }
     });

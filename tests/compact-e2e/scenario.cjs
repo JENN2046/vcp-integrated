@@ -14,7 +14,7 @@ const text = row => Array.isArray(row.content)
 const checkpointMessage = row => row.contextCompaction?.kind === 'vchat-context-checkpoint';
 const checkpointText = row => text(row)?.includes('COMPACT_DESKTOP_CHECKPOINT');
 
-module.exports = async ({ clients: { A }, out, result, service, picture, click, evalJs, waitUntil, start, stop, profiles, sha }) => {
+module.exports = async ({ clients: { A, B }, out, result, service, picture, click, evalJs, waitUntil, start, stop, profiles, sha }) => {
     const db = new DatabaseSync(path.join(service.data, 'central.sqlite'), { readOnly:true });
     const descriptor = service.descriptors.A.preSubmit;
     const topicId = service.topics.preSubmit.id;
@@ -26,15 +26,21 @@ module.exports = async ({ clients: { A }, out, result, service, picture, click, 
     const transcript = client => evalJs(client, "document.querySelector('#chatMessages').innerText");
     const compactIpc = client => client.events.filter(({event,data}) => event === 'ipc-result' && data.channel?.startsWith('native-sync:compact-'));
 
-    async function select(client) {
+    async function select(client, target = descriptor) {
         if (!await evalJs(client, "document.querySelector('#tabContentAgents').classList.contains('active')")) {
             await click(client, '.sidebar-tab-button[data-tab="agents"]');
         }
         await click(client, '#agentList > li .agent-name', 'Synthetic shared');
-        await waitUntil(async () => (await evalJs(client, 'window.VCPStateChannels.get("conversation.current").get()')).topicId === descriptor.topicId,
+        await waitUntil(async () => (await evalJs(client, 'window.VCPStateChannels.get("conversation.current").get()')).topicId === target.topicId,
             'shared topic selected');
-        await waitUntil(async () => (await evalJs(client, `window.chatAPI.getNativeDeletionContext(${quote(descriptor)})`))?.kind === 'shared',
-            'shared ownership');
+        await waitUntil(async () => {
+            try {
+                return (await evalJs(client, `window.chatAPI.getNativeDeletionContext(${quote(target)})`))?.kind === 'shared';
+            } catch (error) {
+                if (!error.message.includes("No handler registered for 'native-sync:directory-context'")) throw error;
+                return false;
+            }
+        }, 'shared ownership');
     }
 
     async function send(client, content, count) {
@@ -56,6 +62,15 @@ module.exports = async ({ clients: { A }, out, result, service, picture, click, 
     }
 
     try {
+        if (B) {
+            const other = service.descriptors.B.preSubmit;
+            await select(B, other);
+            await waitUntil(async () => (await transcript(B)).includes(fixture.edited), 'B sees edited shared History before going offline');
+            assert.equal(await evalJs(B, 'document.querySelectorAll(".vcp-context-checkpoint").length'), 0);
+            assert.notEqual(result.A.profileDigest, result.B.profileDigest);
+            await picture(B, 'B-before-A-compaction');
+            await stop('B');
+        }
         await select(A);
         const controlled = result.controlledTurns;
         const [editedTurn, deletedTurn] = controlled;
@@ -87,8 +102,10 @@ module.exports = async ({ clients: { A }, out, result, service, picture, click, 
         await click(A, '.context-menu-item', '压缩前文');
         const committed = await waitUntil(() => intents().find(row => row.state === 'committed'), 'durable checkpoint commit');
         const compacted = await waitUntil(() => history().find(checkpointMessage) && history(), 'physical checkpoint projection');
-        assert.deepEqual(compacted.slice(0, -1), prior);
-        const checkpoint = compacted.at(-1);
+        const checkpoint = compacted.find(checkpointMessage);
+        assert.deepEqual(compacted.filter(row => row.id !== checkpoint.id), prior);
+        if (B) assert.ok(prior.at(-1).timestamp > checkpoint.timestamp, 'fixture clock skew exceeds A checkpoint timestamp');
+        else assert.equal(compacted.at(-1).id, checkpoint.id);
         assert.equal(checkpoint.id, committed.message_id);
         assert.equal(checkpoint.contextCompaction.checkpoint, fixture.checkpoint);
         assert.deepEqual(journal().slice(0, -1), originalJournal);
@@ -114,6 +131,15 @@ module.exports = async ({ clients: { A }, out, result, service, picture, click, 
         await waitUntil(() => evalJs(A, 'document.querySelector(".vcp-context-checkpoint")?.checkVisibility()'), 'checkpoint card');
         await picture(A, 'checkpoint-committed');
         await stop('A');
+        if (B) {
+            result.compaction = { checkpoint, checkpointSeq:committed.committed_seq, source, proofLinks,
+                summaryCall, compactIpc:compactIpc(A) };
+            await require('./cross-device.cjs')({
+                out,result,service,picture,click,evalJs,waitUntil,start,stop,profiles,sha,select,db,
+                works,journal,intents,prior,compacted,originalJournal,checkpoint,
+            });
+            return;
+        }
         const reopened = await start('A-reopened', 'A');
         await select(reopened);
         assert.equal(result.A.profileDigest, result['A-reopened'].profileDigest);

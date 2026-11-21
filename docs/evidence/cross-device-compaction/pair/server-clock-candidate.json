@@ -1,0 +1,286 @@
+{
+  "revision": "63b2fe70da9e872deb4163dcd48eda5dea7cf419",
+  "source": "candidate worktree",
+  "node": "24.22.1",
+  "loadedFiles": {
+    "apps/server/modules/chatCompletionHandler.js": "f134bdf90f9e79250cb02f14324cf837a7732464bdf82efb3adf53baf7ae70e9",
+    "apps/server/Plugin/NativeSync/mobile/execution.js": "761918b0d8764b662a4e3da3e5ec119100fd6f29af94dd7a2ccf7c571848c5ad",
+    "apps/server/Plugin/NativeSync/mobile/effectiveContext.js": "d9649e5a7329714a17ca9375aa11fde88bc695b9199ef1e9aaea8b2b4250a84a",
+    "apps/desktop/modules/chat/historyWindow/index.mjs": "bc6ac15b2431321340508a8d5510f1d89f1c50bc62c8ff2906400d049db75338"
+  },
+  "cases": [
+    {
+      "name": "skewed-source",
+      "sourceRows": [
+        {
+          "id": "probe-ancient",
+          "role": "user",
+          "content": "SERVER-PROBE-ANCIENT-RAW",
+          "timestamp": 1700000000000
+        },
+        {
+          "id": "reply_request_d19725057f8643bbaff64229ed10983e",
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY",
+          "timestamp": 1795256436152
+        },
+        {
+          "id": "probe-clock-skewed",
+          "role": "user",
+          "content": "SERVER-PROBE-CLOCK-SKEWED-RAW",
+          "timestamp": 4102444800000
+        },
+        {
+          "id": "reply_request_50c3859b03654b89aa4904137f92b595",
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY",
+          "timestamp": 1795256436505
+        }
+      ],
+      "checkpoint": {
+        "success": true,
+        "messageId": "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+        "seq": 5,
+        "replayed": false,
+        "timestamp": 1800000000000,
+        "content": "SERVER-PROBE-CHECKPOINT-skewed-source"
+      },
+      "coveredEdit": null,
+      "submission": {
+        "requestId": "probe-next-skewed-source",
+        "workId": "request_e465f72868ca44dabfc3efb8edaab7db",
+        "userSeq": 6,
+        "contextHead": 5
+      },
+      "work": {
+        "state": "completed",
+        "attempts": 1,
+        "request_dispatched": 1
+      },
+      "selection": {
+        "beforeIds": [
+          "probe-ancient",
+          "reply_request_d19725057f8643bbaff64229ed10983e",
+          "probe-clock-skewed",
+          "reply_request_50c3859b03654b89aa4904137f92b595",
+          "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+          "probe-next-skewed-source"
+        ],
+        "afterIds": [
+          "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+          "probe-next-skewed-source"
+        ]
+      },
+      "handler": [
+        {
+          "role": "system",
+          "content": "FROZEN_SHARED_PROMPT"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-CHECKPOINT-skewed-source"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-NEXT skewed-source"
+        }
+      ],
+      "provider": [
+        {
+          "role": "system",
+          "content": "FROZEN_SHARED_PROMPT"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-CHECKPOINT-skewed-source"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-NEXT skewed-source"
+        }
+      ],
+      "bindingIds": [
+        "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+        "probe-next-skewed-source"
+      ]
+    },
+    {
+      "name": "second-checkpoint",
+      "sourceRows": [
+        {
+          "id": "probe-ancient",
+          "role": "user",
+          "content": "SERVER-PROBE-ANCIENT-RAW",
+          "timestamp": 1700000000000
+        },
+        {
+          "id": "reply_request_d19725057f8643bbaff64229ed10983e",
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY",
+          "timestamp": 1795256436152
+        },
+        {
+          "id": "probe-clock-skewed",
+          "role": "user",
+          "content": "SERVER-PROBE-CLOCK-SKEWED-RAW",
+          "timestamp": 4102444800000
+        },
+        {
+          "id": "reply_request_50c3859b03654b89aa4904137f92b595",
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY",
+          "timestamp": 1795256436505
+        },
+        {
+          "id": "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+          "role": "user",
+          "content": "SERVER-PROBE-CHECKPOINT-skewed-source",
+          "timestamp": 1800000000000
+        },
+        {
+          "id": "probe-next-skewed-source",
+          "role": "user",
+          "content": "SERVER-PROBE-NEXT skewed-source",
+          "timestamp": 1600000000000
+        },
+        {
+          "id": "reply_request_e465f72868ca44dabfc3efb8edaab7db",
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY",
+          "timestamp": 1795256436686
+        }
+      ],
+      "checkpoint": {
+        "success": true,
+        "messageId": "checkpoint_compact_52ec880e20e7d5a3f52d746cd5f3f3490d5694be",
+        "seq": 8,
+        "replayed": false,
+        "timestamp": 1750000000000,
+        "content": "SERVER-PROBE-CHECKPOINT-second-checkpoint"
+      },
+      "coveredEdit": {
+        "id": "probe-clock-skewed",
+        "seq": 9,
+        "content": "SERVER-PROBE-EDITED-COVERED-RAW",
+        "timestamp": 4202444800000
+      },
+      "submission": {
+        "requestId": "probe-next-second-checkpoint",
+        "workId": "request_b05ce9d6405a45588fabf59278436239",
+        "userSeq": 10,
+        "contextHead": 9
+      },
+      "work": {
+        "state": "completed",
+        "attempts": 1,
+        "request_dispatched": 1
+      },
+      "selection": {
+        "beforeIds": [
+          "probe-ancient",
+          "reply_request_d19725057f8643bbaff64229ed10983e",
+          "probe-clock-skewed",
+          "reply_request_50c3859b03654b89aa4904137f92b595",
+          "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+          "probe-next-skewed-source",
+          "reply_request_e465f72868ca44dabfc3efb8edaab7db",
+          "checkpoint_compact_52ec880e20e7d5a3f52d746cd5f3f3490d5694be",
+          "probe-next-second-checkpoint"
+        ],
+        "afterIds": [
+          "checkpoint_compact_52ec880e20e7d5a3f52d746cd5f3f3490d5694be",
+          "probe-next-second-checkpoint"
+        ]
+      },
+      "handler": [
+        {
+          "role": "system",
+          "content": "FROZEN_SHARED_PROMPT"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-CHECKPOINT-second-checkpoint"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-NEXT second-checkpoint"
+        }
+      ],
+      "provider": [
+        {
+          "role": "system",
+          "content": "FROZEN_SHARED_PROMPT"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-CHECKPOINT-second-checkpoint"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-NEXT second-checkpoint"
+        }
+      ],
+      "bindingIds": [
+        "checkpoint_compact_52ec880e20e7d5a3f52d746cd5f3f3490d5694be",
+        "probe-next-second-checkpoint"
+      ]
+    }
+  ],
+  "journal": [
+    {
+      "seq": 1,
+      "msg_id": "probe-ancient",
+      "action": "upsert"
+    },
+    {
+      "seq": 2,
+      "msg_id": "reply_request_d19725057f8643bbaff64229ed10983e",
+      "action": "upsert"
+    },
+    {
+      "seq": 3,
+      "msg_id": "probe-clock-skewed",
+      "action": "upsert"
+    },
+    {
+      "seq": 4,
+      "msg_id": "reply_request_50c3859b03654b89aa4904137f92b595",
+      "action": "upsert"
+    },
+    {
+      "seq": 5,
+      "msg_id": "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+      "action": "upsert"
+    },
+    {
+      "seq": 6,
+      "msg_id": "probe-next-skewed-source",
+      "action": "upsert"
+    },
+    {
+      "seq": 7,
+      "msg_id": "reply_request_e465f72868ca44dabfc3efb8edaab7db",
+      "action": "upsert"
+    },
+    {
+      "seq": 8,
+      "msg_id": "checkpoint_compact_52ec880e20e7d5a3f52d746cd5f3f3490d5694be",
+      "action": "upsert"
+    },
+    {
+      "seq": 9,
+      "msg_id": "probe-clock-skewed",
+      "action": "upsert"
+    },
+    {
+      "seq": 10,
+      "msg_id": "probe-next-second-checkpoint",
+      "action": "upsert"
+    },
+    {
+      "seq": 11,
+      "msg_id": "reply_request_b05ce9d6405a45588fabf59278436239",
+      "action": "upsert"
+    }
+  ]
+}

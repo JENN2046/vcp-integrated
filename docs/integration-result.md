@@ -56,3 +56,5 @@ AgentAssistant 长委托已接入共享单聊的 Work。桌面重开、发起端
 共享单聊压缩输入已按原消息 ID 和 Journal 当前版本处理编辑与删除。同文不同 ID、真实桌面生成检查点以及重开后的模型请求见[压缩输入交付](evidence/compaction-input/README.md)。
 
 本机单聊的六项自动中断测试已通过。真实桌面在两种角色分隔设置下均能在工具返回处中断，部分回复以原 ID 落盘后触发自动压缩。基线、候选、重开结果与截图见[本机流式中断回执](evidence/local-stream-interrupt/README.md)。
+
+共享单聊已完成 A 发布检查点并退出、B 重开同话题发送和丢接纳回执后的恢复验证。原生窗口按 Journal 消息顺序选择检查点，两次独立桌面实测均找回原 Work，无重复派发或工具执行。[跨端接续差异、回执和截图](evidence/cross-device-compaction/README.md)

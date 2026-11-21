@@ -11,7 +11,7 @@ const inputs = ['SYNTHETIC CONTROLLED EDIT TURN', 'SYNTHETIC CONTROLLED DELETE T
 const replies = ['SYNTHETIC ARCHIVED ORIGINAL EDIT', 'SYNTHETIC ARCHIVED ORIGINAL DELETE'];
 const edited = 'SYNTHETIC UPDATED EDIT TEXT';
 
-async function stage(service, out) {
+async function stage(service, out, crossDevice = false) {
     const sharedSpaceId = 'sharedAB';
     const sharedId = service.topics.preSubmit.id;
     const scope = { sharedSpaceId, sharedId };
@@ -39,7 +39,8 @@ async function stage(service, out) {
     const turns = [];
     try {
         for (const [index, content] of inputs.entries()) {
-            const message = { id:'compact-controlled-user-' + index, role:'user', content, timestamp:1700000000010 + index * 2 };
+            const timestamp = crossDevice && index === 1 ? Date.now() + 5 * 60 * 1000 : 1700000000010 + index * 2;
+            const message = { id:'compact-controlled-user-' + index, role:'user', content, timestamp };
             const initial = await api('context?' + new URLSearchParams(scope));
             const work = await api('admit', {
                 ...scope, requestId:message.id, expectedHead:initial.head, configHash:initial.hash, message, controlMode:'text-only-v1',

@@ -44,6 +44,22 @@ class HistoryAuthority {
     assertNativeAdmission() {
         if (!this.singleInstance || ((this.blocked || this.closing) && !this.inChange)) throw pending('HISTORY_AUTHORITY_PENDING');
     }
+    async readAfterTransition(readSnapshot) {
+        // A renderer can open a shared topic while recovery is publishing its
+        // protection descriptor. Re-read through the same gate after that work.
+        let waited;
+        for (;;) {
+            try {
+                this.assertNativeAdmission();
+                return await readSnapshot();
+            } catch (error) {
+                if (error.code !== 'HISTORY_AUTHORITY_PENDING' || this.closing || !this.singleInstance ||
+                    this.inChange || this.queue.isOperationActive() || waited === this.#tail) throw error;
+                waited = this.#tail;
+                await waited;
+            }
+        }
+    }
     async derive() {
         const descriptor = { ...empty(), ...structuredClone(await this.deriveProtection()) };
         const nativeSyncProtection = structuredClone(descriptor);

@@ -1,0 +1,326 @@
+{
+  "revision": "63b2fe70da9e872deb4163dcd48eda5dea7cf419",
+  "source": "git baseline",
+  "node": "24.22.1",
+  "loadedFiles": {
+    "apps/server/modules/chatCompletionHandler.js": "f134bdf90f9e79250cb02f14324cf837a7732464bdf82efb3adf53baf7ae70e9",
+    "apps/server/Plugin/NativeSync/mobile/execution.js": "a3047f7951e3b6030ca1ea6d3163172171bd1c14ef9ff3d29bb234dd24f76e12",
+    "apps/server/Plugin/NativeSync/mobile/effectiveContext.js": "7cc2e5eda287de64026ebe883c4dc9ddcd5459ae33b6bd66aae26534a0e95ba1",
+    "apps/desktop/modules/chat/historyWindow/index.mjs": "bc6ac15b2431321340508a8d5510f1d89f1c50bc62c8ff2906400d049db75338"
+  },
+  "cases": [
+    {
+      "name": "skewed-source",
+      "sourceRows": [
+        {
+          "id": "probe-ancient",
+          "role": "user",
+          "content": "SERVER-PROBE-ANCIENT-RAW",
+          "timestamp": 1700000000000
+        },
+        {
+          "id": "reply_request_a9324603c22a4ae0b3d1175934b13072",
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY",
+          "timestamp": 1795256432750
+        },
+        {
+          "id": "probe-clock-skewed",
+          "role": "user",
+          "content": "SERVER-PROBE-CLOCK-SKEWED-RAW",
+          "timestamp": 4102444800000
+        },
+        {
+          "id": "reply_request_a3675296f67347f483db6b476eba28d5",
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY",
+          "timestamp": 1795256433302
+        }
+      ],
+      "checkpoint": {
+        "success": true,
+        "messageId": "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+        "seq": 5,
+        "replayed": false,
+        "timestamp": 1800000000000,
+        "content": "SERVER-PROBE-CHECKPOINT-skewed-source"
+      },
+      "coveredEdit": null,
+      "submission": {
+        "requestId": "probe-next-skewed-source",
+        "workId": "request_da69b401dc6242ec81b740cac6c19c0f",
+        "userSeq": 6,
+        "contextHead": 5
+      },
+      "work": {
+        "state": "completed",
+        "attempts": 1,
+        "request_dispatched": 1
+      },
+      "selection": {
+        "beforeIds": [
+          "probe-ancient",
+          "reply_request_a9324603c22a4ae0b3d1175934b13072",
+          "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+          "probe-clock-skewed",
+          "reply_request_a3675296f67347f483db6b476eba28d5",
+          "probe-next-skewed-source"
+        ],
+        "afterIds": [
+          "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+          "probe-clock-skewed",
+          "reply_request_a3675296f67347f483db6b476eba28d5",
+          "probe-next-skewed-source"
+        ]
+      },
+      "handler": [
+        {
+          "role": "system",
+          "content": "FROZEN_SHARED_PROMPT"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-CHECKPOINT-skewed-source"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-CLOCK-SKEWED-RAW"
+        },
+        {
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-NEXT skewed-source"
+        }
+      ],
+      "provider": [
+        {
+          "role": "system",
+          "content": "FROZEN_SHARED_PROMPT"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-CHECKPOINT-skewed-source"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-CLOCK-SKEWED-RAW"
+        },
+        {
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-NEXT skewed-source"
+        }
+      ],
+      "bindingIds": [
+        "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+        "probe-clock-skewed",
+        "reply_request_a3675296f67347f483db6b476eba28d5",
+        "probe-next-skewed-source"
+      ]
+    },
+    {
+      "name": "second-checkpoint",
+      "sourceRows": [
+        {
+          "id": "probe-ancient",
+          "role": "user",
+          "content": "SERVER-PROBE-ANCIENT-RAW",
+          "timestamp": 1700000000000
+        },
+        {
+          "id": "reply_request_a9324603c22a4ae0b3d1175934b13072",
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY",
+          "timestamp": 1795256432750
+        },
+        {
+          "id": "probe-clock-skewed",
+          "role": "user",
+          "content": "SERVER-PROBE-CLOCK-SKEWED-RAW",
+          "timestamp": 4102444800000
+        },
+        {
+          "id": "reply_request_a3675296f67347f483db6b476eba28d5",
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY",
+          "timestamp": 1795256433302
+        },
+        {
+          "id": "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+          "role": "user",
+          "content": "SERVER-PROBE-CHECKPOINT-skewed-source",
+          "timestamp": 1800000000000
+        },
+        {
+          "id": "probe-next-skewed-source",
+          "role": "user",
+          "content": "SERVER-PROBE-NEXT skewed-source",
+          "timestamp": 1600000000000
+        },
+        {
+          "id": "reply_request_da69b401dc6242ec81b740cac6c19c0f",
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY",
+          "timestamp": 1795256434511
+        }
+      ],
+      "checkpoint": {
+        "success": true,
+        "messageId": "checkpoint_compact_52ec880e20e7d5a3f52d746cd5f3f3490d5694be",
+        "seq": 8,
+        "replayed": false,
+        "timestamp": 1750000000000,
+        "content": "SERVER-PROBE-CHECKPOINT-second-checkpoint"
+      },
+      "coveredEdit": {
+        "id": "probe-clock-skewed",
+        "seq": 9,
+        "content": "SERVER-PROBE-EDITED-COVERED-RAW",
+        "timestamp": 4202444800000
+      },
+      "submission": {
+        "requestId": "probe-next-second-checkpoint",
+        "workId": "request_bc75ef573d0448699afddaa2924868c8",
+        "userSeq": 10,
+        "contextHead": 9
+      },
+      "work": {
+        "state": "completed",
+        "attempts": 1,
+        "request_dispatched": 1
+      },
+      "selection": {
+        "beforeIds": [
+          "probe-next-skewed-source",
+          "reply_request_da69b401dc6242ec81b740cac6c19c0f",
+          "probe-ancient",
+          "reply_request_a9324603c22a4ae0b3d1175934b13072",
+          "checkpoint_compact_52ec880e20e7d5a3f52d746cd5f3f3490d5694be",
+          "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+          "probe-clock-skewed",
+          "reply_request_a3675296f67347f483db6b476eba28d5",
+          "probe-next-second-checkpoint"
+        ],
+        "afterIds": [
+          "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+          "probe-clock-skewed",
+          "reply_request_a3675296f67347f483db6b476eba28d5",
+          "probe-next-second-checkpoint"
+        ]
+      },
+      "handler": [
+        {
+          "role": "system",
+          "content": "FROZEN_SHARED_PROMPT"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-CHECKPOINT-skewed-source"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-EDITED-COVERED-RAW"
+        },
+        {
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-NEXT second-checkpoint"
+        }
+      ],
+      "provider": [
+        {
+          "role": "system",
+          "content": "FROZEN_SHARED_PROMPT"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-CHECKPOINT-skewed-source"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-EDITED-COVERED-RAW"
+        },
+        {
+          "role": "assistant",
+          "content": "SERVER-PROBE-REPLY"
+        },
+        {
+          "role": "user",
+          "content": "SERVER-PROBE-NEXT second-checkpoint"
+        }
+      ],
+      "bindingIds": [
+        "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+        "probe-clock-skewed",
+        "reply_request_a3675296f67347f483db6b476eba28d5",
+        "probe-next-second-checkpoint"
+      ]
+    }
+  ],
+  "journal": [
+    {
+      "seq": 1,
+      "msg_id": "probe-ancient",
+      "action": "upsert"
+    },
+    {
+      "seq": 2,
+      "msg_id": "reply_request_a9324603c22a4ae0b3d1175934b13072",
+      "action": "upsert"
+    },
+    {
+      "seq": 3,
+      "msg_id": "probe-clock-skewed",
+      "action": "upsert"
+    },
+    {
+      "seq": 4,
+      "msg_id": "reply_request_a3675296f67347f483db6b476eba28d5",
+      "action": "upsert"
+    },
+    {
+      "seq": 5,
+      "msg_id": "checkpoint_compact_1d45eb6e46b85f5ae36d168698fe0eb3aa6dfb2d",
+      "action": "upsert"
+    },
+    {
+      "seq": 6,
+      "msg_id": "probe-next-skewed-source",
+      "action": "upsert"
+    },
+    {
+      "seq": 7,
+      "msg_id": "reply_request_da69b401dc6242ec81b740cac6c19c0f",
+      "action": "upsert"
+    },
+    {
+      "seq": 8,
+      "msg_id": "checkpoint_compact_52ec880e20e7d5a3f52d746cd5f3f3490d5694be",
+      "action": "upsert"
+    },
+    {
+      "seq": 9,
+      "msg_id": "probe-clock-skewed",
+      "action": "upsert"
+    },
+    {
+      "seq": 10,
+      "msg_id": "probe-next-second-checkpoint",
+      "action": "upsert"
+    },
+    {
+      "seq": 11,
+      "msg_id": "reply_request_bc75ef573d0448699afddaa2924868c8",
+      "action": "upsert"
+    }
+  ]
+}

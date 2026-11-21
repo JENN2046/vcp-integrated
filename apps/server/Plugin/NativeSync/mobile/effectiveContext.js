@@ -7,8 +7,17 @@ const tavern=require('../nativeRules/modules/tavernRulesEngine');
 
 // IO is supplied by the CAS adapter; context selection and Tavern semantics
 // remain the author's locally deployed pure rules.
-async function effectiveRequest(history,config,currentId,buildContent=async m=>[{type:'text',text:stripHiddenToolResults(m.content)}]){
-    const rules=config.tavernRules||[],messages=[],selected=effectiveContextHistory(history);
+async function effectiveRequest(history,config,currentId,buildContent=async m=>[{type:'text',text:stripHiddenToolResults(m.content)}],journalHistory){
+    const rules=config.tavernRules||[],messages=[];
+    let selected=effectiveContextHistory(journalHistory||history);
+    if(journalHistory){
+        // Journal identity order defines the covered prefix. Preserve the
+        // existing conversation order within the native window's retained tail.
+        const checkpoint=isContextCheckpoint(selected[0])?selected[0]:null;
+        const retained=new Set(selected.map(message=>message.id));
+        selected=history.filter(message=>retained.has(message.id)&&message.id!==checkpoint?.id);
+        if(checkpoint)selected.unshift(checkpoint);
+    }
     const transform=require('../sync/contracts.generated.cjs').sharedContextTransform(selected,config.stripRegexes,currentId);
     for(const message of selected){
         const checkpoint=isContextCheckpoint(message);

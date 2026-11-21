@@ -29,6 +29,62 @@ test('one HTTP session send owns durable execution and completes without a deskt
  await start(f);await completed(f,id);assert.equal(f.calls(),1);assert.equal(f.store.metrics().journalRows,2);assert.equal(f.shared.active(f.topic.id),undefined);
  assert.equal(f.shared.workState(f.actor('B'),{sharedSpaceId:'sharedAB',workId:id}).request.state,'completed');
 });
+test('shared session context follows checkpoint publication order across device clocks and message edits', async t => {
+ const f = await fixture(t);
+ const actorA = f.actor('A'), actorB = f.actor('B');
+ const scope = { sharedSpaceId:'sharedAB', sharedId:f.topic.id };
+ const packets = [];
+ f.control.modelResponse = body => {
+  packets.push(body);
+  return {choices:[{message:{role:'assistant',content:'reply '+body.requestId},finish_reason:'stop'}]};
+ };
+ async function send(actor, id, timestamp) {
+  const context = f.shared.executionConfig(actor, scope);
+  const message = { id, role:'user', content:id, timestamp };
+  const accepted = f.shared.sessionSend(actor, {
+   ...scope, requestId:id, expectedHead:context.head, configHash:context.hash, message,
+  });
+  await start(f);
+  await completed(f, accepted.id);
+  return { message, replyId:f.portal.engine.get(accepted.id).reply_message_id, workId:accepted.id };
+ }
+ function compact(text, timestamp, covered) {
+  const context = f.shared.executionConfig(actorA, scope);
+  const intent = f.shared.compactPrepare(actorA, { ...scope, opId:'prepare-'+timestamp, expectedHead:context.head });
+  const input = f.shared.compactInput(actorA, { ...scope, id:intent.id });
+  assert.ok(input.history.some(message => message.id === covered));
+  const message = {
+   id:intent.messageId, role:'user', content:text, timestamp,
+   contextCompaction:{kind:'vchat-context-checkpoint',version:1,checkpoint:text},
+  };
+  return f.shared.compactCommit(actorA, {
+   ...scope, id:intent.id, sourceHash:intent.sourceHash, opId:'commit-'+timestamp, message,
+  });
+ }
+ function assertPacket(ids, contents) {
+  const packet = packets.at(-1);
+  assert.deepEqual(packet.vcpchatExtensions.messageTimestampBindings.map(binding => binding.messageId), ids);
+  assert.deepEqual(packet.messages.slice(1).map(message => message.content.map(part => part.text).join('')), contents);
+ }
+ const covered = await send(actorA, 'covered-input', 200);
+ const first = compact('first checkpoint', 100, covered.message.id);
+ const skewed = await send(actorB, 'between-checkpoints', 300);
+ assertPacket([first.messageId, skewed.message.id], ['first checkpoint', skewed.message.content]);
+ const last = compact('latest checkpoint', 60, skewed.message.id);
+ const base = f.store.db.prepare('SELECT hash FROM messages WHERE topic_id=? AND msg_id=?').get(f.topic.id, skewed.message.id);
+ const edit = f.shared.editMessage(actorA, {...scope, operation:{
+  msgId:skewed.message.id, deviceId:actorA.principal, opId:'edit-covered', baseHash:base.hash, action:'upsert',
+  message:{...skewed.message, content:'edited covered text', timestamp:400},
+ }});
+ assert.ok(edit.seq > last.seq);
+ const retained = await send(actorB, 'retained-input', 40);
+ assertPacket([last.messageId, retained.message.id], ['latest checkpoint', retained.message.content]);
+ const current = await send(actorB, 'current-input', 20);
+ assertPacket([last.messageId, retained.message.id, retained.replyId, current.message.id],
+  ['latest checkpoint', retained.message.content, 'reply '+retained.workId, current.message.content]);
+ assert.equal(f.calls(), 4);
+ assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM journal WHERE topic_id=?').get(f.topic.id).n, 11);
+});
 test('a shared single checks the work fence once at the native provider boundary', async t => {
  for (const hold of [false, true]) {
   await t.test(hold ? 'held before provider dispatch' : 'accepted provider dispatch', async t => {

@@ -1,0 +1,20 @@
+{
+  "desktopBase": "63b2fe70da9e872deb4163dcd48eda5dea7cf419",
+  "beforeReadFix": [
+    {
+      "view": "A checkpoint on first B reopen",
+      "error": "Sync failed: Could not fetch new history. HISTORY_AUTHORITY_PENDING",
+      "at": 1795256568200,
+      "originalEvidenceSha256": "0cfc5daca985b12ad7a78d45ab624ec61b487f973df4ebf46cdde788490065ba",
+      "observedOutcome": "Error: Timed out: B sees the shared checkpoint"
+    },
+    {
+      "view": "original reply after B recovery",
+      "error": "加载话题 \"ns_bc5ecca2cee78d21ffcd5d1c\" 的聊天记录失败: HISTORY_AUTHORITY_PENDING",
+      "at": 1795256466262,
+      "originalEvidenceSha256": "b2bb753cbcd2fcb4c19bd6d50ef3fce6673bf652bb1db1d180a0a3531765fec4",
+      "observedOutcome": "Reply visible while initial History error remained in the selected conversation"
+    }
+  ],
+  "fixedEvidence": "desktop/candidate.json"
+}
