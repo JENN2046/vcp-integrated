@@ -19,6 +19,7 @@ const ordinaryModes = { 'ordinary-shared': 'pre-only', 'ordinary-local': 'local-
 const ordinaryMode = Object.hasOwn(ordinaryModes, requested) ? ordinaryModes[requested] : undefined;
 const nativeQueue = requested === 'native-local-queue' ? require('../group-extra/local.cjs') : undefined;
 const aaDesktop = requested === 'aa-desktop';
+const streamInterrupt = requested === 'local-stream-interrupt' ? require('../local-stream-interrupt/fixture.cjs') : undefined;
 const compaction = requested === 'compact-e2e' ? require('../compact-e2e/fixture.cjs') : undefined;
 const approvalRestoreModes = { 'approval-restore': 'desktop', 'approval-restore-stale': 'stale' };
 const approvalRestore = Object.hasOwn(approvalRestoreModes, requested) ? approvalRestoreModes[requested] : undefined;
@@ -37,8 +38,8 @@ const ordinaryFixture = ordinaryMode || approvalRestore ? {
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e]');
+if (![...modes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'local-stream-interrupt'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|local-stream-interrupt]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -167,7 +168,7 @@ async function runCase(root, mode) {
         try {
             service = await require('./service.cjs').start({
                 out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision, groupRelay,
-                observedContext: compaction?.observe(out),
+                observedContext: compaction?.observe(out), streamInterrupt: streamInterrupt?.observe(out),
             });
         } finally { fs.rmSync(key, { force: true }); }
     }
@@ -248,13 +249,13 @@ async function runCase(root, mode) {
     };
     try {
         if (compaction) result.controlledTurns = await compaction.stage(service, out);
-        const roles = approvalRestore || aaDesktop || nativeQueue || compaction ? ['A'] : ['A', 'B'];
+        const roles = approvalRestore || aaDesktop || nativeQueue || compaction || streamInterrupt ? ['A'] : ['A', 'B'];
         for(const role of roles){
             const profile=profiles[role]=path.join(out,'profile-'+role);
             if (mode==='local-only' && role==='A') {
                 const write=(rel,obj)=>{const file=path.join(profile,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,json(obj));};
                 write('settings.json',{vcpApiKey:'synthetic-only',disableAsana:true,disableUpdateCheck:true});
-                write('Agents/local-agent/config.json',{id:'local-agent',name:'Synthetic local',model:'synthetic',systemPrompt:'Synthetic test',streamOutput:false,topics:[{id:'local-topic',name:'Local topic',createdAt:1}],current_topic_id:'local-topic'});
+                write('Agents/local-agent/config.json',{id:'local-agent',name:'Synthetic local',model:'synthetic',systemPrompt:'Synthetic test',streamOutput:false,...streamInterrupt?.agent,topics:[{id:'local-topic',name:'Local topic',createdAt:1}],current_topic_id:'local-topic'});
                 write('UserData/local-agent/topics/local-topic/history.json',[]);
                 for (const speaker of nativeQueue?.agents || []) {
                     const id = 'local-group-' + speaker.toLowerCase();
@@ -266,10 +267,10 @@ async function runCase(root, mode) {
             } else await restoreProfile(path.join(out,'seed','desktop'+role),profile,service.origin,role);
             const settingsFile=path.join(profile,'settings.json');
             fs.writeFileSync(settingsFile,json({...read(settingsFile),ChatDataServiceEnabled:true,ChatDataServiceNotifyEnabled:false,ChatDataServiceTantivyEnabled:false,vcpServerUrl:service.origin+(compaction?'/v1/chat/completions':'/v1/local-chat/completions'),
-                ...compaction?.settings,userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
+                ...compaction?.settings,...streamInterrupt?.settings,userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
         }
         const [A,B] = await Promise.all(roles.map(role => start(role)));
-        if (!approvalRestore && !compaction) {
+        if (!approvalRestore && !compaction && !streamInterrupt) {
             result.mobile = await service.checkMobile();
             if (mode !== 'idle') result.mobile.chromium = await A.command('mobile', service.origin + '/mobile/');
         }
@@ -287,6 +288,7 @@ async function runCase(root, mode) {
             result.idle = await require('./idle.cjs').measure({out, waitUntil, pids:{ A:A.proc.pid, B:B.proc.pid, backend:service.backendPid }});
         } else if (mode !== 'ready') {
             const runScenario = compaction ? require('../compact-e2e/scenario.cjs')
+                : streamInterrupt ? require('../local-stream-interrupt/scenario.cjs')
                 : aaDesktop ? require('../aa-desktop/scenario.cjs')
                 : approvalRestore ? require('../approval-restore/' + approvalRestore + '.cjs')
                 : nativeQueue ? nativeQueue.scenario
@@ -341,7 +343,7 @@ async function main() {
     const xvfb = devDisplay ? null : await isolatedDisplay(root);
     if (devDisplay) display = devDisplay;
     try {
-        for (const mode of requested === 'all' ? modes : [nativeQueue ? 'local-only' : ordinaryMode || requested]) await runCase(root, mode);
+        for (const mode of requested === 'all' ? modes : [nativeQueue || streamInterrupt ? 'local-only' : ordinaryMode || requested]) await runCase(root, mode);
     } finally {
         if (xvfb && xvfb.exitCode === null && xvfb.signalCode === null) {
             const exited = once(xvfb, 'exit');

@@ -97,7 +97,11 @@ async function createTopicMessageAdmissionHost({
             || message.role !== 'assistant' || message.isThinking || message.isPendingStream) {
             throw new TypeError('终稿提交需要单聊目标与完整 assistant 消息');
         }
-        if (!['completed','stop'].includes(message.finishReason) || message.error || message.nativeFailure) {
+        const interrupted = message.finishReason === 'interrupted' &&
+            typeof message.admissionToken === 'string' && message.admissionToken.length > 0 &&
+            (message.id === `admission_${message.admissionToken}` || message.id === message.admissionToken) &&
+            typeof message.content === 'string' && message.content.trim().length > 0;
+        if ((!interrupted && !['completed','stop'].includes(message.finishReason)) || message.error || message.nativeFailure) {
             throw Object.assign(new Error('NATIVE_TERMINAL_REVIEW_REQUIRED'), { code: 'NATIVE_TERMINAL_REVIEW_REQUIRED' });
         }
         const target = structuredClone(scope);
@@ -106,18 +110,27 @@ async function createTopicMessageAdmissionHost({
         if (typeof terminal.admissionToken === 'string' && terminal.admissionToken) {
             terminal.admissionTerminal = true;
         }
-        await validate(target);
-        const result = await historyQueue.mutate(target, history => {
-            const index = history.findIndex(item => item.id === terminal.id);
-            if (index >= 0) {
-                if (history[index].role !== 'assistant') throw new Error('终稿 ID 与非 assistant 消息冲突');
-                history[index] = { ...history[index], ...terminal };
-            } else {
-                history.push(terminal);
-            }
-            return history;
-        }, { requireExisting: true });
-        return { success: true, messageId: terminal.id, history: result.history };
+        const persist = async () => {
+            await validate(target);
+            const result = await historyQueue.mutate(target, history => {
+                const index = history.findIndex(item => item.id === terminal.id);
+                if (index >= 0) {
+                    if (history[index].role !== 'assistant') throw new Error('终稿 ID 与非 assistant 消息冲突');
+                    if (interrupted && history[index].admissionTerminal &&
+                        (history[index].finishReason !== terminal.finishReason || history[index].content !== terminal.content)) {
+                        throw new Error('NATIVE_TERMINAL_CONFLICT');
+                    }
+                    history[index] = { ...history[index], ...terminal };
+                } else {
+                    history.push(terminal);
+                }
+                return history;
+            }, { requireExisting: true });
+            return { success: true, messageId: terminal.id, history: result.history };
+        };
+        // Only the current local request may save its interrupted prefix.
+        // Recovery still requires a completed/stop receipt to advance on restart.
+        return interrupted ? service.withActiveLease(target, terminal.admissionToken, persist) : persist();
     });
     register('topic-admission:withdraw', (_event, scope, entryId) => service.withdraw(scope, entryId));
     register('topic-admission:resume', (_event, scope) => service.resume(scope));

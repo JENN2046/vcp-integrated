@@ -22,7 +22,7 @@ async function jsonBody(req) {
     for await (const chunk of req) chunks.push(chunk);
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision, mobileBuild, groupRelay, serverDependencies, restoreSyntheticState, expectedStartupError}) {
+async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision, mobileBuild, groupRelay, serverDependencies, restoreSyntheticState, expectedStartupError, streamInterrupt}) {
     const sourceApp = path.join(candidate, 'apps/server');
     const box = path.join(out, 'runtime-box');
     fs.mkdirSync(box);
@@ -71,6 +71,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     }));
 
     ordinaryTools?.stage(box);
+    streamInterrupt?.stage(box);
     delegation?.stage(box);
 
     const cleanup = [];
@@ -133,6 +134,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 return await delegation.reply(body, row, res);
             }
             calls.push(row);trace('provider',row);
+            if (await streamInterrupt?.respond(body, row, res, calls)) return;
             if (groupRelay && await groupRelay.respond(body, row, res)) return;
             if (await observedContext?.respond?.(body, row, res)) return;
             observedContext?.recordProvider?.(req.url, body);
@@ -171,7 +173,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             return res.writeHead(500).end(JSON.stringify({error:{code:'UNEXPECTED_DESKTOP_LOCAL_EXECUTION'}}));
         }
         const relayAction = groupRelay && req.method === 'POST' && /\/mobile\/api\/executions\/[^/]+\/cancel(?:-remaining)?$/.test(route);
-        const relevant = relayAction || req.method==='POST' && /\/shared\/(session-send|session-cancel|task-stop|admit|complete|config)$/.test(route);
+        const relevant = (streamInterrupt && route === '/v1/interrupt') || relayAction || req.method==='POST' && /\/shared\/(session-send|session-cancel|task-stop|admit|complete|config)$/.test(route);
         const row = {route,method:req.method,at:Date.now(),device:req.headers['x-nativesync-device'],capabilities:req.headers['x-nativesync-capabilities']};
         let body;
         if (relevant) {
@@ -201,7 +203,11 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 return res.writeHead(503,{'content-type':'application/json'}).end(JSON.stringify({error:{code:'FIXTURE_RECONCILE_HELD'}}));
             }
         }
-        if(mode==='local-only' && route==='/v1/local-chat/completions') requests.push(row);
+        if (mode === 'local-only' && route === '/v1/local-chat/completions') {
+            requests.push(row);
+            streamInterrupt?.observeSummaryRequest(row);
+        }
+        if (streamInterrupt && route === '/v1/chatvcp/completions') requests.push(row);
         const isLocalChat = route === '/v1/local-chat/completions';
         const upstream = http.request({host:'127.0.0.1',port:backendPort,path:isLocalChat?'/v1/chat/completions':req.url,method:req.method,headers:{...req.headers, 'x-forwarded-proto':'https'}},async response => {
             if (relevant) {
@@ -233,6 +239,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 return res.writeHead(response.statusCode,response.headers).end(payload);
             }
             row.status=response.statusCode;
+            if (streamInterrupt && route === '/v1/chatvcp/completions') streamInterrupt.inspect(response, row);
             res.writeHead(response.statusCode,response.headers);
             response.pipe(res);
         });
@@ -264,6 +271,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 NativeMobileOrigin:'https://127.0.0.1:'+proxyPort,NativeMobileStartDelayMs:'0',
                 ...(delegation ? { AdminUsername:'synthetic-admin', AdminPassword:'synthetic-admin-only' } : {}),
                 ...(observedContext ? { NativeMobileConfigSync:'true', NativeMobileAttachments:'true' } : {}),
+                ...(streamInterrupt ? { EnableRoleDivider:String(streamInterrupt.roleDivider) } : {}),
                 ...(hardwareStream ? { NativeMobileExecutionTimeoutMs:'300000', NativeMobileGroupIdleTimeoutMs:'300000' } : {}),
                 NativeSyncFullSources:JSON.stringify(['A','B','C','D'].map(x=>({sourceId:'source'+x,deviceId:'device'+x,executionMode:'all-supported'}))),
                 NativeSyncSharedSpaces:JSON.stringify([{id:'sharedAB',sources:['sourceA','sourceB','sourceC']},{id:'foreignSpace',sources:['sourceD']}])
@@ -357,7 +365,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             await beforeStart();
             await startBackend();
             return stopped;
-        }}), origin:'https://127.0.0.1:'+proxyPort,wsOrigin:'http://127.0.0.1:'+backendPort,calls,requests,topics:{preSubmit:source,lostAck:target,interrupted:stopTopic,...ordinaryTopics},descriptors,data,gates,
+        }}), origin:'https://127.0.0.1:'+proxyPort,wsOrigin:'http://127.0.0.1:'+backendPort,calls,requests,topics:{preSubmit:source,lostAck:target,interrupted:stopTopic,...ordinaryTopics},descriptors,data,gates,streamInterrupt,
         disarmDrop(){drop=false;}, dropConfigOnce(name) { dropConfigName = name; }, releaseLost,
         cutPartial(){assert.ok(activePartial&&!activePartial.destroyed);gates.providerTransportCut=true;
             trace('actual-provider-socket-cut',{hadPrefix:true});activePartial.destroy();}, close};

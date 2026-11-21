@@ -1,0 +1,256 @@
+{
+  "result": "FAIL",
+  "evidenceSha256": "711abca6e5ac365ca42db9c57b77f46839fca225b19669b0d9daac00cbc285fe",
+  "revision": "ccb024b7b7abf93a5bb9a6f8a6a74030de0b6caf",
+  "roleDivider": true,
+  "desktop": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+  },
+  "loaded": [
+    {
+      "file": "apps/desktop/modules/ipc/chatHandlers.js",
+      "sha256": "177fe4baaa6c650b1bc7293efcb77ef74841608998d0bbc516d2f681265f3545",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/vcpClient.js",
+      "sha256": "0363750e21aea1debb1238c455626f943ad675f4a9e5a84036e400c9072f0d46",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/chat/contextCompactionService.js",
+      "bytes": 14475,
+      "sha256": "b424c5e8704573f4164700df51c4d3f45ac33b4c44d2add930e194dec8a1698e",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/chatManager.js",
+      "bytes": 175456,
+      "sha256": "90daf97367643e1aed9d8869de5e028a4783df7f6a99d083460968ed6a43859b",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/renderer/mainChatSurfaceAdapter.js",
+      "bytes": 13103,
+      "sha256": "b56d8733354230d1ec188ace96c04f050db026ae7db5d7a1d76294ed11c79a79",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/renderer/mainChatStreamConsumer.js",
+      "bytes": 7816,
+      "sha256": "22a035ce647d17789a78e446f3608624277de916ba041834dd03cd4ed05f3b91",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/server/server.js",
+      "sha256": "3095443182aca5d60dec2f6ee776790906028befa9364496fd8fac5951a096df",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "9bac35b45ae82bcdd20a23f73c88fad9eadadaad99e4c8fd37fa424e09e20e08",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "3483b635f0b735b80b0f02d6d0ad5ddefdb9bf52988affb6f5f8b2b63f8ca0b1",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "3a599eeb82699bcfe7297cec547eeda442ebeac0a49c5bc3ff8765bc97f57692",
+      "matchesGitRevision": true
+    }
+  ],
+  "calls": [
+    {
+      "id": "admission_0c6eab4a-182a-40c7-9cae-f66a24d47646",
+      "stream": true,
+      "at": 1795254607043,
+      "model": "synthetic",
+      "phase": "tool-request"
+    },
+    {
+      "id": "admission_0c6eab4a-182a-40c7-9cae-f66a24d47646",
+      "stream": true,
+      "at": 1795254607722,
+      "model": "synthetic",
+      "phase": "held-continuation",
+      "hasToolResult": true,
+      "closedAt": 1795254607732,
+      "providerEndedNormally": false
+    },
+    {
+      "id": "compaction_1795254607809_xos5nkaq7n",
+      "stream": true,
+      "at": 1795254607846,
+      "model": "synthetic-summary",
+      "phase": "summary",
+      "includesPartial": true
+    },
+    {
+      "id": "admission_bb06133a-e727-4fda-b9ac-fe47a0efecd4",
+      "stream": true,
+      "at": 1795254607956,
+      "model": "synthetic",
+      "phase": "resumed",
+      "includesInterruptedPrefix": false
+    }
+  ],
+  "requests": [
+    {
+      "route": "/v1/chatvcp/completions",
+      "method": "POST",
+      "at": 1795254607028,
+      "status": 200,
+      "streamWire": {
+        "terminal": [
+          "stop",
+          "[DONE]"
+        ],
+        "toolResults": 1,
+        "framesAfterToolReturn": [
+          {
+            "object": "chat.completion.chunk",
+            "choiceFinishReason": null,
+            "text": "\n"
+          },
+          {
+            "type": "done"
+          }
+        ],
+        "toolResultIncluded": true,
+        "toolReturnAt": 1795254607721,
+        "endedAt": 1795254607735,
+        "closedAt": 1795254607735
+      }
+    },
+    {
+      "route": "/v1/interrupt",
+      "method": "POST",
+      "at": 1795254607727,
+      "bodySha256": "f311ac168755f6249735c055b5cf07094ceb1040f6fd7a3507bc03e184a2bd7f",
+      "body": {
+        "requestId": "admission_0c6eab4a-182a-40c7-9cae-f66a24d47646"
+      },
+      "status": 200,
+      "response": {
+        "status": "success",
+        "message": "Interrupt signal sent for request admission_0c6eab4a-182a-40c7-9cae-f66a24d47646."
+      }
+    },
+    {
+      "route": "/v1/local-chat/completions",
+      "method": "POST",
+      "at": 1795254607834,
+      "status": 200
+    },
+    {
+      "route": "/v1/chatvcp/completions",
+      "method": "POST",
+      "at": 1795254607951,
+      "status": 200,
+      "streamWire": {
+        "terminal": [
+          "stop",
+          "stop",
+          "[DONE]"
+        ],
+        "toolResults": 0,
+        "framesAfterToolReturn": [],
+        "endedAt": 1795254607957,
+        "closedAt": 1795254607957
+      }
+    }
+  ],
+  "summaryHttpEntry": [],
+  "summaryProviderEntry": [
+    {
+      "at": 1795254607846,
+      "history": [
+        {
+          "id": "msg_1795254606911_user_1bg28ecikm",
+          "role": "user",
+          "textSha256": "46554c23bd2e2158579469ff4b51c732371e3b0808ee4806dfcdaa03fa24eeb7"
+        },
+        {
+          "id": "admission_0c6eab4a-182a-40c7-9cae-f66a24d47646",
+          "role": "assistant",
+          "textSha256": "634e7f80e371777cf7261d73417c4c385a031a950110a9ea97d0eb413c8d0fcd",
+          "finishReason": "completed",
+          "isThinking": false,
+          "admissionTerminal": true
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "id": "msg_1795254606911_user_1bg28ecikm",
+      "role": "user",
+      "textSha256": "46554c23bd2e2158579469ff4b51c732371e3b0808ee4806dfcdaa03fa24eeb7"
+    },
+    {
+      "id": "admission_0c6eab4a-182a-40c7-9cae-f66a24d47646",
+      "role": "assistant",
+      "textSha256": "634e7f80e371777cf7261d73417c4c385a031a950110a9ea97d0eb413c8d0fcd",
+      "finishReason": "completed",
+      "isThinking": false,
+      "admissionTerminal": true
+    },
+    {
+      "id": "checkpoint_1795254607852_x1g7at4a",
+      "role": "user",
+      "textSha256": "381f63ddd6c2e4a24ead59d395e33798478e6d3a28816013fe2e647eb4225bc6",
+      "checkpointSourceCount": 2
+    },
+    {
+      "id": "admission_bb06133a-e727-4fda-b9ac-fe47a0efecd4",
+      "role": "assistant",
+      "textSha256": "388855fc1552b7b059c70c8ab0f8d9471f61d00124566a8a809649d8554e8838",
+      "finishReason": "completed",
+      "isThinking": false,
+      "admissionTerminal": true
+    }
+  ],
+  "durableCounter": [
+    {
+      "marker": "ORDINARY_TOOL_LOCAL"
+    }
+  ],
+  "toolRecords": [
+    {
+      "tool_name": "OrdinaryToolCounter",
+      "status": "success",
+      "success": 1
+    }
+  ],
+  "sharedCounts": {
+    "mobile_executions": 0,
+    "journal": 0,
+    "shared_compaction_intents": 0
+  },
+  "profileReopened": true,
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "A-reopened": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "failure": "AssertionError [ERR_ASSERTION]: Expected \"actual\" to be strictly unequal to:\n\n'completed'"
+}

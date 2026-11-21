@@ -1513,8 +1513,12 @@ function initialize(mainWindow, context) {
                                 sendStreamPayload({ type: 'data', chunk: parsedChunk, messageId, context });
                             },
                             onDone(terminal) {
-                                trajectoryCall.finish();
-                                sendStreamPayload({ type: 'end', messageId, context, modelFinishReason: terminal.finishReason });
+                                const interrupted = terminal.finishReason === 'interrupted';
+                                trajectoryCall.finish({ aborted: interrupted });
+                                sendStreamPayload({
+                                    type: 'end', messageId, context, modelFinishReason: terminal.finishReason,
+                                    ...(interrupted ? { aborted: true } : {}),
+                                });
                             },
                         });
                         while (true) {

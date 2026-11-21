@@ -128,6 +128,16 @@ class TopicMessageAdmission {
         this.notify();
     }
 
+    withActiveLease(scope, token, operation) {
+        return this.run(() => {
+            this.assertReady();
+            if (!token || this.leases.get(conversationKey(scope)) !== token) {
+                throw Object.assign(new Error('STALE_LEASE'), { code: 'STALE_LEASE' });
+            }
+            return operation();
+        });
+    }
+
     async acquireNow(scope, token) {
         this.assertReady();
         await this.validate(scope);

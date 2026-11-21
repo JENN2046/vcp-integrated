@@ -54,3 +54,5 @@ AgentAssistant 长委托已接入共享单聊的 Work。桌面重开、发起端
 普通共享群聊的成员回复与 AA 已按同一组证据结算。两种完成顺序及原故障库升级结果见[群聊收尾修复](evidence/group-settlement/README.md)。阶段复审记录中的压缩输入问题另案保留。
 
 共享单聊压缩输入已按原消息 ID 和 Journal 当前版本处理编辑与删除。同文不同 ID、真实桌面生成检查点以及重开后的模型请求见[压缩输入交付](evidence/compaction-input/README.md)。
+
+本机单聊的六项自动中断测试已通过。真实桌面在两种角色分隔设置下均能在工具返回处中断，部分回复以原 ID 落盘后触发自动压缩。基线、候选、重开结果与截图见[本机流式中断回执](evidence/local-stream-interrupt/README.md)。

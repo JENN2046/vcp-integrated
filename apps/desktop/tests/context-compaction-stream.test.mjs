@@ -13,7 +13,7 @@ function fixture(context = {}) {
         append: (_id, text) => appended.push(text),
         onToolReturnBoundary: value => boundaries.push(value),
     });
-    return { boundaries, appended, push: text => consumer.consume({ type: 'chunk', text }) };
+    return { consumer, boundaries, appended, push: text => consumer.consume({ type: 'chunk', text }) };
 }
 
 test('split tool-return marker triggers immediately during streaming without a terminal event', () => {
@@ -45,6 +45,34 @@ test('group streams never run context-compaction boundary checks', () => {
         assert.equal(f.boundaries.length, 0);
         assert.equal(f.appended.length, 1);
     }
+});
+
+test('only a complete standalone ToolBox batch packet triggers the unwrapped tool boundary', () => {
+    const start = '<<<[VCP_TOOL_BATCH_START:timestamp]>>>';
+    const end = '<<<[VCP_TOOL_BATCH_END:timestamp]>>>';
+    const batch = start + 'tool result' + end;
+    function deliver(f, id, content) {
+        const chunk = f.consumer.normalizeChunk({ id, choices: [{ delta: { content } }] });
+        f.consumer.consume({ type: 'chunk', ...(typeof chunk === 'string' ? { text: chunk } : chunk) });
+    }
+    const nativeId = 'chatcmpl-vcp-batch-123';
+    const f = fixture();
+    deliver(f, 'provider-text', batch);
+    deliver(f, nativeId, start + 'unclosed');
+    deliver(f, nativeId, start + 'mismatch' + end.replace('timestamp', 'other'));
+    deliver(f, nativeId, 'quoted sample: ' + batch);
+    deliver(f, nativeId, batch + ' following text');
+    assert.equal(f.boundaries.length, 0);
+
+    deliver(f, nativeId, '\n' + batch + '\n');
+    deliver(f, 'provider-text', 'next delta');
+    assert.equal(f.boundaries.length, 1);
+    assert.ok(f.boundaries[0].text.endsWith('\n' + batch + '\n'));
+
+    const group = fixture({ groupId: 'group' });
+    deliver(group, nativeId, batch);
+    assert.equal(group.boundaries.length, 0);
+    assert.deepEqual(group.appended, [batch]);
 });
 
 for (const saveFailure of [false, true]) {

@@ -1,0 +1,64 @@
+{
+  "baselineHostRevision": "ccb024b7b7abf93a5bb9a6f8a6a74030de0b6caf",
+  "command": "node --test apps/desktop/tests/chat-compaction-interrupt.test.mjs",
+  "candidateHostSha256": "655dc61c73cc24e0c43607c483333d1f6de8c5a38e096eab82dd6c032a2ae13a",
+  "candidateTestSha256": "bae1cd770d6d01f502ec64932f6ab083a17bab2aebe2dd2af3397ebcb598c6ca",
+  "baseline": {
+    "passed": 0,
+    "failed": 6,
+    "canceled": 0,
+    "commonFailure": "The VM fixture omitted streamBoundaryChecks, so every case stopped on a ReferenceError."
+  },
+  "fixedFixtureWithBaselineHost": {
+    "passed": 2,
+    "failed": 4,
+    "canceled": 0
+  },
+  "fixedFixtureWithCandidateHost": {
+    "passed": 6,
+    "failed": 0,
+    "canceled": 0
+  },
+  "tests": [
+    {
+      "name": "an interrupt acknowledgement without a terminal event falls back after a bounded wait",
+      "baseline": "fail",
+      "fixedFixture": "pass",
+      "candidate": "pass"
+    },
+    {
+      "name": "a durably finalized stream completes the wait without local cancellation",
+      "baseline": "fail",
+      "fixedFixture": "fail",
+      "candidate": "pass",
+      "baselineHostFailure": "Successful durable finalization left the interruption waiter pending on the deadline. The host never installed a terminal resolver."
+    },
+    {
+      "name": "a refused upstream interrupt uses local cancellation immediately",
+      "baseline": "fail",
+      "fixedFixture": "pass",
+      "candidate": "pass"
+    },
+    {
+      "name": "failed terminal persistence releases the waiter without resuming compaction",
+      "baseline": "fail",
+      "fixedFixture": "fail",
+      "candidate": "pass",
+      "baselineHostFailure": "Failed durable persistence left the interruption waiter pending on the deadline. The host never installed a terminal resolver."
+    },
+    {
+      "name": "a background stream retired during configuration loading cannot suspend the conversation",
+      "baseline": "fail",
+      "fixedFixture": "fail",
+      "candidate": "pass",
+      "baselineHostFailure": "The asynchronous configuration load returned after operation retirement. The ownership check still allowed Flowlock suspension and upstream interruption."
+    },
+    {
+      "name": "a background stream retired during history loading cannot suspend the conversation",
+      "baseline": "fail",
+      "fixedFixture": "fail",
+      "candidate": "pass",
+      "baselineHostFailure": "The asynchronous history load returned after operation retirement. The ownership check still allowed Flowlock suspension and upstream interruption."
+    }
+  ]
+}

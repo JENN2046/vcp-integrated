@@ -1,4 +1,5 @@
 import { normalizeStreamChunk } from '../chat/contentRuntime.js';
+import { collectToolBatchRanges } from './toolBatchRegions.js';
 
 const terminalTypes = new Set(['completed', 'failed', 'cancelled', 'discarded']);
 
@@ -32,6 +33,7 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
     const projection = capabilities.resolveProjection?.(messageId) || null;
     let accumulatedText = '';
     let checkedBoundaryCount = 0;
+    let budgetInterruptRequested = false;
     const reportError = (...args) => { try { capabilities.reportError?.(...args); } catch { /* diagnostics cannot own persistence */ } };
     const setPersistenceState = (...args) => {
         try { capabilities.setPersistenceState?.(...args); }
@@ -40,7 +42,15 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
 
     return Object.freeze({
         surfaceGeneration: capabilities.getSurfaceGeneration?.(),
-        normalizeChunk: normalizeStreamChunk,
+        normalizeChunk(chunk) {
+            const text = normalizeStreamChunk(chunk);
+            // Without role dividers ToolBox sends its entire result batch in
+            // one native SSE packet. Ordinary assistant text is not a receipt.
+            if (!/^chatcmpl-vcp-batch-\d+$/.test(chunk?.id || '')) return text;
+            const [batch] = collectToolBatchRanges(text);
+            if (!batch?.closed || text.slice(0, batch.start).trim() || text.slice(batch.end).trim()) return text;
+            return { text, toolReturnBoundary: true };
+        },
         async prepare(event) {
             context = { ...context, ...(event.context || {}) };
             if (preparedType === null) {
@@ -59,10 +69,11 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
                 accumulatedText += event.text;
                 if (!context.isGroupMessage && !context.groupId) {
                     const boundaries = accumulatedText.match(/^[ \t]*<<<\[END_ROLE_DIVIDE_USER\]>>>[ \t]*(?=\r?$)/gm) || [];
-                    if (boundaries.length > checkedBoundaryCount) {
+                    if (event.toolReturnBoundary || boundaries.length > checkedBoundaryCount) {
                         checkedBoundaryCount = boundaries.length;
                         Promise.resolve(capabilities.onToolReturnBoundary?.({
                             messageId, streamOperationId: operationId, context, text: accumulatedText,
+                            onInterruptRequested: () => { budgetInterruptRequested = true; },
                         })).catch(error => capabilities.reportError?.('[ContextCompaction] Boundary check failed', error));
                     }
                 }
@@ -99,10 +110,15 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
             }
             const releasePersistence = capabilities.beginHistoryPersistence?.({ ...(terminal.context || context), messageId, streamOperationId: operationId });
             const projectTerminal = projection?.projectTerminal || capabilities.projectTerminal;
+            const interruptedForBudget = budgetInterruptRequested && terminal.kind === 'cancelled' &&
+                (terminal.finishReason === 'interrupted' || terminal.reason === 'tool-return-relay' ||
+                    terminal.reason === 'tool-return-relay-settle-timeout');
+            const finishReason = terminal.kind === 'completed' ? (terminal.finishReason || 'completed')
+                : interruptedForBudget ? 'interrupted' : terminal.kind;
             let projected;
             try { projected = await projectTerminal(
                 messageId,
-                terminal.kind === 'completed' ? (terminal.finishReason || 'completed') : terminal.kind,
+                finishReason,
                 terminal.context || context,
                 { fullResponse, error, streamOperationId: operationId },
             );

@@ -5,10 +5,16 @@ import vm from 'node:vm';
 import { parse } from '@babel/parser';
 
 const source = fs.readFileSync(new URL('../modules/chatManager.js', import.meta.url), 'utf8');
+const functionNames = new Set([
+    'executionAuthority',
+    'checkStreamContextBudget',
+    'finishStreamContextCompaction',
+    'abandonStreamContextCompaction',
+]);
 const wanted = new Map();
 function visit(node) {
     if (!node || typeof node !== 'object') return;
-    if (node.type === 'FunctionDeclaration' && ['checkStreamContextBudget', 'finishStreamContextCompaction', 'abandonStreamContextCompaction'].includes(node.id.name)) wanted.set(node.id.name, source.slice(node.start, node.end));
+    if (node.type === 'FunctionDeclaration' && functionNames.has(node.id.name)) wanted.set(node.id.name, source.slice(node.start, node.end));
     for (const value of Object.values(node)) {
         if (Array.isArray(value)) value.forEach(visit);
         else if (value && typeof value === 'object') visit(value);
@@ -16,6 +22,7 @@ function visit(node) {
 }
 const syntax = parse(source, { sourceType: 'module' });
 visit(syntax);
+assert.equal(wanted.size, functionNames.size);
 const timers = syntax.program.body.filter(node => node.type === 'VariableDeclaration'
     && node.declarations.some(declaration => ['INTERRUPT_SETTLE_MS', 'settlesWithin'].includes(declaration.id.name)));
 assert.equal(timers.length, 2, 'the fixture must load both real interruption timer declarations');
@@ -26,6 +33,8 @@ function fixture(success = true) {
     const scope = { agentId: 'A', topicId: 'T' };
     const selected = { id: 'A', type: 'agent', config: { contextTokenLimit: 1 } };
     const context = { disposed: false, streamCompactionRequests: requests, streamCompactionTerminalSignals: signals,
+        streamBoundaryChecks: new Map(),
+        electronAPI: { getTopicExecutionAuthority: async () => ({ success: true, kind: 'local' }) },
         globalSettingsRef: { get: () => ({ enableContextCompaction: true }) },
         currentSelectedItemRef: { get: () => selected }, currentTopicIdRef: { get: () => 'T' },
         currentChatHistoryRef: { get: () => [] }, effectiveContextHistory: value => value, estimateContextTokens: () => 2,
@@ -45,7 +54,22 @@ function fixture(success = true) {
 }
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
-test('an interrupt acknowledgement without a terminal event falls back after a bounded wait', async () => {
+function testWithDeadline(name, run) {
+    test(name, async () => {
+        // Keep the test runner alive long enough to report a stuck synthetic wait.
+        let timer;
+        const deadline = new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('Test did not settle within 1 second')), 1000);
+        });
+        try {
+            await Promise.race([run(), deadline]);
+        } finally {
+            clearTimeout(timer);
+        }
+    });
+}
+
+testWithDeadline('an interrupt acknowledgement without a terminal event falls back after a bounded wait', async () => {
     const f = fixture();
     const checking = f.start();
     await flush();
@@ -58,7 +82,7 @@ test('an interrupt acknowledgement without a terminal event falls back after a b
     assert.equal(f.requests.size, 0);
     assert.equal(f.signals.size, 0);
 });
-test('a durably finalized stream completes the wait without local cancellation', async () => {
+testWithDeadline('a durably finalized stream completes the wait without local cancellation', async () => {
     const f = fixture();
     let settled = false;
     const checking = f.start().then(() => { settled = true; });
@@ -70,14 +94,14 @@ test('a durably finalized stream completes the wait without local cancellation',
     assert.equal(f.timers.size, 0);
     assert.equal(f.signals.size, 0);
 });
-test('a refused upstream interrupt uses local cancellation immediately', async () => {
+testWithDeadline('a refused upstream interrupt uses local cancellation immediately', async () => {
     const f = fixture(false);
     await f.start();
     assert.deepEqual(f.events, ['suspend', 'interrupt', 'cancel', 'compact']);
     assert.equal(f.timers.size, 0);
 });
 
-test('failed terminal persistence releases the waiter without resuming compaction', async () => {
+testWithDeadline('failed terminal persistence releases the waiter without resuming compaction', async () => {
     const f = fixture();
     const checking = f.start();
     await flush();
@@ -88,23 +112,31 @@ test('failed terminal persistence releases the waiter without resuming compactio
     assert.equal(f.signals.size, 0);
 });
 
-for (const stage of ['configuration', 'history']) test(`a background stream retired during ${stage} loading cannot suspend the conversation`, async () => {
+for (const stage of ['configuration', 'history']) testWithDeadline(`a background stream retired during ${stage} loading cannot suspend the conversation`, async () => {
     const f = fixture();
     let active = true, release;
+    let enteredStage = false;
     const pending = new Promise(resolve => { release = resolve; });
     f.context.currentSelectedItemRef = { get: () => ({ id: 'B', type: 'agent' }) };
-    f.context.electronAPI = { getAgentConfig: async () => stage === 'configuration' ? pending : { contextTokenLimit: 1 } };
-    f.context.getHistory = async () => stage === 'history' ? pending : [];
+    f.context.electronAPI.getAgentConfig = async () => {
+        if (stage !== 'configuration') return { contextTokenLimit: 1 };
+        enteredStage = true;
+        return pending;
+    };
+    f.context.getHistory = async () => {
+        if (stage !== 'history') return [];
+        enteredStage = true;
+        return pending;
+    };
     const checking = f.context.checkStreamContextBudget({ messageId: 'M', context: { agentId: 'A', topicId: 'T' }, text: 'synthetic',
         isStreamActive: () => active, cancelStream: async () => { f.events.push('cancel'); await f.context.finishStreamContextCompaction({ messageId: 'M' }); } });
     await flush();
+    assert.equal(enteredStage, true, 'the stream must reach the intended asynchronous load');
     active = false;
     await f.context.finishStreamContextCompaction({ messageId: 'M' });
     release(stage === 'configuration' ? { contextTokenLimit: 1 } : []);
     await flush();
-    const observed = [...f.events];
-    for (const timer of f.timers.values()) timer.callback();
+    assert.deepEqual(f.events, [], 'a retired stream must not register a budget request or suspend Flowlock');
     await checking;
-    assert.deepEqual(observed, [], 'a retired stream must not register a budget request or suspend Flowlock');
     assert.equal(f.requests.size, 0);
 });

@@ -83,22 +83,23 @@ export const chatManager = (() => {
         return true;
     }
 
-    async function checkStreamContextBudget({ messageId, context, text, cancelStream, isActive = () => true, isStreamActive = isActive }) {
+    async function checkStreamContextBudget({ messageId, context, text, cancelStream, onInterruptRequested, isActive = () => true, isStreamActive = isActive }) {
         if (disposed || !isActive() || context?.isGroupMessage || context?.groupId
             || !context?.agentId || !context?.topicId
             || /^sidechat_[0-9]+_[0-9a-f]+$/.test(context.topicId)
             || streamCompactionRequests.has(messageId) || streamBoundaryChecks.has(messageId)) return;
-        const boundaryAuthority = await executionAuthority({ itemType: 'agent', itemId: context.agentId, topicId: context.topicId });
-        if (boundaryAuthority.kind !== 'local' || !isStreamActive()) return;
-        const canRelay = Boolean(context.admissionToken
-            && typeof electronAPI.topicAdmissionRelay === 'function'
-            && typeof electronAPI.topicAdmissionList === 'function');
-        const compressionEnabled = globalSettingsRef.get().enableContextCompaction === true;
-        if (!canRelay && !compressionEnabled) return;
         const boundaryCheck = { cancelled: false };
         streamBoundaryChecks.set(messageId, boundaryCheck);
         try {
             const scope = { itemId: context.agentId, itemType: 'agent', topicId: context.topicId };
+            const boundaryAuthority = await executionAuthority(scope);
+            const ownsBoundary = () => !disposed && !boundaryCheck.cancelled && isActive() && isStreamActive();
+            if (boundaryAuthority.kind !== 'local' || !ownsBoundary()) return;
+            const canRelay = Boolean(context.admissionToken
+                && typeof electronAPI.topicAdmissionRelay === 'function'
+                && typeof electronAPI.topicAdmissionList === 'function');
+            const compressionEnabled = globalSettingsRef.get().enableContextCompaction === true;
+            if (!canRelay && !compressionEnabled) return;
             let hasPending = false;
             if (canRelay) {
                 const receipt = await electronAPI.topicAdmissionList(scope);
@@ -124,7 +125,7 @@ export const chatManager = (() => {
                         && estimateContextTokens([...effective, { role: 'assistant', content: text }], config.systemPrompt || '') >= limit;
                 }
             }
-            if (disposed || boundaryCheck.cancelled || !isActive() || streamCompactionRequests.has(messageId)
+            if (!ownsBoundary() || streamCompactionRequests.has(messageId)
                 || (!hasPending && !needsCompression)) return;
             // The adapter installs the durable handover before exposing this capability.
             const relay = canRelay && typeof finishStreamAdmissionRelay === 'function';
@@ -140,28 +141,30 @@ export const chatManager = (() => {
             notifySendStateChanged();
             let stopTimer;
             const intent = streamCompactionRequests.get(messageId);
-            const stillOwned = () => !disposed && isActive()
-                && streamCompactionRequests.get(messageId) === intent;
+            // The stream can settle while Stop is pending or after its ACK.
+            // A single deadline bounds both waits; only persistence releases the intent.
+            let settled = false;
+            const terminal = new Promise(resolve => {
+                streamCompactionTerminalSignals.set(messageId, () => { settled = true; resolve(); });
+            });
+            const deadline = new Promise(resolve => {
+                stopTimer = setTimeout(resolve, INTERRUPT_SETTLE_MS);
+            });
             try {
-                // Bound both the Stop acknowledgement and the remaining transport.
-                // The timer never grants admission: local cancellation still persists first.
-                const deadline = new Promise(resolve => {
-                    stopTimer = setTimeout(() => resolve({ success: false, timedOut: true }), INTERRUPT_SETTLE_MS);
-                });
-                const result = await Promise.race([
-                    Promise.resolve(interruptCapability?.interrupt?.(messageId)),
-                    deadline,
-                ]);
-                if (!result?.success) {
-                    if (stillOwned()) await cancelStream?.(messageId, 'tool-return-relay');
-                } else {
-                    await deadline;
-                    if (stillOwned()) await cancelStream?.(messageId, 'tool-return-relay-settle-timeout');
+                onInterruptRequested?.();
+                let ack;
+                try {
+                    ack = await Promise.race([interruptCapability?.interrupt?.(messageId), terminal, deadline]);
+                } catch {
+                    // The active stream still owns local cancellation when Stop fails.
                 }
-            } catch (error) {
-                if (stillOwned()) await cancelStream?.(messageId, 'tool-return-relay');
+                if (ack?.success && !settled) await Promise.race([terminal, deadline]);
+                if (!settled && ownsBoundary() && streamCompactionRequests.get(messageId) === intent) {
+                    await cancelStream?.(messageId, ack?.success ? 'tool-return-relay-settle-timeout' : 'tool-return-relay');
+                }
             } finally {
                 clearTimeout(stopTimer);
+                streamCompactionTerminalSignals.delete(messageId);
             }
         } finally {
             if (!boundaryCheck.cancelled && streamBoundaryChecks.get(messageId) === boundaryCheck) {
@@ -188,6 +191,7 @@ export const chatManager = (() => {
             || intent.itemId !== context?.agentId || intent.topicId !== context?.topicId) {
             throw new Error('中继归属与已保存终稿不匹配');
         }
+        streamCompactionTerminalSignals.get(messageId)?.();
         const scope = { itemType: 'agent', itemId: intent.itemId, topicId: intent.topicId };
         try {
             if (disposed || intent.cancelled) {

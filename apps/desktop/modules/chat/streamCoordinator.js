@@ -124,7 +124,8 @@ export function createStreamCoordinator({ run, persist, reportError = console.er
             signal: abortController.signal,
             pushChunk(chunk) {
                 if (!owns(record) || !record.session.pushChunk(chunk, generation)) return false;
-                publish(record, { type: 'chunk', text: typeof chunk === 'string' ? chunk : String(chunk?.text || '') });
+                publish(record, { type: 'chunk', text: typeof chunk === 'string' ? chunk : String(chunk?.text || ''),
+                    ...(chunk?.toolReturnBoundary === true && { toolReturnBoundary: true }) });
                 return true;
             },
             final(payload = {}) {

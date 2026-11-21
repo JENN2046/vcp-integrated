@@ -1908,6 +1908,7 @@ class ChatCompletionHandler {
 
           // Read the error body from the upstream response
           const errorBodyText = await firstAiAPIResponse.text();
+          abortController.signal.throwIfAborted();
 
           // Log the error
           console.error(`[Upstream Error Stream Proxy] Upstream API returned status ${upstreamStatus}. Streaming error to client: ${errorBodyText}`);
@@ -1933,9 +1934,7 @@ class ChatCompletionHandler {
           };
           try {
             res.write(`data: ${JSON.stringify(errorPayload)}\n\n`);
-            res.write('data: [DONE]\n\n', () => {
-              res.end();
-            });
+            res.end('data: [DONE]\n\n');
           } catch (writeError) {
             console.error('[Upstream Error] Failed to write error to stream:', writeError.message);
             if (!res.writableEnded) {
@@ -2045,9 +2044,7 @@ class ChatCompletionHandler {
           };
           try {
             res.write(`data: ${JSON.stringify(errorPayload)}\n\n`);
-            res.write('data: [DONE]\n\n', () => {
-              res.end();
-            });
+            res.end('data: [DONE]\n\n');
           } catch (writeError) {
             console.error('[Error Handler Stream] Failed to write error:', writeError.message);
             if (!res.writableEnded && !res.destroyed) {
@@ -2089,9 +2086,7 @@ class ChatCompletionHandler {
         }
         // Send [DONE] marker before ending the stream for graceful termination
         try {
-          res.write('data: [DONE]\n\n', () => {
-            try { res.end(); } catch (e) { }
-          });
+          res.end('data: [DONE]\n\n');
         } catch (writeError) {
           console.error('[Error Handler Stream Cleanup] Failed to write [DONE]:', writeError.message);
           if (!res.writableEnded && !res.destroyed) {

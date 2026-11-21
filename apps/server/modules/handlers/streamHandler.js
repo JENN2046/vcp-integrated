@@ -48,9 +48,7 @@ async function streamUpstreamErrorAndEnd(res, nextAiAPIResponse, originalModel, 
         model: originalModel || 'unknown',
         choices: [{ index: 0, delta: { content: errorContent }, finish_reason: 'stop' }],
       })}\n\n`);
-      res.write('data: [DONE]\n\n', () => {
-        try { res.end(); } catch (e) { }
-      });
+      res.end('data: [DONE]\n\n');
     } catch (writeErr) {
       console.error('[StreamHandler Upstream Error] Failed to write error to stream:', writeErr.message);
       try { res.end(); } catch (e) { }
@@ -640,7 +638,7 @@ class StreamHandler {
           };
           try {
             res.write(`data: ${JSON.stringify(finalChunkPayload)}\n\n`);
-            res.write('data: [DONE]\n\n', () => res.end());
+            res.end('data: [DONE]\n\n');
           } catch (writeError) {
             console.error('[VCP Stream Loop] Failed to write final chunk:', writeError.message);
             if (!res.writableEnded && !res.destroyed) try { res.end(); } catch (e) { }
@@ -772,9 +770,7 @@ class StreamHandler {
               object: 'chat.completion.chunk',
               choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
             })}\n\n`);
-            res.write('data: [DONE]\n\n', () => {
-              try { res.end(); } catch (e) { }
-            });
+            res.end('data: [DONE]\n\n');
           } catch (e) { }
         }
         completed = validUpstreamTurns && archeryErrorContents.length === 0;
@@ -934,9 +930,7 @@ class StreamHandler {
           object: 'chat.completion.chunk',
           choices: [{ index: 0, delta: {}, finish_reason: 'length' }],
         })}\n\n`);
-        res.write('data: [DONE]\n\n', () => {
-          try { res.end(); } catch (e) { }
-        });
+        res.end('data: [DONE]\n\n');
       } catch (e) { }
     }
     return {

@@ -133,9 +133,18 @@ export function createVcpStreamBridge({ createConsumer, reportError = console.er
                     operation.controls.pushChunk(normalized);
                 }
                 if (event.type === 'end' || event.type === 'error') {
-                    const terminal = event.type === 'end'
-                        ? { kind: event.finish_reason || 'completed', fullResponse: event.fullResponse, context: event.context }
-                        : { kind: 'failed', error: event.error, fullResponse: event.fullResponse || event.accumulatedResponse, context: event.context };
+                    const finishReason = event.modelFinishReason ?? event.finish_reason;
+                    const terminal = event.type === 'error' || finishReason === 'error'
+                        ? { kind: 'failed', error: event.error, fullResponse: event.fullResponse || event.accumulatedResponse, context: event.context }
+                        : { kind: 'completed', fullResponse: event.fullResponse, context: event.context };
+                    if (event.type === 'end' && finishReason === 'interrupted') {
+                        terminal.kind = 'cancelled';
+                        terminal.finishReason = finishReason;
+                    } else if (event.type === 'end' && finishReason === 'length') {
+                        terminal.finishReason = finishReason;
+                    } else if (event.type === 'end' && event.modelFinishReason == null && terminal.kind === 'completed' && event.finish_reason) {
+                        terminal.kind = event.finish_reason;
+                    }
                     operation.accepting = false;
                     operation.projecting = false;
                     operation.controls.terminal(terminal);

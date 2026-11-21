@@ -1,0 +1,143 @@
+{
+  "result": "FAIL",
+  "evidenceSha256": "db1d5c2942a6539663272354474e94e8791eab36e7afcf6897efa3727f1648e6",
+  "revision": "ccb024b7b7abf93a5bb9a6f8a6a74030de0b6caf",
+  "roleDivider": false,
+  "desktop": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+  },
+  "loaded": [
+    {
+      "file": "apps/desktop/modules/ipc/chatHandlers.js",
+      "sha256": "177fe4baaa6c650b1bc7293efcb77ef74841608998d0bbc516d2f681265f3545",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/vcpClient.js",
+      "sha256": "0363750e21aea1debb1238c455626f943ad675f4a9e5a84036e400c9072f0d46",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/chat/contextCompactionService.js",
+      "bytes": 14475,
+      "sha256": "b424c5e8704573f4164700df51c4d3f45ac33b4c44d2add930e194dec8a1698e",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/chatManager.js",
+      "bytes": 175456,
+      "sha256": "90daf97367643e1aed9d8869de5e028a4783df7f6a99d083460968ed6a43859b",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/renderer/mainChatSurfaceAdapter.js",
+      "bytes": 13103,
+      "sha256": "b56d8733354230d1ec188ace96c04f050db026ae7db5d7a1d76294ed11c79a79",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/renderer/mainChatStreamConsumer.js",
+      "bytes": 7816,
+      "sha256": "22a035ce647d17789a78e446f3608624277de916ba041834dd03cd4ed05f3b91",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/server/server.js",
+      "sha256": "3095443182aca5d60dec2f6ee776790906028befa9364496fd8fac5951a096df",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "9bac35b45ae82bcdd20a23f73c88fad9eadadaad99e4c8fd37fa424e09e20e08",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "3483b635f0b735b80b0f02d6d0ad5ddefdb9bf52988affb6f5f8b2b63f8ca0b1",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "3a599eeb82699bcfe7297cec547eeda442ebeac0a49c5bc3ff8765bc97f57692",
+      "matchesGitRevision": true
+    }
+  ],
+  "calls": [
+    {
+      "id": "admission_e6039b36-671e-4582-8e28-e6ab0800d109",
+      "stream": true,
+      "at": 1795254625015,
+      "model": "synthetic",
+      "phase": "tool-request"
+    },
+    {
+      "id": "admission_e6039b36-671e-4582-8e28-e6ab0800d109",
+      "stream": true,
+      "at": 1795254625654,
+      "model": "synthetic",
+      "phase": "held-continuation",
+      "hasToolResult": true,
+      "closedAt": 1795254634182,
+      "providerEndedNormally": false
+    }
+  ],
+  "requests": [
+    {
+      "route": "/v1/chatvcp/completions",
+      "method": "POST",
+      "at": 1795254625000,
+      "status": 200,
+      "streamWire": {
+        "terminal": [
+          "stop"
+        ],
+        "toolResults": 1,
+        "framesAfterToolReturn": [
+          {
+            "object": "chat.completion.chunk",
+            "choiceFinishReason": null,
+            "text": "\n"
+          }
+        ],
+        "toolResultIncluded": true,
+        "toolReturnAt": 1795254625654,
+        "closedAt": 1795254634181
+      }
+    }
+  ],
+  "summaryHttpEntry": [],
+  "summaryProviderEntry": [],
+  "history": [
+    {
+      "id": "msg_1795254624930_user_wj229ppj6z",
+      "role": "user",
+      "textSha256": "46554c23bd2e2158579469ff4b51c732371e3b0808ee4806dfcdaa03fa24eeb7"
+    }
+  ],
+  "durableCounter": [
+    {
+      "marker": "ORDINARY_TOOL_LOCAL"
+    }
+  ],
+  "toolRecords": null,
+  "sharedCounts": null,
+  "profileReopened": false,
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "failure": "Error: Timed out: real Toolbox interrupt acknowledgement"
+}

@@ -1,0 +1,330 @@
+{
+  "result": "PASS",
+  "evidenceSha256": "3bd543e6e0ebc5a202d14f1df678a6eeef4010334f562d386fa708e8f5c94dbb",
+  "revision": "ccb024b7b7abf93a5bb9a6f8a6a74030de0b6caf",
+  "roleDivider": true,
+  "desktop": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+  },
+  "loaded": [
+    {
+      "file": "apps/desktop/modules/ipc/chatHandlers.js",
+      "sha256": "0a64dc7547831122b1aeb2d82be55a3a77e5793d8c5a2b934f0c041cca88ee01",
+      "matchesGitRevision": false
+    },
+    {
+      "file": "apps/desktop/modules/vcpClient.js",
+      "sha256": "0363750e21aea1debb1238c455626f943ad675f4a9e5a84036e400c9072f0d46",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/ipc/nativeHistoryHandlers.js",
+      "sha256": "0ac70828e72bf4a0c289ad838829af222ae1259c15b5748c33e7538012528df7",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/services/topicMessageAdmissionHost.js",
+      "sha256": "e447ca91d41783ee7ebbc803c3b5920c0338bb08c26b12c255851fbbb95795d9",
+      "matchesGitRevision": false
+    },
+    {
+      "file": "apps/desktop/modules/services/topicMessageAdmission.js",
+      "sha256": "f8763201f6ba32bd7f18d12cdc3c51b60c6a4322d3bb40c8cd35af5bc766486c",
+      "matchesGitRevision": false
+    },
+    {
+      "file": "apps/desktop/modules/chat/contextCompactionService.js",
+      "bytes": 14475,
+      "sha256": "b424c5e8704573f4164700df51c4d3f45ac33b4c44d2add930e194dec8a1698e",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/chat/chatHistoryPersistence.js",
+      "bytes": 7948,
+      "sha256": "e72de06e2c666c5b775c8cd6498f9dd77fa2d034f41c63fb9be91cfe5b408daf",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/chatManager.js",
+      "bytes": 175699,
+      "sha256": "655dc61c73cc24e0c43607c483333d1f6de8c5a38e096eab82dd6c032a2ae13a",
+      "matchesGitRevision": false
+    },
+    {
+      "file": "apps/desktop/modules/renderer/mainChatSurfaceAdapter.js",
+      "bytes": 13103,
+      "sha256": "b56d8733354230d1ec188ace96c04f050db026ae7db5d7a1d76294ed11c79a79",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/desktop/modules/renderer/mainChatStreamConsumer.js",
+      "bytes": 8944,
+      "sha256": "67e80686607dbf168fce7eed1172da7706c8fa9d11e3753227129c21bf1a170f",
+      "matchesGitRevision": false
+    },
+    {
+      "file": "apps/desktop/modules/chat/vcpStreamBridge.js",
+      "bytes": 8463,
+      "sha256": "cd6edbdca690148b7b5f7a884e732e028e65ce7a09334f3f43e84248609e32c9",
+      "matchesGitRevision": false
+    },
+    {
+      "file": "apps/desktop/modules/chat/streamCoordinator.js",
+      "bytes": 11697,
+      "sha256": "ccecbc636d542de85a633bc472d1e5d424a7285254b05d73ddded65f818594f6",
+      "matchesGitRevision": false
+    },
+    {
+      "file": "apps/server/server.js",
+      "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0",
+      "matchesGitRevision": false
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "9bac35b45ae82bcdd20a23f73c88fad9eadadaad99e4c8fd37fa424e09e20e08",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "f134bdf90f9e79250cb02f14324cf837a7732464bdf82efb3adf53baf7ae70e9",
+      "matchesGitRevision": false
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f",
+      "matchesGitRevision": true
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "3ba90a8b835c31c4926990eda88701b1e6cb0ab0462fcdfba50c24c7949d8e4d",
+      "matchesGitRevision": false
+    }
+  ],
+  "calls": [
+    {
+      "id": "admission_e3b0e898-21f7-4793-8b84-a32bd5a4c62b",
+      "stream": true,
+      "at": 1795255376386,
+      "model": "synthetic",
+      "phase": "tool-request"
+    },
+    {
+      "id": "admission_e3b0e898-21f7-4793-8b84-a32bd5a4c62b",
+      "stream": true,
+      "at": 1795255377011,
+      "model": "synthetic",
+      "phase": "held-continuation",
+      "hasToolResult": true,
+      "closedAt": 1795255377021,
+      "providerEndedNormally": false
+    },
+    {
+      "id": "compaction_1795255377104_ckd541boyc",
+      "stream": true,
+      "at": 1795255377179,
+      "model": "synthetic-summary",
+      "phase": "summary",
+      "includesPartial": true
+    },
+    {
+      "id": "admission_99c40cfd-548d-4ef2-80bb-9e0ee3c8c486",
+      "stream": true,
+      "at": 1795255377283,
+      "model": "synthetic",
+      "phase": "resumed",
+      "includesInterruptedPrefix": false
+    }
+  ],
+  "requests": [
+    {
+      "route": "/v1/chatvcp/completions",
+      "method": "POST",
+      "at": 1795255376369,
+      "status": 200,
+      "streamWire": {
+        "terminal": [
+          "stop",
+          "interrupted",
+          "[DONE]"
+        ],
+        "toolResults": 1,
+        "framesAfterToolReturn": [
+          {
+            "id": "chatcmpl-VCP-separator-1795255377009",
+            "object": "chat.completion.chunk",
+            "choiceFinishReason": null,
+            "text": "\n"
+          },
+          {
+            "id": "chatcmpl-interrupt-1795255377020",
+            "object": "chat.completion.chunk",
+            "choiceFinishReason": "interrupted"
+          },
+          {
+            "type": "done"
+          }
+        ],
+        "toolResultIncluded": true,
+        "toolReturnWrapped": true,
+        "toolReturnAt": 1795255377010,
+        "endedAt": 1795255377020,
+        "closedAt": 1795255377020
+      }
+    },
+    {
+      "route": "/v1/interrupt",
+      "method": "POST",
+      "at": 1795255377018,
+      "bodySha256": "e0f8ff646cc1ae13467dbb699c2b13c035fa9b195d90f140258f9c3710302744",
+      "body": {
+        "requestId": "admission_e3b0e898-21f7-4793-8b84-a32bd5a4c62b"
+      },
+      "status": 200,
+      "response": {
+        "status": "success",
+        "message": "Interrupt signal sent for request admission_e3b0e898-21f7-4793-8b84-a32bd5a4c62b."
+      }
+    },
+    {
+      "route": "/v1/local-chat/completions",
+      "method": "POST",
+      "at": 1795255377166,
+      "status": 200
+    },
+    {
+      "route": "/v1/chatvcp/completions",
+      "method": "POST",
+      "at": 1795255377278,
+      "status": 200,
+      "streamWire": {
+        "terminal": [
+          "stop",
+          "stop",
+          "[DONE]"
+        ],
+        "toolResults": 0,
+        "framesAfterToolReturn": [],
+        "endedAt": 1795255377285,
+        "closedAt": 1795255377285
+      }
+    }
+  ],
+  "summaryHttpEntry": [
+    {
+      "at": 1795255377166,
+      "history": [
+        {
+          "id": "msg_1795255376285_user_8p7m2urkcu",
+          "role": "user",
+          "textSha256": "46554c23bd2e2158579469ff4b51c732371e3b0808ee4806dfcdaa03fa24eeb7"
+        },
+        {
+          "id": "admission_e3b0e898-21f7-4793-8b84-a32bd5a4c62b",
+          "role": "assistant",
+          "textSha256": "a50146d481b29b4deea7b056cddaeee8fff525d5927fd147dd98072e59e31311",
+          "finishReason": "interrupted",
+          "isThinking": false,
+          "admissionTerminal": true
+        }
+      ]
+    }
+  ],
+  "summaryProviderEntry": [
+    {
+      "at": 1795255377179,
+      "history": [
+        {
+          "id": "msg_1795255376285_user_8p7m2urkcu",
+          "role": "user",
+          "textSha256": "46554c23bd2e2158579469ff4b51c732371e3b0808ee4806dfcdaa03fa24eeb7"
+        },
+        {
+          "id": "admission_e3b0e898-21f7-4793-8b84-a32bd5a4c62b",
+          "role": "assistant",
+          "textSha256": "a50146d481b29b4deea7b056cddaeee8fff525d5927fd147dd98072e59e31311",
+          "finishReason": "interrupted",
+          "isThinking": false,
+          "admissionTerminal": true
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "id": "msg_1795255376285_user_8p7m2urkcu",
+      "role": "user",
+      "textSha256": "46554c23bd2e2158579469ff4b51c732371e3b0808ee4806dfcdaa03fa24eeb7"
+    },
+    {
+      "id": "admission_e3b0e898-21f7-4793-8b84-a32bd5a4c62b",
+      "role": "assistant",
+      "textSha256": "a50146d481b29b4deea7b056cddaeee8fff525d5927fd147dd98072e59e31311",
+      "finishReason": "interrupted",
+      "isThinking": false,
+      "admissionTerminal": true
+    },
+    {
+      "id": "checkpoint_1795255377184_94ewaczo",
+      "role": "user",
+      "textSha256": "381f63ddd6c2e4a24ead59d395e33798478e6d3a28816013fe2e647eb4225bc6",
+      "checkpointSourceCount": 2
+    },
+    {
+      "id": "admission_99c40cfd-548d-4ef2-80bb-9e0ee3c8c486",
+      "role": "assistant",
+      "textSha256": "388855fc1552b7b059c70c8ab0f8d9471f61d00124566a8a809649d8554e8838",
+      "finishReason": "completed",
+      "isThinking": false,
+      "admissionTerminal": true
+    }
+  ],
+  "durableCounter": [
+    {
+      "marker": "ORDINARY_TOOL_LOCAL"
+    }
+  ],
+  "toolRecords": [
+    {
+      "tool_name": "OrdinaryToolCounter",
+      "status": "success",
+      "success": 1
+    }
+  ],
+  "sharedCounts": {
+    "mobile_executions": 0,
+    "journal": 0,
+    "shared_compaction_intents": 0
+  },
+  "profileReopened": true,
+  "desktopTerminals": [
+    {
+      "at": 1795255377022,
+      "type": "end"
+    },
+    {
+      "at": 1795255377287,
+      "type": "end"
+    }
+  ],
+  "admissionCounts": {
+    "entries": 0,
+    "leases": 0
+  },
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "A-reopened": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "failure": null
+}

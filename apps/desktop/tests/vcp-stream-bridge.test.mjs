@@ -276,3 +276,30 @@ test('post-commit side effect failure is reported without changing the durable c
     assert.equal(reports.some(([, error]) => error?.message === 'summary failed'), true);
     await bridge.dispose();
 });
+
+test('desktop SSE end forwards interruption and truncation while preserving natural completion', async () => {
+    const cases = [
+        ['interrupted', 'cancelled', 'interrupted'],
+        ['length', 'completed', 'length'],
+        ['stop', 'completed', undefined],
+    ];
+    for (const [modelFinishReason, kind, finishReason] of cases) {
+        const terminals = [];
+        const bridge = createVcpStreamBridge({
+            createConsumer: () => ({
+                persist({ terminal, snapshot }) {
+                    terminals.push([terminal.kind, terminal.finishReason, snapshot.text]);
+                    return {};
+                },
+            }),
+        });
+        try {
+            bridge.accept({ type: 'data', messageId: modelFinishReason, chunk: 'received partial' });
+            bridge.accept({ type: 'end', messageId: modelFinishReason, modelFinishReason });
+            await waitUntil(() => terminals.length === 1);
+            assert.deepEqual(terminals, [[kind, finishReason, 'received partial']]);
+        } finally {
+            await bridge.dispose();
+        }
+    }
+});
