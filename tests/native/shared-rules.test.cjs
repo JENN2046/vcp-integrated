@@ -23,3 +23,24 @@ test('sandbox browser scripts are byte-identical to the installed shared rules',
         assert.deepEqual(fs.readFileSync(path.join(desktop,'modules',target+'.js')),fs.readFileSync(desktopRequire.resolve('@vcp/core-rules/'+entry)));
     }
 });
+
+test('group depth follows speaker history and the invitation while preserving timestamped source rows', () => {
+    const native = desktopRequire('./Groupmodules/groupContextWindow');
+    const worker = require(path.join(serverRules, 'Groupmodules/groupContextWindow'));
+    assert.equal(worker.applyGroupContextRules, native.applyGroupContextRules);
+    const engine = desktopRequire('@vcp/core-rules/tavern');
+    const rules = [{ type: 'context_inject', scope: 'group', enabled: true, role: 'user', depth: 2, content: 'context', wrap: false }];
+    const make = (role, text) => ({ role, content: [{ type: 'text', text }] });
+    const system = make('system', 'agent'), historySystem = make('system', 'notice');
+    const user = make('user', 'input'), reply = { ...make('assistant', 'A reply'), __vcpchatTimestampMeta: { messageId: 'reply-A', role: 'assistant', timestamp: 42 } };
+    const invite = make('user', 'B invitation');
+    const input = [system, user, historySystem, reply, invite];
+    const original = structuredClone(input);
+    assert.deepEqual(native.applyGroupContextRules(input, rules, engine), [
+        system, historySystem, user, make('user', 'context'), reply, invite,
+    ]);
+    for (const inactive of [[], [{ ...rules[0], enabled: false }], [{ type: 'user_suffix' }]]) {
+        assert.deepEqual(native.applyGroupContextRules(input, inactive, engine), original);
+    }
+    assert.deepEqual(input, original);
+});

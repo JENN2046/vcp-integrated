@@ -22,7 +22,7 @@ async function jsonBody(req) {
     for await (const chunk of req) chunks.push(chunk);
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision, mobileBuild, groupRelay}) {
+async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision, mobileBuild, groupRelay, serverDependencies}) {
     const sourceApp = path.join(candidate, 'apps/server');
     const box = path.join(out, 'runtime-box');
     fs.mkdirSync(box);
@@ -61,7 +61,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         throw Error('Mobile build missing. Run the repository build before integration.');
     }
     fs.cpSync(builtMobile, path.join(box, pluginPath, 'mobile-dist'), { recursive: true });
-    for (const [from, to] of [[path.join(sourceApp, 'node_modules'), path.join(box, 'node_modules')],
+    for (const [from, to] of [[serverDependencies || path.join(sourceApp, 'node_modules'), path.join(box, 'node_modules')],
         [path.join(candidate, 'node_modules'), path.join(out, 'node_modules')]]) {
         if (fs.existsSync(from)) fs.symlinkSync(from, to, 'dir');
     }

@@ -1,0 +1,2143 @@
+{
+  "variant": "candidate",
+  "revision": "6f34d0c0a260f41315767e39fb126f2cbdd98275",
+  "nodeVersion": "v24.22.3",
+  "shared": {
+    "topicId": "shared_cbcd5cf16a3742bd8c792735e6dbf68c",
+    "memberIds": {
+      "gc-a": "shared_d18aa65ddb4d4b2b9558e1f81e23ae48",
+      "gc-b": "shared_6cfeb6c893a54350bf75a53e2cfc3f9d"
+    },
+    "savedOrder": [
+      "shared_d18aa65ddb4d4b2b9558e1f81e23ae48",
+      "shared_6cfeb6c893a54350bf75a53e2cfc3f9d"
+    ],
+    "planForNative": [
+      "gc-a",
+      "gc-b"
+    ],
+    "attachment": {
+      "messageId": "gc-history-user",
+      "attachmentId": "attachment_ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+      "sha256": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+      "bytes": 22,
+      "boundBlobHash": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+      "claimHash": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+      "finishState": "ready"
+    },
+    "work": {
+      "id": "request_0c191bb6acab48cb924ee1ea20eff4b5",
+      "request_id": "gc-current",
+      "state": "completed",
+      "kind": "group_message",
+      "user_message_id": "mobile_job_0247c09389e284b17c37433533a46655",
+      "user_seq": 4,
+      "request_dispatched": null,
+      "group_position": 2,
+      "reply_message_id": "reply_gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+      "error_code": null,
+      "plan": [
+        "shared_d18aa65ddb4d4b2b9558e1f81e23ae48",
+        "shared_6cfeb6c893a54350bf75a53e2cfc3f9d"
+      ]
+    },
+    "admission": {
+      "id": "request_0c191bb6acab48cb924ee1ea20eff4b5",
+      "request_id": "gc-current",
+      "context_head": 3,
+      "user_seq": 4,
+      "reply_seq": 6,
+      "state": "completed",
+      "dispatched": 1,
+      "native_terminal": 1,
+      "turn": {
+        "kind": "message",
+        "plan": [
+          "shared_d18aa65ddb4d4b2b9558e1f81e23ae48",
+          "shared_6cfeb6c893a54350bf75a53e2cfc3f9d"
+        ],
+        "userMessageId": "mobile_job_0247c09389e284b17c37433533a46655"
+      },
+      "configHash": "e11dee9fc896d5f253cd2c463770225ccd02909c86d68dcf2d15b33be337b758"
+    },
+    "steps": [
+      {
+        "id": "gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+        "step_index": 0,
+        "agent_id": "shared_d18aa65ddb4d4b2b9558e1f81e23ae48",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+        "error_code": null
+      },
+      {
+        "id": "gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+        "step_index": 1,
+        "agent_id": "shared_6cfeb6c893a54350bf75a53e2cfc3f9d",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+        "error_code": null
+      }
+    ],
+    "nativeRequests": [
+      {
+        "id": "gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+        "member_id": "shared_d18aa65ddb4d4b2b9558e1f81e23ae48",
+        "ordinal": 0,
+        "body_hash": "783f552e864c1d4b25a376f8f66c27b4f62206d876a2b4a997776125087eda89",
+        "state": "model_terminal"
+      },
+      {
+        "id": "gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+        "member_id": "shared_6cfeb6c893a54350bf75a53e2cfc3f9d",
+        "ordinal": 1,
+        "body_hash": "8be8d1e5e6ac1fbb8cf5c3b1af8916770806ff29d0559613ce9a2b5f474d70bc",
+        "state": "model_terminal"
+      }
+    ],
+    "phases": [
+      {
+        "request_id": "gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+        "stage": "native_prepared"
+      },
+      {
+        "request_id": "gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+        "stage": "native_entered"
+      },
+      {
+        "request_id": "gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+        "stage": "provider_attempt"
+      },
+      {
+        "request_id": "gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+        "stage": "native_settled"
+      },
+      {
+        "request_id": "gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+        "stage": "native_prepared"
+      },
+      {
+        "request_id": "gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+        "stage": "native_entered"
+      },
+      {
+        "request_id": "gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+        "stage": "provider_attempt"
+      },
+      {
+        "request_id": "gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+        "stage": "native_settled"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "gc-history-user",
+        "action": "upsert",
+        "metadata_hash": "ad36937e57a539f39f231cbba66190520e922f7c29420f4e2b1a9cd80dfc15a8",
+        "message": {
+          "id": "gc-history-user",
+          "role": "user",
+          "name": "用户",
+          "timestamp": 1700000000000,
+          "content": "GC_HISTORY_USER",
+          "attachments": [
+            {
+              "id": "attachment_ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+              "name": "context-note.txt",
+              "type": "text/plain",
+              "size": 22,
+              "hash": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+              "extractedText": "CTX_ATTACHMENT_BODY_V1",
+              "blobHash": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b"
+            }
+          ],
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "ad36937e57a539f39f231cbba66190520e922f7c29420f4e2b1a9cd80dfc15a8",
+            "fields": {
+              "attachmentData": [
+                {
+                  "id": "attachment_ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+                  "contentHash": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+                  "extractedText": "CTX_ATTACHMENT_BODY_V1",
+                  "blobHash": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "seq": 2,
+        "msg_id": "gc-history-assistant",
+        "action": "upsert",
+        "metadata_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "message": {
+          "id": "gc-history-assistant",
+          "role": "assistant",
+          "name": "Fixture B",
+          "agentId": "shared_6cfeb6c893a54350bf75a53e2cfc3f9d",
+          "timestamp": 1700000001000,
+          "content": "GC_HISTORY_ASSISTANT",
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "fields": {}
+          }
+        }
+      },
+      {
+        "seq": 3,
+        "msg_id": "gc-history-system",
+        "action": "upsert",
+        "metadata_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "message": {
+          "id": "gc-history-system",
+          "role": "system",
+          "name": "系统",
+          "timestamp": 1700000002000,
+          "content": "GC_HISTORY_SYSTEM",
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "fields": {}
+          }
+        }
+      },
+      {
+        "seq": 4,
+        "msg_id": "mobile_job_0247c09389e284b17c37433533a46655",
+        "action": "upsert",
+        "metadata_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "message": {
+          "id": "mobile_job_0247c09389e284b17c37433533a46655",
+          "role": "user",
+          "name": "用户",
+          "content": "GC_CURRENT: read the attached sample.",
+          "timestamp": 1795250060674,
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "fields": {}
+          }
+        }
+      },
+      {
+        "seq": 5,
+        "msg_id": "reply_gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+        "action": "upsert",
+        "metadata_hash": "67131e4686f12003389721eec073caefbe42372bf6fe0c9557ed1692a44dc375",
+        "message": {
+          "id": "reply_gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+          "role": "assistant",
+          "name": "Fixture A",
+          "agentId": "shared_d18aa65ddb4d4b2b9558e1f81e23ae48",
+          "groupId": "shared_3f7aa576aaf2480cb308c88479a58cde",
+          "topicId": "shared_cbcd5cf16a3742bd8c792735e6dbf68c",
+          "isGroupMessage": true,
+          "content": "GC_REPLY_A_UNIQUE",
+          "timestamp": 1795250060784,
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+            "executionId": "request_0c191bb6acab48cb924ee1ea20eff4b5",
+            "dependsOnMessageIds": [
+              "gc-history-user",
+              "gc-history-assistant",
+              "gc-history-system",
+              "mobile_job_0247c09389e284b17c37433533a46655"
+            ]
+          },
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "67131e4686f12003389721eec073caefbe42372bf6fe0c9557ed1692a44dc375",
+            "fields": {
+              "continuity": {
+                "version": 1,
+                "known": true,
+                "requestId": "gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+                "executionId": "request_0c191bb6acab48cb924ee1ea20eff4b5",
+                "dependsOnMessageIds": [
+                  "gc-history-user",
+                  "gc-history-assistant",
+                  "gc-history-system",
+                  "mobile_job_0247c09389e284b17c37433533a46655"
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "seq": 6,
+        "msg_id": "reply_gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+        "action": "upsert",
+        "metadata_hash": "7684dbf4011d28c5d3a99736bea0fa8a8893032a59ebc03d7303762d331197f1",
+        "message": {
+          "id": "reply_gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+          "role": "assistant",
+          "name": "Fixture B",
+          "agentId": "shared_6cfeb6c893a54350bf75a53e2cfc3f9d",
+          "groupId": "shared_3f7aa576aaf2480cb308c88479a58cde",
+          "topicId": "shared_cbcd5cf16a3742bd8c792735e6dbf68c",
+          "isGroupMessage": true,
+          "content": "GC_REPLY_B_UNIQUE",
+          "timestamp": 1795250060850,
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+            "executionId": "request_0c191bb6acab48cb924ee1ea20eff4b5",
+            "dependsOnMessageIds": [
+              "gc-history-user",
+              "gc-history-assistant",
+              "gc-history-system",
+              "mobile_job_0247c09389e284b17c37433533a46655",
+              "reply_gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b"
+            ]
+          },
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "7684dbf4011d28c5d3a99736bea0fa8a8893032a59ebc03d7303762d331197f1",
+            "fields": {
+              "continuity": {
+                "version": 1,
+                "known": true,
+                "requestId": "gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+                "executionId": "request_0c191bb6acab48cb924ee1ea20eff4b5",
+                "dependsOnMessageIds": [
+                  "gc-history-user",
+                  "gc-history-assistant",
+                  "gc-history-system",
+                  "mobile_job_0247c09389e284b17c37433533a46655",
+                  "reply_gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b"
+                ]
+              }
+            }
+          }
+        }
+      }
+    ],
+    "mobile": {
+      "browser": "Chrome/158.0.8127.36",
+      "route": "conversations/shared_cbcd5cf16a3742bd8c792735e6dbf68c/messages",
+      "body": {
+        "requestId": "gc-current",
+        "text": "GC_CURRENT: read the attached sample."
+      },
+      "first": {
+        "status": 202,
+        "id": "request_0c191bb6acab48cb924ee1ea20eff4b5",
+        "state": "queued",
+        "replayed": false
+      },
+      "lookup": {
+        "status": 200,
+        "id": "request_0c191bb6acab48cb924ee1ea20eff4b5",
+        "state": "completed"
+      },
+      "replay": {
+        "status": 202,
+        "id": "request_0c191bb6acab48cb924ee1ea20eff4b5",
+        "state": "completed",
+        "replayed": true
+      },
+      "terminalVisible": true,
+      "sameLedgerAndPackets": true
+    }
+  },
+  "native": {
+    "variant": "candidate",
+    "surface": "native-desktop",
+    "seedIds": [
+      "gc-history-user",
+      "gc-history-assistant",
+      "gc-history-system"
+    ],
+    "inputId": "gc-current",
+    "replyIds": [
+      "msg_group_gc-current_gc-a_1795250063392",
+      "msg_group_gc-current_gc-b_1795250063624"
+    ],
+    "committedReplyABinding": {
+      "messageId": "msg_group_gc-current_gc-a_1795250063392",
+      "role": "assistant",
+      "timestamp": 1795250063617,
+      "timestampIso": "2026-11-21T08:34:23.617Z",
+      "source": "client_history",
+      "sentMessageHash": "sha256:4b0c49b1ca60738a31b48808aab508e56a930f60ac408ce2870d1c9849659b31",
+      "sentMessageIndex": 6
+    },
+    "source": "https://127.0.0.1:43275",
+    "attachment": {
+      "name": "context-note.txt",
+      "bytes": 22,
+      "sha256": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+      "storedAt": "gc-history-user",
+      "realFileManager": true
+    },
+    "terminalVisible": true,
+    "historyCount": 6,
+    "renderer": {
+      "pid": 2637388,
+      "version": "44.9.3",
+      "sandbox": true
+    },
+    "sources": {
+      "url": "file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/apps/desktop/main.html",
+      "main": [
+        {
+          "file": "apps/desktop/Groupmodules/groupchat.js",
+          "sha256": "fb844ea7b45ea5dfc73582fd8c409810c8f267929fa5ebf004cbc72a6e69a54e"
+        },
+        {
+          "file": "apps/desktop/modules/tavernRulesEngine.js",
+          "sha256": "ede855fbe40b70cd7b13684671047d040180cef2b354a6e8677a1b1b5c1c51bb"
+        },
+        {
+          "file": "packages/core-rules/group/modes/sequentialMode.js",
+          "sha256": "7d4a3a2e89aeb8e3dd7c13dbc6427c29f4d2b85d46f04a0ae0f233d662cb06c4"
+        },
+        {
+          "file": "apps/desktop/Groupmodules/groupContextWindow.js",
+          "sha256": "6d91dfd55861e2fbaae1d438a2b3c509b5b3c46ec604901d7c755e572b1aa067"
+        },
+        {
+          "file": "packages/core-rules/group/groupContextWindow.js",
+          "sha256": "8db8b8e877aaf49b8426c49dc6b058c88f7341e72e938153ba9cdee2fd11b7bb"
+        },
+        {
+          "file": "apps/desktop/modules/ipc/groupChatHandlers.js",
+          "sha256": "6ef48c9802634e5bc7246f7762d3112b45708eff99374b95b2a5136be1e8f303"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/Groupmodules/grouprenderer.js",
+          "bytes": 102785,
+          "sha256": "c6f813b703a428eb12ad2c6900e05ac6c74bfdc6d0af1a948ace49d5128e8055"
+        }
+      ]
+    },
+    "coverage": [
+      {
+        "file": "apps/desktop/Groupmodules/groupchat.js",
+        "hitFunctions": [
+          {
+            "name": "expandWorkspacePlaceholdersInPrompt",
+            "count": 2
+          },
+          {
+            "name": "requireTrustedGroupTerminal",
+            "count": 2
+          },
+          {
+            "name": "observeGroupFinishReason",
+            "count": 6
+          },
+          {
+            "name": "getGroupQueueKey",
+            "count": 3
+          },
+          {
+            "name": "createGroupQueueContext",
+            "count": 1
+          },
+          {
+            "name": "isAborted",
+            "count": 10
+          },
+          {
+            "name": "registerActiveGroupRequest",
+            "count": 2
+          },
+          {
+            "name": "extractTextForHash",
+            "count": 9
+          },
+          {
+            "name": "hashSentMessage",
+            "count": 9
+          },
+          {
+            "name": "attachTimestampMetaToVcpMessage",
+            "count": 9
+          },
+          {
+            "name": "buildVcpChatExtensionsFromMessages",
+            "count": 2
+          },
+          {
+            "name": "stripInternalMessageMetadata",
+            "count": 2
+          },
+          {
+            "name": "buildGroupRequestBody",
+            "count": 2
+          },
+          {
+            "name": "getGroupHistoryDescriptor",
+            "count": 7
+          },
+          {
+            "name": "assertNativeGroupTopic",
+            "count": 1
+          },
+          {
+            "name": "readLatestGroupHistory",
+            "count": 3
+          },
+          {
+            "name": "requireGroupHistoryQueue",
+            "count": 2
+          },
+          {
+            "name": "appendGroupHistoryMessage",
+            "count": 2
+          },
+          {
+            "name": "groupHistoryMutationQueue.mutate.intent",
+            "count": 2
+          },
+          {
+            "name": "setGroupStreamCallback",
+            "count": 1
+          },
+          {
+            "name": "getVcpGlobalSettings",
+            "count": 2
+          },
+          {
+            "name": "resolveEffectiveModel",
+            "count": 2
+          },
+          {
+            "name": "normalizeUniqueStringArray",
+            "count": 12
+          },
+          {
+            "name": "normalizeGroupModeSettings",
+            "count": 4
+          },
+          {
+            "name": "getAgentGroupConfig",
+            "count": 12
+          },
+          {
+            "name": "handleGroupChatMessage",
+            "count": 1
+          },
+          {
+            "name": "persistAgentResponse",
+            "count": 2
+          },
+          {
+            "name": "resetIdleTimer",
+            "count": 4
+          },
+          {
+            "name": "processStreamForGroupAndUpdateHistory",
+            "count": 2
+          },
+          {
+            "name": "onData",
+            "count": 6
+          },
+          {
+            "name": "onDone",
+            "count": 2
+          },
+          {
+            "name": "getGroupChatHistory",
+            "count": 6
+          },
+          {
+            "name": "handleGroupChatMessage",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "file": "apps/desktop/modules/tavernRulesEngine.js",
+        "hitFunctions": [
+          {
+            "name": "renderRuleContent",
+            "count": 5
+          },
+          {
+            "name": "isRuleActive",
+            "count": 5
+          },
+          {
+            "name": "filterRulesByType",
+            "count": 5
+          },
+          {
+            "name": "applySystemSuffix",
+            "count": 2
+          },
+          {
+            "name": "applyUserSuffix",
+            "count": 1
+          },
+          {
+            "name": "applyContextInject",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "file": "packages/core-rules/group/modes/sequentialMode.js",
+        "hitFunctions": [
+          {
+            "name": "determineSpeakers",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "file": "packages/core-rules/group/groupContextWindow.js",
+        "hitFunctions": [
+          {
+            "name": "normalizeGroupContextWindowSettings",
+            "count": 6
+          },
+          {
+            "name": "selectGroupContextHistory",
+            "count": 2
+          },
+          {
+            "name": "applyGroupContextRules",
+            "count": 2
+          },
+          {
+            "name": "makeMessage",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "file": "apps/desktop/modules/ipc/groupChatHandlers.js",
+        "hitFunctions": [
+          {
+            "name": "advanceTopicAdmission",
+            "count": 1
+          },
+          {
+            "name": "findAvatarUrl",
+            "count": 2
+          },
+          {
+            "name": "getAgentConfigById",
+            "count": 2
+          },
+          {
+            "name": "createStreamSender",
+            "count": 1
+          },
+          {
+            "name": "readHistory",
+            "count": 1
+          },
+          {
+            "name": "loadGroupConfig",
+            "count": 1
+          },
+          {
+            "name": "runGroup",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "configuredPlan": {
+      "file": "AgentGroups/gc-group/config.json",
+      "mode": "sequential",
+      "speakerOrder": [
+        "gc-a",
+        "gc-b"
+      ],
+      "sha256": "d13bb58ca1dc2068be5c955aafe43d832b297783c242e66e472d3eda1a266ebe"
+    },
+    "history": [
+      {
+        "id": "gc-history-user",
+        "role": "user",
+        "name": "用户",
+        "timestamp": 1700000000000,
+        "content": "GC_HISTORY_USER",
+        "attachments": [
+          {
+            "id": "attachment_ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+            "name": "context-note.txt",
+            "internalFileName": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b.txt",
+            "internalPath": "isolated-content-addressed:ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b.txt",
+            "type": "text/plain",
+            "size": 22,
+            "hash": "ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b",
+            "createdAt": 1795250061063,
+            "extractedText": "CTX_ATTACHMENT_BODY_V1",
+            "imageFrames": null,
+            "pdfMeta": null
+          }
+        ]
+      },
+      {
+        "id": "gc-history-assistant",
+        "role": "assistant",
+        "name": "Fixture B",
+        "agentId": "gc-b",
+        "timestamp": 1700000001000,
+        "content": "GC_HISTORY_ASSISTANT"
+      },
+      {
+        "id": "gc-history-system",
+        "role": "system",
+        "name": "系统",
+        "timestamp": 1700000002000,
+        "content": "GC_HISTORY_SYSTEM"
+      },
+      {
+        "id": "gc-current",
+        "role": "user",
+        "name": "用户",
+        "content": "GC_CURRENT: read the attached sample.",
+        "attachments": [],
+        "timestamp": 1795250063381,
+        "isGroupMessage": true,
+        "groupId": "gc-group",
+        "topicId": "gc-topic",
+        "_metadata": {
+          "groupRequestText": "GC_CURRENT: read the attached sample."
+        }
+      },
+      {
+        "role": "assistant",
+        "name": "Fixture A",
+        "agentId": "gc-a",
+        "model": "synthetic",
+        "modelSource": "agent",
+        "content": "GC_REPLY_A_UNIQUE",
+        "finishReason": "completed",
+        "timestamp": 1795250063617,
+        "id": "msg_group_gc-current_gc-a_1795250063392",
+        "isGroupMessage": true,
+        "groupId": "gc-group",
+        "topicId": "gc-topic",
+        "avatarUrl": null,
+        "admissionToken": "093c80ef-989e-4dcf-94f8-6cc9863fec7b",
+        "admissionTerminal": true
+      },
+      {
+        "role": "assistant",
+        "name": "Fixture B",
+        "agentId": "gc-b",
+        "model": "synthetic",
+        "modelSource": "agent",
+        "content": "GC_REPLY_B_UNIQUE",
+        "finishReason": "completed",
+        "timestamp": 1795250063836,
+        "id": "msg_group_gc-current_gc-b_1795250063624",
+        "isGroupMessage": true,
+        "groupId": "gc-group",
+        "topicId": "gc-topic",
+        "avatarUrl": null,
+        "admissionToken": "9cccc544-0beb-48f6-b28b-adb7b786e14a",
+        "admissionTerminal": true
+      }
+    ],
+    "dispatch": [
+      {
+        "kind": "group-send-ipc",
+        "groupId": "gc-group",
+        "topicId": "gc-topic",
+        "inputId": "gc-current",
+        "content": {
+          "text": "GC_CURRENT: read the attached sample."
+        }
+      },
+      {
+        "kind": "dispatch",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "GC_MEMBER_A\n\n[群聊设定]:\nGC_GROUP_PROMPT\n\nGC_SYSTEM_SUFFIX"
+            },
+            {
+              "role": "system",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[系统的发言]: GC_HISTORY_SYSTEM"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "GC_DEPTH_INJECTION"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[用户的发言]: GC_HISTORY_USER\n\n[附加文件: file:///tmp/vcp-group-context-native-8m0rFv/profile/UserData/attachments/ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+                }
+              ]
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[Fixture B的发言]: GC_HISTORY_ASSISTANT"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[用户的发言]: GC_CURRENT: read the attached sample.\n\nGC_USER_SUFFIX"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "GC_INVITATION Fixture A"
+                }
+              ],
+              "name": "用户"
+            }
+          ],
+          "model": "synthetic",
+          "temperature": 0.5,
+          "max_tokens": 128,
+          "stream": true,
+          "messageId": "msg_group_gc-current_gc-a_1795250063392",
+          "vcpchatExtensions": {
+            "schemaVersion": 1,
+            "messageMetadataMode": "hash_only",
+            "messageTimestampBindings": [
+              {
+                "messageId": "gc-history-system",
+                "role": "system",
+                "timestamp": 1700000002000,
+                "timestampIso": "2023-11-14T22:13:22.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:f4a0c906ce6650d78e38714fac424ceeacb9185a5991a365c4a698f5b211b312",
+                "sentMessageIndex": 1
+              },
+              {
+                "messageId": "gc-history-user",
+                "role": "user",
+                "timestamp": 1700000000000,
+                "timestampIso": "2023-11-14T22:13:20.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:fd8e4eabe9b8f2b16ef973040c047f90eef6213b672b53d9d493db52625a8b97",
+                "sentMessageIndex": 3
+              },
+              {
+                "messageId": "gc-history-assistant",
+                "role": "assistant",
+                "timestamp": 1700000001000,
+                "timestampIso": "2023-11-14T22:13:21.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:b69a16e77d31d5c815cc1254beba37b7f2e6930d693f5ef0cdb75d9ea4729f5d",
+                "sentMessageIndex": 4
+              },
+              {
+                "messageId": "gc-current",
+                "role": "user",
+                "timestamp": 1795250063381,
+                "timestampIso": "2026-11-21T08:34:23.381Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:81505f524d4c3df8ab6bb9d5e1deb3fcad27e432668c35ae79155bd52ffb743f",
+                "sentMessageIndex": 5
+              }
+            ]
+          }
+        },
+        "committed": [
+          {
+            "id": "gc-history-user",
+            "role": "user",
+            "content": "GC_HISTORY_USER"
+          },
+          {
+            "id": "gc-history-assistant",
+            "role": "assistant",
+            "content": "GC_HISTORY_ASSISTANT"
+          },
+          {
+            "id": "gc-history-system",
+            "role": "system",
+            "content": "GC_HISTORY_SYSTEM"
+          },
+          {
+            "id": "gc-current",
+            "role": "user",
+            "content": "GC_CURRENT: read the attached sample."
+          }
+        ]
+      },
+      {
+        "kind": "dispatch",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "GC_MEMBER_B\n\n[群聊设定]:\nGC_GROUP_PROMPT\n\nGC_SYSTEM_SUFFIX"
+            },
+            {
+              "role": "system",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[系统的发言]: GC_HISTORY_SYSTEM"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[用户的发言]: GC_HISTORY_USER\n\n[附加文件: file:///tmp/vcp-group-context-native-8m0rFv/profile/UserData/attachments/ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "GC_DEPTH_INJECTION"
+                }
+              ]
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[Fixture B的发言]: GC_HISTORY_ASSISTANT"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[用户的发言]: GC_CURRENT: read the attached sample.\n\nGC_USER_SUFFIX"
+                }
+              ]
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[Fixture A的发言]: GC_REPLY_A_UNIQUE"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "GC_INVITATION Fixture B"
+                }
+              ],
+              "name": "用户"
+            }
+          ],
+          "model": "synthetic",
+          "temperature": 0.5,
+          "max_tokens": 128,
+          "stream": true,
+          "messageId": "msg_group_gc-current_gc-b_1795250063624",
+          "vcpchatExtensions": {
+            "schemaVersion": 1,
+            "messageMetadataMode": "hash_only",
+            "messageTimestampBindings": [
+              {
+                "messageId": "gc-history-system",
+                "role": "system",
+                "timestamp": 1700000002000,
+                "timestampIso": "2023-11-14T22:13:22.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:f4a0c906ce6650d78e38714fac424ceeacb9185a5991a365c4a698f5b211b312",
+                "sentMessageIndex": 1
+              },
+              {
+                "messageId": "gc-history-user",
+                "role": "user",
+                "timestamp": 1700000000000,
+                "timestampIso": "2023-11-14T22:13:20.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:fd8e4eabe9b8f2b16ef973040c047f90eef6213b672b53d9d493db52625a8b97",
+                "sentMessageIndex": 2
+              },
+              {
+                "messageId": "gc-history-assistant",
+                "role": "assistant",
+                "timestamp": 1700000001000,
+                "timestampIso": "2023-11-14T22:13:21.000Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:b69a16e77d31d5c815cc1254beba37b7f2e6930d693f5ef0cdb75d9ea4729f5d",
+                "sentMessageIndex": 4
+              },
+              {
+                "messageId": "gc-current",
+                "role": "user",
+                "timestamp": 1795250063381,
+                "timestampIso": "2026-11-21T08:34:23.381Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:81505f524d4c3df8ab6bb9d5e1deb3fcad27e432668c35ae79155bd52ffb743f",
+                "sentMessageIndex": 5
+              },
+              {
+                "messageId": "msg_group_gc-current_gc-a_1795250063392",
+                "role": "assistant",
+                "timestamp": 1795250063617,
+                "timestampIso": "2026-11-21T08:34:23.617Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:4b0c49b1ca60738a31b48808aab508e56a930f60ac408ce2870d1c9849659b31",
+                "sentMessageIndex": 6
+              }
+            ]
+          }
+        },
+        "committed": [
+          {
+            "id": "gc-history-user",
+            "role": "user",
+            "content": "GC_HISTORY_USER"
+          },
+          {
+            "id": "gc-history-assistant",
+            "role": "assistant",
+            "content": "GC_HISTORY_ASSISTANT"
+          },
+          {
+            "id": "gc-history-system",
+            "role": "system",
+            "content": "GC_HISTORY_SYSTEM"
+          },
+          {
+            "id": "gc-current",
+            "role": "user",
+            "content": "GC_CURRENT: read the attached sample."
+          },
+          {
+            "id": "msg_group_gc-current_gc-a_1795250063392",
+            "role": "assistant",
+            "content": "GC_REPLY_A_UNIQUE"
+          }
+        ]
+      }
+    ]
+  },
+  "handler": [
+    {
+      "kind": "worker-rules",
+      "method": "applyContextInject",
+      "source": "../../../../packages/core-rules/tavernRulesEngine.cjs",
+      "sha256": "ede855fbe40b70cd7b13684671047d040180cef2b354a6e8677a1b1b5c1c51bb"
+    },
+    {
+      "kind": "worker-rules",
+      "method": "applyGroupContextRules",
+      "source": "../../../../packages/core-rules/group/groupContextWindow.js",
+      "sha256": "8db8b8e877aaf49b8426c49dc6b058c88f7341e72e938153ba9cdee2fd11b7bb"
+    },
+    {
+      "kind": "handler",
+      "member": "A",
+      "route": "/v1/chat/completions",
+      "workId": "request_0c191bb6acab48cb924ee1ea20eff4b5",
+      "forceShowVCP": false,
+      "body": {
+        "model": "synthetic",
+        "temperature": 0.5,
+        "max_tokens": 128,
+        "stream": true,
+        "requestId": "gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+        "messages": [
+          {
+            "role": "system",
+            "content": "GC_MEMBER_A\n\n[群聊设定]:\nGC_GROUP_PROMPT\n\nGC_SYSTEM_SUFFIX"
+          },
+          {
+            "role": "system",
+            "content": [
+              {
+                "type": "text",
+                "text": "[系统的发言]: GC_HISTORY_SYSTEM"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_DEPTH_INJECTION"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_HISTORY_USER\n\n[附加文件: context-note.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "[Fixture B的发言]: GC_HISTORY_ASSISTANT"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_CURRENT: read the attached sample.\n\nGC_USER_SUFFIX"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_INVITATION Fixture A"
+              }
+            ],
+            "name": "用户"
+          }
+        ],
+        "vcpchatExtensions": {
+          "schemaVersion": 1,
+          "messageMetadataMode": "hash_only",
+          "messageTimestampBindings": [
+            {
+              "messageId": "gc-history-system",
+              "role": "system",
+              "timestamp": 1700000002000,
+              "timestampIso": "2023-11-14T22:13:22.000Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:f4a0c906ce6650d78e38714fac424ceeacb9185a5991a365c4a698f5b211b312",
+              "sentMessageIndex": 1
+            },
+            {
+              "messageId": "gc-history-user",
+              "role": "user",
+              "timestamp": 1700000000000,
+              "timestampIso": "2023-11-14T22:13:20.000Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:ac079c18202867f183effc53334e2f90415e89d35f89edf6990963de5601e295",
+              "sentMessageIndex": 3
+            },
+            {
+              "messageId": "gc-history-assistant",
+              "role": "assistant",
+              "timestamp": 1700000001000,
+              "timestampIso": "2023-11-14T22:13:21.000Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:b69a16e77d31d5c815cc1254beba37b7f2e6930d693f5ef0cdb75d9ea4729f5d",
+              "sentMessageIndex": 4
+            },
+            {
+              "messageId": "mobile_job_0247c09389e284b17c37433533a46655",
+              "role": "user",
+              "timestamp": 1795250060674,
+              "timestampIso": "2026-11-21T08:34:20.674Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:81505f524d4c3df8ab6bb9d5e1deb3fcad27e432668c35ae79155bd52ffb743f",
+              "sentMessageIndex": 5
+            }
+          ],
+          "requestContext": {
+            "requestId": "gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+            "agentId": "shared_d18aa65ddb4d4b2b9558e1f81e23ae48",
+            "agentName": "Fixture A",
+            "topicId": "shared_cbcd5cf16a3742bd8c792735e6dbf68c",
+            "ownerType": "group",
+            "isGroupMessage": true
+          }
+        }
+      }
+    },
+    {
+      "kind": "worker-rules",
+      "method": "applyContextInject",
+      "source": "../../../../packages/core-rules/tavernRulesEngine.cjs",
+      "sha256": "ede855fbe40b70cd7b13684671047d040180cef2b354a6e8677a1b1b5c1c51bb"
+    },
+    {
+      "kind": "worker-rules",
+      "method": "applyGroupContextRules",
+      "source": "../../../../packages/core-rules/group/groupContextWindow.js",
+      "sha256": "8db8b8e877aaf49b8426c49dc6b058c88f7341e72e938153ba9cdee2fd11b7bb"
+    },
+    {
+      "kind": "handler",
+      "member": "B",
+      "route": "/v1/chat/completions",
+      "workId": "request_0c191bb6acab48cb924ee1ea20eff4b5",
+      "forceShowVCP": false,
+      "body": {
+        "model": "synthetic",
+        "temperature": 0.5,
+        "max_tokens": 128,
+        "stream": true,
+        "requestId": "gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+        "messages": [
+          {
+            "role": "system",
+            "content": "GC_MEMBER_B\n\n[群聊设定]:\nGC_GROUP_PROMPT\n\nGC_SYSTEM_SUFFIX"
+          },
+          {
+            "role": "system",
+            "content": [
+              {
+                "type": "text",
+                "text": "[系统的发言]: GC_HISTORY_SYSTEM"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_HISTORY_USER\n\n[附加文件: context-note.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_DEPTH_INJECTION"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "[Fixture B的发言]: GC_HISTORY_ASSISTANT"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_CURRENT: read the attached sample.\n\nGC_USER_SUFFIX"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "[Fixture A的发言]: GC_REPLY_A_UNIQUE"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_INVITATION Fixture B"
+              }
+            ],
+            "name": "用户"
+          }
+        ],
+        "vcpchatExtensions": {
+          "schemaVersion": 1,
+          "messageMetadataMode": "hash_only",
+          "messageTimestampBindings": [
+            {
+              "messageId": "gc-history-system",
+              "role": "system",
+              "timestamp": 1700000002000,
+              "timestampIso": "2023-11-14T22:13:22.000Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:f4a0c906ce6650d78e38714fac424ceeacb9185a5991a365c4a698f5b211b312",
+              "sentMessageIndex": 1
+            },
+            {
+              "messageId": "gc-history-user",
+              "role": "user",
+              "timestamp": 1700000000000,
+              "timestampIso": "2023-11-14T22:13:20.000Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:ac079c18202867f183effc53334e2f90415e89d35f89edf6990963de5601e295",
+              "sentMessageIndex": 2
+            },
+            {
+              "messageId": "gc-history-assistant",
+              "role": "assistant",
+              "timestamp": 1700000001000,
+              "timestampIso": "2023-11-14T22:13:21.000Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:b69a16e77d31d5c815cc1254beba37b7f2e6930d693f5ef0cdb75d9ea4729f5d",
+              "sentMessageIndex": 4
+            },
+            {
+              "messageId": "mobile_job_0247c09389e284b17c37433533a46655",
+              "role": "user",
+              "timestamp": 1795250060674,
+              "timestampIso": "2026-11-21T08:34:20.674Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:81505f524d4c3df8ab6bb9d5e1deb3fcad27e432668c35ae79155bd52ffb743f",
+              "sentMessageIndex": 5
+            },
+            {
+              "messageId": "reply_gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+              "role": "assistant",
+              "timestamp": 1795250060784,
+              "timestampIso": "2026-11-21T08:34:20.784Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:4b0c49b1ca60738a31b48808aab508e56a930f60ac408ce2870d1c9849659b31",
+              "sentMessageIndex": 6
+            }
+          ],
+          "requestContext": {
+            "requestId": "gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+            "agentId": "shared_6cfeb6c893a54350bf75a53e2cfc3f9d",
+            "agentName": "Fixture B",
+            "topicId": "shared_cbcd5cf16a3742bd8c792735e6dbf68c",
+            "ownerType": "group",
+            "isGroupMessage": true
+          }
+        }
+      }
+    },
+    {
+      "kind": "handler",
+      "member": "A",
+      "route": "/v1/chat/completions",
+      "workId": null,
+      "forceShowVCP": false,
+      "body": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "GC_MEMBER_A\n\n[群聊设定]:\nGC_GROUP_PROMPT\n\nGC_SYSTEM_SUFFIX"
+          },
+          {
+            "role": "system",
+            "content": [
+              {
+                "type": "text",
+                "text": "[系统的发言]: GC_HISTORY_SYSTEM"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_DEPTH_INJECTION"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_HISTORY_USER\n\n[附加文件: file:///tmp/vcp-group-context-native-8m0rFv/profile/UserData/attachments/ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "[Fixture B的发言]: GC_HISTORY_ASSISTANT"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_CURRENT: read the attached sample.\n\nGC_USER_SUFFIX"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_INVITATION Fixture A"
+              }
+            ],
+            "name": "用户"
+          }
+        ],
+        "model": "synthetic",
+        "temperature": 0.5,
+        "max_tokens": 128,
+        "stream": true,
+        "messageId": "msg_group_gc-current_gc-a_1795250063392",
+        "vcpchatExtensions": {
+          "schemaVersion": 1,
+          "messageMetadataMode": "hash_only",
+          "messageTimestampBindings": [
+            {
+              "messageId": "gc-history-system",
+              "role": "system",
+              "timestamp": 1700000002000,
+              "timestampIso": "2023-11-14T22:13:22.000Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:f4a0c906ce6650d78e38714fac424ceeacb9185a5991a365c4a698f5b211b312",
+              "sentMessageIndex": 1
+            },
+            {
+              "messageId": "gc-history-user",
+              "role": "user",
+              "timestamp": 1700000000000,
+              "timestampIso": "2023-11-14T22:13:20.000Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:fd8e4eabe9b8f2b16ef973040c047f90eef6213b672b53d9d493db52625a8b97",
+              "sentMessageIndex": 3
+            },
+            {
+              "messageId": "gc-history-assistant",
+              "role": "assistant",
+              "timestamp": 1700000001000,
+              "timestampIso": "2023-11-14T22:13:21.000Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:b69a16e77d31d5c815cc1254beba37b7f2e6930d693f5ef0cdb75d9ea4729f5d",
+              "sentMessageIndex": 4
+            },
+            {
+              "messageId": "gc-current",
+              "role": "user",
+              "timestamp": 1795250063381,
+              "timestampIso": "2026-11-21T08:34:23.381Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:81505f524d4c3df8ab6bb9d5e1deb3fcad27e432668c35ae79155bd52ffb743f",
+              "sentMessageIndex": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "handler",
+      "member": "B",
+      "route": "/v1/chat/completions",
+      "workId": null,
+      "forceShowVCP": false,
+      "body": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "GC_MEMBER_B\n\n[群聊设定]:\nGC_GROUP_PROMPT\n\nGC_SYSTEM_SUFFIX"
+          },
+          {
+            "role": "system",
+            "content": [
+              {
+                "type": "text",
+                "text": "[系统的发言]: GC_HISTORY_SYSTEM"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_HISTORY_USER\n\n[附加文件: file:///tmp/vcp-group-context-native-8m0rFv/profile/UserData/attachments/ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_DEPTH_INJECTION"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "[Fixture B的发言]: GC_HISTORY_ASSISTANT"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_CURRENT: read the attached sample.\n\nGC_USER_SUFFIX"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "[Fixture A的发言]: GC_REPLY_A_UNIQUE"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_INVITATION Fixture B"
+              }
+            ],
+            "name": "用户"
+          }
+        ],
+        "model": "synthetic",
+        "temperature": 0.5,
+        "max_tokens": 128,
+        "stream": true,
+        "messageId": "msg_group_gc-current_gc-b_1795250063624",
+        "vcpchatExtensions": {
+          "schemaVersion": 1,
+          "messageMetadataMode": "hash_only",
+          "messageTimestampBindings": [
+            {
+              "messageId": "gc-history-system",
+              "role": "system",
+              "timestamp": 1700000002000,
+              "timestampIso": "2023-11-14T22:13:22.000Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:f4a0c906ce6650d78e38714fac424ceeacb9185a5991a365c4a698f5b211b312",
+              "sentMessageIndex": 1
+            },
+            {
+              "messageId": "gc-history-user",
+              "role": "user",
+              "timestamp": 1700000000000,
+              "timestampIso": "2023-11-14T22:13:20.000Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:fd8e4eabe9b8f2b16ef973040c047f90eef6213b672b53d9d493db52625a8b97",
+              "sentMessageIndex": 2
+            },
+            {
+              "messageId": "gc-history-assistant",
+              "role": "assistant",
+              "timestamp": 1700000001000,
+              "timestampIso": "2023-11-14T22:13:21.000Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:b69a16e77d31d5c815cc1254beba37b7f2e6930d693f5ef0cdb75d9ea4729f5d",
+              "sentMessageIndex": 4
+            },
+            {
+              "messageId": "gc-current",
+              "role": "user",
+              "timestamp": 1795250063381,
+              "timestampIso": "2026-11-21T08:34:23.381Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:81505f524d4c3df8ab6bb9d5e1deb3fcad27e432668c35ae79155bd52ffb743f",
+              "sentMessageIndex": 5
+            },
+            {
+              "messageId": "msg_group_gc-current_gc-a_1795250063392",
+              "role": "assistant",
+              "timestamp": 1795250063617,
+              "timestampIso": "2026-11-21T08:34:23.617Z",
+              "source": "client_history",
+              "sentMessageHash": "sha256:4b0c49b1ca60738a31b48808aab508e56a930f60ac408ce2870d1c9849659b31",
+              "sentMessageIndex": 6
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "provider": [
+    {
+      "member": "A",
+      "route": "/v1/chat/completions",
+      "body": {
+        "model": "synthetic",
+        "temperature": 0.5,
+        "max_tokens": 128,
+        "stream": true,
+        "requestId": "gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+        "messages": [
+          {
+            "role": "system",
+            "content": "GC_MEMBER_A\n\n[群聊设定]:\nGC_GROUP_PROMPT\n\nGC_SYSTEM_SUFFIX"
+          },
+          {
+            "role": "system",
+            "content": [
+              {
+                "type": "text",
+                "text": "[系统的发言]: GC_HISTORY_SYSTEM"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_DEPTH_INJECTION"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_HISTORY_USER\n\n[附加文件: context-note.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "[Fixture B的发言]: GC_HISTORY_ASSISTANT"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_CURRENT: read the attached sample.\n\nGC_USER_SUFFIX"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_INVITATION Fixture A"
+              }
+            ]
+          }
+        ]
+      },
+      "committedJournal": [
+        {
+          "seq": 1,
+          "id": "gc-history-user",
+          "role": "user",
+          "content": "GC_HISTORY_USER"
+        },
+        {
+          "seq": 2,
+          "id": "gc-history-assistant",
+          "role": "assistant",
+          "content": "GC_HISTORY_ASSISTANT"
+        },
+        {
+          "seq": 3,
+          "id": "gc-history-system",
+          "role": "system",
+          "content": "GC_HISTORY_SYSTEM"
+        },
+        {
+          "seq": 4,
+          "id": "mobile_job_0247c09389e284b17c37433533a46655",
+          "role": "user",
+          "content": "GC_CURRENT: read the attached sample."
+        }
+      ]
+    },
+    {
+      "member": "B",
+      "route": "/v1/chat/completions",
+      "body": {
+        "model": "synthetic",
+        "temperature": 0.5,
+        "max_tokens": 128,
+        "stream": true,
+        "requestId": "gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+        "messages": [
+          {
+            "role": "system",
+            "content": "GC_MEMBER_B\n\n[群聊设定]:\nGC_GROUP_PROMPT\n\nGC_SYSTEM_SUFFIX"
+          },
+          {
+            "role": "system",
+            "content": [
+              {
+                "type": "text",
+                "text": "[系统的发言]: GC_HISTORY_SYSTEM"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_HISTORY_USER\n\n[附加文件: context-note.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_DEPTH_INJECTION"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "[Fixture B的发言]: GC_HISTORY_ASSISTANT"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_CURRENT: read the attached sample.\n\nGC_USER_SUFFIX"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "[Fixture A的发言]: GC_REPLY_A_UNIQUE"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_INVITATION Fixture B"
+              }
+            ]
+          }
+        ]
+      },
+      "committedJournal": [
+        {
+          "seq": 1,
+          "id": "gc-history-user",
+          "role": "user",
+          "content": "GC_HISTORY_USER"
+        },
+        {
+          "seq": 2,
+          "id": "gc-history-assistant",
+          "role": "assistant",
+          "content": "GC_HISTORY_ASSISTANT"
+        },
+        {
+          "seq": 3,
+          "id": "gc-history-system",
+          "role": "system",
+          "content": "GC_HISTORY_SYSTEM"
+        },
+        {
+          "seq": 4,
+          "id": "mobile_job_0247c09389e284b17c37433533a46655",
+          "role": "user",
+          "content": "GC_CURRENT: read the attached sample."
+        },
+        {
+          "seq": 5,
+          "id": "reply_gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+          "role": "assistant",
+          "content": "GC_REPLY_A_UNIQUE"
+        }
+      ]
+    },
+    {
+      "member": "A",
+      "route": "/v1/chat/completions",
+      "body": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "GC_MEMBER_A\n\n[群聊设定]:\nGC_GROUP_PROMPT\n\nGC_SYSTEM_SUFFIX"
+          },
+          {
+            "role": "system",
+            "content": [
+              {
+                "type": "text",
+                "text": "[系统的发言]: GC_HISTORY_SYSTEM"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_DEPTH_INJECTION"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_HISTORY_USER\n\n[附加文件: file:///tmp/vcp-group-context-native-8m0rFv/profile/UserData/attachments/ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "[Fixture B的发言]: GC_HISTORY_ASSISTANT"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_CURRENT: read the attached sample.\n\nGC_USER_SUFFIX"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_INVITATION Fixture A"
+              }
+            ]
+          }
+        ],
+        "model": "synthetic",
+        "temperature": 0.5,
+        "max_tokens": 128,
+        "stream": true,
+        "messageId": "msg_group_gc-current_gc-a_1795250063392"
+      },
+      "committedJournal": [
+        {
+          "seq": 1,
+          "id": "gc-history-user",
+          "role": "user",
+          "content": "GC_HISTORY_USER"
+        },
+        {
+          "seq": 2,
+          "id": "gc-history-assistant",
+          "role": "assistant",
+          "content": "GC_HISTORY_ASSISTANT"
+        },
+        {
+          "seq": 3,
+          "id": "gc-history-system",
+          "role": "system",
+          "content": "GC_HISTORY_SYSTEM"
+        },
+        {
+          "seq": 4,
+          "id": "mobile_job_0247c09389e284b17c37433533a46655",
+          "role": "user",
+          "content": "GC_CURRENT: read the attached sample."
+        },
+        {
+          "seq": 5,
+          "id": "reply_gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+          "role": "assistant",
+          "content": "GC_REPLY_A_UNIQUE"
+        },
+        {
+          "seq": 6,
+          "id": "reply_gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+          "role": "assistant",
+          "content": "GC_REPLY_B_UNIQUE"
+        }
+      ]
+    },
+    {
+      "member": "B",
+      "route": "/v1/chat/completions",
+      "body": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "GC_MEMBER_B\n\n[群聊设定]:\nGC_GROUP_PROMPT\n\nGC_SYSTEM_SUFFIX"
+          },
+          {
+            "role": "system",
+            "content": [
+              {
+                "type": "text",
+                "text": "[系统的发言]: GC_HISTORY_SYSTEM"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_HISTORY_USER\n\n[附加文件: file:///tmp/vcp-group-context-native-8m0rFv/profile/UserData/attachments/ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b.txt]\nCTX_ATTACHMENT_BODY_V1\n[/附加文件结束: context-note.txt]"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_DEPTH_INJECTION"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "[Fixture B的发言]: GC_HISTORY_ASSISTANT"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "[用户的发言]: GC_CURRENT: read the attached sample.\n\nGC_USER_SUFFIX"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "[Fixture A的发言]: GC_REPLY_A_UNIQUE"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "GC_INVITATION Fixture B"
+              }
+            ]
+          }
+        ],
+        "model": "synthetic",
+        "temperature": 0.5,
+        "max_tokens": 128,
+        "stream": true,
+        "messageId": "msg_group_gc-current_gc-b_1795250063624"
+      },
+      "committedJournal": [
+        {
+          "seq": 1,
+          "id": "gc-history-user",
+          "role": "user",
+          "content": "GC_HISTORY_USER"
+        },
+        {
+          "seq": 2,
+          "id": "gc-history-assistant",
+          "role": "assistant",
+          "content": "GC_HISTORY_ASSISTANT"
+        },
+        {
+          "seq": 3,
+          "id": "gc-history-system",
+          "role": "system",
+          "content": "GC_HISTORY_SYSTEM"
+        },
+        {
+          "seq": 4,
+          "id": "mobile_job_0247c09389e284b17c37433533a46655",
+          "role": "user",
+          "content": "GC_CURRENT: read the attached sample."
+        },
+        {
+          "seq": 5,
+          "id": "reply_gstep_cd4c2fa7e4d9334a4b1425808412587ae9812b0b",
+          "role": "assistant",
+          "content": "GC_REPLY_A_UNIQUE"
+        },
+        {
+          "seq": 6,
+          "id": "reply_gstep_750ec6682232f2324e7d449348b0675dcbfc58e2",
+          "role": "assistant",
+          "content": "GC_REPLY_B_UNIQUE"
+        }
+      ]
+    }
+  ],
+  "backend": [
+    {
+      "file": "apps/server/server.js",
+      "sha256": "3095443182aca5d60dec2f6ee776790906028befa9364496fd8fac5951a096df"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "a4754eea49c9d91e155d1862e40666bf3c77085760e62bded7e2ecf1336faeee"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "9bac35b45ae82bcdd20a23f73c88fad9eadadaad99e4c8fd37fa424e09e20e08"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "3483b635f0b735b80b0f02d6d0ad5ddefdb9bf52988affb6f5f8b2b63f8ca0b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "6eb7600e0f6212d5fb6569dafa257d28713b1adaea346236adbd8d8a4da88529"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "946cc2c9160ac58e9e213132091b96e47cb57e5cba5c2dde397b3220345c6828"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+      "sha256": "b16e07afa969e4674a98fe093f4e7c892c3125635b9c63ac0064bafdaf47f17d"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "94a2517a153ec8f343ed69ce9c09c2fccd593d441949e5ea8d295106042d91e2"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "c7777a89d9a2b461f1f562764d075d47437473932ae2ecf62985d5d54f01d4d9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+      "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "200540207a903bb0e7dc342eba36edb271619df7304eb5f433b7d62353a1cc56"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "c135a4ae59741a02cdf07653b7112f7932693f10600f6d4dac76e28a72d4d825"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "a3047f7951e3b6030ca1ea6d3163172171bd1c14ef9ff3d29bb234dd24f76e12"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/groupTurn.js",
+      "sha256": "1d159c4a38d0b8247a59b8bec1318bc06ed25bb9ca0e6811392827049ff5bed7"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedGroups.js",
+      "sha256": "68704fc589a6ad43ce33df4c7f2100a57c0242ad36638e195ec96b58e6f0e8be"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/portal.js",
+      "sha256": "3088ccf0e10e0b912164ad2f6e89ec97e19fd5249daa0965947cd7101e5ce95b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTurns.js",
+      "sha256": "023986b7c439261fb2287809543b63a3ba962cf02c1c93197404c71eff4a6025"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedEvents.js",
+      "sha256": "43ce2e77a98be68657b91078dd9fcbcae9382a51baccd2faca6816786d51c915"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/native-sync.js",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    }
+  ]
+}

@@ -28,7 +28,8 @@ const { JevGroupSessionOrchestrator } = require('./jevGroupSessionOrchestrator')
 const {
     DEFAULT_GROUP_CONTEXT_MESSAGE_WINDOW_SIZE,
     normalizeGroupContextWindowSettings,
-    selectGroupContextHistory
+    selectGroupContextHistory,
+    applyGroupContextRules
 } = require('./groupContextWindow');
 
 // 话题标题管理模块
@@ -1356,18 +1357,7 @@ ${canvasData.errors || 'No errors'}
         // 添加触发AI发言的模拟用户输入 (as text part of a content array)
         messagesForAI.push({ role: 'user', content: [{ type: 'text', text: invitePromptContent }], name: userNameForMessage });
 
-        // VCPChatTarven: 应用 context_inject 规则（按深度插入消息，跳过 system）
-        if (Array.isArray(tavernRules) && tavernRules.some(r => r.type === 'context_inject' && r.enabled !== false)) {
-            const sysMsgs = messagesForAI.filter(m => m.role === 'system');
-            const nonSysMsgs = messagesForAI.filter(m => m.role !== 'system');
-            const injected = tavernEngine.applyContextInject(nonSysMsgs, tavernRules, 'group', {
-                makeMessage: (role, text) => ({
-                    role,
-                    content: [{ type: 'text', text }]
-                })
-            });
-            messagesForAI = [...sysMsgs, ...injected];
-        }
+        messagesForAI = applyGroupContextRules(messagesForAI, tavernRules, tavernEngine);
         // --- VCP Thought Chain Stripping ---
         try {
             // 默认不注入元思考链，除非明确开启
@@ -2066,18 +2056,7 @@ ${canvasData.errors || 'No errors'}
     messagesForAI.push(...contextForAgent);
     messagesForAI.push({ role: 'user', content: [{ type: 'text', text: invitePromptContent }], name: (globalVcpSettings.userName || '用户') }); // 模拟用户触发
 
-    // VCPChatTarven: 应用 context_inject 规则（按深度插入消息，跳过 system）
-    if (Array.isArray(tavernRulesInvite) && tavernRulesInvite.some(r => r.type === 'context_inject' && r.enabled !== false)) {
-        const sysMsgs = messagesForAI.filter(m => m.role === 'system');
-        const nonSysMsgs = messagesForAI.filter(m => m.role !== 'system');
-        const injected = tavernEngine.applyContextInject(nonSysMsgs, tavernRulesInvite, 'group', {
-            makeMessage: (role, text) => ({
-                role,
-                content: [{ type: 'text', text }]
-            })
-        });
-        messagesForAI = [...sysMsgs, ...injected];
-    }
+    messagesForAI = applyGroupContextRules(messagesForAI, tavernRulesInvite, tavernEngine);
     // --- VCP Thought Chain Stripping ---
     try {
         // 默认不注入元思考链，除非明确开启

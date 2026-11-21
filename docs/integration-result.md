@@ -46,3 +46,5 @@ AgentAssistant 长委托已接入共享单聊的 Work。桌面重开、发起端
 共享单聊的酒馆深度注入现由 VCPChat 的同一原生入口定位。带有历史系统消息的输入在两端得到相同的注入位置，实际请求、附件和恢复回执见[单聊酒馆规则对照](evidence/context-rules/README.md)。
 
 共享群聊的「取消剩余接力」现允许已认领的成员完成，并阻止后续成员派发。原生桌面对照、PWA 实测、工具审批及进程中断恢复见[共享群聊取消剩余接力](evidence/group-relay/README.md)。
+
+群聊逐成员上下文现复用原生桌面的酒馆深度规则。A 的正式回复在 B 的 handler 和 Provider 请求中均恰好一次；同一 History、规则、附件与发言计划的前后对照见[群聊逐成员请求验收](evidence/group-context/README.md)。

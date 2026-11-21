@@ -38,10 +38,25 @@ function selectGroupContextHistory(groupHistory, groupConfig = {}) {
     return history.slice(-settings.contextMessageWindowSize);
 }
 
+// The invitation is already in the conversation. System messages never
+// consume a Tavern depth position in the native group turn.
+function applyGroupContextRules(messages, rules, engine) {
+    if (!Array.isArray(rules) || !rules.some(rule => rule.type === 'context_inject' && rule.enabled !== false)) {
+        return messages;
+    }
+    const system = messages.filter(message => message.role === 'system');
+    const conversation = messages.filter(message => message.role !== 'system');
+    const injected = engine.applyContextInject(conversation, rules, 'group', {
+        makeMessage: (role, text) => ({ role, content: [{ type: 'text', text }] }),
+    });
+    return [...system, ...injected];
+}
+
 module.exports = {
     DEFAULT_GROUP_CONTEXT_MESSAGE_WINDOW_SIZE,
     MIN_GROUP_CONTEXT_MESSAGE_WINDOW_SIZE,
     MAX_GROUP_CONTEXT_MESSAGE_WINDOW_SIZE,
     normalizeGroupContextWindowSettings,
-    selectGroupContextHistory
+    selectGroupContextHistory,
+    applyGroupContextRules
 };

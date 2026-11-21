@@ -1,0 +1,92 @@
+{
+  "status": "PASS",
+  "orders": {
+    "A": {
+      "nativeBeforeAndAfter": [
+        "system prompt A",
+        "old system",
+        "depth 4",
+        "old user + attachment",
+        "old assistant",
+        "current user",
+        "invitation"
+      ],
+      "sharedBefore": [
+        "system prompt A",
+        "old user + attachment",
+        "depth 4",
+        "old assistant",
+        "old system",
+        "current user",
+        "invitation"
+      ],
+      "sharedAfter": [
+        "system prompt A",
+        "old system",
+        "depth 4",
+        "old user + attachment",
+        "old assistant",
+        "current user",
+        "invitation"
+      ]
+    },
+    "B": {
+      "nativeBeforeAndAfter": [
+        "system prompt B",
+        "old system",
+        "old user + attachment",
+        "depth 4",
+        "old assistant",
+        "current user",
+        "committed A",
+        "invitation"
+      ],
+      "sharedBefore": [
+        "system prompt B",
+        "old user + attachment",
+        "old assistant",
+        "depth 4",
+        "old system",
+        "current user",
+        "committed A",
+        "invitation"
+      ],
+      "sharedAfter": [
+        "system prompt B",
+        "old system",
+        "old user + attachment",
+        "depth 4",
+        "old assistant",
+        "current user",
+        "committed A",
+        "invitation"
+      ]
+    }
+  },
+  "normalizedNativeHandlerAndProviderBodiesUnchanged": true,
+  "sharedHandlerAndProviderOnlyReorderedWithBindingIndexes": true,
+  "candidateCommonHandlerAndProviderBodiesMatch": true,
+  "verifiedPerRun": {
+    "handlerBodies": 4,
+    "providerBodies": 4,
+    "sharedWorks": 1,
+    "sharedMemberAttempts": [
+      1,
+      1
+    ],
+    "sharedJournalRows": 6,
+    "sameWorkReplay": true,
+    "committedAOnceInB": true,
+    "candidateOwnerSourceSha256Matches": true
+  },
+  "observedTransportDifferences": {
+    "nativeRequestField": "messageId",
+    "sharedRequestField": "requestId",
+    "requestContextOnlyInSharedHandler": true,
+    "attachmentHeader": [
+      "native file URI",
+      "shared filename"
+    ],
+    "invitationNameRemovedByToolBoxBeforeProviderOnBothPaths": true
+  }
+}

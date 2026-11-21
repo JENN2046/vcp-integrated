@@ -47,7 +47,7 @@ async function launch(puppet, cert) {
     });
 }
 
-async function openPwa({ browser, service, request, topic = service.topics.groupTopic.id, execute = false }) {
+async function openPwa({ browser, service, request, topic = service.topics.groupTopic.id, execute = false, groupName = 'Relay fixture A B C' }) {
     const { pairingCode } = await request('/api/plugins/NativeSync/mobile/pairing', {
         scopeMode: 'shared', sharedSpaceId: 'sharedAB', permissions: execute ? ['read', 'execute'] : ['read'],
     });
@@ -67,8 +67,8 @@ async function openPwa({ browser, service, request, topic = service.topics.group
     await page.waitForFunction(() => Boolean(document.querySelector('#pair-code')?.value));
     await page.click('#pair-submit');
     await page.waitForSelector('#agent-select');
-    const agent = await page.$eval('#agent-select', element => [...element.options]
-        .find(option => option.textContent.includes('Relay fixture A B C'))?.value);
+    const agent = await page.$eval('#agent-select', (element, name) => [...element.options]
+        .find(option => option.textContent.includes(name))?.value, groupName);
     assert.ok(agent, 'paired PWA can see the shared group');
     await page.select('#agent-select', agent);
     await page.waitForFunction(topicId => [...document.querySelectorAll('#topic-select option')]

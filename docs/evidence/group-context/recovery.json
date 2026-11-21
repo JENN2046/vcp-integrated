@@ -1,0 +1,299 @@
+{
+  "scenario": "SIGKILL shared group during B stream without cancellation",
+  "node": "v24.22.1",
+  "browser": "Chrome/158.0.8127.36",
+  "accepted": {
+    "workId": "request_72e8daeeee294157aa5d47c0573a1cef",
+    "requestId": "6ad2d968-5c70-42ec-914e-c72797e63da3",
+    "status": 202
+  },
+  "before": {
+    "job": {
+      "id": "request_72e8daeeee294157aa5d47c0573a1cef",
+      "request_id": "6ad2d968-5c70-42ec-914e-c72797e63da3",
+      "state": "running",
+      "cancel_requested": 0,
+      "group_stop_index": null,
+      "user_message_id": "mobile_job_dc88065fae83670521fca8396209ec33",
+      "user_seq": 1,
+      "attempts": 1
+    },
+    "plan": [
+      "shared_ee89815af55c48bf968c855c6b459a4d",
+      "shared_ddb430bc2eac4d17b07a050251ac8d92",
+      "shared_f5a34d1465ba4e4db61db90d0e894c23"
+    ],
+    "steps": [
+      {
+        "id": "gstep_cf28fa9573c2b0dcce0776f88a8814aaea080786",
+        "agent_id": "shared_ee89815af55c48bf968c855c6b459a4d",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_cf28fa9573c2b0dcce0776f88a8814aaea080786"
+      },
+      {
+        "id": "gstep_dcedd18154494f6bb1f4cd7a42bb65af39345229",
+        "agent_id": "shared_ddb430bc2eac4d17b07a050251ac8d92",
+        "state": "running",
+        "attempts": 1,
+        "reply_message_id": null
+      },
+      {
+        "id": "gstep_e108aec95dca3ffb6fb9e252aaa187c25cdb3d61",
+        "agent_id": "shared_f5a34d1465ba4e4db61db90d0e894c23",
+        "state": "queued",
+        "attempts": 0,
+        "reply_message_id": null
+      }
+    ],
+    "admission": {
+      "id": "request_72e8daeeee294157aa5d47c0573a1cef",
+      "state": "dispatched",
+      "dispatched": 1
+    },
+    "native": [
+      {
+        "id": "gstep_cf28fa9573c2b0dcce0776f88a8814aaea080786",
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "id": "gstep_dcedd18154494f6bb1f4cd7a42bb65af39345229",
+        "ordinal": 1,
+        "state": "dispatched"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "mobile_job_dc88065fae83670521fca8396209ec33",
+        "action": "upsert"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_gstep_cf28fa9573c2b0dcce0776f88a8814aaea080786",
+        "action": "upsert"
+      }
+    ],
+    "calls": [
+      "A",
+      "B"
+    ],
+    "history": [
+      {
+        "id": "mobile_job_dc88065fae83670521fca8396209ec33",
+        "role": "user",
+        "content": "GROUP_RECOVERY_USER"
+      },
+      {
+        "id": "reply_gstep_cf28fa9573c2b0dcce0776f88a8814aaea080786",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      }
+    ]
+  },
+  "observedLivePrefix": "RELAY_B_PARTIAL",
+  "crash": {
+    "code": null,
+    "signal": "SIGKILL"
+  },
+  "replay": {
+    "status": 202,
+    "replayed": true,
+    "workId": "request_72e8daeeee294157aa5d47c0573a1cef",
+    "state": "review_required"
+  },
+  "after": {
+    "job": {
+      "id": "request_72e8daeeee294157aa5d47c0573a1cef",
+      "request_id": "6ad2d968-5c70-42ec-914e-c72797e63da3",
+      "state": "review_required",
+      "cancel_requested": 0,
+      "group_stop_index": null,
+      "user_message_id": "mobile_job_dc88065fae83670521fca8396209ec33",
+      "user_seq": 1,
+      "attempts": 1
+    },
+    "plan": [
+      "shared_ee89815af55c48bf968c855c6b459a4d",
+      "shared_ddb430bc2eac4d17b07a050251ac8d92",
+      "shared_f5a34d1465ba4e4db61db90d0e894c23"
+    ],
+    "steps": [
+      {
+        "id": "gstep_cf28fa9573c2b0dcce0776f88a8814aaea080786",
+        "agent_id": "shared_ee89815af55c48bf968c855c6b459a4d",
+        "state": "completed",
+        "attempts": 1,
+        "reply_message_id": "reply_gstep_cf28fa9573c2b0dcce0776f88a8814aaea080786"
+      },
+      {
+        "id": "gstep_dcedd18154494f6bb1f4cd7a42bb65af39345229",
+        "agent_id": "shared_ddb430bc2eac4d17b07a050251ac8d92",
+        "state": "interrupted",
+        "attempts": 1,
+        "reply_message_id": null
+      },
+      {
+        "id": "gstep_e108aec95dca3ffb6fb9e252aaa187c25cdb3d61",
+        "agent_id": "shared_f5a34d1465ba4e4db61db90d0e894c23",
+        "state": "queued",
+        "attempts": 0,
+        "reply_message_id": null
+      }
+    ],
+    "admission": {
+      "id": "request_72e8daeeee294157aa5d47c0573a1cef",
+      "state": "review_required",
+      "dispatched": 1
+    },
+    "native": [
+      {
+        "id": "gstep_cf28fa9573c2b0dcce0776f88a8814aaea080786",
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "id": "gstep_dcedd18154494f6bb1f4cd7a42bb65af39345229",
+        "ordinal": 1,
+        "state": "unknown"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "mobile_job_dc88065fae83670521fca8396209ec33",
+        "action": "upsert"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_gstep_cf28fa9573c2b0dcce0776f88a8814aaea080786",
+        "action": "upsert"
+      }
+    ],
+    "calls": [
+      "A",
+      "B"
+    ],
+    "history": [
+      {
+        "id": "mobile_job_dc88065fae83670521fca8396209ec33",
+        "role": "user",
+        "content": "GROUP_RECOVERY_USER"
+      },
+      {
+        "id": "reply_gstep_cf28fa9573c2b0dcce0776f88a8814aaea080786",
+        "role": "assistant",
+        "content": "RELAY_A_FINAL"
+      }
+    ]
+  },
+  "messageWrites": [
+    "/mobile/api/conversations/shared_4d8917bc852147d3a6b458ce0db2b208/messages",
+    "/mobile/api/conversations/shared_4d8917bc852147d3a6b458ce0db2b208/messages"
+  ],
+  "backendExits": [
+    {
+      "code": null,
+      "signal": "SIGKILL"
+    },
+    {
+      "code": 0,
+      "signal": null
+    }
+  ],
+  "backendSources": [
+    {
+      "file": "apps/server/server.js",
+      "sha256": "3095443182aca5d60dec2f6ee776790906028befa9364496fd8fac5951a096df"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "a4754eea49c9d91e155d1862e40666bf3c77085760e62bded7e2ecf1336faeee"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "9bac35b45ae82bcdd20a23f73c88fad9eadadaad99e4c8fd37fa424e09e20e08"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "3483b635f0b735b80b0f02d6d0ad5ddefdb9bf52988affb6f5f8b2b63f8ca0b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "6eb7600e0f6212d5fb6569dafa257d28713b1adaea346236adbd8d8a4da88529"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "946cc2c9160ac58e9e213132091b96e47cb57e5cba5c2dde397b3220345c6828"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "94a2517a153ec8f343ed69ce9c09c2fccd593d441949e5ea8d295106042d91e2"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "c7777a89d9a2b461f1f562764d075d47437473932ae2ecf62985d5d54f01d4d9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+      "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "15a87bba102fab2d7b15d92c2754cff2efc269e9652111aafec32e320023011f"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "200540207a903bb0e7dc342eba36edb271619df7304eb5f433b7d62353a1cc56"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "c135a4ae59741a02cdf07653b7112f7932693f10600f6d4dac76e28a72d4d825"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "a3047f7951e3b6030ca1ea6d3163172171bd1c14ef9ff3d29bb234dd24f76e12"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/groupTurn.js",
+      "sha256": "1d159c4a38d0b8247a59b8bec1318bc06ed25bb9ca0e6811392827049ff5bed7"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/portal.js",
+      "sha256": "3088ccf0e10e0b912164ad2f6e89ec97e19fd5249daa0965947cd7101e5ce95b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedEvents.js",
+      "sha256": "43ce2e77a98be68657b91078dd9fcbcae9382a51baccd2faca6816786d51c915"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/native-sync.js",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    }
+  ],
+  "candidateSharedRule": {
+    "source": "packages/core-rules/group/groupContextWindow.js",
+    "sha256": "8db8b8e877aaf49b8426c49dc6b058c88f7341e72e938153ba9cdee2fd11b7bb"
+  }
+}

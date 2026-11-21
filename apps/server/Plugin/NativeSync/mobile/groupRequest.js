@@ -1,5 +1,5 @@
 'use strict';
-const {selectGroupContextHistory}=require('../nativeRules/Groupmodules/groupContextWindow');
+const {selectGroupContextHistory,applyGroupContextRules}=require('../nativeRules/Groupmodules/groupContextWindow');
 const {resolveEffectiveModel}=require('../nativeRules/Groupmodules/modelSelection');
 const {attachTimestampMetadata}=require('../nativeRules/modules/chat/requestMetadata');
 const sanitizer=require('../nativeRules/modules/contextSanitizer');
@@ -48,8 +48,8 @@ async function groupRequest({topic,config,member,history,currentUserId,requestId
  }
  const invite=(group.invitePrompt||'[系统邀请指令:] 现在轮到你 {{VCPChatAgentName}} 发言了。').replace(/{{VCPChatAgentName}}/g,name);
  messages.push({role:'user',content:[{type:'text',text:invite}],name:policy.userName||'用户'});
- const injected=tavern.applyContextInject(messages,rules,'group',{makeMessage:(role,text)=>({role,content:[{type:'text',text}]})});
- const prepared=sanitize([...(prompt.trim()?[{role:'system',content:prompt}]:[]),...injected],policy);
+ if(prompt.trim())messages.unshift({role:'system',content:prompt});
+ const prepared=sanitize(applyGroupContextRules(messages,rules,tavern),policy);
  assertPortableContext(prepared);
  const resolution=resolveEffectiveModel(group,member);
  if(!resolution.effectiveModel)throw fail('AGENT_NOT_CONFIGURED');

@@ -1,0 +1,108 @@
+diff --git a/apps/desktop/Groupmodules/groupchat.js b/apps/desktop/Groupmodules/groupchat.js
+index 2b58e86..593a464 100644
+--- a/apps/desktop/Groupmodules/groupchat.js
++++ b/apps/desktop/Groupmodules/groupchat.js
+@@ -28,7 +28,8 @@ const { JevGroupSessionOrchestrator } = require('./jevGroupSessionOrchestrator')
+ const {
+     DEFAULT_GROUP_CONTEXT_MESSAGE_WINDOW_SIZE,
+     normalizeGroupContextWindowSettings,
+-    selectGroupContextHistory
++    selectGroupContextHistory,
++    applyGroupContextRules
+ } = require('./groupContextWindow');
+ 
+ // 话题标题管理模块
+@@ -1356,18 +1357,7 @@ ${canvasData.errors || 'No errors'}
+         // 添加触发AI发言的模拟用户输入 (as text part of a content array)
+         messagesForAI.push({ role: 'user', content: [{ type: 'text', text: invitePromptContent }], name: userNameForMessage });
+ 
+-        // VCPChatTarven: 应用 context_inject 规则（按深度插入消息，跳过 system）
+-        if (Array.isArray(tavernRules) && tavernRules.some(r => r.type === 'context_inject' && r.enabled !== false)) {
+-            const sysMsgs = messagesForAI.filter(m => m.role === 'system');
+-            const nonSysMsgs = messagesForAI.filter(m => m.role !== 'system');
+-            const injected = tavernEngine.applyContextInject(nonSysMsgs, tavernRules, 'group', {
+-                makeMessage: (role, text) => ({
+-                    role,
+-                    content: [{ type: 'text', text }]
+-                })
+-            });
+-            messagesForAI = [...sysMsgs, ...injected];
+-        }
++        messagesForAI = applyGroupContextRules(messagesForAI, tavernRules, tavernEngine);
+         // --- VCP Thought Chain Stripping ---
+         try {
+             // 默认不注入元思考链，除非明确开启
+@@ -2066,18 +2056,7 @@ ${canvasData.errors || 'No errors'}
+     messagesForAI.push(...contextForAgent);
+     messagesForAI.push({ role: 'user', content: [{ type: 'text', text: invitePromptContent }], name: (globalVcpSettings.userName || '用户') }); // 模拟用户触发
+ 
+-    // VCPChatTarven: 应用 context_inject 规则（按深度插入消息，跳过 system）
+-    if (Array.isArray(tavernRulesInvite) && tavernRulesInvite.some(r => r.type === 'context_inject' && r.enabled !== false)) {
+-        const sysMsgs = messagesForAI.filter(m => m.role === 'system');
+-        const nonSysMsgs = messagesForAI.filter(m => m.role !== 'system');
+-        const injected = tavernEngine.applyContextInject(nonSysMsgs, tavernRulesInvite, 'group', {
+-            makeMessage: (role, text) => ({
+-                role,
+-                content: [{ type: 'text', text }]
+-            })
+-        });
+-        messagesForAI = [...sysMsgs, ...injected];
+-    }
++    messagesForAI = applyGroupContextRules(messagesForAI, tavernRulesInvite, tavernEngine);
+     // --- VCP Thought Chain Stripping ---
+     try {
+         // 默认不注入元思考链，除非明确开启
+diff --git a/apps/server/Plugin/NativeSync/mobile/groupRequest.js b/apps/server/Plugin/NativeSync/mobile/groupRequest.js
+index 693c02f..e31cd17 100644
+--- a/apps/server/Plugin/NativeSync/mobile/groupRequest.js
++++ b/apps/server/Plugin/NativeSync/mobile/groupRequest.js
+@@ -1,5 +1,5 @@
+ 'use strict';
+-const {selectGroupContextHistory}=require('../nativeRules/Groupmodules/groupContextWindow');
++const {selectGroupContextHistory,applyGroupContextRules}=require('../nativeRules/Groupmodules/groupContextWindow');
+ const {resolveEffectiveModel}=require('../nativeRules/Groupmodules/modelSelection');
+ const {attachTimestampMetadata}=require('../nativeRules/modules/chat/requestMetadata');
+ const sanitizer=require('../nativeRules/modules/contextSanitizer');
+@@ -48,8 +48,8 @@ async function groupRequest({topic,config,member,history,currentUserId,requestId
+  }
+  const invite=(group.invitePrompt||'[系统邀请指令:] 现在轮到你 {{VCPChatAgentName}} 发言了。').replace(/{{VCPChatAgentName}}/g,name);
+  messages.push({role:'user',content:[{type:'text',text:invite}],name:policy.userName||'用户'});
+- const injected=tavern.applyContextInject(messages,rules,'group',{makeMessage:(role,text)=>({role,content:[{type:'text',text}]})});
+- const prepared=sanitize([...(prompt.trim()?[{role:'system',content:prompt}]:[]),...injected],policy);
++ if(prompt.trim())messages.unshift({role:'system',content:prompt});
++ const prepared=sanitize(applyGroupContextRules(messages,rules,tavern),policy);
+  assertPortableContext(prepared);
+  const resolution=resolveEffectiveModel(group,member);
+  if(!resolution.effectiveModel)throw fail('AGENT_NOT_CONFIGURED');
+diff --git a/packages/core-rules/group/groupContextWindow.js b/packages/core-rules/group/groupContextWindow.js
+index c735b97..9007a26 100644
+--- a/packages/core-rules/group/groupContextWindow.js
++++ b/packages/core-rules/group/groupContextWindow.js
+@@ -38,10 +38,25 @@ function selectGroupContextHistory(groupHistory, groupConfig = {}) {
+     return history.slice(-settings.contextMessageWindowSize);
+ }
+ 
++// The invitation is already in the conversation. System messages never
++// consume a Tavern depth position in the native group turn.
++function applyGroupContextRules(messages, rules, engine) {
++    if (!Array.isArray(rules) || !rules.some(rule => rule.type === 'context_inject' && rule.enabled !== false)) {
++        return messages;
++    }
++    const system = messages.filter(message => message.role === 'system');
++    const conversation = messages.filter(message => message.role !== 'system');
++    const injected = engine.applyContextInject(conversation, rules, 'group', {
++        makeMessage: (role, text) => ({ role, content: [{ type: 'text', text }] }),
++    });
++    return [...system, ...injected];
++}
++
+ module.exports = {
+     DEFAULT_GROUP_CONTEXT_MESSAGE_WINDOW_SIZE,
+     MIN_GROUP_CONTEXT_MESSAGE_WINDOW_SIZE,
+     MAX_GROUP_CONTEXT_MESSAGE_WINDOW_SIZE,
+     normalizeGroupContextWindowSettings,
+-    selectGroupContextHistory
++    selectGroupContextHistory,
++    applyGroupContextRules
+ };
+\ No newline at end of file
