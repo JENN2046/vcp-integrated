@@ -15,7 +15,10 @@ node tests/hardware/linux-desktop.cjs .runs/hardware/run-<id>
 
 HTTPS 固定为 `https://127.0.0.1:18443`。实际 Android 可对这一端口使用授权的 `adb reverse`，Windows 可使用授权的同号回环转发。Windows 用同版源码及其原生 Electron，并用 `prepare-windows.cjs` 从本次 `seed/desktopB` 准备新 Profile。对 Windows 的 Chromium 和主进程也使用仅当前进程生效的叶证书指纹与 CA，例如给现有 Electron 夹具设 `NS_HOST`、`VCPCHAT_APP_DATA_DIR`、`VCPCHAT_E2E_TEST=1`、`NODE_EXTRA_CA_CERTS` 和 `NS_CERT_FINGERPRINT`。本次 Windows 会话只观察目标话题。将合成 seed、公有 CA 与叶证书通过获授权的临时通道送到 Windows 测试目录，然后从 Windows checkout 根目录执行：
 
+若使用源码光盘和便携 Electron，先安装与 Windows 匹配的锁定依赖，并运行完整的桌面构建入口。`build:preloads` 同时生成浏览器直接加载的共享规则、Agent 保存模块和沙盒 preload。CDS 使用同一源码构建的 Windows x64 EXE 和匹配的 authority sidecar。
+
 ```powershell
+npm --prefix apps/desktop run build:preloads
 node tests/hardware/prepare-windows.cjs $seed $newProfile
 $env:NS_HOST = (Resolve-Path 'apps/desktop').Path
 $env:VCPCHAT_APP_DATA_DIR = $newProfile
@@ -24,6 +27,8 @@ $env:NODE_EXTRA_CA_CERTS = $publicCaPem
 $env:NS_CERT_FINGERPRINT = node -e "const fs=require('node:fs'); const {X509Certificate}=require('node:crypto'); console.log(new X509Certificate(fs.readFileSync(process.argv[1])).fingerprint256)" $publicLeafPem
 & 'apps/desktop/node_modules/electron/dist/electron.exe' '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1' '--disable-background-networking' 'tests/integration/electron.cjs'
 ```
+
+Windows 正式打开候选前，用与该进程相同的 CA 对回环 HTTPS 发一次请求，并检查来宾 UTC 是否在测试 CA 和叶证书的有效期内。宿主调整时区后，正在运行的来宾仍可能报告不同的 UTC。本次用单独的回环 TLS 前置覆盖两个测试时点；前置对原服务仍验证原 CA，Windows 只信该进程的测试 CA，无需系统导入。
 
 变量 `$seed`、`$newProfile`、`$publicCaPem` 和 `$publicLeafPem` 使用 Windows 本机的绝对路径，在测试专用 PowerShell 中设置。打开 `Synthetic lost receipt` 的 `Sponsor target existing topic`。
 

@@ -1,0 +1,101 @@
+{
+  "source": "c379d0ca1ebcb6faad72324d2f7b34062749c104",
+  "checkoutAtMediaPreparation": "4cb149fa0553",
+  "topology": "Linux A submitted, physical Android observed while running and after restart, Windows B opened the same persisted conversation after completion. Single synthetic nonstream provider.",
+  "work": {
+    "id": "request_f59a8de1b7a4461ba14478064ce61f7c",
+    "request_id": "msg_1795231479085_user_8kfqawllov",
+    "state": "completed",
+    "attempts": 1,
+    "request_dispatched": 1,
+    "user_message_id": "msg_1795231479085_user_8kfqawllov",
+    "user_seq": 1,
+    "reply_message_id": "reply_request_f59a8de1b7a4461ba14478064ce61f7c"
+  },
+  "providerCalls": 1,
+  "journal": [
+    {
+      "seq": 1,
+      "msg_id": "msg_1795231479085_user_8kfqawllov",
+      "action": "upsert"
+    },
+    {
+      "seq": 2,
+      "msg_id": "reply_request_f59a8de1b7a4461ba14478064ce61f7c",
+      "action": "upsert"
+    }
+  ],
+  "historyLinux": [
+    {
+      "id": "msg_1795231479085_user_8kfqawllov",
+      "role": "user"
+    },
+    {
+      "id": "reply_request_f59a8de1b7a4461ba14478064ce61f7c",
+      "role": "assistant"
+    }
+  ],
+  "historyAndroid": [
+    {
+      "id": "msg_1795231479085_user_8kfqawllov",
+      "text": "Send-recovery compare 02: accept exactly once."
+    },
+    {
+      "id": "reply_request_f59a8de1b7a4461ba14478064ce61f7c",
+      "text": "合成回复完成。"
+    }
+  ],
+  "windows": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.22631",
+    "processes": {
+      "electron": 5,
+      "cds": 1,
+      "desktopVersion": "44.9.3"
+    },
+    "cdsDigest": "0bccf38d13b864cee490f64176d10151c4c96af4e38cc10b3f6b7e9e0683694f",
+    "cdsTwice": true,
+    "rowCount": 2,
+    "rows": [
+      {
+        "id": "msg_1795231479085_user_8kfqawllov",
+        "role": "user",
+        "contentMatches": true
+      },
+      {
+        "id": "reply_request_f59a8de1b7a4461ba14478064ce61f7c",
+        "role": "assistant",
+        "contentMatches": true
+      }
+    ],
+    "pass": true
+  },
+  "windowsObserverUser": "R16Limited",
+  "TLS": {
+    "scope": "Windows observer only; fixed upstream 127.0.0.1:18443; backend data and Work retained",
+    "sourceCommit": "c379d0ca1ebcb6faad72324d2f7b34062749c104",
+    "guestError": "CERT_TRUST_IS_NOT_TIME_VALID",
+    "oldLeafNotBeforeUTC": "2026-11-21 03:17:58+00:00",
+    "newLeafNotBeforeUTC": "2026-11-20 04:00:09+00:00",
+    "newLeafNotAfterUTC": "2026-11-22 04:00:09+00:00",
+    "newLeafSHA256": "b4d73bd2d1904376aeb4be2924aa942a23b559d8f582fdf8c70015fe34070928",
+    "target": "127.0.0.1:28443",
+    "upstreamValidatedCA": true,
+    "systemCaChange": false
+  },
+  "captures": {
+    "windows": "windows-b-same-work.png",
+    "linux": "linux-same-work.png",
+    "android": "../android-device/android-reopened.png"
+  },
+  "closeout": {
+    "windowsNativeQuitEvent": true,
+    "windowsTestProcessesRemaining": 0,
+    "windowsNumericExitCode": null,
+    "windowsVM": "running, signed in as R16Limited",
+    "linuxSupervisorExitCode": 0,
+    "coordinatorExitCode": 0,
+    "hostFixtureListenersRemaining": 0
+  }
+}

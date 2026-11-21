@@ -29,6 +29,6 @@
 
 初次 Linux 联验使用两个隔离 Electron Profile 和独立的 Chromium 手机会话。后续在 Android 16 实体手机上完成同一 Work 的运行中观察、锁屏、断开测试通道、强停临时 WebView 和重开后的终态核对。手机与 Linux 的输入、回复及中央 Journal 的 ID 一致，Provider 共调用一次。临时手机应用已经卸载。Linux 草稿保留；实体联验期间记录到一次终态刷新后选区变空，独立 pointer 选区用例未稳定复现。[实体 Android 回执与截图](evidence/android-device/README.md)
 
-已找到本机 Windows 11 QEMU 基盘。从独立写入层开机并挂载同版桌面、锁定依赖、Win x64 CDS、公共测试证书和合成 B Profile 的只读光盘。Windows 普通账户尚未确认登录，本次仍缺 Windows 端实际启动、同一 Work 的 History ID 及恢复进度。已编译的 Windows 二进制不计入来宾运行验收。
+原 Windows 11 虚拟机上的同版联验已完成。使用原基盘的独立写入层，以 R16Limited 正常登录。Windows B 在 Work 完成后加入，在真实窗口读到输入和回复；已落盘 History 的两个 ID 和正文与 Linux、实体 Android 及中央 Journal 一致，Provider 共调用一次。Windows 使用测试进程专用的 HTTPS 信任配置。三端分别在运行中或完成后观察了同一 Work，三端同时观察流式正文仍属此次用例之外。[Windows 与三端汇总回执](evidence/windows-device/README.md)
 
 本机开发仓保留已构建的桌面、服务端、PWA 和 Node/Xvfb 工具链。Linux 干净检出的重建产物已回收；脱敏回执与截图随提交保留。
