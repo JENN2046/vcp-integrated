@@ -59,9 +59,7 @@ class ConversationExecution {
             try { this.completeIntent(row); }
             catch(failure) { if(!this.topics.get(row.topic_key)?.sharedSpaceId)throw failure;require('./sharedSingle').hold(this,row);this.db.prepare("UPDATE mobile_executions SET state='review_required',error_code=? WHERE id=?").run(failure.code||'SHARED_COMPLETION_REVIEW_REQUIRED',row.id); }
         }
-        // An explicit never-dispatched session intent may resume. A dispatch
-        // fence, native terminal or unknown tool fact must never become queued.
-        if(this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='shared_native_requests'").get())this.db.prepare("UPDATE mobile_executions SET state='queued' WHERE kind='shared_session' AND state='running' AND request_dispatched=0 AND tool_started=0 AND cancel_requested=0 AND EXISTS (SELECT 1 FROM shared_admissions a WHERE a.id=mobile_executions.id AND a.state='accepted' AND a.dispatched=0 AND a.native_terminal=0) AND NOT EXISTS (SELECT 1 FROM mobile_native_invocations i WHERE i.execution_id=mobile_executions.id) AND NOT EXISTS (SELECT 1 FROM mobile_native_tasks t WHERE t.execution_id=mobile_executions.id) AND NOT EXISTS (SELECT 1 FROM shared_native_requests n WHERE n.admission_id=mobile_executions.id AND n.state<>'prepared')").run();
+        if(this.store.shared)sharedSingle.requeueUndispatched(this);
         // A lost in-flight result may already have executed external tools.
         // Resume queued work, but never automatically repeat uncertain execution.
         this.db.prepare("UPDATE mobile_executions SET state=CASE WHEN cancel_requested=1 AND request_dispatched=0 AND tool_started=0 THEN 'cancelled' ELSE 'review_required' END,error_code=CASE WHEN cancel_requested=1 AND request_dispatched=0 AND tool_started=0 THEN 'EXECUTION_CANCELLED_BEFORE_DISPATCH' ELSE 'EXECUTION_INTERRUPTED_REVIEW_REQUIRED' END,updated_at=? WHERE state IN ('running','cancelling','waiting_approval') AND coalesce(kind,'') NOT IN ('group_message','group_invitation')").run(Date.now());

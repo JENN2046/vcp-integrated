@@ -9,6 +9,62 @@ function acceptedActor(engine,row){
  // This is the server's durable accepted request, not a renewed public grant.
  return {kind:'mobile',principal:admission.principal,spaceId:admission.space_id,permissions:['execute']};
 }
+const mobileRequestHash=(topicKey,text,attachments)=>sha256(JSON.stringify(attachments.length?[topicKey,text,attachments]:[topicKey,text]));
+const mobileMessageId=(sessionId,requestId)=>'mobile_'+sha256(sessionId+'\0'+requestId).slice(0,32);
+function mobileRecoveryBound(engine,row){
+ const topic=engine.topics.get(row.topic_key),db=engine.db;
+ if(topic?.ownerType!=='agent'||!topic.sharedSpaceId||topic.directoryDeleted||
+  row.accepted_actor!=null||row.group_plan!=null||row.group_stop_index!=null)return false;
+ const admission=db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(row.id);
+ if(admission.topic_id!==topic.key||admission.space_id!==topic.sharedSpaceId||admission.principal!=='mobile:'+row.session_id||
+  admission.request_id!==row.request_id||admission.user_seq!==row.user_seq||admission.reply_seq!=null||
+  row.user_message_id!==mobileMessageId(row.session_id,row.request_id))return false;
+ const original=db.prepare(`SELECT j.* FROM journal j
+  JOIN applied_ops a ON a.device_id=j.device_id AND a.op_id=? AND json_extract(a.result_json,'$.seq')=j.seq
+   AND json_extract(a.result_json,'$.hash')=j.hash
+  WHERE j.seq=? AND j.owner_type=? AND j.owner_id=? AND j.topic_id=? AND j.msg_id=? AND j.device_id=? AND j.action='upsert'`)
+  .get('shared-user:'+row.request_id,row.user_seq,topic.ownerType,topic.ownerId,topic.topicId,row.user_message_id,admission.principal);
+ if(!original)return false;
+ let operation,payload,message;
+ try{operation=JSON.parse(admission.user_op);payload=JSON.parse(row.request_payload);message=JSON.parse(original.message_json);}catch{return false;}
+ const files=payload?.attachments??[],turn=operation?.sharedTurn;
+ if(payload?.requestId!==row.request_id||typeof payload.text!=='string'||!Array.isArray(files)||
+  mobileRequestHash(row.topic_key,payload.text,files)!==row.request_hash||
+  turn?.kind!=='message'||!Array.isArray(turn.plan)||turn.plan.length!==0||
+  turn.userMessageId!==row.user_message_id||turn.topicSponsor||turn.steeringCapable||
+  operation.ownerType!==topic.ownerType||operation.ownerId!==topic.ownerId||operation.topicId!==topic.topicId||
+  operation.deviceId!==admission.principal||operation.opId!=='shared-user:'+row.request_id||operation.action!=='upsert'||
+  operation.msgId!==row.user_message_id)return false;
+ return [operation.message,message].every(m=>m?.id===row.user_message_id&&m.role==='user'&&m.content===payload.text);
+}
+function requeueUndispatched(engine){
+ const db=engine.db;
+ const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name));
+ if(!tables.has('shared_native_requests'))return;
+ // A prepared request may reuse its original identity. Any evidence of
+ // dispatch or child activity delegates recovery to the existing review path.
+ engine.store.shared.atomic(()=>{
+ const candidates=db.prepare(`SELECT e.* FROM mobile_executions e JOIN shared_admissions a ON a.id=e.id
+  WHERE (e.kind IS NULL OR e.kind='shared_session') AND e.state='running' AND e.request_dispatched=0
+   AND e.tool_started=0 AND e.cancel_requested=0 AND e.pending_operation IS NULL AND e.native_final_operation IS NULL
+   AND e.reply_message_id IS NULL AND e.error_code IS NULL AND e.review_resolved=0 AND e.terminal_state='completed'
+   AND a.state='accepted' AND a.dispatched=0 AND a.native_terminal=0
+   AND NOT EXISTS (SELECT 1 FROM mobile_native_invocations i WHERE i.execution_id=e.id)
+   AND NOT EXISTS (SELECT 1 FROM mobile_native_tasks t WHERE t.execution_id=e.id)
+   AND NOT EXISTS (SELECT 1 FROM shared_native_requests n WHERE n.admission_id=e.id
+    AND (n.state<>'prepared' OR n.id<>e.id OR n.principal<>a.principal OR n.member_id IS NOT NULL OR n.ordinal<>0))
+   AND NOT EXISTS (SELECT 1 FROM mobile_execution_steps s WHERE s.job_id=e.id
+    AND (s.id<>e.id OR s.step_index<>0 OR s.state<>'pending' OR s.attempts<>0 OR s.tool_started<>0
+     OR s.pending_operation IS NOT NULL OR s.reply_message_id IS NOT NULL OR s.error_code IS NOT NULL))
+   ${tables.has('shared_request_phases')?"AND NOT EXISTS (SELECT 1 FROM shared_request_phases p WHERE p.work_id=e.id AND (p.stage<>'native_prepared' OR p.request_id<>e.id))":''}
+   ${['shared_native_child_requests','shared_native_task_controls'].filter(name=>tables.has(name))
+       .map(name=>`AND NOT EXISTS (SELECT 1 FROM ${name} WHERE work_id=e.id)`).join(' ')}`).all();
+ const queue=db.prepare("UPDATE mobile_executions SET state='queued',updated_at=? WHERE id=?");
+ for(const row of candidates){
+  if(row.kind==='shared_session'||mobileRecoveryBound(engine,row))queue.run(Date.now(),row.id);
+ }
+ });
+}
 function accept(engine,sessionId,{topicKey,requestId,text,attachments=[]}){
  const shared=engine.store.shared,topic=engine.topics.get(topicKey);
  if(topic.ownerType!=='agent')throw fail('SHARED_GROUP_EXECUTION_NOT_READY');
@@ -16,7 +72,7 @@ function accept(engine,sessionId,{topicKey,requestId,text,attachments=[]}){
  const session=engine.db.prepare('SELECT * FROM mobile_sessions WHERE id=? AND expires>?').get(sessionId,Date.now());
  const actor=shared.mobile(session&&{id:sessionId,scopes:JSON.parse(session.scopes)},topic.sharedSpaceId,'execute');
  if(typeof requestId!=='string'||!/^[a-zA-Z0-9_-]{8,80}$/.test(requestId)||typeof text!=='string'||!Array.isArray(attachments)||attachments.length>8||attachments.some(id=>typeof id!=='string')||(!text.trim()&&!attachments.length)||text.length>12000)throw fail('INVALID_TEXT_SUBMISSION');
- const requestHash=sha256(JSON.stringify(attachments.length?[topicKey,text,attachments]:[topicKey,text]));
+ const requestHash=mobileRequestHash(topicKey,text,attachments);
  return shared.atomic(()=>{
   const prior=engine.db.prepare('SELECT * FROM mobile_executions WHERE session_id=? AND request_id=?').get(sessionId,requestId);
   if(prior){if(prior.request_hash!==requestHash)throw fail('REQUEST_ID_REUSED');return {...engine.public(prior,sessionId),replayed:true};}
@@ -24,7 +80,7 @@ function accept(engine,sessionId,{topicKey,requestId,text,attachments=[]}){
   if(engine.dependencyHeld(topicKey))throw fail('DEPENDENCY_REVIEW_REQUIRED');
   if(engine.db.prepare('SELECT count(*) n FROM mobile_executions WHERE session_id=? AND created_at>?').get(sessionId,Date.now()-60000).n>=20)throw fail('SUBMISSION_RATE_LIMIT');
   const config=engine.configs.snapshot(topic);engine.configs.assertRunnable(topic,config);
-  const now=Date.now(),msgId='mobile_'+sha256(sessionId+'\0'+requestId).slice(0,32),row=shared.topic(actor,topic.sharedSpaceId,topic.key,'execute');
+  const now=Date.now(),msgId=mobileMessageId(sessionId,requestId),row=shared.topic(actor,topic.sharedSpaceId,topic.key,'execute');
   const files=attachments.length?(engine.attachments?engine.attachments.claim(actor.principal,topicKey,attachments):(()=>{throw fail('ATTACHMENTS_NOT_ENABLED');})()):[];
   const message={id:msgId,role:'user',content:text,timestamp:now,...(files.length?{attachments:files}:{})};
   const context=require('./effectiveContext'),head=shared.head(row);
@@ -101,4 +157,4 @@ function abandon(engine,row){
  const shared=engine.store.shared,topic=engine.topics.get(row.topic_key),actor=acceptedActor(engine,row);
  return shared.abandon(actor,{sharedSpaceId:topic.sharedSpaceId,admissionId:row.id,opId:'mobile-abandon_'+row.id,confirm:true});
 }
-module.exports={accept,register,complete,hold,abandon,acceptedActor,promoteNativeFinal,sealNativeFinal,nativeFinalOperation};
+module.exports={accept,register,complete,hold,abandon,acceptedActor,promoteNativeFinal,sealNativeFinal,nativeFinalOperation,requeueUndispatched};

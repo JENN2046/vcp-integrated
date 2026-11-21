@@ -74,3 +74,5 @@ AgentAssistant 长委托已接入共享单聊的 Work。桌面重开、发起端
 普通共享单聊 worker 现在能从原生终稿凭据恢复原回复发布意图。JSON/SSE、手机共享消息入口、两次重启、损坏凭据和仅派发对照见[普通 worker 终稿恢复](evidence/ordinary-final-recovery/README.md)。
 
 普通共享单聊的桌面路由、中央准入和 worker 现按同一 Journal 检查点窗口核对桌面依赖。已归档的 Canvas 和文件引用不再阻塞后端；有效依赖仍走桌面路径，PWA 在接纳前得到拒绝。[窗口对照回执](evidence/portable-context/README.md)
+
+PWA 普通共享单聊在可证明尚未派发时按原 Work 回到队列；派发意图已写、结果未知或身份不符时保留待核对。取消记录保持终态。[强停、两次重启和原请求重放回执](evidence/mobile-undispatched/README.md)
