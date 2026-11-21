@@ -1,5 +1,6 @@
 'use strict';
 const { stable, sha256 } = require('./protocol');
+const controlled=require('./sharedControlledText');
 const fail = (code, status = 409) => Object.assign(Error(code), { code, status });
 const id = value => { if (typeof value !== 'string' || !value || value.length > 256 || /[\0\r\n]/.test(value)) throw fail('INVALID_STEERING_INPUT', 400); return value; };
 
@@ -30,7 +31,7 @@ class SharedSteering {
         const row = this.shared.admission(actor, space, id(work));if(existing&&!this.enabled&&!this.db.prepare('SELECT 1 FROM shared_work_controls WHERE work_id=?').get(row.id))throw fail('SHARED_STEERING_UNAVAILABLE');
         const topic = this.shared.topic(actor, space, row.topic_id, 'execute');
         if(!require('./sharedTurns').intent(row).steeringCapable)throw fail('SHARED_STEERING_TARGET_UNSUPPORTED');
-        if(!observe){const mode=require('./sharedTurns').intent(row).controlMode,policy=require('./releasePolicy.cjs');if(mode==='text-only-v1'?!policy.sharedControlledText:!policy.sharedSteering)throw fail('SHARED_STEERING_UNAVAILABLE');}
+        if(!observe&&!controlled.enabled(this.shared,require('./sharedTurns').intent(row).controlMode))throw fail('SHARED_STEERING_UNAVAILABLE');
         if (topic.owner_type !== 'agent') throw fail('SHARED_STEERING_SINGLE_CHAT_ONLY');
         return { row, topic };
     }
@@ -49,28 +50,48 @@ class SharedSteering {
         const pending = this.db.prepare('SELECT input_id,input_seq,attachments_ready,journal_seq FROM shared_work_inputs WHERE work_id=? AND input_seq>? ORDER BY input_seq').all(row.id, c.consumed_seq);
         const current = this.db.prepare('SELECT state,revision,config_json,checkpoint_json FROM shared_work_generations WHERE work_id=? AND generation=?').get(row.id, c.generation);
         const native = this.shared.native?.engine.nativeTasks;
-        const unknown = row.state === 'review_required' || native?.needsReview(row.id)||native?.uncertainTools(row.id);
+        const safeToolMode=require('./sharedTurns').intent(row).controlMode===controlled.TOOLS_MODE;
+        const unknown = row.state === 'review_required' || native?.needsReview(row.id) ||
+            (native?.uncertainTools(row.id) && !(safeToolMode&&row.state==='dispatched'&&native.unsettledTools(row.id)));
         // Child tools already bound to the new revision can continue independently.
         const busy = this.db.prepare("SELECT 1 FROM mobile_native_invocations i LEFT JOIN shared_native_child_requests r ON r.id=i.native_request_id WHERE i.execution_id=? AND i.state='started' AND (r.id IS NULL OR r.control_revision<?) LIMIT 1").get(row.id,c.revision);
         const tasks = native?.list(row.id) || [];
         const waitingTasks = tasks.some(t => !['completed','failed','cancelled','stopped'].includes(t.state) && (t.appliedControlRevision < c.revision || t.safeBoundary !== true));
         const controlError=tasks.find(t=>!['completed','failed','cancelled','stopped'].includes(t.state)&&t.controlError)?.controlError;
         const compaction=this.shared.compaction?.active(row.id);
-        const state = unknown||controlError ? 'blocked' : compaction?'compacting':pending.some(p => !p.attachments_ready || !p.journal_seq) ? 'attachments_pending'
+        const safeToolBoundary=safeToolMode&&c.generation===0&&current?.state==='paused'&&Boolean(current.checkpoint_json);
+        const compacted=safeToolBoundary&&this.hasToolCompaction(row.id);
+        const state = unknown||controlError ? 'blocked' : compaction?'compacting':safeToolBoundary?(!compacted?'awaiting_compaction':c.executor===row.principal?'awaiting_handoff':'ready'):pending.some(p => !p.attachments_ready || !p.journal_seq) ? 'attachments_pending'
             : pending.length ? (busy || waitingTasks || !['paused','paused_terminal'].includes(current?.state) || !current?.checkpoint_json ? 'waiting_safe_boundary' : 'ready') : current?.state==='paused'&&current.checkpoint_json&&JSON.parse(current.checkpoint_json).noDispatch?'ready':['prepared','preprocessing'].includes(current?.state) ? 'applying' : 'applied';
-        return { workId: row.id, revision: c.revision, generation: c.generation, consumedInputSeq: c.consumed_seq,
+        return { workId: row.id, ...(safeToolMode?{controlMode:controlled.TOOLS_MODE,safeToolBoundary,
+            requiresCompaction:safeToolBoundary&&!compacted,requiresHandoff:safeToolBoundary&&compacted&&c.executor===row.principal}:{}), revision: c.revision, generation: c.generation, consumedInputSeq: c.consumed_seq,
             generations:this.db.prepare('SELECT generation,request_id,state,config_json,checkpoint_json FROM shared_work_generations WHERE work_id=? ORDER BY generation').all(row.id).map(g=>({generation:g.generation,requestId:g.request_id,state:g.state,model:JSON.parse(g.config_json).owner.config.model,noDispatch:Boolean(g.checkpoint_json&&JSON.parse(g.checkpoint_json).noDispatch)})),generationRevision:current?.revision,frozenConfigHash:current?JSON.parse(current.config_json).hash:null,compaction,latestInputSeq: c.revision, noDispatch:Boolean(current?.checkpoint_json&&JSON.parse(current.checkpoint_json).noDispatch), executor: c.executor, applicationState: state,
             ...(unknown||controlError ? { blockedReason: controlError||'NATIVE_RESULT_REQUIRES_REVIEW' } : {}),
             inputs: pending.map(p => ({ inputId: p.input_id, inputSeq: p.input_seq, attachmentsReady: Boolean(p.attachments_ready), journalSeq: p.journal_seq })) };
     }
     status(actor, body) {
-        const { row } = this.admission(actor, body.sharedSpaceId, body.workId,{existing:true,observe:true});
-        return this.public(row, this.db.prepare('SELECT * FROM shared_work_controls WHERE work_id=?').get(row.id));
+        const { row, topic } = this.admission(actor, body.sharedSpaceId, body.workId,{existing:true,observe:true});
+        const status=this.public(row,this.db.prepare('SELECT * FROM shared_work_controls WHERE work_id=?').get(row.id));
+        if(body.pausedRequestId===undefined)return status;
+        // Confirm the exact native generation against its committed Journal projection.
+        // A renderer may receive the stop before its local History has caught up.
+        const first=status.generations?.find(g=>g.generation===0 && g.requestId===body.pausedRequestId);
+        if(status.controlMode!==controlled.TOOLS_MODE || row.state==='review_required' || first?.state!=='paused' || first.noDispatch)
+            return {...status,pausedReply:null};
+        const [record]=this.shared.store.readProjected(()=>this.db.prepare(
+            'SELECT * FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND msg_id=? AND deleted=0'
+        ).all(topic.owner_type,topic.owner_id,topic.topic_id,first.requestId));
+        const message=record?.message;
+        if(message?.role!=='assistant'||message.finishReason!=='interrupted'||message.continuity?.executionId!==row.id)
+            throw fail('NATIVE_CHECKPOINT_CHANGED');
+        return {...status,pausedReply:{message,seq:record.row.last_seq}};
     }
     submit(actor, body) {
         const { row, topic } = this.admission(actor, body.sharedSpaceId, body.workId);
         require('./sharedControlledText').assertWork(this.shared,row,topic,actor,body.message);
-        if(require('./sharedTurns').intent(row).controlMode==='text-only-v1'&&body.attachmentManifest?.length)throw fail('CONTROLLED_TEXT_PORTABLE_REQUIRED');
+        const mode=require('./sharedTurns').intent(row).controlMode;
+        if(mode===controlled.TOOLS_MODE)throw fail('CONTROLLED_TOOL_STEERING_UNAVAILABLE');
+        if(mode===controlled.MODE&&body.attachmentManifest?.length)throw fail('CONTROLLED_TEXT_PORTABLE_REQUIRED');
         id(body.inputId); id(body.message?.id);
         if (body.message.id !== body.inputId || body.message.role !== 'user' || typeof body.message.content !== 'string') throw fail('INVALID_STEERING_INPUT', 400);
         if (!Number.isSafeInteger(body.observedRevision) || body.observedRevision < 0) throw fail('INVALID_STEERING_REVISION', 400);
@@ -167,6 +188,21 @@ class SharedSteering {
         const data=this.shared.native?.continuations.read(generation.request_id),sourceIds=(data?.metadata?.messageTimestampBindings||[]).map(v=>v.messageId).filter(id=>id!==message.id&&!this.db.prepare('SELECT 1 FROM shared_work_inputs WHERE work_id=? AND input_id=? AND input_seq>?').get(row.id,id,generation.consumed_seq));
         return {...message,continuity:{version:1,known:true,executionId:row.id,requestId:generation.request_id,dependsOnMessageIds:[...new Set([root,inputs.at(-1),...sourceIds].filter(id=>id&&id!==message.id))].slice(0,1000)}};
     }
+    hasToolCompaction(workId){
+        return Boolean(this.db.prepare('SELECT 1 FROM shared_work_compactions WHERE work_id=?').get(workId));
+    }
+    checkpointSettledTool(actor,row,generation){
+        const data=this.shared.native.continuations.read(generation.request_id);
+        if(!data)throw fail('NATIVE_CHECKPOINT_REQUIRED');
+        // Model tool envelopes can include private arguments. Journal only the
+        // visible assistant prefix, while the native archive retains the exact source.
+        const text=data.assistant.at(-1)||'';
+        const parser=require('../../../modules/vcpLoop/toolCallParser');
+        const firstTool=parser.extractNextToolBlock(text);
+        const content=firstTool?text.slice(0,firstTool.startIndex):'';
+        return this.checkpoint(actor,{sharedSpaceId:row.space_id,workId:row.id,opId:'safe_tool_checkpoint_'+sha256(generation.request_id).slice(0,40),
+            generation:generation.generation,message:{id:generation.request_id,role:'assistant',content,timestamp:this.now(),finishReason:'interrupted'}});
+    }
     checkpoint(actor, body) {
         const { row, topic } = this.admission(actor, body.sharedSpaceId, body.workId,{existing:true});
         return this.shared.receipt(actor, body, 'steer-checkpoint', () => {
@@ -180,7 +216,9 @@ class SharedSteering {
             if (message?.id !== generation.request_id || message.role !== 'assistant' || (generation.state==='paused' ? message.finishReason !== 'interrupted' : !['completed','failed','interrupted','cancelled','length'].includes(message.finishReason))) throw fail('INVALID_STEERING_CHECKPOINT');
             if (generation.checkpoint_json && stable(JSON.parse(generation.checkpoint_json)) !== stable(message)) throw fail('SHARED_REPLY_INTENT_CHANGED');
             const settled=this.db.prepare("SELECT invocation_id FROM mobile_native_invocations WHERE execution_id=? AND native_request_id=? AND (state='returned' OR (state='error' AND error_code='NATIVE_CANCELLED_BEFORE_EXECUTION')) ORDER BY invocation_id").all(row.id,generation.request_id).map(r=>r.invocation_id);
-            const proof=this.shared.native.checkpointProof(row.id,generation.request_id,settled);
+            const proof=require('./sharedTurns').intent(row).controlMode===controlled.TOOLS_MODE
+                ? this.shared.native.verifiedToolBoundary(row.id,generation.request_id)
+                : this.shared.native.checkpointProof(row.id,generation.request_id,settled);
             this.db.prepare('INSERT OR REPLACE INTO shared_native_checkpoints VALUES(?,?,?)').run(row.id,body.generation,JSON.stringify(proof));
             const normalized = { ...message }; delete normalized._nativeSyncMetadata;
             const metadata = require('./metadata');
@@ -201,6 +239,7 @@ class SharedSteering {
             const request=this.db.prepare('SELECT state FROM shared_native_requests WHERE id=? AND admission_id=?').get(generation.request_id,row.id);
             if(request?.state!=='model_terminal')throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
             const native=this.shared.native.engine.nativeTasks;if(native.unsettledTools(row.id,generation.request_id))throw fail('WORK_SAFE_BOUNDARY_PENDING');
+            if(require('./sharedTurns').intent(row).controlMode===controlled.TOOLS_MODE&&generation.state==='paused')throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
             if(generation.checkpoint_json&&stable(JSON.parse(generation.checkpoint_json))!==stable(message))throw fail('SHARED_REPLY_INTENT_CHANGED');
             const settled=this.db.prepare("SELECT invocation_id FROM mobile_native_invocations WHERE execution_id=? AND native_request_id=? AND (state='returned' OR (state='error' AND error_code='NATIVE_CANCELLED_BEFORE_EXECUTION')) ORDER BY invocation_id").all(row.id,generation.request_id).map(r=>r.invocation_id);
             const proof=this.shared.native.checkpointProof(row.id,generation.request_id,settled),metadata=require('./metadata'),value={...message};delete value._nativeSyncMetadata;
@@ -278,6 +317,8 @@ class SharedSteering {
             const c=this.control(row);if(c.revision!==body.expectedRevision||c.generation!==body.expectedGeneration||c.executor!==body.expectedExecutor)throw fail('WORK_HANDOFF_STATE_CHANGED');
             if(!['accepted','dispatched'].includes(row.state))throw fail('WORK_SAFE_BOUNDARY_PENDING');
             const current=this.generation(row.id,c.generation),native=this.shared.native.engine.nativeTasks;
+            const safeToolMode=require('./sharedTurns').intent(row).controlMode===controlled.TOOLS_MODE;
+            if(safeToolMode&&(c.generation!==0||c.executor!==row.principal||actor.principal===row.principal||current.state!=='paused'||!current.checkpoint_json||!this.hasToolCompaction(row.id)))throw fail('WORK_SAFE_BOUNDARY_PENDING');
             if(native.needsReview(row.id)||native.uncertainTools(row.id)||this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state IN ('dispatched','unknown')").get(row.id))throw fail('WORK_SAFE_BOUNDARY_PENDING');
             if(native.unsettledTools(row.id,current.request_id))throw fail('WORK_SAFE_BOUNDARY_PENDING');
             // Local-only resource references have no verified receiver-side grant.
@@ -285,7 +326,7 @@ class SharedSteering {
             if(messages.some(v=>v.message?.desktopReferences?.length)||this.db.prepare('SELECT message_json FROM shared_work_inputs WHERE work_id=? AND journal_seq IS NULL').all(row.id).some(v=>JSON.parse(v.message_json).desktopReferences?.length))throw fail('WORK_HANDOFF_REQUIRES_ORIGINAL_DEVICE');
             this.shared.freezeForExecution(actor,topic);
             const request=this.db.prepare('SELECT state FROM shared_native_requests WHERE id=?').get(current.request_id);
-            if(!this.quiesceUnstarted(row,c)&&(!current.checkpoint_json||!['paused','paused_terminal','completed'].includes(current.state)))throw fail('WORK_SAFE_BOUNDARY_PENDING');
+            if(!safeToolMode&&!this.quiesceUnstarted(row,c)&&(!current.checkpoint_json||!['paused','paused_terminal','completed'].includes(current.state)))throw fail('WORK_SAFE_BOUNDARY_PENDING');
             this.db.prepare('UPDATE shared_work_controls SET executor=? WHERE work_id=?').run(actor.principal,row.id);this.shared.compaction?.invalidate(row.id);
             return this.public(row,this.control(row));
         });

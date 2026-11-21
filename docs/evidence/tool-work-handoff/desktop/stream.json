@@ -1,0 +1,625 @@
+{
+  "sourceBase": "bd7f62d02bb551ad2a391b5f6dff58ba51f055e7",
+  "mode": "tool-handoff-stream",
+  "desktop": [
+    {
+      "role": "A",
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    },
+    {
+      "role": "B",
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    },
+    {
+      "role": "B-taking-over",
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    },
+    {
+      "role": "B-recovered",
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    }
+  ],
+  "reusedBProfile": true,
+  "exits": {
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B-taking-over": {
+      "code": 0,
+      "signal": null
+    },
+    "B-recovered": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "toolHandoff": {
+    "original": {
+      "id": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+      "request_id": "controlled_0a57a3d8d6f9420fadc38bfa7078af40",
+      "principal": "desktop:deviceA",
+      "state": "accepted",
+      "dispatched": 0,
+      "native_terminal": 0
+    },
+    "final": {
+      "id": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+      "request_id": "controlled_0a57a3d8d6f9420fadc38bfa7078af40",
+      "principal": "desktop:deviceA",
+      "state": "completed",
+      "dispatched": 1,
+      "native_terminal": 1
+    },
+    "paused": {
+      "generation": 0,
+      "executor": "desktop:deviceA",
+      "request_id": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+      "state": "paused",
+      "checkpoint": {
+        "id": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+        "role": "assistant",
+        "content": "Synthetic A requested the isolated counter.\n",
+        "timestamp": 1795258603803,
+        "finishReason": "interrupted",
+        "continuity": {
+          "version": 1,
+          "known": true,
+          "executionId": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+          "requestId": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+          "dependsOnMessageIds": [
+            "controlled_0a57a3d8d6f9420fadc38bfa7078af40",
+            "compact-same-1",
+            "compact-same-2"
+          ]
+        }
+      }
+    },
+    "nativeProof": {
+      "requestId": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+      "hash": "8b675946efd200471f4969ca0f0bc58752963fe3d4821352843bd439e35e6a28",
+      "settledInvocationIds": [
+        "217a24f7-5a49-4876-afde-137ba33121b2"
+      ]
+    },
+    "committed": {
+      "message_id": "checkpoint_compact_64541525b3edba6aa921e481ced9908afedd1271",
+      "committed_seq": 5,
+      "proof": {
+        "topicId": "shared_47a0f725f6794fffaec7442c2c278170",
+        "head": 4,
+        "configHash": "48a410f13b5df7b5b22b872b4720401f3d8f7619d8a18249be6a20ce431b07a3",
+        "work": {
+          "id": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+          "revision": 0,
+          "generation": 0,
+          "executor": "desktop:deviceA"
+        },
+        "canonical": [
+          {
+            "id": "compact-same-1",
+            "hash": "f3c57e0d650b340c79f1efa3ba2bb9ce40d68c3f052ff34c59a1f5304a70797c",
+            "seq": 1,
+            "metadataHash": null
+          },
+          {
+            "id": "compact-same-2",
+            "hash": "3eceefe4a1f408b204d6cbfe2d8d5394ae00c554adcdf7872acd47c9cd803236",
+            "seq": 2,
+            "metadataHash": null
+          },
+          {
+            "id": "controlled_0a57a3d8d6f9420fadc38bfa7078af40",
+            "hash": "85ec71d4706e716fb2f4c6e3141381f35e0a7af5d91ffaaa676470d2574e7b56",
+            "seq": 3,
+            "metadataHash": "76b8d808a234e689ace56d7caa8c341f83efb612dcd52cde6baf2ff8784a58cf"
+          },
+          {
+            "id": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+            "hash": "ed12c54374f9b9cdc1c3fe7e80e93e01486be3de4044425598c741e0d942cc03",
+            "seq": 4,
+            "metadataHash": "2c0a2c547974fa4f4fab0eef53a619fc24dca9232aa0f211a022a5fe116cb507"
+          }
+        ],
+        "native": [
+          {
+            "requestId": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+            "workId": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+            "hash": "8b675946efd200471f4969ca0f0bc58752963fe3d4821352843bd439e35e6a28"
+          }
+        ],
+        "inputVersion": 2
+      }
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+        "state": "paused",
+        "checkpoint": {
+          "id": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+          "role": "assistant",
+          "content": "Synthetic A requested the isolated counter.\n",
+          "timestamp": 1795258603803,
+          "finishReason": "interrupted",
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "executionId": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+            "requestId": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+            "dependsOnMessageIds": [
+              "controlled_0a57a3d8d6f9420fadc38bfa7078af40",
+              "compact-same-1",
+              "compact-same-2"
+            ]
+          }
+        }
+      },
+      {
+        "generation": 1,
+        "executor": "desktop:deviceB",
+        "request_id": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f_g1",
+        "state": "completed",
+        "checkpoint": {
+          "id": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f_g1",
+          "role": "assistant",
+          "name": "Synthetic shared",
+          "content": "Synthetic B finished the original tool Work.",
+          "timestamp": 1795258610529,
+          "agentId": "ns_7ca4125a4273bb809d40d3b0",
+          "topicId": "shared_47a0f725f6794fffaec7442c2c278170",
+          "isGroupMessage": false,
+          "finishReason": "completed",
+          "isThinking": false,
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "executionId": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+            "requestId": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f_g1",
+            "dependsOnMessageIds": [
+              "controlled_0a57a3d8d6f9420fadc38bfa7078af40",
+              "checkpoint_compact_64541525b3edba6aa921e481ced9908afedd1271"
+            ]
+          }
+        }
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "217a24f7-5a49-4876-afde-137ba33121b2",
+        "execution_id": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+        "native_request_id": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+        "plugin_name": "OrdinaryToolCounter",
+        "record_id": "tcr-1795258603790-0cd3b893-7a61-4ae6-9b33-935ec27f48d4",
+        "state": "returned",
+        "error_code": null
+      }
+    ],
+    "waitingCompaction": "工具回执已确认，等待执行端压缩前文 · 执行端：本端",
+    "earlyHandoff": {
+      "httpStatus": 409,
+      "error": "WORK_SAFE_BOUNDARY_PENDING"
+    },
+    "streamTerminal": "interrupted",
+    "nativePause": {
+      "transport": "SSE",
+      "httpStatus": 200,
+      "state": "paused",
+      "code": "WORK_SAFE_TOOL_BOUNDARY",
+      "requestId": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f"
+    },
+    "droppedHandoff": {
+      "workId": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+      "status": 200,
+      "executor": "desktop:deviceB",
+      "dropped": true,
+      "opId": "handoff_3f22e32a5f324d892c3480c4609ab37f9d7c89d4",
+      "clientError": "NETWORK_UNAVAILABLE"
+    },
+    "desktopSources": {
+      "main": [
+        {
+          "file": "apps/desktop/modules/ipc/chatHandlers.js",
+          "sha256": "e359a238ce393f22bae5023574139e947257ac29e9ecf3dcfa7b5a1127f48958"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+          "sha256": "e40e999597c14039f96910fac251b908cce43ae8a427a9f0393f6b079ffd20f5"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+          "sha256": "9f0138b9fcede09bdd3e03002d8db2075fc8ed7aec8dc6c6806a33dbbe5b9dfb"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+          "sha256": "4db5d3730a6da019ae14f7f8c07cdd41cf3e6eaa4a70f2bd20ccb3b9b8492d15"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/modules/chatManager.js",
+          "bytes": 176549,
+          "sha256": "72dd5ef25ff38115276545838d8c9159fb8ce569a9bfb158a51eb6bd327cfed8"
+        },
+        {
+          "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+          "bytes": 6970,
+          "sha256": "f7379f242fb60012ca172c204c06666db1a300fd7130692e4d12ba3bef3a8936"
+        }
+      ]
+    },
+    "counter": [
+      {
+        "marker": "ORDINARY_TOOL_LOCAL"
+      }
+    ],
+    "history": [
+      {
+        "id": "compact-same-1",
+        "role": "user",
+        "content": "SYNTHETIC SAME TEXT"
+      },
+      {
+        "id": "compact-same-2",
+        "role": "user",
+        "content": "SYNTHETIC SAME TEXT"
+      },
+      {
+        "id": "controlled_0a57a3d8d6f9420fadc38bfa7078af40",
+        "role": "user",
+        "content": "ORDINARY_TOOL_LOCAL",
+        "executionId": "request_a7d9a0d9ce924a60bdaa2be3505b200f"
+      },
+      {
+        "id": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+        "role": "assistant",
+        "content": "Synthetic A requested the isolated counter.\n",
+        "finishReason": "interrupted",
+        "executionId": "request_a7d9a0d9ce924a60bdaa2be3505b200f"
+      },
+      {
+        "id": "checkpoint_compact_64541525b3edba6aa921e481ced9908afedd1271",
+        "role": "user",
+        "content": "[系统提示:][VCHAT上下文智能压缩块]\n以下是之前对话的状态快照，用于接续工作，不是新的压缩任务。\n请继承其中有效约束、工程状态、已排除的失败路径和待办事项，并结合后续用户消息继续工作；不要重复执行已经完成的动作。宿主保留的最新版本日记是历史数据，不是待执行的日记工具调用。\n<context_checkpoint>\nCOMPACT_DESKTOP_CHECKPOINT. Settled counter invocation 217a24f7-5a49-4876-afde-137ba33121b2, record tcr-1795258603790-0cd3b893-7a61-4ae6-9b33-935ec27f48d4. ordinary tool invocation recorded for ORDINARY_TOOL_LOCAL. Continue the original task without repeating the tool.\n</context_checkpoint>\n【宿主保留：当前无日记】"
+      },
+      {
+        "id": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f_g1",
+        "role": "assistant",
+        "content": "Synthetic B finished the original tool Work.",
+        "finishReason": "completed",
+        "executionId": "request_a7d9a0d9ce924a60bdaa2be3505b200f"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "compact-same-1",
+        "action": "upsert",
+        "hash": "f3c57e0d650b340c79f1efa3ba2bb9ce40d68c3f052ff34c59a1f5304a70797c"
+      },
+      {
+        "seq": 2,
+        "msg_id": "compact-same-2",
+        "action": "upsert",
+        "hash": "3eceefe4a1f408b204d6cbfe2d8d5394ae00c554adcdf7872acd47c9cd803236"
+      },
+      {
+        "seq": 3,
+        "msg_id": "controlled_0a57a3d8d6f9420fadc38bfa7078af40",
+        "action": "upsert",
+        "hash": "85ec71d4706e716fb2f4c6e3141381f35e0a7af5d91ffaaa676470d2574e7b56"
+      },
+      {
+        "seq": 4,
+        "msg_id": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+        "action": "upsert",
+        "hash": "ed12c54374f9b9cdc1c3fe7e80e93e01486be3de4044425598c741e0d942cc03"
+      },
+      {
+        "seq": 5,
+        "msg_id": "checkpoint_compact_64541525b3edba6aa921e481ced9908afedd1271",
+        "action": "upsert",
+        "hash": "63273953c72aac282446d02d5588123356c84f65dc654de790f2f4c0bf17458a"
+      },
+      {
+        "seq": 6,
+        "msg_id": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f_g1",
+        "action": "upsert",
+        "hash": "e5c4fca0c6e32880b99135e1ffc1a460d47322cca01e2151fbc86beb77e26ffc"
+      }
+    ],
+    "summaryReceipt": {
+      "invocationId": "217a24f7-5a49-4876-afde-137ba33121b2",
+      "pluginName": "OrdinaryToolCounter",
+      "recordId": "tcr-1795258603790-0cd3b893-7a61-4ae6-9b33-935ec27f48d4",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "ordinary tool invocation recorded for ORDINARY_TOOL_LOCAL"
+          }
+        ],
+        "timestamp": "2026-11-21T10:56:43.796+00:00"
+      }
+    }
+  },
+  "provider": [
+    {
+      "phase": "initial",
+      "requestId": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f",
+      "stream": true,
+      "containsCounterReceipt": false
+    },
+    {
+      "phase": "summary",
+      "requestId": "compaction_1795258604569_qouka90g3w",
+      "stream": true
+    },
+    {
+      "phase": "resumed",
+      "requestId": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f_g1",
+      "stream": true,
+      "containsCounterReceipt": true,
+      "checkpointInput": [
+        {
+          "role": "user",
+          "content": "[系统提示:][VCHAT上下文智能压缩块]\n以下是之前对话的状态快照，用于接续工作，不是新的压缩任务。\n请继承其中有效约束、工程状态、已排除的失败路径和待办事项，并结合后续用户消息继续工作；不要重复执行已经完成的动作。宿主保留的最新版本日记是历史数据，不是待执行的日记工具调用。\n<context_checkpoint>\nCOMPACT_DESKTOP_CHECKPOINT. Settled counter invocation 217a24f7-5a49-4876-afde-137ba33121b2, record tcr-1795258603790-0cd3b893-7a61-4ae6-9b33-935ec27f48d4. ordinary tool invocation recorded for ORDINARY_TOOL_LOCAL. Continue the original task without repeating the tool.\n</context_checkpoint>\n【宿主保留：当前无日记】"
+        }
+      ]
+    }
+  ],
+  "nativeTraffic": [
+    {
+      "route": "/api/v1/sync/shared/admit",
+      "status": 200,
+      "device": "deviceA",
+      "receiptWorkId": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+      "requestId": "controlled_0a57a3d8d6f9420fadc38bfa7078af40"
+    },
+    {
+      "route": "/api/v1/sync/shared/admit",
+      "status": 200,
+      "device": "deviceA",
+      "receiptWorkId": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+      "requestId": "controlled_0a57a3d8d6f9420fadc38bfa7078af40"
+    },
+    {
+      "route": "/api/v1/sync/shared/native-request",
+      "status": 200,
+      "device": "deviceA",
+      "workId": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+      "requestId": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f"
+    },
+    {
+      "route": "/v1/chat/completions",
+      "status": 200,
+      "device": "deviceA",
+      "nativePause": {
+        "state": "paused",
+        "code": "WORK_SAFE_TOOL_BOUNDARY",
+        "requestId": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f"
+      }
+    },
+    {
+      "route": "/api/v1/sync/shared/compact-prepare",
+      "status": 200,
+      "device": "deviceA",
+      "opId": "compact_prepare_1f6f6980-2aaf-48c8-bea1-68fd00d2dbce",
+      "receiptWorkId": "request_a7d9a0d9ce924a60bdaa2be3505b200f"
+    },
+    {
+      "route": "/api/v1/sync/shared/compact-commit",
+      "status": 200,
+      "device": "deviceA",
+      "opId": "compact_commit_compact_64541525b3edba6aa921e481ced9908afedd1271"
+    },
+    {
+      "route": "/api/v1/sync/shared/steer-handoff",
+      "status": 200,
+      "device": "deviceB",
+      "dropped": true,
+      "opId": "handoff_3f22e32a5f324d892c3480c4609ab37f9d7c89d4",
+      "workId": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+      "receiptWorkId": "request_a7d9a0d9ce924a60bdaa2be3505b200f"
+    },
+    {
+      "route": "/api/v1/sync/shared/steer-prepare",
+      "status": 200,
+      "device": "deviceB",
+      "opId": "continue_ba3f0cc4e675cd7dbfcdd748645c210a6fc8c30d",
+      "workId": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+      "receiptWorkId": "request_a7d9a0d9ce924a60bdaa2be3505b200f"
+    },
+    {
+      "route": "/api/v1/sync/shared/native-request",
+      "status": 200,
+      "device": "deviceB",
+      "workId": "request_a7d9a0d9ce924a60bdaa2be3505b200f",
+      "requestId": "reply_request_a7d9a0d9ce924a60bdaa2be3505b200f_g1"
+    },
+    {
+      "route": "/v1/chat/completions",
+      "status": 200,
+      "device": "deviceB"
+    },
+    {
+      "route": "/api/v1/sync/shared/steer-turn-complete",
+      "status": 200,
+      "device": "deviceB",
+      "opId": "turn_f98d996c7345254748e1600de8c3a15eb466a6d5",
+      "workId": "request_a7d9a0d9ce924a60bdaa2be3505b200f"
+    }
+  ],
+  "backendSources": [
+    {
+      "file": "apps/server/server.js",
+      "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "5fe109606e02b4101c8da15c5a810cd2d83a1796117dfcac91979491c52d3339"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "bd565d29533bf71863a304dfd88d134f574921e518d7be6a1eb5d0e27ae5c94f"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "6dd80aeceb8c1d5202fe1151fed4e74ae4d05ea7adc3ebc02d3687426f5ac7cd"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "e0cdd6e14834b6b31dbec30afb9b593b4c55b4405d53503c430d0bcfe0aabd07"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "2e637687e88f05d3ae23cb19e663b3a0e5998f424df4101cb7663f9fb41e5481"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+      "sha256": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+      "sha256": "4f7dab15039bb42a5dc1289b21a5a84627abc4c9ce577b7b7575b2ac3648408f"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "78b53bbb5016510fc3a4827c32df1c3e9b8a57fd218d7d6ae7419ae35c601b57"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+      "sha256": "f4aea542cdcbbe7273bc66e0aee7d35df01b3688d32c11786681ceb3c04d5fe0"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+      "sha256": "c0be485ee31ed3d50db0e5a7e5e72aa38110434fe63c23606a7855a05ca7d512"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+      "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "072cf520ebb2638b85ea2bfe84b0226a216d9996748697c9e1324b3f88156793"
+    },
+    {
+      "file": "apps/server/modules/nativeContinuationStore.cjs",
+      "sha256": "f6774df34bdcc60346f4ed49f5dccaa2e0da5645b5b60ea29f364f89a5090ee6"
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "c32debeee780e1a9528c8025cdb77c00d3e6b5f07464471abdc9e1a14fcef712"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "2f27f829f7f269d66b74a7a60fdae5cab17ae42e3c0769fa758d83a398e5dc4c"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "635c94f249a0f67cb085ae51f1a53e08dc49ddf2aaadb30e434fe6a9a36900f3"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "761918b0d8764b662a4e3da3e5ec119100fd6f29af94dd7a2ccf7c571848c5ad"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/groupTurn.js",
+      "sha256": "7d37337452fd8428aff74a40f621631a70b7f1bf9584ef6bd3538bac0de3d3f7"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/portal.js",
+      "sha256": "3088ccf0e10e0b912164ad2f6e89ec97e19fd5249daa0965947cd7101e5ce95b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTurns.js",
+      "sha256": "7df79649f69c57b7ce800a8e85f3345d604b93bda81f45e58dcbee2aa7a6b2a7"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedEvents.js",
+      "sha256": "62e81d32e6e963554cdce3343ba3942a62414e91cc723170356b54cda7ed3a81"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/native-sync.js",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    }
+  ],
+  "failures": [],
+  "independentReplay": {
+    "workId": "request_7ddb53b054054ff68e969f2c0ec4c14b",
+    "nativePause": {
+      "transport": "SSE",
+      "httpStatus": 200,
+      "state": "paused",
+      "code": "WORK_SAFE_TOOL_BOUNDARY",
+      "requestId": "reply_request_7ddb53b054054ff68e969f2c0ec4c14b"
+    },
+    "rendererTerminal": "interrupted",
+    "invokedOnce": true,
+    "workState": "completed",
+    "exits": {
+      "B": {
+        "code": 0,
+        "signal": null
+      },
+      "A": {
+        "code": 0,
+        "signal": null
+      },
+      "B-taking-over": {
+        "code": 0,
+        "signal": null
+      },
+      "B-recovered": {
+        "code": 0,
+        "signal": null
+      },
+      "backend": {
+        "code": 0,
+        "signal": null
+      }
+    },
+    "failures": []
+  }
+}

@@ -1983,7 +1983,7 @@ async function projectStreamTerminalInternal(messageId, finishReason, context, f
 
     // 终态 payload 是生产端给出的规范完整响应；有可用 payload 时不再按长度猜测权威来源。
     // payload 缺失时才回退到渲染端累计文本。
-    let finalFullText = payloadResponseIsUsable
+    let finalFullText = finalPayload?.authoritativeContent || payloadResponseIsUsable
         ? payloadFullResponse
         : (streamedTextIsUsable ? accumulatedText : "");
 

@@ -1247,6 +1247,7 @@ mainChatSettingsPresentationOwner.configureStartup({
         container: chatMessagesDiv.parentElement, api: chatAPI, ownerWindow: window,
         createObservedFrame: streamManager.createObservedFrame,
         setInterruptTarget: mainChatSendOwner.setInterruptTarget,
+        executePreparedShared: payload => chatManager.executePreparedShared(payload),
         onRetryInput:payload=>chatManager.retryLocalInput(payload),
         onControlledExecute:payload=>chatManager.executeSharedPrepared(payload),
         getSelection: currentSelectedItemRef.get, getTopicId: currentTopicIdRef.get,

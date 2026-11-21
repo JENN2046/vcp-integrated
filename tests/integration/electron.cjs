@@ -105,6 +105,8 @@ app.on('web-contents-created', (_event, contents) => {
             const session = payload?.serverSession;
             log('renderer-event', { channel, sender:contents.id,
                 type:channel === 'vcp-stream-event' ? payload?.type : undefined,
+                modelFinishReason:channel === 'vcp-stream-event' ? payload?.modelFinishReason : undefined,
+                code:channel === 'vcp-stream-event' ? payload?.code : undefined,
                 textLength:typeof session?.text === 'string' ? session.text.length : undefined,
                 executionId:session?.executionId,
             });

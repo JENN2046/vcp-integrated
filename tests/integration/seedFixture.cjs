@@ -24,7 +24,7 @@ const { HistoryAuthority } = desktop('./modules/services/historyAuthority');
 const { prepareLocalHistoryAuthority, deriveHistoryProtection } = desktop('./modules/services/nativeSync/historyAuthority');
 const AgentConfigManager = desktop('./modules/utils/agentConfigManager');
 
-async function fixture(t, { syntheticRoot: root }) {
+async function fixture(t, { syntheticRoot: root, agentConfig }) {
     const marker = await fs.readFile(path.join(root, 'L4-SYNTHETIC-ONLY'), 'utf8');
     assert.equal(marker, 'NativeSync L4 synthetic process fixture\n');
     const config = {
@@ -47,7 +47,7 @@ async function fixture(t, { syntheticRoot: root }) {
         sharedSpaceId: 'sharedAB', opId: 'owner', kind: 'agent', localId: 'origin',
         config: { name: 'Synthetic shared', model: 'synthetic', systemPrompt: 'FROZEN_SHARED_PROMPT',
             temperature: 0.5, contextTokenLimit: 32000, maxOutputTokens: 128,
-            streamOutput: false, stripRegexes: [], tavernRules: [] },
+            streamOutput: false, stripRegexes: [], tavernRules: [], ...agentConfig },
     }).object;
     const topic = shared.create(actor('C'), {
         sharedSpaceId: 'sharedAB', opId: 'topic', kind: 'topic', parentId: owner.id,

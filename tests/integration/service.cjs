@@ -22,7 +22,7 @@ async function jsonBody(req) {
     for await (const chunk of req) chunks.push(chunk);
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision, mobileBuild, groupRelay, serverDependencies, restoreSyntheticState, expectedStartupError, streamInterrupt}) {
+async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision, mobileBuild, groupRelay, serverDependencies, restoreSyntheticState, expectedStartupError, streamInterrupt, toolHandoff}) {
     const sourceApp = path.join(candidate, 'apps/server');
     const box = path.join(out, 'runtime-box');
     fs.mkdirSync(box);
@@ -71,6 +71,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     }));
 
     ordinaryTools?.stage(box);
+    toolHandoff?.stage?.(box);
     streamInterrupt?.stage(box);
     delegation?.stage(box);
 
@@ -81,7 +82,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     let source, target, stopTopic, ordinaryTopics;
     const descriptors = {};
     try {
-        const f = await fixture({ after: fn => cleanup.push(fn) }, { syntheticRoot: seed });
+        const f = await fixture({ after: fn => cleanup.push(fn) }, { syntheticRoot: seed, agentConfig: toolHandoff?.agentConfig });
         source = f.topic;
         const actor = f.actor('C');
         const targetAgent = f.shared.create(actor, {sharedSpaceId:'sharedAB',opId:'sponsor-target-agent',kind:'agent',localId:'sponsor-target-agent',config:{...f.owner.config,name:'Synthetic lost receipt',systemPrompt:'SYNTHETIC_LOST_RECEIPT',model:'synthetic',streamOutput:false}}).object;
@@ -173,7 +174,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             return res.writeHead(500).end(JSON.stringify({error:{code:'UNEXPECTED_DESKTOP_LOCAL_EXECUTION'}}));
         }
         const relayAction = groupRelay && req.method === 'POST' && /\/mobile\/api\/executions\/[^/]+\/cancel(?:-remaining)?$/.test(route);
-        const relevant = (streamInterrupt && route === '/v1/interrupt') || relayAction || req.method==='POST' && /\/shared\/(session-send|session-cancel|task-stop|admit|complete|config)$/.test(route);
+        const relevant = (streamInterrupt && route === '/v1/interrupt') || relayAction || toolHandoff?.observeRequest(req.method, route) || req.method==='POST' && /\/shared\/(session-send|session-cancel|task-stop|admit|complete|config)$/.test(route);
         const row = {route,method:req.method,at:Date.now(),device:req.headers['x-nativesync-device'],capabilities:req.headers['x-nativesync-capabilities']};
         let body;
         if (relevant) {
@@ -225,11 +226,13 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                         row.response = { request:request && { id:request.id, requestId:request.requestId, state:request.state } };
                     } else row.response = value;
                 } catch {}
-                if (relayAction && groupRelay.dropResponse?.(row)) {
+                if ((relayAction && groupRelay.dropResponse?.(row)) || toolHandoff?.dropResponse(row)) {
                     row.dropped = true;
                     // Send only a prefix of the accepted response so the client cannot
                     // decode the ACK. A pre-header disconnect permits Chrome auto-retry.
-                    res.writeHead(response.statusCode, { ...response.headers, 'content-length': payload.length });
+                    const headers = { ...response.headers, 'content-length': payload.length };
+                    delete headers['transfer-encoding'];
+                    res.writeHead(response.statusCode, headers);
                     res.write(payload.subarray(0, 1), () => res.destroy());
                     return;
                 }
@@ -249,6 +252,10 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             }
             row.status=response.statusCode;
             if (streamInterrupt && route === '/v1/chatvcp/completions') streamInterrupt.inspect(response, row);
+            if (toolHandoff?.observeNativeResponse && req.headers['x-nativesync-admission'] && route === '/v1/chat/completions') {
+                toolHandoff.observeNativeResponse(response, row);
+                requests.push(row);
+            }
             res.writeHead(response.statusCode,response.headers);
             response.pipe(res);
         });
@@ -280,6 +287,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 NativeMobileOrigin:'https://127.0.0.1:'+proxyPort,NativeMobileStartDelayMs:'0',
                 ...(delegation ? { AdminUsername:'synthetic-admin', AdminPassword:'synthetic-admin-only' } : {}),
                 ...(observedContext ? { NativeMobileConfigSync:'true', NativeMobileAttachments:'true' } : {}),
+                ...toolHandoff?.env,
                 ...(streamInterrupt ? { EnableRoleDivider:String(streamInterrupt.roleDivider) } : {}),
                 ...(hardwareStream ? { NativeMobileExecutionTimeoutMs:'300000', NativeMobileGroupIdleTimeoutMs:'300000' } : {}),
                 NativeSyncFullSources:JSON.stringify(['A','B','C','D'].map(x=>({sourceId:'source'+x,deviceId:'device'+x,executionMode:'all-supported'}))),

@@ -25,7 +25,7 @@ posts['task-stop']=['stopTask',['sharedSpaceId','workId','nativeTaskId']];
 gets.active=['activeWork',['sharedSpaceId','sharedId']];
 gets['task-result']=['taskResult',['sharedSpaceId','workId','nativeTaskId']];
 gets.work=['workState',['sharedSpaceId','workId']];
-gets.steering=['steeringState',['sharedSpaceId','workId']];
+gets.steering=['steeringState',['sharedSpaceId','workId','pausedRequestId']];
 gets.matches=['matchStates',['sharedSpaceId','after','limit','active']];
 gets['match-state']=['matchState',['sharedSpaceId','planHash']];
 gets['request-config']=['requestConfig',['sharedSpaceId','admissionId']];
@@ -53,6 +53,7 @@ async function sharedRequest(store,req,url,mobileActor,signal){
    ...(shared.native?.engine?[require('./sharedSession').CAPABILITY,'shared-execution-trace-v1','shared-session-cancel-v1',require('./sharedTopicSponsor').CAPABILITY]:[]),
    ...(shared.events&&!shared.events.closed?['shared-events-v1']:[]),
    ...(policy.sharedSteering?['shared-steering-v1']:[]),
+   ...(shared.native?.engine&&require('./sharedControlledText').enabled(shared,require('./sharedControlledText').TOOLS_MODE)?[require('./sharedControlledText').TOOLS_CAPABILITY]:[]),
    ...(shared.native?.engine&&policy.sharedControlledText?[require('./sharedControlledText').CAPABILITY]:[]),
   );
   return {capability:SHARED_SPACE_CAPABILITY,schemaVersion:1,features,readOnly:shared.readOnly,spaces:[...shared.grants].filter(([,sources])=>sources.has(binding.sourceId)).map(([id])=>({id}))};

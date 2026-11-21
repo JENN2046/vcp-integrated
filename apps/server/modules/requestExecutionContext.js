@@ -96,7 +96,7 @@ function middleware(req, res, next) {
     const finishNative=success=>{if(!scope)return;scope.transportEnded=true;scope.transportSuccess=success;outcome.check();};
     res.once('finish', () => { releaseContext();finishNative(res.statusCode>=200&&res.statusCode<300);req.removeListener('aborted', abort); res.removeListener('close', abort); });
     if(shared)res.once('close',()=>{if(!res.writableFinished)finishNative(false);});
-    scope={ toolRun: { waiting: 0 },finishNative,requestId, signal: controller.signal, ...snapshot,...(shared?{bridge:shared.bridge,sponsorAuthority:shared.sponsorAuthority,sponsorBoundary:sharedBoundary,textOnly:shared.textOnly===true,canSteer:shared.steeringEnabled===true,workId:shared.workId,generation:shared.generation,phase:shared.phase,fence:shared.fence,applied:shared.applied,continuation:shared.continuation,checkpoint:shared.checkpoint}:{}) };
+    scope={ toolRun: { waiting: 0 },finishNative,requestId, signal: controller.signal, ...snapshot,...(shared?{bridge:shared.bridge,sponsorAuthority:shared.sponsorAuthority,sponsorBoundary:sharedBoundary,textOnly:shared.textOnly===true,safeTools:shared.safeTools,settleToolPause:shared.settleToolPause,canSteer:shared.steeringEnabled===true,workId:shared.workId,generation:shared.generation,phase:shared.phase,fence:shared.fence,applied:shared.applied,continuation:shared.continuation,checkpoint:shared.checkpoint}:{}) };
     return local.run(scope,next);
 }
 async function waitForApproval(promise, onCancel) {
@@ -140,10 +140,29 @@ function agentPrompt(alias) {
     return context && context.agentAlias === alias ? context.agentPrompt : undefined;
 }
 
-function assertToolsAllowed() {
+function assertToolsAllowed(pluginName, args, { indirect = false } = {}) {
     assertToolOutcomeKnown();
     throwIfCancelled();
-    if (local.getStore()?.textOnly) throw Object.assign(Error('CONTROLLED_TEXT_TOOLS_FORBIDDEN'), { code: 'CONTROLLED_TEXT_TOOLS_FORBIDDEN' });
+    const scope = local.getStore();
+    if (scope?.textOnly) throw Object.assign(Error('CONTROLLED_TEXT_TOOLS_FORBIDDEN'), { code: 'CONTROLLED_TEXT_TOOLS_FORBIDDEN' });
+    if (scope?.safeTools && (!scope.safeTools.has(pluginName) || scope.invocation || indirect
+        || Object.hasOwn(args || {}, 'timely_contact') || /file:\/\//i.test(JSON.stringify(args || {})))) {
+        throw Object.assign(Error('CONTROLLED_TOOL_FORBIDDEN'), { code: 'CONTROLLED_TOOL_FORBIDDEN' });
+    }
+}
+
+function controlledToolWork() { return Boolean(local.getStore()?.safeTools); }
+function assertToolBatch(calls) {
+    if (controlledToolWork() && (calls.length>1 || calls[0]?.archery)) {
+        throw Object.assign(Error('CONTROLLED_TOOL_CALL_LIMIT'), { code: 'CONTROLLED_TOOL_CALL_LIMIT' });
+    }
+}
+
+function assertToolBoundary() {
+    const scope = local.getStore();
+    if (!scope?.safeTools) return;
+    assertToolOutcomeKnown();
+    scope.fence();
 }
 
 function assertToolOutcomeKnown() {
@@ -209,7 +228,7 @@ async function trackToolInvocation({ pluginName, recordId = null }, process, isU
 }
 
 async function runToolInvocation({ pluginName, recordId, unconfirmedError }, fn) {
-    assertToolsAllowed();
+    assertToolsAllowed(pluginName, null, { indirect: true });
     return trackToolInvocation({ pluginName, recordId }, dispatch => dispatch(fn), error => error === unconfirmedError);
 }
 
@@ -240,6 +259,7 @@ async function confirmToolSettlement(bridge, event) {
 
 async function acceptNativeTask({ pluginName, nativeTaskId, agentBaseName }) {
     const context = local.getStore();
+    if(context?.safeTools)throw Object.assign(Error('CONTROLLED_TOOL_FORBIDDEN'),{code:'CONTROLLED_TOOL_FORBIDDEN'});
     if(context?.textOnly)throw Object.assign(Error('CONTROLLED_TEXT_TOOLS_FORBIDDEN'),{code:'CONTROLLED_TEXT_TOOLS_FORBIDDEN'});
     if (!context?.bridge) return null;
     if (!context.invocation || context.invocation.pluginName !== pluginName) {
@@ -319,7 +339,8 @@ module.exports = {
     checkpointAssistant: content => local.getStore()?.checkpoint?.assistant(content),
     markModelTerminal: () => { const scope=local.getStore();if(scope)scope.modelTerminalKnown=true; },
     currentSignal: () => local.getStore()?.signal, currentWork: () => local.getStore()?.workId || null,
-    assertToolsAllowed, trackToolInvocation,
+    assertToolsAllowed, controlledToolWork, assertToolBatch, assertToolBoundary, trackToolInvocation,
+    settleToolPause: () => local.getStore()?.settleToolPause?.(),
     currentTopicSponsorCall, approvalOwner,
     runToolInvocation, acceptNativeTask, registerNativeTaskProvider, queryNativeTask,
     toolStarted: () => note('tool', { started: true }),

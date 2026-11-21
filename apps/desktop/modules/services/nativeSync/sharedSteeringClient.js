@@ -4,7 +4,7 @@ const endpoint='/api/v1/sync/shared/';
 const terminal=new Set(['completed','abandoned']);
 class SharedSteeringClient{
  constructor(owner){this.owner=owner;this.runtime=owner.runtime;this.sessions=new Set();this.notified=new Map();}
- enabled(){return this.runtime.capabilities.features?.some(value=>['shared-steering-v1','shared-controlled-text-v1'].includes(value))===true;}
+ enabled(){return this.runtime.capabilities.features?.some(value=>['shared-steering-v1','shared-controlled-text-v1','shared-controlled-tools-v1'].includes(value))===true;}
  steps(record){if(!record.generations)record.generations=[{generation:0,requestId:'reply_'+record.accepted.id,consumedInputSeq:0,config:record.config,nativeBody:record.nativeBody||null}];return record.generations;}
  find(requestId){for(const record of Object.values(this.owner.state.requests)){if(!record.steeringV1||!record.accepted||record.isSteeringInput)continue;const step=this.steps(record).find(s=>s.requestId===requestId);if(step)return {record,step};}return null;}
  policy(requestId){const found=this.find(requestId);return found?.step.config.rules[0]?.config.executionPolicy||null;}
@@ -14,11 +14,12 @@ class SharedSteeringClient{
   if(observedWorkId&&observedWorkId!==value.request.id)throw fail('STEERING_TARGET_CHANGED');
   let record=Object.values(this.owner.state.requests).find(v=>!v.isSteeringInput&&v.accepted?.id===value.request.id);
   if(!record){record={steeringV1:Boolean(value.request.turn?.steeringCapable),remote:true,descriptor:{...d},sharedId:mapping.sharedId,phase:value.request.state,accepted:value.request,body:{requestId:value.request.requestId}};this.owner.state.requests['remote:'+value.request.id]=record;}
-  else{record.accepted=value.request;if(terminal.has(value.request.state))record.phase=value.request.state;}
+  else{record.accepted=value.request;if(terminal.has(value.request.state)||value.request.state==='review_required')record.phase=value.request.state;}
+  if(value.request.steering)record.control=value.request.steering;
   record.observedAt=Date.now();await this.owner.save();return record;
  }
- async refresh(record){const value=await this.runtime.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,workId:record.accepted.id}));if(value.request){record.accepted=value.request;record.observedAt=Date.now();if(terminal.has(value.request.state))record.phase=value.request.state;await this.owner.save();}return value.request;}
- query(record){return this.runtime.send(endpoint+'steering?'+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,workId:record.accepted.id}));}
+ async refresh(record){const value=await this.runtime.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,workId:record.accepted.id}));if(value.request){record.accepted=value.request;record.observedAt=Date.now();if(terminal.has(value.request.state)||value.request.state==='review_required')record.phase=value.request.state;if(value.request.steering)record.control=value.request.steering;await this.owner.save();}return value.request;}
+ query(record, extra={}){return this.runtime.send(endpoint+'steering?'+new URLSearchParams({...extra,sharedSpaceId:this.runtime.connection.sharedSpaceId,workId:record.accepted.id}));}
  async submit(record,d,message,{deferReady=false,modelSaveRef=null}={}){
   const r=this.runtime,o=this.owner,input=o.state.requests[message.id]||{phase:'local_pending',descriptor:{...d},localMessage:JSON.parse(JSON.stringify(message)),body:{requestId:message.id}};
   if(!input.isSteeringInput){
@@ -54,7 +55,21 @@ class SharedSteeringClient{
   if(!step.nativeBody){step.nativeBody=JSON.parse(JSON.stringify(body));if(step.generation===0)record.nativeBody=step.nativeBody;await this.owner.save();}
   await this.runtime.send(endpoint+'native-request',{body:{sharedSpaceId:this.runtime.connection.sharedSpaceId,admissionId:record.accepted.id,requestId:step.requestId,bodyHash:sha256(stable(step.nativeBody)),generation:step.generation,consumedInputSeq:step.consumedInputSeq}});
   if(this.runtime.closed)throw fail('APPLICATION_SHUTTING_DOWN');step.phase='dispatching';step.timings||={};step.timings.native_prepared=Date.now();record.phase='dispatching';this.sessions.add(record.accepted.id);await this.owner.save();
-  return {body:step.nativeBody,headers:{...require('./runtime').syncHeaders(this.runtime.connection),'X-NativeSync-Capabilities':'shared-space-v1,shared-context-v1,shared-steering-v1','X-NativeSync-Admission':record.accepted.id,'X-NativeSync-Generation':String(step.generation),'X-NativeSync-Consumed-Input-Seq':String(step.consumedInputSeq)}};
+  const readPausedMessage = async () => {
+   const control=await this.query(record,{pausedRequestId:body.requestId});
+   const reply=control.pausedReply,message=reply?.message;
+   if(!message||message.id!==body.requestId||message.role!=='assistant'||message.finishReason!=='interrupted'||
+      message.continuity?.executionId!==record.accepted.id||!Number.isSafeInteger(reply.seq)||reply.seq<1)return null;
+   const mapping=this.owner.mapping(record.descriptor);
+   // The Journal already owns this prefix. Let the ordinary projector finish
+   // at its watermark without making a slow local projection a transport failure.
+   await this.runtime.syncExecutionTopic(mapping,{minSeq:reply.seq}).catch(error=>{
+    console.warn('[NativeSync] Paused Work History projection pending',error.code||error.name);
+   });
+   return message;
+  };
+  const pause=record.accepted.turn?.controlMode==='safe-tools-v1'&&step.generation===0?{readPausedMessage}:{};
+  return {...pause,body:step.nativeBody,headers:{...require('./runtime').syncHeaders(this.runtime.connection),'X-NativeSync-Capabilities':'shared-space-v1,shared-context-v1,shared-steering-v1','X-NativeSync-Admission':record.accepted.id,'X-NativeSync-Generation':String(step.generation),'X-NativeSync-Consumed-Input-Seq':String(step.consumedInputSeq)}};
  }
  async handoff(d,workId){
   const record=await this.active(d,workId);if(!record?.steeringV1)throw fail('SHARED_STEERING_TARGET_UNSUPPORTED');
@@ -115,7 +130,7 @@ class SharedSteeringClient{
   record.control=known.steering||await this.query(record);
   for(const input of Object.values(o.state.requests))if(input.isSteeringInput&&input.workId===record.accepted.id&&record.control?.applicationState==='applied'&&input.inputReceipt?.inputSeq<=record.control?.consumedInputSeq){input.phase='input_applied';}
   await o.save();
-  if(record.control?.applicationState==='ready'&&this.sessions.has(record.accepted.id)&&record.control.executor==='desktop:'+r.connection.deviceId&&(this.notified.get(record.accepted.id)?.revision!==record.control.revision||Date.now()-this.notified.get(record.accepted.id).at>=1000)){
+  if(record.accepted.turn?.controlMode!=='safe-tools-v1'&&record.control?.applicationState==='ready'&&this.sessions.has(record.accepted.id)&&record.control.executor==='desktop:'+r.connection.deviceId&&(this.notified.get(record.accepted.id)?.revision!==record.control.revision||Date.now()-this.notified.get(record.accepted.id).at>=1000)){
    this.notified.set(record.accepted.id,{revision:record.control.revision,at:Date.now()});const mapping=r.mappings().find(m=>m.sharedId===record.sharedId);if(!mapping)return;
    const value=await o.status(mapping.local,{refresh:false});r.notifyExecutionStatus?.({...value,readOnly:r.readOnly===true,controlledTextAvailable:!r.closed&&r.readOnly!==true&&r.capabilities.features?.includes('shared-controlled-text-v1')===true,continuation:{workId:record.accepted.id,expectedRevision:record.control.revision,expectedGeneration:record.control.generation,descriptor:mapping.local}});
   }

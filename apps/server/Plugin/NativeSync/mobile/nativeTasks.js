@@ -52,7 +52,9 @@ class NativeTaskLinks {
         if (!job || !this.engine.topics.has(job.topic_key)) throw fail('NATIVE_TASK_PARENT_NOT_FOUND');
         if (stepId) {
             const step = this.db.prepare('SELECT job_id FROM mobile_execution_steps WHERE id=?').get(stepId);
-            if (!step || step.job_id !== executionId) throw fail('NATIVE_TASK_PARENT_MISMATCH');
+            const shared = !step && this.engine.store?.shared?.native?.db
+                ?.prepare('SELECT admission_id FROM shared_native_requests WHERE id=?').get(stepId);
+            if ((step?.job_id || shared?.admission_id) !== executionId) throw fail('NATIVE_TASK_PARENT_MISMATCH');
         }
         return { executionId, stepId, nativeRequestId: stepId || executionId };
     }

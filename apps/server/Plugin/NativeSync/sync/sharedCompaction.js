@@ -1,5 +1,6 @@
 'use strict';
 const {stable,sha256}=require('./protocol');
+const controlled=require('./sharedControlledText');
 const fail=code=>Object.assign(Error(code),{code,status:409});
 /** Shared versions authorize publication. Private execution evidence stays in VCP. */
 class SharedCompaction{
@@ -54,7 +55,7 @@ class SharedCompaction{
  }
  prepare(actor,body){const topic=this.topic(actor,body.sharedSpaceId,body.sharedId);return this.shared.receipt(actor,body,'compact-prepare',()=>{
   if(!Number.isSafeInteger(body.expectedHead)||body.expectedHead!==this.shared.head(topic))throw fail('SHARED_COMPACTION_SOURCE_CHANGED');
-  const active=this.shared.active(topic.id);if(active){const control=this.shared.steering.control(active);if(control.executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');this.shared.steering.quiesceUnstarted(active,control);}
+  const active=this.shared.active(topic.id);if(active){const control=this.shared.steering.control(active);if(control.executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');if(require('./sharedTurns').intent(active).controlMode!==controlled.TOOLS_MODE)this.shared.steering.quiesceUnstarted(active,control);}
   this.db.prepare("UPDATE shared_compaction_intents SET state='superseded' WHERE topic_id=? AND principal=? AND state='prepared'").run(topic.id,actor.principal);
   const snapshot=this.snapshot(actor,topic),id='compact_'+sha256(stable([actor.principal,body.opId])).slice(0,40),messageId='checkpoint_'+id;
   this.db.prepare("INSERT INTO shared_compaction_intents(id,principal,topic_id,proof_json,message_id,committed_seq,work_id,state) VALUES(?,?,?,?,?,NULL,?,'prepared')").run(id,actor.principal,topic.id,JSON.stringify(snapshot.proof),messageId,snapshot.proof.work?.id||null);

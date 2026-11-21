@@ -351,6 +351,7 @@ class NonStreamHandler {
       conversationHistoryForClient.push(currentAIContentForClient);
 
       const toolCalls = vcpToolUseForbidden ? [] : ToolCallParser.parse(currentAIContentForLoop);
+      require('../requestExecutionContext').assertToolBatch(toolCalls);
       const residentProposalCalls = toolCalls.filter(isResidentProposalToolCall);
 
       if (toolCalls.length > 0) {
@@ -476,6 +477,7 @@ class NonStreamHandler {
           currentMessagesForNonStreamLoop,
           { residentPresentationSink }
         );
+        require('../requestExecutionContext').assertToolBoundary();
         if (res.writableEnded || res.destroyed || abortController?.signal.aborted) break;
         if (residentProposalCalls.length === 1) {
           const proposalIndex = normalCalls.findIndex(isResidentProposalToolCall);

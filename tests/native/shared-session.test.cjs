@@ -29,6 +29,22 @@ test('one HTTP session send owns durable execution and completes without a deskt
  await start(f);await completed(f,id);assert.equal(f.calls(),1);assert.equal(f.store.metrics().journalRows,2);assert.equal(f.shared.active(f.topic.id),undefined);
  assert.equal(f.shared.workState(f.actor('B'),{sharedSpaceId:'sharedAB',workId:id}).request.state,'completed');
 });
+test('ordinary session admission rejects controlled mode even for an opted-in executor',async t=>{
+ const f=await fixture(t),body=submission(f);
+ const capabilities='shared-space-v1,shared-context-v1,shared-session-v1,shared-steering-v1,shared-controlled-tools-v1';
+ const actor=f.shared.desktop({sourceId:'sourceA',deviceId:'deviceA',spaceId:f.store.sourceCatalog.spaceId},capabilities);
+ f.shared.safeTools.add('Synthetic');
+ f.shared.authorize(actor,body.sharedSpaceId,'execute');
+ const invalid={...body,controlMode:'safe-tools-v1'};
+ assert.throws(()=>f.shared.sessionSend(actor,invalid),{code:'SHARED_SESSION_CONTROL_MODE_UNSUPPORTED'});
+ assert.equal((await httpSend(f,invalid,capabilities)).status,400);
+ assert.equal(f.shared.active(f.topic.id),undefined);
+ assert.equal(f.store.metrics().journalRows,0);
+ const ordinary=f.shared.sessionSend(actor,body);
+ assert.equal(f.portal.engine.get(ordinary.workId).kind,'shared_session');
+ assert.equal(ordinary.turn.steeringCapable,undefined);
+ assert.equal(f.store.metrics().journalRows,1);
+});
 test('shared session context follows checkpoint publication order across device clocks and message edits', async t => {
  const f = await fixture(t);
  const actorA = f.actor('A'), actorB = f.actor('B');

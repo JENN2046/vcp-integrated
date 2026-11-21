@@ -140,6 +140,8 @@ export function createVcpStreamBridge({ createConsumer, reportError = console.er
                     if (event.type === 'end' && finishReason === 'interrupted') {
                         terminal.kind = 'cancelled';
                         terminal.finishReason = finishReason;
+                        if (event.pausedWorkMessage?.id === event.messageId && event.pausedWorkMessage.finishReason === 'interrupted')
+                            terminal.pausedWorkMessage = event.pausedWorkMessage;
                     } else if (event.type === 'end' && finishReason === 'length') {
                         terminal.finishReason = finishReason;
                     } else if (event.type === 'end' && event.modelFinishReason == null && terminal.kind === 'completed' && event.finish_reason) {

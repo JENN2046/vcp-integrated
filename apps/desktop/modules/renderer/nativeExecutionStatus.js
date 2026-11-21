@@ -1,3 +1,4 @@
+import {createControlledWorkView} from './controlledWorkView.mjs';
 import {createSharedSessionView} from '../services/nativeSync/sharedSessionView.mjs';
 const key = topic => JSON.stringify([topic?.ownerType, topic?.ownerId, topic?.topicId]);
 const labels = {
@@ -32,7 +33,7 @@ function localDeliveryText(delivery) {
 
 // Status stays outside the message list. Explicit local recovery retries only
 // an already accepted projection through the existing snapshot capability.
-export function createNativeExecutionStatus({ container, api, getSelection, getTopicId, subscribeSelection, subscribeHistory, ownerWindow, createObservedFrame, setInterruptTarget, onSharedProjectionSettled, onRetryInput }) {
+export function createNativeExecutionStatus({ container, api, getSelection, getTopicId, subscribeSelection, subscribeHistory, ownerWindow, createObservedFrame, setInterruptTarget, onSharedProjectionSettled, onRetryInput, executePreparedShared }) {
     if (!container || typeof api?.getNativeExecutionStatus !== 'function') return { dispose() {} };
     const document = container.ownerDocument;
     const sharedSessionView = createSharedSessionView(container, createObservedFrame, { api, setInterruptTarget });
@@ -51,6 +52,9 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
     const composer=container.parentElement?.querySelector('.chat-input-area');
     if(composer)composer.prepend(recovery);else container.after(recovery);
     let disposed = false, selection = null, generation = 0, resultGeneration = 0, view = null, historyTimer = null, taskTimer = null;
+    const controls = executePreparedShared && createControlledWorkView({
+        container, api, execute: executePreparedShared, refresh: () => query(true),
+    });
     const stopRequests = new Set();
     const currentTopic = () => {
         const item = getSelection();
@@ -62,6 +66,7 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
     function render(value) {
         settleSharedFlowlock(value);
         sharedSessionView.update(value);
+        controls?.update(value, selection);
         view = value;
         recovery.replaceChildren(); recovery.hidden = true;
         for (const saved of value?.localInputs || []) {
@@ -300,6 +305,7 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
             ownerWindow?.removeEventListener('online', recover);
             ownerWindow?.removeEventListener('native-sync:local-input-changed',localChanged);
             closeResult.removeEventListener('click', clearResult); clearResult();
+            controls?.dispose();
             sharedSessionView.dispose();
             panel.remove(); recovery.remove();
         },

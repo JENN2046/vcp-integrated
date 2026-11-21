@@ -20,11 +20,14 @@ const ordinaryMode = Object.hasOwn(ordinaryModes, requested) ? ordinaryModes[req
 const nativeQueue = requested === 'native-local-queue' ? require('../group-extra/local.cjs') : undefined;
 const aaDesktop = requested === 'aa-desktop';
 const streamInterrupt = requested === 'local-stream-interrupt' ? require('../local-stream-interrupt/fixture.cjs') : undefined;
+const toolHandoffModes = ['tool-handoff-baseline', 'tool-handoff', 'tool-handoff-unknown', 'tool-handoff-stream'];
+const toolHandoffMode = toolHandoffModes.includes(requested) ? requested : undefined;
+const toolHandoffFixture = toolHandoffMode && require('../tool-work-handoff/fixture.cjs');
 const crossDeviceCompaction = requested === 'compact-cross-device';
 const compaction = requested === 'compact-e2e' || crossDeviceCompaction ? require('../compact-e2e/fixture.cjs') : undefined;
 const approvalRestoreModes = { 'approval-restore': 'desktop', 'approval-restore-stale': 'stale' };
 const approvalRestore = Object.hasOwn(approvalRestoreModes, requested) ? approvalRestoreModes[requested] : undefined;
-const serverRevision = ordinaryMode || approvalRestore ? process.env.NS_BASELINE_SERVER_REVISION : undefined;
+const serverRevision = ordinaryMode || approvalRestore || toolHandoffMode ? process.env.NS_BASELINE_SERVER_REVISION : undefined;
 if (serverRevision && !/^[a-f0-9]{40}$/.test(serverRevision)) throw Error('Expected full Git revision for baseline server');
 const ordinaryTools = require('../ordinary-tools/fixture.cjs');
 const ordinaryFixture = ordinaryMode || approvalRestore ? {
@@ -41,8 +44,8 @@ const ordinaryFixture = ordinaryMode || approvalRestore ? {
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', 'local-stream-interrupt'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|local-stream-interrupt]');
+if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', 'local-stream-interrupt'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|local-stream-interrupt]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -158,6 +161,11 @@ async function runCase(root, mode) {
     out = path.join(root, mode);
     fs.mkdirSync(out, { mode: 0o700 });
     let service, aa;
+    const toolHandoff = toolHandoffFixture?.create(out, {
+        unknown: mode === 'tool-handoff-unknown',
+        loseHandoff: ['tool-handoff', 'tool-handoff-stream'].includes(mode),
+        stream: mode === 'tool-handoff-stream',
+    });
     const groupRelay = nativeQueue?.createProvider();
     if (aaDesktop) {
         aa = await require('../aa-delegation/fixture.cjs').startFixture({out, candidate, trace, mode: 'pre-only'});
@@ -170,8 +178,8 @@ async function runCase(root, mode) {
             '-keyout', key, '-out', cert], { env: { PATH: '/usr/bin:/bin' }, stdio: 'ignore' });
         try {
             service = await require('./service.cjs').start({
-                out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision, groupRelay,
-                observedContext: compaction?.observe(out, crossDeviceCompaction), streamInterrupt: streamInterrupt?.observe(out),
+                out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision, groupRelay, toolHandoff,
+                observedContext: toolHandoff?.observed || compaction?.observe(out, crossDeviceCompaction), streamInterrupt: streamInterrupt?.observe(out),
             });
         } finally { fs.rmSync(key, { force: true }); }
     }
@@ -269,11 +277,11 @@ async function runCase(root, mode) {
                 }
             } else await restoreProfile(path.join(out,'seed','desktop'+role),profile,service.origin,role);
             const settingsFile=path.join(profile,'settings.json');
-            fs.writeFileSync(settingsFile,json({...read(settingsFile),ChatDataServiceEnabled:true,ChatDataServiceNotifyEnabled:false,ChatDataServiceTantivyEnabled:false,vcpServerUrl:service.origin+(compaction?'/v1/chat/completions':'/v1/local-chat/completions'),
-                ...compaction?.settings,...streamInterrupt?.settings,userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
+            fs.writeFileSync(settingsFile,json({...read(settingsFile),ChatDataServiceEnabled:true,ChatDataServiceNotifyEnabled:false,ChatDataServiceTantivyEnabled:false,vcpServerUrl:service.origin+((compaction || toolHandoff)?'/v1/chat/completions':'/v1/local-chat/completions'),
+                ...compaction?.settings,...toolHandoffFixture?.settings,...streamInterrupt?.settings,userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
         }
         const [A,B] = await Promise.all(roles.map(role => start(role)));
-        if (!approvalRestore && !compaction && !streamInterrupt) {
+        if (!approvalRestore && !compaction && !streamInterrupt && !toolHandoff) {
             result.mobile = await service.checkMobile();
             if (mode !== 'idle') result.mobile.chromium = await A.command('mobile', service.origin + '/mobile/');
         }
@@ -290,14 +298,15 @@ async function runCase(root, mode) {
         } else if (mode === 'idle') {
             result.idle = await require('./idle.cjs').measure({out, waitUntil, pids:{ A:A.proc.pid, B:B.proc.pid, backend:service.backendPid }});
         } else if (mode !== 'ready') {
-            const runScenario = compaction ? require('../compact-e2e/scenario.cjs')
+            const runScenario = toolHandoff ? require('../tool-work-handoff/scenario.cjs')
+                : compaction ? require('../compact-e2e/scenario.cjs')
                 : streamInterrupt ? require('../local-stream-interrupt/scenario.cjs')
                 : aaDesktop ? require('../aa-desktop/scenario.cjs')
                 : approvalRestore ? require('../approval-restore/' + approvalRestore + '.cjs')
                 : nativeQueue ? nativeQueue.scenario
                 : ordinaryMode ? require('../ordinary-desktop/scenario.cjs')
                 : mode === 'config-only' ? require('./configuration.cjs') : scenario;
-            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash,aa,groupRelay});
+            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash,aa,groupRelay,toolHandoff});
         }
     } catch(error) {
         result.failures.push(error.stack);

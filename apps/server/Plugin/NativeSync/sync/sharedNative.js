@@ -1,4 +1,5 @@
 'use strict';
+const controlled=require('./sharedControlledText');
 const {sha256,stable}=require('./protocol');
 const {sharedIdentity}=require('./contracts.generated.cjs');
 const fail=(code,status=409)=>Object.assign(Error(code),{code,status});
@@ -23,6 +24,7 @@ class SharedNative {
   require('../../../modules/requestExecutionContext').events.on('approval',this.approvalObserver);
   this.taskControls=new (require('./sharedTaskControls').SharedTaskControls)(shared);this.taskRequests=new (require('./sharedTaskRequests').SharedTaskRequests)(this);shared.steering.onInput=(workId)=>{require('../../../modules/requestExecutionContext').interruptWork(workId);return this.taskControls.request(workId);};
   if(engine?.get&&engine.configs){
+   this.verifyRecoveredToolBoundaries();
    require('../mobile/groupTurn').recover(engine);
    // A verified AA row can commit just before its parent terminal flag.
    // Such a child has left the reconcile queue. Recheck the existing reply
@@ -35,6 +37,29 @@ class SharedNative {
    for(const row of pendingReplies)this.checkTerminal(row.id);
   }
  }
+ verifyRecoveredToolBoundaries(){
+  const candidates=this.db.prepare(`SELECT a.id,g.request_id,p.proof_json FROM shared_admissions a
+   JOIN shared_work_generations g ON g.work_id=a.id AND g.generation=0 AND g.state='paused'
+   JOIN shared_native_checkpoints p ON p.work_id=g.work_id AND p.generation=0
+   WHERE a.state='dispatched' AND json_extract(a.user_op,'$.sharedTurn.controlMode')=?`).all(controlled.TOOLS_MODE);
+  for(const row of candidates){
+   try{
+    this.verifiedToolBoundary(row.id,row.request_id,JSON.parse(row.proof_json));
+   }catch(error){
+    this.db.prepare("UPDATE shared_admissions SET state='review_required',native_terminal=0 WHERE id=?").run(row.id);
+    console.warn('[NativeSync] SAFE_TOOL_RECOVERY_FAILED',error.code||'UNEXPECTED');
+   }
+  }
+ }
+ verifiedToolBoundary(workId,requestId,savedProof){
+  const ledger=this.db.prepare('SELECT invocation_id,native_request_id,plugin_name,record_id,state FROM mobile_native_invocations WHERE execution_id=?').all(workId);
+  const [call]=ledger;
+  if(ledger.length!==1||call.native_request_id!==requestId||call.state!=='returned')throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
+  const proof=savedProof||this.checkpointProof(workId,requestId,[call.invocation_id]);
+  const receipts=this.continuations.compactionToolResults(requestId,workId,proof),receipt=receipts[0]?.result;
+  if(receipts.length!==1||receipt.invocationId!==call.invocation_id||receipt.pluginName!==call.plugin_name||receipt.recordId!==call.record_id||!Object.hasOwn(receipt,'result'))throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
+  return proof;
+ }
  prepare(actor,body,{session=false}={}){
   if(this.draining||this.closed)throw fail('HOST_DRAINING',503);
   this.shared.authorize(actor,body.sharedSpaceId,'execute');
@@ -43,9 +68,9 @@ class SharedNative {
   if(!/^[a-f0-9]{64}$/.test(body.bodyHash||''))throw fail('INVALID_SHARED_NATIVE_REQUEST',400);
   return this.shared.atomic(()=>{
    const admission=this.shared.admission(actor,body.sharedSpaceId,body.admissionId);
-   const turn=require('./sharedTurns').intent(admission);if(turn.steeringCapable&&(turn.controlMode==='text-only-v1'?!require('./releasePolicy.cjs').sharedControlledText:!require('./releasePolicy.cjs').sharedSteering))throw fail('SHARED_STEERING_UNAVAILABLE');
-   if(turn.controlMode==='text-only-v1'&&(!Number.isSafeInteger(body.generation)||body.generation<0||!Number.isSafeInteger(body.consumedInputSeq)||body.consumedInputSeq<0))throw fail('INVALID_STEERING_GENERATION');
-   if(turn.controlMode==='text-only-v1'){const current=this.shared.steering.control(admission),frozen=this.shared.steering.generation(admission.id,body.generation);if(current.executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');if(!frozen||frozen.executor!==actor.principal||frozen.request_id!==body.requestId||frozen.consumed_seq!==body.consumedInputSeq||current.generation!==body.generation)throw fail('INVALID_STEERING_GENERATION');this.shared.steering.fence(admission.id,body.generation,actor.principal);}
+   const turn=require('./sharedTurns').intent(admission);if(turn.steeringCapable&&!controlled.enabled(this.shared,turn.controlMode))throw fail('SHARED_STEERING_UNAVAILABLE');
+   if(controlled.isControlled(turn.controlMode)&&(!Number.isSafeInteger(body.generation)||body.generation<0||!Number.isSafeInteger(body.consumedInputSeq)||body.consumedInputSeq<0))throw fail('INVALID_STEERING_GENERATION');
+   if(controlled.isControlled(turn.controlMode)){const current=this.shared.steering.control(admission),frozen=this.shared.steering.generation(admission.id,body.generation);if(current.executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');if(!frozen||frozen.executor!==actor.principal||frozen.request_id!==body.requestId||frozen.consumed_seq!==body.consumedInputSeq||current.generation!==body.generation)throw fail('INVALID_STEERING_GENERATION');this.shared.steering.fence(admission.id,body.generation,actor.principal);}
    if(this.engine.get?.(admission.id)?.kind==='shared_session'&&!session)throw fail('SHARED_SESSION_DISPATCH_ONLY');
    if(this.shared.steering.enabled&&require('./sharedTurns').intent(admission).steeringCapable)this.shared.steering.control(admission);
    const selected=body.generation===undefined?null:this.shared.steering.generation(admission.id,body.generation);
@@ -99,7 +124,7 @@ class SharedNative {
   const actor=trustedActor||this.shared.desktop({sourceId:req.headers['x-nativesync-source'],deviceId:req.headers['x-nativesync-device'],spaceId:req.headers['x-nativesync-space'],scopeHash:req.headers['x-nativesync-scope']},req.headers['x-nativesync-capabilities']);
   const admission=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(ticket);
   if(!admission)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
-  const turn=require('./sharedTurns').intent(admission);if(turn.steeringCapable&&(turn.controlMode==='text-only-v1'?!require('./releasePolicy.cjs').sharedControlledText:!require('./releasePolicy.cjs').sharedSteering))throw fail('SHARED_STEERING_UNAVAILABLE');
+  const turn=require('./sharedTurns').intent(admission);if(turn.steeringCapable&&!controlled.enabled(this.shared,turn.controlMode))throw fail('SHARED_STEERING_UNAVAILABLE');
   if(this.engine.get?.(ticket)?.kind==='shared_session'&&!trustedActor)throw fail('SHARED_SESSION_DISPATCH_ONLY');
   this.shared.authorize(actor,admission.space_id,'execute');
   const inline=req.method==='POST'&&actor.kind==='desktop'&&req.headers['x-nativesync-register']==='v1'&&String(req.headers['x-nativesync-capabilities']||'').split(',').includes(NATIVE_INLINE_CAPABILITY);
@@ -119,8 +144,8 @@ class SharedNative {
   const stop=this.engine.get?.(admission.id)?.group_stop_index;
   if(stop!=null&&row.ordinal>=stop)throw fail('SHARED_REQUEST_FENCED');
   const generation=this.shared.steering.requestGeneration(admission.id,row.id);
-  if(turn.controlMode==='text-only-v1'&&(!generation||generation.executor!==actor.principal))throw fail('INVALID_STEERING_GENERATION');
-  if(turn.controlMode==='text-only-v1'){const gen=req.headers['x-nativesync-generation'],seq=req.headers['x-nativesync-consumed-input-seq'];if(!/^\d+$/.test(gen||'')||!/^\d+$/.test(seq||'')||Number(gen)!==generation.generation||Number(seq)!==generation.consumed_seq)throw fail('INVALID_STEERING_GENERATION');if(this.shared.steering.control(admission).executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');}
+  if(controlled.isControlled(turn.controlMode)&&(!generation||generation.executor!==actor.principal))throw fail('INVALID_STEERING_GENERATION');
+  if(controlled.isControlled(turn.controlMode)){const gen=req.headers['x-nativesync-generation'],seq=req.headers['x-nativesync-consumed-input-seq'];if(!/^\d+$/.test(gen||'')||!/^\d+$/.test(seq||'')||Number(gen)!==generation.generation||Number(seq)!==generation.consumed_seq)throw fail('INVALID_STEERING_GENERATION');if(this.shared.steering.control(admission).executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');}
   if(generation)this.shared.steering.fence(admission.id,generation.generation,actor.principal);
   const frozen=JSON.parse(generation?.config_json||admission.config_json),member=row.member_id?frozen.members.find(m=>m.id===row.member_id):frozen.owner;
   const expectedModel=frozen.owner.kind==='group'&&frozen.owner.config.useUnifiedModel?frozen.owner.config.unifiedModel:member?.config.model;
@@ -144,14 +169,17 @@ class SharedNative {
    }
    if(previous){const inputs=this.db.prepare('SELECT input_id FROM shared_work_inputs WHERE work_id=? AND input_seq>? AND input_seq<=? ORDER BY input_seq').all(admission.id,previous.consumed_seq,generation.consumed_seq);
     const link=this.db.prepare('SELECT * FROM shared_compaction_native_links WHERE request_id=? AND proof_hash=? ORDER BY journal_seq DESC LIMIT 1').get(previous.request_id,proof.hash);
+    if(turn.controlMode===controlled.TOOLS_MODE&&!link)throw fail('NATIVE_COMPACTION_CHECKPOINT_MISSING');
     if(link){const checkpoint=this.shared.store.readProjected(()=>{const value=this.shared.store.findMessage.get(topic.owner_type,topic.owner_id,topic.topic_id,link.checkpoint_id);return value?[value]:[];})[0]?.message;if(!checkpoint)throw fail('NATIVE_COMPACTION_CHECKPOINT_MISSING');
      const after=this.db.prepare('SELECT input_id FROM shared_work_inputs WHERE work_id=? AND input_seq>? AND input_seq<=? ORDER BY input_seq').all(admission.id,Math.max(previous.consumed_seq,link.through_input_seq),generation.consumed_seq);
      continuedBody=this.continuations.mergeCompactedBody(previous.request_id,req.body,{workId:admission.id,expectedHash:proof.hash,checkpoint,inputIds:after.map(v=>v.input_id)});
     }else continuedBody=this.continuations.mergeBody(previous.request_id,req.body,{workId:admission.id,expectedHash:proof.hash,inputIds:inputs.map(v=>v.input_id),partialMessageId:previous.request_id});}
 
   }
-  const textOnly=require('./sharedTurns').intent(admission).controlMode===require('./sharedControlledText').MODE;
-  if(textOnly&&((req.body.tools||[]).length||req.body.functions||!Array.isArray(req.body.messages)||continuedBody.messages.some(message=>!['system','developer','user','assistant'].includes(message.role)||typeof message.content!=='string'||require('./sharedControlledText').local(message.content))))throw fail('CONTROLLED_TEXT_ONLY');
+  const safeToolWork=turn.controlMode===controlled.TOOLS_MODE;
+  const safeTools=safeToolWork&&generation?.generation===0?this.shared.safeTools:null;
+  const textOnly=turn.controlMode===controlled.MODE||safeToolWork&&!safeTools;
+  if(controlled.isControlled(turn.controlMode)&&((req.body.tools||[]).length||req.body.functions||!Array.isArray(req.body.messages)||continuedBody.messages.some(message=>!['system','developer','user','assistant'].includes(message.role)||typeof message.content!=='string'||controlled.local(message.content))))throw fail('CONTROLLED_TEXT_ONLY');
   const steeringEnabled=require('./sharedTurns').intent(admission).steeringCapable&&Boolean(this.db.prepare('SELECT 1 FROM shared_work_controls WHERE work_id=?').get(admission.id));
   if(steeringEnabled)this.continuations.begin({workId:admission.id,requestId:row.id,generation:generation?.generation||0,controlRevision:generation?.revision||0},continuedBody.messages,continuedBody.vcpchatExtensions||{});
   this.shared.atomic(()=>{
@@ -159,19 +187,33 @@ class SharedNative {
    this.db.prepare("UPDATE shared_admissions SET state='dispatched',dispatched=1 WHERE id=?").run(admission.id);
   });
   const base=this.engine.nativeTasks.hooks(admission.id,row.id);
+  let settledTool=false,pausedAtFence=false;
   const fence=()=>{
    if(this.closed)throw fail('SHARED_NATIVE_CLOSED',503);
+   if(settledTool){pausedAtFence=true;throw fail('WORK_SAFE_TOOL_BOUNDARY');}
    this.shared.steering.fence(admission.id,generation?.generation||0,actor.principal);
    const current=this.db.prepare('SELECT state FROM shared_admissions WHERE id=?').get(admission.id);
    if(!current||current.state!=='dispatched')throw fail('SHARED_REQUEST_FENCED');
   };
   const hint=(event,state)=>this.engine.emitEvent?.(admission.id,'tool',{state,nativeRequestId:row.id,...(event.invocationId?{invocationId:event.invocationId}:{}),...(event.nativeTaskId?{nativeTaskId:event.nativeTaskId}:{})});
-  const hooks={...base,onToolDispatch:event=>{fence();const value=base.onToolDispatch(event);hint(event,'started');return value;},onTaskAccepted:event=>{fence();const value=base.onTaskAccepted(event);hint(event,'accepted');return value;},onToolSettled:event=>{const value=base.onToolSettled(event);hint(event,'settled');this.checkTerminal(admission.id);return value;},onTaskObserved:event=>{const value=base.onTaskObserved(event);hint(event,'observed');this.checkTerminal(admission.id);return value;}};
+  const hooks={...base,
+   onToolDispatch:event=>{
+    fence();
+    if(safeTools){
+     if(!safeTools.has(event.pluginName))throw fail('CONTROLLED_TOOL_FORBIDDEN');
+     if(this.db.prepare('SELECT 1 FROM mobile_native_invocations WHERE execution_id=?').get(admission.id))throw fail('CONTROLLED_TOOL_CALL_LIMIT');
+    }
+    const value=base.onToolDispatch(event);hint(event,'started');return value;
+   },
+   onTaskAccepted:event=>{fence();if(safeTools)throw fail('CONTROLLED_TOOL_FORBIDDEN');const value=base.onTaskAccepted(event);hint(event,'accepted');return value;},
+   onToolSettled:event=>{const value=base.onToolSettled(event);if(safeTools&&event.outcome==='returned')settledTool=true;hint(event,'settled');this.checkTerminal(admission.id);return value;},
+   onTaskObserved:event=>{const value=base.onTaskObserved(event);hint(event,'observed');this.checkTerminal(admission.id);return value;}
+  };
   let ended=false;
   if(generation)this.db.prepare("UPDATE shared_work_generations SET state='preprocessing' WHERE work_id=? AND generation=?").run(admission.id,generation.generation);
   this.phase(admission.id,row.id,'native_entered');this.engine.emitEvent?.(admission.id,'state',{state:'dispatched'});
   let previewStopped=false;
-  const observeAssistantText=(row.member_id||textOnly&&generation)?text=>{
+  const observeAssistantText=(row.member_id||controlled.isControlled(turn.controlMode)&&generation)?text=>{
    try{
     if(previewStopped||ended||this.closed||typeof text!=='string'||!text)return;
     const at=text.indexOf('<'),safe=at<0?text:text.slice(0,at);
@@ -184,14 +226,35 @@ class SharedNative {
   const applied=generation?()=>{
    this.db.prepare("UPDATE shared_work_generations SET state='running' WHERE work_id=? AND generation=? AND state='preprocessing'").run(admission.id,generation.generation);
   }:undefined;
-  return {textOnly,observeAssistantText,sponsorAuthority:{actor,admissionId:admission.id,spaceId:admission.space_id,routeHash:JSON.parse(admission.user_op||'{}').sponsorRouteHash},phase:name=>this.phase(admission.id,row.id,name),steeringEnabled,workId:admission.id,generation:generation?.generation||0,fence,applied,continuation:()=>continuedBody,checkpoint:steeringEnabled?{completion:value=>this.continuations.completion(row.id,value),assistant:content=>this.continuations.assistant(row.id,content),result:(invocation,value)=>this.continuations.result(row.id,invocation,value)}:null,bridge:hooks,finish:success=>{
+  const finish=success=>{
    if(ended||this.closed)return;ended=true;
    this.phase(admission.id,row.id,'native_settled');
+   if(pausedAtFence){
+    try{
+     this.shared.atomic(()=>{
+      const update=this.db.prepare("UPDATE shared_work_generations SET state='paused' WHERE work_id=? AND generation=? AND state='running'").run(admission.id,generation.generation);
+      if(!update.changes)throw fail('SHARED_GENERATION_FENCED');
+      this.db.prepare("UPDATE shared_native_requests SET state='model_terminal' WHERE id=?").run(row.id);
+      this.shared.steering.checkpointSettledTool(actor,admission,generation);
+     });
+    }catch(error){console.warn('[NativeSync] SAFE_TOOL_CHECKPOINT_FAILED',error.code||'UNEXPECTED');success=false;}
+    if(this.shared.steering.generation(admission.id,generation.generation)?.state==='paused'){
+     try{this.engine.emitEvent?.(admission.id,'state',{state:'dispatched'});}catch{/* Polling can recover the committed pause. */}
+     return;
+    }
+   }
+   if(safeToolWork&&this.engine.nativeTasks.uncertainTools(admission.id))success=false;
    const steered=this.shared.steering.modelStopped(admission.id,row.id);
    this.db.prepare('UPDATE shared_native_requests SET state=? WHERE id=?').run(success||steered?'model_terminal':'unknown',row.id);
    if(!success&&!steered){this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE id=? AND state='dispatched'").run(admission.id);this.engine.emitEvent?.(admission.id,'state',{state:'review_required'});}
    else this.checkTerminal(admission.id);
-  }};
+  };
+  return {textOnly,safeTools,observeAssistantText,sponsorAuthority:{actor,admissionId:admission.id,spaceId:admission.space_id,routeHash:JSON.parse(admission.user_op||'{}').sponsorRouteHash},phase:name=>this.phase(admission.id,row.id,name),steeringEnabled,workId:admission.id,generation:generation?.generation||0,fence,applied,continuation:()=>continuedBody,checkpoint:steeringEnabled?{completion:value=>this.continuations.completion(row.id,value),assistant:content=>this.continuations.assistant(row.id,content),result:(invocation,value)=>this.continuations.result(row.id,invocation,value)}:null,bridge:hooks,finish,
+   settleToolPause:()=>{
+    if(!pausedAtFence)return false;
+    finish(false);
+    return this.shared.steering.generation(admission.id,generation.generation)?.state==='paused';
+   }};
  }
  phase(workId,requestId,stage){const key=requestId+':'+stage;if(this.seenPhases.has(key))return;if(!['native_prepared','native_entered','vcp_preprocessing','provider_attempt','first_model_body','native_settled','final_persisted'].includes(stage))throw fail('INVALID_EXECUTION_PHASE');this.db.prepare('INSERT OR IGNORE INTO shared_request_phases VALUES(?,?,?,?)').run(workId,requestId,stage,Date.now());this.seenPhases.add(key);if(this.seenPhases.size>50000)this.seenPhases.delete(this.seenPhases.values().next().value);}
  checkTerminal(admissionId,{advanceGroup=true}={}){
@@ -209,6 +272,7 @@ class SharedNative {
   const recheck=admission.state==='review_required'&&(stop!=null||(!advanceGroup&&require('../mobile/groupTurn').isGroup(job)));
   if(admission.state!=='dispatched'&&!recheck)return;
   const config=JSON.parse(admission.config_json);
+  if(require('./sharedTurns').intent(admission).controlMode===controlled.TOOLS_MODE&&this.shared.steering.generation(admissionId,0)?.state==='paused'&&this.shared.steering.control(admission).generation===0)return;
   const pending=this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state IN ('prepared','dispatched','unknown') LIMIT 1").get(admissionId);
   const native=this.engine.nativeTasks;
   if(pending)return;

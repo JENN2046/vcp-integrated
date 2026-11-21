@@ -44,6 +44,9 @@ class PluginExecutionBridgeRegistry {
     async execute(plugin, toolArgs, context) {
         for (const bridge of this.bridges) {
             if (await bridge.canHandle(plugin, context)) {
+                if (require('./requestExecutionContext').controlledToolWork() && bridge.name !== 'direct-hybrid-service') {
+                    throw Object.assign(Error('CONTROLLED_TOOL_FORBIDDEN'), { code: 'CONTROLLED_TOOL_FORBIDDEN' });
+                }
                 if (context.debugMode) {
                     console.log(`[PluginManager] Executing "${plugin.name}" through bridge "${bridge.name}".`);
                 }

@@ -84,6 +84,14 @@ export function createSharedSessionView(container, createObservedFrame, { api, s
             // Work is not proof of deletion. Existing execution status does
             // explicitly identify closed local Works and can retire their UI.
             for (const execution of change.executions || []) {
+                if (execution.controlMode === 'safe-tools-v1') {
+                    for (const generation of execution.steering?.generations || []) {
+                        if (generation.state !== 'paused' || generation.noDispatch) continue;
+                        const previewId = execution.id + '/' + generation.requestId;
+                        retired.add(previewId);
+                        remove(previewId);
+                    }
+                }
                 if (views.get(execution.id)?.setText && [execution.phase, execution.state].includes('completed')) continue;
                 if (['completed','abandoned','failed','cancelled'].some(state=>execution.phase===state||execution.state===state)){retired.add(execution.id);remove(execution.id);}
             }
@@ -105,7 +113,7 @@ export function createSharedSessionView(container, createObservedFrame, { api, s
                 const parts=work.nativeBodies?.length?work.nativeBodies.map(body=>({...work,...body,text:body.text,gap:body.gap,viewId:work.executionId+'/'+body.nativeRequestId})): [work];
                 if(parts.length>1||parts[0]?.nativeRequestId){const base=views.get(work.executionId);if(base){base.stopObserving?.();base.element.remove();views.delete(work.executionId);}}
                 for (const session of parts) {
-                if (!session.executionId) continue;
+                if (!session.executionId || retired.has(session.viewId)) continue;
                 if (session.projectionSynced && views.get(session.executionId)?.setText && session.request?.state !== 'abandoned') continue;
                 if (session.projectionSynced || session.request?.state === 'abandoned') { retired.add(session.executionId);remove(session.executionId); continue; }
                 if (showOrdinaryBody(session)) continue;

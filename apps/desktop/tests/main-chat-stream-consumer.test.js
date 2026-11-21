@@ -71,3 +71,40 @@ test('send-state projection settles immediately after terminal projection, befor
         'persist-end',
     ]);
 });
+test('an archived pause with an empty prefix replaces transient text without persisting again', async () => {
+    const { createMainChatStreamConsumer } = await import('../modules/renderer/mainChatStreamConsumer.js');
+    const context = { agentId: 'agent-a', topicId: 'topic-a' };
+    const paused = { id: 'paused-turn', role: 'assistant', content: '', timestamp: 1, finishReason: 'interrupted' };
+    const calls = [];
+    const consumer = createMainChatStreamConsumer({
+        type: 'start', messageId: paused.id, streamOperationId: 'operation-a', context,
+    }, {
+        async projectTerminal(...args) {
+            calls.push(['project', ...args]);
+            return { content: '' };
+        },
+        beginHistoryPersistence() {
+            return saved => calls.push(['release', saved]);
+        },
+        setPersistenceState(...args) {
+            calls.push(['state', ...args]);
+        },
+        persistTerminal() {
+            assert.fail('an archived pause is already persisted');
+        },
+    });
+
+    const result = await consumer.persist({
+        terminal: { kind: 'cancelled', finishReason: 'interrupted', context, pausedWorkMessage: paused },
+        snapshot: { text: 'transient pre-checkpoint text' },
+    });
+
+    assert.equal(result, paused);
+    assert.deepEqual(calls, [
+        ['project', paused.id, 'interrupted', context, {
+            fullResponse: '', error: '', streamOperationId: 'operation-a', authoritativeContent: true,
+        }],
+        ['release', true],
+        ['state', paused.id, 'saved'],
+    ]);
+});

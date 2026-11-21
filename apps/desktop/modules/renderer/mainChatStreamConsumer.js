@@ -99,7 +99,8 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
             if (terminal.phase === 'projection') {
                 throw terminal.error || new Error(`Stream projection failed: ${messageId}`);
             }
-            const receivedText = terminal.fullResponse || value.snapshot?.text || '';
+            const pausedMessage = terminal.pausedWorkMessage;
+            const receivedText = pausedMessage ? pausedMessage.content : terminal.fullResponse || value.snapshot?.text || '';
             let fullResponse = receivedText;
             const error = terminal.error?.message || terminal.error || '';
             if (terminal.finishReason === 'length') {
@@ -114,13 +115,13 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
                 (terminal.finishReason === 'interrupted' || terminal.reason === 'tool-return-relay' ||
                     terminal.reason === 'tool-return-relay-settle-timeout');
             const finishReason = terminal.kind === 'completed' ? (terminal.finishReason || 'completed')
-                : interruptedForBudget ? 'interrupted' : terminal.kind;
+                : interruptedForBudget || pausedMessage ? 'interrupted' : terminal.kind;
             let projected;
             try { projected = await projectTerminal(
                 messageId,
                 finishReason,
                 terminal.context || context,
-                { fullResponse, error, streamOperationId: operationId },
+                { fullResponse, error, streamOperationId: operationId, ...(pausedMessage && { authoritativeContent: true }) },
             );
             if (!projected) throw new Error(`Stream terminal projection failed: ${messageId}`);
             } catch (error) { releasePersistence?.(true); throw error; }
@@ -131,6 +132,11 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
             try { capabilities.onProjectionSettled?.({ terminal, projected, context, messageId }); }
             catch (error) { reportError('[MainChatStreamConsumer] projection notification failed', error); }
 
+            if (pausedMessage) {
+                releasePersistence?.(true);
+                setPersistenceState(messageId, 'saved');
+                return pausedMessage;
+            }
             setPersistenceState(messageId, 'saving');
             let finalized;
             try {

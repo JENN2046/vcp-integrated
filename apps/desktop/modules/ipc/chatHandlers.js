@@ -1109,6 +1109,22 @@ function initialize(mainWindow, context) {
 
         let streamTask = null;
         let streamTaskDetached = false;
+        let readPausedMessage;
+        // A dropped transport or a pause frame is only a hint. Confirm the
+        // exact generation and its already-projected Journal row before showing it.
+        const recoverToolPause = async () => {
+            const message = await readPausedMessage?.().catch(error => {
+                console.warn('[NativeSync] Could not confirm paused generation:', error.code || error.name);
+                return null;
+            });
+            if (!message) return null;
+            trajectoryCall.finish({ aborted: true });
+            if (modelConfig.stream === true) sendStreamPayload({
+                type: 'end', messageId, context, aborted: true, modelFinishReason: 'interrupted',
+                pausedWorkMessage: message,
+            });
+            return { pausedWorkMessage: message, context };
+        };
         let trajectoryCall = null; // 侧栏「调用轨迹」的记录句柄；记录器自己吞掉一切异常
         const finishStreamTask = () => {
             if (!streamTask) return;
@@ -1402,6 +1418,7 @@ function initialize(mainWindow, context) {
 
             const sharedRequest=await require('../services/topicExecutionAuthority').prepareNativeRequest({authority:topicExecutionAuthority,queue:historyMutationQueue,context:buildRequestContext(context,messageId),body:requestBody});
             if(sharedRequest)serializedBody=JSON.stringify(sharedRequest.body);
+            readPausedMessage = sharedRequest?.readPausedMessage;
             const requestBodyDeadline=Date.now()+900000;
             const responsePromise = fetch(finalVcpUrl, {
                 method: 'POST',
@@ -1440,6 +1457,11 @@ function initialize(mainWindow, context) {
                     }
                 } catch (e) { /* Not JSON, use raw text */ }
 
+                if (response.status === 409 && errorData.nativeSync?.code === 'WORK_SAFE_TOOL_BOUNDARY' &&
+                    errorData.nativeSync.requestId === messageId) {
+                    const pause = await recoverToolPause();
+                    if (pause) return pause;
+                }
                 // 🔧 改进错误消息构造，防止 [object Object]
                 let errorMessage = '';
                 if (errorData.message && typeof errorData.message === 'string') {
@@ -1528,6 +1550,7 @@ function initialize(mainWindow, context) {
                             if (protocol.done) break;
                         }
                     } catch (streamError) {
+                        if (readPausedMessage && await recoverToolPause()) return;
                         trajectoryCall.finish({ error: streamError, aborted: streamError?.name === 'AbortError' || streamTask?.controller.signal.aborted === true });
                         sendStreamPayload({ type: 'error', error: streamError.message, code: streamError.code || 'STREAM_READ_ERROR', messageId, context });
                     } finally {
@@ -1574,6 +1597,10 @@ function initialize(mainWindow, context) {
             }
 
         } catch (error) {
+            if (readPausedMessage) {
+                const pause = await recoverToolPause();
+                if (pause) return pause;
+            }
             console.error('VCP请求错误 (catch block):', error);
             trajectoryCall?.finish({ error, aborted: error?.name === 'AbortError' || streamTask?.controller.signal.aborted === true });
             if (!isGroupCall && modelConfig.stream !== true) {

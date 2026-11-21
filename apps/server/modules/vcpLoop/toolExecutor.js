@@ -247,8 +247,10 @@ class ToolExecutor {
    * @returns {Promise<{success: boolean, content: Array, error?: string, raw?: any}>}
    */
   async execute(toolCall, clientIp, contextMessages = [], requestExecutionContext = {}) {
-    require('../requestExecutionContext').assertToolsAllowed();
     const { name, args, river, vref, archeryNoReply } = toolCall;
+    require('../requestExecutionContext').assertToolsAllowed(name, args, {
+      indirect: Boolean(river || vref || archeryNoReply || jevToolCallExp.isVirtualToolName(name))
+    });
     const residentProposalCall = isResidentProposalCall(toolCall);
 
     // === JEV 实验性虚拟工具展开 ===

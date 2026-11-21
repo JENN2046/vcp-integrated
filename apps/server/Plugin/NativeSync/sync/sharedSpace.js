@@ -13,6 +13,7 @@ class SharedSpace {
  constructor(store,config={}, {configurationOnly=false}={}) {
   this.store=store;this.db=store.db;this.catalog=store.sourceCatalog;
   this.configurationOnly=configurationOnly;
+  this.safeTools=require('./sharedControlledText').allowedTools(config.NativeSyncSharedSafeTools);
   this.readOnly=config.NativeSyncSharedReadOnly===true||require('./releasePolicy.cjs').sharedReadOnly;
   let grants;try{grants=JSON.parse(config.NativeSyncSharedSpaces||'[]');}catch{throw fail('INVALID_SHARED_GRANTS',400);}
   if(!Array.isArray(grants)||grants.length>32)throw fail('INVALID_SHARED_GRANTS',400);
@@ -63,7 +64,20 @@ class SharedSpace {
   const publishing=tables.has('mobile_executions')?` AND NOT (EXISTS (SELECT 1 FROM mobile_executions e
    WHERE e.id=shared_admissions.id AND e.state='publishing' AND e.pending_operation IS NOT NULL)
    AND (native_terminal=1${recoverableTask}))`:'';
-  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing).run();
+  // A committed tool pause remains transferable across restarts. Only an
+  // untouched continuation may survive; a dispatched continuation requires review.
+  const safePause=tables.has('shared_native_requests')?` AND NOT (
+   coalesce(json_extract(user_op,'$.sharedTurn.controlMode'),'')='safe-tools-v1' AND EXISTS (
+    SELECT 1 FROM shared_work_generations g JOIN shared_native_requests r ON r.id=g.request_id
+     JOIN shared_native_checkpoints p ON p.work_id=g.work_id AND p.generation=g.generation
+     JOIN shared_work_controls c ON c.work_id=g.work_id
+    WHERE g.work_id=shared_admissions.id AND g.generation=0 AND g.state='paused'
+      AND g.checkpoint_json IS NOT NULL AND r.state='model_terminal'
+      AND (c.generation=0 OR (c.generation=1 AND EXISTS (
+       SELECT 1 FROM shared_work_generations next WHERE next.work_id=g.work_id AND next.generation=1 AND next.state='prepared')))
+      AND NOT EXISTS (SELECT 1 FROM shared_native_requests n WHERE n.admission_id=g.work_id AND n.state IN ('dispatched','unknown'))
+   ))`:'';
+  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing+safePause).run();
  }
  atomic(fn){
   const own=!this.db.isTransaction;
@@ -338,6 +352,7 @@ class SharedSpace {
   return {request:row?this.publicWork(actor,row):null};
  }
  admit(actor,body,{session=false,sponsor=null}={}){
+  if(session&&body.controlMode!==undefined)throw fail('SHARED_SESSION_CONTROL_MODE_UNSUPPORTED',400);
   const sponsored=sponsor===require('./sharedTopicSponsor').dispatchKey&&session;
   if(this.readOnly)throw fail('SHARED_READ_ONLY');
   const topic=this.topic(actor,body.sharedSpaceId,body.sharedId,'execute');id(body.requestId);

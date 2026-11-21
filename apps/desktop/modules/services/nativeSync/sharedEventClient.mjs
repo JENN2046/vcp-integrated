@@ -11,7 +11,7 @@ const nativeIdentity = (request, value) => {
         || !Number.isSafeInteger(value.ordinal) || value.ordinal<0
         || typeof value.memberName!=='string' || value.memberName.length>160)throw problem('SHARED_EVENT_NATIVE_INVALID');
     if(value.kind==='controlled-text'){
-        if(request?.turn?.controlMode!=='text-only-v1'||request.turn.steeringCapable!==true
+        if(!['text-only-v1','safe-tools-v1'].includes(request?.turn?.controlMode)||request.turn.steeringCapable!==true
             ||value.memberId!==undefined||!Number.isSafeInteger(value.nativeGeneration)||value.nativeGeneration!==value.ordinal)throw problem('SHARED_EVENT_NATIVE_INVALID');
         const generations=request.steering?.generations;
         if(!Array.isArray(generations))throw problem('SHARED_EVENT_NATIVE_INVALID');

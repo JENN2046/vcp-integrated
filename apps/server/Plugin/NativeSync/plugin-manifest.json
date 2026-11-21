@@ -32,7 +32,8 @@
     "NativeMobileSessionHours": "integer",
     "NativeSyncFullSources": "string",
     "NativeSyncSharedSpaces": "string",
-    "NativeSyncSharedReadOnly": "boolean"
+    "NativeSyncSharedReadOnly": "boolean",
+    "NativeSyncSharedSafeTools": "string"
   },
   "capabilities": {
     "services": [

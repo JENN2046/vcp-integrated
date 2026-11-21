@@ -1,0 +1,19 @@
+{
+  "workId": "request_f3b140bc7ba84e5ba875e9bdbb99c620",
+  "originalNativeRequestId": "reply_request_f3b140bc7ba84e5ba875e9bdbb99c620",
+  "continuationNativeRequestId": "reply_request_f3b140bc7ba84e5ba875e9bdbb99c620_g1",
+  "executor": "desktop:deviceB",
+  "generation": 1,
+  "invocationIdsBefore": [
+    "6ef2e14c-9bf6-4d30-abbd-0da2717e2ac4"
+  ],
+  "invocationIdsAfter": [
+    "6ef2e14c-9bf6-4d30-abbd-0da2717e2ac4"
+  ],
+  "sideEffectsBefore": 1,
+  "sideEffectsAfter": 1,
+  "providerCalls": 3,
+  "continuationHttpStatus": 500,
+  "continuationRejection": "CONTROLLED_TEXT_TOOLS_FORBIDDEN",
+  "finalWorkState": "review_required"
+}

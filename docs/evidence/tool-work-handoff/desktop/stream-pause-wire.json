@@ -1,0 +1,4 @@
+{
+  "httpStatus": 200,
+  "wireTail": "data: {\"id\":\"synthetic-tool-handoff\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"synthetic\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Synthetic A requested the isolated counter.\\n<<<[TOOL_REQUEST]>>>\\ntool_name:「始」OrdinaryToolCounter「末」,\\ncommand:「始」Count「末」,\\nmarker:「始」ORDINARY_TOOL_LOCAL「末」\\n<<<[END_TOOL_REQUEST]>>>\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"synthetic-tool-handoff\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"synthetic\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n\nevent: nativesync_work_paused\ndata: {\"nativeSync\":{\"state\":\"paused\",\"code\":\"WORK_SAFE_TOOL_BOUNDARY\",\"requestId\":\"reply_request_a7d9a0d9ce924a60bdaa2be3505b200f\"}}\n\ndata: [DONE]\n\n"
+}

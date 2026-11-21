@@ -15,6 +15,8 @@ export function createSseDecoder({ onData = () => {}, onDone = () => {} } = {}) 
         let value;
         try { value = JSON.parse(data); } catch { throw failure('STREAM_MALFORMED'); }
         if (!value || typeof value !== 'object' || Array.isArray(value)) throw failure('STREAM_MALFORMED');
+        if (text.split(/\r?\n/).includes('event: nativesync_work_paused') && value.nativeSync?.code === 'WORK_SAFE_TOOL_BOUNDARY')
+            throw failure('WORK_SAFE_TOOL_BOUNDARY');
         if(value.error?.code==='WORK_STEERING_PENDING')throw Object.assign(new Error('补充已收到，正在按新指令调整。'),{code:'WORK_STEERING_PENDING'});
         if (value.error) throw failure(/^[A-Z][A-Z0-9_]{0,79}$/.test(value.error.code||'')?value.error.code:'VCP_UPSTREAM_ERROR', Number(value.error.status || value.error.code));
         if (!Array.isArray(value.choices)) throw failure('STREAM_MALFORMED');

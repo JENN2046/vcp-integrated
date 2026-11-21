@@ -1,5 +1,6 @@
 'use strict';
 const {randomUUID,createHash}=require('node:crypto');
+const {isControlled}=require('./sharedControlledText');
 const fail=(code,status=409)=>Object.assign(Error(code),{code,status});
 const defaults={maxWorks:128,maxEvents:256,maxEventBytes:64*1024,maxBytes:512*1024,maxBodyBytes:256*1024,maxNativeBodies:32,maxSubscribers:128,maxSubscribersPerWork:16,maxSubscribersPerTopic:16,retentionMs:120000};
 const statusTypes=new Set(['state','status','accepted','queued','dispatched','running','completed','failed','cancelled','review_required','tool','approval']);
@@ -143,7 +144,7 @@ class SharedEvents{
    const name=config.members.find(member=>member.id===native.member_id)?.config.name;
    return {nativeRequestId:native.id,memberId:native.member_id,ordinal:native.ordinal,memberName:typeof name==='string'?name.slice(0,160):''};
   }
-  if(config.owner.kind!=='agent'||turn.controlMode!=='text-only-v1'||turn.steeringCapable!==true)throw fail('SHARED_EVENT_NATIVE_INVALID');
+  if(config.owner.kind!=='agent'||!isControlled(turn.controlMode)||turn.steeringCapable!==true)throw fail('SHARED_EVENT_NATIVE_INVALID');
   const generation=this.shared.steering.requestGeneration(row.id,native.id);
   if(!generation||generation.executor!==native.principal)throw fail('SHARED_EVENT_NATIVE_INVALID');
   return {kind:'controlled-text',nativeRequestId:native.id,nativeGeneration:generation.generation,ordinal:generation.generation,memberName:typeof config.owner.config.name==='string'?config.owner.config.name.slice(0,160):''};
@@ -198,7 +199,7 @@ class SharedEvents{
  }
  nativeSnapshot(row,stream,job){
   const turn=require('./sharedTurns').intent(row),config=JSON.parse(row.config_json);
-  if(config.owner.kind!=='group'&&turn.controlMode!=='text-only-v1')return undefined;
+  if(config.owner.kind!=='group'&&!isControlled(turn.controlMode))return undefined;
   if(config.owner.kind==='group'&&(!Array.isArray(turn.plan)||!turn.plan.length))return undefined;
   const nativeRows=config.owner.kind==='group'
    ?this.shared.db.prepare('SELECT * FROM shared_native_requests WHERE admission_id=? ORDER BY ordinal LIMIT ?').all(row.id,this.limits.maxNativeBodies)

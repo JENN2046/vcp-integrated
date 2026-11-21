@@ -2453,7 +2453,7 @@ export const chatManager = (() => {
                 const sourceHistory = await getHistory(sendContext.agentId, sendContext.itemType || 'agent', sendContext.topicId);
                 if (!Array.isArray(sourceHistory)) return null;
                 let cleanedHistory = sourceHistory.filter(message => message.id !== thinkingMessage.id);
-                if (cleanedHistory.length !== sourceHistory.length) {
+                if (!sharedSubmission && cleanedHistory.length !== sourceHistory.length) {
                     const commit = await mutateHistory(
                         sendContext.agentId, sendContext.itemType || 'agent', sendContext.topicId,
                         current => current.filter(message => message.id !== thinkingMessage.id),
@@ -2637,6 +2637,15 @@ export const chatManager = (() => {
                      else renderTarget?.removeMessageById?.(thinkingMessage.id);
                  }
 
+                if (vcpResponse?.pausedWorkMessage?.id === thinkingMessage.id) {
+                    const saved = await getHistory(sendContext.agentId, sendContext.itemType, sendContext.topicId);
+                    if (isSendContextCurrent() && Array.isArray(saved)) {
+                        sendHistoryRef.set(saved);
+                        await renderTarget?.renderMessage?.(vcpResponse.pausedWorkMessage);
+                    }
+                    settleOwnedStreamOperation?.({ event: { type: 'cancelled', reason: 'WORK_SAFE_TOOL_BOUNDARY' } });
+                    return { handled: true, paused: true, messageId: thinkingMessage.id };
+                }
                 if (!response) {
                     throw new Error('VCP returned an empty response.');
                 }
@@ -3206,6 +3215,10 @@ export const chatManager = (() => {
         if(modelSaveRef){const saved=await electronAPI.confirmSharedModelSave({itemId:descriptor.itemId,reference:modelSaveRef});if(saved?.success===false)throw Object.assign(Error(saved.error),{code:saved.error});modelSaveResolutionRef=saved.reference;}
         const prepared=await electronAPI.retrySharedInput({descriptor,inputId,modelSaveResolutionRef});
         if(prepared?.success===false)throw Object.assign(Error(prepared.error),{code:prepared.error});
+        return executePreparedShared({descriptor,prepared});
+    }
+
+    async function executePreparedShared({descriptor,prepared}) {
         if(!prepared?.handled||prepared.serverSession||prepared.inputAccepted)return prepared;
         const d=descriptor,item={id:d.itemId,type:d.itemType||'agent',name:prepared.config?.name||d.itemId,config:prepared.config};
         let history=orderSharedHistory(prepared.history);
@@ -3231,6 +3244,7 @@ export const chatManager = (() => {
         handleSendMessage,
         onSharedProjectionSettled,
         retryLocalInput,
+        executePreparedShared,
         getPendingSendState,
         cancelPendingSend,
         compactContext,
