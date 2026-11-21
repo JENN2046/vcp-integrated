@@ -19,6 +19,7 @@ const ordinaryModes = { 'ordinary-shared': 'pre-only', 'ordinary-local': 'local-
 const ordinaryMode = Object.hasOwn(ordinaryModes, requested) ? ordinaryModes[requested] : undefined;
 const nativeQueue = requested === 'native-local-queue' ? require('../group-extra/local.cjs') : undefined;
 const aaDesktop = requested === 'aa-desktop';
+const compaction = requested === 'compact-e2e' ? require('../compact-e2e/fixture.cjs') : undefined;
 const approvalRestoreModes = { 'approval-restore': 'desktop', 'approval-restore-stale': 'stale' };
 const approvalRestore = Object.hasOwn(approvalRestoreModes, requested) ? approvalRestoreModes[requested] : undefined;
 const serverRevision = ordinaryMode || approvalRestore ? process.env.NS_BASELINE_SERVER_REVISION : undefined;
@@ -36,8 +37,8 @@ const ordinaryFixture = ordinaryMode || approvalRestore ? {
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue]');
+if (![...modes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -166,6 +167,7 @@ async function runCase(root, mode) {
         try {
             service = await require('./service.cjs').start({
                 out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision, groupRelay,
+                observedContext: compaction?.observe(out),
             });
         } finally { fs.rmSync(key, { force: true }); }
     }
@@ -245,7 +247,8 @@ async function runCase(root, mode) {
         }
     };
     try {
-        const roles = approvalRestore || aaDesktop || nativeQueue ? ['A'] : ['A', 'B'];
+        if (compaction) result.controlledTurns = await compaction.stage(service, out);
+        const roles = approvalRestore || aaDesktop || nativeQueue || compaction ? ['A'] : ['A', 'B'];
         for(const role of roles){
             const profile=profiles[role]=path.join(out,'profile-'+role);
             if (mode==='local-only' && role==='A') {
@@ -262,10 +265,11 @@ async function runCase(root, mode) {
                 }
             } else await restoreProfile(path.join(out,'seed','desktop'+role),profile,service.origin,role);
             const settingsFile=path.join(profile,'settings.json');
-            fs.writeFileSync(settingsFile,json({...read(settingsFile),ChatDataServiceEnabled:true,ChatDataServiceNotifyEnabled:false,ChatDataServiceTantivyEnabled:false,vcpServerUrl:service.origin+'/v1/local-chat/completions',userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
+            fs.writeFileSync(settingsFile,json({...read(settingsFile),ChatDataServiceEnabled:true,ChatDataServiceNotifyEnabled:false,ChatDataServiceTantivyEnabled:false,vcpServerUrl:service.origin+(compaction?'/v1/chat/completions':'/v1/local-chat/completions'),
+                ...compaction?.settings,userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
         }
         const [A,B] = await Promise.all(roles.map(role => start(role)));
-        if (!approvalRestore) {
+        if (!approvalRestore && !compaction) {
             result.mobile = await service.checkMobile();
             if (mode !== 'idle') result.mobile.chromium = await A.command('mobile', service.origin + '/mobile/');
         }
@@ -282,7 +286,8 @@ async function runCase(root, mode) {
         } else if (mode === 'idle') {
             result.idle = await require('./idle.cjs').measure({out, waitUntil, pids:{ A:A.proc.pid, B:B.proc.pid, backend:service.backendPid }});
         } else if (mode !== 'ready') {
-            const runScenario = aaDesktop ? require('../aa-desktop/scenario.cjs')
+            const runScenario = compaction ? require('../compact-e2e/scenario.cjs')
+                : aaDesktop ? require('../aa-desktop/scenario.cjs')
                 : approvalRestore ? require('../approval-restore/' + approvalRestore + '.cjs')
                 : nativeQueue ? nativeQueue.scenario
                 : ordinaryMode ? require('../ordinary-desktop/scenario.cjs')

@@ -134,7 +134,8 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             }
             calls.push(row);trace('provider',row);
             if (groupRelay && await groupRelay.respond(body, row, res)) return;
-            observedContext?.recordProvider(req.url, body);
+            if (await observedContext?.respond?.(body, row, res)) return;
+            observedContext?.recordProvider?.(req.url, body);
             if(which==='lostAck')await lostGate;
             if(which==='interrupted'){
                 if(!body.stream)throw Error('Partial fixture expected streaming provider input');

@@ -165,7 +165,7 @@ input.on('line', async line => {
             if (!win) throw Error('Main window unavailable');
             result = await win.webContents.executeJavaScript(script, true);
         }
-        if (['picture','mouse'].includes(action)) {
+        if (['picture','mouse','mouse-right'].includes(action)) {
             const debuggerApi = win.webContents.debugger;
             if (!debuggerApi.isAttached()) debuggerApi.attach('1.3');
             const cdp = (method, params) => debuggerApi.sendCommand(method,params);
@@ -173,11 +173,13 @@ input.on('line', async line => {
                 const shot = await cdp('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:true});
                 require('node:fs').writeFileSync(script, Buffer.from(shot.data,'base64'));
             }
-            if (action === 'mouse') {
+            if (action === 'mouse' || action === 'mouse-right') {
+                const button = action === 'mouse-right' ? 'right' : 'left';
+                const buttons = button === 'right' ? 2 : 1;
                 win.show(); win.focus(); win.webContents.focus();
                 await cdp('Input.dispatchMouseEvent',{type:'mouseMoved',...script});
-                await cdp('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',buttons:1,clickCount:1,...script});
-                await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',buttons:0,clickCount:1,...script});
+                await cdp('Input.dispatchMouseEvent',{type:'mousePressed',button,buttons,clickCount:1,...script});
+                await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',button,buttons:0,clickCount:1,...script});
             }
         }
         if (action === 'loaded-sources') {

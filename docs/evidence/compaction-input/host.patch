@@ -1,0 +1,117 @@
+diff --git a/apps/server/Plugin/NativeSync/sync/sharedCompaction.js b/apps/server/Plugin/NativeSync/sync/sharedCompaction.js
+index fbea0be..143dd4c 100644
+--- a/apps/server/Plugin/NativeSync/sync/sharedCompaction.js
++++ b/apps/server/Plugin/NativeSync/sync/sharedCompaction.js
+@@ -21,23 +21,35 @@ class SharedCompaction{
+    if(control.executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');frozenHash=JSON.parse(generation.config_json).hash;
+    if(!generation.checkpoint_json||!['paused','paused_terminal','completed'].includes(generation.state)||native.needsReview(work.id)||native.uncertainTools(work.id)||native.unsettledTools(work.id,generation.request_id)||this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state IN ('dispatched','unknown')").get(work.id)||this.db.prepare('SELECT 1 FROM shared_work_inputs WHERE work_id=? AND (attachments_ready=0 OR journal_seq IS NULL)').get(work.id))throw fail('WORK_SAFE_BOUNDARY_PENDING');
+   }
+-  const rows=this.db.prepare(`SELECT m.* FROM messages m WHERE m.owner_type=? AND m.owner_id=? AND m.topic_id=? AND m.deleted=0 ORDER BY (SELECT min(j.seq) FROM journal j WHERE j.owner_type=m.owner_type AND j.owner_id=m.owner_id AND j.topic_id=m.topic_id AND j.msg_id=m.msg_id)`).all(topic.owner_type,topic.owner_id,topic.topic_id);
+-  const projected=s.store.readProjected(()=>rows),history=projected.map(v=>v.message),lastCheckpoint=projected.filter(v=>v.message.contextCompaction?.kind==='vchat-context-checkpoint').at(-1)?.row.last_seq||0;
++  // readProjected verifies each latest Journal identity, version, hash and tombstone.
++  // Order by first appearance: an edit must not move the original message.
++  const latest=s.store.readProjected(db=>db.prepare(`SELECT j.* FROM journal j JOIN (
++   SELECT min(seq) AS first_seq,max(seq) AS latest_seq FROM journal
++   WHERE owner_type=? AND owner_id=? AND topic_id=? GROUP BY msg_id
++  ) versions ON j.seq=versions.latest_seq ORDER BY versions.first_seq`).all(topic.owner_type,topic.owner_id,topic.topic_id));
++  const sourceIds=new Set(latest.map(v=>v.row.msg_id));
++  const projected=latest.filter(v=>v.message!==null),history=projected.map(v=>v.message);
++  const lastCheckpoint=projected.filter(v=>v.message.contextCompaction?.kind==='vchat-context-checkpoint').at(-1)?.row.seq||0;
+   const nativeProofs=[];
+   if(s.native)for(const generation of this.db.prepare(`SELECT g.* FROM shared_work_generations g JOIN shared_admissions a ON a.id=g.work_id WHERE a.topic_id=? AND g.checkpoint_json IS NOT NULL ORDER BY a.rowid,g.generation`).all(topic.id)){
+-   if(JSON.parse(generation.checkpoint_json).noDispatch)continue;
+-   const stored=this.db.prepare('SELECT proof_json FROM shared_native_checkpoints WHERE work_id=? AND generation=?').get(generation.work_id,generation.generation);if(!stored)throw fail('NATIVE_CHECKPOINT_REQUIRED');const proof=JSON.parse(stored.proof_json);
+-   const actual=s.native.continuations.proof(generation.request_id,generation.work_id,proof.settledInvocationIds);if(actual.hash!==proof.hash)throw fail('NATIVE_CHECKPOINT_CHANGED');
+-   nativeProofs.push({requestId:generation.request_id,workId:generation.work_id,hash:actual.hash});
+-   if(this.db.prepare('SELECT 1 FROM shared_compaction_native_links WHERE request_id=? AND proof_hash=? AND journal_seq<=?').get(generation.request_id,actual.hash,lastCheckpoint))continue;
+-   const data=s.native.continuations.read(generation.request_id);
+-   for(const [index,event]of data.events.entries()){
+-    const content=event.kind==='assistant'?event.content:'[已结清的原生工具结果，不得重复执行]\n'+JSON.stringify(data.results[event.invocationId]);
+-    if(event.kind==='assistant'&&history.some(m=>m.role==='assistant'&&m.content===content))continue;
+-    history.push({id:'native_evidence_'+sha256(stable([generation.request_id,index])).slice(0,32),role:event.kind==='assistant'?'assistant':'user',content,name:'原生检查点证据'});
++   const reply=JSON.parse(generation.checkpoint_json);
++   if(reply.noDispatch)continue;
++   if(reply.role!=='assistant'||reply.id!==generation.request_id||!sourceIds.has(reply.id))throw fail('NATIVE_COMPACTION_SOURCE_MISSING');
++   const stored=this.db.prepare('SELECT proof_json FROM shared_native_checkpoints WHERE work_id=? AND generation=?').get(generation.work_id,generation.generation);
++   if(!stored)throw fail('NATIVE_CHECKPOINT_REQUIRED');
++   const proof=JSON.parse(stored.proof_json);
++   const results=s.native.continuations.compactionToolResults(generation.request_id,generation.work_id,proof);
++   nativeProofs.push({requestId:generation.request_id,workId:generation.work_id,hash:proof.hash});
++   if(this.db.prepare('SELECT 1 FROM shared_compaction_native_links WHERE request_id=? AND proof_hash=? AND journal_seq<=?').get(generation.request_id,proof.hash,lastCheckpoint))continue;
++   for(const {index,result} of results){
++    history.push({id:'native_evidence_'+sha256(stable([generation.request_id,index])).slice(0,32),role:'user',
++     content:'[已结清的原生工具结果，不得重复执行]\n'+JSON.stringify(result),name:'原生检查点证据'});
+    }
+   }
+-  const proof={topicId:topic.id,head:s.head(topic),configHash:frozenHash||s.freezeForExecution(actor,topic).hash,work:work?{id:work.id,revision:control.revision,generation:control.generation,executor:control.executor}:null,canonical:projected.map(v=>({id:v.row.msg_id,hash:v.row.hash,seq:v.row.last_seq,metadataHash:v.row.metadata_hash})),native:nativeProofs};
++  // A prepare made with the former text-based projection must not authorize
++  // a late summary of that old input, even when no Journal writes intervened.
++  const proof={topicId:topic.id,head:s.head(topic),configHash:frozenHash||s.freezeForExecution(actor,topic).hash,work:work?{id:work.id,revision:control.revision,generation:control.generation,executor:control.executor}:null,canonical:projected.map(v=>({id:v.row.msg_id,hash:v.row.hash,seq:v.row.seq,metadataHash:v.row.metadata_hash})),native:nativeProofs,
++   ...(nativeProofs.length?{inputVersion:2}:{})};
+   return {proof,history};
+  }
+  prepare(actor,body){const topic=this.topic(actor,body.sharedSpaceId,body.sharedId);return this.shared.receipt(actor,body,'compact-prepare',()=>{
+@@ -48,7 +60,16 @@ class SharedCompaction{
+   this.db.prepare("INSERT INTO shared_compaction_intents(id,principal,topic_id,proof_json,message_id,committed_seq,work_id,state) VALUES(?,?,?,?,?,NULL,?,'prepared')").run(id,actor.principal,topic.id,JSON.stringify(snapshot.proof),messageId,snapshot.proof.work?.id||null);
+   return {id,messageId,sourceHash:sha256(stable(snapshot.proof)),head:snapshot.proof.head,workId:snapshot.proof.work?.id||null};
+  });}
+- get(actor,body){const intent=this.db.prepare('SELECT * FROM shared_compaction_intents WHERE id=?').get(body.id);if(!intent||intent.principal!==actor.principal)throw fail('SHARED_COMPACTION_NOT_FOUND');if(intent.state!=='prepared')throw fail('SHARED_COMPACTION_SUPERSEDED');const topic=this.topic(actor,body.sharedSpaceId,intent.topic_id),snapshot=this.snapshot(actor,topic);if(stable(snapshot.proof)!==stable(JSON.parse(intent.proof_json)))throw fail('SHARED_COMPACTION_SOURCE_CHANGED');return {id:intent.id,messageId:intent.message_id,sourceHash:sha256(stable(snapshot.proof)),history:snapshot.history};}
++ get(actor,body){
++  return this.shared.store.readSnapshot(()=>{
++   const intent=this.db.prepare('SELECT * FROM shared_compaction_intents WHERE id=?').get(body.id);
++   if(!intent||intent.principal!==actor.principal)throw fail('SHARED_COMPACTION_NOT_FOUND');
++   if(intent.state!=='prepared')throw fail('SHARED_COMPACTION_SUPERSEDED');
++   const topic=this.topic(actor,body.sharedSpaceId,intent.topic_id),snapshot=this.snapshot(actor,topic);
++   if(stable(snapshot.proof)!==stable(JSON.parse(intent.proof_json)))throw fail('SHARED_COMPACTION_SOURCE_CHANGED');
++   return {id:intent.id,messageId:intent.message_id,sourceHash:sha256(stable(snapshot.proof)),history:snapshot.history};
++  });
++ }
+  cancel(actor,body){return this.shared.receipt(actor,body,'compact-cancel',()=>{
+   const intent=this.db.prepare('SELECT * FROM shared_compaction_intents WHERE id=?').get(body.id);if(!intent||intent.principal!==actor.principal)throw fail('SHARED_COMPACTION_NOT_FOUND');this.topic(actor,body.sharedSpaceId,intent.topic_id);
+   if(intent.committed_seq)return {success:true,alreadyCommitted:true,messageId:intent.message_id,seq:intent.committed_seq};
+diff --git a/apps/server/modules/nativeContinuationStore.cjs b/apps/server/modules/nativeContinuationStore.cjs
+index d6e25b4..d354940 100644
+--- a/apps/server/modules/nativeContinuationStore.cjs
++++ b/apps/server/modules/nativeContinuationStore.cjs
+@@ -12,6 +12,12 @@ function createNativeContinuationStore(directory) {
+         if (data.version !== 1 || data.identity.requestId !== requestId) throw fail('NATIVE_CHECKPOINT_IDENTITY_CHANGED');
+         return data;
+     };
++    const proofSource = (requestId, workId, settledInvocationIds = []) => {
++        const data = read(requestId);
++        if (!data || data.identity.workId !== workId) throw fail('NATIVE_CHECKPOINT_REQUIRED');
++        if (settledInvocationIds.some(id => !data.results[id])) throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
++        return data;
++    };
+     const write = data => {
+         const bytes = Buffer.from(JSON.stringify(data)); if (bytes.length > MAX) throw fail('NATIVE_CHECKPOINT_TOO_LARGE');
+         fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+@@ -50,10 +56,26 @@ function createNativeContinuationStore(directory) {
+             mutate(data);if(hash(data.identity)!==identityHash)throw fail('NATIVE_CHECKPOINT_IDENTITY_CHANGED');data.revision++;write(data);return data;
+         },
+         proof(requestId, workId, settledInvocationIds = []) {
+-            const data=read(requestId);if(!data||data.identity.workId!==workId)throw fail('NATIVE_CHECKPOINT_REQUIRED');
+-            if(settledInvocationIds.some(id=>!data.results[id]))throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
++            const data = proofSource(requestId, workId, settledInvocationIds);
+             return {requestId,hash:hash(data),settledInvocationIds};
+         },
++        compactionToolResults(requestId, workId, proof) {
++            const data = proofSource(requestId, workId, proof.settledInvocationIds);
++            if (proof.requestId !== requestId || hash(data) !== proof.hash) throw fail('NATIVE_CHECKPOINT_CHANGED');
++            const settled = new Set(proof.settledInvocationIds);
++            const results = [];
++            for (const [index, event] of data.events.entries()) {
++                // Assistant events belong to the generation's one Journal reply.
++                // Only independently settled tool invocations supply extra rows.
++                if (event.kind === 'assistant') continue;
++                const result = data.results[event.invocationId];
++                if (event.kind !== 'result' || !settled.has(event.invocationId) || result?.invocationId !== event.invocationId) {
++                    throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
++                }
++                results.push({ index, result });
++            }
++            return results;
++        },
+         mergeBody(requestId, body, {workId,expectedHash,inputIds,partialMessageId}={}) {
+             const data=read(requestId);if(!data||data.identity.workId!==workId||hash(data)!==expectedHash)throw fail('NATIVE_CHECKPOINT_CHANGED');
+             const bindings=body.vcpchatExtensions?.messageTimestampBindings||[];

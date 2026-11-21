@@ -12,6 +12,12 @@ function createNativeContinuationStore(directory) {
         if (data.version !== 1 || data.identity.requestId !== requestId) throw fail('NATIVE_CHECKPOINT_IDENTITY_CHANGED');
         return data;
     };
+    const proofSource = (requestId, workId, settledInvocationIds = []) => {
+        const data = read(requestId);
+        if (!data || data.identity.workId !== workId) throw fail('NATIVE_CHECKPOINT_REQUIRED');
+        if (settledInvocationIds.some(id => !data.results[id])) throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
+        return data;
+    };
     const write = data => {
         const bytes = Buffer.from(JSON.stringify(data)); if (bytes.length > MAX) throw fail('NATIVE_CHECKPOINT_TOO_LARGE');
         fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -50,9 +56,25 @@ function createNativeContinuationStore(directory) {
             mutate(data);if(hash(data.identity)!==identityHash)throw fail('NATIVE_CHECKPOINT_IDENTITY_CHANGED');data.revision++;write(data);return data;
         },
         proof(requestId, workId, settledInvocationIds = []) {
-            const data=read(requestId);if(!data||data.identity.workId!==workId)throw fail('NATIVE_CHECKPOINT_REQUIRED');
-            if(settledInvocationIds.some(id=>!data.results[id]))throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
+            const data = proofSource(requestId, workId, settledInvocationIds);
             return {requestId,hash:hash(data),settledInvocationIds};
+        },
+        compactionToolResults(requestId, workId, proof) {
+            const data = proofSource(requestId, workId, proof.settledInvocationIds);
+            if (proof.requestId !== requestId || hash(data) !== proof.hash) throw fail('NATIVE_CHECKPOINT_CHANGED');
+            const settled = new Set(proof.settledInvocationIds);
+            const results = [];
+            for (const [index, event] of data.events.entries()) {
+                // Assistant events belong to the generation's one Journal reply.
+                // Only independently settled tool invocations supply extra rows.
+                if (event.kind === 'assistant') continue;
+                const result = data.results[event.invocationId];
+                if (event.kind !== 'result' || !settled.has(event.invocationId) || result?.invocationId !== event.invocationId) {
+                    throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
+                }
+                results.push({ index, result });
+            }
+            return results;
         },
         mergeBody(requestId, body, {workId,expectedHash,inputIds,partialMessageId}={}) {
             const data=read(requestId);if(!data||data.identity.workId!==workId||hash(data)!==expectedHash)throw fail('NATIVE_CHECKPOINT_CHANGED');

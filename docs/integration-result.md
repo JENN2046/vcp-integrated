@@ -52,3 +52,5 @@ AgentAssistant 长委托已接入共享单聊的 Work。桌面重开、发起端
 在进入「压缩后跨端接续」前，阶段复审核对了群聊、原生审批和 AA 的组合故障，并复现普通群聊收尾与共享压缩输入的两项阻断问题。[职责归属、实测回执和开工判断](evidence/stage-review/README.md)
 
 普通共享群聊的成员回复与 AA 已按同一组证据结算。两种完成顺序及原故障库升级结果见[群聊收尾修复](evidence/group-settlement/README.md)。阶段复审记录中的压缩输入问题另案保留。
+
+共享单聊压缩输入已按原消息 ID 和 Journal 当前版本处理编辑与删除。同文不同 ID、真实桌面生成检查点以及重开后的模型请求见[压缩输入交付](evidence/compaction-input/README.md)。
