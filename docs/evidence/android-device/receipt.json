@@ -1,0 +1,155 @@
+{
+  "appSource": "c379d0ca1ebcb6faad72324d2f7b34062749c104",
+  "checkout": "4cb149fa0553",
+  "model": "2602BRT18C",
+  "android": "16",
+  "provider": "loopback synthetic, held nonstream response",
+  "beforeLock": {
+    "secure": true,
+    "title": "VCP Mobile",
+    "origin": "https://127.0.0.1:18443",
+    "paired": true,
+    "selectedAgent": "Synthetic lost receipt",
+    "selectedTopic": "shared_6d571d269a9d47a6b356b6a37f54a216",
+    "online": "已连接",
+    "ids": [
+      {
+        "id": "msg_1795231479085_user_8kfqawllov",
+        "text": "Send-recovery compare 02: accept exactly once."
+      }
+    ],
+    "jobs": [
+      {
+        "id": "request_f59a8de1b7a4461ba14478064ce61f7c",
+        "state": "running"
+      }
+    ],
+    "live": [
+      {
+        "text": "Synthetic lost receipt · 服务端执行中 · 实时观察"
+      }
+    ],
+    "editable": false,
+    "viewport": [
+      394,
+      853
+    ],
+    "pixelRatio": 3.25,
+    "visibility": "visible"
+  },
+  "observedScreenState": "Dozing",
+  "offline": {
+    "work": [
+      {
+        "id": "request_f59a8de1b7a4461ba14478064ce61f7c",
+        "request_id": "msg_1795231479085_user_8kfqawllov",
+        "state": "running",
+        "attempts": 1,
+        "request_dispatched": 1,
+        "user_message_id": "msg_1795231479085_user_8kfqawllov",
+        "user_seq": 1,
+        "reply_message_id": null
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "msg_1795231479085_user_8kfqawllov",
+        "action": "upsert"
+      }
+    ],
+    "paired": 1,
+    "providerCalls": 1,
+    "released": false
+  },
+  "testReverseRemoved": true,
+  "testWebViewForceStopped": true,
+  "afterFreshProcess": {
+    "secure": true,
+    "title": "VCP Mobile",
+    "origin": "https://127.0.0.1:18443",
+    "paired": true,
+    "selectedAgent": "Synthetic lost receipt",
+    "selectedTopic": "shared_6d571d269a9d47a6b356b6a37f54a216",
+    "online": "已连接",
+    "ids": [
+      {
+        "id": "msg_1795231479085_user_8kfqawllov",
+        "text": "Send-recovery compare 02: accept exactly once."
+      },
+      {
+        "id": "reply_request_f59a8de1b7a4461ba14478064ce61f7c",
+        "text": "合成回复完成。"
+      }
+    ],
+    "jobs": [
+      {
+        "id": "request_f59a8de1b7a4461ba14478064ce61f7c",
+        "state": "completed"
+      }
+    ],
+    "live": [],
+    "editable": false,
+    "viewport": [
+      394,
+      853
+    ],
+    "pixelRatio": 3.25,
+    "visibility": "visible"
+  },
+  "completed": {
+    "work": [
+      {
+        "id": "request_f59a8de1b7a4461ba14478064ce61f7c",
+        "request_id": "msg_1795231479085_user_8kfqawllov",
+        "state": "completed",
+        "attempts": 1,
+        "request_dispatched": 1,
+        "user_message_id": "msg_1795231479085_user_8kfqawllov",
+        "user_seq": 1,
+        "reply_message_id": "reply_request_f59a8de1b7a4461ba14478064ce61f7c"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "msg_1795231479085_user_8kfqawllov",
+        "action": "upsert"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_request_f59a8de1b7a4461ba14478064ce61f7c",
+        "action": "upsert"
+      }
+    ],
+    "paired": 1,
+    "providerCalls": 1,
+    "released": true
+  },
+  "linuxHistory": [
+    {
+      "id": "msg_1795231479085_user_8kfqawllov",
+      "role": "user"
+    },
+    {
+      "id": "reply_request_f59a8de1b7a4461ba14478064ce61f7c",
+      "role": "assistant"
+    }
+  ],
+  "linuxDraftRetained": true,
+  "linuxSelectedTextBefore": "Send-recovery compare 02: accept exactly once.",
+  "linuxSelectedTextAfter": "",
+  "linuxReadingBefore": {
+    "scrollTop": 52,
+    "height": 681,
+    "scrollHeight": 733
+  },
+  "linuxReadingAfter": {
+    "scrollTop": 0,
+    "height": 704,
+    "scrollHeight": 704
+  },
+  "testPackageUninstalled": true,
+  "adbTestForwardAndReverseRemoved": true,
+  "windowsInThisReceipt": false
+}
