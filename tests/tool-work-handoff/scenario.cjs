@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
+const { setTimeout: delay } = require('node:timers/promises');
 const tool = require('../ordinary-tools/fixture.cjs');
 const fixture = require('./fixture.cjs');
 
@@ -55,6 +56,7 @@ async function loadedDesktop(client, sha, root) {
         renderer: [
             'apps/desktop/modules/renderer/controlledWorkView.mjs',
             'apps/desktop/modules/chatManager.js',
+            'apps/desktop/modules/services/nativeSync/sharedSessionView.mjs',
         ],
     };
     const loaded = await client.command('loaded-sources', expected);
@@ -64,8 +66,8 @@ async function loadedDesktop(client, sha, root) {
     return { main: loaded.main, renderer: loaded.renderer };
 }
 
-async function candidate({ result, service, out, clients: { A, B }, picture, click, evalJs, waitUntil, stop, start, profiles, sha, toolHandoff, db }) {
-    const { marker, loseHandoff, stream } = toolHandoff;
+async function candidate({ result, service, out, clients: { A, B }, picture, click, evalJs, waitUntil, stop, start, quitBeforeFinalReceipt, profiles, sha, toolHandoff, db }) {
+    const { marker, loseHandoff, stream, finalReceipt, receipt } = toolHandoff;
     const read = {};
     const buttons = client => evalJs(client, `Object.fromEntries([...document.querySelectorAll(${quote(panel + ' button')})]
         .map(button => [button.textContent.trim(), !button.disabled]))`);
@@ -258,8 +260,147 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
     assert.equal(service.requests.filter(row => row.route.endsWith('/steer-handoff')).length, 1);
     assert.deepEqual(tool.counts(out), [{ marker }]);
     await action(recovered, '本端继续执行');
+    if (finalReceipt) {
+        const resumed = await waitUntil(() => service.calls.find(call => call.toolHandoffPhase === 'resumed'), 'B reaches the actual Provider');
+        assert.ok(receipt.releaseProvider, 'the final Provider response is held after dispatch');
+        const requestId = resumed.id;
+        const nativeRow = () => db.prepare('SELECT id,admission_id,principal,state FROM shared_native_requests WHERE id=?').get(requestId);
+        const archiveFile = path.join(out, 'runtime-box', '.state', 'native-continuations',
+            require('node:crypto').createHash('sha256').update(JSON.stringify(requestId)).digest('hex') + '.json');
+        const finalTextShown = client => evalJs(client, `document.querySelector('#chatMessages').innerText.includes(${quote(fixture.finalText)})`);
+        const observedPreview = client => evalJs(client, `(() => {
+            const item = document.querySelector(${quote('.native-sync-live-message[data-native-sync-request="' + requestId + '"]')});
+            return item ? { kind: item.dataset.nativeSyncPreview, status: item.querySelector('[role=status]')?.innerText,
+                text: item.querySelector('pre')?.innerText } : null;
+        })()`);
+        const publicationsByB = () => service.requests.filter(row => row.device === 'deviceB' && row.route.endsWith('/steer-turn-complete')).length;
+        async function snapshot(client) {
+            const archive = JSON.parse(fs.readFileSync(archiveFile, 'utf8'));
+            assert.equal(archive.identity.workId, workId);
+            const history = read.B();
+            const canonicalFinal = db.prepare('SELECT message_json FROM journal WHERE topic_id=? AND msg_id=? ORDER BY seq').all(topicId, requestId);
+            const value = {
+                backendPid: service.backendPid, admission: admissions()[0], native: nativeRow(), control: control(workId),
+                generations: generations(workId), journal: journal().map(row => row.msg_id), history: history.map(row => row.id),
+                journalFinal: canonicalFinal.map(row => row.message_json && JSON.parse(row.message_json).content),
+                historyFinal: history.filter(row => row.id === requestId).map(row => row.content),
+                archive: { identity: archive.identity, assistant: archive.assistant, completion: archive.completion ?? null },
+                phases: db.prepare('SELECT stage,at FROM shared_request_phases WHERE request_id=? ORDER BY at').all(requestId),
+                counter: tool.counts(out), providerCalls: service.calls.map(row => ({ id: row.id, phase: row.toolHandoffPhase })),
+                ...(client && { status: await status(client), buttons: await buttons(client), finalTextShown: await finalTextShown(client),
+                    nativePreview: await observedPreview(client) }),
+            };
+            return value;
+        }
+        assert.deepEqual({ ...nativeRow() }, { id: requestId, admission_id: workId, principal: 'desktop:deviceB', state: 'dispatched' });
+        const beforeExit = await snapshot(recovered);
+        assert.equal(beforeExit.finalTextShown, false);
+        assert.equal(beforeExit.admission.native_terminal, 0);
+        await picture(recovered, 'B-final-dispatched-before-exit');
+        async function finishUpstream() {
+            receipt.releaseProvider();
+            const upstream = await waitUntil(() => receipt.upstream, 'ToolBox sends a complete native final response to the detached proxy');
+            assert.deepEqual({ ...upstream, at: undefined }, { at: undefined, status: 200, bodyComplete: true,
+                finishReason: 'stop', text: fixture.finalText, ...(stream && { done: true }) });
+        }
+        let terminalBeforeExit;
+        if (finalReceipt === 'terminal' && process.env.VCP_TEST_TERMINAL_BEFORE_CLOSE === '1') {
+            await finishUpstream();
+            await waitUntil(() => nativeRow().state === 'model_terminal', 'ToolBox records the model terminal before B quits');
+            terminalBeforeExit = await snapshot(recovered);
+            assert.equal(terminalBeforeExit.finalTextShown, false);
+            assert.equal(receipt.downstream, undefined, 'B remains connected without receiving the buffered model response');
+        }
+        const exit = await quitBeforeFinalReceipt('B-recovered');
+        const publishedBeforeReopen = publicationsByB();
+        assert.equal(publishedBeforeReopen, 0, 'B never received and submitted the model reply before it exited');
+        await waitUntil(() => receipt.downstream, 'B downstream connection closed');
+        assert.equal(receipt.downstream.headersSent, false);
+        if (finalReceipt === 'terminal') {
+            if (!terminalBeforeExit) await finishUpstream();
+        } else {
+            await waitUntil(() => receipt.providerClosed, 'B disconnect closes the Provider request');
+            assert.equal(receipt.providerClosed.responseEnded, false);
+        }
+        const afterExit = await snapshot();
+        const restarted = await start('B-after-final-loss', 'B');
+        assert.equal(result.B.profileDigest, result['B-after-final-loss'].profileDigest);
+        await select(restarted, 'B');
+        const selectedAt = Date.now();
+        await delay(1600);
+        const beforeManualCheck = await snapshot(restarted);
+        const executionReads = () => restarted.events.filter(event => event.event === 'ipc-result' &&
+            event.data.channel === 'native-sync:executions' && event.data.success !== false).length;
+        const readsBefore = executionReads();
+        await action(restarted, '核对任务');
+        await waitUntil(() => executionReads() > readsBefore, 'B completes an explicit read-only Work refresh');
+        const manualCheck = { selectedAt, checkedAt: Date.now(), readsBefore, readsAfter: executionReads(), beforeManualCheck };
+        await waitUntil(async () => !(await status(restarted))?.startsWith('操作已确认'),
+            'the periodic refresh renders the Work status after the check acknowledgement');
+        const reopened = await snapshot(restarted);
+        assert.equal(reopened.backendPid, beforeExit.backendPid);
+        await picture(restarted, 'B-reopened-toolbox-kept-running');
+        await stop('B-after-final-loss');
+        const backendExit = await service.restartAfterCrash();
+        const afterBackend = await start('B-after-toolbox-restart', 'B');
+        assert.equal(result.B.profileDigest, result['B-after-toolbox-restart'].profileDigest);
+        await select(afterBackend, 'B');
+        await delay(1600);
+        const reopenedAfterBackend = await snapshot(afterBackend);
+        await picture(afterBackend, 'B-reopened-after-toolbox-restart');
+        result.finalReceipt = {
+            branch: finalReceipt, workId, requestId, receipt, exit, backendExit, beforeExit, terminalBeforeExit, afterExit, reopened, reopenedAfterBackend,
+            manualCheck, profileDigest: result.B.profileDigest, desktopSources: await loadedDesktop(afterBackend, sha, result.candidate),
+            publishedBeforeReopen, publishedByB: publicationsByB(),
+        };
+        assert.deepEqual(invocations(workId), invocationsAtPause);
+        assert.deepEqual(tool.counts(out), [{ marker }]);
+        assert.equal(admissions().length, 1);
+        assert.deepEqual(service.calls.map(row => row.toolHandoffPhase), ['initial', 'summary', 'resumed']);
+        assert.deepEqual(journal().slice(0, journalOnA.length), journalOnA);
+        if (finalReceipt === 'terminal') {
+            const outcome = value => ({
+                workState: value.admission.state,
+                journalFinal: value.journalFinal,
+                historyFinal: value.historyFinal,
+                finalTextShown: value.finalTextShown,
+            });
+            const expected = { workState: 'completed', journalFinal: [fixture.finalText], historyFinal: [fixture.finalText], finalTextShown: true };
+            assert.deepEqual([outcome(reopened), outcome(reopenedAfterBackend)], [expected, expected],
+                'Reopening should recover one final reply for the original Work in Journal, physical History and chat');
+        } else {
+            assert.equal(result.finalReceipt.publishedByB, 0, 'B cannot publish a final reply with no authoritative model terminal');
+            assert.equal(reopened.admission.state, 'review_required');
+            assert.equal(reopenedAfterBackend.admission.state, 'review_required');
+            assert.equal(reopened.finalTextShown, false);
+            assert.equal(reopened.history.includes(requestId), false);
+            assert.equal(reopened.journal.includes(requestId), false);
+            assert.equal(reopened.buttons['本端继续执行'] ?? false, false);
+        }
+        return;
+    }
     const final = await waitUntil(() => admissions().find(row => row.id === workId && row.state === 'completed'),
         'B completes the original Work');
+    let finalReader = recovered;
+    if (toolHandoff.losePublication) {
+        const publication = await waitUntil(() => service.requests.find(row => row.device === 'deviceB' &&
+            row.route.endsWith('/steer-turn-complete') && row.dropped && row.response?.workState === 'completed'),
+        'B publication succeeded centrally and the proxy cut its ACK');
+        const replyId = generations(workId).at(-1).request_id;
+        const committedJournal = journal();
+        assert.equal(publication.body.workId, workId);
+        assert.equal(publication.body.message.id, replyId);
+        assert.equal(committedJournal.at(-1).msg_id, replyId);
+        assert.equal(committedJournal.at(-1).seq, publication.response.receipt.seq);
+        const before = { historyIds: read.B().map(row => row.id), journal: committedJournal, calls: service.calls.length };
+        await stop('B-recovered');
+        finalReader = await start('B-reopened-final', 'B');
+        assert.equal(result.B.profileDigest, result['B-reopened-final'].profileDigest);
+        await select(finalReader, 'B');
+        assert.deepEqual(journal(), committedJournal);
+        result.publicationAck = { workId, replyId, opId:publication.body.opId, seq:publication.response.receipt.seq,
+            originalInvocation:invocation.invocation_id, status:publication.status, dropped:publication.dropped, before };
+    }
     const finished = generations(workId);
     assert.deepEqual(finished.map(row => [row.generation, row.executor]), [
         [paused.generation, 'desktop:deviceA'], [paused.generation + 1, 'desktop:deviceB'],
@@ -289,16 +430,23 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         return reply?.id === finished.at(-1).request_id && JSON.stringify(reply.content).includes(fixture.finalText) && history;
     }, 'B writes the final original Work reply to its physical History');
     assert.deepEqual(saved.slice(0, -1), compactedHistory);
-    await waitUntil(() => evalJs(recovered, `document.querySelector('#chatMessages').innerText.includes(${quote(fixture.finalText)})`),
+    await waitUntil(() => evalJs(finalReader, `document.querySelector('#chatMessages').innerText.includes(${quote(fixture.finalText)})`),
         'B renders the completed original Work result');
     result.toolHandoff = {
         original, final, paused, nativeProof, committed, generations: finished, invocations: invocationsAtPause,
         waitingCompaction, earlyHandoff, ...(streamTerminal && { streamTerminal: streamTerminal.data.modelFinishReason }), nativePause: { transport: transport.pauseTransport, httpStatus: transport.status, ...transport.nativePause },
         droppedHandoff: { workId, status: dropped.status, executor: control(workId).executor, dropped: dropped.dropped, opId: dropped.body.opId, clientError: unavailable.data.error },
-        desktopSources: await loadedDesktop(recovered, sha, result.candidate),
+        desktopSources: await loadedDesktop(finalReader, sha, result.candidate),
         counter: tool.counts(out), history: saved, journal: journal(), summaryReceipt: summary.toolReceipt,
     };
-    await picture(recovered, 'B-completed-original-tool-work');
+    await picture(finalReader, 'B-completed-original-tool-work');
+    if (result.publicationAck) {
+        const attempts = service.requests.filter(row=>row.device==='deviceB' && row.route.endsWith('/steer-turn-complete'));
+        assert.ok(attempts.every(row=>row.dropped && row.body.opId===result.publicationAck.opId));
+        assert.equal(service.calls.length,result.publicationAck.before.calls);
+        Object.assign(result.publicationAck, { exit:result.exits['B-recovered'], postAttempts:attempts.length,
+            workState:final.state, finalHistoryIds:saved.map(row=>row.id), counter:tool.counts(out).length });
+    }
 }
 
 module.exports = async context => {

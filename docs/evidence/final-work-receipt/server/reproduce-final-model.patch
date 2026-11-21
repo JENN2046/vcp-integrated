@@ -1,0 +1,106 @@
+--- protocol.cjs
++++ .final-server-observe.cjs
+@@ -14,6 +14,7 @@ const { stable, sha256 } = require('../../apps/server/Plugin/NativeSync/sync/pro
+ const prefix = '/api/v1/sync/shared/';
+ const marker = 'ORDINARY_TOOL_LOCAL';
+ const summary = 'Continue the original Work after the settled counter call.';
++const finalText = "Native final response from loopback provider.";
+ const toolCall = [
+     '<<<[TOOL_REQUEST]>>>',
+     'tool_name:「始」' + counter.name + '「末」,',
+@@ -58,7 +59,7 @@ async function main() {
+                     } else {
+                         assert.ok(['nonstream-two-tools', summary].includes(ask));
+                         assert.equal(body.stream, false);
+-                        const content = ask === summary ? toolCall : toolCall + '\n' + toolCall;
++                        const content = ask === summary ? finalText : toolCall + '\n' + toolCall;
+                         const choices = [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }];
+                         res.writeHead(200, { 'Content-Type': 'application/json' });
+                         res.end(JSON.stringify({ id: 'nonstream-two', choices }));
+@@ -171,37 +172,58 @@ async function main() {
+             bodyHash: sha256(stable(packet)), generation: 1, consumedInputSeq: 0 }, b);
+         const retry = await send('/v1/chat/completions', packet, { ...b, 'x-nativesync-admission': settled.id,
+             'x-nativesync-generation': '1', 'x-nativesync-consumed-input-seq': '0' });
+-        assert.equal(retry.status, 500);
+-        const rejection = (await retry.json()).details;
+-        assert.equal(rejection, 'CONTROLLED_TEXT_TOOLS_FORBIDDEN');
+-        const reviewed = await waitUntil(async () => {
+-            const value = await stream.readWork();
+-            return value.state === 'review_required' && value;
+-        }, 'continuation tool refusal');
+-        assert.equal(reviewed.id, settled.id);
+-        assert.deepEqual(reviewed.toolInvocations, settled.toolInvocations);
+-        assert.equal(counter.counts(out).length, 1);
+-        assert.equal(service.calls.length, 3);
+-        if (process.env.VCP_PROTOCOL_EVIDENCE) {
+-            const evidence = {
+-                workId: reviewed.id,
+-                originalNativeRequestId: stream.requestId,
+-                continuationNativeRequestId: prepared.requestId,
+-                executor: handoff.executor,
+-                generation: prepared.generation,
+-                invocationIdsBefore: settled.toolInvocations.map(call => call.invocationId),
+-                invocationIdsAfter: reviewed.toolInvocations.map(call => call.invocationId),
+-                sideEffectsBefore,
+-                sideEffectsAfter: counter.counts(out).length,
+-                providerCalls: service.calls.length,
+-                continuationHttpStatus: retry.status,
+-                continuationRejection: rejection,
+-                finalWorkState: reviewed.state,
++        assert.equal(retry.status, 200);
++        const responseContent=(await retry.json()).choices[0].message.content;
++        assert.equal(responseContent,finalText);
++        const { DatabaseSync } = require('node:sqlite');
++        const db = new DatabaseSync(path.join(service.data,'central.sqlite'), {readOnly:true});
++        const { createNativeContinuationStore }=require('../../apps/server/modules/nativeContinuationStore.cjs');
++        const archive=createNativeContinuationStore(path.join(out,'runtime-box/.state/native-continuations'));
++        async function observe() {
++            const admission=db.prepare('SELECT id,principal,state,native_terminal,reply_seq FROM shared_admissions WHERE id=?').get(settled.id);
++            const request=db.prepare('SELECT id,principal,state FROM shared_native_requests WHERE id=?').get(prepared.requestId);
++            const generations=db.prepare('SELECT generation,executor,request_id,state FROM shared_work_generations WHERE work_id=? ORDER BY generation').all(settled.id);
++            const journal=db.prepare('SELECT seq,msg_id,device_id FROM journal WHERE topic_id=? ORDER BY seq').all(service.topics.interrupted.topic.topicId);
++            const record=archive.read(prepared.requestId);
++            return {
++                admission, request, generations, journal, archiveIdentity:record?.identity, archiveKeys:Object.keys(record||{}),
++                invocations:db.prepare('SELECT invocation_id,native_request_id,state FROM mobile_native_invocations WHERE execution_id=?').all(settled.id),
++                workState:(await stream.readWork()).state,
++                counts:{provider:service.calls.length, tool:counter.counts(out).length},
++                phases:db.prepare('SELECT stage FROM shared_request_phases WHERE request_id=? ORDER BY at').all(prepared.requestId).map(x=>x.stage),
+             };
+-            fs.writeFileSync(process.env.VCP_PROTOCOL_EVIDENCE, JSON.stringify(evidence, null, 2) + '\n');
+         }
++        try {
++            const before=await waitUntil(async()=>{const x=await observe();return x.request.state==='model_terminal'&&x.admission.native_terminal===1&&x;}, 'server marks model terminal');
++            assert.equal(before.admission.native_terminal,1);
++            assert.equal(before.admission.state,'dispatched');
++            assert.equal(before.admission.reply_seq,null);
++            assert.ok(!before.archiveKeys.includes('completion'));
++            assert.ok(!before.journal.find(row=>row.msg_id===prepared.requestId));
++            assert.equal(before.counts.tool,1);
++            const crash=await service.restartAfterCrash();
++            const after=await observe();
++            assert.equal(after.admission.state,'review_required');
++            assert.equal(after.request.state,'model_terminal');
++            const replayPacket=await send('/v1/chat/completions',packet,{...b,'x-nativesync-admission':settled.id,'x-nativesync-generation':'1','x-nativesync-consumed-input-seq':'0'});
++            assert.equal(replayPacket.status,409);
++            const replay={status:replayPacket.status,code:(await replayPacket.json()).error.code};
++            assert.equal(replay.code,'SHARED_REQUEST_ALREADY_DISPATCHED');
++            const final=await observe();
++            assert.deepEqual(final,after);
++            assert.deepEqual(after.journal,before.journal);
++            assert.deepEqual(after.invocations,before.invocations);
++            assert.deepEqual(after.counts,before.counts);
++            await service.close();
++            fs.writeFileSync(process.env.VCP_PROTOCOL_EVIDENCE, JSON.stringify({
++                revision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
++                scenario:'ToolBox returns B final text; B sends zero completion requests; ToolBox restarts; exact packet replay is refused',
++                responseContent,before,crash,after,replay,
++                loadedSources:JSON.parse(fs.readFileSync(path.join(out,'backend-loaded.json'),'utf8')).filter(row=>/(?:nativeContinuationStore|requestExecutionContext|chatCompletionHandler|sharedNative|sharedSteering|sharedSpace)\.c?js$/.test(row.file)),
++            },null,2)+'\n');
++        } finally { db.close(); }
+         passed = true;
+-        console.log('Tool Work transport PASS (stream pause after one returned call, multi-call refused before dispatch, B cannot repeat the tool)');
++        console.log('Final model result without desktop settlement stayed unprojected, including after restart');
+     } finally {
+         await service?.close();
+         if (passed) fs.rmSync(out, { recursive: true, force: true });

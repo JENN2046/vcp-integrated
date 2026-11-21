@@ -162,6 +162,8 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     const proxy = https.createServer({key:fs.readFileSync(key),cert:fs.readFileSync(cert)},async (req,res) => {
         const url=new URL(req.url,'https://127.0.0.1');
         const route=url.pathname;
+        const detachFinal = toolHandoff?.finalReceipt && req.method === 'POST' && route === '/v1/chat/completions' &&
+            req.headers['x-nativesync-device'] === 'deviceB' && Number(req.headers['x-nativesync-generation']) > 0;
         if (handleFixtureRequest && await handleFixtureRequest(req, res, route)) return;
         if (hardwareStream && req.method === 'POST' && route.endsWith('/session-send') &&
             req.headers['x-nativesync-device'] !== 'deviceA') {
@@ -253,6 +255,10 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 return res.writeHead(response.statusCode,response.headers).end(payload);
             }
             row.status=response.statusCode;
+            if (detachFinal) {
+                toolHandoff.observeDetachedFinal(response, row);
+                return;
+            }
             if (streamInterrupt && route === '/v1/chatvcp/completions') streamInterrupt.inspect(response, row);
             if (toolHandoff?.observeNativeResponse && req.headers['x-nativesync-admission'] && route === '/v1/chat/completions') {
                 toolHandoff.observeNativeResponse(response, row);
@@ -262,7 +268,10 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             response.pipe(res);
         });
         upstream.on('error',() => { if (!res.headersSent) res.writeHead(502); res.end(); });
-        res.on('close',() => upstream.destroy());
+        res.on('close',() => {
+            if (detachFinal) toolHandoff.downstreamClosed(res, row);
+            if (!detachFinal || toolHandoff.finalReceipt !== 'terminal') upstream.destroy();
+        });
         if (body) upstream.end(body); else req.pipe(upstream);
     });
     let proxyPort;
@@ -317,6 +326,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     }
     async function close() {
         releaseLost();
+        toolHandoff?.receipt?.releaseProvider?.();
         hardwareStream?.provider.close();
         if (activePartial && !activePartial.destroyed) activePartial.destroy();
         const stopped = await stopBackend('SIGTERM');
@@ -374,7 +384,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         return { htmlStatus: page.status, bundleStatus: bundle.status, connectionStatus: connection.status };
     }
     return { checkMobile, startupError, get backendPid(){return backend.pid;},
-        ...((ordinaryTools || delegation || groupRelay) && { async restartAfterCrash() {
+        ...((ordinaryTools || delegation || groupRelay || toolHandoff?.finalReceipt) && { async restartAfterCrash() {
             const crashed = await stopBackend('SIGKILL');
             assert.deepEqual(crashed, {code:null,signal:'SIGKILL'});
             await startBackend();

@@ -17,14 +17,43 @@ const initialAnswer = marker => [
     '<<<[END_TOOL_REQUEST]>>>',
 ].join('\n');
 
-function create(out, { unknown = false, loseHandoff = false, stream = false } = {}) {
+function create(out, { unknown = false, loseHandoff = false, stream = false, losePublication = false, finalReceipt } = {}) {
     const marker = unknown ? 'ORDINARY_TOOL_THROW' : 'ORDINARY_TOOL_LOCAL';
     const observed = compaction.observe(out);
     let dropped = false;
+    const receipt = {};
     return {
         marker,
         loseHandoff,
+        losePublication,
         stream,
+        finalReceipt,
+        receipt,
+        observeDetachedFinal(response, row) {
+            const chunks = [];
+            response.on('data', chunk => chunks.push(chunk));
+            response.on('end', () => {
+                const text = Buffer.concat(chunks).toString('utf8');
+                const terminal = { at: Date.now(), status: row.status, bodyComplete: response.complete };
+                try {
+                    if (stream) {
+                        const frames = text.split(/\r?\n/).filter(line => line.startsWith('data: ')).map(line => line.slice(6));
+                        const choices = frames.filter(frame => frame !== '[DONE]').flatMap(frame => JSON.parse(frame).choices ?? []);
+                        terminal.finishReason = choices.findLast(choice => choice.finish_reason)?.finish_reason;
+                        terminal.text = choices.map(choice => choice.delta?.content ?? '').join('');
+                        terminal.done = frames.at(-1) === '[DONE]';
+                    } else {
+                        const choice = JSON.parse(text).choices?.[0];
+                        terminal.finishReason = choice?.finish_reason;
+                        terminal.text = choice?.message?.content;
+                    }
+                } catch (error) { terminal.decodeError = error.message; }
+                receipt.upstream = terminal;
+            });
+        },
+        downstreamClosed(response, row) {
+            receipt.downstream = { at: Date.now(), device: row.device, headersSent: response.headersSent };
+        },
         agentConfig: { streamOutput: stream },
         observed: {
             ...observed,
@@ -58,6 +87,17 @@ function create(out, { unknown = false, loseHandoff = false, stream = false } = 
                 row.hasToolResult = hasResult;
                 const content = resumed || hasResult ? finalText : initialAnswer(marker);
                 assert.equal(Boolean(body.stream), stream);
+                if (resumed && finalReceipt) {
+                    const gate = Promise.withResolvers();
+                    receipt.releaseProvider = gate.resolve;
+                    res.once('close', () => {
+                        receipt.providerClosed = { at: Date.now(), responseEnded: res.writableEnded };
+                        gate.resolve();
+                    });
+                    await gate.promise;
+                    if (res.destroyed || finalReceipt === 'unknown') return true;
+                    receipt.providerReplyAt = Date.now();
+                }
                 if (stream) {
                     const chunk = (delta, finish_reason) => 'data: ' + JSON.stringify({id:'synthetic-tool-handoff',
                         object:'chat.completion.chunk',created:1,model:'synthetic',choices:[{index:0,delta,finish_reason}]}) + '\n\n';
@@ -86,7 +126,7 @@ function create(out, { unknown = false, loseHandoff = false, stream = false } = 
         },
         env: { NativeSyncSharedSafeTools: JSON.stringify([tool.name]) },
         observeRequest(method, route) {
-            return method === 'POST' && /\/shared\/(?:steer-[\w-]+|compact-[\w-]+|native-request)$/.test(route);
+            return method === 'POST' && /\/shared\/(?:steer-[\w-]+|compact-[\w-]+|native-request|work-review)$/.test(route);
         },
         observeNativeResponse(response, row) {
             const chunks = [];
@@ -112,6 +152,8 @@ function create(out, { unknown = false, loseHandoff = false, stream = false } = 
             });
         },
         dropResponse(row) {
+            if (losePublication && row.device === 'deviceB' && row.route.endsWith('/steer-turn-complete') &&
+                row.body?.generation === 1 && row.status === 200 && row.response?.workState === 'completed') return true;
             if (!loseHandoff || dropped || row.device !== 'deviceB' || !row.route.endsWith('/steer-handoff') ||
                 row.status < 200 || row.status >= 300) return false;
             assert.ok(row.body.workId);

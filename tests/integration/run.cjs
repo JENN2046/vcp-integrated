@@ -20,7 +20,8 @@ const ordinaryMode = Object.hasOwn(ordinaryModes, requested) ? ordinaryModes[req
 const nativeQueue = requested === 'native-local-queue' ? require('../group-extra/local.cjs') : undefined;
 const aaDesktop = requested === 'aa-desktop';
 const streamInterrupt = requested === 'local-stream-interrupt' ? require('../local-stream-interrupt/fixture.cjs') : undefined;
-const toolHandoffModes = ['tool-handoff-baseline', 'tool-handoff', 'tool-handoff-unknown', 'tool-handoff-stream'];
+const finalReceiptModes = { 'tool-final-receipt-lost': 'terminal', 'tool-final-receipt-unknown': 'unknown' };
+const toolHandoffModes = ['tool-handoff-baseline', 'tool-handoff', 'tool-handoff-unknown', 'tool-handoff-stream', 'tool-final-publication-ack', ...Object.keys(finalReceiptModes)];
 const toolHandoffMode = toolHandoffModes.includes(requested) ? requested : undefined;
 const toolHandoffFixture = toolHandoffMode && require('../tool-work-handoff/fixture.cjs');
 const compactionRetryMode = 'compact-history-identity';
@@ -46,7 +47,7 @@ if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.n
     throw Error('Integration requires Linux x64 and Node 24');
 }
 if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', compactionRetryMode, 'local-stream-interrupt'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|local-stream-interrupt]');
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|tool-final-receipt-lost|tool-final-receipt-unknown|tool-final-publication-ack|local-stream-interrupt]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -165,8 +166,11 @@ async function runCase(root, mode) {
     let service, aa;
     const toolHandoff = toolHandoffFixture?.create(out, {
         unknown: mode === 'tool-handoff-unknown',
-        loseHandoff: ['tool-handoff', 'tool-handoff-stream'].includes(mode),
-        stream: mode === 'tool-handoff-stream',
+        loseHandoff: ['tool-handoff', 'tool-handoff-stream', 'tool-final-publication-ack'].includes(mode) || Boolean(finalReceiptModes[mode]),
+        losePublication: mode === 'tool-final-publication-ack',
+        stream: mode === 'tool-handoff-stream' ||
+            (finalReceiptModes[mode] === 'terminal' && process.env.VCP_TEST_FINAL_STREAM === '1'),
+        finalReceipt: finalReceiptModes[mode],
     });
     const groupRelay = nativeQueue?.createProvider();
     if (aaDesktop) {
@@ -235,6 +239,21 @@ async function runCase(root, mode) {
             if (groupMembers(client.proc.pid).length) process.kill(-client.proc.pid, 'SIGKILL');
         }
         return { electronPid:client.proc.pid, cdsPid, liveGroupMembers:groupMembers(client.proc.pid).length };
+    };
+    const quitBeforeFinalReceipt = async role => {
+        const client = clients[role];
+        const electronPid = client.proc.pid;
+        const cdsPid = result[role].cds.pid;
+        void client.command('quit').catch(() => {});
+        const exited = await Promise.race([client.exit, delay(7500, null, { ref:false })]);
+        if (!exited) return { normalExit: false, ...await crash(role) };
+        result.exits[role] = exited;
+        delete clients[role];
+        assert.deepEqual(exited, { code:0, signal:null });
+        assert.ok(client.events.some(event => event.event === 'runtime-close-end'));
+        assert.ok(client.events.some(event => event.event === 'electron-quit'));
+        await waitUntil(() => !isLive(cdsPid) && !groupMembers(electronPid).length, 'Electron and CDS exit after normal quit');
+        return { normalExit: true, electronPid, cdsPid, liveGroupMembers: 0 };
     };
     const stop = async role => {
         const client = clients[role];
@@ -308,7 +327,7 @@ async function runCase(root, mode) {
                 : nativeQueue ? nativeQueue.scenario
                 : ordinaryMode ? require('../ordinary-desktop/scenario.cjs')
                 : mode === 'config-only' ? require('./configuration.cjs') : scenario;
-            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash,aa,groupRelay,toolHandoff});
+            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash,quitBeforeFinalReceipt,aa,groupRelay,toolHandoff});
         }
     } catch(error) {
         result.failures.push(error.stack);

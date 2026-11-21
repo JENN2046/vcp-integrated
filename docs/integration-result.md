@@ -64,3 +64,5 @@ AgentAssistant 长委托已接入共享单聊的 Work。桌面重开、发起端
 工具型共享单聊支持在第一个已确认的直接工具回执处暂停。A 压缩后，B 可以在同一 Work 中接管并生成文本；副作用不明时保留待核对状态。流式与非流式、丢接管回执、ToolBox 强停重开及重复工具请求见[工具 Work 的跨端接续](evidence/tool-work-handoff/README.md)。
 
 共享检查点提交后的 History 身份报错已用真实投影重放复现。A 的共享读现在与原生话题写队列串行；本机确认失败后重试会找回原压缩意图与检查点，B 能用同一检查点继续。[文件身份、宿主差异与回执](evidence/history-identity/README.md)
+
+工具 Work 的 B 末代已派发、终稿尚未送达时退出：未得到模型终态会保留待核对；ToolBox 已输出全文但 B 未发布时，重开仍无法恢复终稿。中央 Journal 已经接受终稿、只丢发布回执的对照通过。[最终确认窗口实测](evidence/final-work-receipt/README.md)

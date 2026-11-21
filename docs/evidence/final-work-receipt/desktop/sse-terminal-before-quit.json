@@ -1,0 +1,1030 @@
+{
+  "branch": "terminal",
+  "workId": "request_d9bc4405b44447d9bf72eb489d5b4686",
+  "requestId": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+  "receipt": {
+    "providerReplyAt": 1795260916167,
+    "providerClosed": {
+      "at": 1795260916168,
+      "responseEnded": true
+    },
+    "upstream": {
+      "at": 1795260916172,
+      "status": 200,
+      "bodyComplete": true,
+      "finishReason": "stop",
+      "text": "Synthetic B finished the original tool Work.",
+      "done": true
+    },
+    "downstream": {
+      "at": 1795260916235,
+      "device": "deviceB",
+      "headersSent": false
+    }
+  },
+  "exit": {
+    "normalExit": true,
+    "electronPid": 2914350,
+    "cdsPid": 2914466,
+    "liveGroupMembers": 0
+  },
+  "backendExit": {
+    "code": null,
+    "signal": "SIGKILL"
+  },
+  "beforeExit": {
+    "backendPid": 2913725,
+    "admission": {
+      "id": "request_d9bc4405b44447d9bf72eb489d5b4686",
+      "request_id": "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "principal": "desktop:deviceA",
+      "state": "dispatched",
+      "dispatched": 1,
+      "native_terminal": 0
+    },
+    "native": {
+      "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+      "admission_id": "request_d9bc4405b44447d9bf72eb489d5b4686",
+      "principal": "desktop:deviceB",
+      "state": "dispatched"
+    },
+    "control": {
+      "revision": 0,
+      "generation": 1,
+      "executor": "desktop:deviceB"
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+        "state": "paused",
+        "checkpoint_json": "{\"id\":\"reply_request_d9bc4405b44447d9bf72eb489d5b4686\",\"role\":\"assistant\",\"content\":\"Synthetic A requested the isolated counter.\\n\",\"timestamp\":1795260909156,\"finishReason\":\"interrupted\",\"continuity\":{\"version\":1,\"known\":true,\"executionId\":\"request_d9bc4405b44447d9bf72eb489d5b4686\",\"requestId\":\"reply_request_d9bc4405b44447d9bf72eb489d5b4686\",\"dependsOnMessageIds\":[\"controlled_b8b01c27b0a842ea9449b4eb2bf07934\",\"compact-same-1\",\"compact-same-2\"]}}"
+      },
+      {
+        "generation": 1,
+        "executor": "desktop:deviceB",
+        "request_id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "state": "running",
+        "checkpoint_json": null
+      }
+    ],
+    "journal": [
+      "compact-same-1",
+      "compact-same-2",
+      "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+      "checkpoint_compact_0c81881fdf29937d04dfdbbcc365ff7d92a52370"
+    ],
+    "history": [
+      "compact-same-1",
+      "compact-same-2",
+      "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+      "checkpoint_compact_0c81881fdf29937d04dfdbbcc365ff7d92a52370"
+    ],
+    "journalFinal": [],
+    "historyFinal": [],
+    "archive": {
+      "identity": {
+        "workId": "request_d9bc4405b44447d9bf72eb489d5b4686",
+        "requestId": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "generation": 1,
+        "controlRevision": 0
+      },
+      "assistant": [],
+      "completion": null
+    },
+    "phases": [
+      {
+        "stage": "native_prepared",
+        "at": 1795260915660
+      },
+      {
+        "stage": "native_entered",
+        "at": 1795260915672
+      },
+      {
+        "stage": "provider_attempt",
+        "at": 1795260915677
+      }
+    ],
+    "counter": [
+      {
+        "marker": "ORDINARY_TOOL_LOCAL"
+      }
+    ],
+    "providerCalls": [
+      {
+        "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+        "phase": "initial"
+      },
+      {
+        "id": "compaction_1795260909816_qriolqwrgc",
+        "phase": "summary"
+      },
+      {
+        "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "phase": "resumed"
+      }
+    ],
+    "status": "可继续 · 执行端：本端",
+    "buttons": {
+      "新建受控任务": false,
+      "新建工具任务": false,
+      "补充到此任务": false,
+      "接管到本端": false,
+      "本端继续执行": false,
+      "核对任务": false
+    },
+    "finalTextShown": false,
+    "nativePreview": null
+  },
+  "terminalBeforeExit": {
+    "backendPid": 2913725,
+    "admission": {
+      "id": "request_d9bc4405b44447d9bf72eb489d5b4686",
+      "request_id": "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "principal": "desktop:deviceA",
+      "state": "dispatched",
+      "dispatched": 1,
+      "native_terminal": 1
+    },
+    "native": {
+      "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+      "admission_id": "request_d9bc4405b44447d9bf72eb489d5b4686",
+      "principal": "desktop:deviceB",
+      "state": "model_terminal"
+    },
+    "control": {
+      "revision": 0,
+      "generation": 1,
+      "executor": "desktop:deviceB"
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+        "state": "paused",
+        "checkpoint_json": "{\"id\":\"reply_request_d9bc4405b44447d9bf72eb489d5b4686\",\"role\":\"assistant\",\"content\":\"Synthetic A requested the isolated counter.\\n\",\"timestamp\":1795260909156,\"finishReason\":\"interrupted\",\"continuity\":{\"version\":1,\"known\":true,\"executionId\":\"request_d9bc4405b44447d9bf72eb489d5b4686\",\"requestId\":\"reply_request_d9bc4405b44447d9bf72eb489d5b4686\",\"dependsOnMessageIds\":[\"controlled_b8b01c27b0a842ea9449b4eb2bf07934\",\"compact-same-1\",\"compact-same-2\"]}}"
+      },
+      {
+        "generation": 1,
+        "executor": "desktop:deviceB",
+        "request_id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "state": "running",
+        "checkpoint_json": null
+      }
+    ],
+    "journal": [
+      "compact-same-1",
+      "compact-same-2",
+      "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+      "checkpoint_compact_0c81881fdf29937d04dfdbbcc365ff7d92a52370"
+    ],
+    "history": [
+      "compact-same-1",
+      "compact-same-2",
+      "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+      "checkpoint_compact_0c81881fdf29937d04dfdbbcc365ff7d92a52370"
+    ],
+    "journalFinal": [],
+    "historyFinal": [],
+    "archive": {
+      "identity": {
+        "workId": "request_d9bc4405b44447d9bf72eb489d5b4686",
+        "requestId": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "generation": 1,
+        "controlRevision": 0
+      },
+      "assistant": [
+        "Synthetic B finished the original tool Work."
+      ],
+      "completion": null
+    },
+    "phases": [
+      {
+        "stage": "native_prepared",
+        "at": 1795260915660
+      },
+      {
+        "stage": "native_entered",
+        "at": 1795260915672
+      },
+      {
+        "stage": "provider_attempt",
+        "at": 1795260915677
+      },
+      {
+        "stage": "native_settled",
+        "at": 1795260916172
+      }
+    ],
+    "counter": [
+      {
+        "marker": "ORDINARY_TOOL_LOCAL"
+      }
+    ],
+    "providerCalls": [
+      {
+        "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+        "phase": "initial"
+      },
+      {
+        "id": "compaction_1795260909816_qriolqwrgc",
+        "phase": "summary"
+      },
+      {
+        "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "phase": "resumed"
+      }
+    ],
+    "status": "本轮执行中 · 执行端：本端",
+    "buttons": {
+      "新建受控任务": false,
+      "新建工具任务": false,
+      "补充到此任务": false,
+      "接管到本端": false,
+      "本端继续执行": false,
+      "核对任务": false
+    },
+    "finalTextShown": false,
+    "nativePreview": {
+      "kind": "live",
+      "status": "Synthetic shared · 第 2 代 · 原生执行中",
+      "text": "Synthetic B finished the original tool Work."
+    }
+  },
+  "afterExit": {
+    "backendPid": 2913725,
+    "admission": {
+      "id": "request_d9bc4405b44447d9bf72eb489d5b4686",
+      "request_id": "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "principal": "desktop:deviceA",
+      "state": "dispatched",
+      "dispatched": 1,
+      "native_terminal": 1
+    },
+    "native": {
+      "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+      "admission_id": "request_d9bc4405b44447d9bf72eb489d5b4686",
+      "principal": "desktop:deviceB",
+      "state": "model_terminal"
+    },
+    "control": {
+      "revision": 0,
+      "generation": 1,
+      "executor": "desktop:deviceB"
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+        "state": "paused",
+        "checkpoint_json": "{\"id\":\"reply_request_d9bc4405b44447d9bf72eb489d5b4686\",\"role\":\"assistant\",\"content\":\"Synthetic A requested the isolated counter.\\n\",\"timestamp\":1795260909156,\"finishReason\":\"interrupted\",\"continuity\":{\"version\":1,\"known\":true,\"executionId\":\"request_d9bc4405b44447d9bf72eb489d5b4686\",\"requestId\":\"reply_request_d9bc4405b44447d9bf72eb489d5b4686\",\"dependsOnMessageIds\":[\"controlled_b8b01c27b0a842ea9449b4eb2bf07934\",\"compact-same-1\",\"compact-same-2\"]}}"
+      },
+      {
+        "generation": 1,
+        "executor": "desktop:deviceB",
+        "request_id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "state": "running",
+        "checkpoint_json": null
+      }
+    ],
+    "journal": [
+      "compact-same-1",
+      "compact-same-2",
+      "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+      "checkpoint_compact_0c81881fdf29937d04dfdbbcc365ff7d92a52370"
+    ],
+    "history": [
+      "compact-same-1",
+      "compact-same-2",
+      "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+      "checkpoint_compact_0c81881fdf29937d04dfdbbcc365ff7d92a52370"
+    ],
+    "journalFinal": [],
+    "historyFinal": [],
+    "archive": {
+      "identity": {
+        "workId": "request_d9bc4405b44447d9bf72eb489d5b4686",
+        "requestId": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "generation": 1,
+        "controlRevision": 0
+      },
+      "assistant": [
+        "Synthetic B finished the original tool Work."
+      ],
+      "completion": null
+    },
+    "phases": [
+      {
+        "stage": "native_prepared",
+        "at": 1795260915660
+      },
+      {
+        "stage": "native_entered",
+        "at": 1795260915672
+      },
+      {
+        "stage": "provider_attempt",
+        "at": 1795260915677
+      },
+      {
+        "stage": "native_settled",
+        "at": 1795260916172
+      }
+    ],
+    "counter": [
+      {
+        "marker": "ORDINARY_TOOL_LOCAL"
+      }
+    ],
+    "providerCalls": [
+      {
+        "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+        "phase": "initial"
+      },
+      {
+        "id": "compaction_1795260909816_qriolqwrgc",
+        "phase": "summary"
+      },
+      {
+        "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "phase": "resumed"
+      }
+    ]
+  },
+  "reopened": {
+    "backendPid": 2913725,
+    "admission": {
+      "id": "request_d9bc4405b44447d9bf72eb489d5b4686",
+      "request_id": "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "principal": "desktop:deviceA",
+      "state": "dispatched",
+      "dispatched": 1,
+      "native_terminal": 1
+    },
+    "native": {
+      "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+      "admission_id": "request_d9bc4405b44447d9bf72eb489d5b4686",
+      "principal": "desktop:deviceB",
+      "state": "model_terminal"
+    },
+    "control": {
+      "revision": 0,
+      "generation": 1,
+      "executor": "desktop:deviceB"
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+        "state": "paused",
+        "checkpoint_json": "{\"id\":\"reply_request_d9bc4405b44447d9bf72eb489d5b4686\",\"role\":\"assistant\",\"content\":\"Synthetic A requested the isolated counter.\\n\",\"timestamp\":1795260909156,\"finishReason\":\"interrupted\",\"continuity\":{\"version\":1,\"known\":true,\"executionId\":\"request_d9bc4405b44447d9bf72eb489d5b4686\",\"requestId\":\"reply_request_d9bc4405b44447d9bf72eb489d5b4686\",\"dependsOnMessageIds\":[\"controlled_b8b01c27b0a842ea9449b4eb2bf07934\",\"compact-same-1\",\"compact-same-2\"]}}"
+      },
+      {
+        "generation": 1,
+        "executor": "desktop:deviceB",
+        "request_id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "state": "running",
+        "checkpoint_json": null
+      }
+    ],
+    "journal": [
+      "compact-same-1",
+      "compact-same-2",
+      "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+      "checkpoint_compact_0c81881fdf29937d04dfdbbcc365ff7d92a52370"
+    ],
+    "history": [
+      "compact-same-1",
+      "compact-same-2",
+      "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+      "checkpoint_compact_0c81881fdf29937d04dfdbbcc365ff7d92a52370"
+    ],
+    "journalFinal": [],
+    "historyFinal": [],
+    "archive": {
+      "identity": {
+        "workId": "request_d9bc4405b44447d9bf72eb489d5b4686",
+        "requestId": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "generation": 1,
+        "controlRevision": 0
+      },
+      "assistant": [
+        "Synthetic B finished the original tool Work."
+      ],
+      "completion": null
+    },
+    "phases": [
+      {
+        "stage": "native_prepared",
+        "at": 1795260915660
+      },
+      {
+        "stage": "native_entered",
+        "at": 1795260915672
+      },
+      {
+        "stage": "provider_attempt",
+        "at": 1795260915677
+      },
+      {
+        "stage": "native_settled",
+        "at": 1795260916172
+      }
+    ],
+    "counter": [
+      {
+        "marker": "ORDINARY_TOOL_LOCAL"
+      }
+    ],
+    "providerCalls": [
+      {
+        "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+        "phase": "initial"
+      },
+      {
+        "id": "compaction_1795260909816_qriolqwrgc",
+        "phase": "summary"
+      },
+      {
+        "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "phase": "resumed"
+      }
+    ],
+    "status": "原任务需要核对 · 执行端：本端",
+    "buttons": {
+      "新建受控任务": false,
+      "新建工具任务": false,
+      "补充到此任务": true,
+      "接管到本端": false,
+      "本端继续执行": false,
+      "核对任务": true
+    },
+    "finalTextShown": false,
+    "nativePreview": {
+      "kind": "live",
+      "status": "Synthetic shared · 第 2 代 · 原生执行中",
+      "text": "Synthetic B finished the original tool Work."
+    }
+  },
+  "reopenedAfterBackend": {
+    "backendPid": 2914751,
+    "admission": {
+      "id": "request_d9bc4405b44447d9bf72eb489d5b4686",
+      "request_id": "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "principal": "desktop:deviceA",
+      "state": "review_required",
+      "dispatched": 1,
+      "native_terminal": 1
+    },
+    "native": {
+      "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+      "admission_id": "request_d9bc4405b44447d9bf72eb489d5b4686",
+      "principal": "desktop:deviceB",
+      "state": "model_terminal"
+    },
+    "control": {
+      "revision": 0,
+      "generation": 1,
+      "executor": "desktop:deviceB"
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+        "state": "paused",
+        "checkpoint_json": "{\"id\":\"reply_request_d9bc4405b44447d9bf72eb489d5b4686\",\"role\":\"assistant\",\"content\":\"Synthetic A requested the isolated counter.\\n\",\"timestamp\":1795260909156,\"finishReason\":\"interrupted\",\"continuity\":{\"version\":1,\"known\":true,\"executionId\":\"request_d9bc4405b44447d9bf72eb489d5b4686\",\"requestId\":\"reply_request_d9bc4405b44447d9bf72eb489d5b4686\",\"dependsOnMessageIds\":[\"controlled_b8b01c27b0a842ea9449b4eb2bf07934\",\"compact-same-1\",\"compact-same-2\"]}}"
+      },
+      {
+        "generation": 1,
+        "executor": "desktop:deviceB",
+        "request_id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "state": "running",
+        "checkpoint_json": null
+      }
+    ],
+    "journal": [
+      "compact-same-1",
+      "compact-same-2",
+      "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+      "checkpoint_compact_0c81881fdf29937d04dfdbbcc365ff7d92a52370"
+    ],
+    "history": [
+      "compact-same-1",
+      "compact-same-2",
+      "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+      "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+      "checkpoint_compact_0c81881fdf29937d04dfdbbcc365ff7d92a52370"
+    ],
+    "journalFinal": [],
+    "historyFinal": [],
+    "archive": {
+      "identity": {
+        "workId": "request_d9bc4405b44447d9bf72eb489d5b4686",
+        "requestId": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "generation": 1,
+        "controlRevision": 0
+      },
+      "assistant": [
+        "Synthetic B finished the original tool Work."
+      ],
+      "completion": null
+    },
+    "phases": [
+      {
+        "stage": "native_prepared",
+        "at": 1795260915660
+      },
+      {
+        "stage": "native_entered",
+        "at": 1795260915672
+      },
+      {
+        "stage": "provider_attempt",
+        "at": 1795260915677
+      },
+      {
+        "stage": "native_settled",
+        "at": 1795260916172
+      }
+    ],
+    "counter": [
+      {
+        "marker": "ORDINARY_TOOL_LOCAL"
+      }
+    ],
+    "providerCalls": [
+      {
+        "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+        "phase": "initial"
+      },
+      {
+        "id": "compaction_1795260909816_qriolqwrgc",
+        "phase": "summary"
+      },
+      {
+        "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "phase": "resumed"
+      }
+    ],
+    "status": "原任务需要核对 · 执行端：本端",
+    "buttons": {
+      "新建受控任务": false,
+      "新建工具任务": false,
+      "补充到此任务": true,
+      "接管到本端": false,
+      "本端继续执行": false,
+      "核对任务": true
+    },
+    "finalTextShown": false,
+    "nativePreview": {
+      "kind": "live",
+      "status": "Synthetic shared · 第 2 代 · 结果需要核对",
+      "text": ""
+    }
+  },
+  "manualCheck": {
+    "selectedAt": 1795260918146,
+    "checkedAt": 1795260919813,
+    "readsBefore": 2,
+    "readsAfter": 3,
+    "beforeManualCheck": {
+      "backendPid": 2913725,
+      "admission": {
+        "id": "request_d9bc4405b44447d9bf72eb489d5b4686",
+        "request_id": "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+        "principal": "desktop:deviceA",
+        "state": "dispatched",
+        "dispatched": 1,
+        "native_terminal": 1
+      },
+      "native": {
+        "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+        "admission_id": "request_d9bc4405b44447d9bf72eb489d5b4686",
+        "principal": "desktop:deviceB",
+        "state": "model_terminal"
+      },
+      "control": {
+        "revision": 0,
+        "generation": 1,
+        "executor": "desktop:deviceB"
+      },
+      "generations": [
+        {
+          "generation": 0,
+          "executor": "desktop:deviceA",
+          "request_id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+          "state": "paused",
+          "checkpoint_json": "{\"id\":\"reply_request_d9bc4405b44447d9bf72eb489d5b4686\",\"role\":\"assistant\",\"content\":\"Synthetic A requested the isolated counter.\\n\",\"timestamp\":1795260909156,\"finishReason\":\"interrupted\",\"continuity\":{\"version\":1,\"known\":true,\"executionId\":\"request_d9bc4405b44447d9bf72eb489d5b4686\",\"requestId\":\"reply_request_d9bc4405b44447d9bf72eb489d5b4686\",\"dependsOnMessageIds\":[\"controlled_b8b01c27b0a842ea9449b4eb2bf07934\",\"compact-same-1\",\"compact-same-2\"]}}"
+        },
+        {
+          "generation": 1,
+          "executor": "desktop:deviceB",
+          "request_id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+          "state": "running",
+          "checkpoint_json": null
+        }
+      ],
+      "journal": [
+        "compact-same-1",
+        "compact-same-2",
+        "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+        "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+        "checkpoint_compact_0c81881fdf29937d04dfdbbcc365ff7d92a52370"
+      ],
+      "history": [
+        "compact-same-1",
+        "compact-same-2",
+        "controlled_b8b01c27b0a842ea9449b4eb2bf07934",
+        "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+        "checkpoint_compact_0c81881fdf29937d04dfdbbcc365ff7d92a52370"
+      ],
+      "journalFinal": [],
+      "historyFinal": [],
+      "archive": {
+        "identity": {
+          "workId": "request_d9bc4405b44447d9bf72eb489d5b4686",
+          "requestId": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+          "generation": 1,
+          "controlRevision": 0
+        },
+        "assistant": [
+          "Synthetic B finished the original tool Work."
+        ],
+        "completion": null
+      },
+      "phases": [
+        {
+          "stage": "native_prepared",
+          "at": 1795260915660
+        },
+        {
+          "stage": "native_entered",
+          "at": 1795260915672
+        },
+        {
+          "stage": "provider_attempt",
+          "at": 1795260915677
+        },
+        {
+          "stage": "native_settled",
+          "at": 1795260916172
+        }
+      ],
+      "counter": [
+        {
+          "marker": "ORDINARY_TOOL_LOCAL"
+        }
+      ],
+      "providerCalls": [
+        {
+          "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686",
+          "phase": "initial"
+        },
+        {
+          "id": "compaction_1795260909816_qriolqwrgc",
+          "phase": "summary"
+        },
+        {
+          "id": "reply_request_d9bc4405b44447d9bf72eb489d5b4686_g1",
+          "phase": "resumed"
+        }
+      ],
+      "status": "原任务需要核对 · 执行端：本端",
+      "buttons": {
+        "新建受控任务": false,
+        "新建工具任务": false,
+        "补充到此任务": true,
+        "接管到本端": false,
+        "本端继续执行": false,
+        "核对任务": true
+      },
+      "finalTextShown": false,
+      "nativePreview": {
+        "kind": "live",
+        "status": "Synthetic shared · 第 2 代 · 原生执行中",
+        "text": "Synthetic B finished the original tool Work."
+      }
+    }
+  },
+  "profileDigest": "c0511243b1d3a910fdce1b5c933a5a4d21c8ba0fe3e5aea9dfb874dc1f7dc60d",
+  "desktopSources": {
+    "main": [
+      {
+        "file": "apps/desktop/modules/ipc/chatHandlers.js",
+        "sha256": "e359a238ce393f22bae5023574139e947257ac29e9ecf3dcfa7b5a1127f48958"
+      },
+      {
+        "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+        "sha256": "d8bff47764d408b846ffc8267b750c1712171741152b0755f05528f21cac7050"
+      },
+      {
+        "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+        "sha256": "9f0138b9fcede09bdd3e03002d8db2075fc8ed7aec8dc6c6806a33dbbe5b9dfb"
+      },
+      {
+        "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+        "sha256": "4db5d3730a6da019ae14f7f8c07cdd41cf3e6eaa4a70f2bd20ccb3b9b8492d15"
+      }
+    ],
+    "renderer": [
+      {
+        "file": "apps/desktop/modules/chatManager.js",
+        "bytes": 176549,
+        "sha256": "72dd5ef25ff38115276545838d8c9159fb8ce569a9bfb158a51eb6bd327cfed8"
+      },
+      {
+        "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+        "bytes": 6970,
+        "sha256": "f7379f242fb60012ca172c204c06666db1a300fd7130692e4d12ba3bef3a8936"
+      },
+      {
+        "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+        "bytes": 10994,
+        "sha256": "692768db496c93e73f8444bd66c35be537958082faa07ba8d40252b130dba22d"
+      }
+    ]
+  },
+  "publishedBeforeReopen": 0,
+  "publishedByB": 0,
+  "baselineCommit": "2a36b507543287350a21d01ce9b29ccc3d970379",
+  "mode": "tool-final-receipt-lost",
+  "outcome": "FAIL",
+  "failure": [
+    "AssertionError [ERR_ASSERTION]: Reopening should recover one final reply for the original Work in Journal, physical History and chat"
+  ],
+  "runtime": {
+    "A": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cds": {
+        "pid": 2913977,
+        "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "profileDigest": "e5d3db04f874912692b9db1bfcc26878c457b3959317e23a8b40b66bf9732ad7"
+    },
+    "B": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cds": {
+        "pid": 2914011,
+        "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "profileDigest": "c0511243b1d3a910fdce1b5c933a5a4d21c8ba0fe3e5aea9dfb874dc1f7dc60d"
+    },
+    "B-recovered": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cds": {
+        "pid": 2914466,
+        "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "profileDigest": "c0511243b1d3a910fdce1b5c933a5a4d21c8ba0fe3e5aea9dfb874dc1f7dc60d"
+    },
+    "B-after-final-loss": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cds": {
+        "pid": 2914612,
+        "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "profileDigest": "c0511243b1d3a910fdce1b5c933a5a4d21c8ba0fe3e5aea9dfb874dc1f7dc60d"
+    },
+    "B-after-toolbox-restart": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cds": {
+        "pid": 2914898,
+        "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "profileDigest": "c0511243b1d3a910fdce1b5c933a5a4d21c8ba0fe3e5aea9dfb874dc1f7dc60d"
+    }
+  },
+  "exits": {
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B-taking-over": {
+      "code": 0,
+      "signal": null
+    },
+    "B-recovered": {
+      "code": 0,
+      "signal": null
+    },
+    "B-after-final-loss": {
+      "code": 0,
+      "signal": null
+    },
+    "B-after-toolbox-restart": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "backendSources": [
+    {
+      "file": "apps/server/server.js",
+      "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "5fe109606e02b4101c8da15c5a810cd2d83a1796117dfcac91979491c52d3339"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "bd565d29533bf71863a304dfd88d134f574921e518d7be6a1eb5d0e27ae5c94f"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "6dd80aeceb8c1d5202fe1151fed4e74ae4d05ea7adc3ebc02d3687426f5ac7cd"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "e0cdd6e14834b6b31dbec30afb9b593b4c55b4405d53503c430d0bcfe0aabd07"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "2e637687e88f05d3ae23cb19e663b3a0e5998f424df4101cb7663f9fb41e5481"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+      "sha256": "7b47a87bf1ad232ec260a406fec36e6fdf4851424ddc574fcfabf71918bc23b2"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+      "sha256": "4f7dab15039bb42a5dc1289b21a5a84627abc4c9ce577b7b7575b2ac3648408f"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "78b53bbb5016510fc3a4827c32df1c3e9b8a57fd218d7d6ae7419ae35c601b57"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+      "sha256": "f4aea542cdcbbe7273bc66e0aee7d35df01b3688d32c11786681ceb3c04d5fe0"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+      "sha256": "c0be485ee31ed3d50db0e5a7e5e72aa38110434fe63c23606a7855a05ca7d512"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+      "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "072cf520ebb2638b85ea2bfe84b0226a216d9996748697c9e1324b3f88156793"
+    },
+    {
+      "file": "apps/server/modules/nativeContinuationStore.cjs",
+      "sha256": "f6774df34bdcc60346f4ed49f5dccaa2e0da5645b5b60ea29f364f89a5090ee6"
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "c32debeee780e1a9528c8025cdb77c00d3e6b5f07464471abdc9e1a14fcef712"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "2f27f829f7f269d66b74a7a60fdae5cab17ae42e3c0769fa758d83a398e5dc4c"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "635c94f249a0f67cb085ae51f1a53e08dc49ddf2aaadb30e434fe6a9a36900f3"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "761918b0d8764b662a4e3da3e5ec119100fd6f29af94dd7a2ccf7c571848c5ad"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/groupTurn.js",
+      "sha256": "7d37337452fd8428aff74a40f621631a70b7f1bf9584ef6bd3538bac0de3d3f7"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/portal.js",
+      "sha256": "3088ccf0e10e0b912164ad2f6e89ec97e19fd5249daa0965947cd7101e5ce95b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTurns.js",
+      "sha256": "7df79649f69c57b7ce800a8e85f3345d604b93bda81f45e58dcbee2aa7a6b2a7"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedEvents.js",
+      "sha256": "62e81d32e6e963554cdce3343ba3942a62414e91cc723170356b54cda7ed3a81"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/native-sync.js",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    }
+  ],
+  "processBoundaryEvents": [
+    {
+      "event": "B-recovered:before-quit",
+      "t": 1795260916204,
+      "data": {
+        "sourceMs": 1795260916204
+      }
+    },
+    {
+      "event": "B-recovered:runtime-close-start",
+      "t": 1795260916206,
+      "data": {
+        "sourceMs": 1795260916206
+      }
+    },
+    {
+      "event": "B-recovered:runtime-close-end",
+      "t": 1795260916208,
+      "data": {
+        "sourceMs": 1795260916208
+      }
+    },
+    {
+      "event": "B-recovered:before-quit",
+      "t": 1795260916217,
+      "data": {
+        "sourceMs": 1795260916217
+      }
+    },
+    {
+      "event": "B-recovered:electron-quit",
+      "t": 1795260916238,
+      "data": {
+        "sourceMs": 1795260916238
+      }
+    },
+    {
+      "event": "B-recovered:process-exit",
+      "t": 1795260916294,
+      "data": {
+        "code": 0,
+        "signal": null
+      }
+    },
+    {
+      "event": "backend-exit",
+      "t": 1795260920344,
+      "data": {
+        "code": null,
+        "signal": "SIGKILL"
+      }
+    },
+    {
+      "event": "backend-exit",
+      "t": 1795260926138,
+      "data": {
+        "code": 0,
+        "signal": null
+      }
+    }
+  ],
+  "screenshots": {
+    "sse-terminal-before-quit-B-same-toolbox.png": "ec10f082bd69c3f47ed956efc19de7eb8b98600c32afe0048b560b1376c6b943",
+    "sse-terminal-before-quit-B-restarted-toolbox.png": "c3960278d0ea31fca37f544f82cf1ad66f9092d7e21e94af73c05f159287f16a"
+  }
+}
