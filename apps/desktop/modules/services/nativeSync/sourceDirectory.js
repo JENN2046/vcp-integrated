@@ -14,7 +14,7 @@ async function plain(file,{directory=false,missing=false}={}){
 }
 // Native config membership is authoritative. Missing/failed reads are observations,
 // never deletions. In particular, do not upload the get-agents DTO or its prompts.
-async function sourceDirectory({appDataRoot,readAgentConfig,readGroupConfig,connection}){
+async function sourceDirectory({appDataRoot,readAgentConfig,readGroupConfig,connection,onNativeTopic}){
  const agents=[],topics=[],errors=[],configRevisions={},root=path.resolve(appDataRoot);
  const {normalizeScope,permits}=require('./sourceScope'),scope=normalizeScope(connection?.sourceScope);
  await plain(root,{directory:true});
@@ -43,6 +43,7 @@ async function sourceDirectory({appDataRoot,readAgentConfig,readGroupConfig,conn
      if(deletedTopic(t.id))continue;
      if(!permits(scope,{ownerType,ownerId,topicId:t.id}))continue;
      identity({ownerType,ownerId,topicId:t.id,msgId:'_'});if(ids.has(t.id))throw fail('SOURCE_DUPLICATE_TOPIC');ids.add(t.id);
+     onNativeTopic?.(ownerType,ownerId,t);
      const history=path.join(root,'UserData',ownerId,'topics',t.id,'history.json');
      await assertHistoryPath(root,history);
      const exists=await plain(history,{missing:true});

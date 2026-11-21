@@ -88,3 +88,5 @@ Android 16 实机已验证共享发送的两个恢复入口：明确 409 后冷�
 Android 首次配对立即强停已定位到隔离 WebView 的 Cookie 写盘时序。测试壳在会话查询前等待写盘，原手机冷开能以同一会话标识直接恢复。[改前改后回执与冷开截图](evidence/android-pair-force-stop/README.md)
 
 在原 Android 16 的独立用户中，Firefox 已安装 PWA 首次配对后强停也会丢失 Cookie。补上设备签名恢复后，82 毫秒强停并冷开，页面自动找回原 sessionMarker，中央仍只消费一枚配对码、保留一条会话。[实体手机前后对照、产品差异和截图](evidence/android-installed-pwa-pair/README.md)
+
+双桌面空闲复测三个一分钟窗口。复用同轮目录扫描得到的话题配置后，两端合计每分钟少读 72 次配置文件、33,792 个逻辑字节。观察端离线后重开追平原游标，在线第三轮收到完整回复。[空闲复测和恢复回执](evidence/idle-review/README.md)

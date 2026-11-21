@@ -30,6 +30,34 @@ test('native topic rename receives an authoritative configuration receipt',async
  const result=await a.runtime.renameNativeTopic(a.descriptor,'Renamed through native UI',confirmed(await a.runtime.nativeDeletionContext(a.descriptor)));
  assert.equal(result.success,true);assert.equal(f.shared.get(f.actor('A'),'sharedAB',f.topic.id).config.name,'Renamed through native UI');
 });
+test('idle topic discovery skips a matching native projection and rereads differences before drafting', async t => {
+ const f = await fixture(t);
+ const {runtime, descriptor} = await f.desktop('A');
+ const topicId = f.topic.id;
+ const ensure = (name, archived) => runtime.host.ensureTopic(descriptor.itemType, descriptor.itemId, {
+  id: descriptor.topicId, name, archived
+ });
+ const readLocal = runtime.readLocal.bind(runtime);
+ let topicReads = 0;
+ runtime.readLocal = object => {
+  if (object.id === topicId) topicReads++;
+  return readLocal(object);
+ };
+ await runtime.tickCore({forceLocal:true});
+ assert.equal(topicReads, 0);
+ assert.equal(runtime.configs.state.drafts[topicId], undefined);
+
+ await ensure('Observed during discovery', false);
+ const discover = runtime.discover.bind(runtime);
+ runtime.discover = async (...args) => {
+  await discover(...args);
+  await ensure('Latest native title', true);
+ };
+ await runtime.tickCore({forceLocal:true});
+ assert.equal(topicReads, 1);
+ assert.deepEqual(runtime.configs.state.drafts[topicId].config, {name:'Latest native title', archived:true});
+ assert.equal(f.shared.get(f.actor('A'), 'sharedAB', topicId).config.name, 'One history');
+});
 function submit(f,id){const c=f.shared.executionConfig(f.actor('A'),{sharedSpaceId:'sharedAB',sharedId:f.topic.id});return f.shared.sessionSend(f.actor('A'),{sharedSpaceId:'sharedAB',sharedId:f.topic.id,requestId:id,expectedHead:c.head,configHash:c.hash,message:{id:'user_'+id,role:'user',content:'synthetic trajectory input',timestamp:1}});}
 async function execute(f){f.portal.engine.db.prepare('UPDATE mobile_executions SET not_before=0').run();f.portal.engine.setEndpoint({url:f.url+'/v1/chat/completions',key:'SYNTHETIC_SECRET_MUST_NOT_APPEAR'});}
 test('real native request and response trace survives backend reopen and is initiator-only',async t=>{

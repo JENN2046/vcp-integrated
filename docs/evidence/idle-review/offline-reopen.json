@@ -1,0 +1,107 @@
+{
+  "result": "PASS",
+  "desktop": "44.9.3",
+  "isolatedProfiles": true,
+  "sandbox": true,
+  "before": {
+    "cursor": 2,
+    "historyIds": [
+      "msg_1795288209252_user_h39q6yerj3",
+      "reply_request_577c1421b19747afa431d78dd405fc49"
+    ],
+    "inbox": 0,
+    "outbox": 0,
+    "pending": true
+  },
+  "stillOffline": {
+    "cursor": 2,
+    "historyIds": [
+      "msg_1795288209252_user_h39q6yerj3",
+      "reply_request_577c1421b19747afa431d78dd405fc49"
+    ],
+    "inbox": 0,
+    "outbox": 0,
+    "pending": true
+  },
+  "reopened": {
+    "cursor": 4,
+    "historyIds": [
+      "msg_1795288209252_user_h39q6yerj3",
+      "reply_request_577c1421b19747afa431d78dd405fc49",
+      "msg_1795288209568_user_g2f79ae00l",
+      "reply_request_edf01b5b0bc14b00a95cc266fa6827a5"
+    ],
+    "inbox": 0,
+    "outbox": 0,
+    "pending": true
+  },
+  "live": {
+    "cursor": 6,
+    "historyIds": [
+      "msg_1795288209252_user_h39q6yerj3",
+      "reply_request_577c1421b19747afa431d78dd405fc49",
+      "msg_1795288209568_user_g2f79ae00l",
+      "reply_request_edf01b5b0bc14b00a95cc266fa6827a5",
+      "msg_1795288211431_user_jrc1q75rgn",
+      "reply_request_e8bf6cd7755843d593e48f078bb96ee0"
+    ],
+    "inbox": 0,
+    "outbox": 0,
+    "pending": true
+  },
+  "journal": [
+    {
+      "seq": 1,
+      "id": "msg_1795288209252_user_h39q6yerj3",
+      "role": "user"
+    },
+    {
+      "seq": 2,
+      "id": "reply_request_577c1421b19747afa431d78dd405fc49",
+      "role": "assistant"
+    },
+    {
+      "seq": 3,
+      "id": "msg_1795288209568_user_g2f79ae00l",
+      "role": "user"
+    },
+    {
+      "seq": 4,
+      "id": "reply_request_edf01b5b0bc14b00a95cc266fa6827a5",
+      "role": "assistant"
+    },
+    {
+      "seq": 5,
+      "id": "msg_1795288211431_user_jrc1q75rgn",
+      "role": "user"
+    },
+    {
+      "seq": 6,
+      "id": "reply_request_e8bf6cd7755843d593e48f078bb96ee0",
+      "role": "assistant"
+    }
+  ],
+  "postCount": 3,
+  "providerCallCount": 3,
+  "sameProfile": true,
+  "renderedTurnCount": 3,
+  "exits": {
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B-reopened": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "failures": []
+}

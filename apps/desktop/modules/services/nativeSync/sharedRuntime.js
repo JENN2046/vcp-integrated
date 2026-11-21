@@ -17,6 +17,10 @@ const kindOrder=['agent','group','rules','topic'];
 const inactiveTaskWork = new Set(['completed','cancelled','failed']);
 const activeTaskStates = new Set(['accepted','running','waiting','cancelling']);
 
+function localTopicConfig(topic){
+ return {name:topic.name||topic.id,archived:topic.archived===true};
+}
+
 function startupFence(sharedSpaceId,error=()=>null){
  const blocked=async()=>{throw fail(error()||'SHARED_STARTUP_PENDING');};
  return {isRecoveryFence:true,sharedSpaceId,topics:[],fullSource:true,isEnabled:()=>true,beforeWrite:blocked,beforeMutation:blocked,beginDelete:blocked,diagnostics:()=>({enabled:false,readOnly:true,degraded:error()||'SHARED_STARTUP_PENDING',outboxSize:0,inboundBuffered:0,conflicts:[],localCommits:[]})};
@@ -210,7 +214,7 @@ class SharedRuntime {
   if(['agent','group'].includes(object.kind)){const value=await this.host.readOwner(object.kind,local.localId);return value&&object.kind==='group'?this.groupToShared(value):value;}
   if(object.kind==='rules')return {name:object.config.name,tavernRules:await this.host.readRules(),executionPolicy:await this.host.readPolicy()};
   const parent=this.localFor(object.parentId),raw=await ownedJson(this.root,path.join(this.root,parent.kind==='agent'?'Agents':'AgentGroups',parent.localId,'config.json'),{optional:true}),topic=raw?.topics?.find(t=>t.id===local.localId);
-  return topic?{name:topic.name||topic.id,archived:topic.archived===true}:null;
+  return topic?localTopicConfig(topic):null;
  }
  async writeLocal(object){
   const local=this.localFor(object.id);
@@ -224,8 +228,8 @@ class SharedRuntime {
   this.state.locals[object.id].seed=false;
   await this.save();
  }
- async discover(adopting=false){
-  const directory=await sourceDirectory({appDataRoot:this.root,connection:this.connection,readAgentConfig:id=>ownedJson(this.root,path.join(this.root,'Agents',id,'config.json')),readGroupConfig:id=>ownedJson(this.root,path.join(this.root,'AgentGroups',id,'config.json'))});
+ async discover(adopting=false,onNativeTopic){
+  const directory=await sourceDirectory({appDataRoot:this.root,connection:this.connection,onNativeTopic,readAgentConfig:id=>ownedJson(this.root,path.join(this.root,'Agents',id,'config.json')),readGroupConfig:id=>ownedJson(this.root,path.join(this.root,'AgentGroups',id,'config.json'))});
   if(directory.errors.length)throw fail(directory.errors[0].code);
   for(const kind of ['agent','group'])for(const owner of directory.agents.filter(o=>o.ownerType===kind)){
    if(this.state.retiredOwners?.[kind+':'+owner.ownerId]||Object.values(this.state.locals).some(l=>l.kind===kind&&l.localId===owner.ownerId))continue;
@@ -351,13 +355,27 @@ class SharedRuntime {
   if(!hints||hints.has('changes'))await this.pollDirectory();
   await this.directoryState.tombstones();await this.materialize();
   const localScan=forceLocal||this.dirty||!this.lastLocalScan||Date.now()-this.lastLocalScan>=5000;
-  if(localScan){this.dirty=false;this.lastLocalScan=Date.now();await this.discover(false);}
+  let scannedTopics;
+  if(localScan){
+   this.dirty=false;this.lastLocalScan=Date.now();
+   scannedTopics=new Map();
+   await this.discover(false,(kind,ownerId,topic)=>{
+    scannedTopics.set(JSON.stringify([kind,ownerId,topic.id]),localTopicConfig(topic));
+   });
+  }
   for(const mapping of this.mappings())if(!this.replica.adapter.isEnabled(mapping.shared))await this.replica.add(mapping);
   await this.backfill();
   for(const [id,known]of Object.entries(this.configs.state.objects)){
    if(this.configs.state.drafts[id])continue;
    if(!localScan)continue;
    const metadata=this.state.objects[id];if(!metadata||metadata.deleted||!this.isLocalVisible(id)||this.matching.fenced(id))continue;
+   if(metadata.kind==='topic'){
+    const owner=this.localFor(metadata.parentId),topic=this.localFor(id);
+    const observed=scannedTopics.get(JSON.stringify([owner.kind,owner.localId,topic.localId]));
+    // Only skip a matching observation from this scan. A difference must
+    // still go through the normal fresh read before it can become a draft.
+    if(observed&&stable(observed)===stable(known.materialized||known.config))continue;
+   }
    const object={...metadata,config:known.config},current=await this.readLocal(object);
    if(current&&stable(current)!==stable(known.materialized||known.config))await this.configs.edit(id,known.kind,current);
   }

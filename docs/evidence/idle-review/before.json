@@ -1,0 +1,711 @@
+{
+  "gitRevision": "32e4074b8deebe6d150e4c2c2bcc7260876ea9c6",
+  "targetSourceSha256": {
+    "sharedRuntime.js": "2b2deb191880b214bb46762c7a678c63d3c6d7563f1f4b29296f50b27cabea66",
+    "sourceDirectory.js": "f6f379f2b17c0514d5e334d38f1c82820d68febd6a2e61632b6ec3077a5efbde"
+  },
+  "electron": "44.9.3",
+  "chromiumSandboxEnabled": true,
+  "fixture": "tests/integration/run.cjs idle",
+  "warmupSeconds": 15,
+  "windowSeconds": 60,
+  "ticksPerSecond": 100,
+  "scope": "Electron A and B main processes and ToolBox Node process",
+  "caughtUpDuringSampling": {
+    "central": {
+      "journalHead": 0,
+      "directoryRevision": 7
+    },
+    "A": {
+      "cursor": 0,
+      "directoryRevision": 7,
+      "topics": 3,
+      "objects": 7,
+      "outbox": 0,
+      "inbox": 0,
+      "messagePending": false,
+      "registryPending": false
+    },
+    "B": {
+      "cursor": 0,
+      "directoryRevision": 7,
+      "topics": 3,
+      "objects": 7,
+      "outbox": 0,
+      "inbox": 0,
+      "messagePending": false,
+      "registryPending": false
+    }
+  },
+  "providerCalls": 0,
+  "exitStatus": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "windows": [
+    {
+      "window": 1,
+      "elapsedMs": 60000,
+      "processes": {
+        "A": {
+          "cpuMs": 590,
+          "processIo": {
+            "rchar": 292505,
+            "wchar": 58781,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "configReadByOperation": {
+            "SharedRuntime.discover": {
+              "count": 36,
+              "logicalBytes": 16896
+            },
+            "SharedRuntime.readLocal": {
+              "count": 72,
+              "logicalBytes": 33792
+            }
+          },
+          "taggedConfigReads": {
+            "count": 108,
+            "logicalBytes": 50688
+          },
+          "backfillStateWrites": {
+            "count": 0,
+            "logicalBytes": 0
+          },
+          "taggedLogicalFiles": {
+            "SharedRuntime.discover|readFile|config": [
+              36,
+              16896
+            ],
+            "SharedRuntime.readLocal|readFile|config": [
+              72,
+              33792
+            ],
+            "SharedRuntime.readLocal|readFile|other": [
+              36,
+              72
+            ]
+          },
+          "taggedInvocations": {
+            "SharedRuntime.tick": 240,
+            "SharedRuntime.tickCore": 240,
+            "SharedRuntime.recoverRegistration": 240,
+            "SharedRuntime.materialize": 240,
+            "SharedRuntime.backfill": 240,
+            "SharedExecution.reconcile": 240,
+            "SharedSessionClient.reconcile": 240,
+            "SharedRuntime.discover": 12,
+            "SharedRuntime.readLocal": 84,
+            "SharedMatching.poll": 1,
+            "SharedRuntime.pollDirectory": 1,
+            "NativeSyncAdapter.synchronize": 1
+          }
+        },
+        "B": {
+          "cpuMs": 630,
+          "processIo": {
+            "rchar": 290653,
+            "wchar": 58737,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "configReadByOperation": {
+            "SharedRuntime.discover": {
+              "count": 36,
+              "logicalBytes": 16896
+            },
+            "SharedRuntime.readLocal": {
+              "count": 72,
+              "logicalBytes": 33792
+            }
+          },
+          "taggedConfigReads": {
+            "count": 108,
+            "logicalBytes": 50688
+          },
+          "backfillStateWrites": {
+            "count": 0,
+            "logicalBytes": 0
+          },
+          "taggedLogicalFiles": {
+            "SharedRuntime.discover|readFile|config": [
+              36,
+              16896
+            ],
+            "SharedRuntime.readLocal|readFile|config": [
+              72,
+              33792
+            ],
+            "SharedRuntime.readLocal|readFile|other": [
+              36,
+              72
+            ]
+          },
+          "taggedInvocations": {
+            "SharedRuntime.tick": 240,
+            "SharedRuntime.tickCore": 240,
+            "SharedRuntime.recoverRegistration": 240,
+            "SharedRuntime.materialize": 240,
+            "SharedRuntime.backfill": 240,
+            "SharedExecution.reconcile": 240,
+            "SharedSessionClient.reconcile": 240,
+            "SharedRuntime.discover": 12,
+            "SharedRuntime.readLocal": 84,
+            "SharedMatching.poll": 1,
+            "SharedRuntime.pollDirectory": 1,
+            "NativeSyncAdapter.synchronize": 1
+          }
+        },
+        "backend": {
+          "cpuMs": 720,
+          "processIo": {
+            "rchar": 48940,
+            "wchar": 21146,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "configReadByOperation": {
+            "SharedRuntime.discover": {
+              "count": 0,
+              "logicalBytes": 0
+            },
+            "SharedRuntime.readLocal": {
+              "count": 0,
+              "logicalBytes": 0
+            }
+          },
+          "taggedConfigReads": {
+            "count": 0,
+            "logicalBytes": 0
+          },
+          "backfillStateWrites": {
+            "count": 0,
+            "logicalBytes": 0
+          },
+          "taggedLogicalFiles": {},
+          "taggedInvocations": {
+            "shared/info": 24,
+            "shared/wait": 4,
+            "shared/matches": 2,
+            "shared/changes": 2,
+            "shared/pull": 2
+          }
+        }
+      },
+      "twoDesktopConfigReadTotal": {
+        "count": 216,
+        "logicalBytes": 101376
+      },
+      "http": {
+        "shared/info": {
+          "requests": 24,
+          "finished": 24,
+          "requestBytes": 0,
+          "responseBytes": 11088,
+          "codes": {
+            "200": 24
+          },
+          "verbs": {
+            "GET": 24
+          }
+        },
+        "shared/wait": {
+          "requests": 4,
+          "finished": 4,
+          "requestBytes": 0,
+          "responseBytes": 268,
+          "codes": {
+            "200": 4
+          },
+          "verbs": {
+            "GET": 4
+          }
+        },
+        "shared/matches": {
+          "requests": 2,
+          "finished": 2,
+          "requestBytes": 0,
+          "responseBytes": 76,
+          "codes": {
+            "200": 2
+          },
+          "verbs": {
+            "GET": 2
+          }
+        },
+        "shared/changes": {
+          "requests": 2,
+          "finished": 2,
+          "requestBytes": 0,
+          "responseBytes": 78,
+          "codes": {
+            "200": 2
+          },
+          "verbs": {
+            "GET": 2
+          }
+        },
+        "shared/pull": {
+          "requests": 2,
+          "finished": 2,
+          "requestBytes": 0,
+          "responseBytes": 106,
+          "codes": {
+            "200": 2
+          },
+          "verbs": {
+            "GET": 2
+          }
+        }
+      },
+      "otherBackendHttpStarts": 0
+    },
+    {
+      "window": 2,
+      "elapsedMs": 60001,
+      "processes": {
+        "A": {
+          "cpuMs": 430,
+          "processIo": {
+            "rchar": 122578,
+            "wchar": 56623,
+            "read_bytes": 94208,
+            "write_bytes": 0
+          },
+          "configReadByOperation": {
+            "SharedRuntime.discover": {
+              "count": 36,
+              "logicalBytes": 16896
+            },
+            "SharedRuntime.readLocal": {
+              "count": 72,
+              "logicalBytes": 33792
+            }
+          },
+          "taggedConfigReads": {
+            "count": 108,
+            "logicalBytes": 50688
+          },
+          "backfillStateWrites": {
+            "count": 0,
+            "logicalBytes": 0
+          },
+          "taggedLogicalFiles": {
+            "SharedRuntime.discover|readFile|config": [
+              36,
+              16896
+            ],
+            "SharedRuntime.readLocal|readFile|config": [
+              72,
+              33792
+            ],
+            "SharedRuntime.readLocal|readFile|other": [
+              36,
+              72
+            ]
+          },
+          "taggedInvocations": {
+            "SharedRuntime.tick": 240,
+            "SharedRuntime.tickCore": 240,
+            "SharedRuntime.recoverRegistration": 240,
+            "SharedRuntime.materialize": 240,
+            "SharedRuntime.backfill": 240,
+            "SharedExecution.reconcile": 240,
+            "SharedSessionClient.reconcile": 240,
+            "SharedRuntime.discover": 12,
+            "SharedRuntime.readLocal": 84,
+            "SharedMatching.poll": 1,
+            "SharedRuntime.pollDirectory": 1,
+            "NativeSyncAdapter.synchronize": 1
+          }
+        },
+        "B": {
+          "cpuMs": 460,
+          "processIo": {
+            "rchar": 120758,
+            "wchar": 56727,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "configReadByOperation": {
+            "SharedRuntime.discover": {
+              "count": 36,
+              "logicalBytes": 16896
+            },
+            "SharedRuntime.readLocal": {
+              "count": 72,
+              "logicalBytes": 33792
+            }
+          },
+          "taggedConfigReads": {
+            "count": 108,
+            "logicalBytes": 50688
+          },
+          "backfillStateWrites": {
+            "count": 0,
+            "logicalBytes": 0
+          },
+          "taggedLogicalFiles": {
+            "SharedRuntime.discover|readFile|config": [
+              36,
+              16896
+            ],
+            "SharedRuntime.readLocal|readFile|config": [
+              72,
+              33792
+            ],
+            "SharedRuntime.readLocal|readFile|other": [
+              36,
+              72
+            ]
+          },
+          "taggedInvocations": {
+            "SharedRuntime.tick": 239,
+            "SharedRuntime.tickCore": 239,
+            "SharedRuntime.recoverRegistration": 239,
+            "SharedRuntime.materialize": 239,
+            "SharedRuntime.backfill": 239,
+            "SharedExecution.reconcile": 239,
+            "SharedSessionClient.reconcile": 239,
+            "SharedRuntime.discover": 12,
+            "SharedRuntime.readLocal": 84,
+            "SharedMatching.poll": 1,
+            "SharedRuntime.pollDirectory": 1,
+            "NativeSyncAdapter.synchronize": 1
+          }
+        },
+        "backend": {
+          "cpuMs": 730,
+          "processIo": {
+            "rchar": 29548,
+            "wchar": 23113,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "configReadByOperation": {
+            "SharedRuntime.discover": {
+              "count": 0,
+              "logicalBytes": 0
+            },
+            "SharedRuntime.readLocal": {
+              "count": 0,
+              "logicalBytes": 0
+            }
+          },
+          "taggedConfigReads": {
+            "count": 0,
+            "logicalBytes": 0
+          },
+          "backfillStateWrites": {
+            "count": 0,
+            "logicalBytes": 0
+          },
+          "taggedLogicalFiles": {},
+          "taggedInvocations": {
+            "shared/info": 24,
+            "shared/wait": 4,
+            "shared/matches": 2,
+            "shared/changes": 2,
+            "shared/pull": 2
+          }
+        }
+      },
+      "twoDesktopConfigReadTotal": {
+        "count": 216,
+        "logicalBytes": 101376
+      },
+      "http": {
+        "shared/info": {
+          "requests": 24,
+          "finished": 24,
+          "requestBytes": 0,
+          "responseBytes": 11088,
+          "codes": {
+            "200": 24
+          },
+          "verbs": {
+            "GET": 24
+          }
+        },
+        "shared/wait": {
+          "requests": 4,
+          "finished": 4,
+          "requestBytes": 0,
+          "responseBytes": 268,
+          "codes": {
+            "200": 4
+          },
+          "verbs": {
+            "GET": 4
+          }
+        },
+        "shared/matches": {
+          "requests": 2,
+          "finished": 2,
+          "requestBytes": 0,
+          "responseBytes": 76,
+          "codes": {
+            "200": 2
+          },
+          "verbs": {
+            "GET": 2
+          }
+        },
+        "shared/changes": {
+          "requests": 2,
+          "finished": 2,
+          "requestBytes": 0,
+          "responseBytes": 78,
+          "codes": {
+            "200": 2
+          },
+          "verbs": {
+            "GET": 2
+          }
+        },
+        "shared/pull": {
+          "requests": 2,
+          "finished": 2,
+          "requestBytes": 0,
+          "responseBytes": 106,
+          "codes": {
+            "200": 2
+          },
+          "verbs": {
+            "GET": 2
+          }
+        }
+      },
+      "otherBackendHttpStarts": 0
+    },
+    {
+      "window": 3,
+      "elapsedMs": 60001,
+      "processes": {
+        "A": {
+          "cpuMs": 390,
+          "processIo": {
+            "rchar": 122209,
+            "wchar": 56287,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "configReadByOperation": {
+            "SharedRuntime.discover": {
+              "count": 36,
+              "logicalBytes": 16896
+            },
+            "SharedRuntime.readLocal": {
+              "count": 72,
+              "logicalBytes": 33792
+            }
+          },
+          "taggedConfigReads": {
+            "count": 108,
+            "logicalBytes": 50688
+          },
+          "backfillStateWrites": {
+            "count": 0,
+            "logicalBytes": 0
+          },
+          "taggedLogicalFiles": {
+            "SharedRuntime.discover|readFile|config": [
+              36,
+              16896
+            ],
+            "SharedRuntime.readLocal|readFile|config": [
+              72,
+              33792
+            ],
+            "SharedRuntime.readLocal|readFile|other": [
+              36,
+              72
+            ]
+          },
+          "taggedInvocations": {
+            "SharedRuntime.tick": 239,
+            "SharedRuntime.tickCore": 239,
+            "SharedRuntime.recoverRegistration": 239,
+            "SharedRuntime.materialize": 239,
+            "SharedRuntime.backfill": 239,
+            "SharedExecution.reconcile": 239,
+            "SharedSessionClient.reconcile": 239,
+            "SharedRuntime.discover": 12,
+            "SharedRuntime.readLocal": 84,
+            "SharedMatching.poll": 1,
+            "SharedRuntime.pollDirectory": 1,
+            "NativeSyncAdapter.synchronize": 1
+          }
+        },
+        "B": {
+          "cpuMs": 410,
+          "processIo": {
+            "rchar": 122346,
+            "wchar": 56356,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "configReadByOperation": {
+            "SharedRuntime.discover": {
+              "count": 36,
+              "logicalBytes": 16896
+            },
+            "SharedRuntime.readLocal": {
+              "count": 72,
+              "logicalBytes": 33792
+            }
+          },
+          "taggedConfigReads": {
+            "count": 108,
+            "logicalBytes": 50688
+          },
+          "backfillStateWrites": {
+            "count": 0,
+            "logicalBytes": 0
+          },
+          "taggedLogicalFiles": {
+            "SharedRuntime.discover|readFile|config": [
+              36,
+              16896
+            ],
+            "SharedRuntime.readLocal|readFile|config": [
+              72,
+              33792
+            ],
+            "SharedRuntime.readLocal|readFile|other": [
+              36,
+              72
+            ]
+          },
+          "taggedInvocations": {
+            "SharedRuntime.tick": 240,
+            "SharedRuntime.tickCore": 240,
+            "SharedRuntime.recoverRegistration": 240,
+            "SharedRuntime.materialize": 240,
+            "SharedRuntime.backfill": 240,
+            "SharedExecution.reconcile": 240,
+            "SharedSessionClient.reconcile": 240,
+            "SharedRuntime.discover": 12,
+            "SharedRuntime.readLocal": 84,
+            "SharedMatching.poll": 1,
+            "SharedRuntime.pollDirectory": 1,
+            "NativeSyncAdapter.synchronize": 1
+          }
+        },
+        "backend": {
+          "cpuMs": 650,
+          "processIo": {
+            "rchar": 28500,
+            "wchar": 22065,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "configReadByOperation": {
+            "SharedRuntime.discover": {
+              "count": 0,
+              "logicalBytes": 0
+            },
+            "SharedRuntime.readLocal": {
+              "count": 0,
+              "logicalBytes": 0
+            }
+          },
+          "taggedConfigReads": {
+            "count": 0,
+            "logicalBytes": 0
+          },
+          "backfillStateWrites": {
+            "count": 0,
+            "logicalBytes": 0
+          },
+          "taggedLogicalFiles": {},
+          "taggedInvocations": {
+            "shared/info": 24,
+            "shared/wait": 4,
+            "shared/matches": 2,
+            "shared/changes": 2,
+            "shared/pull": 2
+          }
+        }
+      },
+      "twoDesktopConfigReadTotal": {
+        "count": 216,
+        "logicalBytes": 101376
+      },
+      "http": {
+        "shared/info": {
+          "requests": 24,
+          "finished": 24,
+          "requestBytes": 0,
+          "responseBytes": 11088,
+          "codes": {
+            "200": 24
+          },
+          "verbs": {
+            "GET": 24
+          }
+        },
+        "shared/wait": {
+          "requests": 4,
+          "finished": 4,
+          "requestBytes": 0,
+          "responseBytes": 268,
+          "codes": {
+            "200": 4
+          },
+          "verbs": {
+            "GET": 4
+          }
+        },
+        "shared/matches": {
+          "requests": 2,
+          "finished": 2,
+          "requestBytes": 0,
+          "responseBytes": 76,
+          "codes": {
+            "200": 2
+          },
+          "verbs": {
+            "GET": 2
+          }
+        },
+        "shared/changes": {
+          "requests": 2,
+          "finished": 2,
+          "requestBytes": 0,
+          "responseBytes": 78,
+          "codes": {
+            "200": 2
+          },
+          "verbs": {
+            "GET": 2
+          }
+        },
+        "shared/pull": {
+          "requests": 2,
+          "finished": 2,
+          "requestBytes": 0,
+          "responseBytes": 106,
+          "codes": {
+            "200": 2
+          },
+          "verbs": {
+            "GET": 2
+          }
+        }
+      },
+      "otherBackendHttpStarts": 0
+    }
+  ]
+}
