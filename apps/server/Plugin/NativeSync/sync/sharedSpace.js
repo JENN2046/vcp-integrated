@@ -510,13 +510,22 @@ class SharedSpace {
     // CentralStore verifies that the original operation and receipt are identical.
     if(this.store.findOp.get(actor.principal,op.opId))return apply();
    }
+   const failedInput=op.action==='delete'&&topic.owner_type==='agent'
+    ?require('./sharedSession').settledFailedInput(this,topic,op.msgId):null;
+   // Preserve receipts for legacy deletes accepted before version checking.
+   if(failedInput&&op.baseSeq===undefined&&this.store.findOp.get(actor.principal,op.opId))return apply();
    this.assertNotPrepared([topic.id,topic.parent_id]);if(this.active(topic.id))throw fail('SHARED_TOPIC_BUSY');
    const row=this.store.findMessage.get(...tuple(topic),op.msgId);
    if(!row)throw fail('SHARED_MESSAGE_NOT_FOUND',404);
+   if(failedInput){
+    if(actor.principal!==failedInput.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
+    if(op.baseSeq===undefined)throw fail('INVALID_SHARED_MESSAGE_MUTATION',400);
+   }
    if(op.baseSeq!==undefined){
     if(row.deleted||row.last_seq!==op.baseSeq||row.hash!==op.baseHash)throw fail('MESSAGE_CONFLICT');
     const original=this.store.projectMessage(row);
-    if(original.role!=='assistant'||original.isThinking||original.isPendingStream||original.contextCompaction)throw fail('INVALID_SHARED_MESSAGE_MUTATION',400);
+    if(failedInput&&(original.role!=='user'||row.last_seq!==failedInput.user_seq))throw fail('MESSAGE_CONFLICT');
+    if((!failedInput&&original.role!=='assistant')||original.isThinking||original.isPendingStream||original.contextCompaction)throw fail('INVALID_SHARED_MESSAGE_MUTATION',400);
     if(op.action==='upsert'){
      const {content,updatedAt,...unchanged}=op.message||{};
      const {content:oldContent,updatedAt:oldUpdatedAt,...oldFields}=original;

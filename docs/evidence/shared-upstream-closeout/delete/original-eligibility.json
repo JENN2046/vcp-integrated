@@ -1,0 +1,27 @@
+{
+  "access": "immutable read only",
+  "originalDatabaseUnchanged": true,
+  "sourceSha256": "732fd5bfba9a154099288b2300ddb3673f9a6ecc65fbf6fa3040c1a78abb1897",
+  "state": {
+    "work": "request_e1863a6577144c34843d58c856a46dfd",
+    "principal": "desktop:deviceA",
+    "admission": "abandoned",
+    "state": "cancelled",
+    "error_code": null,
+    "terminal_state": "completed",
+    "review_resolved": 1,
+    "user_message_id": "msg_1795368587893_user_1mn9kgmv1q",
+    "topic_id": "shared_ac645f5ffc334cd5b89e15feedb04e60",
+    "pending": 1,
+    "user_seq": 3
+  },
+  "eligibility": {
+    "principal": "desktop:deviceA",
+    "user_seq": 3
+  },
+  "originalMessage": {
+    "msg_id": "msg_1795368587893_user_1mn9kgmv1q",
+    "deleted": 0,
+    "last_seq": 3
+  }
+}

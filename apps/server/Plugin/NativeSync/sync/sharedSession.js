@@ -47,6 +47,24 @@ function settleAbandon(shared,execution){
  shared.db.prepare("UPDATE mobile_execution_steps SET state='cancelled' WHERE job_id=? AND state='queued'").run(execution.id);
  shared.native.engine.nativeTasks.acknowledge(execution.id);
 }
+// The transport status was not persisted by older hosts. Use the original
+// admission and durable review outcome to identify abandoned, replyless turns.
+// Older hosts could leave an unconfirmed publication intent in the Work ledger.
+function settledFailedInput(shared,topic,messageId){
+ if(!shared.native?.engine)return null;
+ return shared.db.prepare(`SELECT a.principal,a.user_seq FROM shared_admissions a
+   JOIN mobile_executions e ON e.id=a.id AND e.topic_key=a.topic_id AND e.session_id=a.principal AND e.user_seq=a.user_seq
+   JOIN journal j ON j.seq=a.user_seq AND j.owner_type=? AND j.owner_id=? AND j.topic_id=? AND j.msg_id=e.user_message_id AND j.action='upsert'
+     AND j.device_id=a.principal AND json_extract(j.message_json,'$.role')='user'
+   WHERE a.space_id=? AND a.topic_id=? AND e.user_message_id=?
+     AND e.kind='shared_session' AND a.state='abandoned' AND a.dispatched=1 AND a.native_terminal=0 AND a.reply_seq IS NULL
+     AND e.state='cancelled' AND e.review_resolved=1 AND e.request_dispatched=1
+     AND e.reply_message_id IS NULL AND e.native_final_operation IS NULL
+     AND ((e.pending_operation IS NULL AND e.error_code='EXECUTION_INTERRUPTED_REVIEW_REQUIRED')
+          OR (e.pending_operation IS NOT NULL AND e.error_code IS NULL))
+     AND EXISTS (SELECT 1 FROM shared_native_requests n WHERE n.admission_id=a.id AND n.state='unknown')
+   LIMIT 1`).get(topic.owner_type,topic.owner_id,topic.topic_id,topic.space_id,topic.id,messageId);
+}
 function send(shared,actor,body,sponsor=null){
  const sponsored=sponsor===require('./sharedTopicSponsor').dispatchKey;
  if(shared.readOnly)throw fail('SHARED_READ_ONLY');
@@ -79,4 +97,4 @@ function send(shared,actor,body,sponsor=null){
  if(!sponsored)notify(engine,response);return response;
 }
 function notify(engine,response){engine.fault('session-accepted-committed');engine.emitEvent?.(response.workId,'state',{state:response.execution.state});engine.wake();}
-module.exports={CAPABILITY,send,notify,acceptedActor,actorRecord,reviewable,settleAbandon};
+module.exports={CAPABILITY,send,notify,acceptedActor,actorRecord,reviewable,settleAbandon,settledFailedInput};

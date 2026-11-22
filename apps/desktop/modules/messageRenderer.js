@@ -2981,7 +2981,7 @@ function removeMessageById(messageId, saveHistory = false, root = mainRendererRe
     if (saveHistory && expectedMessage) {
         const refs=mainRendererReferences;
         const selected=refs.currentSelectedItemRef.get(), topicId=refs.currentTopicIdRef.get();
-        if (selected?.type==='agent' && selected.id && topicId && expectedMessage.role==='assistant') {
+        if (selected?.type==='agent' && selected.id && topicId && ['assistant', 'user'].includes(expectedMessage.role)) {
             return refs.historyMutationAuthority.mutate({
                 itemId:selected.id,itemType:selected.type,topicId,category:'message-remove',
                 expectedMessage,deleteIds:[messageId],
@@ -2991,7 +2991,10 @@ function removeMessageById(messageId, saveHistory = false, root = mainRendererRe
                     refs.currentTopicIdRef.get()===topicId) removeMessageById(messageId,false,root);
             }).catch(error=>{
                 console.error('[MessageRenderer] history mutation failed:',error);
-                refs.uiHelper?.showToastNotification?.('消息删除未保存，请刷新后重试','error');
+                const notice = error?.code === 'SHARED_TOPIC_BUSY'
+                    ? '话题仍有未结清的请求，处理后再删除'
+                    : '消息删除未保存，请刷新后重试';
+                refs.uiHelper?.showToastNotification?.(notice,'error');
             });
         }
     }

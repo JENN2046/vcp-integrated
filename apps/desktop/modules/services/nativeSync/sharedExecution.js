@@ -251,12 +251,12 @@ class SharedExecution {
    r.assertSharedAccess?.();return {body:nativeBody,headers:{...require('./runtime').syncHeaders(r.connection),'X-NativeSync-Capabilities':'shared-space-v1','X-NativeSync-Admission':record.accepted.id}};
   });
  }
- async commitExistingAssistant(d,intent,mapping){
+ async commitExistingMessage(d,intent,mapping){
   const r=this.runtime,operation=intent.operations?.[0],edit=intent.source==='message-edit';
   const expected=edit?operation?.expected:operation?.expected?.[0];
   const id=edit?operation?.id:operation?.ids?.[0];
   if(intent.version!==1||intent.requestId||intent.executionId||intent.localOnly||!Array.isArray(intent.operations)||intent.operations.length!==1||
-     typeof id!=='string'||!id||expected?.id!==id||expected.role!=='assistant'||
+     typeof id!=='string'||!id||expected?.id!==id||(expected.role!=='assistant'&&(edit||expected.role!=='user'))||
      (edit?(operation.kind!=='edit'||typeof operation.set?.content!=='string'||
        Object.keys(operation.set).some(key=>!['content','updatedAt'].includes(key))||
        (operation.unset!==undefined&&(!Array.isArray(operation.unset)||operation.unset.length))):
@@ -273,7 +273,7 @@ class SharedExecution {
    const {adapter,queue}=r.replica,topicId=mapping.shared.topicId;
    const history=await queue.read(mapping.shared),current=history.find(message=>message.id===id);
    if(!current)throw fail('HISTORY_MESSAGE_NOT_FOUND');
-   if(current.role!=='assistant'||current.isThinking||current.isPendingStream||current.contextCompaction||
+   if(current.role!==expected.role||current.isThinking||current.isPendingStream||current.contextCompaction||
       messagePreconditionValue(current)!==messagePreconditionValue(expected))throw fail('HISTORY_MESSAGE_CONFLICT');
    if(intent.expectedRevision!==undefined&&intent.expectedRevision!==queue.revision(history))throw fail('HISTORY_REVISION_CONFLICT');
    const identity={...wireTopic(mapping.shared),msgId:id},base=adapter.state.acked[messageKey(identity)];
@@ -295,7 +295,7 @@ class SharedExecution {
  }
  async commit(d,intent){
   const mapping=this.mapping(d);
-  if(mapping.shared.itemType==='agent'&&['message-edit','message-remove'].includes(intent?.source))return this.commitExistingAssistant(d,intent,mapping);
+  if(mapping.shared.itemType==='agent'&&['message-edit','message-remove'].includes(intent?.source))return this.commitExistingMessage(d,intent,mapping);
   const record=Object.values(this.state.requests).find(v=>v.sharedId===mapping.sharedId&&v.accepted&&!v.isSteeringInput&&('reply_'+v.accepted.id===intent.requestId||v.generations?.some(g=>g.requestId===intent.requestId)));
   if(!record)throw fail('SHARED_NATIVE_ADMISSION_REQUIRED');
   const appended=intent.operations.filter(o=>o.kind==='append');
