@@ -141,4 +141,15 @@ function projectToolBatchForUpstream(body) {
     };
 }
 
-module.exports = { formatToolResultBatch, createBatchStartScanner, findBatchEnd, projectToolBatchForUpstream };
+function buildToolPayloadMessage(parts) {
+    const header = '<!-- VCP_TOOL_PAYLOAD -->\nResults:';
+    // Preserve file text verbatim, including actual JSON documents. Only the
+    // transport envelope changes; multimodal receipts keep their original parts.
+    if (parts.every(part => part?.type === 'text' && typeof part.text === 'string')) {
+        const text = parts.map(part => part.text).join('\n\n');
+        return { role: 'user', content: text ? `${header} ${text}` : header };
+    }
+    return { role: 'user', content: [{ type: 'text', text: header }, ...parts] };
+}
+
+module.exports = { formatToolResultBatch, createBatchStartScanner, findBatchEnd, projectToolBatchForUpstream, buildToolPayloadMessage };

@@ -2,7 +2,7 @@
 const { StringDecoder } = require('string_decoder');
 const vcpInfoHandler = require('../../vcpInfoHandler.js');
 const roleDivider = require('../roleDivider.js');
-const { formatToolResultBatch, projectToolBatchForUpstream } = require('../toolResultBatch.js');
+const { formatToolResultBatch, projectToolBatchForUpstream, buildToolPayloadMessage } = require('../toolResultBatch.js');
 const {
   extractReasoningText,
   removeReasoningFields,
@@ -723,8 +723,7 @@ class StreamHandler {
 
       // 处理纯 Archery 的错误或用户审核留言；成功留言不改变工具成功状态。
       if (normalCalls.length === 0 && archeryErrorContents.length > 0) {
-        const errorPayload = `<!-- VCP_TOOL_PAYLOAD -->\n${JSON.stringify(archeryErrorContents)}`;
-        currentMessagesForLoop.push({ role: 'user', content: errorPayload });
+        currentMessagesForLoop.push(buildToolPayloadMessage(archeryErrorContents));
 
         if (!res.writableEnded && !res.destroyed) {
           try {
@@ -827,8 +826,8 @@ class StreamHandler {
           return;
         }
       }
-      const combinedToolResultsForAI = toolResults.map(r => r.content).flat();
-      if (archeryErrorContents.length > 0) combinedToolResultsForAI.push(...archeryErrorContents);
+      const toolResultsForRAG = toolResults.flatMap(result => result.content);
+      if (archeryErrorContents.length > 0) toolResultsForRAG.push(...archeryErrorContents);
 
       const normalCallLogs = (() => {
         let logs = [];
@@ -878,7 +877,7 @@ class StreamHandler {
       }
 
       // RAG 刷新
-      const toolResultsTextForRAG = JSON.stringify(combinedToolResultsForAI, (k, v) =>
+      const toolResultsTextForRAG = JSON.stringify(toolResultsForRAG, (k, v) =>
         (k === 'url' || k === 'image_url') && typeof v === 'string' && v.startsWith('data:') ? "[Omitted]" : v
       );
 
@@ -889,18 +888,12 @@ class StreamHandler {
         }, pluginManager, DEBUG_MODE);
       }
 
-      const hasImage = combinedToolResultsForAI.some(item => item.type === 'image_url');
-      const translatedToolResultsForAI = hasImage
-        ? await maybeTranslateToolPayloadMedia([
-          { type: 'text', text: `<!-- VCP_TOOL_PAYLOAD -->\nResults:` },
-          ...combinedToolResultsForAI
-        ])
-        : null;
-      const finalToolPayloadForAI = hasImage
-        ? translatedToolResultsForAI
-        : `<!-- VCP_TOOL_PAYLOAD -->\n${toolResultsTextForRAG}`;
-
-      currentMessagesForLoop.push({ role: 'user', content: finalToolPayloadForAI });
+      const toolPayload = buildToolPayloadMessage([
+        ...toolResults.flatMap(result => result.contentForAI ?? result.content),
+        ...archeryErrorContents
+      ]);
+      toolPayload.content = await maybeTranslateToolPayloadMedia(toolPayload.content);
+      currentMessagesForLoop.push(toolPayload);
 
       if (!res.writableEnded && !res.destroyed) {
         try {

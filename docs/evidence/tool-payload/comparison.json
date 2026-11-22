@@ -1,0 +1,30 @@
+{
+  "json": {
+    "baselineMessagesBytes": [
+      50,
+      912,
+      1446,
+      2001
+    ],
+    "candidateMessagesBytes": [
+      50,
+      701,
+      1176,
+      1731
+    ]
+  },
+  "sse": {
+    "baselineMessagesBytes": [
+      49,
+      909,
+      1440,
+      1992
+    ],
+    "candidateMessagesBytes": [
+      49,
+      698,
+      1170,
+      1722
+    ]
+  }
+}

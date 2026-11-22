@@ -1,0 +1,19 @@
+{
+  "workId": "request_5d386710a3854142a605f0096a795e60",
+  "originalNativeRequestId": "reply_request_5d386710a3854142a605f0096a795e60",
+  "continuationNativeRequestId": "reply_request_5d386710a3854142a605f0096a795e60_g1",
+  "executor": "desktop:deviceB",
+  "generation": 1,
+  "invocationIdsBefore": [
+    "4185f319-9a6e-4ed9-8e78-329c85df1f1c"
+  ],
+  "invocationIdsAfter": [
+    "4185f319-9a6e-4ed9-8e78-329c85df1f1c"
+  ],
+  "sideEffectsBefore": 1,
+  "sideEffectsAfter": 1,
+  "providerCalls": 3,
+  "continuationHttpStatus": 500,
+  "continuationRejection": "CONTROLLED_TEXT_TOOLS_FORBIDDEN",
+  "finalWorkState": "review_required"
+}
