@@ -72,7 +72,7 @@ async function start(options = {}) {
     try {
         service = await startService({out,candidate:root,cert,key,trace(){},waitUntil,mode:'context-chain',
             observedContext:{
-                seedCount:seed.length,preload,handlerLog,reply:spec.reply,input:spec.input,
+                seedCount:seed.length,preload:options.preload || preload,handlerLog,reply:spec.reply,input:spec.input,
                 seed:(f,topic,out)=>seedContext(f,topic,out,seed,spec),
                 recordProvider(route,body) {
                     const current=Array.isArray(body.messages)?body.messages.findLast(row=>row.role==='user')?.content:null;

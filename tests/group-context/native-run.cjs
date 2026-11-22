@@ -168,13 +168,15 @@ async function main(){
             {id:replyA.id,role:'assistant',content:spec.replyA},
         ]);
         assert.equal(dispatchA.body.vcpchatExtensions.messageTimestampBindings.some(binding=>binding.messageId===replyA.id),false);
-        assert.equal(dispatchA.body.messages.some(row=>JSON.stringify(row.content).includes(spec.replyA)),false);
+        const matchesReplyText=row=>row.role==='assistant'&&JSON.stringify(row.content).includes(spec.replyA);
+        const seedMatches=seed.filter(matchesReplyText).length;
+        assert.equal(dispatchA.body.messages.filter(matchesReplyText).length,seedMatches);
         const aBindings=dispatchB.body.vcpchatExtensions.messageTimestampBindings.filter(binding=>binding.messageId===replyA.id);
         assert.equal(aBindings.length,1);
         const aBound=dispatchB.body.messages[aBindings[0].sentMessageIndex];
         assert.equal(aBound.role,'assistant');
         assert.ok(JSON.stringify(aBound.content).includes(spec.replyA));
-        assert.equal(dispatchB.body.messages.filter(row=>JSON.stringify(row.content).includes(spec.replyA)).length,1);
+        assert.equal(dispatchB.body.messages.filter(matchesReplyText).length,seedMatches+1);
         const serialized=structuredClone(rows);
         const storedRow=serialized.find(row=>row.id===attach.messageId).attachments[0];
         storedRow.internalPath='isolated-content-addressed:'+storedRow.internalFileName;

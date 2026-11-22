@@ -1,0 +1,481 @@
+{
+  "variant": "candidate",
+  "revision": "4d8b67ce316160f0c84cae0f1b554c7bb60d20a2",
+  "runtime": {
+    "node": "v24.22.3",
+    "electron": "44.9.3",
+    "browser": "Chrome/158.0.8127.36"
+  },
+  "fixtureLimits": [
+    "[Physical mobile fixture] RAG parameter watcher unavailable due to host inotify exhaustion."
+  ],
+  "source": {
+    "desktop": {
+      "file": "apps/desktop/Groupmodules/groupchat.js",
+      "sha256": "038091edbb1de800281501191d15075f4bfa6a138aa389f7314b10957fc8446b"
+    },
+    "handler": {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "918323c2b533bef5fc4caae5d5e2c47967240966f801fb32812a433445aa0588"
+    },
+    "projector": {
+      "file": "modules/toolResultBatch.js",
+      "sha256": "266b340bc55c375feebe0b6cacc1616d5983effa6040ce93f71696fd21c3b627"
+    }
+  },
+  "sharedReplayKeptLedgerAndPackets": true,
+  "native": {
+    "history": [
+      {
+        "id": "gc-history-assistant",
+        "name": "成员乙",
+        "agentId": "gc-b",
+        "content": "GC_SAME_ASSISTANT_BODY"
+      },
+      {
+        "id": "msg_group_gc-current_gc-a_1795361258613",
+        "name": "成员甲",
+        "agentId": "gc-a",
+        "content": "GC_SAME_ASSISTANT_BODY"
+      }
+    ],
+    "preSignedHistory": {
+      "id": "gc-history-pre-signed",
+      "name": "成员甲",
+      "agentId": "gc-a",
+      "text": "[成员甲的发言]: GC_PRE_SIGNED_BODY"
+    },
+    "workId": null,
+    "route": "/v1/chat/completions",
+    "memberBRequestId": "msg_group_gc-current_gc-b_1795361258837",
+    "requestContext": null,
+    "handlerExtensions": {
+      "schemaVersion": 1,
+      "messageMetadataMode": "hash_only"
+    },
+    "handler": {
+      "speakers": [
+        {
+          "index": 3,
+          "text": "[成员乙的发言]: GC_SAME_ASSISTANT_BODY",
+          "fields": {
+            "role": "assistant"
+          }
+        },
+        {
+          "index": 7,
+          "text": "[成员甲的发言]: GC_SAME_ASSISTANT_BODY",
+          "fields": {
+            "role": "assistant"
+          }
+        }
+      ],
+      "invite": {
+        "text": "GC_INVITATION 成员乙",
+        "name": "用户"
+      },
+      "preSigned": {
+        "text": "[成员甲的发言]: GC_PRE_SIGNED_BODY",
+        "tagCount": 1
+      }
+    },
+    "toolbox": [
+      {
+        "stage": "detectors",
+        "source": {
+          "file": "modules/messageProcessor.js",
+          "sha256": "f67e63c7ac24798b612bd5490531086e687d16d0a2998634bddd9ed3ddccf011"
+        },
+        "speakers": [
+          {
+            "index": 3,
+            "text": "[成员乙的发言]: GC_SAME_ASSISTANT_BODY",
+            "fields": {
+              "role": "assistant"
+            }
+          },
+          {
+            "index": 7,
+            "text": "[成员甲的发言]: GC_SAME_ASSISTANT_BODY",
+            "fields": {
+              "role": "assistant"
+            }
+          }
+        ],
+        "invite": {
+          "text": "GC_INVITATION 成员乙",
+          "name": "用户"
+        },
+        "preSigned": {
+          "text": "[成员甲的发言]: GC_PRE_SIGNED_BODY",
+          "tagCount": 1
+        }
+      },
+      {
+        "stage": "final-context",
+        "source": {
+          "file": "modules/finalContextStore.js",
+          "sha256": "c398fe2801ddc9bee92adcdc85bd35140cccae1cf6a73b9234525ca4ff06eee2"
+        },
+        "speakers": [
+          {
+            "index": 3,
+            "text": "[成员乙的发言]: GC_SAME_ASSISTANT_BODY",
+            "fields": {
+              "role": "assistant"
+            }
+          },
+          {
+            "index": 7,
+            "text": "[成员甲的发言]: GC_SAME_ASSISTANT_BODY",
+            "fields": {
+              "role": "assistant"
+            }
+          }
+        ],
+        "invite": {
+          "text": "GC_INVITATION 成员乙",
+          "name": null
+        },
+        "preSigned": {
+          "text": "[成员甲的发言]: GC_PRE_SIGNED_BODY",
+          "tagCount": 1
+        }
+      },
+      {
+        "stage": "stream-loop-input",
+        "source": {
+          "file": "modules/handlers/streamHandler.js",
+          "sha256": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec"
+        },
+        "speakers": [
+          {
+            "index": 3,
+            "text": "[成员乙的发言]: GC_SAME_ASSISTANT_BODY",
+            "fields": {
+              "role": "assistant"
+            }
+          },
+          {
+            "index": 7,
+            "text": "[成员甲的发言]: GC_SAME_ASSISTANT_BODY",
+            "fields": {
+              "role": "assistant"
+            }
+          }
+        ],
+        "invite": {
+          "text": "GC_INVITATION 成员乙",
+          "name": "用户"
+        },
+        "preSigned": {
+          "text": "[成员甲的发言]: GC_PRE_SIGNED_BODY",
+          "tagCount": 1
+        }
+      }
+    ],
+    "provider": {
+      "route": "/v1/chat/completions",
+      "speakers": [
+        {
+          "index": 3,
+          "text": "[成员乙的发言]: GC_SAME_ASSISTANT_BODY",
+          "fields": {
+            "role": "assistant"
+          }
+        },
+        {
+          "index": 7,
+          "text": "[成员甲的发言]: GC_SAME_ASSISTANT_BODY",
+          "fields": {
+            "role": "assistant"
+          }
+        }
+      ],
+      "invite": {
+        "text": "GC_INVITATION 成员乙",
+        "name": null
+      },
+      "preSigned": {
+        "text": "[成员甲的发言]: GC_PRE_SIGNED_BODY",
+        "tagCount": 1
+      }
+    }
+  },
+  "shared": {
+    "history": [
+      {
+        "id": "gc-history-assistant",
+        "name": "成员乙",
+        "agentId": "shared_e7649a54320b4663a24c8d5d6671b717",
+        "content": "GC_SAME_ASSISTANT_BODY"
+      },
+      {
+        "id": "reply_gstep_6dc472ff4c3c0da0f41b8c5a84ac0f470a619f5a",
+        "name": "成员甲",
+        "agentId": "shared_5b7e50b1cd084fdd8959cf4cc145b748",
+        "content": "GC_SAME_ASSISTANT_BODY"
+      }
+    ],
+    "preSignedHistory": {
+      "id": "gc-history-pre-signed",
+      "name": "成员甲",
+      "agentId": "shared_5b7e50b1cd084fdd8959cf4cc145b748",
+      "text": "[成员甲的发言]: GC_PRE_SIGNED_BODY"
+    },
+    "workId": "request_73c56d38730746388018a1fe66cbff13",
+    "route": "/v1/chat/completions",
+    "memberBRequestId": "gstep_02e1885e9159703aec21b11c16f3cf75d2829d32",
+    "requestContext": {
+      "requestId": "gstep_02e1885e9159703aec21b11c16f3cf75d2829d32",
+      "agentId": "shared_e7649a54320b4663a24c8d5d6671b717",
+      "agentName": "成员乙",
+      "topicId": "shared_5d1a503cc7e542298d256a3ecc9c3459",
+      "ownerType": "group",
+      "isGroupMessage": true
+    },
+    "handlerExtensions": {
+      "schemaVersion": 1,
+      "messageMetadataMode": "hash_only"
+    },
+    "handler": {
+      "speakers": [
+        {
+          "index": 3,
+          "text": "[成员乙的发言]: GC_SAME_ASSISTANT_BODY",
+          "fields": {
+            "role": "assistant"
+          }
+        },
+        {
+          "index": 7,
+          "text": "[成员甲的发言]: GC_SAME_ASSISTANT_BODY",
+          "fields": {
+            "role": "assistant"
+          }
+        }
+      ],
+      "invite": {
+        "text": "GC_INVITATION 成员乙",
+        "name": "用户"
+      },
+      "preSigned": {
+        "text": "[成员甲的发言]: GC_PRE_SIGNED_BODY",
+        "tagCount": 1
+      }
+    },
+    "toolbox": [
+      {
+        "stage": "detectors",
+        "source": {
+          "file": "modules/messageProcessor.js",
+          "sha256": "f67e63c7ac24798b612bd5490531086e687d16d0a2998634bddd9ed3ddccf011"
+        },
+        "speakers": [
+          {
+            "index": 3,
+            "text": "[成员乙的发言]: GC_SAME_ASSISTANT_BODY",
+            "fields": {
+              "role": "assistant"
+            }
+          },
+          {
+            "index": 7,
+            "text": "[成员甲的发言]: GC_SAME_ASSISTANT_BODY",
+            "fields": {
+              "role": "assistant"
+            }
+          }
+        ],
+        "invite": {
+          "text": "GC_INVITATION 成员乙",
+          "name": "用户"
+        },
+        "preSigned": {
+          "text": "[成员甲的发言]: GC_PRE_SIGNED_BODY",
+          "tagCount": 1
+        }
+      },
+      {
+        "stage": "final-context",
+        "source": {
+          "file": "modules/finalContextStore.js",
+          "sha256": "c398fe2801ddc9bee92adcdc85bd35140cccae1cf6a73b9234525ca4ff06eee2"
+        },
+        "speakers": [
+          {
+            "index": 3,
+            "text": "[成员乙的发言]: GC_SAME_ASSISTANT_BODY",
+            "fields": {
+              "role": "assistant"
+            }
+          },
+          {
+            "index": 7,
+            "text": "[成员甲的发言]: GC_SAME_ASSISTANT_BODY",
+            "fields": {
+              "role": "assistant"
+            }
+          }
+        ],
+        "invite": {
+          "text": "GC_INVITATION 成员乙",
+          "name": null
+        },
+        "preSigned": {
+          "text": "[成员甲的发言]: GC_PRE_SIGNED_BODY",
+          "tagCount": 1
+        }
+      },
+      {
+        "stage": "stream-loop-input",
+        "source": {
+          "file": "modules/handlers/streamHandler.js",
+          "sha256": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec"
+        },
+        "speakers": [
+          {
+            "index": 3,
+            "text": "[成员乙的发言]: GC_SAME_ASSISTANT_BODY",
+            "fields": {
+              "role": "assistant"
+            }
+          },
+          {
+            "index": 7,
+            "text": "[成员甲的发言]: GC_SAME_ASSISTANT_BODY",
+            "fields": {
+              "role": "assistant"
+            }
+          }
+        ],
+        "invite": {
+          "text": "GC_INVITATION 成员乙",
+          "name": "用户"
+        },
+        "preSigned": {
+          "text": "[成员甲的发言]: GC_PRE_SIGNED_BODY",
+          "tagCount": 1
+        }
+      }
+    ],
+    "provider": {
+      "route": "/v1/chat/completions",
+      "speakers": [
+        {
+          "index": 3,
+          "text": "[成员乙的发言]: GC_SAME_ASSISTANT_BODY",
+          "fields": {
+            "role": "assistant"
+          }
+        },
+        {
+          "index": 7,
+          "text": "[成员甲的发言]: GC_SAME_ASSISTANT_BODY",
+          "fields": {
+            "role": "assistant"
+          }
+        }
+      ],
+      "invite": {
+        "text": "GC_INVITATION 成员乙",
+        "name": null
+      },
+      "preSigned": {
+        "text": "[成员甲的发言]: GC_PRE_SIGNED_BODY",
+        "tagCount": 1
+      }
+    }
+  },
+  "namedControl": {
+    "status": 200,
+    "completed": true,
+    "requestId": "gc-named-control",
+    "handler": [
+      {
+        "role": "assistant",
+        "text": "GC_NAMED_CONTROL_UNDECORATED",
+        "name": "成员甲"
+      },
+      {
+        "role": "user",
+        "text": "GC_NAMED_CONTROL_INPUT",
+        "name": "成员乙"
+      }
+    ],
+    "internal": [
+      {
+        "stage": "detectors",
+        "source": {
+          "file": "modules/messageProcessor.js",
+          "sha256": "f67e63c7ac24798b612bd5490531086e687d16d0a2998634bddd9ed3ddccf011"
+        },
+        "messages": [
+          {
+            "role": "assistant",
+            "text": "GC_NAMED_CONTROL_UNDECORATED",
+            "name": "成员甲"
+          },
+          {
+            "role": "user",
+            "text": "GC_NAMED_CONTROL_INPUT",
+            "name": "成员乙"
+          }
+        ]
+      },
+      {
+        "stage": "final-context",
+        "source": {
+          "file": "modules/finalContextStore.js",
+          "sha256": "c398fe2801ddc9bee92adcdc85bd35140cccae1cf6a73b9234525ca4ff06eee2"
+        },
+        "messages": [
+          {
+            "role": "assistant",
+            "text": "GC_NAMED_CONTROL_UNDECORATED",
+            "name": null
+          },
+          {
+            "role": "user",
+            "text": "GC_NAMED_CONTROL_INPUT",
+            "name": null
+          }
+        ]
+      },
+      {
+        "stage": "stream-loop-input",
+        "source": {
+          "file": "modules/handlers/streamHandler.js",
+          "sha256": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec"
+        },
+        "messages": [
+          {
+            "role": "assistant",
+            "text": "GC_NAMED_CONTROL_UNDECORATED",
+            "name": "成员甲"
+          },
+          {
+            "role": "user",
+            "text": "GC_NAMED_CONTROL_INPUT",
+            "name": "成员乙"
+          }
+        ]
+      }
+    ],
+    "provider": {
+      "route": "/v1/chat/completions",
+      "messages": [
+        {
+          "role": "assistant",
+          "text": "GC_NAMED_CONTROL_UNDECORATED",
+          "name": null
+        },
+        {
+          "role": "user",
+          "text": "GC_NAMED_CONTROL_INPUT",
+          "name": null
+        }
+      ]
+    }
+  }
+}

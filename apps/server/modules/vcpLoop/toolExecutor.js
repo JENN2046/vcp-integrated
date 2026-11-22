@@ -67,6 +67,11 @@ function extractTextFromMessage(msg) {
   return msg;
 }
 
+function projectRiverSpeaker(message) {
+  const name = typeof message?.name === 'string' ? message.name.trim() : '';
+  return name ? { name } : {};
+}
+
 // Preparation is private to this registry and tool. The regular record and
 // approval path still runs after preparation, including when auditing is off.
 const preparations = new WeakMap();
@@ -406,6 +411,7 @@ class ToolExecutor {
         args.river_context = topN.map(m => ({
           role: m.role,
           content: m.text,
+          ...projectRiverSpeaker(m.original),
           _river_score: m.score,
           _river_index: m.index
         }));

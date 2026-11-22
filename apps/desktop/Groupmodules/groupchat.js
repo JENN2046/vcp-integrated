@@ -37,6 +37,7 @@ const topicTitleManager = require('./topicTitleManager');
 const { noteToolApprovalMessage, isWaitingForToolApproval, isWatchdogAbort, withWatchdogNote, getGroupErrorMessage, normalizeGroupFetchError } = require('./streamWatchdog');
 const { resolveGroupChatUrl } = require('./groupChatUrl');
 const { groupStreamDelta } = require('@vcp/core-rules/group/streamDelta');
+const { withGroupSpeaker } = require('@vcp/core-rules/group/speaker');
 const { resolveEffectiveModel } = require('@vcp/core-rules/group/modelSelection');
 
 // 模式注册表 - 添加新模式只需在此注册
@@ -1269,8 +1270,7 @@ ${canvasData.errors || 'No errors'}
             }
 
             textForAIContext = sharedGroup.contextText(contextHistoryForAgent,msg,textForAIContext,agentConfig,userMessageEntry.id);
-            const contentWithSpeakerTag = textForAIContext.startsWith(`[${speakerName}的发言]`)
-                ? textForAIContext : `[${speakerName}的发言]: ${textForAIContext}`;
+            const contentWithSpeakerTag = withGroupSpeaker(textForAIContext, speakerName);
             const vcpMessageContent = [{ type: 'text', text: contentWithSpeakerTag }];
 
             // Image handling: Iterate through attachments of the current message (msg)
@@ -1929,8 +1929,7 @@ ${canvasData.errors || 'No errors'}
         }
 
         textForAIContext = sharedGroup.contextText(contextHistoryForAgent,msg,textForAIContext,agentConfig);
-        const contentWithSpeakerTag = textForAIContext.startsWith(`[${speakerName}的发言]`)
-                ? textForAIContext : `[${speakerName}的发言]: ${textForAIContext}`;
+        const contentWithSpeakerTag = withGroupSpeaker(textForAIContext, speakerName);
         const vcpMessageContent = [{ type: 'text', text: contentWithSpeakerTag }];
 
         if (msg.attachments && msg.attachments.length > 0) {

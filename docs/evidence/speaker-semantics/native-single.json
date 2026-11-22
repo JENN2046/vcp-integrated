@@ -1,0 +1,61 @@
+{
+  "surface": "native-desktop-single-chat",
+  "terminalVisible": true,
+  "historyMessageId": "ctx-retained-user",
+  "replyId": "admission_1bd04f0f-20b8-47c9-9960-20237eeb3123",
+  "electron": "44.9.3",
+  "ipc": {
+    "role": "user",
+    "text": "CTX_RETAINED_INPUT",
+    "name": "留名访客"
+  },
+  "handler": {
+    "role": "user",
+    "text": "CTX_RETAINED_INPUT",
+    "name": "留名访客"
+  },
+  "toolbox": [
+    {
+      "stage": "detectors",
+      "source": {
+        "file": "modules/messageProcessor.js",
+        "sha256": "f67e63c7ac24798b612bd5490531086e687d16d0a2998634bddd9ed3ddccf011"
+      },
+      "message": {
+        "role": "user",
+        "text": "CTX_RETAINED_INPUT",
+        "name": "留名访客"
+      }
+    },
+    {
+      "stage": "final-context",
+      "source": {
+        "file": "modules/finalContextStore.js",
+        "sha256": "c398fe2801ddc9bee92adcdc85bd35140cccae1cf6a73b9234525ca4ff06eee2"
+      },
+      "message": {
+        "role": "user",
+        "text": "CTX_RETAINED_INPUT",
+        "name": null
+      }
+    },
+    {
+      "stage": "non-stream-loop-input",
+      "source": {
+        "file": "modules/handlers/nonStreamHandler.js",
+        "sha256": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2"
+      },
+      "message": {
+        "role": "user",
+        "text": "CTX_RETAINED_INPUT",
+        "name": "留名访客"
+      }
+    }
+  ],
+  "provider": {
+    "route": "/v1/chat/completions",
+    "role": "user",
+    "text": "CTX_RETAINED_INPUT",
+    "name": null
+  }
+}

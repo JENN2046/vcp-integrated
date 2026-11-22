@@ -108,13 +108,19 @@ function projectBatchWrapperText(text, role) {
     return text;
 }
 
-/** Request-only copy; media, tool arguments and all other fields remain untouched. */
+const displayNameRoles = new Set(['system', 'developer', 'user', 'assistant']);
+
+/** Request-only projection. Native tool/function names are protocol fields. */
 function projectToolBatchForUpstream(body) {
     if (!body || !Array.isArray(body.messages)) return body;
     return {
         ...body,
         messages: body.messages.map(message => {
             if (!message) return message;
+            if (displayNameRoles.has(message.role) && Object.hasOwn(message, 'name')) {
+                message = { ...message };
+                delete message.name;
+            }
             const content = message.content;
             if (typeof content === 'string') {
                 const projected = projectBatchWrapperText(content, message.role);

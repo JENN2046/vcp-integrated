@@ -1,0 +1,59 @@
+{
+  "workId": "request_e64127e79224484cb54bdea3bb7de870",
+  "state": "completed",
+  "memberRequests": [
+    {
+      "id": "group_request_e64127e79224484cb54bdea3bb7de870_0",
+      "ordinal": 0,
+      "principal": "desktop:deviceA",
+      "member_id": "shared_119f0eb7a42b4cbb815ae1dff6bed615",
+      "state": "model_terminal"
+    },
+    {
+      "id": "group_request_e64127e79224484cb54bdea3bb7de870_1",
+      "ordinal": 1,
+      "principal": "desktop:deviceB",
+      "member_id": "shared_9bc01820e6f84bef9e44b7d6b0f07603",
+      "state": "model_terminal"
+    }
+  ],
+  "providerCallsByMember": [
+    1,
+    1
+  ],
+  "journalMessage": {
+    "id": "reply_group_request_e64127e79224484cb54bdea3bb7de870_0",
+    "role": "assistant",
+    "name": "A",
+    "agentId": "shared_119f0eb7a42b4cbb815ae1dff6bed615",
+    "content": "RELAY_A_FINAL",
+    "timestamp": 1795361833967
+  },
+  "bindingAtSecondMember": {
+    "messageId": "reply_group_request_e64127e79224484cb54bdea3bb7de870_0",
+    "role": "assistant",
+    "timestamp": 1795361833967,
+    "timestampIso": "2026-11-22T15:37:13.967Z",
+    "source": "client_history",
+    "sentMessageHash": "sha256:18371e499f77e15c5a2e2003b603e2a493773452abe719c64e2bd3b0325f5cee",
+    "sentMessageIndex": 2
+  },
+  "handlerAssistantMessage": {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "[A的发言]: RELAY_A_FINAL"
+      }
+    ]
+  },
+  "providerAssistantMessage": {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "[A的发言]: RELAY_A_FINAL"
+      }
+    ]
+  }
+}

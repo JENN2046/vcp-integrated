@@ -1,5 +1,6 @@
 'use strict';
 const {selectGroupContextHistory,applyGroupContextRules}=require('../nativeRules/Groupmodules/groupContextWindow');
+const {withGroupSpeaker}=require('@vcp/core-rules/group/speaker');
 const {resolveEffectiveModel}=require('@vcp/core-rules/group/modelSelection');
 const {attachTimestampMetadata}=require('../nativeRules/modules/chat/requestMetadata');
 const sanitizer=require('../nativeRules/modules/contextSanitizer');
@@ -45,7 +46,7 @@ async function groupRequest({topic,config,member,history,currentUserId,requestId
   if(message.attachments?.length){if(!attachments)throw fail('ATTACHMENTS_NOT_ENABLED');parts=await attachments.content(topic.key,projected,config.imageModels?.includes(resolution.effectiveModel),budget);}
   if(config.authority?.sharedSpaceId)parts=parts.map((part,i)=>i===0&&part.type==='text'?{...part,text:transform(part.text,message)}:part);
   if(message.id===currentUserId&&message.role==='user')parts[0]={...parts[0],text:tavern.applyUserSuffix(parts[0].text,rules,'group')};
-  parts[0]={...parts[0],text:`[${speaker}的发言]: ${parts[0].text}`};
+  parts[0]={...parts[0],text:withGroupSpeaker(parts[0].text,speaker)};
   messages.push(attachTimestampMetadata({role:message.role,content:parts},message));
  }
  const invite=(group.invitePrompt||'[系统邀请指令:] 现在轮到你 {{VCPChatAgentName}} 发言了。').replace(/{{VCPChatAgentName}}/g,name);

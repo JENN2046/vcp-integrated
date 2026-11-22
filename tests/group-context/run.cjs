@@ -2,6 +2,7 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const https = require('node:https');
 const path = require('node:path');
 const { execFile, execFileSync } = require('node:child_process');
 const { createRequire } = require('node:module');
@@ -15,12 +16,13 @@ const spec = process.env.NS_GROUP_FIXTURE ? JSON.parse(fs.readFileSync(process.e
 
 const root = path.resolve(__dirname, '../..');
 const server = path.join(root, 'apps/server');
-const baseline = '6f34d0c0a260';
+const baseline = process.env.NS_GROUP_BASELINE_REVISION || '6f34d0c0a260';
 const runRoot = path.join(root, '.runs/group-context');
 const execute = promisify(execFile);
 const text = value => JSON.stringify(value, null, 2) + '\n';
 const dump = (file, value) => fs.writeFileSync(file, text(value), { mode: 0o600 });
 const load = file => JSON.parse(fs.readFileSync(file, 'utf8'));
+const namedControlId = 'gc-named-control';
 const lines = file => fs.readFileSync(file, 'utf8').trim().split('\n').map(JSON.parse);
 
 async function waitUntil(check, label, timeout = 18000) {
@@ -107,7 +109,7 @@ async function main() {
                 serverRevision: isBaseline ? baseline : undefined,
                 serverDependencies: isBaseline ? baselineDependencies(out, nativeSource) : undefined,
                 groupRelay: fixture,
-                observedContext: { seedCount: 0, seed: fixture.seedHistory, preload: path.join(__dirname, 'server-capture.cjs'),
+                observedContext: { seedCount: 0, seed: fixture.seedHistory, preload: process.env.NS_GROUP_CAPTURE || path.join(__dirname, 'server-capture.cjs'),
                     handlerLog, input: 'GC_CURRENT', recordProvider() {} },
             });
         } finally {
@@ -169,6 +171,26 @@ async function main() {
             evidence.native = { ...load(file('native.json')), history: load(file('native.json.history.json')),
                 dispatch: lines(file('native.json.dispatch.jsonl')) };
         }
+        if (spec.namedControl) {
+            const body = JSON.stringify({ model: 'synthetic', stream: true, requestId: namedControlId, messages: spec.namedControl });
+            evidence.namedControl = await new Promise((resolve, reject) => {
+                const request = https.request(service.origin + '/v1/chat/completions', {
+                    method: 'POST', ca: fs.readFileSync(cert), timeout: 10000,
+                    headers: { authorization: 'Bearer synthetic-only', 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) },
+                }, response => {
+                    const chunks = [];
+                    response.on('data', chunk => chunks.push(chunk));
+                    response.on('error', reject);
+                    response.on('end', () => resolve({ status: response.statusCode,
+                        completed: Buffer.concat(chunks).toString().includes('data: [DONE]'), requestId: namedControlId }));
+                });
+                request.on('error', reject);
+                request.on('timeout', () => request.destroy(Error('Named control timed out')));
+                request.end(body);
+            });
+            assert.equal(evidence.namedControl.status, 200);
+            assert.equal(evidence.namedControl.completed, true);
+        }
         evidence.handler = lines(handlerLog);
         evidence.provider = provider;
     } finally {
@@ -190,6 +212,10 @@ async function main() {
             assert.ok(evidence.handler.some(row => row.kind === 'worker-rules'));
             assert.equal(sha256(fs.readFileSync(file('runtime-box/Plugin/NativeSync/' + rel))), sha256(bytes));
         }
+    }
+    if (spec.namedControl) {
+        const log = fs.readFileSync(file('backend.log'), 'utf8');
+        evidence.fixtureLimits = log.split('\n').filter(line => line.startsWith('[Physical mobile fixture]'));
     }
     dump(file('evidence.json'), evidence);
     for (const name of ['seed', 'data', 'runtime-box', 'empty-diaries', 'server-deps', 'backend.log', 'cert.pem']) {
