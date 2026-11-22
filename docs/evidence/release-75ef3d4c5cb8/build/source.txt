@@ -1,0 +1,15 @@
+Commit: 75ef3d4c5cb8a880772342209841a40104127ba3
+Git tree: fc9ca39fb3dc087d8a2a3758286a50c8373cb2a6
+Candidate: /home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/release-75ef3d4-3w8Dxh
+Architecture: x86_64
+Libc: glibc 2.43
+Node: v24.22.1
+npm: 11.19.1
+CDS: rustc 1.96.1 (31fca3adb 2026-06-26)
+Vexus: cargo 1.89.0 (c24e10642 2025-06-23)
+Electron: 44.9.3
+Working tree status before dependency install: clean
+Working tree status after build: clean
+Dependency install exit: 0
+Full build exit: 0
+SHA256 checks: 32

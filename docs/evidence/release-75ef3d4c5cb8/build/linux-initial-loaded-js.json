@@ -1,0 +1,34 @@
+{
+  "url": "file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/release-75ef3d4-3w8Dxh/apps/desktop/main.html",
+  "main": [
+    {
+      "file": "apps/desktop/modules/ipc/chatHandlers.js",
+      "sha256": "3f72379e438e2cadbb904bc7893175b0a3e69481795bfa59ab18e3e059e88ab7"
+    },
+    {
+      "file": "apps/desktop/modules/services/topicExecutionAuthority.js",
+      "sha256": "d95be8d511db7d830cc582cc65f4bef59a718a6e56c69c07c28a8cf014f47486"
+    },
+    {
+      "file": "apps/desktop/modules/services/nativeSync/sharedSessionClient.js",
+      "sha256": "aefae06d0bc48e601da231bd9a75140f75b860e08d1b909860a5a5f8a01fe879"
+    }
+  ],
+  "renderer": [
+    {
+      "file": "apps/desktop/modules/event-listeners.js",
+      "bytes": 72357,
+      "sha256": "b1b0d975beba491eec9193a17f63d71d232de15ae16f44ac9ac543603d43b6ea"
+    },
+    {
+      "file": "apps/desktop/modules/renderer/nativeExecutionStatus.js",
+      "bytes": 24582,
+      "sha256": "e018c44cf40b1576f4f60f84ad119839128968a6f7b182e0b0cdecde01560aee"
+    },
+    {
+      "file": "apps/desktop/modules/renderer/mainChatSendOwner.js",
+      "bytes": 9043,
+      "sha256": "b1c8836bbeb62dc96db5e81439a01ee28d69c36382b441663e7707928ddea0ef"
+    }
+  ]
+}

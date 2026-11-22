@@ -1,0 +1,57 @@
+{
+  "status": "PASS",
+  "candidate": "75ef3d4c5cb8a880772342209841a40104127ba3",
+  "sharedTopicId": "shared_b2fc37dab9684d0daa26fc28360dc1e3",
+  "workId": "request_f409661e94b945c4b9a834047a56fac0",
+  "state": "completed",
+  "attempts": 1,
+  "dispatches": 1,
+  "providerCalls": 1,
+  "journal": [
+    {
+      "seq": 1,
+      "msg_id": "msg_1795365334745_user_ync7f96m43",
+      "action": "upsert"
+    },
+    {
+      "seq": 2,
+      "msg_id": "reply_request_f409661e94b945c4b9a834047a56fac0",
+      "action": "upsert"
+    }
+  ],
+  "messageRows": [
+    {
+      "id": "msg_1795365334745_user_ync7f96m43",
+      "role": "user",
+      "bytes": 46,
+      "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "id": "reply_request_f409661e94b945c4b9a834047a56fac0",
+      "role": "assistant",
+      "bytes": 21,
+      "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "loadedSourceDigestsVerifiedAgainstGitTree": {
+    "apps/desktop/main.js": "7027975eacea21ba1d4259121b0c53960333c1ba1cd44e0c84bfca673a79a7db",
+    "apps/desktop/modules/ipc/chatHandlers.js": "3f72379e438e2cadbb904bc7893175b0a3e69481795bfa59ab18e3e059e88ab7",
+    "apps/desktop/modules/services/nativeSync/queries.js": "4bbf33d8595e135af5f19058ad1194172af458ead4a2ff3a47b39619b4e14e4c",
+    "apps/desktop/modules/services/nativeSync/sharedRuntime.js": "2ae17bc4d02cd5b8c2eaf063411568ed287940beddc71ccc11a1811e2632c6b3",
+    "apps/desktop/modules/services/nativeSync/sharedSessionClient.js": "aefae06d0bc48e601da231bd9a75140f75b860e08d1b909860a5a5f8a01fe879",
+    "apps/desktop/modules/renderer/nativeExecutionStatus.js": "e018c44cf40b1576f4f60f84ad119839128968a6f7b182e0b0cdecde01560aee",
+    "apps/desktop/modules/messageRenderer.js": "e3741c4ae084be080e4d76dc49c636a22a99bd7f224f93cedf99bed3cdd9b480",
+    "apps/desktop/modules/renderer/topicRiverQuote.mjs": "a8430bb887e892be4cdb355123ed8c165be632f7d7e7f006342ee41d308a7b1c",
+    "apps/desktop/modules/renderer/mainChatSendOwner.js": "b1c8836bbeb62dc96db5e81439a01ee28d69c36382b441663e7707928ddea0ef"
+  },
+  "windowsProcessIds": [
+    3632,
+    7140
+  ],
+  "sameHistoryAsLinuxAndCentralByIdRoleBytesAndSha256": true,
+  "imageSha256": {
+    "first": "fa4da1e206c3af5d68360649e8684f7d9526654f4465bcdd42ed90b37b9311b4",
+    "reopened": "fa4da1e206c3af5d68360649e8684f7d9526654f4465bcdd42ed90b37b9311b4"
+  },
+  "loadedGeneratedChatPreloadSha256": "4e0606e3c6a6e385c308b9e84b40f5cc9a589205edfecac8b5bf2b51b46b955e"
+}

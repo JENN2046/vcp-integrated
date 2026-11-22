@@ -1,0 +1,151 @@
+{
+  "status": "PASS",
+  "phase": "reopened",
+  "candidate": "75ef3d4c5cb8a880772342209841a40104127ba3",
+  "sharedTopicId": "shared_b2fc37dab9684d0daa26fc28360dc1e3",
+  "platform": "win32",
+  "arch": "x64",
+  "osRelease": "10.0.22631",
+  "ordinaryTestAccount": true,
+  "https": {
+    "strict": true,
+    "statusCode": 200,
+    "observedUtc": "2026-11-22T16:35:40.098Z"
+  },
+  "electron": {
+    "pid": 7140,
+    "version": "44.9.3",
+    "sandbox": true
+  },
+  "nativeSync": {
+    "ready": true,
+    "readOnly": false
+  },
+  "desktopTopic": {
+    "itemId": "ns_a037a7ee49bc4e79479060db",
+    "itemType": "agent",
+    "topicId": "ns_f4b34cc01db60780c39d9f48",
+    "historyRevision": 6
+  },
+  "work": {
+    "id": "request_f409661e94b945c4b9a834047a56fac0",
+    "state": "completed",
+    "source": "Windows B authenticated read-only GET /api/v1/sync/shared/work",
+    "rendererStatus": {
+      "success": true,
+      "topic": {
+        "ownerType": "agent",
+        "ownerId": "ns_a037a7ee49bc4e79479060db",
+        "topicId": "ns_f4b34cc01db60780c39d9f48"
+      },
+      "connection": "online"
+    }
+  },
+  "dom": [
+    {
+      "id": "msg_1795365334745_user_ync7f96m43",
+      "text": "Send-recovery compare 02: accept exactly once.",
+      "visible": true,
+      "bytes": 46,
+      "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "id": "reply_request_f409661e94b945c4b9a834047a56fac0",
+      "text": "合成回复完成。",
+      "visible": true,
+      "bytes": 21,
+      "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "history": [
+    {
+      "id": "msg_1795365334745_user_ync7f96m43",
+      "role": "user",
+      "bytes": 46,
+      "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "id": "reply_request_f409661e94b945c4b9a834047a56fac0",
+      "role": "assistant",
+      "bytes": 21,
+      "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "executableDigests": {
+    "electron": "61f45e6f522c666c6156222680712870b38f3a4acbd2e847b987f53ddb613544",
+    "cds": "36c065ca74251ebcf9f0d90c458a66ba9156673cf7672c25a5a28c361db2cb96"
+  },
+  "loaded": {
+    "main": [
+      {
+        "file": "apps\\desktop\\main.js",
+        "sha256": "7027975eacea21ba1d4259121b0c53960333c1ba1cd44e0c84bfca673a79a7db"
+      },
+      {
+        "file": "apps\\desktop\\modules\\ipc\\chatHandlers.js",
+        "sha256": "3f72379e438e2cadbb904bc7893175b0a3e69481795bfa59ab18e3e059e88ab7"
+      },
+      {
+        "file": "apps\\desktop\\modules\\services\\nativeSync\\queries.js",
+        "sha256": "4bbf33d8595e135af5f19058ad1194172af458ead4a2ff3a47b39619b4e14e4c"
+      },
+      {
+        "file": "apps\\desktop\\modules\\services\\nativeSync\\sharedRuntime.js",
+        "sha256": "2ae17bc4d02cd5b8c2eaf063411568ed287940beddc71ccc11a1811e2632c6b3"
+      },
+      {
+        "file": "apps\\desktop\\modules\\services\\nativeSync\\sharedSessionClient.js",
+        "sha256": "aefae06d0bc48e601da231bd9a75140f75b860e08d1b909860a5a5f8a01fe879"
+      }
+    ],
+    "renderer": [
+      {
+        "file": "apps\\desktop\\modules\\renderer\\nativeExecutionStatus.js",
+        "bytes": 24582,
+        "sha256": "e018c44cf40b1576f4f60f84ad119839128968a6f7b182e0b0cdecde01560aee"
+      },
+      {
+        "file": "apps\\desktop\\modules\\messageRenderer.js",
+        "bytes": 246762,
+        "sha256": "e3741c4ae084be080e4d76dc49c636a22a99bd7f224f93cedf99bed3cdd9b480"
+      },
+      {
+        "file": "apps\\desktop\\modules\\renderer\\mainChatSendOwner.js",
+        "bytes": 9043,
+        "sha256": "b1c8836bbeb62dc96db5e81439a01ee28d69c36382b441663e7707928ddea0ef"
+      },
+      {
+        "file": "apps\\desktop\\modules\\renderer\\topicRiverQuote.mjs",
+        "bytes": 3509,
+        "sha256": "a8430bb887e892be4cdb355123ed8c165be632f7d7e7f006342ee41d308a7b1c"
+      }
+    ],
+    "configuredPreload": {
+      "file": "preloads\\bundled\\dist\\chat.cjs",
+      "sha256": "4e0606e3c6a6e385c308b9e84b40f5cc9a589205edfecac8b5bf2b51b46b955e",
+      "source": "candidate main BrowserWindow preload path and renderer-ready"
+    }
+  },
+  "processesWhileVisible": {
+    "electron": [
+      7140,
+      4308,
+      2032,
+      4476,
+      4068
+    ],
+    "cds": [
+      5944
+    ]
+  },
+  "exit": {
+    "code": 0,
+    "signal": null
+  },
+  "electronQuit": true,
+  "sendAttempts": 0,
+  "processesAfterQuit": {
+    "electron": [],
+    "cds": []
+  }
+}

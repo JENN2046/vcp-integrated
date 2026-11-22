@@ -1,0 +1,11 @@
+{
+  "restoredOriginalAndroidUser": 0,
+  "isolatedAndroidUserRetained": 12,
+  "firefoxVersion": "160.0.1",
+  "existingFirefoxPwaPinnedAfterTest": true,
+  "adbReversePortRemoved": 18443,
+  "adbForwardPortRemoved": 18446,
+  "temporaryPublicCertificateDownloadRemoved": true,
+  "testCaTrustRetainedInIsolatedUser": true,
+  "testCaExpiresUtc": "2026-11-23T16:31:07Z"
+}

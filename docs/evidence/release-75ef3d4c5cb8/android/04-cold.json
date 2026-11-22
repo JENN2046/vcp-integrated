@@ -1,0 +1,40 @@
+{
+  "pid": "18213",
+  "focus": "  mCurrentFocus=Window{a495ecf u12 org.mozilla.firefox/org.mozilla.fenix.customtabs.ExternalAppBrowserActivity}",
+  "secure": true,
+  "visible": true,
+  "standalone": true,
+  "origin": "https://127.0.0.1:18443",
+  "connection": "已连接",
+  "bundle": "/mobile/assets/index-CmAezHC1.js",
+  "workerControlled": true,
+  "isPrivate": false,
+  "browsingContextID": 2,
+  "observed": {
+    "topicKey": "shared_b2fc37dab9684d0daa26fc28360dc1e3",
+    "messages": [
+      {
+        "id": "msg_1795365334745_user_ync7f96m43",
+        "role": "user",
+        "characters": 46,
+        "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+      },
+      {
+        "id": "reply_request_f409661e94b945c4b9a834047a56fac0",
+        "role": "assistant",
+        "characters": 7,
+        "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+      }
+    ],
+    "executions": [
+      {
+        "id": "request_f409661e94b945c4b9a834047a56fac0",
+        "state": "completed"
+      }
+    ]
+  },
+  "readback": {
+    "status": 200,
+    "sessionMarker": "66b9ea59c05b1420f6c9e3e008e6b77acdbecb6e1c4a8d276ec9597dbfa8b458"
+  }
+}

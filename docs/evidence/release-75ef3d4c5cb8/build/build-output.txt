@@ -1,0 +1,15 @@
+npm warn Unknown project config "electron_mirror". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown project config "ELECTRON_MIRROR". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+added 989 packages in 10s
+added 807 packages in 8s
+npm warn install-scripts 4 packages have install scripts not yet covered by allowScripts:
+added 35 packages in 645ms
+vite v8.3.5 building client environment for production...
+✓ 34 modules transformed.
+✓ built in 479ms
+{"status":"BUNDLED","roles":4,"domains":43,"externalModules":["external \"electron\""]}
+[VCP-CDS build] Building native linux-x64 release binary...
+    Finished `release` profile [optimized] target(s) in 2m 21s
+[VCP-CDS build] Runtime binary deployed to /home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/release-75ef3d4-3w8Dxh/apps/desktop/modules/services/chatDataService/bin/linux-x64/vcp_chat_data_service.
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 54.79s
+Vexus Linux x64 GNU addon built and checked against the native runtime ABI.

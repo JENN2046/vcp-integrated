@@ -1,0 +1,16 @@
+{
+  "sharedTopicId": "shared_b2fc37dab9684d0daa26fc28360dc1e3",
+  "desktopDescriptor": {
+    "itemType": "agent",
+    "itemId": "ns_a037a7ee49bc4e79479060db",
+    "topicId": "ns_f4b34cc01db60780c39d9f48"
+  },
+  "windowsDescriptor": {
+    "itemType": "agent",
+    "itemId": "ns_a037a7ee49bc4e79479060db",
+    "topicId": "ns_f4b34cc01db60780c39d9f48"
+  },
+  "agent": "Synthetic lost receipt",
+  "topic": "Sponsor target existing topic",
+  "input": "Send-recovery compare 02: accept exactly once."
+}

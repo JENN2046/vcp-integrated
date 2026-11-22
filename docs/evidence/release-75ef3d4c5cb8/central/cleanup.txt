@@ -1,0 +1,1 @@
+Coordinator and loopback services stopped. Test run, including synthetic database, profiles, seed and TLS files, removed by coordinator. Port 18443 closed.

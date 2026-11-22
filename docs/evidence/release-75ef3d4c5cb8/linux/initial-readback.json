@@ -1,0 +1,95 @@
+{
+  "event": "linux-readback",
+  "value": {
+    "pid": 1169316,
+    "scope": {
+      "ownerType": "agent",
+      "ownerId": "ns_a037a7ee49bc4e79479060db",
+      "topicId": "ns_f4b34cc01db60780c39d9f48"
+    },
+    "connection": "online",
+    "freshness": "last-known",
+    "work": {
+      "id": "request_f409661e94b945c4b9a834047a56fac0",
+      "requestId": "msg_1795365334745_user_ync7f96m43",
+      "canHandoff": false,
+      "state": "completed",
+      "canResume": false,
+      "interruptedGroupReplies": [],
+      "retainedReplies": [],
+      "shared": true,
+      "executionHost": "shared-backend",
+      "timings": {
+        "local_save_started": 1795365334770,
+        "local_saved": 1795365334777,
+        "accepted": 1795365334847
+      },
+      "nativePhases": [],
+      "phase": "completed",
+      "canAbandon": false,
+      "nativeTasks": [],
+      "toolInvocations": []
+    },
+    "workRow": [
+      {
+        "id": "request_f409661e94b945c4b9a834047a56fac0",
+        "text": "主请求已结束 · 请求 msg_1795365334745_user_ync7f96m43",
+        "title": "",
+        "visible": false
+      }
+    ],
+    "messages": [
+      {
+        "id": "msg_1795365334745_user_ync7f96m43",
+        "role": "user",
+        "dom": {
+          "utf8Bytes": 47,
+          "sha256": "48306e31ec4862b0491f94b6fabb0cc5de8bc2ebc6847125d744d10663c66453"
+        },
+        "history": {
+          "utf8Bytes": 46,
+          "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+        }
+      },
+      {
+        "id": "reply_request_f409661e94b945c4b9a834047a56fac0",
+        "role": "assistant",
+        "dom": {
+          "utf8Bytes": 22,
+          "sha256": "b2bce975602a30d7cb96a7d931455b392369f9f457148bf41b171b4bc7f0922b"
+        },
+        "history": {
+          "utf8Bytes": 21,
+          "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+        }
+      }
+    ],
+    "view": {
+      "context": {
+        "itemId": "ns_a037a7ee49bc4e79479060db",
+        "itemType": "agent",
+        "topicId": "ns_f4b34cc01db60780c39d9f48",
+        "historyRevision": 18
+      },
+      "text": "用户\n2026-11-23 00:35\n\nSend-recovery compare 02: accept exactly once.\n\nSynthetic lost receipt\n2026-11-23 00:35\n\n合成回复完成。",
+      "composer": "",
+      "selectionText": "",
+      "selectionInTranscript": false,
+      "reading": {
+        "scrollTop": 0,
+        "height": 704,
+        "scrollHeight": 704
+      },
+      "history": [
+        {
+          "id": "msg_1795365334745_user_ync7f96m43",
+          "role": "user"
+        },
+        {
+          "id": "reply_request_f409661e94b945c4b9a834047a56fac0",
+          "role": "assistant"
+        }
+      ]
+    }
+  }
+}

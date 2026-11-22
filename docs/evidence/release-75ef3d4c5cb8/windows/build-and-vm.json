@@ -1,0 +1,35 @@
+{
+  "candidate": "75ef3d4c5cb8a880772342209841a40104127ba3",
+  "tree": "fc9ca39fb3dc087d8a2a3758286a50c8373cb2a6",
+  "source": "git archive candidate, Windows x64 locked package set, generated desktop preloads",
+  "packageLockSha256": "84f9d3463f51f99a8c9085d0fbb58914235afa4b3220e5a8640bf534b7702476",
+  "windowsElectron": {
+    "version": "44.9.3",
+    "releaseZipSha256": "41a1ffa0541cb0f2c9b9fe920dd2cef1793ad0ea2ada1a9582958880f4d1b23c",
+    "executableSha256": "61f45e6f522c666c6156222680712870b38f3a4acbd2e847b987f53ddb613544"
+  },
+  "windowsCDS": {
+    "rustc": "1.96.1",
+    "target": "x86_64-pc-windows-gnu",
+    "cargoFlags": [
+      "--release",
+      "--locked",
+      "--offline"
+    ],
+    "sourceSha256": "dc6cd1f2dea9de92b49d6044c98b6e3ce5a049e0c503b3ab099b0f1a3acbd6ae",
+    "executableSha256": "36c065ca74251ebcf9f0d90c458a66ba9156673cf7672c25a5a28c361db2cb96"
+  },
+  "vm": {
+    "qemu": "10.2.1",
+    "acceleration": "KVM",
+    "baseReadOnly": true,
+    "isolatedOverlayWritable": true,
+    "inputImageReadOnly": true,
+    "publicInternetAccess": false,
+    "rtc": "base=localtime,clock=host",
+    "normalShutdownConfirmed": true,
+    "baseReadOnlyVerification": "QEMU backing file descriptor opened read-only",
+    "evidenceTransfer": "FAT32 USB image with MBR partition table"
+  },
+  "builtChatPreloadSha256": "4e0606e3c6a6e385c308b9e84b40f5cc9a589205edfecac8b5bf2b51b46b955e"
+}
