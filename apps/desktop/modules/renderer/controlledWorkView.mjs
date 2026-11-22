@@ -85,6 +85,10 @@ export function createControlledWorkView({container,api,execute,refresh}){
   description.textContent='按群聊顺序发言。第一位成员回复确认后，可在另一设备接管，再继续第二位成员。';
   const state=current?.state==='continuing'&&current.canContinue?'已确认继续操作，等待本端开始第二位成员':groupStages[current?.state];
   status.textContent=current?`${state||'正在核对原接力'}${current.executor?' · 执行端：'+(current.owned?'本端':'另一设备'):''}`:allowed?'当前没有进行中的接力。':'';
+  if(current?.unknownMember){
+   const {ordinal,name}=current.unknownMember;
+   status.textContent+=` · 第${ordinal===0?'一':'二'}位成员${name?' '+name:''}的回复已派发，结果未知`;
+  }
   if(current&&!current.fresh)status.textContent+=' · 最近已知';
   buttons();return;
  }

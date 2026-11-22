@@ -1,0 +1,387 @@
+{
+  "revision": "774b70e3256836a57e2998d4fc116d206380e347",
+  "workId": "request_9c83476f43f546a1a8f96d54254467fe",
+  "nativeRequestIds": [
+    "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+    "group_request_9c83476f43f546a1a8f96d54254467fe_1"
+  ],
+  "sourceSha256": "99db7df76016daf3624e66a220ef80891ac84be3bd151d1f3d877dc79bb27c44",
+  "before": {
+    "admission": {
+      "id": "request_9c83476f43f546a1a8f96d54254467fe",
+      "request_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+      "principal": "desktop:deviceA",
+      "state": "review_required",
+      "dispatched": 1,
+      "user_seq": 1,
+      "native_terminal": 0
+    },
+    "handoff": {
+      "executor": "desktop:deviceB",
+      "executor_version": 1,
+      "state": "continuing",
+      "first_reply_seq": 2
+    },
+    "native": [
+      {
+        "id": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+        "ordinal": 0,
+        "principal": "desktop:deviceA",
+        "member_id": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+        "state": "model_terminal"
+      },
+      {
+        "id": "group_request_9c83476f43f546a1a8f96d54254467fe_1",
+        "ordinal": 1,
+        "principal": "desktop:deviceB",
+        "member_id": "shared_91126376e0274108a9cf155f967873cf",
+        "state": "unknown"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "message": {
+          "id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+          "role": "user",
+          "content": "GROUP_HANDOFF_BASELINE_INPUT",
+          "timestamp": 1795342815156,
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "fields": {}
+          }
+        }
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "message": {
+          "id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "role": "assistant",
+          "name": "A",
+          "content": "RELAY_A_FINAL",
+          "timestamp": 1795342815605,
+          "agentId": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+          "groupId": "shared_c5d0c176dd6e4306a647141f983e8f85",
+          "topicId": "shared_846c39801b47445ca51fae9b0c64a85d",
+          "isGroupMessage": true,
+          "finishReason": "completed",
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+            "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+            "dependsOnMessageIds": [
+              "controlled_88aead004a8a49d496526cfe58f3a75d"
+            ]
+          },
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "3f35588067781a3cfae6153cfe4ef630cc36377a1e626a4a61e5d0c167aeb900",
+            "fields": {
+              "continuity": {
+                "version": 1,
+                "known": true,
+                "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+                "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+                "dependsOnMessageIds": [
+                  "controlled_88aead004a8a49d496526cfe58f3a75d"
+                ]
+              }
+            }
+          }
+        }
+      }
+    ],
+    "providerCalls": []
+  },
+  "desktop": {
+    "sourceOpen": {
+      "pid": 1184657
+    },
+    "before": {
+      "groupStatus": "原回复结果待核对 · 执行端：本端",
+      "messages": "用户\n2026-11-22 18:20\n\nGROUP_HANDOFF_BASELINE_INPUT\n\nA\n2026-11-22 18:20\n\nRELAY_A_FINAL",
+      "history": [
+        {
+          "id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+          "role": "user",
+          "content": "GROUP_HANDOFF_BASELINE_INPUT"
+        },
+        {
+          "id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "role": "assistant",
+          "agentId": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+          "content": "RELAY_A_FINAL"
+        }
+      ],
+      "executionStatus": "需要核对 · 请求 controlled_88aead004a8a49d496526cfe58f3a75d我已核对可能的工具副作用，放弃此请求剩余工作确认放弃并解除暂停"
+    },
+    "receiptRecipientExit": {
+      "electronPid": 1184881,
+      "cdsPid": 1185066,
+      "liveGroupMembers": 0
+    }
+  },
+  "readOnly": {
+    "permissions": [
+      "shared:sharedAB:read"
+    ],
+    "observedBefore": {
+      "route": "/mobile/api/shared/session-events",
+      "status": 200,
+      "workId": "request_9c83476f43f546a1a8f96d54254467fe",
+      "requestId": "controlled_88aead004a8a49d496526cfe58f3a75d",
+      "state": "review_required",
+      "groupHandoff": {
+        "state": "review_required",
+        "executor": "desktop:deviceB",
+        "executorVersion": 1,
+        "nextOrdinal": null,
+        "nextRequestId": null,
+        "firstReplySeq": 2
+      },
+      "epoch": "9ecca4d5-4d6a-4a1d-ae3a-a1506c77874e.71e8fd94-fc3b-48a8-8084-7e991243d5a3",
+      "seq": 0
+    },
+    "denied": [
+      {
+        "route": "/mobile/api/shared/abandon",
+        "status": 403,
+        "code": "SHARED_PERMISSION_REQUIRED"
+      },
+      {
+        "route": "/mobile/api/shared/group-continue",
+        "status": 403,
+        "code": "SHARED_PERMISSION_REQUIRED"
+      },
+      {
+        "route": "/mobile/api/shared/group-handoff",
+        "status": 403,
+        "code": "SHARED_PERMISSION_REQUIRED"
+      }
+    ],
+    "observedAfter": {
+      "route": "/mobile/api/shared/session-events",
+      "status": 200,
+      "workId": "request_9c83476f43f546a1a8f96d54254467fe",
+      "requestId": "controlled_88aead004a8a49d496526cfe58f3a75d",
+      "state": "review_required",
+      "groupHandoff": {
+        "state": "review_required",
+        "executor": "desktop:deviceB",
+        "executorVersion": 1,
+        "nextOrdinal": null,
+        "nextRequestId": null,
+        "firstReplySeq": 2
+      },
+      "epoch": "9ecca4d5-4d6a-4a1d-ae3a-a1506c77874e.71e8fd94-fc3b-48a8-8084-7e991243d5a3",
+      "seq": 0
+    },
+    "durableStateUnchanged": true,
+    "operationReceiptsAdded": 0
+  },
+  "lostReceipt": {
+    "route": "/api/v1/sync/shared/abandon",
+    "method": "POST",
+    "at": 1795366074079,
+    "device": "deviceB",
+    "capabilities": "attachments-v1,message-intents-v1,desktop-references-v1,source-data-v2,shared-space-v1,shared-merge-v1,shared-attachments-v1,shared-context-v1,shared-steering-v1,shared-controlled-text-v1,shared-controlled-tools-v1,group-member-handoff-v1,shared-controlled-tool-pair-v1,shared-controlled-aa-v1,shared-model-save-v1,shared-inline-receipts-v1,shared-native-inline-v1,shared-session-v1,shared-events-v1,shared-topic-sponsor-v1",
+    "bodySha256": "b4da15601ec9669fcbdc2836539b77ed43a51bc6e43e6e476e7207a913ed272f",
+    "body": {
+      "sharedSpaceId": "sharedAB",
+      "admissionId": "request_9c83476f43f546a1a8f96d54254467fe",
+      "opId": "desktop-abandon_request_9c83476f43f546a1a8f96d54254467fe",
+      "confirm": true
+    },
+    "status": 200,
+    "response": {
+      "request": {
+        "id": "request_9c83476f43f546a1a8f96d54254467fe",
+        "sharedSpaceId": "sharedAB",
+        "sharedId": "shared_846c39801b47445ca51fae9b0c64a85d",
+        "requestId": "controlled_88aead004a8a49d496526cfe58f3a75d",
+        "state": "abandoned",
+        "configHash": "4a65784e95bc834c307f4611ef3523375e2dec813db27317cc1ea784b9bf0cd8",
+        "contextHead": 0,
+        "userSeq": 1,
+        "replySeq": 2,
+        "dispatched": true,
+        "turn": {
+          "kind": "message",
+          "plan": [
+            "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+            "shared_91126376e0274108a9cf155f967873cf"
+          ],
+          "userMessageId": "controlled_88aead004a8a49d496526cfe58f3a75d",
+          "controlMode": "group-member-handoff-v1"
+        },
+        "groupHandoff": {
+          "state": "abandoned",
+          "executor": "desktop:deviceB",
+          "executorVersion": 1,
+          "nextOrdinal": null,
+          "nextRequestId": null,
+          "firstReplySeq": 2
+        }
+      },
+      "replayed": false
+    },
+    "dropped": true
+  },
+  "closeoutReceipt": {
+    "expectedOpId": "desktop-abandon_request_9c83476f43f546a1a8f96d54254467fe",
+    "actualOpId": "desktop-abandon_request_9c83476f43f546a1a8f96d54254467fe",
+    "rows": [
+      {
+        "principal": "desktop:deviceB",
+        "op_id": "desktop-abandon_request_9c83476f43f546a1a8f96d54254467fe",
+        "result": {
+          "request": {
+            "id": "request_9c83476f43f546a1a8f96d54254467fe",
+            "sharedSpaceId": "sharedAB",
+            "sharedId": "shared_846c39801b47445ca51fae9b0c64a85d",
+            "requestId": "controlled_88aead004a8a49d496526cfe58f3a75d",
+            "state": "abandoned",
+            "configHash": "4a65784e95bc834c307f4611ef3523375e2dec813db27317cc1ea784b9bf0cd8",
+            "contextHead": 0,
+            "userSeq": 1,
+            "replySeq": 2,
+            "dispatched": true,
+            "turn": {
+              "kind": "message",
+              "plan": [
+                "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+                "shared_91126376e0274108a9cf155f967873cf"
+              ],
+              "userMessageId": "controlled_88aead004a8a49d496526cfe58f3a75d",
+              "controlMode": "group-member-handoff-v1"
+            },
+            "groupHandoff": {
+              "state": "abandoned",
+              "executor": "desktop:deviceB",
+              "executorVersion": 1,
+              "nextOrdinal": null,
+              "nextRequestId": null,
+              "firstReplySeq": 2
+            }
+          }
+        }
+      }
+    ]
+  },
+  "settled": {
+    "admission": {
+      "id": "request_9c83476f43f546a1a8f96d54254467fe",
+      "request_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+      "principal": "desktop:deviceA",
+      "state": "abandoned",
+      "dispatched": 1,
+      "user_seq": 1,
+      "native_terminal": 0
+    },
+    "handoff": {
+      "executor": "desktop:deviceB",
+      "executor_version": 1,
+      "state": "continuing",
+      "first_reply_seq": 2
+    },
+    "native": [
+      {
+        "id": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+        "ordinal": 0,
+        "principal": "desktop:deviceA",
+        "member_id": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+        "state": "model_terminal"
+      },
+      {
+        "id": "group_request_9c83476f43f546a1a8f96d54254467fe_1",
+        "ordinal": 1,
+        "principal": "desktop:deviceB",
+        "member_id": "shared_91126376e0274108a9cf155f967873cf",
+        "state": "unknown"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "message": {
+          "id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+          "role": "user",
+          "content": "GROUP_HANDOFF_BASELINE_INPUT",
+          "timestamp": 1795342815156,
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "fields": {}
+          }
+        }
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "message": {
+          "id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "role": "assistant",
+          "name": "A",
+          "content": "RELAY_A_FINAL",
+          "timestamp": 1795342815605,
+          "agentId": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+          "groupId": "shared_c5d0c176dd6e4306a647141f983e8f85",
+          "topicId": "shared_846c39801b47445ca51fae9b0c64a85d",
+          "isGroupMessage": true,
+          "finishReason": "completed",
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+            "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+            "dependsOnMessageIds": [
+              "controlled_88aead004a8a49d496526cfe58f3a75d"
+            ]
+          },
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "3f35588067781a3cfae6153cfe4ef630cc36377a1e626a4a61e5d0c167aeb900",
+            "fields": {
+              "continuity": {
+                "version": 1,
+                "known": true,
+                "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+                "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+                "dependsOnMessageIds": [
+                  "controlled_88aead004a8a49d496526cfe58f3a75d"
+                ]
+              }
+            }
+          }
+        }
+      }
+    ],
+    "providerCalls": []
+  },
+  "provider": [],
+  "restartStatus": "原回复结果待核对 · 执行端：本端",
+  "lostReceiptResult": {
+    "event": "B:ipc-result",
+    "t": 1795366074086,
+    "data": {
+      "channel": "native-sync:abandon-send",
+      "error": "NETWORK_UNAVAILABLE",
+      "success": false,
+      "sourceMs": 1795366074085
+    }
+  },
+  "result": "Central closeout committed, desktop restarted still projecting review_required. No new round attempted."
+}

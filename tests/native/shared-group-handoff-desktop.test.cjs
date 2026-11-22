@@ -77,6 +77,20 @@ test('group continuation with lost ACK can be retried with the same receipt, but
     assert.equal(status.canContinue, false);
     await executeAction(afterDispatch, payload, invoke);
     assert.equal(launches, 1);
+    const second = work.nativeRequests[1];
+    second.state = 'unknown';
+    second.memberId = 'memberB';
+    work.state = work.groupHandoff.state = 'review_required';
+    const review = await observe(afterDispatch, mapping, { refresh: true, connection: 'online' });
+    assert.equal(review.state, 'review_required');
+    assert.equal(review.unknownMember.ordinal, 1);
+
+    work.state = work.groupHandoff.state = 'abandoned';
+    const closed = await observe(afterDispatch, mapping, { refresh: true, connection: 'online' });
+    assert.equal(closed.state, 'abandoned');
+    assert.deepEqual(closed.unknownMember, review.unknownMember);
+    assert.equal(closed.canContinue, false);
+    assert.equal(closed.canHandoff, false);
     afterDispatch.runtime.send = async () => {
         afterDispatch.runtime.backgroundDenied = true;
         return { request: work };

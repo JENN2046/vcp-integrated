@@ -118,3 +118,5 @@ Android 首次配对立即强停已定位到隔离 WebView 的 Cookie 写盘时�
 单聊压缩现在识别 ToolBox 代理返回的上游拒绝状态。配置备用模型时，明确的 HTTP 400、404、422 或 429 可以触发一次备用尝试。鉴权失败和状态未明的断流保留原 History。历史中已有错误摘要时，桌面和共享 worker 从最近有效检查点继续；提交回执丢失后按原意图核对。[压缩、重开与原 Work 接续回执](evidence/compaction-fallback/README.md)
 
 TopicSponsor 的 River 引用对齐作者的最近消息窗口。两位成员同文和一条无名短消息经工具派发、桌面投递和冷重开后仍逐行对应；旧 V1 与作者 V2 均能读取。共享目标在提交后丢回执时仍按原收据恢复。[工具对照、History 与冷开截图](evidence/river-quote/README.md)
+
+在群聊接力原故障库的隔离副本中，当前执行端人工结清了乙已派发、结果未知的原 Work。丢失结清回执后重开，桌面同时显示接力已结束和乙结果未知。甲的正式回复仍只有一份；新的普通群聊轮次在同一话题完成。只读会话能观察原 Work，三项代办操作均被拒绝。[改前改后回执及截图](evidence/group-review-closeout/e2e/README.md)

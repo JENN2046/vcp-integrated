@@ -81,9 +81,13 @@ async function observe(execution, mapping, { refresh, connection }) {
     const control = request.groupHandoff;
     const owned = control.executor === executor(runtime);
     const live = execution.liveGroups.has(request.id);
-    const reviewing = request.state === 'review_required'
-        || request.nativeRequests?.some(step => step.state === 'unknown'
-            || owned && !live && ['dispatched', 'model_terminal'].includes(step.state) && step.ordinal === control.nextOrdinal);
+    const unknown = request.nativeRequests?.find(step => step.state === 'unknown');
+    const member = unknown && localRecord(execution, mapping, request.id)?.config?.members
+        ?.find(entry => entry.id === unknown.memberId);
+    // Closing the Work does not resolve the original member request.
+    const reviewing = !settled.has(request.state) && (request.state === 'review_required' || unknown
+        || owned && !live && request.nativeRequests?.some(step =>
+            ['dispatched', 'model_terminal'].includes(step.state) && step.ordinal === control.nextOrdinal));
     return {
         id: request.id,
         requestId: request.requestId,
@@ -93,6 +97,7 @@ async function observe(execution, mapping, { refresh, connection }) {
         owned,
         fresh,
         nextRequestId: control.nextRequestId,
+        ...(unknown && [0, 1].includes(unknown.ordinal) && { unknownMember: { ordinal: unknown.ordinal, name: member?.config?.name } }),
         canRetryFirst: fresh && owned && !live && canDispatch(request, 0) && Boolean(localRecord(execution, mapping, request.id)),
         canHandoff: fresh && !owned && !reviewing && control.state === 'awaiting_handoff',
         canContinue: fresh && owned && !live && !reviewing && (control.state === 'awaiting_continue' || canDispatch(request, 1)),

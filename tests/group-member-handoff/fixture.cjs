@@ -3,15 +3,21 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { createFixture } = require('../group-relay/fixture.cjs');
+const nextInput = 'GROUP_REVIEW_CLOSEOUT_NEXT_INPUT';
+const isNextInput = text => text === nextInput || text === '[用户的发言]: ' + nextInput;
+const hasNextInput = body => body.messages.some(({ role, content }) => role === 'user' &&
+    (isNextInput(content) || Array.isArray(content) && content.some(part => part.type === 'text' && isNextInput(part.text))));
 
 function create() {
     const mode = process.env.NS_GROUP_HANDOFF_CASE;
     const frames = [];
     const requests = [];
     const fixture = createFixture();
+    const closeout = mode === 'review-closeout';
     const isCandidate = mode.startsWith('handoff');
     let loseAck = isCandidate;
     let loseContinueAck = mode === 'handoff';
+    let loseCloseoutAck = closeout;
     let secondFinal, secondCut;
     if (isCandidate) fixture.finishFutureRounds();
     function seed(f) {
@@ -42,9 +48,16 @@ function create() {
             };
         },
         proxyHooks: {
-            observeRequest(method, route) { return method === 'POST' && /\/shared\/group-(handoff|continue)$/.test(route); },
+            observeRequest(method, route) {
+                return method === 'POST' && (/\/shared\/group-(handoff|continue)$/.test(route)
+                    || closeout && route.endsWith('/shared/abandon'));
+            },
             dropResponse(row) {
                 if (row.status < 200 || row.status >= 300) return false;
+                if (loseCloseoutAck && row.route.endsWith('/shared/abandon')) {
+                    loseCloseoutAck = false;
+                    return true;
+                }
                 if (loseAck && row.route.endsWith('/group-handoff')) {
                     loseAck = false;
                     return true;
@@ -64,6 +77,22 @@ function create() {
             if (!member) return false;
             row.member = member;
             requests.push({ member, packet: body });
+            if (closeout) {
+                if (!hasNextInput(body)) {
+                    row.case = 'fixtureError';
+                    response.writeHead(500).end('Unexpected dispatch of original Work');
+                    return true;
+                }
+                const text = 'REVIEW_NEXT_' + member + '_FINAL';
+                const reply = (delta, finish_reason) => 'data: ' + JSON.stringify({
+                    id: 'synthetic-review-closeout-next', object: 'chat.completion.chunk', model: 'synthetic',
+                    choices: [{ index: 0, delta, finish_reason }],
+                }) + '\n\n';
+                frames.push({ member, text });
+                response.writeHead(200, { 'content-type': 'text/event-stream' });
+                response.end(reply({ role: 'assistant', content: text }, null) + reply({}, 'stop') + 'data: [DONE]\n\n');
+                return true;
+            }
             if ((['a-partial', 'handoff-a-partial'].includes(mode) && member === 'A') || member === 'B') {
                 response.writeHead(200, { 'content-type': 'text/event-stream' });
                 const text = `RELAY_${member}_PARTIAL`;
@@ -102,4 +131,4 @@ function create() {
     };
 }
 
-module.exports = { create };
+module.exports = { create, nextInput, hasNextInput };
