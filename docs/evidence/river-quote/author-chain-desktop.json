@@ -1,0 +1,222 @@
+{
+  "variant": "author",
+  "traceKey": "authorShortSemantic",
+  "electron": "44.9.3",
+  "accepted": {
+    "success": true,
+    "queued": true,
+    "entryId": "c016fa9f-d315-469d-8f18-9c865a1ee1c7",
+    "topic_id": "river-target",
+    "target_id": "fixture-river-group",
+    "target_type": "group",
+    "message_id": "msg_409be59a-6127-4d5b-b46d-7aa86b98390f",
+    "sender": "隔离来信人",
+    "sender_id": "river-sender"
+  },
+  "history": [
+    {
+      "id": "fixture-legacy-v1",
+      "role": "assistant",
+      "name": "隔离来信人",
+      "agentId": "river-sender",
+      "groupId": "fixture-river-group",
+      "topicId": "river-target",
+      "isGroupMessage": true,
+      "isThinking": false,
+      "finishReason": "completed",
+      "timestamp": 1795364650396,
+      "content": "旧版留言 · 仅含角色和正文\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"旧格式正文\"}\n[/VCP_TOPIC_RIVER_V1]"
+    },
+    {
+      "id": "msg_409be59a-6127-4d5b-b46d-7aa86b98390f",
+      "role": "assistant",
+      "name": "隔离来信人",
+      "agentId": "river-sender",
+      "avatarUrl": null,
+      "avatarColor": "rgb(96,106,116)",
+      "content": "[隔离来信人的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V2]\n#### 1 · 青岚（助手）\n> 蓝色样本按原计划保留，等下一轮确认。\n\n#### 2 · 用户\n> 收到。\n\n#### 3 · 白露（助手）\n> 蓝色样本按原计划保留，等下一轮确认。\n[/VCP_TOPIC_RIVER_V2]\n\n[该发言发送自river-source话题]",
+      "timestamp": 1795364663636,
+      "isThinking": false,
+      "finishReason": "completed",
+      "isGroupMessage": true,
+      "groupId": "fixture-river-group",
+      "topicId": "river-target",
+      "_metadata": {
+        "createdBy": "plugin",
+        "isPluginReply": true,
+        "speaker_agent_id": "river-sender",
+        "speaker_name": "隔离来信人"
+      }
+    }
+  ],
+  "live": {
+    "domId": "msg_409be59a-6127-4d5b-b46d-7aa86b98390f",
+    "text": "隔离来信人\n2026-11-23 00:24\n\n请转达蓝色样本的决定。\n\n[该发言发送自river-source话题]\n\n随附上下文 · 3 条",
+    "collapsed": true,
+    "summaries": [
+      "青岚（助手）：蓝色样本按原计划保留，等下一轮确认。",
+      "用户：收到。",
+      "白露（助手）：蓝色样本按原计划保留，等下一轮确认。"
+    ],
+    "content": [
+      "蓝色样本按原计划保留，等下一轮确认。",
+      "收到。",
+      "蓝色样本按原计划保留，等下一轮确认。"
+    ]
+  },
+  "reopened": {
+    "domId": "msg_409be59a-6127-4d5b-b46d-7aa86b98390f",
+    "text": "隔离来信人\n2026-11-23 00:24\n\n请转达蓝色样本的决定。\n\n[该发言发送自river-source话题]\n\n随附上下文 · 3 条",
+    "collapsed": true,
+    "summaries": [
+      "青岚（助手）：蓝色样本按原计划保留，等下一轮确认。",
+      "用户：收到。",
+      "白露（助手）：蓝色样本按原计划保留，等下一轮确认。"
+    ],
+    "content": [
+      "蓝色样本按原计划保留，等下一轮确认。",
+      "收到。",
+      "蓝色样本按原计划保留，等下一轮确认。"
+    ]
+  },
+  "reopenedLegacy": {
+    "domId": "fixture-legacy-v1",
+    "text": "隔离来信人\n2026-11-23 00:24\n\n旧版留言 · 仅含角色和正文\n\n随附上下文 · 1 条",
+    "collapsed": true,
+    "summaries": [
+      "助手：旧格式正文"
+    ],
+    "content": [
+      "旧格式正文"
+    ]
+  },
+  "chain": {
+    "execution": {
+      "revision": "d9233bc1bc7cfec5177dd886e685670c40b56a66",
+      "river": "semantic:3",
+      "sourceMessages": [
+        {
+          "id": "river-source-0",
+          "role": "assistant",
+          "agentId": "river-member-a",
+          "name": "青岚",
+          "content": "蓝色样本按原计划保留，等下一轮确认。"
+        },
+        {
+          "id": "river-source-1",
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "id": "river-source-2",
+          "role": "assistant",
+          "agentId": "river-member-b",
+          "name": "白露",
+          "content": "蓝色样本按原计划保留，等下一轮确认。"
+        }
+      ],
+      "inputArgs": {
+        "command": "ReplyToTopic",
+        "topic_id": "river-target",
+        "source_topic_id": "river-source",
+        "sender_id": "river-sender",
+        "message": "请转达蓝色样本的决定。"
+      },
+      "auditedArgs": {
+        "command": "ReplyToTopic",
+        "topic_id": "river-target",
+        "source_topic_id": "river-source",
+        "sender_id": "river-sender",
+        "message": "请转达蓝色样本的决定。",
+        "river_context": [
+          {
+            "role": "assistant",
+            "content": "蓝色样本按原计划保留，等下一轮确认。",
+            "name": "青岚"
+          },
+          {
+            "role": "user",
+            "content": "收到。"
+          },
+          {
+            "role": "assistant",
+            "content": "蓝色样本按原计划保留，等下一轮确认。",
+            "name": "白露"
+          }
+        ]
+      },
+      "dispatchedArgs": {
+        "command": "ReplyToTopic",
+        "topic_id": "river-target",
+        "source_topic_id": "river-source",
+        "sender_id": "river-sender",
+        "message": "请转达蓝色样本的决定。",
+        "river_context": [
+          {
+            "role": "assistant",
+            "content": "蓝色样本按原计划保留，等下一轮确认。",
+            "name": "青岚"
+          },
+          {
+            "role": "user",
+            "content": "收到。"
+          },
+          {
+            "role": "assistant",
+            "content": "蓝色样本按原计划保留，等下一轮确认。",
+            "name": "白露"
+          }
+        ]
+      },
+      "desktopReturn": {
+        "success": true,
+        "queued": true,
+        "entryId": "c016fa9f-d315-469d-8f18-9c865a1ee1c7",
+        "topic_id": "river-target",
+        "target_id": "fixture-river-group",
+        "target_type": "group",
+        "message_id": "msg_409be59a-6127-4d5b-b46d-7aa86b98390f",
+        "sender": "隔离来信人",
+        "sender_id": "river-sender"
+      },
+      "toolReturn": {
+        "success": true,
+        "content": [
+          {
+            "type": "text",
+            "text": "{\n  \"success\": true,\n  \"queued\": true,\n  \"entryId\": \"c016fa9f-d315-469d-8f18-9c865a1ee1c7\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"fixture-river-group\",\n  \"target_type\": \"group\",\n  \"message_id\": \"msg_409be59a-6127-4d5b-b46d-7aa86b98390f\",\n  \"sender\": \"隔离来信人\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:24:23.631+08:00\"\n}"
+          }
+        ],
+        "approvalFeedbackContent": [],
+        "raw": {
+          "success": true,
+          "queued": true,
+          "entryId": "c016fa9f-d315-469d-8f18-9c865a1ee1c7",
+          "topic_id": "river-target",
+          "target_id": "fixture-river-group",
+          "target_type": "group",
+          "message_id": "msg_409be59a-6127-4d5b-b46d-7aa86b98390f",
+          "sender": "隔离来信人",
+          "sender_id": "river-sender",
+          "timestamp": "2026-11-23T00:24:23.631+08:00"
+        }
+      },
+      "embeddingCalls": []
+    },
+    "sources": {
+      "revision": "d9233bc1bc7cfec5177dd886e685670c40b56a66",
+      "server": {
+        "modules/vcpLoop/toolExecutor.js": "bdbf1e6962fc05dad6108b668a4d75088d2796e6aa5474d79576d5412a418514",
+        "Plugin.js": "2c5fe790d17c897468fcfdc1baf9ef866b7392be36600526d75768c01912df51",
+        "EmbeddingUtils.js": "35ea49902cc4ce9fef1fd5a8de040db45599e06c34c4506b59d9edde893a3e9f"
+      },
+      "desktop": {
+        "VCPDistributedServer/Plugin/TopicSponsor/plugin-manifest.json": "6da2df4958e947ea32eee33b89bdacb45a658c9573e6dc6d2505626cc8082e3a",
+        "VCPDistributedServer/Plugin/TopicSponsor/topicsponsor-service.js": "0b86f07ab23b68c09a9ac23197b703288ff716623105de7d0ec540de6a744bc2",
+        "modules/services/pluginAgentOperationService.js": "4d5d59dbce9aeb500264da3448709048ce28f9f3dc792e7050eeba8befcc30f7",
+        "modules/services/topicSponsorDelivery.js": "46dc3f58516cc9b020d84ed38941d1245b856989c15a29b3b691df34188d9675",
+        "modules/services/topicRiverQuote.js": "a26463969bfe1373e61cec6242862f7f47776b6b41b5cbfc2732d5bafdcc629f"
+      }
+    }
+  }
+}

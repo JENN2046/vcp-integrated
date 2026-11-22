@@ -116,3 +116,5 @@ Android 首次配对立即强停已定位到隔离 WebView 的 Cookie 写盘时�
 工具结果在原生 ToolBox 回填时保留文本、JSON 文档和多模态部件。回环 Provider 逐轮记录了 JSON 与 SSE 两条路径，另有双工具、AA 接续回归。[工具回填前后对照](evidence/tool-payload/README.md)
 
 单聊压缩现在识别 ToolBox 代理返回的上游拒绝状态。配置备用模型时，明确的 HTTP 400、404、422 或 429 可以触发一次备用尝试。鉴权失败和状态未明的断流保留原 History。历史中已有错误摘要时，桌面和共享 worker 从最近有效检查点继续；提交回执丢失后按原意图核对。[压缩、重开与原 Work 接续回执](evidence/compaction-fallback/README.md)
+
+TopicSponsor 的 River 引用对齐作者的最近消息窗口。两位成员同文和一条无名短消息经工具派发、桌面投递和冷重开后仍逐行对应；旧 V1 与作者 V2 均能读取。共享目标在提交后丢回执时仍按原收据恢复。[工具对照、History 与冷开截图](evidence/river-quote/README.md)

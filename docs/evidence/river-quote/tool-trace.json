@@ -1,0 +1,3299 @@
+{
+  "fixture": {
+    "args": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-3",
+        "role": "user",
+        "name": "测试者",
+        "content": "咖啡菜单试验，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-4",
+        "role": "user",
+        "name": "测试者",
+        "content": "今天午餐讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-5",
+        "role": "assistant",
+        "name": "青岚",
+        "content": "绿植摆放讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-6",
+        "role": "user",
+        "name": "测试者",
+        "content": "家具摆放讨论，记录用于区分最近和相关。"
+      }
+    ]
+  },
+  "sources": {
+    "author": {
+      "revision": "d9233bc1bc7cfec5177dd886e685670c40b56a66",
+      "server": {
+        "modules/vcpLoop/toolExecutor.js": "bdbf1e6962fc05dad6108b668a4d75088d2796e6aa5474d79576d5412a418514",
+        "Plugin.js": "2c5fe790d17c897468fcfdc1baf9ef866b7392be36600526d75768c01912df51",
+        "EmbeddingUtils.js": "35ea49902cc4ce9fef1fd5a8de040db45599e06c34c4506b59d9edde893a3e9f"
+      },
+      "desktop": {
+        "VCPDistributedServer/Plugin/TopicSponsor/plugin-manifest.json": "45409aba68a74cd02675a919ee9d978a0b6fd84ef9bf1f0e721a61c4cc2e8872",
+        "VCPDistributedServer/Plugin/TopicSponsor/topicsponsor-service.js": "ec3d8b5301235e9bc3d4f8f9ccc544d3c47a8edd633ef464d0db1d7fad7d48f1",
+        "modules/services/pluginAgentOperationService.js": "b7fcf8e822167a42d18aaa9efa860cbc553c5aeb8cef8b13eefee56a6df4a469",
+        "modules/services/topicSponsorDelivery.js": "61992129ea42a895e765f9599eb9d8a0ef60b870692ebf58c77623742b72e1ee",
+        "modules/services/nativeSync/topicRiverQuote.js": "78b5971bf026ff5f4e5a2ef3875b08fb9e4436dc0e0d5252e66d30469a0fed32"
+      }
+    },
+    "integrated": {
+      "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b",
+      "server": {
+        "modules/vcpLoop/toolExecutor.js": "0d8ad06e6abf44db56be07e7ef239b8bd13ee75d8a05535fc4be8c8c9c664b8d",
+        "Plugin.js": "c0e8ff13cbbdedf5db103590ca98e1b0e194443e4ac40accf5715cb1aae33950",
+        "EmbeddingUtils.js": "822f5d10c4c63ae20017519830aae48d86768bc310291057a75af666d498744c"
+      },
+      "desktop": {
+        "VCPDistributedServer/Plugin/TopicSponsor/plugin-manifest.json": "45409aba68a74cd02675a919ee9d978a0b6fd84ef9bf1f0e721a61c4cc2e8872",
+        "VCPDistributedServer/Plugin/TopicSponsor/topicsponsor-service.js": "ec3d8b5301235e9bc3d4f8f9ccc544d3c47a8edd633ef464d0db1d7fad7d48f1",
+        "modules/services/pluginAgentOperationService.js": "b7fcf8e822167a42d18aaa9efa860cbc553c5aeb8cef8b13eefee56a6df4a469",
+        "modules/services/topicSponsorDelivery.js": "61992129ea42a895e765f9599eb9d8a0ef60b870692ebf58c77623742b72e1ee",
+        "modules/services/nativeSync/topicRiverQuote.js": "78b5971bf026ff5f4e5a2ef3875b08fb9e4436dc0e0d5252e66d30469a0fed32"
+      }
+    },
+    "candidate": {
+      "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b + candidate changes",
+      "server": {
+        "modules/vcpLoop/toolExecutor.js": "bb114f2afc05f176ebdf67fa72230c2921ac6c9c84447f31450524f0d90e8817",
+        "Plugin.js": "c0e8ff13cbbdedf5db103590ca98e1b0e194443e4ac40accf5715cb1aae33950",
+        "EmbeddingUtils.js": "822f5d10c4c63ae20017519830aae48d86768bc310291057a75af666d498744c"
+      },
+      "desktop": {
+        "VCPDistributedServer/Plugin/TopicSponsor/plugin-manifest.json": "45409aba68a74cd02675a919ee9d978a0b6fd84ef9bf1f0e721a61c4cc2e8872",
+        "VCPDistributedServer/Plugin/TopicSponsor/topicsponsor-service.js": "ec3d8b5301235e9bc3d4f8f9ccc544d3c47a8edd633ef464d0db1d7fad7d48f1",
+        "modules/services/pluginAgentOperationService.js": "b7fcf8e822167a42d18aaa9efa860cbc553c5aeb8cef8b13eefee56a6df4a469",
+        "modules/services/topicSponsorDelivery.js": "61992129ea42a895e765f9599eb9d8a0ef60b870692ebf58c77623742b72e1ee",
+        "modules/services/nativeSync/topicRiverQuote.js": "efc752a000c0eba13cd0a5ca433fb2fcc8ce5cbb2a1cabbe815d334c8deff4ac"
+      }
+    }
+  },
+  "authorSemantic": {
+    "revision": "d9233bc1bc7cfec5177dd886e685670c40b56a66",
+    "river": "semantic:3",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-3",
+        "role": "user",
+        "name": "测试者",
+        "content": "咖啡菜单试验，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-4",
+        "role": "user",
+        "name": "测试者",
+        "content": "今天午餐讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-5",
+        "role": "assistant",
+        "name": "青岚",
+        "content": "绿植摆放讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-6",
+        "role": "user",
+        "name": "测试者",
+        "content": "家具摆放讨论，记录用于区分最近和相关。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        },
+        {
+          "role": "user",
+          "content": "咖啡菜单试验，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "user",
+          "content": "今天午餐讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "assistant",
+          "content": "绿植摆放讨论，记录用于区分最近和相关。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "家具摆放讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        },
+        {
+          "role": "user",
+          "content": "咖啡菜单试验，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "user",
+          "content": "今天午餐讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "assistant",
+          "content": "绿植摆放讨论，记录用于区分最近和相关。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "家具摆放讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_c5034de4-8edb-4823-8c44-a1769bda7a49",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n{\"role\":\"user\",\"content\":\"咖啡菜单试验，记录用于区分最近和相关。\"}\n{\"role\":\"user\",\"content\":\"今天午餐讨论，记录用于区分最近和相关。\"}\n{\"role\":\"assistant\",\"content\":\"绿植摆放讨论，记录用于区分最近和相关。\"}\n{\"role\":\"user\",\"content\":\"家具摆放讨论，记录用于区分最近和相关。\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563569,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_c5034de4-8edb-4823-8c44-a1769bda7a49",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_c5034de4-8edb-4823-8c44-a1769bda7a49\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.569+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_c5034de4-8edb-4823-8c44-a1769bda7a49",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.569+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "authorLast": {
+    "revision": "d9233bc1bc7cfec5177dd886e685670c40b56a66",
+    "river": "last:7",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-3",
+        "role": "user",
+        "name": "测试者",
+        "content": "咖啡菜单试验，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-4",
+        "role": "user",
+        "name": "测试者",
+        "content": "今天午餐讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-5",
+        "role": "assistant",
+        "name": "青岚",
+        "content": "绿植摆放讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-6",
+        "role": "user",
+        "name": "测试者",
+        "content": "家具摆放讨论，记录用于区分最近和相关。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        },
+        {
+          "role": "user",
+          "content": "咖啡菜单试验，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "user",
+          "content": "今天午餐讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "assistant",
+          "content": "绿植摆放讨论，记录用于区分最近和相关。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "家具摆放讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        },
+        {
+          "role": "user",
+          "content": "咖啡菜单试验，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "user",
+          "content": "今天午餐讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "assistant",
+          "content": "绿植摆放讨论，记录用于区分最近和相关。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "家具摆放讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_8b1883d9-e712-4185-9ee8-06fe4cd65a27",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n{\"role\":\"user\",\"content\":\"这条作者显示名为空，仍然属于蓝色样本决策。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n{\"role\":\"user\",\"content\":\"咖啡菜单试验，记录用于区分最近和相关。\"}\n{\"role\":\"user\",\"content\":\"今天午餐讨论，记录用于区分最近和相关。\"}\n{\"role\":\"assistant\",\"content\":\"绿植摆放讨论，记录用于区分最近和相关。\"}\n{\"role\":\"user\",\"content\":\"家具摆放讨论，记录用于区分最近和相关。\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563570,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_8b1883d9-e712-4185-9ee8-06fe4cd65a27",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_8b1883d9-e712-4185-9ee8-06fe4cd65a27\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.570+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_8b1883d9-e712-4185-9ee8-06fe4cd65a27",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.570+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "authorShortSemantic": {
+    "revision": "d9233bc1bc7cfec5177dd886e685670c40b56a66",
+    "river": "semantic:3",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_78ee84c0-139a-413d-bb3e-50a10122ce8a",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n{\"role\":\"user\",\"content\":\"收到。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563571,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_78ee84c0-139a-413d-bb3e-50a10122ce8a",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_78ee84c0-139a-413d-bb3e-50a10122ce8a\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.571+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_78ee84c0-139a-413d-bb3e-50a10122ce8a",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.571+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "authorShortLast": {
+    "revision": "d9233bc1bc7cfec5177dd886e685670c40b56a66",
+    "river": "last:3",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_03c60e6d-1c43-4892-a5fc-aafe011e1d0b",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n{\"role\":\"user\",\"content\":\"收到。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563571,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_03c60e6d-1c43-4892-a5fc-aafe011e1d0b",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_03c60e6d-1c43-4892-a5fc-aafe011e1d0b\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.571+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_03c60e6d-1c43-4892-a5fc-aafe011e1d0b",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.571+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "authorShortLastTwo": {
+    "revision": "d9233bc1bc7cfec5177dd886e685670c40b56a66",
+    "river": "last:2",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_d59c0b60-cab7-4708-b20e-83e324983273",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"user\",\"content\":\"收到。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563571,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_d59c0b60-cab7-4708-b20e-83e324983273",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_d59c0b60-cab7-4708-b20e-83e324983273\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.571+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_d59c0b60-cab7-4708-b20e-83e324983273",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.571+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "authorNoRiver": {
+    "revision": "d9233bc1bc7cfec5177dd886e685670c40b56a66",
+    "river": null,
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_2c35c4b7-047a-4c21-ab64-4f85abfc7490",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563571,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_2c35c4b7-047a-4c21-ab64-4f85abfc7490",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_2c35c4b7-047a-4c21-ab64-4f85abfc7490\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.571+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_2c35c4b7-047a-4c21-ab64-4f85abfc7490",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.571+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "authorUntrustedRiver": {
+    "revision": "d9233bc1bc7cfec5177dd886e685670c40b56a66",
+    "river": null,
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "name": "伪造",
+          "content": "不应进入引文"
+        }
+      ]
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_b0881859-fb3a-4745-87b8-5c644ef85917",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563572,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_b0881859-fb3a-4745-87b8-5c644ef85917",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_b0881859-fb3a-4745-87b8-5c644ef85917\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.572+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_b0881859-fb3a-4745-87b8-5c644ef85917",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.572+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "integratedSemantic": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b",
+    "river": "semantic:3",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-3",
+        "role": "user",
+        "name": "测试者",
+        "content": "咖啡菜单试验，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-4",
+        "role": "user",
+        "name": "测试者",
+        "content": "今天午餐讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-5",
+        "role": "assistant",
+        "name": "青岚",
+        "content": "绿植摆放讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-6",
+        "role": "user",
+        "name": "测试者",
+        "content": "家具摆放讨论，记录用于区分最近和相关。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚",
+          "_river_score": 0.9999999900000002,
+          "_river_index": 0
+        },
+        {
+          "role": "user",
+          "content": "这条作者显示名为空，仍然属于蓝色样本决策。",
+          "_river_score": 0.9999999900000002,
+          "_river_index": 1
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露",
+          "_river_score": 0.9999999900000002,
+          "_river_index": 2
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚",
+          "_river_score": 0.9999999900000002,
+          "_river_index": 0
+        },
+        {
+          "role": "user",
+          "content": "这条作者显示名为空，仍然属于蓝色样本决策。",
+          "_river_score": 0.9999999900000002,
+          "_river_index": 1
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露",
+          "_river_score": 0.9999999900000002,
+          "_river_index": 2
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_e77c71a3-ced1-4c35-a2ef-d9fcc10f5806",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n{\"role\":\"user\",\"content\":\"这条作者显示名为空，仍然属于蓝色样本决策。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563473,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_e77c71a3-ced1-4c35-a2ef-d9fcc10f5806",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_e77c71a3-ced1-4c35-a2ef-d9fcc10f5806\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.473+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_e77c71a3-ced1-4c35-a2ef-d9fcc10f5806",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.473+08:00"
+      }
+    },
+    "embeddingCalls": [
+      {
+        "method": "batch",
+        "texts": [
+          "ReplyToTopic river-target river-source river-sender 请转达蓝色样本的决定。",
+          "蓝色样本按原计划保留，等下一轮确认。",
+          "这条作者显示名为空，仍然属于蓝色样本决策。",
+          "蓝色样本按原计划保留，等下一轮确认。",
+          "咖啡菜单试验，记录用于区分最近和相关。",
+          "今天午餐讨论，记录用于区分最近和相关。",
+          "绿植摆放讨论，记录用于区分最近和相关。",
+          "家具摆放讨论，记录用于区分最近和相关。"
+        ]
+      }
+    ]
+  },
+  "integratedLast": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b",
+    "river": "last:7",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-3",
+        "role": "user",
+        "name": "测试者",
+        "content": "咖啡菜单试验，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-4",
+        "role": "user",
+        "name": "测试者",
+        "content": "今天午餐讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-5",
+        "role": "assistant",
+        "name": "青岚",
+        "content": "绿植摆放讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-6",
+        "role": "user",
+        "name": "测试者",
+        "content": "家具摆放讨论，记录用于区分最近和相关。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "id": "river-source-0",
+          "role": "assistant",
+          "agentId": "river-member-a",
+          "name": "青岚",
+          "content": "蓝色样本按原计划保留，等下一轮确认。"
+        },
+        {
+          "id": "river-source-1",
+          "role": "user",
+          "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+        },
+        {
+          "id": "river-source-2",
+          "role": "assistant",
+          "agentId": "river-member-b",
+          "name": "白露",
+          "content": "蓝色样本按原计划保留，等下一轮确认。"
+        },
+        {
+          "id": "river-source-3",
+          "role": "user",
+          "name": "测试者",
+          "content": "咖啡菜单试验，记录用于区分最近和相关。"
+        },
+        {
+          "id": "river-source-4",
+          "role": "user",
+          "name": "测试者",
+          "content": "今天午餐讨论，记录用于区分最近和相关。"
+        },
+        {
+          "id": "river-source-5",
+          "role": "assistant",
+          "name": "青岚",
+          "content": "绿植摆放讨论，记录用于区分最近和相关。"
+        },
+        {
+          "id": "river-source-6",
+          "role": "user",
+          "name": "测试者",
+          "content": "家具摆放讨论，记录用于区分最近和相关。"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "id": "river-source-0",
+          "role": "assistant",
+          "agentId": "river-member-a",
+          "name": "青岚",
+          "content": "蓝色样本按原计划保留，等下一轮确认。"
+        },
+        {
+          "id": "river-source-1",
+          "role": "user",
+          "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+        },
+        {
+          "id": "river-source-2",
+          "role": "assistant",
+          "agentId": "river-member-b",
+          "name": "白露",
+          "content": "蓝色样本按原计划保留，等下一轮确认。"
+        },
+        {
+          "id": "river-source-3",
+          "role": "user",
+          "name": "测试者",
+          "content": "咖啡菜单试验，记录用于区分最近和相关。"
+        },
+        {
+          "id": "river-source-4",
+          "role": "user",
+          "name": "测试者",
+          "content": "今天午餐讨论，记录用于区分最近和相关。"
+        },
+        {
+          "id": "river-source-5",
+          "role": "assistant",
+          "name": "青岚",
+          "content": "绿植摆放讨论，记录用于区分最近和相关。"
+        },
+        {
+          "id": "river-source-6",
+          "role": "user",
+          "name": "测试者",
+          "content": "家具摆放讨论，记录用于区分最近和相关。"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_2e509383-8400-4345-aa87-bf845459ee1d",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n{\"role\":\"user\",\"content\":\"这条作者显示名为空，仍然属于蓝色样本决策。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n{\"role\":\"user\",\"content\":\"咖啡菜单试验，记录用于区分最近和相关。\"}\n{\"role\":\"user\",\"content\":\"今天午餐讨论，记录用于区分最近和相关。\"}\n{\"role\":\"assistant\",\"content\":\"绿植摆放讨论，记录用于区分最近和相关。\"}\n{\"role\":\"user\",\"content\":\"家具摆放讨论，记录用于区分最近和相关。\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563475,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_2e509383-8400-4345-aa87-bf845459ee1d",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_2e509383-8400-4345-aa87-bf845459ee1d\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.475+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_2e509383-8400-4345-aa87-bf845459ee1d",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.475+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "integratedShortSemantic": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b",
+    "river": "semantic:3",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚",
+          "_river_score": 0.9999999900000002,
+          "_river_index": 0
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露",
+          "_river_score": 0.9999999900000002,
+          "_river_index": 2
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚",
+          "_river_score": 0.9999999900000002,
+          "_river_index": 0
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露",
+          "_river_score": 0.9999999900000002,
+          "_river_index": 2
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_3195bd14-c58f-4d70-a990-0318be6b6ea8",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563475,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_3195bd14-c58f-4d70-a990-0318be6b6ea8",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_3195bd14-c58f-4d70-a990-0318be6b6ea8\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.475+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_3195bd14-c58f-4d70-a990-0318be6b6ea8",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.475+08:00"
+      }
+    },
+    "embeddingCalls": [
+      {
+        "method": "batch",
+        "texts": [
+          "ReplyToTopic river-target river-source river-sender 请转达蓝色样本的决定。",
+          "蓝色样本按原计划保留，等下一轮确认。",
+          "蓝色样本按原计划保留，等下一轮确认。"
+        ]
+      }
+    ]
+  },
+  "integratedShortLast": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b",
+    "river": "last:3",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "id": "river-source-0",
+          "role": "assistant",
+          "agentId": "river-member-a",
+          "name": "青岚",
+          "content": "蓝色样本按原计划保留，等下一轮确认。"
+        },
+        {
+          "id": "river-source-1",
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "id": "river-source-2",
+          "role": "assistant",
+          "agentId": "river-member-b",
+          "name": "白露",
+          "content": "蓝色样本按原计划保留，等下一轮确认。"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "id": "river-source-0",
+          "role": "assistant",
+          "agentId": "river-member-a",
+          "name": "青岚",
+          "content": "蓝色样本按原计划保留，等下一轮确认。"
+        },
+        {
+          "id": "river-source-1",
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "id": "river-source-2",
+          "role": "assistant",
+          "agentId": "river-member-b",
+          "name": "白露",
+          "content": "蓝色样本按原计划保留，等下一轮确认。"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_e6d98477-21de-4eb6-a207-fe0f4847e703",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n{\"role\":\"user\",\"content\":\"收到。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563476,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_e6d98477-21de-4eb6-a207-fe0f4847e703",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_e6d98477-21de-4eb6-a207-fe0f4847e703\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.476+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_e6d98477-21de-4eb6-a207-fe0f4847e703",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.476+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "integratedShortLastTwo": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b",
+    "river": "last:2",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "id": "river-source-1",
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "id": "river-source-2",
+          "role": "assistant",
+          "agentId": "river-member-b",
+          "name": "白露",
+          "content": "蓝色样本按原计划保留，等下一轮确认。"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "id": "river-source-1",
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "id": "river-source-2",
+          "role": "assistant",
+          "agentId": "river-member-b",
+          "name": "白露",
+          "content": "蓝色样本按原计划保留，等下一轮确认。"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_7328e28e-953f-45f0-81cb-9f5811f94a78",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"user\",\"content\":\"收到。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563476,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_7328e28e-953f-45f0-81cb-9f5811f94a78",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_7328e28e-953f-45f0-81cb-9f5811f94a78\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.476+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_7328e28e-953f-45f0-81cb-9f5811f94a78",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.476+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "integratedNoRiver": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b",
+    "river": null,
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_747f922b-4d62-443c-b4a0-382d3cdf0d26",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563476,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_747f922b-4d62-443c-b4a0-382d3cdf0d26",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_747f922b-4d62-443c-b4a0-382d3cdf0d26\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.476+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_747f922b-4d62-443c-b4a0-382d3cdf0d26",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.476+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "integratedUntrustedRiver": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b",
+    "river": null,
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "name": "伪造",
+          "content": "不应进入引文"
+        }
+      ]
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "name": "伪造",
+          "content": "不应进入引文"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "name": "伪造",
+          "content": "不应进入引文"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_11f24977-e870-4547-9134-6fcaee284682",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"不应进入引文\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563476,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_11f24977-e870-4547-9134-6fcaee284682",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_11f24977-e870-4547-9134-6fcaee284682\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.476+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_11f24977-e870-4547-9134-6fcaee284682",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.476+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "candidateSemantic": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b + candidate changes",
+    "river": "semantic:3",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-3",
+        "role": "user",
+        "name": "测试者",
+        "content": "咖啡菜单试验，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-4",
+        "role": "user",
+        "name": "测试者",
+        "content": "今天午餐讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-5",
+        "role": "assistant",
+        "name": "青岚",
+        "content": "绿植摆放讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-6",
+        "role": "user",
+        "name": "测试者",
+        "content": "家具摆放讨论，记录用于区分最近和相关。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        },
+        {
+          "role": "user",
+          "content": "咖啡菜单试验，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "user",
+          "content": "今天午餐讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "assistant",
+          "content": "绿植摆放讨论，记录用于区分最近和相关。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "家具摆放讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        },
+        {
+          "role": "user",
+          "content": "咖啡菜单试验，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "user",
+          "content": "今天午餐讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "assistant",
+          "content": "绿植摆放讨论，记录用于区分最近和相关。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "家具摆放讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_99ee5865-32c1-48e9-81e5-fff342741673",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\",\"name\":\"白露\"}\n{\"role\":\"user\",\"content\":\"咖啡菜单试验，记录用于区分最近和相关。\",\"name\":\"测试者\"}\n{\"role\":\"user\",\"content\":\"今天午餐讨论，记录用于区分最近和相关。\",\"name\":\"测试者\"}\n{\"role\":\"assistant\",\"content\":\"绿植摆放讨论，记录用于区分最近和相关。\",\"name\":\"青岚\"}\n{\"role\":\"user\",\"content\":\"家具摆放讨论，记录用于区分最近和相关。\",\"name\":\"测试者\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563653,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_99ee5865-32c1-48e9-81e5-fff342741673",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_99ee5865-32c1-48e9-81e5-fff342741673\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.653+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_99ee5865-32c1-48e9-81e5-fff342741673",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.653+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "candidateLast": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b + candidate changes",
+    "river": "last:7",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-3",
+        "role": "user",
+        "name": "测试者",
+        "content": "咖啡菜单试验，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-4",
+        "role": "user",
+        "name": "测试者",
+        "content": "今天午餐讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-5",
+        "role": "assistant",
+        "name": "青岚",
+        "content": "绿植摆放讨论，记录用于区分最近和相关。"
+      },
+      {
+        "id": "river-source-6",
+        "role": "user",
+        "name": "测试者",
+        "content": "家具摆放讨论，记录用于区分最近和相关。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        },
+        {
+          "role": "user",
+          "content": "咖啡菜单试验，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "user",
+          "content": "今天午餐讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "assistant",
+          "content": "绿植摆放讨论，记录用于区分最近和相关。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "家具摆放讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "这条作者显示名为空，仍然属于蓝色样本决策。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        },
+        {
+          "role": "user",
+          "content": "咖啡菜单试验，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "user",
+          "content": "今天午餐讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        },
+        {
+          "role": "assistant",
+          "content": "绿植摆放讨论，记录用于区分最近和相关。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "家具摆放讨论，记录用于区分最近和相关。",
+          "name": "测试者"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_b5f3fab6-f096-4da5-a60c-9e98ff07bfca",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\",\"name\":\"青岚\"}\n{\"role\":\"user\",\"content\":\"这条作者显示名为空，仍然属于蓝色样本决策。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\",\"name\":\"白露\"}\n{\"role\":\"user\",\"content\":\"咖啡菜单试验，记录用于区分最近和相关。\",\"name\":\"测试者\"}\n{\"role\":\"user\",\"content\":\"今天午餐讨论，记录用于区分最近和相关。\",\"name\":\"测试者\"}\n{\"role\":\"assistant\",\"content\":\"绿植摆放讨论，记录用于区分最近和相关。\",\"name\":\"青岚\"}\n{\"role\":\"user\",\"content\":\"家具摆放讨论，记录用于区分最近和相关。\",\"name\":\"测试者\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563654,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_b5f3fab6-f096-4da5-a60c-9e98ff07bfca",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_b5f3fab6-f096-4da5-a60c-9e98ff07bfca\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.654+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_b5f3fab6-f096-4da5-a60c-9e98ff07bfca",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.654+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "candidateShortSemantic": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b + candidate changes",
+    "river": "semantic:3",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_9da49a26-eade-43aa-9d0d-1efffe6db66e",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\",\"name\":\"青岚\"}\n{\"role\":\"user\",\"content\":\"收到。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\",\"name\":\"白露\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563654,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_9da49a26-eade-43aa-9d0d-1efffe6db66e",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_9da49a26-eade-43aa-9d0d-1efffe6db66e\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.654+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_9da49a26-eade-43aa-9d0d-1efffe6db66e",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.654+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "candidateShortLast": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b + candidate changes",
+    "river": "last:3",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "青岚"
+        },
+        {
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_991f8a46-73bf-4fda-bdbf-4b64daa16466",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\",\"name\":\"青岚\"}\n{\"role\":\"user\",\"content\":\"收到。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\",\"name\":\"白露\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563654,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_991f8a46-73bf-4fda-bdbf-4b64daa16466",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_991f8a46-73bf-4fda-bdbf-4b64daa16466\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.654+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_991f8a46-73bf-4fda-bdbf-4b64daa16466",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.654+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "candidateShortLastTwo": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b + candidate changes",
+    "river": "last:2",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "user",
+          "content": "收到。"
+        },
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。",
+          "name": "白露"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_2f6a152a-db23-4c07-8c19-c123678cfdc4",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"user\",\"content\":\"收到。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\",\"name\":\"白露\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563654,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_2f6a152a-db23-4c07-8c19-c123678cfdc4",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_2f6a152a-db23-4c07-8c19-c123678cfdc4\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.655+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_2f6a152a-db23-4c07-8c19-c123678cfdc4",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.655+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "candidateNoRiver": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b + candidate changes",
+    "river": null,
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_d15f4583-ea0d-4388-9714-4e7af018368c",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563655,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_d15f4583-ea0d-4388-9714-4e7af018368c",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_d15f4583-ea0d-4388-9714-4e7af018368c\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.655+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_d15f4583-ea0d-4388-9714-4e7af018368c",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.655+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "candidateUntrustedRiver": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b + candidate changes",
+    "river": null,
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      },
+      {
+        "id": "river-source-1",
+        "role": "user",
+        "content": "收到。"
+      },
+      {
+        "id": "river-source-2",
+        "role": "assistant",
+        "agentId": "river-member-b",
+        "name": "白露",
+        "content": "蓝色样本按原计划保留，等下一轮确认。"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "name": "伪造",
+          "content": "不应进入引文"
+        }
+      ]
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_a17fbb89-f96c-45e4-bbde-6259dc46343b",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563655,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_a17fbb89-f96c-45e4-bbde-6259dc46343b",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_a17fbb89-f96c-45e4-bbde-6259dc46343b\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.655+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_a17fbb89-f96c-45e4-bbde-6259dc46343b",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.655+08:00"
+      }
+    },
+    "embeddingCalls": []
+  },
+  "candidateForwardedV2": {
+    "revision": "e6fdf5b9f010776d66dda9dcc8a32b439935506b + candidate changes",
+    "river": "last:1",
+    "sourceMessages": [
+      {
+        "id": "river-source-0",
+        "role": "assistant",
+        "agentId": "river-member-a",
+        "name": "青岚",
+        "content": "蓝色样本按原计划保留，等下一轮确认。\n\n[VCP_TOPIC_RIVER_V2]\n{\"role\":\"assistant\",\"name\":\"旧发言\",\"content\":\"旧引文\"}\n[/VCP_TOPIC_RIVER_V2]"
+      }
+    ],
+    "inputArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。"
+    },
+    "auditedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。\n\n[VCP_TOPIC_RIVER_V2]\n{\"role\":\"assistant\",\"name\":\"旧发言\",\"content\":\"旧引文\"}\n[/VCP_TOPIC_RIVER_V2]",
+          "name": "青岚"
+        }
+      ]
+    },
+    "dispatchedArgs": {
+      "command": "ReplyToTopic",
+      "topic_id": "river-target",
+      "source_topic_id": "river-source",
+      "sender_id": "river-sender",
+      "message": "请转达蓝色样本的决定。",
+      "river_context": [
+        {
+          "role": "assistant",
+          "content": "蓝色样本按原计划保留，等下一轮确认。\n\n[VCP_TOPIC_RIVER_V2]\n{\"role\":\"assistant\",\"name\":\"旧发言\",\"content\":\"旧引文\"}\n[/VCP_TOPIC_RIVER_V2]",
+          "name": "青岚"
+        }
+      ]
+    },
+    "delivery": {
+      "scope": {
+        "topicId": "river-target",
+        "itemType": "agent",
+        "itemId": "river-recipient"
+      },
+      "message": {
+        "id": "msg_0e1dff38-048b-4204-b69d-ab0978aa2a47",
+        "role": "assistant",
+        "name": "送信者",
+        "agentId": "river-sender",
+        "avatarUrl": null,
+        "avatarColor": "rgb(96,106,116)",
+        "content": "[送信者的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\",\"name\":\"青岚\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+        "timestamp": 1795364563655,
+        "isThinking": false,
+        "finishReason": "completed",
+        "isGroupMessage": false,
+        "_metadata": {
+          "createdBy": "plugin",
+          "isPluginReply": true,
+          "speaker_agent_id": "river-sender",
+          "speaker_name": "送信者"
+        }
+      },
+      "triggerPolicy": "none",
+      "invitePrompt": "[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。"
+    },
+    "desktopReturn": {
+      "accepted": true,
+      "status": "fixture-captured",
+      "topic_id": "river-target",
+      "target_id": "river-recipient",
+      "target_type": "agent",
+      "message_id": "msg_0e1dff38-048b-4204-b69d-ab0978aa2a47",
+      "sender": "送信者",
+      "sender_id": "river-sender"
+    },
+    "toolReturn": {
+      "success": true,
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"accepted\": true,\n  \"status\": \"fixture-captured\",\n  \"topic_id\": \"river-target\",\n  \"target_id\": \"river-recipient\",\n  \"target_type\": \"agent\",\n  \"message_id\": \"msg_0e1dff38-048b-4204-b69d-ab0978aa2a47\",\n  \"sender\": \"送信者\",\n  \"sender_id\": \"river-sender\",\n  \"timestamp\": \"2026-11-23T00:22:43.655+08:00\"\n}"
+        }
+      ],
+      "approvalFeedbackContent": [],
+      "raw": {
+        "accepted": true,
+        "status": "fixture-captured",
+        "topic_id": "river-target",
+        "target_id": "river-recipient",
+        "target_type": "agent",
+        "message_id": "msg_0e1dff38-048b-4204-b69d-ab0978aa2a47",
+        "sender": "送信者",
+        "sender_id": "river-sender",
+        "timestamp": "2026-11-23T00:22:43.655+08:00"
+      }
+    },
+    "embeddingCalls": []
+  }
+}

@@ -12,13 +12,8 @@ function projectRiver(args, river) {
     delete args.river_context;
     delete args.vref_files;
     if (!Array.isArray(rows)) return;
-    const { projectText } = require('./topicRiverQuote');
-    const projected = [];
-    for (const row of rows) {
-        if (row?.role !== 'user' && row?.role !== 'assistant') continue;
-        const content = projectText(row.content);
-        if (content) projected.push({role:row.role, content});
-    }
+    const { projectRiverRow } = require('./topicRiverQuote');
+    const projected = rows.map(projectRiverRow).filter(Boolean);
     if (projected.length) args.river_context = projected;
 }
 

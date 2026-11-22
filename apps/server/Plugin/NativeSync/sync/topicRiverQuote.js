@@ -19,25 +19,32 @@ function projectText(content) {
         || /^\s*\[(?:系统提示|系统邀请指令)[:：]?\]/.test(text)) return '';
 
     // Avoid exponential growth when a previously delivered quote is forwarded.
-    text = text.replace(/^\[VCP_TOPIC_RIVER_V1\]\r?\n[\s\S]*?^\[\/VCP_TOPIC_RIVER_V1\][ \t]*$/gm, '');
+    text = text.replace(/^\[VCP_TOPIC_RIVER_(V[12])\]\r?\n[\s\S]*?^\[\/VCP_TOPIC_RIVER_\1\][ \t]*$/gm, '');
     for (const block of INTERNAL_BLOCKS) text = text.replace(block, '');
     return text.replace(/data:[^,\s"'<>]*;base64,[A-Za-z0-9+/_=-]*/gi, '').trim();
+}
+
+function projectRiverRow(message) {
+    const role = message?.role;
+    if (role !== 'user' && role !== 'assistant') return null;
+    const content = projectText(message.content);
+    if (!content) return null;
+    const name = typeof message.name === 'string' ? message.name.replace(/\s+/gu, ' ').trim() : '';
+    return name ? { role, name, content } : { role, content };
 }
 
 function formatTopicRiverQuote(messages) {
     if (!Array.isArray(messages)) return '';
     const rows = [];
     for (const message of messages) {
-        const role = message?.role;
-        if (role !== 'user' && role !== 'assistant') continue;
-        const content = projectText(message.content);
-        if (!content) continue;
+        const row = projectRiverRow(message);
+        if (!row) continue;
         // Keep rows single-line and prevent HTML/protocol tags from being interpreted
         // when this text travels through an older renderer or an upstream processor.
-        rows.push(JSON.stringify({ role, content })
+        rows.push(JSON.stringify(row)
             .replace(/[<>&\u2028\u2029]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`));
     }
     return rows.length ? [HEADER, ...rows, FOOTER].join('\n') : '';
 }
 
-module.exports = { formatTopicRiverQuote, projectText };
+module.exports = { formatTopicRiverQuote, projectRiverRow, projectText };

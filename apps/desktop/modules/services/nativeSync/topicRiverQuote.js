@@ -19,7 +19,7 @@ function projectText(content) {
         || /^\s*\[(?:系统提示|系统邀请指令)[:：]?\]/.test(text)) return '';
 
     // Avoid exponential growth when a previously delivered quote is forwarded.
-    text = text.replace(/^\[VCP_TOPIC_RIVER_V1\]\r?\n[\s\S]*?^\[\/VCP_TOPIC_RIVER_V1\][ \t]*$/gm, '');
+    text = text.replace(/^\[VCP_TOPIC_RIVER_(V[12])\]\r?\n[\s\S]*?^\[\/VCP_TOPIC_RIVER_\1\][ \t]*$/gm, '');
     for (const block of INTERNAL_BLOCKS) text = text.replace(block, '');
     return text.replace(/data:[^,\s"'<>]*;base64,[A-Za-z0-9+/_=-]*/gi, '').trim();
 }
@@ -34,7 +34,8 @@ function formatTopicRiverQuote(messages) {
         if (!content) continue;
         // Keep rows single-line and prevent HTML/protocol tags from being interpreted
         // when this text travels through an older renderer or an upstream processor.
-        rows.push(JSON.stringify({ role, content })
+        const name = typeof message.name === 'string' ? message.name.replace(/\s+/gu, ' ').trim() : '';
+        rows.push(JSON.stringify({ role, content, ...(name && { name }) })
             .replace(/[<>&\u2028\u2029]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`));
     }
     return rows.length ? [HEADER, ...rows, FOOTER].join('\n') : '';

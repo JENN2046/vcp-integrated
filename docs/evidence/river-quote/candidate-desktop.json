@@ -1,0 +1,104 @@
+{
+  "variant": "candidate",
+  "traceKey": "candidateShortSemantic",
+  "electron": "44.9.3",
+  "accepted": {
+    "success": true,
+    "queued": true,
+    "entryId": "39d41f2a-fd89-4be4-8fd3-de2f3a22a9b9",
+    "topic_id": "river-target",
+    "target_id": "fixture-river-group",
+    "target_type": "group",
+    "message_id": "msg_34eb2638-df23-44e0-bbbb-999c969a5490",
+    "sender": "隔离来信人",
+    "sender_id": "river-sender"
+  },
+  "history": [
+    {
+      "id": "fixture-legacy-v1",
+      "role": "assistant",
+      "name": "隔离来信人",
+      "agentId": "river-sender",
+      "groupId": "fixture-river-group",
+      "topicId": "river-target",
+      "isGroupMessage": true,
+      "isThinking": false,
+      "finishReason": "completed",
+      "timestamp": 1795364514158,
+      "content": "旧版留言 · 仅含角色和正文\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"旧格式正文\"}\n[/VCP_TOPIC_RIVER_V1]"
+    },
+    {
+      "id": "msg_34eb2638-df23-44e0-bbbb-999c969a5490",
+      "role": "assistant",
+      "name": "隔离来信人",
+      "agentId": "river-sender",
+      "avatarUrl": null,
+      "avatarColor": "rgb(96,106,116)",
+      "content": "[隔离来信人的发言]:\n请转达蓝色样本的决定。\n\n[VCP_TOPIC_RIVER_V1]\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\",\"name\":\"青岚\"}\n{\"role\":\"user\",\"content\":\"收到。\"}\n{\"role\":\"assistant\",\"content\":\"蓝色样本按原计划保留，等下一轮确认。\",\"name\":\"白露\"}\n[/VCP_TOPIC_RIVER_V1]\n\n[该发言发送自river-source话题]",
+      "timestamp": 1795364526341,
+      "isThinking": false,
+      "finishReason": "completed",
+      "isGroupMessage": true,
+      "groupId": "fixture-river-group",
+      "topicId": "river-target",
+      "_metadata": {
+        "createdBy": "plugin",
+        "isPluginReply": true,
+        "speaker_agent_id": "river-sender",
+        "speaker_name": "隔离来信人"
+      }
+    }
+  ],
+  "live": {
+    "text": "隔离来信人\n2026-11-23 00:22\n\n请转达蓝色样本的决定。\n\n[该发言发送自river-source话题]\n\n随附上下文 · 3 条",
+    "collapsed": true,
+    "summaries": [
+      "青岚（助手）：蓝色样本按原计划保留，等下一轮确认。",
+      "用户：收到。",
+      "白露（助手）：蓝色样本按原计划保留，等下一轮确认。"
+    ],
+    "content": [
+      "蓝色样本按原计划保留，等下一轮确认。",
+      "收到。",
+      "蓝色样本按原计划保留，等下一轮确认。"
+    ]
+  },
+  "reopened": {
+    "text": "隔离来信人\n2026-11-23 00:22\n\n请转达蓝色样本的决定。\n\n[该发言发送自river-source话题]\n\n随附上下文 · 3 条",
+    "collapsed": true,
+    "summaries": [
+      "青岚（助手）：蓝色样本按原计划保留，等下一轮确认。",
+      "用户：收到。",
+      "白露（助手）：蓝色样本按原计划保留，等下一轮确认。"
+    ],
+    "content": [
+      "蓝色样本按原计划保留，等下一轮确认。",
+      "收到。",
+      "蓝色样本按原计划保留，等下一轮确认。"
+    ]
+  },
+  "reopenedLegacy": {
+    "text": "隔离来信人\n2026-11-23 00:21\n\n旧版留言 · 仅含角色和正文\n\n随附上下文 · 1 条",
+    "collapsed": true,
+    "summaries": [
+      "助手：旧格式正文"
+    ],
+    "content": [
+      "旧格式正文"
+    ]
+  },
+  "importedAuthorV2": {
+    "text": "隔离来信人\n2026-11-23 00:20\n\n请转达蓝色样本的决定。\n\n[该发言发送自river-source话题]\n\n随附上下文 · 3 条",
+    "collapsed": true,
+    "summaries": [
+      "青岚（助手）：蓝色样本按原计划保留，等下一轮确认。",
+      "用户：收到。",
+      "白露（助手）：蓝色样本按原计划保留，等下一轮确认。"
+    ],
+    "content": [
+      "蓝色样本按原计划保留，等下一轮确认。",
+      "收到。",
+      "蓝色样本按原计划保留，等下一轮确认。"
+    ]
+  }
+}

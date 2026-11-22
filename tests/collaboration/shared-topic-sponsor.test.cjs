@@ -75,7 +75,7 @@ test('real ToolExecutor and distributed bridge issue a durable, device-bound exi
   assert.notEqual(authority.proof,'model-supplied');
   assert.deepEqual([authority.sourceSharedId,authority.targetSharedId],[f.topic.id,target.id]);
   envelope={operationId:authority.operationId,proof:authority.proof,args};
-  assert.deepEqual(args.river_context,[{role:'user',content:'recent user'},{role:'assistant',content:'recent assistant'}]);
+  assert.deepEqual(args.river_context,expectedRiver);
   assert.equal((await post(f,envelope,'B')).status,403);
   assert.equal((await post(f,{...envelope,args:{...args,message:'edited'}})).value.error.code,'REQUEST_ID_REUSED');
   observedResult=await post(f,envelope);assert.equal(observedResult.status,200,JSON.stringify(observedResult.value));
@@ -100,7 +100,12 @@ test('real ToolExecutor and distributed bridge issue a durable, device-bound exi
   if(event.type==='tool_approval_request')manager.handleApprovalResponse(event.data.requestId,false,'synthetic rejection');
  }});
  const executor=new ToolExecutor({pluginManager:manager,webSocketServer:{broadcast(){}},vcpToolCode:false});
- const fakeCall={name:'TopicSponsor',river:'last:2',args:{command:'ReplyToTopic',topic_id:'target',source_topic_id:'topic',maid:'origin',sender_id:'origin',message:'Authorized peer message  ',_nativeSyncTopicSponsor:{proof:'model-supplied'}}};
+ const expectedRiver=[
+  {role:'user',name:'诺宝',content:'相同正文'},
+  {role:'assistant',name:'小雨',content:'相同正文'},
+  {role:'assistant',content:'[假名字的发言]: 无名正文'}
+ ];
+ const fakeCall={name:'TopicSponsor',river:'last:3',args:{command:'ReplyToTopic',topic_id:'target',source_topic_id:'topic',maid:'origin',sender_id:'origin',message:'Authorized peer message  ',_nativeSyncTopicSponsor:{proof:'model-supplied'}}};
  f.control.nativeResponder=async(req,res)=>{
   try{
    if(req.body.vcpchatExtensions.requestContext.topicId===target.topic.topicId){
@@ -117,7 +122,7 @@ test('real ToolExecutor and distributed bridge issue a durable, device-bound exi
    assert.equal(deliveriesB,0);
    assert.equal(f.shared.db.prepare('SELECT count(*) n FROM shared_topic_sponsor_grants').get().n,0);
    distributedServers.set(recipientA,a);
-   const toolResult=await executor.execute(fakeCall,'127.0.0.1',[{role:'user',content:'older excluded'},{role:'user',name:'private-name',activation:'private-metadata',content:[{type:'text',text:'recent user'},{type:'image_url',image_url:{url:'data:image/png;base64,SYNTHETIC'}}]},{role:'assistant',tool_calls:[{id:'private'}],content:'recent assistant'}]);
+   const toolResult=await executor.execute(fakeCall,'127.0.0.1',[{role:'user',content:'older excluded'},{role:'user',name:'  诺宝  ',activation:'private-metadata',content:[{type:'text',text:'相同正文'},{type:'image_url',image_url:{url:'data:image/png;base64,SYNTHETIC'}}]},{role:'assistant',name:'小雨',tool_calls:[{id:'private'}],content:'相同正文'},{role:'assistant',content:'[假名字的发言]: 无名正文'}]);
    assert.equal(toolResult.success,true,JSON.stringify(toolResult));sourceDone();
    res.json(modelReply('Source reply'));
   }catch(error){transportError=error;sourceDone();res.status(500).json({error:{code:'SYNTHETIC_ERROR'}});}
@@ -139,7 +144,9 @@ test('real ToolExecutor and distributed bridge issue a durable, device-bound exi
  assert.equal(message.agentId,f.owner.id);
  assert.match(message.content,/Authorized peer message\n\n\[VCP_TOPIC_RIVER_V1\]/);
  assert.match(message.content,/\[\/VCP_TOPIC_RIVER_V1\]\n\n\[该发言发送自topic话题\]/);
- assert.doesNotMatch(message.content,/older excluded/);
+ assert.doesNotMatch(message.content,/older excluded|private-metadata|base64/);
+ const quoteBody=message.content.match(/\[VCP_TOPIC_RIVER_V1\]\n([\s\S]*?)\n\[\/VCP_TOPIC_RIVER_V1\]/)[1];
+ assert.deepEqual(quoteBody.split('\n').map(line=>JSON.parse(line)),expectedRiver);
  assert.equal(providerTargetCalls,1);
  assert.equal(deliveriesA,1);
  assert.equal(deliveriesB,0);
@@ -148,6 +155,9 @@ test('real ToolExecutor and distributed bridge issue a durable, device-bound exi
  await f.reopenBackend();
  const replay=await post(f,envelope);assert.equal(replay.status,200,JSON.stringify(replay.value));
  assert.deepEqual(replay.value,{...receipt,replayed:true});
+ const afterReplay=f.shared.topicHistory(actor,{sharedSpaceId:'sharedAB',sharedId:target.id}).events;
+ const persisted=afterReplay.map(row=>row.message||row).filter(row=>row.id===receipt.message_id);
+ assert.deepEqual(persisted.map(row=>row.content),[message.content]);
  assert.equal((await post(f,{...envelope,args:{...envelope.args,source_topic_id:'another'}})).value.error.code,'REQUEST_ID_REUSED');
 });
 

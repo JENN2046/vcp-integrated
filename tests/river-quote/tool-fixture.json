@@ -1,0 +1,18 @@
+{
+  "args": {
+    "command": "ReplyToTopic",
+    "topic_id": "river-target",
+    "source_topic_id": "river-source",
+    "sender_id": "river-sender",
+    "message": "请转达蓝色样本的决定。"
+  },
+  "sourceMessages": [
+    {"id":"river-source-0","role":"assistant","agentId":"river-member-a","name":"青岚","content":"蓝色样本按原计划保留，等下一轮确认。"},
+    {"id":"river-source-1","role":"user","content":"这条作者显示名为空，仍然属于蓝色样本决策。"},
+    {"id":"river-source-2","role":"assistant","agentId":"river-member-b","name":"白露","content":"蓝色样本按原计划保留，等下一轮确认。"},
+    {"id":"river-source-3","role":"user","name":"测试者","content":"咖啡菜单试验，记录用于区分最近和相关。"},
+    {"id":"river-source-4","role":"user","name":"测试者","content":"今天午餐讨论，记录用于区分最近和相关。"},
+    {"id":"river-source-5","role":"assistant","name":"青岚","content":"绿植摆放讨论，记录用于区分最近和相关。"},
+    {"id":"river-source-6","role":"user","name":"测试者","content":"家具摆放讨论，记录用于区分最近和相关。"}
+  ]
+}
