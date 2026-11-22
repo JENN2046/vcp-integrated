@@ -173,3 +173,27 @@ test('online read-only downgrade rechecks capability and retains pull access', a
     assert(f.control.trace.some(row => row.route.endsWith('/shared/info')));
     assert(!f.control.trace.some(row => row.method === 'POST'));
 });
+
+test('renderer cannot receive a verified config after its original grant is revoked during local bookkeeping', async t => {
+    const {registerNativeSyncQueries} = require('../../apps/desktop/modules/services/nativeSync/queries');
+    const handlers = new Map();
+    const ipcMain = {handle: handlers.set.bind(handlers), removeHandler: handlers.delete.bind(handlers)};
+    const frame = {url:'file:///watch-test/main.html'};
+    const contents = {mainFrame:frame};
+    let release, entered;
+    const recording = new Promise(resolve => { entered=resolve; });
+    const hold = new Promise(resolve => { release=resolve; });
+    const runtime = {
+        accessController: new AbortController(),
+        async sharedConfigRequest() { entered(); await hold; return {object:{name:'previous grant'}}; }
+    };
+    const bridge = registerNativeSyncQueries({ipcMain, getRuntime:()=>runtime, projectRoot:'/watch-test',
+        getMainWindow:()=>({isDestroyed:()=>false, webContents:contents})});
+    t.after(() => bridge.close());
+    const pending = handlers.get('native-sync:shared-config-request')({sender:contents, senderFrame:frame}, {route:'shared/config'});
+    await recording;
+    runtime.accessController.abort();
+    runtime.accessController = new AbortController();
+    release();
+    assert.deepEqual(await pending, {success:false,error:'SHARED_WATCH_PERMISSION_REQUIRED'});
+});

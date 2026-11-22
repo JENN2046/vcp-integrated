@@ -53,7 +53,16 @@ function registerNativeSyncQueries({ipcMain,getRuntime,getMainWindow,queue,proje
         register('native-sync:session-cancel',async(_event,payload)=>{const runtime=getRuntime();if(!runtime?.cancelNativeSession)throw Object.assign(Error(),{code:'SHARED_SESSION_CONTROL_UNAVAILABLE'});return runtime.cancelNativeSession(payload);},'SHARED_CANCEL_FAILED');
         register('native-sync:directory-context',async(_event,scope)=>{const runtime=getRuntime();return runtime?.nativeDeletionContext?runtime.nativeDeletionContext(scope):{success:true,kind:'local'};},'NATIVE_DIRECTORY_UNAVAILABLE');
         register('native-sync:shared-config-context',async()=>{const runtime=getRuntime();return runtime?.sharedConfigContext?runtime.sharedConfigContext():{enabled:false};},'SHARED_CONFIG_UNAVAILABLE');
-        register('native-sync:shared-config-request',async(_event,payload)=>{const runtime=getRuntime();if(!runtime?.sharedConfigRequest)throw Object.assign(Error(),{code:'SHARED_CONFIG_UNAVAILABLE'});return runtime.sharedConfigRequest(payload);},'SHARED_CONFIG_UNAVAILABLE');
+        register('native-sync:shared-config-request', async (_event, payload) => {
+            const runtime = getRuntime();
+            if (!runtime?.sharedConfigRequest) throw fail('SHARED_CONFIG_UNAVAILABLE');
+            // A reply can already be local while its version is being recorded.
+            // Keep the original grant through delivery to the renderer.
+            const access = runtime.accessController?.signal;
+            const result = await runtime.sharedConfigRequest(payload);
+            if (access?.aborted) throw fail('SHARED_WATCH_PERMISSION_REQUIRED');
+            return result;
+        }, 'SHARED_CONFIG_UNAVAILABLE');
         register('native-sync:abandon-send',async (_event,payload)=>{const runtime=getRuntime();if(!runtime?.abandonSharedSend)throw Object.assign(Error(),{code:'SHARED_SEND_UNAVAILABLE'});return runtime.abandonSharedSend(payload);},'SHARED_ABANDON_FAILED');
         register('native-sync:stage-input',async(_event,payload)=>{const runtime=getRuntime();if(!runtime?.stageLocalSharedInput)return {handled:false};return runtime.stageLocalSharedInput(payload);},'LOCAL_INPUT_SAVE_FAILED');
         register('native-sync:steer',async(_event,payload)=>{const runtime=getRuntime();if(!runtime?.submitSharedSteering)throw Object.assign(Error(),{code:'SHARED_STEERING_UNAVAILABLE'});return runtime.submitSharedSteering(payload);},'SHARED_STEERING_FAILED');
