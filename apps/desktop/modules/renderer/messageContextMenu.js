@@ -441,6 +441,7 @@ function showContextMenu(event, messageItem, message) {
         };
         menu.appendChild(readModeOption);
 
+        const topicAtMenuOpen=mainRefs.currentTopicIdRef.get();
         const deleteOption = ownerDocument.createElement('div');
         deleteOption.classList.add('context-menu-item', 'danger-item');
         deleteOption.innerHTML = `<i class="fas fa-trash-alt"></i> 删除消息`;
@@ -455,7 +456,11 @@ function showContextMenu(event, messageItem, message) {
             }
 
             if (await uiHelper.showConfirmDialog(`确定要删除此消息吗？\n"${textForConfirm.substring(0, 50)}${textForConfirm.length > 50 ? '...' : ''}"`, '删除确认', '删除', '取消', true)) {
-                contextMenuDependencies.removeMessageById(message.id, true); // Pass true to save history
+                const selected=mainRefs.currentSelectedItemRef.get();
+                if (selected?.id===currentSelectedItemVal.id && selected?.type===currentSelectedItemVal.type &&
+                    mainRefs.currentTopicIdRef.get()===topicAtMenuOpen) {
+                    await contextMenuDependencies.removeMessageById(message.id, true, undefined, message);
+                }
             }
             closeContextMenu();
         };
@@ -625,6 +630,7 @@ function toggleEditMode(messageItem, message) {
 
         const saveButton = ownerDocument.createElement('button');
         saveButton.innerHTML = `<i class="fas fa-save"></i> 保存`;
+        let editAttempt;
         saveButton.onclick = async () => {
             const newContent = textarea.value;
 
@@ -691,14 +697,21 @@ function toggleEditMode(messageItem, message) {
             }
 
             try {
+                const selected=mainRefs.currentSelectedItemRef.get();
+                if (selected?.id!==currentSelectedItemVal.id || selected?.type!==currentSelectedItemVal.type ||
+                    mainRefs.currentTopicIdRef.get()!==currentTopicIdVal || !messageItem.isConnected) {
+                    throw new Error('HISTORY_MESSAGE_CONFLICT');
+                }
                 if (currentSelectedItemVal.id && currentTopicIdVal) {
                     if (!mainRefs.historyMutationAuthority) throw new Error('History mutation authority is required for message edits');
-                    const updatedAt = Date.now();
+                    if (editAttempt?.content!==newContent) editAttempt={content:newContent,updatedAt:Date.now()};
+                    const {updatedAt}=editAttempt;
                     const commit = await mainRefs.historyMutationAuthority.mutate({
                         itemId: currentSelectedItemVal.id,
                         itemType: currentSelectedItemVal.type,
                         topicId: currentTopicIdVal,
                         category: 'message-edit',
+                        expectedMessage: message,
                     }, historyForSave => {
                         const nextHistory = [...historyForSave];
                         let liveIndex = nextHistory.findIndex(entry => entry?.id === message.id);
@@ -775,10 +788,10 @@ function toggleEditMode(messageItem, message) {
                 messageItem._vcpMessageModel = committedMessage;
             }
 
-            if (contextMenuDependencies.updateMessageContent) {
-                contextMenuDependencies.updateMessageContent(message.id, newContent);
-            } else {
-                const ppResult2 = contextMenuDependencies.preprocessFullContent(newContent);
+            if (committedMessage && contextMenuDependencies.updateMessageContent) {
+                contextMenuDependencies.updateMessageContent(message.id, committedMessage.content);
+            } else if (committedMessage) {
+                const ppResult2 = contextMenuDependencies.preprocessFullContent(committedMessage.content);
                 const rawHtml = markedInstance.parse(ppResult2.text || ppResult2);
                 contextMenuDependencies.setContentAndProcessImages(contentDiv, rawHtml, message.id);
                 contextMenuDependencies.processRenderedContent(contentDiv);

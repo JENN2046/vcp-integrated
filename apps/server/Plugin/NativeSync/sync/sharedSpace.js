@@ -467,10 +467,28 @@ class SharedSpace {
   if(this.readOnly)throw fail('SHARED_READ_ONLY');
   const topic=this.topic(actor,body.sharedSpaceId,body.sharedId,'execute');
   return this.atomic(()=>{
-   this.assertNotPrepared([topic.id,topic.parent_id]);if(this.active(topic.id))throw fail('SHARED_TOPIC_BUSY');
    const op=body.operation;if(!op||op.deviceId!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
-   if(!this.store.findMessage.get(...tuple(topic),op.msgId))throw fail('SHARED_MESSAGE_NOT_FOUND',404);
-   return this.store.apply({...op,ownerType:topic.owner_type,ownerId:topic.owner_id,topicId:topic.topic_id},{sharedSpace:topic.space_id,metadataPublisher:true,attachmentPrincipal:actor.principal});
+   const apply=()=>this.store.apply({...op,ownerType:topic.owner_type,ownerId:topic.owner_id,topicId:topic.topic_id},{sharedSpace:topic.space_id,metadataPublisher:true,attachmentPrincipal:actor.principal});
+   if(op.baseSeq!==undefined){
+    if(actor.kind!=='desktop'||topic.owner_type!=='agent'||!Number.isSafeInteger(op.baseSeq)||op.baseSeq<1)throw fail('INVALID_SHARED_MESSAGE_MUTATION',400);
+    // CentralStore verifies that the original operation and receipt are identical.
+    if(this.store.findOp.get(actor.principal,op.opId))return apply();
+   }
+   this.assertNotPrepared([topic.id,topic.parent_id]);if(this.active(topic.id))throw fail('SHARED_TOPIC_BUSY');
+   const row=this.store.findMessage.get(...tuple(topic),op.msgId);
+   if(!row)throw fail('SHARED_MESSAGE_NOT_FOUND',404);
+   if(op.baseSeq!==undefined){
+    if(row.deleted||row.last_seq!==op.baseSeq||row.hash!==op.baseHash)throw fail('MESSAGE_CONFLICT');
+    const original=this.store.projectMessage(row);
+    if(original.role!=='assistant'||original.isThinking||original.isPendingStream||original.contextCompaction)throw fail('INVALID_SHARED_MESSAGE_MUTATION',400);
+    if(op.action==='upsert'){
+     const {content,updatedAt,...unchanged}=op.message||{};
+     const {content:oldContent,updatedAt:oldUpdatedAt,...oldFields}=original;
+     if(typeof content!=='string'||(updatedAt!==undefined&&(!Number.isSafeInteger(updatedAt)||updatedAt<0))||
+        stable(unchanged)!==stable(oldFields)||stable(op.metadata)!==stable(original._nativeSyncMetadata))throw fail('INVALID_SHARED_MESSAGE_MUTATION',400);
+    }
+   }
+   return apply();
   });
  }
 }

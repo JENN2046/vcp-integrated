@@ -47,7 +47,7 @@ function sharedInfo(shared,sourceId){
  const features=typeof shared.db.function==='function'?[wait.capability,wait.watchCapability]:[];
  features.push('shared-model-save-v1');
  if(!shared.configurationOnly)features.push(
-  'shared-compaction-v1','shared-topic-history-v1','shared-attachments-v1','shared-merge-v1','shared-context-v1',
+  'shared-compaction-v1','shared-topic-history-v1','shared-desktop-message-edit-v1','shared-attachments-v1','shared-merge-v1','shared-context-v1',
   require('./sharedInline.cjs').CAP,
   ...(shared.native?[require('./sharedNative').NATIVE_INLINE_CAPABILITY]:[]),
   ...(shared.native?.engine?[require('./sharedSession').CAPABILITY,'shared-execution-trace-v1','shared-session-cancel-v1',require('./sharedTopicSponsor').CAPABILITY]:[]),

@@ -136,7 +136,7 @@ class CentralStore {
     const incoming=raw.metadata===undefined?null:validateEnvelope(message,raw.metadata);
     if(message?._nativeSyncMetadata&&!incoming)throw new SyncError('VERSIONED_METADATA_REQUIRED','Stored metadata cannot be supplied without publication authority',409);
     const normalized = { ...id, deviceId: raw.deviceId, opId: raw.opId,
-      action: raw.action, baseHash: raw.baseHash, message, ...(incoming?{metadata:incoming}:{}) };
+      action: raw.action, baseHash: raw.baseHash, ...(authority.sharedSpace&&raw.baseSeq!==undefined?{baseSeq:raw.baseSeq}:{}), message, ...(incoming?{metadata:incoming}:{}) };
     const requestHash = sha256(stable(normalized));
     const args = [id.ownerType, id.ownerId, id.topicId, id.msgId];
     const hash = raw.action === 'delete' ? tombstoneHash(id) : messageHash(message);

@@ -1,6 +1,7 @@
 'use strict';
 const path=require('node:path');
-const {stable,sha256,fail,messageHash}=require('./protocol');
+const {stable,sha256,fail,messageHash,messageKey,wireTopic,tombstoneHash}=require('./protocol');
+const {fieldsFrom}=require('./metadata');
 const {ownedJson}=require('./sharedLocal');
 const {durableJson}=require('./durableJson');
 const {NativeBodyArchive,eligible:bodyArchiveEligible}=require('./nativeBodyArchive');
@@ -245,8 +246,52 @@ class SharedExecution {
    r.assertSharedAccess?.();return {body:nativeBody,headers:{...require('./runtime').syncHeaders(r.connection),'X-NativeSync-Capabilities':'shared-space-v1','X-NativeSync-Admission':record.accepted.id}};
   });
  }
+ async commitExistingAssistant(d,intent,mapping){
+  const r=this.runtime,operation=intent.operations?.[0],edit=intent.source==='message-edit';
+  const expected=edit?operation?.expected:operation?.expected?.[0];
+  const id=edit?operation?.id:operation?.ids?.[0];
+  if(intent.version!==1||intent.requestId||intent.executionId||intent.localOnly||!Array.isArray(intent.operations)||intent.operations.length!==1||
+     typeof id!=='string'||!id||expected?.id!==id||expected.role!=='assistant'||
+     (edit?(operation.kind!=='edit'||typeof operation.set?.content!=='string'||
+       Object.keys(operation.set).some(key=>!['content','updatedAt'].includes(key))||
+       (operation.unset!==undefined&&(!Array.isArray(operation.unset)||operation.unset.length))):
+       (operation.kind!=='delete'||!Array.isArray(operation.ids)||operation.ids.length!==1||!Array.isArray(operation.expected)||operation.expected.length!==1)))throw fail('INVALID_SHARED_MESSAGE_MUTATION');
+  const {applyMessageOperations,messagePreconditionValue}=await import('../../chat/historyMessageIntent.mjs');
+  return this.run(mapping.sharedId,async()=>{
+   r.assertSharedAccess();
+   if(r.readOnly)throw fail('SHARED_READ_ONLY');
+   if(r.closed||!r.ready)throw fail('SHARED_STARTUP_PENDING');
+   if(!r.capabilities.features?.includes('shared-desktop-message-edit-v1'))throw fail('SHARED_CLIENT_UPGRADE_REQUIRED');
+   if(!r.isLocalVisible(mapping.sharedId))throw fail('SHARED_LOCAL_REMOVED');
+   if(d.itemId!==mapping.local.itemId||d.topicId!==mapping.local.topicId||this.mapping(d).sharedId!==mapping.sharedId)throw fail('SHARED_LOCAL_MAPPING_REQUIRED');
+   r.matching.assert([mapping.sharedId,r.state.objects[mapping.sharedId].parentId]);
+   const {adapter,queue}=r.replica,topicId=mapping.shared.topicId;
+   const history=await queue.read(mapping.shared),current=history.find(message=>message.id===id);
+   if(!current)throw fail('HISTORY_MESSAGE_NOT_FOUND');
+   if(current.role!=='assistant'||current.isThinking||current.isPendingStream||current.contextCompaction||
+      messagePreconditionValue(current)!==messagePreconditionValue(expected))throw fail('HISTORY_MESSAGE_CONFLICT');
+   if(intent.expectedRevision!==undefined&&intent.expectedRevision!==queue.revision(history))throw fail('HISTORY_REVISION_CONFLICT');
+   const identity={...wireTopic(mapping.shared),msgId:id},base=adapter.state.acked[messageKey(identity)];
+   const original=adapter.canonical(current,topicId);
+   if(!base||base.deleted||!Number.isSafeInteger(base.seq)||base.seq<1||base.hash!==messageHash(original)||
+      base.metadataHash!==sha256(stable(fieldsFrom(original))))throw fail('SHARED_LOCAL_HISTORY_CONFLICT');
+   const next=applyMessageOperations([current],[operation]);
+   const message=edit?adapter.canonical(next[0],topicId):null;
+   const wire={...identity,deviceId:adapter.deviceId,action:edit?'upsert':'delete',baseHash:base.hash,baseSeq:base.seq,message,
+      ...(message?._nativeSyncMetadata?{metadata:message._nativeSyncMetadata}:{})};
+   const opId='desktop-message_'+sha256(stable(wire));
+   const receipt=await r.send(endpoint+'message',{body:{sharedSpaceId:r.connection.sharedSpaceId,sharedId:mapping.sharedId,operation:{...wire,opId}}});
+   if(!Number.isSafeInteger(receipt?.seq)||receipt.seq<base.seq||receipt.deleted!==!edit||
+      receipt.hash!==(edit?messageHash(message):tombstoneHash(identity)))throw fail('SHARED_MESSAGE_RECEIPT_INVALID');
+   await r.syncExecutionTopic(mapping,{minSeq:receipt.seq});
+   const saved=await queue.read(mapping.shared);
+   return {handled:true,success:true,localState:'saved',history:saved,revision:queue.revision(saved),sync:{state:'captured',delivery:'accepted',recoverable:true}};
+  });
+ }
  async commit(d,intent){
-  const mapping=this.mapping(d),record=Object.values(this.state.requests).find(v=>v.sharedId===mapping.sharedId&&v.accepted&&!v.isSteeringInput&&('reply_'+v.accepted.id===intent.requestId||v.generations?.some(g=>g.requestId===intent.requestId)));
+  const mapping=this.mapping(d);
+  if(mapping.shared.itemType==='agent'&&['message-edit','message-remove'].includes(intent?.source))return this.commitExistingAssistant(d,intent,mapping);
+  const record=Object.values(this.state.requests).find(v=>v.sharedId===mapping.sharedId&&v.accepted&&!v.isSteeringInput&&('reply_'+v.accepted.id===intent.requestId||v.generations?.some(g=>g.requestId===intent.requestId)));
   if(!record)throw fail('SHARED_NATIVE_ADMISSION_REQUIRED');
   const appended=intent.operations.filter(o=>o.kind==='append');
   if(appended.length!==1||intent.operations.some(o=>o.kind!=='append'&&(o.kind!=='delete'||o.ids?.length))||appended[0].message.id!==(record.steeringV1?intent.requestId:'reply_'+record.accepted.id))throw fail('INVALID_SHARED_REPLY');

@@ -2977,7 +2977,24 @@ function cleanupMessageDomResources(messageItem, messageId = null) {
     visibilityOptimizer.unobserveMessage(messageItem);
 }
 
-function removeMessageById(messageId, saveHistory = false, root = mainRendererReferences.chatMessagesDiv) {
+function removeMessageById(messageId, saveHistory = false, root = mainRendererReferences.chatMessagesDiv, expectedMessage) {
+    if (saveHistory && expectedMessage) {
+        const refs=mainRendererReferences;
+        const selected=refs.currentSelectedItemRef.get(), topicId=refs.currentTopicIdRef.get();
+        if (selected?.type==='agent' && selected.id && topicId && expectedMessage.role==='assistant') {
+            return refs.historyMutationAuthority.mutate({
+                itemId:selected.id,itemType:selected.type,topicId,category:'message-remove',
+                expectedMessage,deleteIds:[messageId],
+            }, latest=>latest.filter(message=>message.id!==messageId)).then(()=>{
+                const active=refs.currentSelectedItemRef.get();
+                if (mainRendererReferences===refs && active?.id===selected.id && active?.type===selected.type &&
+                    refs.currentTopicIdRef.get()===topicId) removeMessageById(messageId,false,root);
+            }).catch(error=>{
+                console.error('[MessageRenderer] history mutation failed:',error);
+                refs.uiHelper?.showToastNotification?.('消息删除未保存，请刷新后重试','error');
+            });
+        }
+    }
     projectForgeTopicSurface.remove(root, messageId);
     const item = root?.querySelector?.(`.message-item[data-message-id="${messageId}"]`);
     if (item) {

@@ -352,3 +352,68 @@ test('a newly created local topic registers only itself while an unrelated space
  let release,entered=false;const gate=new Promise(resolve=>{release=resolve;}),request=r.adapter.request;r.adapter.request=async(route,...args)=>{if(route.startsWith('/api/v1/sync/pull?')&&!entered){entered=true;await gate;}return request.call(r.adapter,route,...args);};const background=r.replica.sync();await wait(()=>entered,'held unrelated pull');let accepted,error;const pending=r.prepareSharedSend({descriptor:d,message:msg('new-topic-current-only')}).then(value=>{accepted=value},cause=>{error=cause});
  try{await wait(()=>accepted||error,'narrow new-topic registration');if(error)throw error;assert.ok(accepted.admissionId);assert.equal(f.calls(),0);if(accepted.projectionPending)await r.execution.waitProjection(d);assert.equal((await a.queue.read(d)).at(-1).id,'new-topic-current-only');assert.equal(r.execution.mapping(d).local.topicId,d.topicId);}finally{release();await background;await pending;}
 });
+
+test('desktop message IPC edits and deletes only the observed committed assistant message',async t=>{
+ const f=await fixture(t),a=await f.desktop('A'),b=await f.desktop('B');
+ const accepted=await a.runtime.prepareSharedSend({descriptor:a.descriptor,message:msg('desktop-menu-user')});
+ await f.reply(a,accepted,await f.dispatch(a,accepted));
+ await b.runtime.tick();
+ const nativeHandlers=new Map();
+ require(CHAT+'/modules/ipc/nativeHistoryHandlers').initialize({ipcMain:{handle:(channel,fn)=>nativeHandlers.set(channel,fn)},historyMutationQueue:a.queue});
+ const commit=intent=>nativeHandlers.get('native-history:messages')(null,a.descriptor.itemId,'agent',a.descriptor.topicId,{version:1,...intent});
+ const assistant=history=>history.find(row=>row.id===accepted.replyId);
+ const original=assistant(await a.queue.read(a.descriptor));
+ const edit=(expected,content)=>({source:'message-edit',operations:[{kind:'edit',id:original.id,expected,set:{content,updatedAt:30},unset:[]}]});
+ const remove=expected=>({source:'message-remove',operations:[{kind:'delete',ids:[original.id],expected:[expected]}]});
+ assert.equal((await commit({source:'message-edit',operations:[{kind:'append',message:original}]})).success,false);
+ assert.equal((await commit(edit({...original,content:'stale baseline'},'unsafe'))).error,'HISTORY_MESSAGE_CONFLICT');
+ assert.equal((await commit(remove({...original,id:'different'}))).error,'INVALID_SHARED_MESSAGE_MUTATION');
+ const operation=edit(original,'edited from the real desktop IPC');
+ const capabilities=a.runtime.capabilities;
+ a.runtime.capabilities={...capabilities,features:capabilities.features.filter(feature=>feature!=='shared-desktop-message-edit-v1')};
+ try { assert.equal((await commit(operation)).error,'SHARED_CLIENT_UPGRADE_REQUIRED'); }
+ finally { a.runtime.capabilities=capabilities; }
+
+ let lost=true, replayBody;
+ f.control.beforeRequest=(request,response,next)=>{
+  if(request.method==='POST'&&request.path==='/api/v1/sync/shared/message'&&lost){
+   replayBody=structuredClone(request.body);
+   const end=response.end.bind(response);
+   response.end=(...args)=>{
+    if(response.statusCode!==200)return end(...args);
+    lost=false;response.destroy();return response;
+   };
+  }
+  next();
+ };
+ assert.equal((await commit(operation)).error,'NETWORK_UNAVAILABLE');
+ assert.equal(assistant(await a.queue.read(a.descriptor)).content,original.content);
+ assert.equal(f.store.metrics().journalRows,3);
+ const edited=await commit(operation);
+ assert.equal(edited.success,true,JSON.stringify(edited));
+ assert.equal(assistant(edited.history).content,'edited from the real desktop IPC');
+ await b.runtime.tick();
+ assert.equal(assistant(await b.queue.read(b.descriptor)).content,'edited from the real desktop IPC');
+ assert.equal((await commit(remove(original))).error,'HISTORY_MESSAGE_CONFLICT');
+ const {operation:wire}=replayBody;
+ const actor=f.actor('A'),scope={sharedSpaceId:'sharedAB',sharedId:f.topic.id};
+ const editCentral=(identity,patch)=>f.shared.editMessage(identity,{...scope,operation:{...wire,...patch}});
+ assert.throws(()=>editCentral(f.actor('B'),{}),rejects('SHARED_REQUEST_OWNER_REQUIRED'));
+ assert.throws(()=>editCentral(f.shared.mobile({id:'readonly',scopes:['shared:sharedAB:read']},'sharedAB','read'),{}),rejects('SHARED_PERMISSION_REQUIRED'));
+ assert.throws(()=>editCentral(actor,{opId:'stale-concurrent-edit'}),rejects('MESSAGE_CONFLICT'));
+ assert.throws(()=>editCentral(actor,{baseSeq:wire.baseSeq+1}),rejects('IDEMPOTENCY_KEY_REUSED'));
+ assert.throws(()=>editCentral(actor,{opId:'missing-original',msgId:'missing'}),rejects('SHARED_MESSAGE_NOT_FOUND'));
+ const ctx=f.shared.executionConfig(actor,scope);
+ const admission=f.shared.admit(actor,{...scope,requestId:'busy-menu-test',expectedHead:ctx.head,configHash:ctx.hash,message:msg('busy-menu-user')});
+ assert.throws(()=>editCentral(actor,{opId:'new-during-active'}),rejects('SHARED_TOPIC_BUSY'));
+ assert.equal(editCentral(actor,{}).replayed,true);
+ f.shared.abandon(actor,{sharedSpaceId:'sharedAB',admissionId:admission.id,opId:'abandon-busy-menu-test',confirm:true});
+ const removed=await commit(remove(assistant(edited.history)));
+ assert.equal(removed.success,true,JSON.stringify(removed));
+ assert.deepEqual(removed.history.map(row=>row.id),['desktop-menu-user','busy-menu-user']);
+ assert.throws(()=>editCentral(actor,{opId:'resurrect-deleted',baseSeq:5}),rejects('MESSAGE_CONFLICT'));
+ await b.runtime.tick();
+ assert.deepEqual(await b.queue.read(b.descriptor),removed.history);
+ assert.equal(f.store.metrics().journalRows,5);
+ assert.equal(f.calls(),1);
+});

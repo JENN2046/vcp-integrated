@@ -1,5 +1,5 @@
 import { assertChatRepositorySuccess, normalizeChatRepositoryError } from './chatRepository.js';
-import { deriveMessageOperations, applyMessageOperations } from './historyMessageIntent.mjs';
+import { deriveMessageOperations, applyMessageOperations, messagePreconditionValue } from './historyMessageIntent.mjs';
 const conversationKey = ({ itemId, itemType = 'agent', topicId }) => {
     if (!itemId || !topicId) throw new TypeError('History mutation requires itemId and topicId');
     return `${itemType}:${itemId}/topic:${topicId}`;
@@ -107,8 +107,15 @@ export function createChatHistoryMutationAuthority({ repository } = {}) {
                 assertChatRepositorySuccess(current, 'History mutation read failed');
                 if (!Array.isArray(current)) throw new Error(current?.error || 'History mutation read failed');
                 const expectedRevision=repository.revisionOf?.(current);
+                const syncEnabled=repository.isSyncEnabled?.(descriptor.itemId, descriptor.itemType || 'agent', descriptor.topicId);
+                if (syncEnabled && (descriptor.itemType || 'agent') === 'agent' && descriptor.expectedMessage) {
+                    const original=current.find(message=>message.id===descriptor.expectedMessage.id);
+                    if (!original || messagePreconditionValue(original)!==messagePreconditionValue(descriptor.expectedMessage)) {
+                        throw Object.assign(new Error('HISTORY_MESSAGE_CONFLICT'),{code:'HISTORY_MESSAGE_CONFLICT'});
+                    }
+                }
                 const next = await transform(structuredClone(current));
-                if (repository.isSyncEnabled?.(descriptor.itemId, descriptor.itemType || 'agent', descriptor.topicId) === false) {
+                if (syncEnabled === false) {
                     return commit(descriptor, next, structuredClone(current));
                 }
                 return messages({...descriptor,causalContextIds:descriptor.useCurrentContext?current.map(m=>m.id):descriptor.causalContextIds},deriveMessageOperations(current,next,{deleteIds:descriptor.deleteIds||[]}),descriptor.requireUnchangedHistory?expectedRevision:undefined);
