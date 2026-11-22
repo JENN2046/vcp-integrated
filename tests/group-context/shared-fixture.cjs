@@ -4,11 +4,11 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
 
-const spec = require('./input.json');
+const defaultSpec = require('./input.json');
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 const names = ['A', 'B'];
 
-function makeFixture({ server, out, onProvider }) {
+function makeFixture({ server, out, spec = defaultSpec, onProvider }) {
     const { AttachmentStore } = require(path.join(server, 'Plugin/NativeSync/mobile/attachments'));
     const { envelopeFor } = require(path.join(server, 'Plugin/NativeSync/sync/metadata'));
     let group, groupTopic, memberIds, attachment;
@@ -71,7 +71,13 @@ function makeFixture({ server, out, onProvider }) {
             res.write('data: ' + JSON.stringify({ id: 'gc-fixture-' + member, object: 'chat.completion.chunk',
                 created: 1, model: 'synthetic', choices: [{ index: 0, delta, finish_reason }] }) + '\n\n');
         }
-        frame({ role: 'assistant', content }, null);
+        if (spec.streamFrames) {
+            for (const payload of spec.streamFrames) {
+                res.write('data: ' + JSON.stringify(payload).replaceAll('{{member}}', member) + '\n\n');
+            }
+        } else {
+            frame({ role: 'assistant', content }, null);
+        }
         frame({}, 'stop');
         res.end('data: [DONE]\n\n');
         return true;

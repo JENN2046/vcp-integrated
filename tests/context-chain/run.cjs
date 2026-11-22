@@ -11,7 +11,7 @@ const execute = promisify(execFile);
 
 async function main() {
     const [mode, baseline] = process.argv.slice(2);
-    assert.ok(!mode || ['tavern-depth', 'request-envelope'].includes(mode), 'unknown context chain scenario');
+    assert.ok(!mode || ['tavern-depth', 'request-envelope', 'request-metadata'].includes(mode), 'unknown context chain scenario');
     assert.ok(!baseline || (mode && baseline === '--baseline'), 'unknown context chain option');
     const contract = mode === 'tavern-depth' ? require('./tavern-depth.cjs') : require('./input.json');
     const fixture = await start({ contract });

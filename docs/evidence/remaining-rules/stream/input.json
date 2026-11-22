@@ -1,0 +1,171 @@
+{
+  "group": {
+    "name": "Context group fixture",
+    "mode": "sequential",
+    "groupPrompt": "GC_GROUP_PROMPT",
+    "invitePrompt": "GC_INVITATION {{VCPChatAgentName}}"
+  },
+  "plan": [
+    "gc-a",
+    "gc-b"
+  ],
+  "speakers": [
+    {
+      "id": "gc-a",
+      "name": "Fixture A",
+      "systemPrompt": "GC_MEMBER_A",
+      "model": "synthetic",
+      "temperature": 0.5,
+      "maxOutputTokens": 128,
+      "contextTokenLimit": 32000,
+      "streamOutput": true
+    },
+    {
+      "id": "gc-b",
+      "name": "Fixture B",
+      "systemPrompt": "GC_MEMBER_B",
+      "model": "synthetic",
+      "temperature": 0.5,
+      "maxOutputTokens": 128,
+      "contextTokenLimit": 32000,
+      "streamOutput": true
+    }
+  ],
+  "input": "GC_CURRENT: read the attached sample.",
+  "current": {
+    "id": "gc-current",
+    "role": "user",
+    "content": "GC_CURRENT: read the attached sample.",
+    "timestamp": 1700000004000
+  },
+  "replyA": "GC_REPLY_A_UNIQUE",
+  "replyB": "GC_REPLY_B_UNIQUE",
+  "attachment": {
+    "messageId": "gc-history-user",
+    "name": "context-note.txt",
+    "type": "text/plain",
+    "text": "CTX_ATTACHMENT_BODY_V1"
+  },
+  "rules": [
+    {
+      "id": "gc-system-rule",
+      "name": "Group system suffix",
+      "type": "system_suffix",
+      "scope": "group",
+      "enabled": true,
+      "wrap": false,
+      "content": "GC_SYSTEM_SUFFIX"
+    },
+    {
+      "id": "gc-user-rule",
+      "name": "Group user suffix",
+      "type": "user_suffix",
+      "scope": "group",
+      "enabled": true,
+      "wrap": false,
+      "content": "GC_USER_SUFFIX"
+    },
+    {
+      "id": "gc-depth-rule",
+      "name": "Group depth four",
+      "type": "context_inject",
+      "scope": "group",
+      "enabled": true,
+      "wrap": false,
+      "role": "user",
+      "depth": 4,
+      "content": "GC_DEPTH_INJECTION"
+    }
+  ],
+  "history": [
+    {
+      "id": "gc-history-user",
+      "role": "user",
+      "name": "用户",
+      "timestamp": 1700000000000,
+      "content": "GC_HISTORY_USER"
+    },
+    {
+      "id": "gc-history-assistant",
+      "role": "assistant",
+      "name": "Fixture B",
+      "agentId": "gc-b",
+      "timestamp": 1700000001000,
+      "content": "GC_HISTORY_ASSISTANT"
+    },
+    {
+      "id": "gc-history-system",
+      "role": "system",
+      "name": "系统",
+      "timestamp": 1700000002000,
+      "content": "GC_HISTORY_SYSTEM"
+    }
+  ],
+  "streamFrames": [
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "content": "GC_REPLY_{{member}}_"
+          }
+        }
+      ],
+      "delta": {
+        "content": "discard-delta"
+      },
+      "content": "discard-content",
+      "message": {
+        "content": "discard-message"
+      }
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "content": ""
+          }
+        }
+      ],
+      "delta": {
+        "content": "UNI"
+      },
+      "content": "discard-content",
+      "message": {
+        "content": "discard-message"
+      }
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {}
+        }
+      ],
+      "delta": {
+        "content": ""
+      },
+      "content": "QU",
+      "message": {
+        "content": "discard-message"
+      }
+    },
+    {
+      "choices": [],
+      "message": {
+        "content": "E"
+      }
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -11,7 +11,7 @@ if (!evidence || !path.isAbsolute(evidence)) throw Error('Native context capture
 
 const packetInspector = new Session();
 const coverageFiles = ['contextCompactionState.js','historyWindow/index.mjs',
-    'chatContextPipeline.js','historyWindow/tavernContext.mjs','tavernRulesEngine.js','singleChatRequestOrchestrator.js','chatManager.js'];
+    'chatContextPipeline.js','historyWindow/requestMetadata.mjs','historyWindow/tavernContext.mjs','tavernRulesEngine.js','singleChatRequestOrchestrator.js','chatManager.js'];
 
 function debuggerFor(window) {
     if (!window || window.isDestroyed()) throw Error('The native context window is unavailable');

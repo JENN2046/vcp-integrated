@@ -25,7 +25,26 @@ Module._load = function (request, parent, isMain) {
             return handle.call(this, req, res, forceShowVCP);
         };
     }
+    if (parent?.filename?.endsWith('/mobile/nativeResponse.js')
+        && request.endsWith('/streamDelta')) {
+        const source = Module._resolveFilename(request, parent);
+        const sha256 = createHash('sha256').update(fs.readFileSync(source)).digest('hex');
+        return { ...loaded, groupStreamDelta(frame) {
+            const text = loaded.groupStreamDelta(frame);
+            append({ kind: 'worker-stream', source: path.relative(process.cwd(), source), sha256, frame, text });
+            return text;
+        } };
+    }
     if (!parent?.filename?.endsWith('/mobile/groupRequest.js')) return loaded;
+    if (request.endsWith('/modelSelection')) {
+        const source = Module._resolveFilename(request, parent);
+        const sha256 = createHash('sha256').update(fs.readFileSync(source)).digest('hex');
+        return { ...loaded, resolveEffectiveModel(...args) {
+            const result = loaded.resolveEffectiveModel(...args);
+            append({ kind: 'worker-model', source: path.relative(process.cwd(), source), sha256, result });
+            return result;
+        } };
+    }
     const method = request.endsWith('/groupContextWindow') ? 'applyGroupContextRules' :
         request.endsWith('/tavernRulesEngine') ? 'applyContextInject' : null;
     if (!method || typeof loaded?.[method] !== 'function') return loaded;

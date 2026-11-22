@@ -1,4 +1,5 @@
 'use strict';
+const {resolveEffectiveModel}=require('@vcp/core-rules/group/modelSelection');
 const fail=(code,status=409)=>Object.assign(Error(code),{code,status});
 function authorize(shared,storage,req){
  if(!shared)throw fail('SHARED_SPACE_UNAVAILABLE');
@@ -21,7 +22,9 @@ function validate(shared,actor,topic,message,config,turn){
  }
  if(files.some(a=>String(a.type).startsWith('image/'))){
   const models=shared.catalog.grants.get(topic.origin_source)?.imageModels||[];
-  const required=config.owner.kind==='group'?(turn.plan||[]).map(id=>config.owner.config.useUnifiedModel?config.owner.config.unifiedModel:config.members.find(m=>m.id===id).config.model):[config.owner.config.model];
+  const required=config.owner.kind==='group'
+   ?(turn.plan||[]).map(id=>resolveEffectiveModel(config.owner.config,config.members.find(m=>m.id===id).config).effectiveModel)
+   :[config.owner.config.model];
   if(required.some(model=>!models.includes(model)))throw fail('MODEL_IMAGE_UNSUPPORTED');
  }
 }

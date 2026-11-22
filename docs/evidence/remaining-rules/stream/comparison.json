@@ -1,0 +1,423 @@
+{
+  "nodeVersion": "v24.22.1",
+  "replayedStreamFixtureSha256": "9459f121c4e1f5d7b09c4e30ae0ab4cdb2379eb8aac8a0a59db752aef1bda5cd",
+  "before": {
+    "groupStreamCallbacks": 14,
+    "groupSharedExtractionCalls": 0,
+    "invitedStreamCallbacks": 7,
+    "invitedSharedExtractionCalls": 0,
+    "workerExtractionCalls": 14,
+    "revision": "6f34d0c0a260",
+    "noExtractionChangesSince": "4f3f9063db7b3d729f6ec34ac3eb792bebb5228c",
+    "immediatePreChangeGroupResultCompared": true,
+    "desktopSource": {
+      "file": "apps/desktop/Groupmodules/groupchat.js",
+      "sha256": "4573e1522f48214b529cbf960e5d959478d7a533ecc9bdd64a4bbd7024909bfd"
+    },
+    "workerSource": {
+      "file": "apps/server/Plugin/NativeSync/nativeRules/Groupmodules/streamDelta.js",
+      "sha256": "e8984983e8b8938e32b411565c08481d3f66d02291598fdfb187af3d775d6e80"
+    }
+  },
+  "after": {
+    "groupStreamCallbacks": 14,
+    "groupSharedExtractionCalls": 14,
+    "invitedStreamCallbacks": 7,
+    "invitedSharedExtractionCalls": 7,
+    "workerExtractionCalls": 14,
+    "worktreeBase": "4f3f9063db7b3d729f6ec34ac3eb792bebb5228c",
+    "desktopSource": {
+      "file": "apps/desktop/Groupmodules/groupchat.js",
+      "sha256": "aed60173799a011ec0f7f051b4908e64d3f5dabcecbcabb6cc8e293fca9d0d3e"
+    },
+    "desktopAndWorkerSource": {
+      "file": "packages/core-rules/group/streamDelta.js",
+      "sha256": "e817c037fd1c5a19ec28af1b29ae61b77cfc5f7f565f5f4b86094480287e3f0f"
+    }
+  },
+  "invariantGroupResult": {
+    "desktopHistory": [
+      {
+        "content": "GC_REPLY_A_UNIQUE",
+        "finishReason": "completed"
+      },
+      {
+        "content": "GC_REPLY_B_UNIQUE",
+        "finishReason": "completed"
+      }
+    ],
+    "workerJournal": [
+      "GC_REPLY_A_UNIQUE",
+      "GC_REPLY_B_UNIQUE"
+    ],
+    "desktopGroupVisible": true,
+    "workerGroupVisible": true,
+    "workState": "completed",
+    "admission": {
+      "state": "completed",
+      "nativeTerminal": 1
+    },
+    "steps": [
+      {
+        "state": "completed",
+        "attempts": 1
+      },
+      {
+        "state": "completed",
+        "attempts": 1
+      }
+    ],
+    "nativeRequests": [
+      "model_terminal",
+      "model_terminal"
+    ],
+    "replayHeldLedgerAndDispatches": true,
+    "providerDispatchOrder": [
+      "A",
+      "B",
+      "A",
+      "B"
+    ]
+  },
+  "invariantInvitationResult": {
+    "content": "GC_REPLY_A_UNIQUE",
+    "finishReason": "completed",
+    "processStreamForInvitedAgent": 1,
+    "providerDispatchMember": "A"
+  },
+  "invariantWorkerFrames": [
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "content": "GC_REPLY_A_"
+          }
+        }
+      ],
+      "delta": {
+        "content": "discard-delta"
+      },
+      "message": {
+        "content": "discard-message"
+      },
+      "content": "discard-content",
+      "text": "GC_REPLY_A_"
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "content": ""
+          }
+        }
+      ],
+      "delta": {
+        "content": "UNI"
+      },
+      "message": {
+        "content": "discard-message"
+      },
+      "content": "discard-content",
+      "text": "UNI"
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {}
+        }
+      ],
+      "delta": {
+        "content": ""
+      },
+      "message": {
+        "content": "discard-message"
+      },
+      "content": "QU",
+      "text": "QU"
+    },
+    {
+      "choices": [],
+      "message": {
+        "content": "E"
+      },
+      "text": "E"
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant"
+          }
+        }
+      ],
+      "text": ""
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ],
+      "text": ""
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ],
+      "text": ""
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "content": "GC_REPLY_B_"
+          }
+        }
+      ],
+      "delta": {
+        "content": "discard-delta"
+      },
+      "message": {
+        "content": "discard-message"
+      },
+      "content": "discard-content",
+      "text": "GC_REPLY_B_"
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "content": ""
+          }
+        }
+      ],
+      "delta": {
+        "content": "UNI"
+      },
+      "message": {
+        "content": "discard-message"
+      },
+      "content": "discard-content",
+      "text": "UNI"
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {}
+        }
+      ],
+      "delta": {
+        "content": ""
+      },
+      "message": {
+        "content": "discard-message"
+      },
+      "content": "QU",
+      "text": "QU"
+    },
+    {
+      "choices": [],
+      "message": {
+        "content": "E"
+      },
+      "text": "E"
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant"
+          }
+        }
+      ],
+      "text": ""
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ],
+      "text": ""
+    },
+    {
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ],
+      "text": ""
+    }
+  ],
+  "ordinaryToolBoxRecovery": {
+    "passes": 16,
+    "cases": [
+      {
+        "entry": "mobile-messages",
+        "cut": "before-final-seal",
+        "transport": "json",
+        "recovery": "review_required",
+        "retainedReplyCount": 0,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "mobile-messages",
+        "cut": "before-final-seal",
+        "transport": "sse",
+        "recovery": "review_required",
+        "retainedReplyCount": 0,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "mobile-messages",
+        "cut": "after-final-seal",
+        "transport": "json",
+        "recovery": "completed",
+        "retainedReplyCount": 1,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "mobile-messages",
+        "cut": "after-final-seal",
+        "transport": "sse",
+        "recovery": "completed",
+        "retainedReplyCount": 1,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "desktop-session-send",
+        "cut": "dispatch-only",
+        "transport": "json",
+        "recovery": "review_required",
+        "retainedReplyCount": 0,
+        "toolCalls": 0,
+        "providerAttemptCount": 0
+      },
+      {
+        "entry": "desktop-session-send",
+        "cut": "dispatch-only",
+        "transport": "sse",
+        "recovery": "review_required",
+        "retainedReplyCount": 0,
+        "toolCalls": 0,
+        "providerAttemptCount": 0
+      },
+      {
+        "entry": "desktop-session-send",
+        "cut": "before-final-seal",
+        "transport": "json",
+        "recovery": "review_required",
+        "retainedReplyCount": 0,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "desktop-session-send",
+        "cut": "before-final-seal",
+        "transport": "sse",
+        "recovery": "review_required",
+        "retainedReplyCount": 0,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "desktop-session-send",
+        "cut": "after-final-seal",
+        "transport": "json",
+        "recovery": "completed",
+        "retainedReplyCount": 1,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "desktop-session-send",
+        "cut": "after-final-seal",
+        "transport": "sse",
+        "recovery": "completed",
+        "retainedReplyCount": 1,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "desktop-session-send",
+        "cut": "before-intent",
+        "transport": "json",
+        "recovery": "completed",
+        "retainedReplyCount": 1,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "desktop-session-send",
+        "cut": "before-intent",
+        "transport": "sse",
+        "recovery": "completed",
+        "retainedReplyCount": 1,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "desktop-session-send",
+        "cut": "after-intent",
+        "transport": "json",
+        "recovery": "completed",
+        "retainedReplyCount": 1,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "desktop-session-send",
+        "cut": "after-intent",
+        "transport": "sse",
+        "recovery": "completed",
+        "retainedReplyCount": 1,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "desktop-session-send",
+        "cut": "corrupt-final",
+        "transport": "json",
+        "recovery": "review_required",
+        "retainedReplyCount": 0,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      },
+      {
+        "entry": "desktop-session-send",
+        "cut": "corrupt-final",
+        "transport": "sse",
+        "recovery": "review_required",
+        "retainedReplyCount": 0,
+        "toolCalls": 1,
+        "providerAttemptCount": 2
+      }
+    ]
+  },
+  "workerStreamAndSessionRegression": {
+    "passed": 41,
+    "failed": 0
+  }
+}

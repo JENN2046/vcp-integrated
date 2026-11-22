@@ -5,6 +5,7 @@
   "license": "CC-BY-NC-SA-4.0",
   "exports": {
     ".": "./index.mjs",
-    "./tavern-context": "./tavernContext.mjs"
+    "./tavern-context": "./tavernContext.mjs",
+    "./request-metadata": "./requestMetadata.mjs"
   }
 }

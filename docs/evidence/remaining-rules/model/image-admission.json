@@ -1,0 +1,106 @@
+{
+  "route": "/api/v1/sync/shared/admit",
+  "imageModels": [
+    "synthetic"
+  ],
+  "pngBytes": 68,
+  "pngHash": "6505f9e34494ac72163d5373fbf9da81341e0844b64755b1bf24efe766dacd63",
+  "before": [
+    {
+      "name": "unified-granted",
+      "model": "synthetic",
+      "upload": "ready",
+      "status": 200,
+      "planPersisted": true,
+      "boundBlobHash": "6505f9e34494ac72163d5373fbf9da81341e0844b64755b1bf24efe766dacd63"
+    },
+    {
+      "name": "unified-padded",
+      "model": " synthetic ",
+      "upload": "ready",
+      "status": 409,
+      "error": "MODEL_IMAGE_UNSUPPORTED"
+    },
+    {
+      "name": "unified-ungranted",
+      "model": "other-model",
+      "upload": "ready",
+      "status": 409,
+      "error": "MODEL_IMAGE_UNSUPPORTED"
+    },
+    {
+      "name": "member-granted",
+      "model": "synthetic",
+      "upload": "ready",
+      "status": 200,
+      "planPersisted": true,
+      "boundBlobHash": "6505f9e34494ac72163d5373fbf9da81341e0844b64755b1bf24efe766dacd63"
+    },
+    {
+      "name": "member-padded",
+      "model": " synthetic ",
+      "upload": "ready",
+      "status": 409,
+      "error": "MODEL_IMAGE_UNSUPPORTED"
+    },
+    {
+      "name": "member-ungranted",
+      "model": "other-model",
+      "upload": "ready",
+      "status": 409,
+      "error": "MODEL_IMAGE_UNSUPPORTED"
+    }
+  ],
+  "after": [
+    {
+      "name": "unified-granted",
+      "model": "synthetic",
+      "upload": "ready",
+      "status": 200,
+      "planPersisted": true,
+      "boundBlobHash": "6505f9e34494ac72163d5373fbf9da81341e0844b64755b1bf24efe766dacd63"
+    },
+    {
+      "name": "unified-padded",
+      "model": " synthetic ",
+      "upload": "ready",
+      "status": 200,
+      "planPersisted": true,
+      "boundBlobHash": "6505f9e34494ac72163d5373fbf9da81341e0844b64755b1bf24efe766dacd63"
+    },
+    {
+      "name": "unified-ungranted",
+      "model": "other-model",
+      "upload": "ready",
+      "status": 409,
+      "error": "MODEL_IMAGE_UNSUPPORTED"
+    },
+    {
+      "name": "member-granted",
+      "model": "synthetic",
+      "upload": "ready",
+      "status": 200,
+      "planPersisted": true,
+      "boundBlobHash": "6505f9e34494ac72163d5373fbf9da81341e0844b64755b1bf24efe766dacd63"
+    },
+    {
+      "name": "member-padded",
+      "model": " synthetic ",
+      "upload": "ready",
+      "status": 200,
+      "planPersisted": true,
+      "boundBlobHash": "6505f9e34494ac72163d5373fbf9da81341e0844b64755b1bf24efe766dacd63"
+    },
+    {
+      "name": "member-ungranted",
+      "model": "other-model",
+      "upload": "ready",
+      "status": 409,
+      "error": "MODEL_IMAGE_UNSUPPORTED"
+    }
+  ],
+  "candidateRelatedTests": {
+    "passed": 35,
+    "failed": 0
+  }
+}

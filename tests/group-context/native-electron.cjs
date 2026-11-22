@@ -47,7 +47,7 @@ install({
         async 'group-coverage-take'() {
             try {
                 const { result } = await inspector.post('Profiler.takePreciseCoverage');
-                return result.filter(row => row.url.startsWith('file:') && /(?:groupchat|groupChatHandlers|sequentialMode|groupContextWindow|tavernRulesEngine)\.js$/.test(row.url))
+                return result.filter(row => row.url.startsWith('file:') && /(?:groupchat|groupChatHandlers|sequentialMode|groupContextWindow|modelSelection|tavernRulesEngine|streamDelta)\.js$/.test(row.url))
                     .map(row => ({
                         file: path.relative(sourceRoot, fileURLToPath(row.url)),
                         hitFunctions: row.functions.filter(fn => fn.functionName && fn.ranges[0]?.count > 0)

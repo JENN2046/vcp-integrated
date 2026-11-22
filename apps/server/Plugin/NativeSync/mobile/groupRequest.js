@@ -1,6 +1,6 @@
 'use strict';
 const {selectGroupContextHistory,applyGroupContextRules}=require('../nativeRules/Groupmodules/groupContextWindow');
-const {resolveEffectiveModel}=require('../nativeRules/Groupmodules/modelSelection');
+const {resolveEffectiveModel}=require('@vcp/core-rules/group/modelSelection');
 const {attachTimestampMetadata}=require('../nativeRules/modules/chat/requestMetadata');
 const sanitizer=require('../nativeRules/modules/contextSanitizer');
 const tavern=require('../nativeRules/modules/tavernRulesEngine');
@@ -32,6 +32,7 @@ async function groupRequest({topic,config,member,history,currentUserId,requestId
  if(groupPrompt.includes('{{VCPChatGroupSessionWatcher}}'))groupPrompt=groupPrompt.replaceAll('{{VCPChatGroupSessionWatcher}}',JSON.stringify(watcher(topic,history,seq)));
  if(groupPrompt)prompt+=`\n\n[群聊设定]:\n${groupPrompt}`;
  prompt=tavern.applySystemSuffix(prompt,rules,'group');
+ const resolution=resolveEffectiveModel(group,member);
  const messages=[],budget={bytes:0},selected=selectGroupContextHistory(history.filter(m=>!m.isThinking),group);
  const transform=require('../sync/contracts.generated.cjs').sharedContextTransform(selected,member.stripRegexes,currentUserId);
  const causality={parents:selected.filter(m=>!m.isPendingStream).map(m=>m.id),known:!selected.some(m=>m.isPendingStream)};
@@ -41,7 +42,7 @@ async function groupRequest({topic,config,member,history,currentUserId,requestId
   const speaker=message.name||(message.role==='user'?(policy.userName||'用户'):(config.agents.find(a=>a.id===message.agentId)?.name||'AI'));
   const projected={...message};
   let parts=[{type:'text',text:projected.content}];
-  if(message.attachments?.length){if(!attachments)throw fail('ATTACHMENTS_NOT_ENABLED');const model=resolveEffectiveModel(group,member).effectiveModel;parts=await attachments.content(topic.key,projected,config.imageModels?.includes(model),budget);}
+  if(message.attachments?.length){if(!attachments)throw fail('ATTACHMENTS_NOT_ENABLED');parts=await attachments.content(topic.key,projected,config.imageModels?.includes(resolution.effectiveModel),budget);}
   if(config.authority?.sharedSpaceId)parts=parts.map((part,i)=>i===0&&part.type==='text'?{...part,text:transform(part.text,message)}:part);
   if(message.id===currentUserId&&message.role==='user')parts[0]={...parts[0],text:tavern.applyUserSuffix(parts[0].text,rules,'group')};
   parts[0]={...parts[0],text:`[${speaker}的发言]: ${parts[0].text}`};
@@ -52,7 +53,6 @@ async function groupRequest({topic,config,member,history,currentUserId,requestId
  if(prompt.trim())messages.unshift({role:'system',content:prompt});
  const prepared=sanitize(applyGroupContextRules(messages,rules,tavern),policy);
  assertPortableContext(prepared);
- const resolution=resolveEffectiveModel(group,member);
  if(!resolution.effectiveModel)throw fail('AGENT_NOT_CONFIGURED');
  // Match the native Group transport: unified model overrides only model;
  // temperature/output/stream remain the member's settings. Token trimming is

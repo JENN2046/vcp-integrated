@@ -58,6 +58,26 @@ Module._load = function (request, parent, isMain) {
         }
         return observePacket(loaded, implementation);
     }
+    if (parent?.filename?.endsWith('/mobile/effectiveContext.js') &&
+        request === '../nativeRules/modules/chat/requestMetadata') {
+        const facade = Module._resolveFilename(request, parent);
+        let source = facade;
+        try {
+            source = Module.createRequire(facade).resolve('@vcp/native-history-window/request-metadata');
+        } catch (error) {
+            if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error;
+        }
+        if (require.cache[source]?.exports.attachTimestampMetadata !== loaded.attachTimestampMetadata) source = facade;
+        const sha256 = createHash('sha256').update(fs.readFileSync(source)).digest('hex');
+        return { ...loaded, attachTimestampMetadata(message, history) {
+            const result = loaded.attachTimestampMetadata(message, history);
+            fs.appendFileSync(file, JSON.stringify({
+                kind:'request-metadata', module:path.relative(process.cwd(),source), sha256,
+                metadata:result.__vcpchatTimestampMeta,
+            }) + '\n', {mode:0o600});
+            return result;
+        } };
+    }
     if (parent?.filename?.endsWith('/mobile/effectiveContext.js') && typeof loaded?.effectiveContextHistory === 'function' && !selectors.has(loaded)) {
         selectors.add(loaded);
         const select = loaded.effectiveContextHistory;

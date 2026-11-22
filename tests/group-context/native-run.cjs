@@ -134,7 +134,9 @@ async function main(){
         const rows=await until(()=>{
             try {
                 const found=JSON.parse(fs.readFileSync(path.join(profile,relative),'utf8'));
-                return found.length===seed.length+3&&found.at(-1)?.content===spec.replyB&&found;
+                if (found.length!==seed.length+3) return null;
+                const finalContent=found.at(-1)?.content;
+                return (spec.expectedModelError ? finalContent?.includes(spec.expectedModelError) : finalContent===spec.replyB) && found;
             } catch (error) {
                 if (error instanceof SyntaxError) return null;
                 throw error;
@@ -143,8 +145,17 @@ async function main(){
         const coverage=await command('group-coverage-take');
         const [user, replyA, replyB]=rows.slice(-3);
         assert.deepEqual([user.id,user.content],[spec.current.id,spec.current.content]);
-        assert.deepEqual([replyA.content,replyB.content],[spec.replyA,spec.replyB]);
         assert.deepEqual([replyA.agentId,replyB.agentId],speakerOrder);
+        if (spec.expectedModelError) {
+            const captured=fs.readFileSync(dispatchFile,'utf8').trim().split('\n').map(JSON.parse);
+            assert.deepEqual(captured.map(row=>row.kind),['group-send-ipc']);
+            assert.ok([replyA,replyB].every(row=>row.content.includes(spec.expectedModelError)));
+            const evidence={surface:'native-desktop', sequence:speakerOrder, errors:[replyA.content,replyB.content],
+                completionDispatches:0, coverage};
+            fs.writeFileSync(evidenceFile,J(evidence,null,2)+'\n',{mode:0o600});
+            return;
+        }
+        assert.deepEqual([replyA.content,replyB.content],[spec.replyA,spec.replyB]);
         assert.equal(rows.find(row=>row.id===attach.messageId).attachments[0].hash,sha(bytes));
         const captured=fs.readFileSync(dispatchFile,'utf8').trim().split('\n').map(row=>JSON.parse(row));
         const [ipc, dispatchA, dispatchB]=captured;
@@ -174,7 +185,8 @@ async function main(){
         const sources=await command('loaded-sources',{
             main:['apps/desktop/Groupmodules/groupchat.js','apps/desktop/modules/ipc/groupChatHandlers.js',
                 'packages/core-rules/group/modes/sequentialMode.js','apps/desktop/Groupmodules/groupContextWindow.js',
-                'packages/core-rules/group/groupContextWindow.js','apps/desktop/modules/tavernRulesEngine.js'],
+                'packages/core-rules/group/groupContextWindow.js','packages/core-rules/group/modelSelection.js',
+                'packages/core-rules/group/streamDelta.js','apps/desktop/modules/tavernRulesEngine.js'],
             renderer:['apps/desktop/Groupmodules/grouprenderer.js'],
         });
         assert.ok(sources.main.some(row=>row.file.endsWith('/groupchat.js')));
@@ -192,6 +204,21 @@ async function main(){
             source:target.origin, attachment:{name:attach.name,bytes:bytes.length,sha256:sha(bytes),storedAt:attach.messageId,realFileManager:true},
             terminalVisible:true, historyCount:rows.length, renderer:events.find(e=>e.event==='electron-ready')?.data,
             sources, coverage, configuredPlan:{ file:groupConfigRelative, mode:savedGroup.mode, speakerOrder, sha256:sha(configBytes) }};
+        if (spec.streamFrames) {
+            await command('group-coverage-start');
+            const invited = await evaluate(`window.chatAPI.inviteAgentToSpeak(${J(groupId)},${J(topicId)},${J(speakerOrder[0])})`);
+            assert.equal(invited.success, true, invited.error);
+            const invitedHistory = JSON.parse(fs.readFileSync(path.join(profile,relative),'utf8'));
+            assert.equal(invitedHistory.length, rows.length + 1);
+            const { id, agentId, content, finishReason } = invitedHistory.at(-1);
+            assert.equal(agentId, speakerOrder[0]);
+            assert.equal(content, spec.replyA);
+            assert.equal(finishReason, 'completed');
+            const dispatch = JSON.parse(fs.readFileSync(dispatchFile,'utf8').trim().split('\n').at(-1));
+            assert.equal(dispatch.body.messageId, id);
+            evidence.invited = { id, agentId, model: dispatch.body.model, content, finishReason,
+                coverage: await command('group-coverage-take') };
+        }
         fs.writeFileSync(evidenceFile,J(evidence,null,2)+'\n',{mode:0o600});
         console.log(J(evidence));
     } finally {

@@ -36,6 +36,8 @@ const {
 const topicTitleManager = require('./topicTitleManager');
 const { noteToolApprovalMessage, isWaitingForToolApproval, isWatchdogAbort, withWatchdogNote, getGroupErrorMessage, normalizeGroupFetchError } = require('./streamWatchdog');
 const { resolveGroupChatUrl } = require('./groupChatUrl');
+const { groupStreamDelta } = require('@vcp/core-rules/group/streamDelta');
+const { resolveEffectiveModel } = require('@vcp/core-rules/group/modelSelection');
 
 // 模式注册表 - 添加新模式只需在此注册
 const CHAT_MODES = {
@@ -494,32 +496,6 @@ async function getVcpGlobalSettings() {
         enableThoughtChainInjection: false
     };
 }
-
-/**
- * Resolve the model that should be used for this agent in group chat.
- * When unified model is enabled, it has priority over per-agent model.
- * @param {object} groupConfig
- * @param {object} agentConfig
- * @returns {{usingUnifiedModel: boolean, unifiedModel: string, agentModel: string, effectiveModel: string}}
- */
-function resolveEffectiveModel(groupConfig, agentConfig) {
-    const usingUnifiedModel = groupConfig && groupConfig.useUnifiedModel === true;
-    const unifiedModel = (groupConfig && typeof groupConfig.unifiedModel === 'string')
-        ? groupConfig.unifiedModel.trim()
-        : '';
-    const agentModel = (agentConfig && typeof agentConfig.model === 'string')
-        ? agentConfig.model.trim()
-        : '';
-
-    return {
-        usingUnifiedModel,
-        unifiedModel,
-        agentModel,
-        effectiveModel: usingUnifiedModel ? unifiedModel : agentModel
-    };
-}
-
-
 
 function normalizeUniqueStringArray(value) {
     if (!Array.isArray(value)) return [];
@@ -1588,56 +1564,27 @@ ${canvasData.errors || 'No errors'}
                     const {createSseDecoder}=await import('../modules/chat/sseProtocol.mjs');
                     let finishReason=null;
                     let observedFinishReason=null;
-                    const protocol=createSseDecoder({onData:parsedChunk=>{
-observedFinishReason=observeGroupFinishReason(observedFinishReason,parsedChunk.choices);
-trajectoryCall.chunk(parsedChunk);
+                    const protocol = createSseDecoder({
+                        onData: parsedChunk => {
+                            observedFinishReason = observeGroupFinishReason(observedFinishReason, parsedChunk.choices);
+                            trajectoryCall.chunk(parsedChunk);
 
-                                        // 更全面的安全检查，处理各种可能的响应格式
-                                        let hasContent = false;
+                            const text = groupStreamDelta(parsedChunk);
+                            accumulatedResponse += text;
 
-                                        // 标准OpenAI格式 (choices[0].delta.content)
-                                        if (parsedChunk.choices && Array.isArray(parsedChunk.choices) && parsedChunk.choices.length > 0) {
-                                            const choice = parsedChunk.choices[0];
-                                            if (choice && choice.delta) {
-                                                if (typeof choice.delta.content === 'string' && choice.delta.content !== '') {
-                                                    accumulatedResponse += choice.delta.content;
-                                                    hasContent = true;
-                                                }
-                                            }
-                                        }
-
-                                        // 备选格式1 (delta.content)
-                                        if (!hasContent && parsedChunk.delta) {
-                                            if (typeof parsedChunk.delta.content === 'string' && parsedChunk.delta.content !== '') {
-                                                accumulatedResponse += parsedChunk.delta.content;
-                                                hasContent = true;
-                                            }
-                                        }
-
-                                        // 备选格式2 (content)
-                                        if (!hasContent && typeof parsedChunk.content === 'string' && parsedChunk.content !== '') {
-                                            accumulatedResponse += parsedChunk.content;
-                                            hasContent = true;
-                                        }
-
-                                        // 备选格式3 (message.content) - 某些API的格式
-                                        if (!hasContent && parsedChunk.message && typeof parsedChunk.message.content === 'string' && parsedChunk.message.content !== '') {
-                                            accumulatedResponse += parsedChunk.message.content;
-                                            hasContent = true;
-                                        }
-
-                                        // 总是发送chunk事件，即使没有新内容（保持流的连续性）
-                                        if (typeof sendStreamChunkToRenderer === 'function') {
-                                            sendStreamChunkToRenderer({
-                                                type: 'data',
-                                                chunk: parsedChunk,
-                                                messageId: messageIdForAgentResponse,
-                                                context: { groupId, topicId, agentId, agentName, isGroupMessage: true },
-                                                hasContent: hasContent // 添加标志位，让前端知道是否有实际内容
-                                            });
-                                        }
-                                    
-                            },onDone:value=>{finishReason=value.finishReason;}});
+                            // 总是发送 chunk 事件，即使没有新内容（保持流的连续性）
+                            if (typeof sendStreamChunkToRenderer === 'function') {
+                                sendStreamChunkToRenderer({
+                                    type: 'data',
+                                    chunk: parsedChunk,
+                                    messageId: messageIdForAgentResponse,
+                                    context: { groupId, topicId, agentId, agentName, isGroupMessage: true },
+                                    hasContent: Boolean(text)
+                                });
+                            }
+                        },
+                        onDone: value => { finishReason = value.finishReason; }
+                    });
                     try {
                         resetIdleTimer();
                         while (true) {
@@ -2282,56 +2229,27 @@ ${canvasData.errors || 'No errors'}
                     const {createSseDecoder}=await import('../modules/chat/sseProtocol.mjs');
                     let finishReason=null;
                     let observedFinishReason=null;
-                    const protocol=createSseDecoder({onData:parsedChunk=>{
-observedFinishReason=observeGroupFinishReason(observedFinishReason,parsedChunk.choices);
-trajectoryCall.chunk(parsedChunk);
+                    const protocol = createSseDecoder({
+                    onData: parsedChunk => {
+                        observedFinishReason = observeGroupFinishReason(observedFinishReason, parsedChunk.choices);
+                        trajectoryCall.chunk(parsedChunk);
 
-                                    // 更全面的安全检查，处理各种可能的响应格式
-                                    let hasContent = false;
+                        const text = groupStreamDelta(parsedChunk);
+                        accumulatedResponse += text;
 
-                                    // 标准OpenAI格式 (choices[0].delta.content)
-                                    if (parsedChunk.choices && Array.isArray(parsedChunk.choices) && parsedChunk.choices.length > 0) {
-                                        const choice = parsedChunk.choices[0];
-                                        if (choice && choice.delta) {
-                                            if (typeof choice.delta.content === 'string' && choice.delta.content !== '') {
-                                                accumulatedResponse += choice.delta.content;
-                                                hasContent = true;
-                                            }
-                                        }
-                                    }
-
-                                    // 备选格式1 (delta.content)
-                                    if (!hasContent && parsedChunk.delta) {
-                                        if (typeof parsedChunk.delta.content === 'string' && parsedChunk.delta.content !== '') {
-                                            accumulatedResponse += parsedChunk.delta.content;
-                                            hasContent = true;
-                                        }
-                                    }
-
-                                    // 备选格式2 (content)
-                                    if (!hasContent && typeof parsedChunk.content === 'string' && parsedChunk.content !== '') {
-                                        accumulatedResponse += parsedChunk.content;
-                                        hasContent = true;
-                                    }
-
-                                    // 备选格式3 (message.content) - 某些API的格式
-                                    if (!hasContent && parsedChunk.message && typeof parsedChunk.message.content === 'string' && parsedChunk.message.content !== '') {
-                                        accumulatedResponse += parsedChunk.message.content;
-                                        hasContent = true;
-                                    }
-
-                                    // 总是发送chunk事件，即使没有新内容（保持流的连续性）
-                                    if (typeof sendStreamChunkToRenderer === 'function') {
-                                        sendStreamChunkToRenderer({
-                                            type: 'data',
-                                            chunk: parsedChunk,
-                                            messageId: messageIdForAgentResponse,
-                                            context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true },
-                                            hasContent: hasContent // 添加标志位，让前端知道是否有实际内容
-                                        });
-                                    }
-                                
-                            },onDone:value=>{finishReason=value.finishReason;}});
+                        // 总是发送 chunk 事件，即使没有新内容（保持流的连续性）
+                        if (typeof sendStreamChunkToRenderer === 'function') {
+                            sendStreamChunkToRenderer({
+                                type: 'data',
+                                chunk: parsedChunk,
+                                messageId: messageIdForAgentResponse,
+                                context: { groupId, topicId, agentId: invitedAgentId, agentName, isGroupMessage: true },
+                                hasContent: Boolean(text)
+                            });
+                        }
+                    },
+                    onDone: value => { finishReason = value.finishReason; }
+                });
                 try {
                     resetIdleTimer();
                     while (true) {

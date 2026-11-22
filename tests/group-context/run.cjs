@@ -11,7 +11,7 @@ const { promisify } = require('node:util');
 const { start } = require('../integration/service.cjs');
 const { launch, mobileControl, openPwa } = require('../group-relay/pwa.cjs');
 const { makeFixture, sha256 } = require('./shared-fixture.cjs');
-const spec = require('./input.json');
+const spec = process.env.NS_GROUP_FIXTURE ? JSON.parse(fs.readFileSync(process.env.NS_GROUP_FIXTURE, 'utf8')) : require('./input.json');
 
 const root = path.resolve(__dirname, '../..');
 const server = path.join(root, 'apps/server');
@@ -92,7 +92,7 @@ async function main() {
     { stdio: 'ignore' });
     const provider = [];
     let db, shared, service, browser;
-    const fixture = makeFixture({ server, out, onProvider(row) {
+    const fixture = makeFixture({ server, out, spec, onProvider(row) {
         provider.push({ ...row, committedJournal: shared.journal().map(({ seq, msg_id, message }) => ({
             seq, id: msg_id, role: message.role, content: message.content,
         })) });

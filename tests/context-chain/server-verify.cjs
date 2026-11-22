@@ -6,6 +6,7 @@ const { createHash } = require('node:crypto');
 const { fileURLToPath } = require('node:url');
 const [run, mode, baseline] = process.argv.slice(2);
 const packet = mode === 'request-envelope';
+const metadata = mode === 'request-metadata';
 const depth = mode === 'tavern-depth';
 const spec = depth ? require('./tavern-depth.cjs') : require('./input.json');
 if (!run) throw Error('Specify the isolated fixture run path.');
@@ -146,6 +147,33 @@ if (packet) {
     }
     requestEnvelope = { desktop, worker };
 }
+let requestMetadata;
+if (metadata) {
+    const root = path.resolve(__dirname,'../..');
+    const method = 'attachTimestampMetadata';
+    const core = 'apps/desktop/modules/chat/historyWindow/requestMetadata.mjs';
+    const rendererSources = nativeSignal.coverage.filter(script =>
+        script.hitFunctions.some(fn => fn.name === method));
+    assert.equal(rendererSources.length, 1);
+    const [renderer] = rendererSources;
+    const source = fileURLToPath(renderer.url);
+    const module = path.relative(root, source);
+    assert.equal(module, baseline ? 'apps/desktop/modules/chat/chatContextPipeline.js' : core);
+    const sha256 = sha(fs.readFileSync(source));
+    const calls = renderer.hitFunctions.find(fn => fn.name === method).count;
+    const bindingRows = item => item.body.vcpchatExtensions.messageTimestampBindings
+        .map(({messageId,role,timestamp}) => ({messageId,role,timestamp}));
+    const desktopMetadata = JSON.parse(fs.readFileSync(path.join(run,'native.json.handler.jsonl'),'utf8'))
+        .messages.map(row => row.__vcpchatTimestampMeta).filter(Boolean);
+    assert.equal(calls, desktopMetadata.length);
+    assert.deepEqual(desktopMetadata, bindingRows(native));
+    const worker = evidence.handler.filter(row => row.kind === mode);
+    assert.deepEqual(worker.map(row => row.metadata), bindingRows(shared));
+    assert.ok(worker.every(row => baseline
+        ? row.module === 'Plugin/NativeSync/nativeRules/modules/chat/requestMetadata.js' && row.sha256 !== sha256
+        : row.module.endsWith('/' + core) && row.sha256 === sha256));
+    requestMetadata = { desktop: { module, method, calls, sha256, metadata:desktopMetadata }, worker };
+}
 const selectedPath = path.resolve(run,'runtime-box',selection.module);
 const hashes = {
     handler:metered('modules/chatCompletionHandler.js'),
@@ -171,8 +199,10 @@ console.log(JSON.stringify({
     status:'PASS',work, nativeRequestId:native.requestId, handlerPackets:2, providerPackets:2, eachHandlerRoleAndContentMatchesProvider:true,
     attachment:evidence.attachment, selection, hashes, replay,
     ...(tavernDepth ? { tavernDepth } : {}),
-    ...(packet ? {
-        scenario:mode, inputSha256:meterInput(), requestEnvelope,
+    ...(requestEnvelope ? { requestEnvelope } : {}),
+    ...(requestMetadata ? { requestMetadata } : {}),
+    ...(packet || metadata ? {
+        scenario:mode, inputSha256:meterInput(),
         paths:{
             native:{handler:native, provider:evidence.provider.find(row => row.requestId === native.requestId), persistedHistory:nativeHistory},
             shared:{handler:shared, provider:evidence.provider.find(row => row.requestId === shared.requestId),

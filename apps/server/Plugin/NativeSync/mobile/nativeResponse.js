@@ -1,5 +1,5 @@
 'use strict';
-const {groupStreamDelta}=require('../nativeRules/Groupmodules/streamDelta');
+const {groupStreamDelta}=require('@vcp/core-rules/group/streamDelta');
 const {createHash}=require('node:crypto');
 const MAX_OUTPUT=4*1024*1024;
 const error=(code,partialContent='')=>Object.assign(new Error(code),{code,partialContent});

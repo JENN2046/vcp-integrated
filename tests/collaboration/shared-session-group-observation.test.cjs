@@ -18,7 +18,7 @@ test('group observer sees native work without creating a local execution, then t
  assert.equal(JSON.stringify(b.runtime.execution.state.requests),before);assert.equal(f.calls(),1);assert.equal(f.store.metrics().journalRows,1);
  assert.equal(g.a.runtime.sessions.values(descriptor(g.a)).length,0,'submitting native group has no duplicate observation preview');
  await finish(g,work);
- await wait(async()=>{const history=await b.queue.read(d);return history.length===2&&history[1].content==='L2 native group result';},'remote terminal queue projection without tick or refresh');
+ await wait(async()=>{const history=await b.queue.readSerialized(d);return history.length===2&&history[1].content==='L2 native group result';},'remote terminal queue projection without tick or refresh');
  assert.equal(f.calls(),1);assert.equal(JSON.stringify(b.runtime.execution.state.requests),before);
  await wait(()=>b.runtime.adapter.state.outbox.length===0&&b.runtime.adapter.state.inbox.length===0,'final projection receipt cleanup');assert.equal(f.store.metrics().journalRows,2);
 });
@@ -35,7 +35,7 @@ test('group selection returns and a disconnected observer recovers the original 
  await b.runtime.getExecutionStatus(d,{refresh:true});
  await wait(()=>b.runtime.sessions.values(d).some(value=>value.executionId===work.record.accepted.id&&value.request?.state==='dispatched'),'same work after reconnect');
  assert.equal(f.calls(),1);assert.equal(Object.keys(b.runtime.execution.state.requests).length,0);
- await finish(g,work);await wait(async()=>(await b.queue.read(d)).length===2,'reconnected final History');
+ await finish(g,work);await wait(async()=>(await b.queue.readSerialized(d)).length===2,'reconnected final History');
  assert.equal(f.calls(),1);assert.equal(f.shared.db.prepare('SELECT count(*) n FROM shared_admissions').get().n,1);
 });
 
@@ -80,8 +80,8 @@ test('actual native StreamHandler exposes separate member deltas before completi
  assert.equal(f.calls(),2);assert.equal(Object.keys(b.runtime.execution.state.requests).length,0);assert.equal(f.store.metrics().journalRows,2);
  sse(secondInput,'结果','stop');secondInput.end('data: [DONE]\n\n');assert.equal((await secondResponse).status,200);await (await secondResponse).text();
  await a.runtime.execution.groupReply(first.record,{id:'reply_'+slot.id,role:'assistant',agentId:a.runtime.localFor(member).localId,content:'成员二独立结果',timestamp:3});await a.runtime.execution.groupDone(first.record);
- await wait(async()=>(await b.queue.read(d)).length===3,'native multi-member terminal Queue history');
- assert.deepEqual((await b.queue.read(d)).map(message=>message.content),['L2 synthetic native group input','成员一🌱完成','成员二独立结果']);assert.equal(f.calls(),2);assert.equal(f.store.metrics().journalRows,3);
+ await wait(async()=>(await b.queue.readSerialized(d)).length===3,'native multi-member terminal Queue history');
+ assert.deepEqual((await b.queue.readSerialized(d)).map(message=>message.content),['L2 synthetic native group input','成员一🌱完成','成员二独立结果']);assert.equal(f.calls(),2);assert.equal(f.store.metrics().journalRows,3);
 });
 test('native parsed content stops before the first markup marker while legacy unshared requests have no observation callback',async t=>{
  const g=await groupFixture(t),{f,b,descriptor}=g,d=descriptor(b),mapping=b.runtime.execution.mapping(d),live=installNativeStreamResponder(f,t);

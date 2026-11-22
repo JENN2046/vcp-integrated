@@ -1,6 +1,7 @@
 import '../tavernRulesEngine.js';
 import { stripHiddenToolResults } from '../renderer/toolResultRegions.js';
 import { effectiveContextHistory, isContextCheckpoint } from './contextCompactionState.js';
+import { attachTimestampMetadata } from './historyWindow/requestMetadata.mjs';
 import { applyContextRules } from './historyWindow/tavernContext.mjs';
 
 function requireDependency(value, name) {
@@ -34,25 +35,6 @@ function updateFirstTextPart(content, transform) {
         parts.unshift({ type: 'text', text: transform('') });
     }
     return parts;
-}
-
-function attachTimestampMetadata(vcpMessage, historyMessage) {
-    if (
-        !historyMessage?.id
-        || typeof historyMessage.timestamp !== 'number'
-        || !Number.isFinite(historyMessage.timestamp)
-    ) {
-        return vcpMessage;
-    }
-
-    return {
-        ...vcpMessage,
-        __vcpchatTimestampMeta: {
-            messageId: historyMessage.id,
-            role: historyMessage.role,
-            timestamp: historyMessage.timestamp,
-        },
-    };
 }
 
 function getAttachmentData(attachment) {

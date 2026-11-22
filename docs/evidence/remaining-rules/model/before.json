@@ -1,0 +1,178 @@
+{
+  "revision": "4f3f9063db7b3d729f6ec34ac3eb792bebb5228c",
+  "tupleFields": [
+    "model",
+    "temperature",
+    "max_tokens",
+    "stream"
+  ],
+  "member": {
+    "inputGroup": {
+      "useUnifiedModel": false,
+      "unifiedModel": "synthetic-unified"
+    },
+    "native": [
+      [
+        "synthetic-a",
+        0.5,
+        128,
+        true
+      ],
+      [
+        "synthetic-b",
+        0.8,
+        144,
+        true
+      ]
+    ],
+    "shared": [
+      [
+        "synthetic-a",
+        0.5,
+        128,
+        true
+      ],
+      [
+        "synthetic-b",
+        0.8,
+        144,
+        true
+      ]
+    ],
+    "provider": [
+      [
+        "synthetic-a",
+        0.5,
+        128,
+        true
+      ],
+      [
+        "synthetic-b",
+        0.8,
+        144,
+        true
+      ],
+      [
+        "synthetic-a",
+        0.5,
+        128,
+        true
+      ],
+      [
+        "synthetic-b",
+        0.8,
+        144,
+        true
+      ]
+    ],
+    "workState": "completed",
+    "attempts": [
+      1,
+      1
+    ],
+    "replaySame": true
+  },
+  "unified": {
+    "inputGroup": {
+      "useUnifiedModel": true,
+      "unifiedModel": "synthetic-unified"
+    },
+    "native": [
+      [
+        "synthetic-unified",
+        0.5,
+        128,
+        true
+      ],
+      [
+        "synthetic-unified",
+        0.8,
+        144,
+        true
+      ]
+    ],
+    "shared": [
+      [
+        "synthetic-unified",
+        0.5,
+        128,
+        true
+      ],
+      [
+        "synthetic-unified",
+        0.8,
+        144,
+        true
+      ]
+    ],
+    "provider": [
+      [
+        "synthetic-unified",
+        0.5,
+        128,
+        true
+      ],
+      [
+        "synthetic-unified",
+        0.8,
+        144,
+        true
+      ],
+      [
+        "synthetic-unified",
+        0.5,
+        128,
+        true
+      ],
+      [
+        "synthetic-unified",
+        0.8,
+        144,
+        true
+      ]
+    ],
+    "workState": "completed",
+    "attempts": [
+      1,
+      1
+    ],
+    "replaySame": true
+  },
+  "padded": {
+    "inputGroup": " synthetic-unified ",
+    "work": {
+      "state": "recovering",
+      "error_code": null,
+      "request_dispatched": null
+    },
+    "steps": [
+      {
+        "step_index": 0,
+        "state": "publishing",
+        "error_code": "MODEL_HTTP_409",
+        "attempts": 1
+      },
+      {
+        "step_index": 1,
+        "state": "queued",
+        "error_code": null,
+        "attempts": 0
+      }
+    ],
+    "admission": {
+      "state": "review_required",
+      "dispatched": 0,
+      "nativeTerminal": 0
+    },
+    "nativeRequests": [
+      {
+        "ordinal": 0,
+        "state": "prepared"
+      }
+    ],
+    "phases": [
+      "native_prepared"
+    ],
+    "handlerDispatches": 0
+  }
+}

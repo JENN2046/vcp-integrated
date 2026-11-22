@@ -1,0 +1,154 @@
+{
+  "member": {
+    "packets": {
+      "native": [
+        [
+          "synthetic-a",
+          0.5,
+          128,
+          true
+        ],
+        [
+          "synthetic-b",
+          0.8,
+          144,
+          true
+        ]
+      ],
+      "shared": [
+        [
+          "synthetic-a",
+          0.5,
+          128,
+          true
+        ],
+        [
+          "synthetic-b",
+          0.8,
+          144,
+          true
+        ]
+      ]
+    },
+    "providerCalls": 4,
+    "sharedWorkState": "completed",
+    "sharedAttempts": [
+      1,
+      1
+    ],
+    "replayPreservedLedgerAndPackets": true,
+    "nativeRule": {
+      "file": "packages/core-rules/group/modelSelection.js",
+      "sha256": "5a978002a9aa78580e1cc806b0cd70eb6e109271e9bd61775a0bfb9eb5e5dab1"
+    },
+    "workerSource": "../../../../packages/core-rules/group/modelSelection.js"
+  },
+  "unified": {
+    "packets": {
+      "native": [
+        [
+          "synthetic-unified",
+          0.5,
+          128,
+          true
+        ],
+        [
+          "synthetic-unified",
+          0.8,
+          144,
+          true
+        ]
+      ],
+      "shared": [
+        [
+          "synthetic-unified",
+          0.5,
+          128,
+          true
+        ],
+        [
+          "synthetic-unified",
+          0.8,
+          144,
+          true
+        ]
+      ]
+    },
+    "providerCalls": 4,
+    "sharedWorkState": "completed",
+    "sharedAttempts": [
+      1,
+      1
+    ],
+    "replayPreservedLedgerAndPackets": true,
+    "nativeRule": {
+      "file": "packages/core-rules/group/modelSelection.js",
+      "sha256": "5a978002a9aa78580e1cc806b0cd70eb6e109271e9bd61775a0bfb9eb5e5dab1"
+    },
+    "workerSource": "../../../../packages/core-rules/group/modelSelection.js"
+  },
+  "padded": {
+    "packets": {
+      "native": [
+        [
+          "synthetic-unified",
+          0.5,
+          128,
+          true
+        ],
+        [
+          "synthetic-unified",
+          0.8,
+          144,
+          true
+        ]
+      ],
+      "shared": [
+        [
+          "synthetic-unified",
+          0.5,
+          128,
+          true
+        ],
+        [
+          "synthetic-unified",
+          0.8,
+          144,
+          true
+        ]
+      ]
+    },
+    "providerCalls": 4,
+    "sharedWorkState": "completed",
+    "sharedAttempts": [
+      1,
+      1
+    ],
+    "replayPreservedLedgerAndPackets": true,
+    "nativeRule": {
+      "file": "packages/core-rules/group/modelSelection.js",
+      "sha256": "5a978002a9aa78580e1cc806b0cd70eb6e109271e9bd61775a0bfb9eb5e5dab1"
+    },
+    "workerSource": "../../../../packages/core-rules/group/modelSelection.js"
+  },
+  "blankUnified": {
+    "nativeErrors": [
+      "[系统消息] Agent Fixture A (gc-a) 无法响应：已启用群组统一模型，但群组统一模型为空。",
+      "[系统消息] Agent Fixture B (gc-b) 无法响应：已启用群组统一模型，但群组统一模型为空。"
+    ],
+    "nativeModelCalls": 2,
+    "completionRequests": 0,
+    "workerError": "AGENT_NOT_CONFIGURED",
+    "sharedConfigError": "INVALID_SHARED_CONFIG"
+  },
+  "blankMember": {
+    "nativeErrors": [
+      "[系统消息] Agent Fixture A (gc-a) 无法响应：当前成员未配置模型。",
+      "[系统消息] Agent Fixture B (gc-b) 无法响应：当前成员未配置模型。"
+    ],
+    "nativeModelCalls": 2,
+    "completionRequests": 0,
+    "workerError": "AGENT_NOT_CONFIGURED",
+    "sharedConfigError": "INVALID_SHARED_CONFIG"
+  }
+}

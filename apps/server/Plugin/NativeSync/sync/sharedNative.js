@@ -1,5 +1,6 @@
 'use strict';
 const controlled=require('./sharedControlledText');
+const {resolveEffectiveModel}=require('@vcp/core-rules/group/modelSelection');
 const {sha256,stable}=require('./protocol');
 const {sharedIdentity}=require('./contracts.generated.cjs');
 const fail=(code,status=409)=>Object.assign(Error(code),{code,status});
@@ -183,7 +184,11 @@ class SharedNative {
   if(controlled.isControlled(turn.controlMode)){const gen=req.headers['x-nativesync-generation'],seq=req.headers['x-nativesync-consumed-input-seq'];if(!/^\d+$/.test(gen||'')||!/^\d+$/.test(seq||'')||Number(gen)!==generation.generation||Number(seq)!==generation.consumed_seq)throw fail('INVALID_STEERING_GENERATION');if(this.shared.steering.control(admission).executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');}
   if(generation)this.shared.steering.fence(admission.id,generation.generation,actor.principal);
   const frozen=JSON.parse(generation?.config_json||admission.config_json),member=row.member_id?frozen.members.find(m=>m.id===row.member_id):frozen.owner;
-  const expectedModel=frozen.owner.kind==='group'&&frozen.owner.config.useUnifiedModel?frozen.owner.config.unifiedModel:member?.config.model;
+  let expectedModel=member?.config.model;
+  if(frozen.owner.kind==='group'){
+   expectedModel=resolveEffectiveModel(frozen.owner.config,member?.config).effectiveModel;
+   if(!member||!expectedModel)throw fail('SHARED_NATIVE_CONFIG_CHANGED');
+  }
   if(req.body.model!==expectedModel)throw fail('SHARED_NATIVE_CONFIG_CHANGED');
   const topic=this.shared.row(admission.space_id,admission.topic_id),context=req.body?.vcpchatExtensions?.requestContext;
   const localTopic=actor.kind==='desktop'&&context&&this.db.prepare("SELECT 1 FROM shared_local_bindings WHERE source_id=? AND object_id=? AND kind='topic' AND local_id=? AND hidden=0").get(actor.sourceId,topic.id,context.topicId);
@@ -270,7 +275,7 @@ class SharedNative {
     this.checkTerminal(admission.id);
    });
   }:undefined;
-  if(sessionFinalReply)sessionFinalReply.readStreamDelta=require('../nativeRules/Groupmodules/streamDelta').groupStreamDelta;
+  if(sessionFinalReply)sessionFinalReply.readStreamDelta=require('@vcp/core-rules/group/streamDelta').groupStreamDelta;
   const finalReply=controlledFinalReply||sessionFinalReply;
   if(generation)this.db.prepare("UPDATE shared_work_generations SET state='preprocessing' WHERE work_id=? AND generation=?").run(admission.id,generation.generation);
   this.phase(admission.id,row.id,'native_entered');this.engine.emitEvent?.(admission.id,'state',{state:'dispatched'});
