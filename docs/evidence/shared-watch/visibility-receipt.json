@@ -1,0 +1,334 @@
+{
+  "appRevision": "5a3ad2ba8502b0663bfde35936b921995be27f52",
+  "runtime": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "provider": "loopback deterministic fixture"
+  },
+  "loaded": {
+    "main": [
+      {
+        "file": "apps/desktop/modules/ipc/nativeHistoryHandlers.js",
+        "sha256": "fe4cff13d5cb3719f16d6cc7fe896bc0c1535e78cf2dec2e9f169987c39769ad"
+      },
+      {
+        "file": "apps/desktop/modules/services/nativeSync/queries.js",
+        "sha256": "33b1c89ee9d48383e96e04adc0d786f07305c3bf03c5aeecfe2cc22a0e1b2579"
+      },
+      {
+        "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+        "sha256": "0eede772271e4549e20ff2170f53c9430372448c5811922be7782d407bc1e145"
+      },
+      {
+        "file": "apps/desktop/modules/services/nativeSync/sharedWaitClient.js",
+        "sha256": "7145b0add975299049971d0cc61684af63a7bca0700dd9d844ab3de4f9808297"
+      }
+    ],
+    "renderer": [
+      {
+        "file": "apps/desktop/modules/renderer/messageContextMenu.js",
+        "bytes": 68508,
+        "sha256": "24a7a6f28cfd07aa963b9e490165558eb97f4c90a6ef9160cdda593cb59cb7b6"
+      }
+    ]
+  },
+  "loadedServerSource": {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+    "sha256": "eaed54d2bc5eef972f96c003d651196f644b99fa3018eefce8f9d8863fb0ebe1"
+  },
+  "earlySamples": [
+    {
+      "condition": "A activated by its GUI click, focus not attested for B",
+      "event": "new",
+      "messageId": "reply_request_128a9b606158458a81f99f891de2a668",
+      "journalSeq": 2,
+      "writerCommitBracketMs": 6,
+      "domAfterCommitMs": [
+        1076,
+        1082
+      ],
+      "visibleFrameAfterCommitMs": [
+        2114,
+        2120
+      ]
+    },
+    {
+      "condition": "B foreground; source desktop GUI edit refused before commit",
+      "event": "new",
+      "messageId": "reply_request_6403256c6c4247d2a0d255ff37d71c3c",
+      "journalSeq": 2,
+      "writerCommitBracketMs": 7,
+      "domAfterCommitMs": [
+        1452,
+        1459
+      ],
+      "visibleFrameAfterCommitMs": [
+        2387,
+        2394
+      ],
+      "withinOneSecond": false
+    },
+    {
+      "condition": "B foreground; API probe edit rejected because operation used device ID instead of principal",
+      "event": "new",
+      "messageId": "reply_request_8fbd868fb65840cd91d739d9f67d2484",
+      "journalSeq": 2,
+      "writerCommitBracketMs": 7,
+      "domAfterCommitMs": [
+        891,
+        898
+      ],
+      "visibleFrameAfterCommitMs": [
+        1939,
+        1946
+      ],
+      "withinOneSecond": false
+    },
+    {
+      "condition": "B foreground; API probe edit rejected because operation echoed stored metadata envelope",
+      "event": "new",
+      "messageId": "reply_request_9796768c5b42486ab17c9d11721b3b83",
+      "journalSeq": 2,
+      "writerCommitBracketMs": 14,
+      "domAfterCommitMs": [
+        1617,
+        1631
+      ],
+      "visibleFrameAfterCommitMs": [
+        2020,
+        2034
+      ],
+      "withinOneSecond": false
+    }
+  ],
+  "desktopGuiEdit": {
+    "status": "rejected before any journal edit",
+    "error": "SHARED_NATIVE_ADMISSION_REQUIRED",
+    "desktopGuiDelete": "not attempted"
+  },
+  "overlappingBenchmarkRun": {
+    "samples": [
+      {
+        "event": "new",
+        "messageId": "reply_request_735315ba50554380bfaae68e816246c6",
+        "journalSeq": 2,
+        "writerCommitBracketMs": 5,
+        "domAfterCommitMs": [
+          1580,
+          1585
+        ],
+        "visibleFrameAfterCommitMs": [
+          2206,
+          2211
+        ],
+        "visibilityState": "visible",
+        "hasFocus": true,
+        "withinOneSecond": false
+      },
+      {
+        "event": "edit",
+        "messageId": "reply_request_735315ba50554380bfaae68e816246c6",
+        "journalSeq": 3,
+        "writerCommitBracketMs": 11,
+        "domAfterCommitMs": [
+          691,
+          702
+        ],
+        "visibleFrameAfterCommitMs": [
+          716,
+          727
+        ],
+        "visibilityState": "visible",
+        "hasFocus": true,
+        "withinOneSecond": true
+      },
+      {
+        "event": "delete",
+        "messageId": "reply_request_735315ba50554380bfaae68e816246c6",
+        "journalSeq": 4,
+        "writerCommitBracketMs": 10,
+        "domAfterCommitMs": [
+          1486,
+          1496
+        ],
+        "visibleFrameAfterCommitMs": [
+          1514,
+          1524
+        ],
+        "visibilityState": "visible",
+        "hasFocus": true,
+        "withinOneSecond": false
+      }
+    ],
+    "idleRenderer": {
+      "visible": true,
+      "focused": true,
+      "minimized": false,
+      "bounds": {
+        "x": 150,
+        "y": 150,
+        "width": 1300,
+        "height": 800
+      },
+      "renderer": {
+        "visibilityState": "visible",
+        "hasFocus": true,
+        "firstFrameMs": 372.5,
+        "twoFramesMs": 552.1000000014901
+      }
+    },
+    "finalRenderer": {
+      "visible": true,
+      "focused": true,
+      "minimized": false,
+      "bounds": {
+        "x": 150,
+        "y": 150,
+        "width": 1300,
+        "height": 800
+      },
+      "renderer": {
+        "visibilityState": "visible",
+        "hasFocus": true,
+        "firstFrameMs": 575.6000000014901,
+        "twoFramesMs": 585.1000000014901
+      }
+    },
+    "providerCalls": 1,
+    "submitPosts": 1,
+    "executionAttempts": [
+      1
+    ],
+    "observerForeground": true,
+    "editDeleteWriter": "ToolBox shared/message endpoint",
+    "exited": true,
+    "failures": []
+  },
+  "postBenchmarkRun": {
+    "samples": [
+      {
+        "event": "new",
+        "messageId": "reply_request_235fad4aadda4a78931bf28b593e9e3d",
+        "journalSeq": 2,
+        "writerCommitBracketMs": 5,
+        "durableHistoryBracketMs": 6,
+        "durableHistoryAfterCommitMs": [
+          58,
+          69
+        ],
+        "domAfterDurableHistoryMs": [
+          100,
+          106
+        ],
+        "domAfterCommitMs": [
+          164,
+          169
+        ],
+        "visibleFrameAfterCommitMs": [
+          264,
+          269
+        ],
+        "visibilityState": "visible",
+        "hasFocus": true,
+        "withinOneSecond": true
+      },
+      {
+        "event": "edit",
+        "messageId": "reply_request_235fad4aadda4a78931bf28b593e9e3d",
+        "journalSeq": 3,
+        "writerCommitBracketMs": 5,
+        "durableHistoryBracketMs": 5,
+        "durableHistoryAfterCommitMs": [
+          16,
+          26
+        ],
+        "domAfterDurableHistoryMs": [
+          2,
+          7
+        ],
+        "domAfterCommitMs": [
+          23,
+          28
+        ],
+        "visibleFrameAfterCommitMs": [
+          79,
+          84
+        ],
+        "visibilityState": "visible",
+        "hasFocus": true,
+        "withinOneSecond": true
+      },
+      {
+        "event": "delete",
+        "messageId": "reply_request_235fad4aadda4a78931bf28b593e9e3d",
+        "journalSeq": 4,
+        "writerCommitBracketMs": 5,
+        "durableHistoryBracketMs": 5,
+        "durableHistoryAfterCommitMs": [
+          10,
+          20
+        ],
+        "domAfterDurableHistoryMs": [
+          0,
+          5
+        ],
+        "domAfterCommitMs": [
+          15,
+          20
+        ],
+        "visibleFrameAfterCommitMs": [
+          74,
+          79
+        ],
+        "visibilityState": "visible",
+        "hasFocus": true,
+        "withinOneSecond": true
+      }
+    ],
+    "idleRenderer": {
+      "visible": true,
+      "focused": true,
+      "minimized": false,
+      "bounds": {
+        "x": 150,
+        "y": 150,
+        "width": 1300,
+        "height": 800
+      },
+      "renderer": {
+        "visibilityState": "visible",
+        "hasFocus": true,
+        "firstFrameMs": 98.69999999552965,
+        "twoFramesMs": 150.69999999552965
+      }
+    },
+    "cpuPressureAtStart": "some avg10=3.80 avg60=17.93 avg300=52.33 total=2570215525\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+    "finalRenderer": {
+      "visible": true,
+      "focused": true,
+      "minimized": false,
+      "bounds": {
+        "x": 150,
+        "y": 150,
+        "width": 1300,
+        "height": 800
+      },
+      "renderer": {
+        "visibilityState": "visible",
+        "hasFocus": true,
+        "firstFrameMs": 4.0999999940395355,
+        "twoFramesMs": 20.399999998509884
+      }
+    },
+    "cpuPressureAtEnd": "some avg10=3.80 avg60=17.93 avg300=52.33 total=2570233588\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0",
+    "providerCalls": 1,
+    "submitPosts": 1,
+    "executionAttempts": [
+      1
+    ],
+    "observerForeground": true,
+    "editDeleteWriter": "ToolBox shared/message endpoint",
+    "exited": true,
+    "failures": []
+  }
+}

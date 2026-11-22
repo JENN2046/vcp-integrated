@@ -1,0 +1,68 @@
+{
+  "run": "shared-watch isolated Linux integration",
+  "runtime": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "desktopBackend": "native CDS",
+    "provider": "loopback deterministic fixture"
+  },
+  "results": {
+    "sameDesktopProfile": true,
+    "cursor": 12,
+    "wakeMs": 205,
+    "offlineCommit": 4,
+    "duringFirstPullCommit": 6,
+    "notificationOnlyRejected": 2,
+    "durableHistoryRows": 12,
+    "providerCalls": 6,
+    "submitPosts": 6,
+    "readOnlyRead": true,
+    "readOnlyWriteDenied409": true,
+    "readOnlyInvalidateMs": 14988,
+    "revokeInvalidateMs": 4978,
+    "restartEpochReset": true,
+    "grantRevocation403": true,
+    "desktopRestoresAfterRestart": true,
+    "lateAuthorizedResponseSuppressed": true,
+    "foregroundConfigAndStatusDenied": true,
+    "uniqueHistoryIds": 12,
+    "lateRendererIpcMs": 4997
+  },
+  "loadedDesktopSources": [
+    {
+      "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+      "sha256": "0eede772271e4549e20ff2170f53c9430372448c5811922be7782d407bc1e145"
+    },
+    {
+      "file": "apps/desktop/modules/services/nativeSync/sharedWaitClient.js",
+      "sha256": "7145b0add975299049971d0cc61684af63a7bca0700dd9d844ab3de4f9808297"
+    }
+  ],
+  "loadedServerSource": {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+    "sha256": "eaed54d2bc5eef972f96c003d651196f644b99fa3018eefce8f9d8863fb0ebe1"
+  },
+  "exits": {
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "B-reopened": {
+      "code": 0,
+      "signal": null
+    },
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B-restored": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "failures": []
+}

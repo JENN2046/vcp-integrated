@@ -1,0 +1,3569 @@
+{
+  "baseline": "b4a501b57b4053a9bc1897c055703db0abb500a4",
+  "candidateFrozenAppsDiffSha256": "8436528ec47f1e28149d99a7a9fe15350aededd261046c79537df7aa82722193",
+  "postFreezeSourceDifferences": [
+    {
+      "file": "apps/desktop/modules/services/nativeSync/queries.js",
+      "frozen": "cf616cc7c251c098fc4652d96012bce5905b8a125cd4a0c6e3d8bd8fd38a49a1",
+      "current": "33b1c89ee9d48383e96e04adc0d786f07305c3bf03c5aeecfe2cc22a0e1b2579"
+    },
+    {
+      "file": "apps/desktop/modules/services/nativeSync/sharedReadonly.js",
+      "frozen": "2ef77413b2c4254b8e9f46dd645dff42d44ff6239ca0b7cb59a14282c25403c4",
+      "current": "21dc9f187e61894b2a92e9b786010f89f8868d0442cd3fa73430d4a829c65e39"
+    }
+  ],
+  "scope": {
+    "latestConfigRequestHandlerInvocations": {
+      "large-meter-off-sync-on-clean-A": 0,
+      "large-meter-off-sync-on-clean-B": 0,
+      "large-meter-on-sync-on-missing-A": 0,
+      "large-meter-on-sync-on-missing-B": 0,
+      "large-meter-on-sync-on-tagged-A": 0,
+      "large-meter-on-sync-on-tagged-B": 0,
+      "small-meter-off-sync-on-clean-A": 0,
+      "small-meter-off-sync-on-clean-B": 0,
+      "small-meter-on-sync-on-tagged-A": 0,
+      "small-meter-on-sync-on-tagged-B": 0
+    },
+    "hostRoleOrder": [
+      "A",
+      "B",
+      "backend"
+    ],
+    "historyFixture": "123 live messages in 123 topics, with 1,564 Journal revisions",
+    "candidateRunsFromWritableReplicas": true
+  },
+  "independentlyMeteredProcessFloor": {
+    "large": {
+      "first10": {
+        "final_minus_disabled_single_core_pct": {
+          "A": 0.055,
+          "B": 0.0517,
+          "backend": 0.1067
+        },
+        "baseline_minus_disabled_single_core_pct": {
+          "A": 2.9022,
+          "B": 3.0089,
+          "backend": 0.1651
+        }
+      },
+      "all": {
+        "final_minus_disabled_single_core_pct": {
+          "A": 0.1087,
+          "B": 0.1215,
+          "backend": 0.1189
+        },
+        "baseline_minus_disabled_single_core_pct": {
+          "A": 2.6911,
+          "B": 2.7303,
+          "backend": 0.1796
+        }
+      }
+    },
+    "small": {
+      "first10": {
+        "final_minus_disabled_single_core_pct": {
+          "A": 0.0433,
+          "B": 0.0483,
+          "backend": 0.0317
+        },
+        "baseline_minus_disabled_single_core_pct": {
+          "A": 0.8733,
+          "B": 0.8766,
+          "backend": 0.1017
+        }
+      },
+      "all": {
+        "final_minus_disabled_single_core_pct": {
+          "A": 0.0511,
+          "B": 0.0522,
+          "backend": 0.0247
+        },
+        "baseline_minus_disabled_single_core_pct": {
+          "A": 0.8376,
+          "B": 0.8425,
+          "backend": 0.0903
+        }
+      }
+    }
+  },
+  "runs": {
+    "baseline-small-attributed": {
+      "startedUnixMs": 1795319359000,
+      "meter": true,
+      "unchangedState": true,
+      "providers": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "central": {
+        "journalHead": 0,
+        "journalRows": 0,
+        "directoryRevision": 7,
+        "liveRows": 0
+      },
+      "devices": {
+        "A": {
+          "cursor": 0,
+          "directoryRevision": 7,
+          "topics": 3,
+          "historyFiles": 3,
+          "historyMessages": 0,
+          "historyDigest": "75daaaadbecbcaf6aab22ad5e9f1eb5fc334dc27ea981418c508b59b62f6f083",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        },
+        "B": {
+          "cursor": 0,
+          "directoryRevision": 7,
+          "topics": 3,
+          "historyFiles": 3,
+          "historyMessages": 0,
+          "historyDigest": "75daaaadbecbcaf6aab22ad5e9f1eb5fc334dc27ea981418c508b59b62f6f083",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        }
+      },
+      "first10": {
+        "elapsedMs": 599982,
+        "hostCpuMs": {
+          "A": 6690,
+          "B": 6730,
+          "backend": 8490
+        },
+        "hostSingleCorePct": {
+          "A": 1.115,
+          "B": 1.1217,
+          "backend": 1.415
+        },
+        "procIO": {
+          "A": {
+            "rchar": 1160490,
+            "wchar": 534921,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 1171384,
+            "wchar": 531050,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 311084,
+            "wchar": 225540,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "taggedCpuUs": {
+          "A": {
+            "SharedRuntime.tick": 427101,
+            "SharedRuntime.tickCore": 85873,
+            "SharedRuntime.recoverRegistration": 9679,
+            "SharedRuntime.materialize": 171670,
+            "SharedRuntime.backfill": 16485,
+            "SharedExecution.reconcile": 12560,
+            "SharedSessionClient.reconcile": 4792,
+            "SharedRuntime.discover": 547437,
+            "SharedRuntime.readLocal": 781430,
+            "AttachmentWork.run": 5124,
+            "SharedMatching.poll": 11470,
+            "SharedRuntime.pollDirectory": 30205,
+            "NativeSyncAdapter.synchronize": 16302
+          },
+          "B": {
+            "SharedRuntime.tick": 406819,
+            "SharedRuntime.tickCore": 75682,
+            "SharedRuntime.recoverRegistration": 6052,
+            "SharedRuntime.materialize": 182710,
+            "SharedRuntime.backfill": 21453,
+            "SharedExecution.reconcile": 10959,
+            "SharedSessionClient.reconcile": 5342,
+            "NativeSyncAdapter.synchronize": 20928,
+            "SharedRuntime.discover": 584154,
+            "SharedRuntime.readLocal": 850607,
+            "AttachmentWork.run": 6934,
+            "SharedMatching.poll": 13905,
+            "SharedRuntime.pollDirectory": 24195
+          },
+          "backend": {
+            "shared/info": 273666,
+            "shared/wait": 59188,
+            "shared/matches": 27367,
+            "shared/changes": 23672,
+            "shared/pull": 31548
+          }
+        },
+        "taggedSingleCorePct": {
+          "A": 0.353365,
+          "B": 0.368301,
+          "backend": 0.069242
+        },
+        "http": {
+          "shared/info": {
+            "requests": 238,
+            "finished": 238,
+            "requestBytes": 0,
+            "responseBytes": 109956,
+            "status_200": 238
+          },
+          "shared/wait": {
+            "requests": 40,
+            "finished": 40,
+            "requestBytes": 0,
+            "responseBytes": 2680,
+            "status_200": 40
+          },
+          "shared/matches": {
+            "requests": 20,
+            "finished": 20,
+            "requestBytes": 0,
+            "responseBytes": 760,
+            "status_200": 20
+          },
+          "shared/changes": {
+            "requests": 20,
+            "finished": 20,
+            "requestBytes": 0,
+            "responseBytes": 780,
+            "status_200": 20
+          },
+          "shared/pull": {
+            "requests": 20,
+            "finished": 20,
+            "requestBytes": 0,
+            "responseBytes": 1060,
+            "status_200": 20
+          }
+        },
+        "invocations": {
+          "A/SharedRuntime.tick": 2327,
+          "A/SharedRuntime.tickCore": 2327,
+          "A/SharedRuntime.recoverRegistration": 2327,
+          "A/SharedRuntime.materialize": 2327,
+          "A/SharedRuntime.backfill": 2327,
+          "A/SharedExecution.reconcile": 2327,
+          "A/SharedSessionClient.reconcile": 2327,
+          "A/SharedRuntime.discover": 119,
+          "A/SharedRuntime.readLocal": 476,
+          "A/AttachmentWork.run": 119,
+          "A/SharedMatching.poll": 10,
+          "A/SharedRuntime.pollDirectory": 10,
+          "A/NativeSyncAdapter.synchronize": 10,
+          "B/SharedRuntime.tick": 2307,
+          "B/SharedRuntime.tickCore": 2307,
+          "B/SharedRuntime.recoverRegistration": 2307,
+          "B/SharedRuntime.materialize": 2307,
+          "B/SharedRuntime.backfill": 2307,
+          "B/SharedExecution.reconcile": 2307,
+          "B/SharedSessionClient.reconcile": 2307,
+          "B/SharedRuntime.discover": 119,
+          "B/SharedRuntime.readLocal": 476,
+          "B/AttachmentWork.run": 118,
+          "B/SharedMatching.poll": 10,
+          "B/SharedRuntime.pollDirectory": 10,
+          "B/NativeSyncAdapter.synchronize": 10,
+          "backend/shared/info": 238,
+          "backend/shared/wait": 40,
+          "backend/shared/matches": 20,
+          "backend/shared/changes": 20,
+          "backend/shared/pull": 20
+        },
+        "historySnapshots": {},
+        "logicalFiles": {
+          "A/config": {
+            "readFile": 714,
+            "readFileBytes": 335104
+          },
+          "A/other": {
+            "readFile": 357,
+            "readFileBytes": 714
+          },
+          "B/config": {
+            "readFile": 714,
+            "readFileBytes": 335104
+          },
+          "B/other": {
+            "readFile": 357,
+            "readFileBytes": 714
+          }
+        }
+      },
+      "full31": {
+        "elapsedMs": 1859986,
+        "hostCpuMs": {
+          "A": 19540,
+          "B": 19200,
+          "backend": 26030
+        },
+        "hostSingleCorePct": {
+          "A": 1.0505,
+          "B": 1.0323,
+          "backend": 1.3995
+        },
+        "procIO": {
+          "A": {
+            "rchar": 3260953,
+            "wchar": 1643618,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 2978354,
+            "wchar": 1689284,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 907836,
+            "wchar": 687646,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "taggedCpuUs": {
+          "A": {
+            "SharedRuntime.tick": 1233990,
+            "SharedRuntime.tickCore": 227223,
+            "SharedRuntime.recoverRegistration": 18870,
+            "SharedRuntime.materialize": 487765,
+            "SharedRuntime.backfill": 50753,
+            "SharedExecution.reconcile": 38392,
+            "SharedSessionClient.reconcile": 17218,
+            "SharedRuntime.discover": 1614397,
+            "SharedRuntime.readLocal": 2297270,
+            "AttachmentWork.run": 16124,
+            "SharedMatching.poll": 34716,
+            "SharedRuntime.pollDirectory": 90715,
+            "NativeSyncAdapter.synchronize": 49175
+          },
+          "B": {
+            "SharedRuntime.tick": 1135504,
+            "SharedRuntime.tickCore": 207386,
+            "SharedRuntime.recoverRegistration": 22989,
+            "SharedRuntime.materialize": 484606,
+            "SharedRuntime.backfill": 49876,
+            "SharedExecution.reconcile": 29530,
+            "SharedSessionClient.reconcile": 13919,
+            "NativeSyncAdapter.synchronize": 52031,
+            "SharedRuntime.discover": 1635434,
+            "SharedRuntime.readLocal": 2342903,
+            "AttachmentWork.run": 16819,
+            "SharedMatching.poll": 40774,
+            "SharedRuntime.pollDirectory": 84608
+          },
+          "backend": {
+            "shared/info": 797703,
+            "shared/wait": 162116,
+            "shared/matches": 77760,
+            "shared/changes": 74576,
+            "shared/pull": 92948
+          }
+        },
+        "taggedSingleCorePct": {
+          "A": 0.332078,
+          "B": 0.32884,
+          "backend": 0.064791
+        },
+        "http": {
+          "shared/info": {
+            "requests": 736,
+            "finished": 736,
+            "requestBytes": 0,
+            "responseBytes": 340032,
+            "status_200": 736
+          },
+          "shared/wait": {
+            "requests": 124,
+            "finished": 124,
+            "requestBytes": 0,
+            "responseBytes": 8308,
+            "status_200": 124
+          },
+          "shared/matches": {
+            "requests": 62,
+            "finished": 62,
+            "requestBytes": 0,
+            "responseBytes": 2356,
+            "status_200": 62
+          },
+          "shared/changes": {
+            "requests": 62,
+            "finished": 62,
+            "requestBytes": 0,
+            "responseBytes": 2418,
+            "status_200": 62
+          },
+          "shared/pull": {
+            "requests": 62,
+            "finished": 62,
+            "requestBytes": 0,
+            "responseBytes": 3286,
+            "status_200": 62
+          }
+        },
+        "invocations": {
+          "A/SharedRuntime.tick": 7238,
+          "A/SharedRuntime.tickCore": 7238,
+          "A/SharedRuntime.recoverRegistration": 7238,
+          "A/SharedRuntime.materialize": 7238,
+          "A/SharedRuntime.backfill": 7238,
+          "A/SharedExecution.reconcile": 7238,
+          "A/SharedSessionClient.reconcile": 7238,
+          "A/SharedRuntime.discover": 368,
+          "A/SharedRuntime.readLocal": 1472,
+          "A/AttachmentWork.run": 368,
+          "A/SharedMatching.poll": 31,
+          "A/SharedRuntime.pollDirectory": 31,
+          "A/NativeSyncAdapter.synchronize": 31,
+          "B/SharedRuntime.tick": 7227,
+          "B/SharedRuntime.tickCore": 7227,
+          "B/SharedRuntime.recoverRegistration": 7227,
+          "B/SharedRuntime.materialize": 7227,
+          "B/SharedRuntime.backfill": 7227,
+          "B/SharedExecution.reconcile": 7227,
+          "B/SharedSessionClient.reconcile": 7227,
+          "B/SharedRuntime.discover": 368,
+          "B/SharedRuntime.readLocal": 1472,
+          "B/AttachmentWork.run": 368,
+          "B/SharedMatching.poll": 31,
+          "B/SharedRuntime.pollDirectory": 31,
+          "B/NativeSyncAdapter.synchronize": 31,
+          "backend/shared/info": 736,
+          "backend/shared/wait": 124,
+          "backend/shared/matches": 62,
+          "backend/shared/changes": 62,
+          "backend/shared/pull": 62
+        },
+        "historySnapshots": {},
+        "logicalFiles": {
+          "A/config": {
+            "readFile": 2208,
+            "readFileBytes": 1036288
+          },
+          "A/other": {
+            "readFile": 1104,
+            "readFileBytes": 2208
+          },
+          "B/config": {
+            "readFile": 2208,
+            "readFileBytes": 1036288
+          },
+          "B/other": {
+            "readFile": 1104,
+            "readFileBytes": 2208
+          }
+        }
+      },
+      "desktopSources": {
+        "A": [
+          {
+            "file": "apps/desktop/modules/services/nativeSync/adapter.js",
+            "sha256": "171ac33f5f8792841fd7a0262c18a7d7fb70e103ddd7a49b839bbe9bb21a2b8c"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/runtime.js",
+            "sha256": "0e05b1a8ce2a8514cb035ab5f2a0ab61987ad4eb0d69111c5b20fafdd46a2fa9"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "8f94170e71ae7638acfe4bdd0cbdb308f2be8fe48a9c1e57581ebd42720d4823"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedWaitClient.js",
+            "sha256": "6b62693ed54e07b3d0a4ed2c0f46f691f184e21037a144b821def33d5451f885"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedDirectory.js",
+            "sha256": "2cd7d19b86bb9336b93c81014a210c7696f82f3ecc93c23bc4e61e0fbff87914"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/attachmentWork.js",
+            "sha256": "c65e88707dc6affae0bdda7e56fd5d09b70cde4b249c42889aa8ba20cdb321f6"
+          }
+        ],
+        "B": [
+          {
+            "file": "apps/desktop/modules/services/nativeSync/adapter.js",
+            "sha256": "171ac33f5f8792841fd7a0262c18a7d7fb70e103ddd7a49b839bbe9bb21a2b8c"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/runtime.js",
+            "sha256": "0e05b1a8ce2a8514cb035ab5f2a0ab61987ad4eb0d69111c5b20fafdd46a2fa9"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "8f94170e71ae7638acfe4bdd0cbdb308f2be8fe48a9c1e57581ebd42720d4823"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedWaitClient.js",
+            "sha256": "6b62693ed54e07b3d0a4ed2c0f46f691f184e21037a144b821def33d5451f885"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedDirectory.js",
+            "sha256": "2cd7d19b86bb9336b93c81014a210c7696f82f3ecc93c23bc4e61e0fbff87914"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/attachmentWork.js",
+            "sha256": "c65e88707dc6affae0bdda7e56fd5d09b70cde4b249c42889aa8ba20cdb321f6"
+          }
+        ]
+      },
+      "backendSources": [
+        {
+          "file": "apps/server/server.js",
+          "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+        },
+        {
+          "file": "apps/server/Plugin.js",
+          "sha256": "5fe109606e02b4101c8da15c5a810cd2d83a1796117dfcac91979491c52d3339"
+        },
+        {
+          "file": "apps/server/WebSocketServer.js",
+          "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+        },
+        {
+          "file": "apps/server/modules/requestExecutionContext.js",
+          "sha256": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6"
+        },
+        {
+          "file": "apps/server/modules/chatCompletionHandler.js",
+          "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+          "sha256": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+          "sha256": "3efd8bf1b4c4411d7f8ec5c648ded72bc19f8e836058c644aa8050684baed133"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+          "sha256": "8601d3070ba9c92ac5288560ed6d4890d2bc308633363a70e1e3046aca180672"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+          "sha256": "2e637687e88f05d3ae23cb19e663b3a0e5998f424df4101cb7663f9fb41e5481"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+          "sha256": "3d7e244833f4ae60c30e6b932752f2cdf9b09f06df628604792bda0078197218"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+          "sha256": "3bdd9fba3596f59ecf8a823303cd2b9dc4a44d0ab071203fa5e91f797010557d"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/httpService.js",
+          "sha256": "fe6d298af52f0fb7c726ed853b55f8ddc45f9bc096d59f49e535285233aa9188"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedWait.js",
+          "sha256": "6c9d821fef2f1689d1ef95227e9a936a494f787ab0cad10517c23a4cdb3b83e8"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+          "sha256": "6bd45ec5f20ab1f35db82145467e2569745b641daed4ffec5bed79c747fc260b"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+          "sha256": "a1b166d894a7e697a54a226b78d381388e1fffe39c0984bf20441069beba4fa3"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+          "sha256": "c0be485ee31ed3d50db0e5a7e5e72aa38110434fe63c23606a7855a05ca7d512"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+          "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+          "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+        },
+        {
+          "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+          "sha256": "072cf520ebb2638b85ea2bfe84b0226a216d9996748697c9e1324b3f88156793"
+        },
+        {
+          "file": "apps/server/modules/nativeContinuationStore.cjs",
+          "sha256": "f6774df34bdcc60346f4ed49f5dccaa2e0da5645b5b60ea29f364f89a5090ee6"
+        },
+        {
+          "file": "apps/server/modules/handlers/streamHandler.js",
+          "sha256": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec"
+        },
+        {
+          "file": "apps/server/modules/handlers/nonStreamHandler.js",
+          "sha256": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2"
+        },
+        {
+          "file": "apps/server/modules/pluginBridgeRegistry.js",
+          "sha256": "635c94f249a0f67cb085ae51f1a53e08dc49ddf2aaadb30e434fe6a9a36900f3"
+        },
+        {
+          "file": "apps/server/modules/toolCallRecordStore.js",
+          "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+          "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+          "sha256": "299fc48e0a1a0687a59f8c19adb91398ea61e40115f5a482a89caadf6d1d03a5"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/mobile/groupTurn.js",
+          "sha256": "7d37337452fd8428aff74a40f621631a70b7f1bf9584ef6bd3538bac0de3d3f7"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/mobile/portal.js",
+          "sha256": "fd4ff20987a5410ee1ed65fa358226ef869e727238daf8cbb704cce09a7fa307"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedEvents.js",
+          "sha256": "62e81d32e6e963554cdce3343ba3942a62414e91cc723170356b54cda7ed3a81"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/native-sync.js",
+          "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+          "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+        }
+      ]
+    },
+    "baseline-small-process": {
+      "startedUnixMs": 1795319354000,
+      "meter": false,
+      "unchangedState": true,
+      "providers": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "central": {
+        "journalHead": 0,
+        "journalRows": 0,
+        "directoryRevision": 7,
+        "liveRows": 0
+      },
+      "devices": {
+        "A": {
+          "cursor": 0,
+          "directoryRevision": 7,
+          "topics": 3,
+          "historyFiles": 3,
+          "historyMessages": 0,
+          "historyDigest": "02ffb7a6b48fe505a8fc1167c971e17e8edfae2eebe1a9cd0f8d90af6b8e5117",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        },
+        "B": {
+          "cursor": 0,
+          "directoryRevision": 7,
+          "topics": 3,
+          "historyFiles": 3,
+          "historyMessages": 0,
+          "historyDigest": "02ffb7a6b48fe505a8fc1167c971e17e8edfae2eebe1a9cd0f8d90af6b8e5117",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        }
+      },
+      "first10": {
+        "elapsedMs": 600000,
+        "hostCpuMs": {
+          "A": 5720,
+          "B": 5720,
+          "backend": 8270
+        },
+        "hostSingleCorePct": {
+          "A": 0.9533,
+          "B": 0.9533,
+          "backend": 1.3783
+        },
+        "procIO": {
+          "A": {
+            "rchar": 1174357,
+            "wchar": 522914,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 1125095,
+            "wchar": 520037,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 304300,
+            "wchar": 210836,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "full31": {
+        "elapsedMs": 1859997,
+        "hostCpuMs": {
+          "A": 16770,
+          "B": 16850,
+          "backend": 25490
+        },
+        "hostSingleCorePct": {
+          "A": 0.9016,
+          "B": 0.9059,
+          "backend": 1.3704
+        },
+        "procIO": {
+          "A": {
+            "rchar": 3273929,
+            "wchar": 1608819,
+            "read_bytes": 8192,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 3219129,
+            "wchar": 1606876,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 906676,
+            "wchar": 660086,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      }
+    },
+    "baseline-small-disabled": {
+      "startedUnixMs": 1795319377000,
+      "meter": false,
+      "unchangedState": true,
+      "providers": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "central": {
+        "journalHead": 0,
+        "journalRows": 0,
+        "directoryRevision": 7,
+        "liveRows": 0
+      },
+      "devices": {
+        "A": {
+          "cursor": 0,
+          "directoryRevision": 7,
+          "topics": 3,
+          "historyFiles": 3,
+          "historyMessages": 0,
+          "historyDigest": "3f15df88a688e2f940e45962a2f581bf21e01ef7a65fbe17d5377f8387bdfa17",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        },
+        "B": {
+          "cursor": 0,
+          "directoryRevision": 7,
+          "topics": 3,
+          "historyFiles": 3,
+          "historyMessages": 0,
+          "historyDigest": "3f15df88a688e2f940e45962a2f581bf21e01ef7a65fbe17d5377f8387bdfa17",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        }
+      },
+      "first10": {
+        "elapsedMs": 600008,
+        "hostCpuMs": {
+          "A": 480,
+          "B": 460,
+          "backend": 7660
+        },
+        "hostSingleCorePct": {
+          "A": 0.08,
+          "B": 0.0767,
+          "backend": 1.2766
+        },
+        "procIO": {
+          "A": {
+            "rchar": 172603,
+            "wchar": 6036,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 97214,
+            "wchar": 5716,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 25328,
+            "wchar": 4848,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "full31": {
+        "elapsedMs": 1860014,
+        "hostCpuMs": {
+          "A": 1190,
+          "B": 1180,
+          "backend": 23810
+        },
+        "hostSingleCorePct": {
+          "A": 0.064,
+          "B": 0.0634,
+          "backend": 1.2801
+        },
+        "procIO": {
+          "A": {
+            "rchar": 177576,
+            "wchar": 15593,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 102226,
+            "wchar": 15288,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 33072,
+            "wchar": 12600,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      }
+    },
+    "baseline-large-attributed": {
+      "startedUnixMs": 1795318959000,
+      "meter": true,
+      "unchangedState": true,
+      "providers": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "central": {
+        "journalHead": 1564,
+        "journalRows": 1564,
+        "directoryRevision": 127,
+        "liveRows": 123
+      },
+      "devices": {
+        "A": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "e66801ea6197a371ef1432c8a49bcbfd21dd883a78312f2c7e467cb70a2c2eec",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        },
+        "B": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "e66801ea6197a371ef1432c8a49bcbfd21dd883a78312f2c7e467cb70a2c2eec",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        }
+      },
+      "first10": {
+        "elapsedMs": 599973,
+        "hostCpuMs": {
+          "A": 17070,
+          "B": 17000,
+          "backend": 8700
+        },
+        "hostSingleCorePct": {
+          "A": 2.8451,
+          "B": 2.8335,
+          "backend": 1.4501
+        },
+        "procIO": {
+          "A": {
+            "rchar": 6641709,
+            "wchar": 1288964,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 6700907,
+            "wchar": 1281925,
+            "read_bytes": 143360,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 303948,
+            "wchar": 218252,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "taggedCpuUs": {
+          "A": {
+            "NativeSyncAdapter.synchronize": 24534,
+            "SharedRuntime.tick": 377649,
+            "SharedRuntime.tickCore": 1039105,
+            "SharedRuntime.recoverRegistration": 5829,
+            "SharedRuntime.materialize": 1219292,
+            "SharedRuntime.backfill": 273295,
+            "SharedExecution.reconcile": 19148,
+            "SharedSessionClient.reconcile": 4906,
+            "SharedRuntime.discover": 3113371,
+            "SharedRuntime.readLocal": 603702,
+            "AttachmentWork.run": 55929,
+            "SharedMatching.poll": 14556,
+            "SharedRuntime.pollDirectory": 25132
+          },
+          "B": {
+            "NativeSyncAdapter.synchronize": 22238,
+            "SharedRuntime.tick": 407721,
+            "SharedRuntime.tickCore": 981730,
+            "SharedRuntime.recoverRegistration": 6061,
+            "SharedRuntime.materialize": 1057357,
+            "SharedRuntime.backfill": 205217,
+            "SharedExecution.reconcile": 15189,
+            "SharedSessionClient.reconcile": 4762,
+            "SharedRuntime.discover": 3190448,
+            "SharedRuntime.readLocal": 631951,
+            "AttachmentWork.run": 54061,
+            "SharedMatching.poll": 8054,
+            "SharedRuntime.pollDirectory": 26924
+          },
+          "backend": {
+            "shared/info": 247286,
+            "shared/wait": 46566,
+            "shared/matches": 25311,
+            "shared/changes": 21647,
+            "shared/pull": 44423
+          }
+        },
+        "taggedSingleCorePct": {
+          "A": 1.129459,
+          "B": 1.102002,
+          "backend": 0.064208
+        },
+        "http": {
+          "shared/info": {
+            "requests": 236,
+            "finished": 236,
+            "requestBytes": 0,
+            "responseBytes": 109032,
+            "status_200": 236
+          },
+          "shared/wait": {
+            "requests": 40,
+            "finished": 40,
+            "requestBytes": 0,
+            "responseBytes": 2680,
+            "status_200": 40
+          },
+          "shared/matches": {
+            "requests": 20,
+            "finished": 20,
+            "requestBytes": 0,
+            "responseBytes": 760,
+            "status_200": 20
+          },
+          "shared/changes": {
+            "requests": 20,
+            "finished": 20,
+            "requestBytes": 0,
+            "responseBytes": 820,
+            "status_200": 20
+          },
+          "shared/pull": {
+            "requests": 20,
+            "finished": 20,
+            "requestBytes": 0,
+            "responseBytes": 1180,
+            "status_200": 20
+          }
+        },
+        "invocations": {
+          "A/SharedRuntime.tick": 2248,
+          "A/SharedRuntime.tickCore": 2248,
+          "A/SharedRuntime.recoverRegistration": 2248,
+          "A/SharedRuntime.materialize": 2248,
+          "A/SharedRuntime.backfill": 2248,
+          "A/SharedExecution.reconcile": 2248,
+          "A/SharedSessionClient.reconcile": 2248,
+          "A/SharedRuntime.discover": 118,
+          "A/SharedRuntime.readLocal": 472,
+          "A/AttachmentWork.run": 118,
+          "A/SharedMatching.poll": 10,
+          "A/SharedRuntime.pollDirectory": 10,
+          "A/NativeSyncAdapter.synchronize": 10,
+          "B/SharedRuntime.tick": 2213,
+          "B/SharedRuntime.tickCore": 2213,
+          "B/SharedRuntime.recoverRegistration": 2213,
+          "B/SharedRuntime.materialize": 2213,
+          "B/SharedRuntime.backfill": 2213,
+          "B/SharedExecution.reconcile": 2213,
+          "B/SharedSessionClient.reconcile": 2213,
+          "B/SharedRuntime.discover": 118,
+          "B/SharedRuntime.readLocal": 472,
+          "B/AttachmentWork.run": 118,
+          "B/SharedMatching.poll": 10,
+          "B/SharedRuntime.pollDirectory": 10,
+          "B/NativeSyncAdapter.synchronize": 10,
+          "backend/shared/info": 236,
+          "backend/shared/wait": 40,
+          "backend/shared/matches": 20,
+          "backend/shared/changes": 20,
+          "backend/shared/pull": 20
+        },
+        "historySnapshots": {},
+        "logicalFiles": {
+          "A/config": {
+            "readFile": 708,
+            "readFileBytes": 5149048
+          },
+          "A/other": {
+            "readFile": 354,
+            "readFileBytes": 708
+          },
+          "B/config": {
+            "readFile": 708,
+            "readFileBytes": 5149048
+          },
+          "B/other": {
+            "readFile": 354,
+            "readFileBytes": 708
+          }
+        }
+      },
+      "full31": {
+        "elapsedMs": 1859981,
+        "hostCpuMs": {
+          "A": 56120,
+          "B": 56300,
+          "backend": 26730
+        },
+        "hostSingleCorePct": {
+          "A": 3.0172,
+          "B": 3.0269,
+          "backend": 1.4371
+        },
+        "procIO": {
+          "A": {
+            "rchar": 20416664,
+            "wchar": 4014682,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 20524484,
+            "wchar": 4005086,
+            "read_bytes": 143360,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 905142,
+            "wchar": 684932,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "taggedCpuUs": {
+          "A": {
+            "NativeSyncAdapter.synchronize": 64527,
+            "SharedRuntime.tick": 1166077,
+            "SharedRuntime.tickCore": 2934243,
+            "SharedRuntime.recoverRegistration": 14913,
+            "SharedRuntime.materialize": 3912200,
+            "SharedRuntime.backfill": 765793,
+            "SharedExecution.reconcile": 57474,
+            "SharedSessionClient.reconcile": 18784,
+            "SharedRuntime.discover": 11458493,
+            "SharedRuntime.readLocal": 2149539,
+            "AttachmentWork.run": 214324,
+            "SharedMatching.poll": 48347,
+            "SharedRuntime.pollDirectory": 84930
+          },
+          "B": {
+            "NativeSyncAdapter.synchronize": 61267,
+            "SharedRuntime.tick": 1218278,
+            "SharedRuntime.tickCore": 2671948,
+            "SharedRuntime.recoverRegistration": 20650,
+            "SharedRuntime.materialize": 3283669,
+            "SharedRuntime.backfill": 589404,
+            "SharedExecution.reconcile": 47847,
+            "SharedSessionClient.reconcile": 18481,
+            "SharedRuntime.discover": 11980430,
+            "SharedRuntime.readLocal": 2183874,
+            "AttachmentWork.run": 195969,
+            "SharedMatching.poll": 49220,
+            "SharedRuntime.pollDirectory": 80999
+          },
+          "backend": {
+            "shared/info": 766005,
+            "shared/wait": 147941,
+            "shared/matches": 71346,
+            "shared/changes": 64767,
+            "shared/pull": 148179
+          }
+        },
+        "taggedSingleCorePct": {
+          "A": 1.230639,
+          "B": 1.204423,
+          "backend": 0.064422
+        },
+        "http": {
+          "shared/info": {
+            "requests": 734,
+            "finished": 734,
+            "requestBytes": 0,
+            "responseBytes": 339108,
+            "status_200": 734
+          },
+          "shared/wait": {
+            "requests": 124,
+            "finished": 124,
+            "requestBytes": 0,
+            "responseBytes": 8308,
+            "status_200": 124
+          },
+          "shared/matches": {
+            "requests": 62,
+            "finished": 62,
+            "requestBytes": 0,
+            "responseBytes": 2356,
+            "status_200": 62
+          },
+          "shared/changes": {
+            "requests": 62,
+            "finished": 62,
+            "requestBytes": 0,
+            "responseBytes": 2542,
+            "status_200": 62
+          },
+          "shared/pull": {
+            "requests": 62,
+            "finished": 62,
+            "requestBytes": 0,
+            "responseBytes": 3658,
+            "status_200": 62
+          }
+        },
+        "invocations": {
+          "A/SharedRuntime.tick": 6604,
+          "A/SharedRuntime.tickCore": 6604,
+          "A/SharedRuntime.recoverRegistration": 6604,
+          "A/SharedRuntime.materialize": 6604,
+          "A/SharedRuntime.backfill": 6604,
+          "A/SharedExecution.reconcile": 6604,
+          "A/SharedSessionClient.reconcile": 6604,
+          "A/SharedRuntime.discover": 367,
+          "A/SharedRuntime.readLocal": 1468,
+          "A/AttachmentWork.run": 366,
+          "A/SharedMatching.poll": 31,
+          "A/SharedRuntime.pollDirectory": 31,
+          "A/NativeSyncAdapter.synchronize": 31,
+          "B/SharedRuntime.tick": 6460,
+          "B/SharedRuntime.tickCore": 6460,
+          "B/SharedRuntime.recoverRegistration": 6460,
+          "B/SharedRuntime.materialize": 6460,
+          "B/SharedRuntime.backfill": 6460,
+          "B/SharedExecution.reconcile": 6460,
+          "B/SharedSessionClient.reconcile": 6460,
+          "B/SharedRuntime.discover": 367,
+          "B/SharedRuntime.readLocal": 1468,
+          "B/AttachmentWork.run": 366,
+          "B/SharedMatching.poll": 31,
+          "B/SharedRuntime.pollDirectory": 31,
+          "B/NativeSyncAdapter.synchronize": 31,
+          "backend/shared/info": 734,
+          "backend/shared/wait": 124,
+          "backend/shared/matches": 62,
+          "backend/shared/changes": 62,
+          "backend/shared/pull": 62
+        },
+        "historySnapshots": {},
+        "logicalFiles": {
+          "A/config": {
+            "readFile": 2202,
+            "readFileBytes": 16014412
+          },
+          "A/other": {
+            "readFile": 1101,
+            "readFileBytes": 2202
+          },
+          "B/config": {
+            "readFile": 2202,
+            "readFileBytes": 16014412
+          },
+          "B/other": {
+            "readFile": 1101,
+            "readFileBytes": 2202
+          }
+        }
+      }
+    },
+    "baseline-large-process": {
+      "startedUnixMs": 1795319711000,
+      "meter": false,
+      "unchangedState": true,
+      "providers": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "central": {
+        "journalHead": 1564,
+        "journalRows": 1564,
+        "directoryRevision": 127,
+        "liveRows": 123
+      },
+      "devices": {
+        "A": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "2cde8793ab885574d6b5a61584161b537a7a3f93fdf6d353ab272574fcf0aef6",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        },
+        "B": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "2cde8793ab885574d6b5a61584161b537a7a3f93fdf6d353ab272574fcf0aef6",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        }
+      },
+      "first10": {
+        "elapsedMs": 599883,
+        "hostCpuMs": {
+          "A": 17860,
+          "B": 18510,
+          "backend": 8750
+        },
+        "hostSingleCorePct": {
+          "A": 2.9772,
+          "B": 3.0856,
+          "backend": 1.4586
+        },
+        "procIO": {
+          "A": {
+            "rchar": 6594145,
+            "wchar": 1295709,
+            "read_bytes": 4096,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 6579672,
+            "wchar": 1292122,
+            "read_bytes": 53248,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 304688,
+            "wchar": 211292,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "full31": {
+        "elapsedMs": 1859881,
+        "hostCpuMs": {
+          "A": 51070,
+          "B": 51820,
+          "backend": 27090
+        },
+        "hostSingleCorePct": {
+          "A": 2.7459,
+          "B": 2.7862,
+          "backend": 1.4565
+        },
+        "procIO": {
+          "A": {
+            "rchar": 20450068,
+            "wchar": 3994994,
+            "read_bytes": 4096,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 20381606,
+            "wchar": 4007636,
+            "read_bytes": 53248,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 904578,
+            "wchar": 658182,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      }
+    },
+    "baseline-large-disabled": {
+      "startedUnixMs": 1795319174000,
+      "meter": false,
+      "unchangedState": true,
+      "providers": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "central": {
+        "journalHead": 1564,
+        "journalRows": 1564,
+        "directoryRevision": 127,
+        "liveRows": 123
+      },
+      "devices": {
+        "A": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "0baf2c194784aad7e7f1cdbc31bc18eb53deb73a3a725ea581187966553101ac",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        },
+        "B": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "0baf2c194784aad7e7f1cdbc31bc18eb53deb73a3a725ea581187966553101ac",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        }
+      },
+      "first10": {
+        "elapsedMs": 599914,
+        "hostCpuMs": {
+          "A": 450,
+          "B": 460,
+          "backend": 7760
+        },
+        "hostSingleCorePct": {
+          "A": 0.075,
+          "B": 0.0767,
+          "backend": 1.2935
+        },
+        "procIO": {
+          "A": {
+            "rchar": 144859,
+            "wchar": 4867,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 171475,
+            "wchar": 4893,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 29776,
+            "wchar": 8928,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "full31": {
+        "elapsedMs": 1859912,
+        "hostCpuMs": {
+          "A": 1020,
+          "B": 1040,
+          "backend": 23750
+        },
+        "hostSingleCorePct": {
+          "A": 0.0548,
+          "B": 0.0559,
+          "backend": 1.2769
+        },
+        "procIO": {
+          "A": {
+            "rchar": 147870,
+            "wchar": 12446,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 174486,
+            "wchar": 12456,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 39608,
+            "wchar": 18760,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      }
+    },
+    "baseline-large-missing": {
+      "startedUnixMs": 1795319717000,
+      "meter": true,
+      "unchangedState": true,
+      "providers": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "central": {
+        "journalHead": 1564,
+        "journalRows": 1564,
+        "directoryRevision": 127,
+        "liveRows": 123
+      },
+      "devices": {
+        "A": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "ce6f5d12de6f8e0720878e9a926b1ed9e0fce0c63bd72a74ba464266b634637f",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        },
+        "B": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "ce6f5d12de6f8e0720878e9a926b1ed9e0fce0c63bd72a74ba464266b634637f",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        }
+      },
+      "first10": {
+        "elapsedMs": 599895,
+        "hostCpuMs": {
+          "A": 20450,
+          "B": 19870,
+          "backend": 8970
+        },
+        "hostSingleCorePct": {
+          "A": 3.4089,
+          "B": 3.3122,
+          "backend": 1.4953
+        },
+        "procIO": {
+          "A": {
+            "rchar": 6748985,
+            "wchar": 1303751,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 6703399,
+            "wchar": 1297760,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 312260,
+            "wchar": 223866,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "taggedCpuUs": {
+          "A": {
+            "SharedRuntime.tick": 405236,
+            "SharedRuntime.tickCore": 889698,
+            "SharedRuntime.recoverRegistration": 6507,
+            "SharedRuntime.materialize": 1150628,
+            "SharedRuntime.discover": 4564373,
+            "NativeSyncAdapter.synchronize": 22773,
+            "SharedRuntime.backfill": 189912,
+            "SharedRuntime.readLocal": 800730,
+            "SharedExecution.reconcile": 13878,
+            "SharedSessionClient.reconcile": 7827,
+            "AttachmentWork.run": 84335,
+            "DesktopAttachments.restoreRemote": 7475,
+            "DesktopAttachments.uploadLocal": 234,
+            "SharedMatching.poll": 18863,
+            "SharedRuntime.pollDirectory": 26838
+          },
+          "B": {
+            "SharedRuntime.tick": 412741,
+            "SharedRuntime.tickCore": 810336,
+            "SharedRuntime.recoverRegistration": 7600,
+            "SharedRuntime.materialize": 1247906,
+            "SharedRuntime.backfill": 232956,
+            "SharedExecution.reconcile": 15117,
+            "SharedSessionClient.reconcile": 11399,
+            "NativeSyncAdapter.synchronize": 25360,
+            "AttachmentWork.run": 95879,
+            "SharedRuntime.discover": 4130955,
+            "SharedRuntime.readLocal": 746697,
+            "SharedMatching.poll": 24985,
+            "DesktopAttachments.restoreRemote": 8523,
+            "DesktopAttachments.uploadLocal": 1433,
+            "SharedRuntime.pollDirectory": 24756
+          },
+          "backend": {
+            "shared/info": 267955,
+            "shared/wait": 57681,
+            "attachment": 14532,
+            "shared/matches": 28386,
+            "shared/changes": 26066,
+            "shared/pull": 52856
+          }
+        },
+        "taggedSingleCorePct": {
+          "A": 1.365123,
+          "B": 1.299668,
+          "backend": 0.074592
+        },
+        "http": {
+          "shared/info": {
+            "requests": 237,
+            "finished": 237,
+            "requestBytes": 0,
+            "responseBytes": 109494,
+            "status_200": 237
+          },
+          "shared/wait": {
+            "requests": 40,
+            "finished": 40,
+            "requestBytes": 0,
+            "responseBytes": 2680,
+            "status_200": 40
+          },
+          "attachment": {
+            "requests": 6,
+            "finished": 6,
+            "requestBytes": 0,
+            "responseBytes": 264,
+            "status_404": 6
+          },
+          "shared/matches": {
+            "requests": 20,
+            "finished": 20,
+            "requestBytes": 0,
+            "responseBytes": 760,
+            "status_200": 20
+          },
+          "shared/changes": {
+            "requests": 20,
+            "finished": 20,
+            "requestBytes": 0,
+            "responseBytes": 820,
+            "status_200": 20
+          },
+          "shared/pull": {
+            "requests": 20,
+            "finished": 20,
+            "requestBytes": 0,
+            "responseBytes": 1180,
+            "status_200": 20
+          }
+        },
+        "invocations": {
+          "A/SharedRuntime.tickCore": 1956,
+          "A/SharedRuntime.recoverRegistration": 1956,
+          "A/SharedRuntime.materialize": 1956,
+          "A/SharedRuntime.discover": 119,
+          "A/SharedRuntime.backfill": 1956,
+          "A/SharedRuntime.readLocal": 476,
+          "A/SharedExecution.reconcile": 1956,
+          "A/SharedSessionClient.reconcile": 1956,
+          "A/SharedRuntime.tick": 1955,
+          "A/AttachmentWork.run": 118,
+          "A/DesktopAttachments.uploadLocal": 3,
+          "A/DesktopAttachments.restoreRemote": 3,
+          "A/SharedMatching.poll": 10,
+          "A/SharedRuntime.pollDirectory": 10,
+          "A/NativeSyncAdapter.synchronize": 10,
+          "B/SharedRuntime.tick": 2022,
+          "B/SharedRuntime.tickCore": 2022,
+          "B/SharedRuntime.recoverRegistration": 2022,
+          "B/SharedRuntime.materialize": 2022,
+          "B/SharedRuntime.backfill": 2022,
+          "B/SharedExecution.reconcile": 2022,
+          "B/SharedSessionClient.reconcile": 2022,
+          "B/AttachmentWork.run": 118,
+          "B/SharedRuntime.discover": 118,
+          "B/SharedRuntime.readLocal": 472,
+          "B/DesktopAttachments.uploadLocal": 3,
+          "B/DesktopAttachments.restoreRemote": 3,
+          "B/SharedMatching.poll": 10,
+          "B/SharedRuntime.pollDirectory": 10,
+          "B/NativeSyncAdapter.synchronize": 10,
+          "backend/shared/info": 237,
+          "backend/shared/wait": 40,
+          "backend/attachment": 6,
+          "backend/shared/matches": 20,
+          "backend/shared/changes": 20,
+          "backend/shared/pull": 20
+        },
+        "historySnapshots": {
+          "A/AttachmentWork.run": 3,
+          "B/AttachmentWork.run": 3
+        },
+        "logicalFiles": {
+          "A/config": {
+            "readFile": 714,
+            "readFileBytes": 5192684
+          },
+          "A/other": {
+            "readFile": 357,
+            "readFileBytes": 714
+          },
+          "A/history": {
+            "readFile": 3,
+            "readFileBytes": 4356
+          },
+          "B/config": {
+            "readFile": 708,
+            "readFileBytes": 5149048
+          },
+          "B/other": {
+            "readFile": 354,
+            "readFileBytes": 708
+          },
+          "B/history": {
+            "readFile": 3,
+            "readFileBytes": 4356
+          }
+        }
+      },
+      "full31": {
+        "elapsedMs": 1859899,
+        "hostCpuMs": {
+          "A": 58570,
+          "B": 57970,
+          "backend": 27510
+        },
+        "hostSingleCorePct": {
+          "A": 3.1491,
+          "B": 3.1168,
+          "backend": 1.4791
+        },
+        "procIO": {
+          "A": {
+            "rchar": 20448310,
+            "wchar": 4034102,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 20535469,
+            "wchar": 4024826,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 920646,
+            "wchar": 693763,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "taggedCpuUs": {
+          "A": {
+            "SharedRuntime.tick": 1231026,
+            "SharedRuntime.tickCore": 2764113,
+            "SharedRuntime.recoverRegistration": 17563,
+            "SharedRuntime.materialize": 3901534,
+            "SharedRuntime.discover": 12363111,
+            "NativeSyncAdapter.synchronize": 61085,
+            "SharedRuntime.backfill": 613017,
+            "SharedRuntime.readLocal": 2372942,
+            "SharedExecution.reconcile": 49068,
+            "SharedSessionClient.reconcile": 17706,
+            "AttachmentWork.run": 251386,
+            "DesktopAttachments.restoreRemote": 18746,
+            "DesktopAttachments.uploadLocal": 731,
+            "SharedMatching.poll": 43534,
+            "SharedRuntime.pollDirectory": 81950
+          },
+          "B": {
+            "SharedRuntime.tick": 1227726,
+            "SharedRuntime.tickCore": 2517994,
+            "SharedRuntime.recoverRegistration": 21025,
+            "SharedRuntime.materialize": 4044284,
+            "SharedRuntime.backfill": 730827,
+            "SharedExecution.reconcile": 50332,
+            "SharedSessionClient.reconcile": 29810,
+            "NativeSyncAdapter.synchronize": 64983,
+            "AttachmentWork.run": 270246,
+            "SharedRuntime.discover": 11975060,
+            "SharedRuntime.readLocal": 2285929,
+            "SharedMatching.poll": 58032,
+            "DesktopAttachments.restoreRemote": 23177,
+            "DesktopAttachments.uploadLocal": 1667,
+            "SharedRuntime.pollDirectory": 78412
+          },
+          "backend": {
+            "shared/info": 802276,
+            "shared/wait": 168766,
+            "attachment": 35309,
+            "shared/matches": 80377,
+            "shared/changes": 77672,
+            "shared/pull": 155149
+          }
+        },
+        "taggedSingleCorePct": {
+          "A": 1.278968,
+          "B": 1.257031,
+          "backend": 0.070947
+        },
+        "http": {
+          "shared/info": {
+            "requests": 735,
+            "finished": 735,
+            "requestBytes": 0,
+            "responseBytes": 339570,
+            "status_200": 735
+          },
+          "shared/wait": {
+            "requests": 124,
+            "finished": 124,
+            "requestBytes": 0,
+            "responseBytes": 8308,
+            "status_200": 124
+          },
+          "attachment": {
+            "requests": 14,
+            "finished": 14,
+            "requestBytes": 0,
+            "responseBytes": 616,
+            "status_404": 14
+          },
+          "shared/matches": {
+            "requests": 62,
+            "finished": 62,
+            "requestBytes": 0,
+            "responseBytes": 2356,
+            "status_200": 62
+          },
+          "shared/changes": {
+            "requests": 62,
+            "finished": 62,
+            "requestBytes": 0,
+            "responseBytes": 2542,
+            "status_200": 62
+          },
+          "shared/pull": {
+            "requests": 62,
+            "finished": 62,
+            "requestBytes": 0,
+            "responseBytes": 3658,
+            "status_200": 62
+          }
+        },
+        "invocations": {
+          "A/SharedRuntime.tickCore": 6512,
+          "A/SharedRuntime.recoverRegistration": 6512,
+          "A/SharedRuntime.materialize": 6512,
+          "A/SharedRuntime.discover": 367,
+          "A/SharedRuntime.backfill": 6512,
+          "A/SharedRuntime.readLocal": 1468,
+          "A/SharedExecution.reconcile": 6512,
+          "A/SharedSessionClient.reconcile": 6512,
+          "A/SharedRuntime.tick": 6511,
+          "A/AttachmentWork.run": 367,
+          "A/DesktopAttachments.uploadLocal": 7,
+          "A/DesktopAttachments.restoreRemote": 7,
+          "A/SharedMatching.poll": 31,
+          "A/SharedRuntime.pollDirectory": 31,
+          "A/NativeSyncAdapter.synchronize": 31,
+          "B/SharedRuntime.tick": 6555,
+          "B/SharedRuntime.tickCore": 6555,
+          "B/SharedRuntime.recoverRegistration": 6555,
+          "B/SharedRuntime.materialize": 6555,
+          "B/SharedRuntime.backfill": 6555,
+          "B/SharedExecution.reconcile": 6555,
+          "B/SharedSessionClient.reconcile": 6555,
+          "B/AttachmentWork.run": 367,
+          "B/SharedRuntime.discover": 367,
+          "B/SharedRuntime.readLocal": 1468,
+          "B/DesktopAttachments.uploadLocal": 7,
+          "B/DesktopAttachments.restoreRemote": 7,
+          "B/SharedMatching.poll": 31,
+          "B/SharedRuntime.pollDirectory": 31,
+          "B/NativeSyncAdapter.synchronize": 31,
+          "backend/shared/info": 735,
+          "backend/shared/wait": 124,
+          "backend/attachment": 14,
+          "backend/shared/matches": 62,
+          "backend/shared/changes": 62,
+          "backend/shared/pull": 62
+        },
+        "historySnapshots": {
+          "A/AttachmentWork.run": 7,
+          "B/AttachmentWork.run": 7
+        },
+        "logicalFiles": {
+          "A/config": {
+            "readFile": 2202,
+            "readFileBytes": 16014412
+          },
+          "A/other": {
+            "readFile": 1101,
+            "readFileBytes": 2202
+          },
+          "A/history": {
+            "readFile": 7,
+            "readFileBytes": 10164
+          },
+          "B/config": {
+            "readFile": 2202,
+            "readFileBytes": 16014412
+          },
+          "B/other": {
+            "readFile": 1101,
+            "readFileBytes": 2202
+          },
+          "B/history": {
+            "readFile": 7,
+            "readFileBytes": 10164
+          }
+        }
+      }
+    },
+    "candidate-small-attributed": {
+      "startedUnixMs": 1795319799000,
+      "meter": true,
+      "unchangedState": true,
+      "providers": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "central": {
+        "journalHead": 0,
+        "journalRows": 0,
+        "directoryRevision": 7,
+        "liveRows": 0
+      },
+      "devices": {
+        "A": {
+          "cursor": 0,
+          "directoryRevision": 7,
+          "topics": 3,
+          "historyFiles": 3,
+          "historyMessages": 0,
+          "historyDigest": "c1f63626c7cc00c3e7c665d45dfc3b82fa37928d11b0fb0b11c0c13efa44c9c6",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        },
+        "B": {
+          "cursor": 0,
+          "directoryRevision": 7,
+          "topics": 3,
+          "historyFiles": 3,
+          "historyMessages": 0,
+          "historyDigest": "c1f63626c7cc00c3e7c665d45dfc3b82fa37928d11b0fb0b11c0c13efa44c9c6",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        }
+      },
+      "first10": {
+        "elapsedMs": 599989,
+        "hostCpuMs": {
+          "A": 780,
+          "B": 790,
+          "backend": 8030
+        },
+        "hostSingleCorePct": {
+          "A": 0.13,
+          "B": 0.1317,
+          "backend": 1.3384
+        },
+        "procIO": {
+          "A": {
+            "rchar": 99954,
+            "wchar": 8560,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 174078,
+            "wchar": 7854,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 25072,
+            "wchar": 8480,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "taggedCpuUs": {
+          "A": {
+            "SharedMatching.poll": 4787,
+            "SharedWaitClient.watch": 6485,
+            "NativeSyncAdapter.synchronize": 0
+          },
+          "B": {
+            "SharedMatching.poll": 7685,
+            "SharedWaitClient.watch": 8195,
+            "NativeSyncAdapter.synchronize": 0
+          },
+          "backend": {
+            "shared/watch": 56838
+          }
+        },
+        "taggedSingleCorePct": {
+          "A": 0.001879,
+          "B": 0.002647,
+          "backend": 0.009473
+        },
+        "http": {
+          "shared/watch": {
+            "requests": 0,
+            "finished": 0,
+            "requestBytes": 0,
+            "responseBytes": 1040,
+            "sseBytes": 1040,
+            "sseDataFrames": 0,
+            "sseCommentFrames": 80
+          }
+        },
+        "invocations": {},
+        "historySnapshots": {},
+        "logicalFiles": {}
+      },
+      "full31": {
+        "elapsedMs": 1859989,
+        "hostCpuMs": {
+          "A": 2230,
+          "B": 2250,
+          "backend": 24920
+        },
+        "hostSingleCorePct": {
+          "A": 0.1199,
+          "B": 0.121,
+          "backend": 1.3398
+        },
+        "procIO": {
+          "A": {
+            "rchar": 132133,
+            "wchar": 43174,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 206252,
+            "wchar": 42468,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 59784,
+            "wchar": 46422,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "taggedCpuUs": {
+          "A": {
+            "SharedMatching.poll": 19221,
+            "SharedWaitClient.watch": 17238,
+            "NativeSyncAdapter.synchronize": 3624,
+            "SharedRuntime.planTick": 0,
+            "SharedRuntime.runTick": 18227,
+            "SharedRuntime.configureWatch": 0,
+            "SharedWaitClient.configure": 0,
+            "SharedWaitClient.take": 0,
+            "SharedRuntime.tick": 365,
+            "SharedRuntime.tickCore": 398,
+            "SharedRuntime.recoverRegistration": 0,
+            "SharedRuntime.pollDirectory": 4114,
+            "SharedRuntime.materialize": 1357,
+            "SharedRuntime.discover": 8951,
+            "SharedRuntime.backfill": 0,
+            "SharedRuntime.readLocal": 13474,
+            "AttachmentWork.run": 0,
+            "SharedExecution.reconcile": 92,
+            "SharedSessionClient.reconcile": 149
+          },
+          "B": {
+            "SharedMatching.poll": 23946,
+            "SharedWaitClient.watch": 15448,
+            "NativeSyncAdapter.synchronize": 4241,
+            "SharedRuntime.planTick": 0,
+            "SharedRuntime.runTick": 22359,
+            "SharedRuntime.configureWatch": 0,
+            "SharedWaitClient.configure": 0,
+            "SharedWaitClient.take": 0,
+            "SharedRuntime.tick": 303,
+            "SharedRuntime.tickCore": 0,
+            "SharedRuntime.recoverRegistration": 0,
+            "SharedRuntime.pollDirectory": 3487,
+            "SharedRuntime.materialize": 789,
+            "SharedRuntime.discover": 6523,
+            "SharedRuntime.backfill": 0,
+            "SharedRuntime.readLocal": 9780,
+            "AttachmentWork.run": 0,
+            "SharedExecution.reconcile": 0,
+            "SharedSessionClient.reconcile": 0
+          },
+          "backend": {
+            "shared/watch": 178821,
+            "shared/info": 5079,
+            "shared/matches": 4698,
+            "shared/changes": 6519,
+            "shared/pull": 6926
+          }
+        },
+        "taggedSingleCorePct": {
+          "A": 0.004689,
+          "B": 0.004671,
+          "backend": 0.010863
+        },
+        "http": {
+          "shared/watch": {
+            "requests": 0,
+            "finished": 0,
+            "requestBytes": 0,
+            "responseBytes": 3224,
+            "sseBytes": 3224,
+            "sseDataFrames": 0,
+            "sseCommentFrames": 248
+          },
+          "shared/info": {
+            "requests": 4,
+            "finished": 4,
+            "requestBytes": 0,
+            "responseBytes": 1920,
+            "status_200": 4
+          },
+          "shared/matches": {
+            "requests": 4,
+            "finished": 4,
+            "requestBytes": 0,
+            "responseBytes": 152,
+            "status_200": 4
+          },
+          "shared/changes": {
+            "requests": 4,
+            "finished": 4,
+            "requestBytes": 0,
+            "responseBytes": 156,
+            "status_200": 4
+          },
+          "shared/pull": {
+            "requests": 4,
+            "finished": 4,
+            "requestBytes": 0,
+            "responseBytes": 212,
+            "status_200": 4
+          }
+        },
+        "invocations": {
+          "A/SharedRuntime.runTick": 2,
+          "A/SharedRuntime.configureWatch": 2,
+          "A/SharedWaitClient.configure": 2,
+          "A/SharedWaitClient.take": 2,
+          "A/SharedRuntime.tick": 2,
+          "A/SharedRuntime.tickCore": 2,
+          "A/SharedRuntime.recoverRegistration": 2,
+          "A/SharedMatching.poll": 2,
+          "A/SharedRuntime.pollDirectory": 2,
+          "A/SharedRuntime.materialize": 2,
+          "A/SharedRuntime.discover": 2,
+          "A/SharedRuntime.backfill": 2,
+          "A/SharedRuntime.readLocal": 8,
+          "A/NativeSyncAdapter.synchronize": 2,
+          "A/AttachmentWork.run": 2,
+          "A/SharedExecution.reconcile": 2,
+          "A/SharedSessionClient.reconcile": 2,
+          "A/SharedRuntime.planTick": 2,
+          "B/SharedRuntime.runTick": 2,
+          "B/SharedRuntime.configureWatch": 2,
+          "B/SharedWaitClient.configure": 2,
+          "B/SharedWaitClient.take": 2,
+          "B/SharedRuntime.tick": 2,
+          "B/SharedRuntime.tickCore": 2,
+          "B/SharedRuntime.recoverRegistration": 2,
+          "B/SharedMatching.poll": 2,
+          "B/SharedRuntime.pollDirectory": 2,
+          "B/SharedRuntime.materialize": 2,
+          "B/SharedRuntime.discover": 2,
+          "B/SharedRuntime.backfill": 2,
+          "B/SharedRuntime.readLocal": 8,
+          "B/NativeSyncAdapter.synchronize": 2,
+          "B/AttachmentWork.run": 2,
+          "B/SharedExecution.reconcile": 2,
+          "B/SharedSessionClient.reconcile": 2,
+          "B/SharedRuntime.planTick": 2,
+          "backend/shared/info": 4,
+          "backend/shared/matches": 4,
+          "backend/shared/changes": 4,
+          "backend/shared/pull": 4
+        },
+        "historySnapshots": {},
+        "logicalFiles": {
+          "A/config": {
+            "readFile": 12,
+            "readFileBytes": 5632
+          },
+          "A/other": {
+            "readFile": 6,
+            "readFileBytes": 12
+          },
+          "A/history": {
+            "readFile": 6,
+            "readFileBytes": 12
+          },
+          "B/config": {
+            "readFile": 12,
+            "readFileBytes": 5632
+          },
+          "B/other": {
+            "readFile": 6,
+            "readFileBytes": 12
+          },
+          "B/history": {
+            "readFile": 6,
+            "readFileBytes": 12
+          }
+        }
+      },
+      "desktopSources": {
+        "A": [
+          {
+            "file": "apps/desktop/modules/services/nativeSync/adapter.js",
+            "sha256": "827112686222bb12a86c05bda210ec1fbdbded8359960de69ebfabcdd9d2aa4d"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/runtime.js",
+            "sha256": "056b62a98ea045b211920fdd8c851fa8ca2f7c93beb7e9b4d91a5c8f171ed6fc"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "0eede772271e4549e20ff2170f53c9430372448c5811922be7782d407bc1e145"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedWaitClient.js",
+            "sha256": "7145b0add975299049971d0cc61684af63a7bca0700dd9d844ab3de4f9808297"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedDirectory.js",
+            "sha256": "df1b93af1af69a4f075cd4973d553807d042040c49ffb47fbfec145e65fe6d86"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/attachmentWork.js",
+            "sha256": "6c20e2e2f36a522c667abdd5e6c7cf74bbbcd825391797b25efab9fac4d644e7"
+          }
+        ],
+        "B": [
+          {
+            "file": "apps/desktop/modules/services/nativeSync/adapter.js",
+            "sha256": "827112686222bb12a86c05bda210ec1fbdbded8359960de69ebfabcdd9d2aa4d"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/runtime.js",
+            "sha256": "056b62a98ea045b211920fdd8c851fa8ca2f7c93beb7e9b4d91a5c8f171ed6fc"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "0eede772271e4549e20ff2170f53c9430372448c5811922be7782d407bc1e145"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedWaitClient.js",
+            "sha256": "7145b0add975299049971d0cc61684af63a7bca0700dd9d844ab3de4f9808297"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedDirectory.js",
+            "sha256": "df1b93af1af69a4f075cd4973d553807d042040c49ffb47fbfec145e65fe6d86"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/attachmentWork.js",
+            "sha256": "6c20e2e2f36a522c667abdd5e6c7cf74bbbcd825391797b25efab9fac4d644e7"
+          }
+        ]
+      },
+      "backendSources": [
+        {
+          "file": "apps/server/server.js",
+          "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+        },
+        {
+          "file": "apps/server/Plugin.js",
+          "sha256": "5fe109606e02b4101c8da15c5a810cd2d83a1796117dfcac91979491c52d3339"
+        },
+        {
+          "file": "apps/server/WebSocketServer.js",
+          "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+        },
+        {
+          "file": "apps/server/modules/requestExecutionContext.js",
+          "sha256": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6"
+        },
+        {
+          "file": "apps/server/modules/chatCompletionHandler.js",
+          "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+          "sha256": "c3ede2f8dc59d42b2759b50882724bd6246b00562ddc1f11ba732774df8f4a4f"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+          "sha256": "3efd8bf1b4c4411d7f8ec5c648ded72bc19f8e836058c644aa8050684baed133"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+          "sha256": "8601d3070ba9c92ac5288560ed6d4890d2bc308633363a70e1e3046aca180672"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+          "sha256": "2e637687e88f05d3ae23cb19e663b3a0e5998f424df4101cb7663f9fb41e5481"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+          "sha256": "3d7e244833f4ae60c30e6b932752f2cdf9b09f06df628604792bda0078197218"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+          "sha256": "eaed54d2bc5eef972f96c003d651196f644b99fa3018eefce8f9d8863fb0ebe1"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/httpService.js",
+          "sha256": "55bf6eb3188466d8fbe4d8d7eef974eeb6126a5e094d1084e4d207b8d78ab736"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedWait.js",
+          "sha256": "b3759186f90387d8bb75033ecb8e007fbda2a23d3f15c03f13b4304051edea6a"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+          "sha256": "6bd45ec5f20ab1f35db82145467e2569745b641daed4ffec5bed79c747fc260b"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+          "sha256": "a1b166d894a7e697a54a226b78d381388e1fffe39c0984bf20441069beba4fa3"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+          "sha256": "c0be485ee31ed3d50db0e5a7e5e72aa38110434fe63c23606a7855a05ca7d512"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+          "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+          "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+        },
+        {
+          "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+          "sha256": "072cf520ebb2638b85ea2bfe84b0226a216d9996748697c9e1324b3f88156793"
+        },
+        {
+          "file": "apps/server/modules/nativeContinuationStore.cjs",
+          "sha256": "f6774df34bdcc60346f4ed49f5dccaa2e0da5645b5b60ea29f364f89a5090ee6"
+        },
+        {
+          "file": "apps/server/modules/handlers/streamHandler.js",
+          "sha256": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec"
+        },
+        {
+          "file": "apps/server/modules/handlers/nonStreamHandler.js",
+          "sha256": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2"
+        },
+        {
+          "file": "apps/server/modules/pluginBridgeRegistry.js",
+          "sha256": "635c94f249a0f67cb085ae51f1a53e08dc49ddf2aaadb30e434fe6a9a36900f3"
+        },
+        {
+          "file": "apps/server/modules/toolCallRecordStore.js",
+          "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+          "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+          "sha256": "299fc48e0a1a0687a59f8c19adb91398ea61e40115f5a482a89caadf6d1d03a5"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/mobile/groupTurn.js",
+          "sha256": "7d37337452fd8428aff74a40f621631a70b7f1bf9584ef6bd3538bac0de3d3f7"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/mobile/portal.js",
+          "sha256": "fd4ff20987a5410ee1ed65fa358226ef869e727238daf8cbb704cce09a7fa307"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sharedEvents.js",
+          "sha256": "62e81d32e6e963554cdce3343ba3942a62414e91cc723170356b54cda7ed3a81"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/native-sync.js",
+          "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+        },
+        {
+          "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+          "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+        }
+      ]
+    },
+    "candidate-small-process": {
+      "startedUnixMs": 1795319834000,
+      "meter": false,
+      "unchangedState": true,
+      "providers": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "central": {
+        "journalHead": 0,
+        "journalRows": 0,
+        "directoryRevision": 7,
+        "liveRows": 0
+      },
+      "devices": {
+        "A": {
+          "cursor": 0,
+          "directoryRevision": 7,
+          "topics": 3,
+          "historyFiles": 3,
+          "historyMessages": 0,
+          "historyDigest": "7260725c7d26e608be14c900232705fe82754dbab2d94b6ab6e15379ce1c135d",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        },
+        "B": {
+          "cursor": 0,
+          "directoryRevision": 7,
+          "topics": 3,
+          "historyFiles": 3,
+          "historyMessages": 0,
+          "historyDigest": "7260725c7d26e608be14c900232705fe82754dbab2d94b6ab6e15379ce1c135d",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        }
+      },
+      "first10": {
+        "elapsedMs": 599997,
+        "hostCpuMs": {
+          "A": 740,
+          "B": 750,
+          "backend": 7850
+        },
+        "hostSingleCorePct": {
+          "A": 0.1233,
+          "B": 0.125,
+          "backend": 1.3083
+        },
+        "procIO": {
+          "A": {
+            "rchar": 158444,
+            "wchar": 6512,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 174294,
+            "wchar": 6665,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 25680,
+            "wchar": 6640,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "full31": {
+        "elapsedMs": 1859996,
+        "hostCpuMs": {
+          "A": 2140,
+          "B": 2150,
+          "backend": 24270
+        },
+        "hostSingleCorePct": {
+          "A": 0.1151,
+          "B": 0.1156,
+          "backend": 1.3048
+        },
+        "procIO": {
+          "A": {
+            "rchar": 190635,
+            "wchar": 35453,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 206292,
+            "wchar": 35413,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 48480,
+            "wchar": 25708,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      }
+    },
+    "candidate-large-attributed": {
+      "startedUnixMs": 1795319908000,
+      "meter": true,
+      "unchangedState": true,
+      "providers": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "central": {
+        "journalHead": 1564,
+        "journalRows": 1564,
+        "directoryRevision": 127,
+        "liveRows": 123
+      },
+      "devices": {
+        "A": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "604e839e242786209e4f96e0e9faa0a2007aa00d7e46cf16dfc81fcea2073d4f",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        },
+        "B": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "604e839e242786209e4f96e0e9faa0a2007aa00d7e46cf16dfc81fcea2073d4f",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        }
+      },
+      "first10": {
+        "elapsedMs": 599905,
+        "hostCpuMs": {
+          "A": 640,
+          "B": 790,
+          "backend": 8230
+        },
+        "hostSingleCorePct": {
+          "A": 0.1067,
+          "B": 0.1317,
+          "backend": 1.3719
+        },
+        "procIO": {
+          "A": {
+            "rchar": 4696,
+            "wchar": 6869,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 5935,
+            "wchar": 8121,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 25328,
+            "wchar": 8744,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "taggedCpuUs": {
+          "A": {
+            "NativeSyncAdapter.synchronize": 8453,
+            "SharedWaitClient.watch": 4746
+          },
+          "B": {
+            "NativeSyncAdapter.synchronize": 7210,
+            "SharedWaitClient.watch": 5307
+          },
+          "backend": {
+            "shared/watch": 60785
+          }
+        },
+        "taggedSingleCorePct": {
+          "A": 0.0022,
+          "B": 0.002086,
+          "backend": 0.010132
+        },
+        "http": {
+          "shared/watch": {
+            "requests": 0,
+            "finished": 0,
+            "requestBytes": 0,
+            "responseBytes": 1040,
+            "sseBytes": 1040,
+            "sseDataFrames": 0,
+            "sseCommentFrames": 80
+          }
+        },
+        "invocations": {},
+        "historySnapshots": {},
+        "logicalFiles": {}
+      },
+      "full31": {
+        "elapsedMs": 1859907,
+        "hostCpuMs": {
+          "A": 3380,
+          "B": 3580,
+          "backend": 25560
+        },
+        "hostSingleCorePct": {
+          "A": 0.1817,
+          "B": 0.1925,
+          "backend": 1.3743
+        },
+        "procIO": {
+          "A": {
+            "rchar": 367183,
+            "wchar": 105271,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 369030,
+            "wchar": 107117,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 54796,
+            "wchar": 41434,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "taggedCpuUs": {
+          "A": {
+            "NativeSyncAdapter.synchronize": 23958,
+            "SharedWaitClient.watch": 15484,
+            "SharedRuntime.planTick": 1189,
+            "SharedRuntime.runTick": 360382,
+            "SharedRuntime.configureWatch": 0,
+            "SharedWaitClient.configure": 0,
+            "SharedWaitClient.take": 0,
+            "SharedRuntime.tick": 1999,
+            "SharedRuntime.tickCore": 4154,
+            "SharedRuntime.recoverRegistration": 0,
+            "SharedMatching.poll": 5925,
+            "SharedRuntime.pollDirectory": 3162,
+            "SharedRuntime.materialize": 3563,
+            "SharedRuntime.discover": 83194,
+            "SharedRuntime.backfill": 0,
+            "SharedRuntime.readLocal": 13476,
+            "AttachmentWork.run": 1295,
+            "SharedExecution.reconcile": 121,
+            "SharedSessionClient.reconcile": 0
+          },
+          "B": {
+            "NativeSyncAdapter.synchronize": 23826,
+            "SharedWaitClient.watch": 16205,
+            "SharedRuntime.planTick": 1609,
+            "SharedRuntime.runTick": 287218,
+            "SharedRuntime.configureWatch": 0,
+            "SharedWaitClient.configure": 0,
+            "SharedWaitClient.take": 0,
+            "SharedRuntime.tick": 54,
+            "SharedRuntime.tickCore": 2896,
+            "SharedRuntime.recoverRegistration": 0,
+            "SharedMatching.poll": 5824,
+            "SharedRuntime.pollDirectory": 2399,
+            "SharedRuntime.materialize": 3514,
+            "SharedRuntime.discover": 64208,
+            "SharedRuntime.backfill": 446,
+            "SharedRuntime.readLocal": 9965,
+            "AttachmentWork.run": 1588,
+            "SharedExecution.reconcile": 0,
+            "SharedSessionClient.reconcile": 0
+          },
+          "backend": {
+            "shared/watch": 177390,
+            "shared/info": 4145,
+            "shared/matches": 6460,
+            "shared/changes": 4941,
+            "shared/pull": 11477
+          }
+        },
+        "taggedSingleCorePct": {
+          "A": 0.027846,
+          "B": 0.022568,
+          "backend": 0.01099
+        },
+        "http": {
+          "shared/watch": {
+            "requests": 0,
+            "finished": 0,
+            "requestBytes": 0,
+            "responseBytes": 3211,
+            "sseBytes": 3211,
+            "sseDataFrames": 0,
+            "sseCommentFrames": 247
+          },
+          "shared/info": {
+            "requests": 4,
+            "finished": 4,
+            "requestBytes": 0,
+            "responseBytes": 1920,
+            "status_200": 4
+          },
+          "shared/matches": {
+            "requests": 4,
+            "finished": 4,
+            "requestBytes": 0,
+            "responseBytes": 152,
+            "status_200": 4
+          },
+          "shared/changes": {
+            "requests": 4,
+            "finished": 4,
+            "requestBytes": 0,
+            "responseBytes": 164,
+            "status_200": 4
+          },
+          "shared/pull": {
+            "requests": 4,
+            "finished": 4,
+            "requestBytes": 0,
+            "responseBytes": 236,
+            "status_200": 4
+          }
+        },
+        "invocations": {
+          "A/SharedRuntime.runTick": 2,
+          "A/SharedRuntime.configureWatch": 2,
+          "A/SharedWaitClient.configure": 2,
+          "A/SharedWaitClient.take": 2,
+          "A/SharedRuntime.tick": 2,
+          "A/SharedRuntime.tickCore": 2,
+          "A/SharedRuntime.recoverRegistration": 2,
+          "A/SharedMatching.poll": 2,
+          "A/SharedRuntime.pollDirectory": 2,
+          "A/SharedRuntime.materialize": 2,
+          "A/SharedRuntime.discover": 2,
+          "A/SharedRuntime.backfill": 2,
+          "A/SharedRuntime.readLocal": 8,
+          "A/NativeSyncAdapter.synchronize": 2,
+          "A/AttachmentWork.run": 2,
+          "A/SharedExecution.reconcile": 2,
+          "A/SharedSessionClient.reconcile": 2,
+          "A/SharedRuntime.planTick": 2,
+          "B/SharedRuntime.runTick": 2,
+          "B/SharedRuntime.configureWatch": 2,
+          "B/SharedWaitClient.configure": 2,
+          "B/SharedWaitClient.take": 2,
+          "B/SharedRuntime.tick": 2,
+          "B/SharedRuntime.tickCore": 2,
+          "B/SharedRuntime.recoverRegistration": 2,
+          "B/SharedMatching.poll": 2,
+          "B/SharedRuntime.pollDirectory": 2,
+          "B/SharedRuntime.materialize": 2,
+          "B/SharedRuntime.discover": 2,
+          "B/SharedRuntime.backfill": 2,
+          "B/SharedRuntime.readLocal": 8,
+          "B/NativeSyncAdapter.synchronize": 2,
+          "B/AttachmentWork.run": 2,
+          "B/SharedExecution.reconcile": 2,
+          "B/SharedSessionClient.reconcile": 2,
+          "B/SharedRuntime.planTick": 2,
+          "backend/shared/info": 4,
+          "backend/shared/matches": 4,
+          "backend/shared/changes": 4,
+          "backend/shared/pull": 4
+        },
+        "historySnapshots": {},
+        "logicalFiles": {
+          "A/config": {
+            "readFile": 12,
+            "readFileBytes": 87272
+          },
+          "A/other": {
+            "readFile": 6,
+            "readFileBytes": 12
+          },
+          "A/history": {
+            "readFile": 246,
+            "readFileBytes": 185510
+          },
+          "B/config": {
+            "readFile": 12,
+            "readFileBytes": 87272
+          },
+          "B/other": {
+            "readFile": 6,
+            "readFileBytes": 12
+          },
+          "B/history": {
+            "readFile": 246,
+            "readFileBytes": 185510
+          }
+        }
+      }
+    },
+    "candidate-large-process": {
+      "startedUnixMs": 1795319913000,
+      "meter": false,
+      "unchangedState": true,
+      "providers": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "central": {
+        "journalHead": 1564,
+        "journalRows": 1564,
+        "directoryRevision": 127,
+        "liveRows": 123
+      },
+      "devices": {
+        "A": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "2ca9c3e8ae0c81cfe2edbe9f0f64a010e5a91a9d7dbaaf85adc5ae7af664ace2",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        },
+        "B": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "2ca9c3e8ae0c81cfe2edbe9f0f64a010e5a91a9d7dbaaf85adc5ae7af664ace2",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        }
+      },
+      "first10": {
+        "elapsedMs": 599894,
+        "hostCpuMs": {
+          "A": 780,
+          "B": 770,
+          "backend": 8400
+        },
+        "hostSingleCorePct": {
+          "A": 0.13,
+          "B": 0.1284,
+          "backend": 1.4002
+        },
+        "procIO": {
+          "A": {
+            "rchar": 6082,
+            "wchar": 6804,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 5747,
+            "wchar": 6461,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 25064,
+            "wchar": 6024,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      },
+      "full31": {
+        "elapsedMs": 1859882,
+        "hostCpuMs": {
+          "A": 3040,
+          "B": 3300,
+          "backend": 25960
+        },
+        "hostSingleCorePct": {
+          "A": 0.1635,
+          "B": 0.1774,
+          "backend": 1.3958
+        },
+        "procIO": {
+          "A": {
+            "rchar": 368002,
+            "wchar": 98762,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 368985,
+            "wchar": 99697,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 48724,
+            "wchar": 25946,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        }
+      }
+    },
+    "candidate-large-missing": {
+      "startedUnixMs": 1795319912000,
+      "meter": true,
+      "unchangedState": true,
+      "providers": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "central": {
+        "journalHead": 1564,
+        "journalRows": 1564,
+        "directoryRevision": 127,
+        "liveRows": 123
+      },
+      "devices": {
+        "A": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "ae915fd1a2ff4eb82647549b86d81db2b8ddc1ccf09d55a6136c9989743fd558",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        },
+        "B": {
+          "cursor": 1564,
+          "directoryRevision": 127,
+          "topics": 123,
+          "historyFiles": 123,
+          "historyMessages": 123,
+          "historyDigest": "ae915fd1a2ff4eb82647549b86d81db2b8ddc1ccf09d55a6136c9989743fd558",
+          "outbox": 0,
+          "inbox": 0,
+          "messagePending": false,
+          "registryPending": false
+        }
+      },
+      "first10": {
+        "elapsedMs": 599748,
+        "hostCpuMs": {
+          "A": 710,
+          "B": 710,
+          "backend": 8590
+        },
+        "hostSingleCorePct": {
+          "A": 0.1184,
+          "B": 0.1184,
+          "backend": 1.4323
+        },
+        "procIO": {
+          "A": {
+            "rchar": 20059,
+            "wchar": 17353,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 20159,
+            "wchar": 17398,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 32398,
+            "wchar": 12853,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "taggedCpuUs": {
+          "A": {
+            "NativeSyncAdapter.synchronize": 7936,
+            "SharedWaitClient.watch": 8980,
+            "DesktopAttachments.restoreRemote": 11631,
+            "SharedRuntime.planTick": 1460,
+            "SharedRuntime.runTick": 504,
+            "SharedWaitClient.take": 0,
+            "SharedRuntime.tick": 350,
+            "SharedRuntime.tickCore": 1521,
+            "SharedRuntime.recoverRegistration": 0,
+            "SharedRuntime.materialize": 4131,
+            "SharedRuntime.backfill": 1615,
+            "AttachmentWork.run": 11101,
+            "DesktopAttachments.uploadLocal": 447
+          },
+          "B": {
+            "NativeSyncAdapter.synchronize": 7436,
+            "SharedWaitClient.watch": 4714,
+            "DesktopAttachments.restoreRemote": 14306,
+            "SharedRuntime.planTick": 480,
+            "SharedRuntime.runTick": 299,
+            "SharedWaitClient.take": 0,
+            "SharedRuntime.tick": 971,
+            "SharedRuntime.tickCore": 2384,
+            "SharedRuntime.recoverRegistration": 0,
+            "SharedRuntime.materialize": 4644,
+            "SharedRuntime.backfill": 232,
+            "AttachmentWork.run": 10541,
+            "DesktopAttachments.uploadLocal": 174
+          },
+          "backend": {
+            "shared/watch": 57408,
+            "attachment": 20024
+          }
+        },
+        "taggedSingleCorePct": {
+          "A": 0.008283,
+          "B": 0.0077,
+          "backend": 0.012911
+        },
+        "http": {
+          "shared/watch": {
+            "requests": 0,
+            "finished": 0,
+            "requestBytes": 0,
+            "responseBytes": 1040,
+            "sseBytes": 1040,
+            "sseDataFrames": 0,
+            "sseCommentFrames": 80
+          },
+          "attachment": {
+            "requests": 6,
+            "finished": 6,
+            "requestBytes": 0,
+            "responseBytes": 264,
+            "status_404": 6
+          }
+        },
+        "invocations": {
+          "A/SharedRuntime.runTick": 3,
+          "A/SharedWaitClient.take": 3,
+          "A/SharedRuntime.tick": 3,
+          "A/SharedRuntime.tickCore": 3,
+          "A/SharedRuntime.recoverRegistration": 3,
+          "A/SharedRuntime.materialize": 3,
+          "A/SharedRuntime.backfill": 3,
+          "A/AttachmentWork.run": 3,
+          "A/DesktopAttachments.uploadLocal": 3,
+          "A/DesktopAttachments.restoreRemote": 3,
+          "A/SharedRuntime.planTick": 3,
+          "B/SharedRuntime.runTick": 3,
+          "B/SharedWaitClient.take": 3,
+          "B/SharedRuntime.tick": 3,
+          "B/SharedRuntime.tickCore": 3,
+          "B/SharedRuntime.recoverRegistration": 3,
+          "B/SharedRuntime.materialize": 3,
+          "B/SharedRuntime.backfill": 3,
+          "B/AttachmentWork.run": 3,
+          "B/DesktopAttachments.uploadLocal": 3,
+          "B/DesktopAttachments.restoreRemote": 3,
+          "B/SharedRuntime.planTick": 3,
+          "backend/attachment": 6
+        },
+        "historySnapshots": {
+          "A/AttachmentWork.run": 3,
+          "B/AttachmentWork.run": 3
+        },
+        "logicalFiles": {
+          "A/history": {
+            "readFile": 3,
+            "readFileBytes": 4356
+          },
+          "B/history": {
+            "readFile": 3,
+            "readFileBytes": 4356
+          }
+        }
+      },
+      "full31": {
+        "elapsedMs": 1859747,
+        "hostCpuMs": {
+          "A": 3750,
+          "B": 3730,
+          "backend": 26370
+        },
+        "hostSingleCorePct": {
+          "A": 0.2016,
+          "B": 0.2006,
+          "backend": 1.4179
+        },
+        "procIO": {
+          "A": {
+            "rchar": 401613,
+            "wchar": 130860,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "B": {
+            "rchar": 401247,
+            "wchar": 130447,
+            "read_bytes": 0,
+            "write_bytes": 0
+          },
+          "backend": {
+            "rchar": 67554,
+            "wchar": 47303,
+            "read_bytes": 0,
+            "write_bytes": 0
+          }
+        },
+        "taggedCpuUs": {
+          "A": {
+            "NativeSyncAdapter.synchronize": 28790,
+            "SharedWaitClient.watch": 16242,
+            "DesktopAttachments.restoreRemote": 25260,
+            "SharedRuntime.planTick": 2972,
+            "SharedRuntime.runTick": 352115,
+            "SharedWaitClient.take": 0,
+            "SharedRuntime.tick": 4504,
+            "SharedRuntime.tickCore": 6619,
+            "SharedRuntime.recoverRegistration": 391,
+            "SharedRuntime.materialize": 12086,
+            "SharedRuntime.backfill": 2618,
+            "AttachmentWork.run": 26466,
+            "DesktopAttachments.uploadLocal": 447,
+            "SharedRuntime.configureWatch": 0,
+            "SharedWaitClient.configure": 0,
+            "SharedMatching.poll": 6201,
+            "SharedRuntime.pollDirectory": 4157,
+            "SharedRuntime.discover": 59507,
+            "SharedRuntime.readLocal": 10359,
+            "SharedExecution.reconcile": 353,
+            "SharedSessionClient.reconcile": 0
+          },
+          "B": {
+            "NativeSyncAdapter.synchronize": 29633,
+            "SharedWaitClient.watch": 14813,
+            "DesktopAttachments.restoreRemote": 28334,
+            "SharedRuntime.planTick": 3570,
+            "SharedRuntime.runTick": 333916,
+            "SharedWaitClient.take": 0,
+            "SharedRuntime.tick": 1319,
+            "SharedRuntime.tickCore": 7184,
+            "SharedRuntime.recoverRegistration": 0,
+            "SharedRuntime.materialize": 9352,
+            "SharedRuntime.backfill": 2245,
+            "AttachmentWork.run": 27857,
+            "DesktopAttachments.uploadLocal": 663,
+            "SharedRuntime.configureWatch": 0,
+            "SharedWaitClient.configure": 0,
+            "SharedMatching.poll": 6632,
+            "SharedRuntime.pollDirectory": 3383,
+            "SharedRuntime.discover": 80399,
+            "SharedRuntime.readLocal": 13666,
+            "SharedExecution.reconcile": 512,
+            "SharedSessionClient.reconcile": 0
+          },
+          "backend": {
+            "shared/watch": 184735,
+            "attachment": 43864,
+            "shared/info": 5259,
+            "shared/matches": 3942,
+            "shared/changes": 5816,
+            "shared/pull": 10346
+          }
+        },
+        "taggedSingleCorePct": {
+          "A": 0.030063,
+          "B": 0.030299,
+          "backend": 0.013656
+        },
+        "http": {
+          "shared/watch": {
+            "requests": 0,
+            "finished": 0,
+            "requestBytes": 0,
+            "responseBytes": 3224,
+            "sseBytes": 3224,
+            "sseDataFrames": 0,
+            "sseCommentFrames": 248
+          },
+          "attachment": {
+            "requests": 14,
+            "finished": 14,
+            "requestBytes": 0,
+            "responseBytes": 616,
+            "status_404": 14
+          },
+          "shared/info": {
+            "requests": 4,
+            "finished": 4,
+            "requestBytes": 0,
+            "responseBytes": 1920,
+            "status_200": 4
+          },
+          "shared/matches": {
+            "requests": 4,
+            "finished": 4,
+            "requestBytes": 0,
+            "responseBytes": 152,
+            "status_200": 4
+          },
+          "shared/changes": {
+            "requests": 4,
+            "finished": 4,
+            "requestBytes": 0,
+            "responseBytes": 164,
+            "status_200": 4
+          },
+          "shared/pull": {
+            "requests": 4,
+            "finished": 4,
+            "requestBytes": 0,
+            "responseBytes": 236,
+            "status_200": 4
+          }
+        },
+        "invocations": {
+          "A/SharedRuntime.runTick": 9,
+          "A/SharedWaitClient.take": 9,
+          "A/SharedRuntime.tick": 9,
+          "A/SharedRuntime.tickCore": 9,
+          "A/SharedRuntime.recoverRegistration": 9,
+          "A/SharedRuntime.materialize": 9,
+          "A/SharedRuntime.backfill": 9,
+          "A/AttachmentWork.run": 9,
+          "A/DesktopAttachments.uploadLocal": 7,
+          "A/DesktopAttachments.restoreRemote": 7,
+          "A/SharedRuntime.planTick": 9,
+          "B/SharedRuntime.runTick": 9,
+          "B/SharedWaitClient.take": 9,
+          "B/SharedRuntime.tick": 9,
+          "B/SharedRuntime.tickCore": 9,
+          "B/SharedRuntime.recoverRegistration": 9,
+          "B/SharedRuntime.materialize": 9,
+          "B/SharedRuntime.backfill": 9,
+          "B/AttachmentWork.run": 9,
+          "B/DesktopAttachments.uploadLocal": 7,
+          "B/DesktopAttachments.restoreRemote": 7,
+          "B/SharedRuntime.planTick": 9,
+          "backend/attachment": 14,
+          "A/SharedRuntime.configureWatch": 2,
+          "A/SharedWaitClient.configure": 2,
+          "A/SharedMatching.poll": 2,
+          "A/SharedRuntime.pollDirectory": 2,
+          "A/SharedRuntime.discover": 2,
+          "A/SharedRuntime.readLocal": 8,
+          "A/NativeSyncAdapter.synchronize": 2,
+          "A/SharedExecution.reconcile": 2,
+          "A/SharedSessionClient.reconcile": 2,
+          "B/SharedRuntime.configureWatch": 2,
+          "B/SharedWaitClient.configure": 2,
+          "B/SharedMatching.poll": 2,
+          "B/SharedRuntime.pollDirectory": 2,
+          "B/SharedRuntime.discover": 2,
+          "B/SharedRuntime.readLocal": 8,
+          "B/NativeSyncAdapter.synchronize": 2,
+          "B/SharedExecution.reconcile": 2,
+          "B/SharedSessionClient.reconcile": 2,
+          "backend/shared/info": 4,
+          "backend/shared/matches": 4,
+          "backend/shared/changes": 4,
+          "backend/shared/pull": 4
+        },
+        "historySnapshots": {
+          "A/AttachmentWork.run": 7,
+          "B/AttachmentWork.run": 7
+        },
+        "logicalFiles": {
+          "A/history": {
+            "readFile": 253,
+            "readFileBytes": 197070
+          },
+          "B/history": {
+            "readFile": 253,
+            "readFileBytes": 197070
+          },
+          "A/config": {
+            "readFile": 12,
+            "readFileBytes": 87272
+          },
+          "A/other": {
+            "readFile": 6,
+            "readFileBytes": 12
+          },
+          "B/config": {
+            "readFile": 12,
+            "readFileBytes": 87272
+          },
+          "B/other": {
+            "readFile": 6,
+            "readFileBytes": 12
+          }
+        }
+      }
+    }
+  },
+  "attachmentRecovery": {
+    "candidate": "ecc6bff",
+    "misses": [
+      {
+        "device": "deviceA",
+        "status": 404,
+        "at": 1795320620709
+      },
+      {
+        "device": "deviceB",
+        "status": 404,
+        "at": 1795320621303
+      }
+    ],
+    "recovered": [
+      {
+        "device": "deviceA",
+        "status": 200,
+        "at": 1795320680929
+      },
+      {
+        "device": "deviceB",
+        "status": 200,
+        "at": 1795320681465
+      }
+    ],
+    "sinceUploadMs": 52014,
+    "materialized": {
+      "A": {
+        "localHash": "2baddc0e3f5d1e342767c3b1a15e3f8869f8f1b5ac254e5597d5bcb9976c7c84",
+        "bytes": 47
+      },
+      "B": {
+        "localHash": "2baddc0e3f5d1e342767c3b1a15e3f8869f8f1b5ac254e5597d5bcb9976c7c84",
+        "bytes": 47
+      }
+    },
+    "journalRows": 1,
+    "providerCalls": 0
+  },
+  "topicObservation": {
+    "candidate": "ecc6bff",
+    "established": {
+      "route": "/api/v1/sync/shared/session-events",
+      "method": "GET",
+      "device": "deviceB",
+      "status": 200,
+      "scope": "topic"
+    },
+    "inactiveWork": true,
+    "unchangedState": true,
+    "measurement": {
+      "elapsedMs": 119992,
+      "hostCpuMs": {
+        "A": 330,
+        "B": 320,
+        "backend": 1820
+      },
+      "hostSingleCorePct": {
+        "A": 0.275,
+        "B": 0.2667,
+        "backend": 1.5168
+      },
+      "procIO": {
+        "A": {
+          "rchar": 170688,
+          "wchar": 2347,
+          "read_bytes": 0,
+          "write_bytes": 0
+        },
+        "B": {
+          "rchar": 144128,
+          "wchar": 1983,
+          "read_bytes": 0,
+          "write_bytes": 0
+        },
+        "backend": {
+          "rchar": 21472,
+          "wchar": 1900,
+          "read_bytes": 0,
+          "write_bytes": 0
+        }
+      },
+      "taggedCpuUs": {
+        "A": {
+          "SharedMatching.poll": 2123,
+          "SharedWaitClient.watch": 1571,
+          "NativeSyncAdapter.synchronize": 0
+        },
+        "B": {
+          "SharedMatching.poll": 1978,
+          "SharedWaitClient.watch": 588,
+          "SharedSessionClient.watchTopic": 3308,
+          "NativeSyncAdapter.synchronize": 0
+        },
+        "backend": {
+          "shared/watch": 13448,
+          "shared/session-events/topic": 7191
+        }
+      },
+      "taggedSingleCorePct": {
+        "A": 0.003079,
+        "B": 0.004895,
+        "backend": 0.0172
+      },
+      "http": {
+        "shared/watch": {
+          "requests": 0,
+          "finished": 0,
+          "requestBytes": 0,
+          "responseBytes": 208,
+          "sseBytes": 208,
+          "sseDataFrames": 0,
+          "sseCommentFrames": 16
+        },
+        "shared/session-events/topic": {
+          "requests": 0,
+          "finished": 0,
+          "requestBytes": 0,
+          "responseBytes": 104,
+          "sseBytes": 104,
+          "sseDataFrames": 0,
+          "sseCommentFrames": 8
+        }
+      },
+      "invocations": {},
+      "historySnapshots": {},
+      "logicalFiles": {}
+    },
+    "windows": [
+      {
+        "minute": 1,
+        "durationMs": 59989,
+        "cpuMs": {
+          "A": 250,
+          "B": 240,
+          "backend": 890
+        },
+        "httpRequests": {},
+        "httpSseBytes": 156,
+        "taggedCpuUs": {
+          "A": 1911,
+          "B": 3629,
+          "backend": 10651
+        },
+        "watchBackendCpuUs": 7298,
+        "auditTicks": {},
+        "historySnapshots": {}
+      },
+      {
+        "minute": 2,
+        "durationMs": 60003,
+        "cpuMs": {
+          "A": 80,
+          "B": 80,
+          "backend": 930
+        },
+        "httpRequests": {},
+        "httpSseBytes": 156,
+        "taggedCpuUs": {
+          "A": 1783,
+          "B": 2245,
+          "backend": 9988
+        },
+        "watchBackendCpuUs": 6150,
+        "auditTicks": {},
+        "historySnapshots": {}
+      }
+    ]
+  }
+}
