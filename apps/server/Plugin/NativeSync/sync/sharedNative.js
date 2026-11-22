@@ -1,5 +1,6 @@
 'use strict';
 const controlled=require('./sharedControlledText');
+const handoff=require('./sharedGroupHandoff');
 const {SharedDelegation,linkageHash}=require('./sharedDelegation');
 const {resolveEffectiveModel}=require('@vcp/core-rules/group/modelSelection');
 const {sha256,stable}=require('./protocol');
@@ -30,6 +31,7 @@ class SharedNative {
   this.recoveryFinals=new Map(this.finalCandidates(controlled.AA_MODE).map(row=>[row.request_id,row.id]));
   const retryFinal=[...this.recoverFinalReplies(),...this.recoveryFinals.keys()];
   this.db.prepare("UPDATE shared_native_requests SET state='unknown' WHERE state='dispatched' AND id NOT IN (SELECT value FROM json_each(?))").run(JSON.stringify(retryFinal));
+  handoff.recoverUnknown(shared);
   if(engine?.get&&engine.configs){
    this.verifyRecoveredToolBoundaries();
    require('../mobile/groupTurn').recover(engine);
@@ -152,9 +154,15 @@ class SharedNative {
    if(controlled.isControlled(turn.controlMode)){const current=this.shared.steering.control(admission),frozen=this.shared.steering.generation(admission.id,body.generation);if(current.executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');if(!frozen||frozen.executor!==actor.principal||frozen.request_id!==body.requestId||frozen.consumed_seq!==body.consumedInputSeq||current.generation!==body.generation)throw fail('INVALID_STEERING_GENERATION');this.shared.steering.fence(admission.id,body.generation,actor.principal);}
    if(this.engine.get?.(admission.id)?.kind==='shared_session'&&!session)throw fail('SHARED_SESSION_DISPATCH_ONLY');
    if(this.shared.steering.enabled&&require('./sharedTurns').intent(admission).steeringCapable)this.shared.steering.control(admission);
-   const selected=body.generation===undefined?null:this.shared.steering.generation(admission.id,body.generation);
-   if((selected?.executor||admission.principal)!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
+   const controlledGroup=handoff.matches(admission);
    const prior=this.db.prepare('SELECT * FROM shared_native_requests WHERE id=?').get(body.requestId);
+   if(controlledGroup){
+    if(body.generation!==undefined||body.consumedInputSeq!==undefined)throw fail('INVALID_STEERING_GENERATION');
+    const ordinal=prior?.ordinal??this.db.prepare('SELECT count(*) n FROM shared_native_requests WHERE admission_id=?').get(admission.id).n;
+    handoff.assertSlot(this.shared,actor,admission,ordinal,body.requestId);
+   }
+   const selected=body.generation===undefined?null:this.shared.steering.generation(admission.id,body.generation);
+   if(!controlledGroup&&(selected?.executor||admission.principal)!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
    if(prior){if(prior.admission_id!==admission.id||prior.principal!==actor.principal||prior.body_hash!==body.bodyHash||(prior.member_id||null)!==(body.memberId||null))throw fail('REQUEST_ID_REUSED');return {requestId:prior.id,state:prior.state,replayed:true};}
    if(!['accepted','dispatched'].includes(admission.state))throw fail('SHARED_REQUEST_NOT_DISPATCHABLE');
    if(this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state IN ('prepared','dispatched','unknown')").get(admission.id))throw fail('SHARED_TOPIC_BUSY');
@@ -221,6 +229,8 @@ class SharedNative {
    row=this.db.prepare('SELECT * FROM shared_native_requests WHERE id=? AND admission_id=?').get(req.body.requestId,ticket);
   }
   if(!row||row.principal!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
+  const controlledGroup=handoff.matches(admission);
+  const groupControl=controlledGroup?handoff.assertSlot(this.shared,actor,admission,row.ordinal,row.id):null;
   const stop=this.engine.get?.(admission.id)?.group_stop_index;
   if(stop!=null&&row.ordinal>=stop)throw fail('SHARED_REQUEST_FENCED');
   const generation=this.shared.steering.requestGeneration(admission.id,row.id);
@@ -273,13 +283,18 @@ class SharedNative {
   if(delegation&&!this.shared.delegationAgents.has(delegation.agentName))throw fail('INVALID_SHARED_AA_DELEGATION');
   const safeTools=generation?.generation!==0?null:delegation?new Set(['AgentAssistant']):
    turn.controlMode===controlled.TOOLS_MODE?this.shared.safeTools:null;
-  const textOnly=turn.controlMode===controlled.MODE||transferable&&!safeTools;
+  if(groupControl)handoff.assertBody(this.shared,admission,topic,groupControl,row.ordinal,req.body);
+  const textOnly=controlledGroup||turn.controlMode===controlled.MODE||transferable&&!safeTools;
   if(controlled.isControlled(turn.controlMode)&&((req.body.tools||[]).length||req.body.functions||!Array.isArray(req.body.messages)||continuedBody.messages.some(message=>!['system','developer','user','assistant'].includes(message.role)||typeof message.content!=='string'||controlled.local(message.content))))throw fail('CONTROLLED_TEXT_ONLY');
   const steeringEnabled=require('./sharedTurns').intent(admission).steeringCapable&&Boolean(this.db.prepare('SELECT 1 FROM shared_work_controls WHERE work_id=?').get(admission.id));
   if(delegation)continuedBody=withDelegationInstruction(continuedBody,delegation);
   if(steeringEnabled)this.continuations.begin({workId:admission.id,requestId:row.id,generation:generation?.generation||0,controlRevision:generation?.revision||0},continuedBody.messages,continuedBody.vcpchatExtensions||{});
   this.shared.atomic(()=>{
-   this.db.prepare("UPDATE shared_native_requests SET state='dispatched' WHERE id=?").run(row.id);
+   if(groupControl){
+    const fresh=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(admission.id);
+    handoff.assertSlot(this.shared,actor,fresh,row.ordinal,row.id);
+   }
+   if(!this.db.prepare("UPDATE shared_native_requests SET state='dispatched' WHERE id=? AND state='prepared'").run(row.id).changes)throw fail('SHARED_REQUEST_ALREADY_DISPATCHED');
    this.db.prepare("UPDATE shared_admissions SET state='dispatched',dispatched=1 WHERE id=?").run(admission.id);
   });
   const base=this.engine.nativeTasks.hooks(admission.id,row.id);
@@ -294,13 +309,16 @@ class SharedNative {
    if(this.closed)throw fail('SHARED_NATIVE_CLOSED',503);
    if(batchNames&&settledCount===batchNames.length){pausedAtFence=true;throw fail('WORK_SAFE_TOOL_BOUNDARY');}
    this.shared.steering.fence(admission.id,generation?.generation||0,actor.principal);
-   const current=this.db.prepare('SELECT state FROM shared_admissions WHERE id=?').get(admission.id);
+   const current=this.db.prepare(groupControl?'SELECT * FROM shared_admissions WHERE id=?':'SELECT state FROM shared_admissions WHERE id=?').get(admission.id);
+   if(groupControl&&handoff.assertSlot(this.shared,actor,current,row.ordinal,row.id).executor_version!==groupControl.executor_version)
+    throw fail('SHARED_GROUP_HANDOFF_FENCED');
    if(!current||current.state!=='dispatched')throw fail('SHARED_REQUEST_FENCED');
   };
   const hint=(event,state)=>this.engine.emitEvent?.(admission.id,'tool',{state,nativeRequestId:row.id,...(event.invocationId?{invocationId:event.invocationId}:{}),...(event.nativeTaskId?{nativeTaskId:event.nativeTaskId}:{})});
   const hooks={...base,
    onToolDispatch:event=>{
     fence();
+    if(controlledGroup)throw fail('CONTROLLED_TEXT_TOOLS_FORBIDDEN');
     if(safeTools){
      if(!safeTools.has(event.pluginName))throw fail('CONTROLLED_TOOL_FORBIDDEN');
      const prior=this.toolLedger(admission.id);
@@ -318,7 +336,7 @@ class SharedNative {
     }
     const value=base.onToolDispatch(event);hint(event,'started');return value;
    },
-   onTaskAccepted:event=>{fence();if(safeTools&&!delegation)throw fail('CONTROLLED_TOOL_FORBIDDEN');
+   onTaskAccepted:event=>{fence();if(controlledGroup)throw fail('CONTROLLED_TEXT_TOOLS_FORBIDDEN');if(safeTools&&!delegation)throw fail('CONTROLLED_TOOL_FORBIDDEN');
     if(delegation&&(event.pluginName!=='AgentAssistant'||this.engine.nativeTasks.list(admission.id).length))throw fail('CONTROLLED_TOOL_CALL_LIMIT');const value=base.onTaskAccepted(event);hint(event,'accepted');return value;},
    onToolSettled:event=>{const value=base.onToolSettled(event);if(safeTools&&event.outcome==='returned'){
     if(event.batchNames!==batchNames||event.batchOrdinal!==settledCount)throw fail('NATIVE_INVOCATION_IDENTITY_MISMATCH');
@@ -424,7 +442,7 @@ class SharedNative {
    if(!success&&!steered){this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE id=? AND state='dispatched'").run(admission.id);this.engine.emitEvent?.(admission.id,'state',{state:'review_required'});}
    else this.checkTerminal(admission.id);
   };
-  return {textOnly,safeTools,delegation,beginToolBatch,observeAssistantText,sponsorAuthority:{actor,admissionId:admission.id,spaceId:admission.space_id,routeHash:JSON.parse(admission.user_op||'{}').sponsorRouteHash},phase:name=>this.phase(admission.id,row.id,name),steeringEnabled,workId:admission.id,generation:generation?.generation||0,fence,applied,continuation:()=>continuedBody,checkpoint:steeringEnabled?{finalReply,completion:value=>this.continuations.completion(row.id,value),assistant:content=>this.continuations.assistant(row.id,content),result:(invocation,value)=>this.continuations.result(row.id,invocation,value)}:null,sessionFinalReply,bridge:hooks,finish,
+  return {textOnly,safeTools,delegation,beginToolBatch,observeAssistantText,sponsorAuthority:controlledGroup?null:{actor,admissionId:admission.id,spaceId:admission.space_id,routeHash:JSON.parse(admission.user_op||'{}').sponsorRouteHash},phase:name=>this.phase(admission.id,row.id,name),steeringEnabled,workId:admission.id,generation:generation?.generation||0,fence,applied,continuation:()=>continuedBody,checkpoint:steeringEnabled?{finalReply,completion:value=>this.continuations.completion(row.id,value),assistant:content=>this.continuations.assistant(row.id,content),result:(invocation,value)=>this.continuations.result(row.id,invocation,value)}:null,sessionFinalReply,bridge:hooks,finish,
    settleToolPause:()=>{
     if(!pausedAtFence)return false;
     finish(false);

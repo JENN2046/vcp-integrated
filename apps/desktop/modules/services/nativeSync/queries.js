@@ -6,7 +6,7 @@ const { identity, fail } = require('./protocol');
 
 // Main-frame identity is checked at invocation, including after window recreation.
 // Device/server grants do not authorize a different local renderer to act.
-function mainWindowSender(getMainWindow, projectRoot) {
+function mainWindowSender(getMainWindow, projectRoot=path.resolve(__dirname,'../../..')) {
     const target = pathToFileURL(path.join(projectRoot, 'main.html')).href;
     return event => {
         try {
@@ -117,4 +117,4 @@ function registerNativeSyncQueries({ipcMain,getRuntime,getMainWindow,queue,proje
         },
     };
 }
-module.exports = { registerNativeSyncQueries };
+module.exports = { registerNativeSyncQueries, mainWindowSender };

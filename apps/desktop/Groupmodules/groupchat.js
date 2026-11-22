@@ -2791,6 +2791,7 @@ module.exports = {
     getAgentGroupConfig,
     saveAgentGroupConfig,
     deleteAgentGroup,
+    groupMemberHandoff: (payload, notify, lookup) => sharedGroup.action(groupHistoryMutationQueue,payload,notify,lookup,handleGroupChatMessage),
     handleGroupChatMessage: (...args) => sharedGroup.wrap(groupHistoryMutationQueue,'message',handleGroupChatMessage)(...args),
     handleInviteAgentToSpeak: (...args) => sharedGroup.wrap(groupHistoryMutationQueue,'invite',handleInviteAgentToSpeak)(...args),
     appendGroupHistoryMessage, // Game runtime publishes committed public events only.

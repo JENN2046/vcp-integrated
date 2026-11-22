@@ -80,7 +80,11 @@ function complete(shared,actor,body,row){
  if(!message||message.role!=='assistant'||message.id!=='reply_'+step.id||message.agentId!==step.member_id)throw fail('INVALID_SHARED_REPLY',400);
  const native=shared.native?.engine.nativeTasks;
  if(!native||native.needsReview(row.id)||native.unsettledTools(row.id)||(stop!=null&&(native.uncertainTools(row.id)||shared.native.taskRequests.uncertain(row.id))))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+ const handoff=require('./sharedGroupHandoff');
+ const controlledGroup=handoff.matches(row);
+ if(controlledGroup)handoff.assertReply(shared,actor,row,step,message);
  const receipt=writeReply(shared,actor,topic,row,message,'shared-step:'+step.id);
+ if(controlledGroup&&step.ordinal===0)handoff.pause(shared,row,topic,receipt.seq);
  if(turn.kind==='regenerate')replaceTarget(shared,actor,topic,row,turn);
  shared.db.prepare('UPDATE shared_admissions SET reply_seq=? WHERE id=?').run(receipt.seq,row.id);
  return {request:shared.publicAdmission(shared.admission(actor,row.space_id,row.id)),receipt};

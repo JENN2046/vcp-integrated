@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const { pathToFileURL } = require('url');
 const groupChat = require('../../Groupmodules/groupchat');
+const { mainWindowSender } = require('../services/nativeSync/queries');
 const { HistoryMutationQueue } = require('../services/historyMutationQueue');
 const { clearTrajectoryOf, clearTrajectoriesOfOwner } = require('../modelTrajectory');
 
@@ -272,6 +273,17 @@ function initialize(mainWindow, context) {
         } catch (error) {
             console.error(`[Main IPC] 保存群组 ${groupId} 话题 ${topicId} 聊天历史失败:`, error);
             return { success: false, error: error.message };
+        }
+    });
+
+    const trustedGroupHandoff = mainWindowSender(() => mainWindow);
+    ipcMain.handle('group-member-handoff', async (event, payload) => {
+        if (!trustedGroupHandoff(event)) return { success: false, error: 'FORBIDDEN' };
+        try {
+            return await require('../services/quitAdmission.cjs').run(() =>
+                groupChat.groupMemberHandoff(payload, createStreamSender(), getAgentConfigById));
+        } catch (error) {
+            return { success: false, error: error.code || 'SHARED_GROUP_HANDOFF_FAILED' };
         }
     });
 

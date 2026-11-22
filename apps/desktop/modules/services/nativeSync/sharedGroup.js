@@ -3,6 +3,7 @@ const {AsyncLocalStorage}=require('node:async_hooks');
 const {randomUUID}=require('node:crypto');
 const {sharedEffectiveRules}=require('./contracts.generated.cjs');
 const {fail}=require('./protocol');
+const handoff=require('./sharedGroupHandoff');
 const local=new AsyncLocalStorage();
 const current=()=>local.getStore();
 function groupConfig(groupId){const s=current();return s?.descriptor.itemId===groupId?s.config:null;}
@@ -20,7 +21,9 @@ function replyId(memberId,fallback){
 }
 async function history(groupId,topicId,fallback){
  const s=current();if(!s)return fallback;
- const rows=await s.execution.runtime.replica.queue.read(s.mapping.shared);
+ const runtime=s.execution.runtime;
+ const rows=await runtime.replica.queue.read(s.mapping.shared);
+ if(s.ordinal===1)handoff.assertFirstReply(runtime,s.mapping,s.record.accepted,rows);
  const index=s.record.accepted.turn.kind==='regenerate'?rows.findIndex(m=>m.id===s.record.accepted.turn.targetId):null;
  if(index!==null&&index<0)throw fail('SHARED_REGENERATION_TARGET_CHANGED');
  return (index===null?rows:rows.slice(0,index)).map(m=>({...m,...(m.agentId?{agentId:s.execution.runtime.localFor(m.agentId).localId}:{}),...(m.groupId?{groupId}:{}),...(m.topicId?{topicId}:{})}));
@@ -45,11 +48,45 @@ async function run(queue,descriptor,message,options,invoke){
  const execution=queue?.syncPolicy?.sharedExecution;
  if(!execution||!execution.runtime.nativeObject('group',descriptor.itemId))return invoke(null);
  const payload=message||{id:'explicit_'+randomUUID().replaceAll('-',''),role:'user',content:'',timestamp:Date.now()};
- const prepared=await execution.prepare(descriptor,payload,options),record=prepared.record;
+ const prepared=await execution.prepare(descriptor,payload,options);
+ return runPrepared(execution,descriptor,prepared,invoke);
+}
+async function runPrepared(execution,descriptor,prepared,invoke,ordinal=null){
+ const record=prepared.record;
+ if(ordinal!==null&&(!handoff.canDispatch(record.accepted,ordinal)||record.accepted.groupHandoff.executor!==handoff.executor(execution.runtime))){
+  throw fail('SHARED_GROUP_HANDOFF_FENCED');
+ }
+ if(execution.liveGroups.has(record.accepted.id))throw fail('SHARED_TOPIC_BUSY');
  const config=prepared.config;config.modeSettings={...config.modeSettings,naturerandom:{memberTags:config.memberTags||{},tagMatchMode:config.tagMatchMode||'strict'}};
- const s={execution,descriptor,record,config,members:prepared.members,mapping:execution.mapping(descriptor),rules:sharedEffectiveRules([...(record.config.rules[0]?.config.tavernRules||[]),...(record.config.owner.config.tavernRules||[])],record.config.owner.config.ruleOverrides||{}),plan:record.accepted.turn.plan.map(id=>execution.runtime.localFor(id).localId)};
+ const s={execution,descriptor,record,ordinal,config,members:prepared.members,mapping:execution.mapping(descriptor),rules:sharedEffectiveRules([...(record.config.rules[0]?.config.tavernRules||[]),...(record.config.owner.config.tavernRules||[])],record.config.owner.config.ruleOverrides||{}),plan:(ordinal===null?record.accepted.turn.plan:[record.accepted.turn.plan[ordinal]]).map(id=>execution.runtime.localFor(id).localId)};
  execution.liveGroups.add(record.accepted.id);
- try{return await local.run(s,async()=>{const result=await invoke(s);await execution.groupDone(record);return result;});}finally{execution.liveGroups.delete(record.accepted.id);}
+ try {
+  return await local.run(s,async()=>{
+   const result=await invoke(s);
+   if(ordinal===null){await execution.groupDone(record);return result;}
+   const request=await execution.refresh(record);
+   if(ordinal===0){
+    if(!request?.groupHandoff?.firstReplySeq)throw fail('SHARED_GROUP_RESULT_UNCONFIRMED');
+   }else if(request?.state!=='completed'){
+    if(!(request?.replySeq>request?.groupHandoff?.firstReplySeq))throw fail('SHARED_GROUP_RESULT_UNCONFIRMED');
+    await execution.groupDone(record);
+   }
+   return {success:true,workId:record.accepted.id};
+  });
+ } finally {execution.liveGroups.delete(record.accepted.id);}
+}
+function action(queue,payload,notify,lookup,invoke){
+ const execution=queue?.syncPolicy?.sharedExecution,descriptor=payload?.descriptor;
+ if(!execution?.runtime.nativeObject('group',descriptor?.itemId))throw fail('SHARED_GROUP_HANDOFF_UNAVAILABLE');
+ return handoff.executeAction(execution,payload,(prepared,ordinal)=>runPrepared(execution,descriptor,prepared,s=>{
+  const frozen=async id=>{
+   const member=s.members.find(m=>m.id===id);
+   if(!member)throw fail('SHARED_MEMBER_NOT_AUTHORIZED');
+   return {...await lookup(id),...member};
+  };
+  const user=prepared.userMessage;
+  return invoke(descriptor.itemId,descriptor.topicId,{...user,content:{text:user.content},originalUserText:user.content},notify,frozen,{committedMessageId:user.id});
+ },ordinal));
 }
 function wrap(queue,kind,original,invite){return async(...args)=>{
  const [groupId,topicId,input,emit,load]=args,execution=queue?.syncPolicy?.sharedExecution;
@@ -66,4 +103,4 @@ function wrap(queue,kind,original,invite){return async(...args)=>{
   return original(groupId,topicId,kind==='invite'?memberId:input,notify,frozen,args[5]);
  });
 };}
-module.exports={current,groupConfig,rules,policy,speakers,contextText,replyId,history,append,send,run,wrap};
+module.exports={current,groupConfig,rules,policy,speakers,contextText,replyId,history,append,send,run,wrap,action};

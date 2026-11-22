@@ -12,6 +12,9 @@ posts['steer-turn-complete']=['steerTurnComplete',['sharedSpaceId','workId','opI
 posts['compact-prepare']=['compactPrepare',['sharedSpaceId','sharedId','opId','expectedHead']];
 posts['compact-cancel']=['compactCancel',['sharedSpaceId','id','opId']];
 posts['compact-commit']=['compactCommit',['sharedSpaceId','id','opId','sourceHash','message']];
+const handoffFields=['sharedSpaceId','workId','opId','expectedExecutor','expectedExecutorVersion'];
+posts['group-handoff']=['groupHandoff',handoffFields];
+posts['group-continue']=['groupContinue',handoffFields];
 posts['steer-handoff']=['steerHandoff',['sharedSpaceId','workId','opId','expectedRevision','expectedGeneration','expectedExecutor']];
 posts['steer-prepare']=['steerPrepare',['sharedSpaceId','workId','opId','expectedRevision','expectedGeneration','expectedHead','configHash']];
 posts.baselines=['beginSharedBaseline',['sharedSpaceId','sharedId','planId']];
@@ -43,12 +46,13 @@ function desktopBinding(req){
 }
 function sharedInfo(shared,sourceId){
  const policy=require('./releasePolicy.cjs');
- const wait=require('./sharedWait'),controlled=require('./sharedControlledText');
+ const wait=require('./sharedWait'),controlled=require('./sharedControlledText'),handoff=require('./sharedGroupHandoff');
  const features=typeof shared.db.function==='function'?[wait.capability,wait.watchCapability]:[];
  features.push('shared-model-save-v1');
  if(!shared.configurationOnly)features.push(
   'shared-compaction-v1','shared-topic-history-v1','shared-desktop-message-edit-v1','shared-attachments-v1','shared-merge-v1','shared-context-v1',
   require('./sharedInline.cjs').CAP,
+  ...(handoff.available(shared)?[handoff.MODE]:[]),
   ...(shared.native?[require('./sharedNative').NATIVE_INLINE_CAPABILITY]:[]),
   ...(shared.native?.engine?[require('./sharedSession').CAPABILITY,'shared-execution-trace-v1','shared-session-cancel-v1',require('./sharedTopicSponsor').CAPABILITY]:[]),
   ...(shared.events&&!shared.events.closed?['shared-events-v1']:[]),

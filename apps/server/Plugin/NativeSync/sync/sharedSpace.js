@@ -1,4 +1,5 @@
 'use strict';
+const handoff=require('./sharedGroupHandoff');
 const {randomUUID} = require('node:crypto');
 const {stable,sha256,identity} = require('./protocol');
 const {sharedIdentity:id,sharedConfig,SHARED_SPACE_CAPABILITY} = require('./contracts.generated.cjs');
@@ -44,8 +45,9 @@ class SharedSpace {
     CREATE TABLE IF NOT EXISTS shared_admissions(id TEXT PRIMARY KEY,space_id TEXT NOT NULL,topic_id TEXT NOT NULL,principal TEXT NOT NULL,request_id TEXT NOT NULL,request_hash TEXT NOT NULL,state TEXT NOT NULL,config_json TEXT NOT NULL CHECK(json_valid(config_json)),context_head INTEGER NOT NULL,user_op TEXT,user_seq INTEGER,reply_seq INTEGER,dispatched INTEGER NOT NULL DEFAULT 0,native_terminal INTEGER NOT NULL DEFAULT 0,UNIQUE(principal,request_id));
     CREATE UNIQUE INDEX IF NOT EXISTS idx_shared_active_topic ON shared_admissions(topic_id) WHERE state IN ('preparing','accepted','dispatched','review_required');`);
    require('./sharedTopicSponsor').schema(this.db);
+   handoff.schema(this.db);
    const version=this.db.prepare('SELECT max(version) v FROM shared_schema').get().v;
-   if(version!==null&&![1,2].includes(version))throw fail('SHARED_SCHEMA_UPGRADE_REQUIRED');
+   if(version!==null&&![1,2,3].includes(version))throw fail('SHARED_SCHEMA_UPGRADE_REQUIRED');
    this.db.prepare('INSERT OR IGNORE INTO shared_schema VALUES(1)').run();
    for(const space of this.grants.keys())this.db.prepare('INSERT OR IGNORE INTO shared_spaces VALUES(?)').run(space);
   });
@@ -99,7 +101,7 @@ class SharedSpace {
    AND NOT (native_terminal=1 AND EXISTS (SELECT 1 FROM mobile_executions e
      WHERE e.id=shared_admissions.id AND (e.kind IS NULL OR e.kind='shared_session') AND e.state='running'
       AND e.cancel_requested=0 AND e.native_final_operation IS NOT NULL))`:'';
-  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing+safePause+nativeFinal+awaitingDelegation+sessionFinal).run();
+  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing+safePause+nativeFinal+awaitingDelegation+sessionFinal+handoff.recoverable(tables)).run();
  }
  atomic(fn){
   const own=!this.db.isTransaction;
@@ -350,7 +352,7 @@ class SharedSpace {
   const row=this.db.prepare('SELECT * FROM shared_admissions WHERE id=? AND space_id=?').get(admissionId,space);
   if(!row)throw fail('SHARED_REQUEST_NOT_FOUND',404);return row;
  }
- publicAdmission(row){const control=this.db.prepare('SELECT * FROM shared_work_controls WHERE work_id=?').get(row.id),turn=require('./sharedTurns').intent(row),stop=row.principal.startsWith('mobile:')&&turn.plan?.length?this.native?.engine.get?.(row.id)?.group_stop_index:null;return {id:row.id,sharedSpaceId:row.space_id,sharedId:row.topic_id,requestId:row.request_id,state:row.state,configHash:JSON.parse(row.config_json).hash,contextHead:row.context_head,userSeq:row.user_seq,replySeq:row.reply_seq,dispatched:Boolean(row.dispatched),turn,...(stop!=null?{remainingCancelled:true,firstSkippedOrdinal:stop}:{}),...(turn.steeringCapable&&this.steering&&(this.steering.enabled||control)?{steering:this.steering.public(row,control)}:{})};}
+ publicAdmission(row){const control=this.db.prepare('SELECT * FROM shared_work_controls WHERE work_id=?').get(row.id),turn=require('./sharedTurns').intent(row),stop=row.principal.startsWith('mobile:')&&turn.plan?.length?this.native?.engine.get?.(row.id)?.group_stop_index:null;return {id:row.id,sharedSpaceId:row.space_id,sharedId:row.topic_id,requestId:row.request_id,state:row.state,configHash:JSON.parse(row.config_json).hash,contextHead:row.context_head,userSeq:row.user_seq,replySeq:row.reply_seq,dispatched:Boolean(row.dispatched),turn,...(turn.controlMode===handoff.MODE?{groupHandoff:handoff.publicState(this,row)}:{}),...(stop!=null?{remainingCancelled:true,firstSkippedOrdinal:stop}:{}),...(turn.steeringCapable&&this.steering&&(this.steering.enabled||control)?{steering:this.steering.public(row,control)}:{})};}
  async taskResult(actor,{sharedSpaceId,workId,nativeTaskId}){const row=this.admission(actor,sharedSpaceId,workId),topic=this.topic(actor,sharedSpaceId,row.topic_id);if(!this.native)throw fail('SHARED_NATIVE_UNAVAILABLE');return this.native.engine.nativeTasks.result(topic.id,row.id,nativeTaskId);}
  workState(actor,{sharedSpaceId,workId}){const row=this.admission(actor,sharedSpaceId,workId);this.topic(actor,sharedSpaceId,row.topic_id,'execute');return {request:this.publicWork(actor,row)};}
  publicWork(actor,row){
@@ -374,7 +376,8 @@ class SharedSpace {
  requestConfig(actor,{sharedSpaceId,admissionId}){
   this.authorize(actor,sharedSpaceId,'config');
   const row=this.admission(actor,sharedSpaceId,admissionId);
-  if(row.principal!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
+  if(handoff.matches(row))handoff.requireExecutor(this,actor,row);
+  else if(row.principal!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
   return {config:JSON.parse(row.config_json)};
  }
  nativeStatus(row){if(!this.native)return [];return [...this.db.prepare('SELECT id,state,member_id AS memberId,ordinal FROM shared_native_requests WHERE admission_id=? ORDER BY ordinal').all(row.id),...this.db.prepare('SELECT id,state,task_id AS nativeTaskId,control_revision AS controlRevision FROM shared_native_child_requests WHERE work_id=? ORDER BY id').all(row.id).map(v=>({...v,child:true}))].map(v=>({...v,phases:Object.fromEntries(this.db.prepare('SELECT stage,at FROM shared_request_phases WHERE request_id=? ORDER BY at').all(v.id).map(p=>[p.stage,p.at]))}));}
@@ -385,6 +388,7 @@ class SharedSpace {
  }
  admit(actor,body,{session=false,sponsor=null}={}){
   if(session&&body.controlMode!==undefined)throw fail('SHARED_SESSION_CONTROL_MODE_UNSUPPORTED',400);
+  if(body.controlMode===handoff.MODE)handoff.requireClient(actor);
   const sponsored=sponsor===require('./sharedTopicSponsor').dispatchKey&&session;
   if(this.readOnly)throw fail('SHARED_READ_ONLY');
   const topic=this.topic(actor,body.sharedSpaceId,body.sharedId,'execute');id(body.requestId);
@@ -397,7 +401,14 @@ class SharedSpace {
    this.assertNotPrepared([topic.id,topic.parent_id]);if(this.active(topic.id))throw fail('SHARED_TOPIC_BUSY');
    const config=this.freezeForExecution(actor,topic),head=this.head(topic);
    if(body.expectedHead!==head||body.configHash!==config.hash)throw fail('SHARED_CONTEXT_CHANGED');this.checkModelSave(actor,topic,body.modelSaveRef,config,body.modelSaveResolutionRef);
-   const turn=require('./sharedTurns').prepare(this,topic,config,body,sponsored),message=body.message;if(require('./sharedControlledText').admit(this,actor,topic,config,body,turn)){turn.steeringCapable=true;turn.controlMode=body.controlMode;this.db.prepare('INSERT OR IGNORE INTO shared_schema VALUES(2)').run();}require('./sharedAttachments').validate(this,actor,topic,message,config,turn);if(turn.kind==='message'&&(!message||message.role!==(sponsored?'assistant':'user')||typeof message.id!=='string'||!message.id))throw fail('INVALID_SHARED_SUBMISSION',400);
+   const turn=require('./sharedTurns').prepare(this,topic,config,body,sponsored),message=body.message;
+   if(body.controlMode===handoff.MODE)handoff.admit(this,actor,topic,config,body,turn);
+   else if(require('./sharedControlledText').admit(this,actor,topic,config,body,turn)){
+    turn.steeringCapable=true;turn.controlMode=body.controlMode;
+    this.db.prepare('INSERT OR IGNORE INTO shared_schema VALUES(2)').run();
+   }
+   require('./sharedAttachments').validate(this,actor,topic,message,config,turn);
+   if(turn.kind==='message'&&(!message||message.role!==(sponsored?'assistant':'user')||typeof message.id!=='string'||!message.id))throw fail('INVALID_SHARED_SUBMISSION',400);
    const admissionId='request_'+randomUUID().replaceAll('-','');
    const acceptedMessage=turn.steeringCapable||session?{...message,continuity:{version:1,known:true,executionId:admissionId,requestId:body.requestId,dependsOnMessageIds:[]}}:message;
    const op=turn.kind==='message'?{ownerType:topic.owner_type,ownerId:topic.owner_id,topicId:topic.topic_id,msgId:message.id,deviceId:actor.principal,opId:'shared-user:'+body.requestId,baseHash:null,action:'upsert',message:{...acceptedMessage}}:{};
@@ -407,6 +418,7 @@ class SharedSpace {
    if(turn.kind==='message'){const metadata=require('./metadata');op.metadata=metadata.envelopeFor(op.message,1);delete op.message._nativeSyncMetadata;receipt=this.store.apply(op,{sharedSpace:topic.space_id,attachmentPrincipal:actor.principal,metadataPublisher:true});}
    this.db.prepare("UPDATE shared_admissions SET state='accepted',user_seq=? WHERE id=?").run(receipt.seq,admissionId);
    const accepted=this.admission(actor,topic.space_id,admissionId);if(turn.steeringCapable)this.steering.control(accepted);
+   if(handoff.matches(accepted))handoff.create(this,accepted);
    return {...this.publicAdmission(accepted),replayed:false};
   });
  }
@@ -416,6 +428,7 @@ class SharedSpace {
   return this.atomic(()=>{
    const row=this.admission(actor,sharedSpaceId,admissionId);
    if(row.principal!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
+   if(handoff.matches(row))throw fail('SHARED_GROUP_HANDOFF_FENCED');
    if(row.state!=='accepted')throw fail(row.dispatched?'SHARED_REQUEST_ALREADY_DISPATCHED':'SHARED_REQUEST_NOT_DISPATCHABLE');
    this.db.prepare("UPDATE shared_admissions SET state='dispatched',dispatched=1 WHERE id=?").run(row.id);
    return {request:this.publicAdmission(this.admission(actor,sharedSpaceId,row.id)),config:JSON.parse(row.config_json)};
@@ -429,7 +442,8 @@ class SharedSpace {
   const result=this.receipt(actor,body,'complete',()=>{
    const row=this.admission(actor,body.sharedSpaceId,body.admissionId);
    if(!session&&this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mobile_executions'").get()&&this.db.prepare("SELECT 1 FROM mobile_executions WHERE id=? AND kind='shared_session'").get(row.id))throw fail('SHARED_SESSION_COMPLETION_ONLY');
-   if(row.principal!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
+   if(handoff.matches(row))handoff.requireExecutor(this,actor,row);
+   else if(row.principal!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
    if(require('./sharedTurns').intent(row).controlMode===require('./sharedControlledText').AA_MODE)throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
    if(this.db.prepare('SELECT 1 FROM shared_work_controls WHERE work_id=? AND (revision>0 OR generation>0)').get(row.id))throw fail('SHARED_CLIENT_UPGRADE_REQUIRED');
    const groupResult=require('./sharedTurns').complete(this,actor,body,row);if(groupResult)return groupResult;
@@ -442,7 +456,11 @@ class SharedSpace {
    this.db.prepare("UPDATE shared_admissions SET reply_seq=?,state='completed' WHERE id=?").run(receipt.seq,row.id);
    return {request:this.publicAdmission(this.admission(actor,row.space_id,row.id)),receipt};
   });
-  if(!session&&result.request?.state==='completed'&&!this.db.isTransaction)this.native?.engine.emitEvent?.(result.request.id,'completed',{});return result;
+  if(!session&&!this.db.isTransaction){
+   if(result.request?.state==='completed')this.native?.engine.emitEvent?.(result.request.id,'completed',{});
+   else if(!result.replayed&&result.request?.groupHandoff?.state==='awaiting_handoff')this.native?.engine.emitEvent?.(result.request.id,'state',{state:'awaiting_handoff'});
+  }
+  return result;
  }
  abandon(actor,body){
   this.authorize(actor,body.sharedSpaceId,'execute');
@@ -450,7 +468,8 @@ class SharedSpace {
    const row=this.admission(actor,body.sharedSpaceId,body.admissionId);
    const execution=this.native?.engine.get?.(row.id),session=execution?.kind==='shared_session';
    if(session&&(row.principal!==actor.principal))throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
-   if(row.principal!==actor.principal&&this.db.prepare('SELECT executor FROM shared_work_controls WHERE work_id=?').get(row.id)?.executor!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
+   if(handoff.matches(row))handoff.requireExecutor(this,actor,row);
+   else if(row.principal!==actor.principal&&this.db.prepare('SELECT executor FROM shared_work_controls WHERE work_id=?').get(row.id)?.executor!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
    if(session&&(body.confirm!==true||!require('./sharedSession').reviewable(this,execution,row)))throw fail('SHARED_REVIEW_CONFIRMATION_REQUIRED');
    if(body.confirm===true&&row.state==='dispatched'&&this.native?.canReview(row.id)){this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE id=?").run(row.id);row.state='review_required';}
    if(body.confirm!==true||!['accepted','review_required'].includes(row.state))throw fail('SHARED_REVIEW_CONFIRMATION_REQUIRED');
@@ -470,6 +489,13 @@ class SharedSpace {
  compactInput(actor,body){return this.compaction.get(actor,body);}
  compactCancel(actor,body){return this.compaction.cancel(actor,body);}
  compactCommit(actor,body){return this.compaction.commit(actor,body);}
+ groupHandoff(actor,body){return this.groupTransition(actor,body,true);}
+ groupContinue(actor,body){return this.groupTransition(actor,body,false);}
+ groupTransition(actor,body,takeover){
+  const result=handoff.transition(this,actor,body,takeover);
+  if(!result.replayed&&!this.db.isTransaction)this.native?.engine.emitEvent?.(body.workId,'state',{state:result.request.groupHandoff.state});
+  return result;
+ }
  steerHandoff(actor,body){return this.steering.handoff(actor,body);}
  steerPrepare(actor,body){return this.steering.prepare(actor,body);}
  steeringState(actor,body){return this.steering.status(actor,body);}

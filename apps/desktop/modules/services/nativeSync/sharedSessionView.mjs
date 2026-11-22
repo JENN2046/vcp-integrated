@@ -114,6 +114,12 @@ export function createSharedSessionView(container, createObservedFrame, { api, s
                 if(parts.length>1||parts[0]?.nativeRequestId){const base=views.get(work.executionId);if(base){base.stopObserving?.();base.element.remove();views.delete(work.executionId);}}
                 for (const session of parts) {
                 if (!session.executionId || retired.has(session.viewId)) continue;
+                if (scope.ownerType === 'group' && session.request?.turn?.controlMode === 'group-member-handoff-v1' && session.nativeRequestId) {
+                    const replyId = 'reply_' + session.nativeRequestId;
+                    const committed = [...(historyMessages?.querySelectorAll('.message-item[data-message-id]') || [])]
+                        .some(node => node.dataset.messageId === replyId && !node.classList.contains('streaming') && !node.classList.contains('thinking'));
+                    if (committed) { retired.add(session.viewId); remove(session.viewId); continue; }
+                }
                 if (session.projectionSynced && views.get(session.executionId)?.setText && session.request?.state !== 'abandoned') continue;
                 if (session.projectionSynced || session.request?.state === 'abandoned') { retired.add(session.executionId);remove(session.executionId); continue; }
                 if (showOrdinaryBody(session)) continue;

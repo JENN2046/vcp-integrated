@@ -1,0 +1,1127 @@
+{
+  "baselineRevision": "88a5d8f1ff1d6f52987e09fb1e091e8bab94be65",
+  "A": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cds": {
+      "pid": 916911,
+      "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    },
+    "profileDigest": "3577fe141af8b50d819ba424b62cc5132fac08baaed94632e371b7777f5af528"
+  },
+  "B": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "cds": {
+      "pid": 917840,
+      "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+    },
+    "profileDigest": "12b9ccd7154a1e841da2bcc206676c69d14e6c75902d4fe05daed5d5c0ba5290"
+  },
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "groupMemberHandoff": {
+    "mode": "handoff-unknown",
+    "providerPackets": [
+      {
+        "member": "A",
+        "packet": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "GROUP_RELAY_MEMBER_A"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[用户的发言]: GROUP_HANDOFF_BASELINE_INPUT"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[系统邀请指令:] 现在轮到你 A 发言了。"
+                }
+              ]
+            }
+          ],
+          "model": "synthetic",
+          "temperature": 0.5,
+          "max_tokens": 128,
+          "stream": true,
+          "messageId": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0"
+        }
+      },
+      {
+        "member": "B",
+        "packet": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "GROUP_RELAY_MEMBER_B"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[用户的发言]: GROUP_HANDOFF_BASELINE_INPUT"
+                }
+              ]
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[A的发言]: RELAY_A_FINAL"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[系统邀请指令:] 现在轮到你 B 发言了。"
+                }
+              ]
+            }
+          ],
+          "model": "synthetic",
+          "temperature": 0.5,
+          "max_tokens": 128,
+          "stream": true,
+          "messageId": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_1",
+          "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_1"
+        }
+      }
+    ],
+    "streamFrames": [
+      {
+        "member": "B",
+        "text": "RELAY_B_PARTIAL"
+      }
+    ],
+    "desktopSources": {
+      "original": {
+        "url": "file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/group-member-handoff-candidate/apps/desktop/main.html",
+        "main": [
+          {
+            "file": "apps/desktop/Groupmodules/groupchat.js",
+            "sha256": "21bfbd21b6404fda26edd24f6ebd49c1fd965746debaab1eea8f51c822eec1c1"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedGroup.js",
+            "sha256": "a0805f051bde5bdfc35613382dce712248abc184405ea83af6af5b7c2c55668e"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedGroupHandoff.js",
+            "sha256": "7636f35958500a069e1307ed60a4478e797e3cb7321cbdaddbaf5a3c2f72123e"
+          },
+          {
+            "file": "apps/desktop/modules/ipc/groupChatHandlers.js",
+            "sha256": "ac16c6e761d57188dbca24fcf274ee1117da3c79a47622c5721137fca898dcaf"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "2ae17bc4d02cd5b8c2eaf063411568ed287940beddc71ccc11a1811e2632c6b3"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+            "sha256": "86f2e16b5bf6d7c049c687b1dc7b50513cdf281d655fc5dda53f2a89c63a43ec"
+          }
+        ],
+        "renderer": [
+          {
+            "file": "apps/desktop/modules/renderer/nativeExecutionStatus.js",
+            "bytes": 24582,
+            "sha256": "e018c44cf40b1576f4f60f84ad119839128968a6f7b182e0b0cdecde01560aee"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+            "bytes": 11398,
+            "sha256": "7bfcd7b4d576f32a724ddedd41598278beea56a10716c8a8b5daa1adda12ad30"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+            "bytes": 11636,
+            "sha256": "8d858eb454a85640e8315ce14ae0b40ab6e4287f96e97a57bb38cad3bdd10350"
+          }
+        ]
+      },
+      "continuing": {
+        "url": "file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/group-member-handoff-candidate/apps/desktop/main.html",
+        "main": [
+          {
+            "file": "apps/desktop/Groupmodules/groupchat.js",
+            "sha256": "21bfbd21b6404fda26edd24f6ebd49c1fd965746debaab1eea8f51c822eec1c1"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedGroup.js",
+            "sha256": "a0805f051bde5bdfc35613382dce712248abc184405ea83af6af5b7c2c55668e"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedGroupHandoff.js",
+            "sha256": "7636f35958500a069e1307ed60a4478e797e3cb7321cbdaddbaf5a3c2f72123e"
+          },
+          {
+            "file": "apps/desktop/modules/ipc/groupChatHandlers.js",
+            "sha256": "ac16c6e761d57188dbca24fcf274ee1117da3c79a47622c5721137fca898dcaf"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+            "sha256": "2ae17bc4d02cd5b8c2eaf063411568ed287940beddc71ccc11a1811e2632c6b3"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+            "sha256": "86f2e16b5bf6d7c049c687b1dc7b50513cdf281d655fc5dda53f2a89c63a43ec"
+          }
+        ],
+        "renderer": [
+          {
+            "file": "apps/desktop/modules/renderer/nativeExecutionStatus.js",
+            "bytes": 24582,
+            "sha256": "e018c44cf40b1576f4f60f84ad119839128968a6f7b182e0b0cdecde01560aee"
+          },
+          {
+            "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+            "bytes": 11398,
+            "sha256": "7bfcd7b4d576f32a724ddedd41598278beea56a10716c8a8b5daa1adda12ad30"
+          },
+          {
+            "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+            "bytes": 11636,
+            "sha256": "8d858eb454a85640e8315ce14ae0b40ab6e4287f96e97a57bb38cad3bdd10350"
+          }
+        ]
+      }
+    },
+    "paused": {
+      "admission": {
+        "id": "request_9c83476f43f546a1a8f96d54254467fe",
+        "request_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+        "principal": "desktop:deviceA",
+        "state": "dispatched",
+        "dispatched": 1,
+        "user_seq": 1
+      },
+      "handoff": {
+        "executor": "desktop:deviceA",
+        "executor_version": 0,
+        "state": "awaiting_handoff",
+        "first_reply_seq": 2
+      },
+      "native": [
+        {
+          "id": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "ordinal": 0,
+          "principal": "desktop:deviceA",
+          "member_id": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+          "state": "model_terminal"
+        }
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+          "device_id": "desktop:deviceA",
+          "action": "upsert",
+          "message": {
+            "id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+            "role": "user",
+            "content": "GROUP_HANDOFF_BASELINE_INPUT",
+            "timestamp": 1795342815156,
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+              "fields": {}
+            }
+          }
+        },
+        {
+          "seq": 2,
+          "msg_id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "device_id": "desktop:deviceA",
+          "action": "upsert",
+          "message": {
+            "id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+            "role": "assistant",
+            "name": "A",
+            "content": "RELAY_A_FINAL",
+            "timestamp": 1795342815605,
+            "agentId": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+            "groupId": "shared_c5d0c176dd6e4306a647141f983e8f85",
+            "topicId": "shared_846c39801b47445ca51fae9b0c64a85d",
+            "isGroupMessage": true,
+            "finishReason": "completed",
+            "continuity": {
+              "version": 1,
+              "known": true,
+              "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+              "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+              "dependsOnMessageIds": [
+                "controlled_88aead004a8a49d496526cfe58f3a75d"
+              ]
+            },
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "3f35588067781a3cfae6153cfe4ef630cc36377a1e626a4a61e5d0c167aeb900",
+              "fields": {
+                "continuity": {
+                  "version": 1,
+                  "known": true,
+                  "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+                  "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+                  "dependsOnMessageIds": [
+                    "controlled_88aead004a8a49d496526cfe58f3a75d"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "counts": [
+        1,
+        0
+      ]
+    },
+    "pausedToolBoxRestart": {
+      "code": null,
+      "signal": "SIGKILL"
+    },
+    "afterPausedRestart": {
+      "admission": {
+        "id": "request_9c83476f43f546a1a8f96d54254467fe",
+        "request_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+        "principal": "desktop:deviceA",
+        "state": "dispatched",
+        "dispatched": 1,
+        "user_seq": 1
+      },
+      "handoff": {
+        "executor": "desktop:deviceA",
+        "executor_version": 0,
+        "state": "awaiting_handoff",
+        "first_reply_seq": 2
+      },
+      "native": [
+        {
+          "id": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "ordinal": 0,
+          "principal": "desktop:deviceA",
+          "member_id": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+          "state": "model_terminal"
+        }
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+          "device_id": "desktop:deviceA",
+          "action": "upsert",
+          "message": {
+            "id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+            "role": "user",
+            "content": "GROUP_HANDOFF_BASELINE_INPUT",
+            "timestamp": 1795342815156,
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+              "fields": {}
+            }
+          }
+        },
+        {
+          "seq": 2,
+          "msg_id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "device_id": "desktop:deviceA",
+          "action": "upsert",
+          "message": {
+            "id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+            "role": "assistant",
+            "name": "A",
+            "content": "RELAY_A_FINAL",
+            "timestamp": 1795342815605,
+            "agentId": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+            "groupId": "shared_c5d0c176dd6e4306a647141f983e8f85",
+            "topicId": "shared_846c39801b47445ca51fae9b0c64a85d",
+            "isGroupMessage": true,
+            "finishReason": "completed",
+            "continuity": {
+              "version": 1,
+              "known": true,
+              "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+              "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+              "dependsOnMessageIds": [
+                "controlled_88aead004a8a49d496526cfe58f3a75d"
+              ]
+            },
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "3f35588067781a3cfae6153cfe4ef630cc36377a1e626a4a61e5d0c167aeb900",
+              "fields": {
+                "continuity": {
+                  "version": 1,
+                  "known": true,
+                  "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+                  "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+                  "dependsOnMessageIds": [
+                    "controlled_88aead004a8a49d496526cfe58f3a75d"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "counts": [
+        1,
+        0
+      ]
+    },
+    "lostAck": {
+      "route": "/api/v1/sync/shared/group-handoff",
+      "method": "POST",
+      "at": 1795342818223,
+      "device": "deviceB",
+      "capabilities": "attachments-v1,message-intents-v1,desktop-references-v1,source-data-v2,shared-space-v1,shared-merge-v1,shared-attachments-v1,shared-context-v1,shared-steering-v1,shared-controlled-text-v1,shared-controlled-tools-v1,group-member-handoff-v1,shared-controlled-tool-pair-v1,shared-controlled-aa-v1,shared-model-save-v1,shared-inline-receipts-v1,shared-native-inline-v1,shared-session-v1,shared-events-v1,shared-topic-sponsor-v1",
+      "bodySha256": "ae29e2d1bd3f80371c63c67ad033392be463c94be2d5149f1baed457bf805c4b",
+      "body": {
+        "sharedSpaceId": "sharedAB",
+        "workId": "request_9c83476f43f546a1a8f96d54254467fe",
+        "expectedExecutor": "desktop:deviceA",
+        "expectedExecutorVersion": 0,
+        "opId": "desktop-group-handoff_0f4f48cacfdfe0f0333af27f40914aa9b0205d60b5e55b4c"
+      },
+      "status": 200,
+      "response": {
+        "request": {
+          "id": "request_9c83476f43f546a1a8f96d54254467fe",
+          "sharedSpaceId": "sharedAB",
+          "sharedId": "shared_846c39801b47445ca51fae9b0c64a85d",
+          "requestId": "controlled_88aead004a8a49d496526cfe58f3a75d",
+          "state": "dispatched",
+          "configHash": "4a65784e95bc834c307f4611ef3523375e2dec813db27317cc1ea784b9bf0cd8",
+          "contextHead": 0,
+          "userSeq": 1,
+          "replySeq": 2,
+          "dispatched": true,
+          "turn": {
+            "kind": "message",
+            "plan": [
+              "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+              "shared_91126376e0274108a9cf155f967873cf"
+            ],
+            "userMessageId": "controlled_88aead004a8a49d496526cfe58f3a75d",
+            "controlMode": "group-member-handoff-v1"
+          },
+          "groupHandoff": {
+            "state": "awaiting_continue",
+            "executor": "desktop:deviceB",
+            "executorVersion": 1,
+            "nextOrdinal": 1,
+            "nextRequestId": "group_request_9c83476f43f546a1a8f96d54254467fe_1",
+            "firstReplySeq": 2
+          }
+        },
+        "replayed": false
+      },
+      "dropped": true
+    },
+    "takeoverRecipientExit": {
+      "electronPid": 916311,
+      "cdsPid": 916943,
+      "liveGroupMembers": 0
+    },
+    "reopened": {
+      "admission": {
+        "id": "request_9c83476f43f546a1a8f96d54254467fe",
+        "request_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+        "principal": "desktop:deviceA",
+        "state": "dispatched",
+        "dispatched": 1,
+        "user_seq": 1
+      },
+      "handoff": {
+        "executor": "desktop:deviceB",
+        "executor_version": 1,
+        "state": "awaiting_continue",
+        "first_reply_seq": 2
+      },
+      "native": [
+        {
+          "id": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "ordinal": 0,
+          "principal": "desktop:deviceA",
+          "member_id": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+          "state": "model_terminal"
+        }
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+          "device_id": "desktop:deviceA",
+          "action": "upsert",
+          "message": {
+            "id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+            "role": "user",
+            "content": "GROUP_HANDOFF_BASELINE_INPUT",
+            "timestamp": 1795342815156,
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+              "fields": {}
+            }
+          }
+        },
+        {
+          "seq": 2,
+          "msg_id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "device_id": "desktop:deviceA",
+          "action": "upsert",
+          "message": {
+            "id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+            "role": "assistant",
+            "name": "A",
+            "content": "RELAY_A_FINAL",
+            "timestamp": 1795342815605,
+            "agentId": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+            "groupId": "shared_c5d0c176dd6e4306a647141f983e8f85",
+            "topicId": "shared_846c39801b47445ca51fae9b0c64a85d",
+            "isGroupMessage": true,
+            "finishReason": "completed",
+            "continuity": {
+              "version": 1,
+              "known": true,
+              "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+              "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+              "dependsOnMessageIds": [
+                "controlled_88aead004a8a49d496526cfe58f3a75d"
+              ]
+            },
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "3f35588067781a3cfae6153cfe4ef630cc36377a1e626a4a61e5d0c167aeb900",
+              "fields": {
+                "continuity": {
+                  "version": 1,
+                  "known": true,
+                  "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+                  "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+                  "dependsOnMessageIds": [
+                    "controlled_88aead004a8a49d496526cfe58f3a75d"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "counts": [
+        1,
+        0
+      ],
+      "visibleFirstReplyCount": 1
+    },
+    "handler": [
+      {
+        "member": "A",
+        "handoffSource": {
+          "file": "Plugin/NativeSync/sync/sharedGroupHandoff.js",
+          "sha256": "5e69cf03ff7ae15e233676ac7026af62cd42e2ade428d18ea5e270053155c13c"
+        },
+        "route": "/v1/chat/completions",
+        "workId": "request_9c83476f43f546a1a8f96d54254467fe",
+        "device": "deviceA",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "GROUP_RELAY_MEMBER_A"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[用户的发言]: GROUP_HANDOFF_BASELINE_INPUT"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[系统邀请指令:] 现在轮到你 A 发言了。"
+                }
+              ],
+              "name": "用户"
+            }
+          ],
+          "model": "synthetic",
+          "temperature": 0.5,
+          "max_tokens": 128,
+          "stream": true,
+          "messageId": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "vcpchatExtensions": {
+            "schemaVersion": 1,
+            "messageMetadataMode": "hash_only",
+            "messageTimestampBindings": [
+              {
+                "messageId": "controlled_88aead004a8a49d496526cfe58f3a75d",
+                "role": "user",
+                "timestamp": 1795342815156,
+                "timestampIso": "2026-11-22T10:20:15.156Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:ba703a1eab8ed77752193da05eed007ce55da776d209a1b29a274ca60d930eb3",
+                "sentMessageIndex": 1
+              }
+            ],
+            "requestContext": {
+              "ownerType": "group",
+              "agentId": "ns_43acc7b2d18fcdb5ddf982be",
+              "groupId": "ns_918b368df02256dd0ce4c140",
+              "topicId": "ns_3a782bb48fadf440908762fb",
+              "isGroupMessage": true
+            }
+          },
+          "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "contextTokenLimit": 32000
+        }
+      },
+      {
+        "member": "B",
+        "handoffSource": {
+          "file": "Plugin/NativeSync/sync/sharedGroupHandoff.js",
+          "sha256": "5e69cf03ff7ae15e233676ac7026af62cd42e2ade428d18ea5e270053155c13c"
+        },
+        "route": "/v1/chat/completions",
+        "workId": "request_9c83476f43f546a1a8f96d54254467fe",
+        "device": "deviceB",
+        "body": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "GROUP_RELAY_MEMBER_B"
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[用户的发言]: GROUP_HANDOFF_BASELINE_INPUT"
+                }
+              ]
+            },
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[A的发言]: RELAY_A_FINAL"
+                }
+              ]
+            },
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "[系统邀请指令:] 现在轮到你 B 发言了。"
+                }
+              ],
+              "name": "用户"
+            }
+          ],
+          "model": "synthetic",
+          "temperature": 0.5,
+          "max_tokens": 128,
+          "stream": true,
+          "messageId": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_1",
+          "vcpchatExtensions": {
+            "schemaVersion": 1,
+            "messageMetadataMode": "hash_only",
+            "messageTimestampBindings": [
+              {
+                "messageId": "controlled_88aead004a8a49d496526cfe58f3a75d",
+                "role": "user",
+                "timestamp": 1795342815156,
+                "timestampIso": "2026-11-22T10:20:15.156Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:ba703a1eab8ed77752193da05eed007ce55da776d209a1b29a274ca60d930eb3",
+                "sentMessageIndex": 1
+              },
+              {
+                "messageId": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+                "role": "assistant",
+                "timestamp": 1795342815605,
+                "timestampIso": "2026-11-22T10:20:15.605Z",
+                "source": "client_history",
+                "sentMessageHash": "sha256:18371e499f77e15c5a2e2003b603e2a493773452abe719c64e2bd3b0325f5cee",
+                "sentMessageIndex": 2
+              }
+            ],
+            "requestContext": {
+              "ownerType": "group",
+              "agentId": "ns_d7548bebd8599a6b7fb81ac3",
+              "groupId": "ns_918b368df02256dd0ce4c140",
+              "topicId": "ns_3a782bb48fadf440908762fb",
+              "isGroupMessage": true
+            }
+          },
+          "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_1",
+          "contextTokenLimit": 32000
+        }
+      }
+    ],
+    "sentFirstMember": {
+      "committed": {
+        "seq": 2,
+        "msg_id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "message": {
+          "id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "role": "assistant",
+          "name": "A",
+          "content": "RELAY_A_FINAL",
+          "timestamp": 1795342815605,
+          "agentId": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+          "groupId": "shared_c5d0c176dd6e4306a647141f983e8f85",
+          "topicId": "shared_846c39801b47445ca51fae9b0c64a85d",
+          "isGroupMessage": true,
+          "finishReason": "completed",
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+            "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+            "dependsOnMessageIds": [
+              "controlled_88aead004a8a49d496526cfe58f3a75d"
+            ]
+          },
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "3f35588067781a3cfae6153cfe4ef630cc36377a1e626a4a61e5d0c167aeb900",
+            "fields": {
+              "continuity": {
+                "version": 1,
+                "known": true,
+                "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+                "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+                "dependsOnMessageIds": [
+                  "controlled_88aead004a8a49d496526cfe58f3a75d"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "binding": {
+        "messageId": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+        "role": "assistant",
+        "timestamp": 1795342815605,
+        "timestampIso": "2026-11-22T10:20:15.605Z",
+        "source": "client_history",
+        "sentMessageHash": "sha256:18371e499f77e15c5a2e2003b603e2a493773452abe719c64e2bd3b0325f5cee",
+        "sentMessageIndex": 2
+      },
+      "handlerMessage": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "[A的发言]: RELAY_A_FINAL"
+          }
+        ]
+      },
+      "providerMessage": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "[A的发言]: RELAY_A_FINAL"
+          }
+        ]
+      }
+    },
+    "beforeUnknown": {
+      "admission": {
+        "id": "request_9c83476f43f546a1a8f96d54254467fe",
+        "request_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+        "principal": "desktop:deviceA",
+        "state": "dispatched",
+        "dispatched": 1,
+        "user_seq": 1
+      },
+      "handoff": {
+        "executor": "desktop:deviceB",
+        "executor_version": 1,
+        "state": "continuing",
+        "first_reply_seq": 2
+      },
+      "native": [
+        {
+          "id": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "ordinal": 0,
+          "principal": "desktop:deviceA",
+          "member_id": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+          "state": "model_terminal"
+        },
+        {
+          "id": "group_request_9c83476f43f546a1a8f96d54254467fe_1",
+          "ordinal": 1,
+          "principal": "desktop:deviceB",
+          "member_id": "shared_91126376e0274108a9cf155f967873cf",
+          "state": "dispatched"
+        }
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+          "device_id": "desktop:deviceA",
+          "action": "upsert",
+          "message": {
+            "id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+            "role": "user",
+            "content": "GROUP_HANDOFF_BASELINE_INPUT",
+            "timestamp": 1795342815156,
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+              "fields": {}
+            }
+          }
+        },
+        {
+          "seq": 2,
+          "msg_id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "device_id": "desktop:deviceA",
+          "action": "upsert",
+          "message": {
+            "id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+            "role": "assistant",
+            "name": "A",
+            "content": "RELAY_A_FINAL",
+            "timestamp": 1795342815605,
+            "agentId": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+            "groupId": "shared_c5d0c176dd6e4306a647141f983e8f85",
+            "topicId": "shared_846c39801b47445ca51fae9b0c64a85d",
+            "isGroupMessage": true,
+            "finishReason": "completed",
+            "continuity": {
+              "version": 1,
+              "known": true,
+              "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+              "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+              "dependsOnMessageIds": [
+                "controlled_88aead004a8a49d496526cfe58f3a75d"
+              ]
+            },
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "3f35588067781a3cfae6153cfe4ef630cc36377a1e626a4a61e5d0c167aeb900",
+              "fields": {
+                "continuity": {
+                  "version": 1,
+                  "known": true,
+                  "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+                  "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+                  "dependsOnMessageIds": [
+                    "controlled_88aead004a8a49d496526cfe58f3a75d"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "counts": [
+        1,
+        1
+      ]
+    },
+    "secondExecutorExit": {
+      "electronPid": 917360,
+      "cdsPid": 917510,
+      "liveGroupMembers": 0
+    },
+    "serverRestart": {
+      "code": null,
+      "signal": "SIGKILL"
+    },
+    "unknown": {
+      "admission": {
+        "id": "request_9c83476f43f546a1a8f96d54254467fe",
+        "request_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+        "principal": "desktop:deviceA",
+        "state": "review_required",
+        "dispatched": 1,
+        "user_seq": 1
+      },
+      "handoff": {
+        "executor": "desktop:deviceB",
+        "executor_version": 1,
+        "state": "continuing",
+        "first_reply_seq": 2
+      },
+      "native": [
+        {
+          "id": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "ordinal": 0,
+          "principal": "desktop:deviceA",
+          "member_id": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+          "state": "model_terminal"
+        },
+        {
+          "id": "group_request_9c83476f43f546a1a8f96d54254467fe_1",
+          "ordinal": 1,
+          "principal": "desktop:deviceB",
+          "member_id": "shared_91126376e0274108a9cf155f967873cf",
+          "state": "unknown"
+        }
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+          "device_id": "desktop:deviceA",
+          "action": "upsert",
+          "message": {
+            "id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+            "role": "user",
+            "content": "GROUP_HANDOFF_BASELINE_INPUT",
+            "timestamp": 1795342815156,
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+              "fields": {}
+            }
+          }
+        },
+        {
+          "seq": 2,
+          "msg_id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+          "device_id": "desktop:deviceA",
+          "action": "upsert",
+          "message": {
+            "id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+            "role": "assistant",
+            "name": "A",
+            "content": "RELAY_A_FINAL",
+            "timestamp": 1795342815605,
+            "agentId": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+            "groupId": "shared_c5d0c176dd6e4306a647141f983e8f85",
+            "topicId": "shared_846c39801b47445ca51fae9b0c64a85d",
+            "isGroupMessage": true,
+            "finishReason": "completed",
+            "continuity": {
+              "version": 1,
+              "known": true,
+              "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+              "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+              "dependsOnMessageIds": [
+                "controlled_88aead004a8a49d496526cfe58f3a75d"
+              ]
+            },
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "3f35588067781a3cfae6153cfe4ef630cc36377a1e626a4a61e5d0c167aeb900",
+              "fields": {
+                "continuity": {
+                  "version": 1,
+                  "known": true,
+                  "requestId": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+                  "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+                  "dependsOnMessageIds": [
+                    "controlled_88aead004a8a49d496526cfe58f3a75d"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "counts": [
+        1,
+        1
+      ]
+    },
+    "reviewButtons": {
+      "新建受控任务": true,
+      "新建工具任务": true,
+      "新建 AA 委托": true,
+      "补充到此任务": true,
+      "开始两成员接力": false,
+      "恢复原接力": false,
+      "接管到本端": false,
+      "本端继续执行": false,
+      "核对任务": true
+    },
+    "rejectedNativeReplay": {
+      "status": 409,
+      "response": {
+        "error": {
+          "code": "SHARED_GROUP_HANDOFF_FENCED"
+        }
+      }
+    }
+  },
+  "backendSources": [
+    {
+      "file": "apps/server/server.js",
+      "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "b9db4583a1f6f4396585b819db587dc4c188b7ecd39bcb5255ad47e93b3b4a41"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "e0965eb464dad61dfa0441c2a4bdb345208c8208ba2f80cb28b40adfe311f23e"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "28e142ddc467aa4c9487b1f28222af54ee77429a1984268a1ae99745d8f59f28"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "2926a9738f9e9e03d8c3672adb8921a76d9df22b84070ec4780b16fecb84b353"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "6e0b78a14665d6201094fc78f2488f21af4d18afefd1e20bd437beb31ee9d82b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+      "sha256": "8601d3070ba9c92ac5288560ed6d4890d2bc308633363a70e1e3046aca180672"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "6001739ddda7ce0c3cf94feb5cf50d8440f82565f2e42940cdabeeb8306126aa"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+      "sha256": "3d7e244833f4ae60c30e6b932752f2cdf9b09f06df628604792bda0078197218"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+      "sha256": "99a7bbeb26dc7759ab2dbafbe28612b5f737eb249aa9a195f84b47cca6372359"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/httpService.js",
+      "sha256": "55bf6eb3188466d8fbe4d8d7eef974eeb6126a5e094d1084e4d207b8d78ab736"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedWait.js",
+      "sha256": "b3759186f90387d8bb75033ecb8e007fbda2a23d3f15c03f13b4304051edea6a"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "599d5d3d217b6384083c9da1088fcf3bfd237bfcf4a3fbcb145b1738617598ec"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+      "sha256": "3c3874bbd73e31f594bf7899d2ae0d0d184f62f827666409a683d22f3c138faf"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+      "sha256": "068ca6c5be59baaf786d15955063d3ba2cb10d81f22c786a14cd966c83eb777c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedDelegation.js",
+      "sha256": "e96f4cc72e5ed76fd2481f60d257985e8ae05876ce635c98de418cb860d7215a"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "4ba8bfccf267ff5ad384046da81ff7e64a7d53a6c58a4f31bca8af3373773923"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+      "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "d85c2847904b8220c54b0823f0ba50af47372310f6fa2faf9ff2c870f7420d6e"
+    },
+    {
+      "file": "apps/server/modules/nativeContinuationStore.cjs",
+      "sha256": "ab225ef3873bc8bd7731c3c1f30e3d2d43eacf3298978afbb6167e1a6e176835"
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "635c94f249a0f67cb085ae51f1a53e08dc49ddf2aaadb30e434fe6a9a36900f3"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+      "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "299fc48e0a1a0687a59f8c19adb91398ea61e40115f5a482a89caadf6d1d03a5"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/groupTurn.js",
+      "sha256": "7d37337452fd8428aff74a40f621631a70b7f1bf9584ef6bd3538bac0de3d3f7"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/portal.js",
+      "sha256": "fd4ff20987a5410ee1ed65fa358226ef869e727238daf8cbb704cce09a7fa307"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTurns.js",
+      "sha256": "135794dea398e82799ebd71fde57fcc30bd8b38f23668ac4754c102b2e879faf"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedEvents.js",
+      "sha256": "62e81d32e6e963554cdce3343ba3942a62414e91cc723170356b54cda7ed3a81"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/native-sync.js",
+      "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+      "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+    }
+  ]
+}

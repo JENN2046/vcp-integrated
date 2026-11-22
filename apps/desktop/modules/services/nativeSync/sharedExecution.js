@@ -6,6 +6,7 @@ const {ownedJson}=require('./sharedLocal');
 const {durableJson}=require('./durableJson');
 const {NativeBodyArchive,eligible:bodyArchiveEligible}=require('./nativeBodyArchive');
 const {sharedTaskList}=require('./sharedTaskList');
+const groupHandoff=require('./sharedGroupHandoff');
 const endpoint='/api/v1/sync/shared/';
 const final=new Set(['completed','abandoned']);
 const localShape=m=>({id:m.id,role:m.role,content:m.content,attachments:(m.attachments||[]).map(a=>({type:a.type,name:a.name,size:a.size,src:a.src,hash:a.hash||a._fileManagerData?.hash||null}))});
@@ -82,7 +83,7 @@ class SharedExecution {
  async consumeInputs(ids){await this.updateInputs(inputs=>{let changed=false;for(const id of ids)if(Object.hasOwn(inputs,id)){delete inputs[id];changed=true;}return changed;});for(const id of ids)this.lightInputs.delete(id);}
  run(id,fn){const prior=this.tails.get(id)||Promise.resolve(),next=prior.catch(()=>{}).then(fn);this.tails.set(id,next);next.finally(()=>{if(this.tails.get(id)===next)this.tails.delete(id);}).catch(()=>{});return next;}
  mapping(d){const r=this.runtime,shared=r.replica.queue.shared(d);const m=r.mappings().find(m=>stable(m.shared)===stable({itemType:shared.itemType||'agent',itemId:shared.itemId,topicId:shared.topicId}));if(!m)throw fail('SHARED_LOCAL_MAPPING_REQUIRED');return m;}
- query(record){return this.runtime.send(endpoint+'request?'+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,requestId:record.body.requestId}));}
+ query(record){const adopted=record.adoptGroupWork;return this.runtime.send(endpoint+(adopted?'work?':'request?')+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,...(adopted?{workId:record.accepted.id}:{requestId:record.body.requestId})}));}
  async refresh(record){if(record.steeringV1&&record.accepted)return this.steering.refresh(record);const result=await this.query(record);if(result.request){const phase=final.has(result.request.state)?result.request.state:record.phase,changed=stable(record.accepted)!==stable(result.request)||record.phase!==phase;record.accepted=result.request;record.observedAt=Date.now();record.phase=phase;if(changed)await this.save();}return result.request;}
  async stageLocal(d,message,options={}){
   const localSaveStarted=Date.now();
@@ -124,7 +125,8 @@ class SharedExecution {
    if(message.attachments?.length&&!r.attachments)throw fail('ATTACHMENTS_NOT_ENABLED');
    const fast=r.capabilities.features?.includes('shared-inline-receipts-v1')&&mapping.shared.itemType==='agent'&&!message.attachments?.length&&(!options.kind||options.kind==='message')&&!options.controlMode;
    const signature=sha256(stable({...((options.kind&&options.kind!=='message')?options:{}),...(options.controlMode==='agent-assistant-v1'&&{delegation:options.delegation}),content:message.content,attachments:message.attachments||[]}));
-   let record=Object.values(this.state.requests).find(v=>v.sharedId===mapping.sharedId&&!v.isSteeringInput&&!final.has(v.phase));
+   let record=Object.values(this.state.requests).find(v=>v.sharedId===mapping.sharedId&&!v.isSteeringInput&&!final.has(v.phase)
+    &&!(v.body?.controlMode===groupHandoff.capability&&v.phase==='local_pending'&&v.rejected&&!v.admitStarted&&options.controlMode!==groupHandoff.capability));
    if(record&&(record.body?.controlMode||null)!==(options.controlMode||null))throw fail('CONTROLLED_MODE_IMMUTABLE');
    if(record?.serverSession)throw fail('SHARED_SESSION_DISPATCH_ONLY');
    if(record?.accepted&&record.steeringV1&&record.body.requestId!==message.id){if(options.requireIdle||!options.observedWorkId)throw fail('SHARED_TOPIC_BUSY');return this.steering.submit(record,d,message,options);}
@@ -169,9 +171,12 @@ class SharedExecution {
    if(record.steeringV1&&Object.values(this.state.requests).some(v=>v.workId===record.accepted.id&&v.isSteeringInput))return {handled:true,success:true,inputAccepted:true,initialSuperseded:true,workId:record.accepted.id,history};
    if(fast&&!record.steeringV1){await this.rememberContext(mapping,record.accepted.userSeq,record.accepted.configHash);await this.save();}
    await this.consumeInputs([message.id,record.body.requestId]);
-   if(config.owner.kind==='group')return {handled:true,success:true,record,history,userMessage:user,turn:record.accepted.turn,config:r.groupToLocal(config.owner.config),members:config.members.map(m=>({id:r.localFor(m.id).localId,...executionConfig(config,m)}))};
+   if(config.owner.kind==='group')return this.groupResult(record,config,user,history);
    return {handled:true,success:true,admissionId:record.accepted.id,replyId:'reply_'+record.accepted.id,userMessage:user,history,turn:record.accepted.turn,config:executionConfig(config),executionPolicy:config.rules[0]?.config.executionPolicy||{},tavernRules:require('./contracts.generated.cjs').sharedEffectiveRules([...(config.rules[0]?.config.tavernRules||[]),...(config.owner.config.tavernRules||[])],config.owner.config.ruleOverrides||{})};
   });
+ }
+ groupResult(record,config,user,history){
+  const r=this.runtime;return {handled:true,success:true,record,history,userMessage:user,turn:record.accepted.turn,config:r.groupToLocal(config.owner.config),members:config.members.map(m=>({id:r.localFor(m.id).localId,...executionConfig(config,m)}))};
  }
  singleResult(record,config,user,history,extra={}){
   return {handled:true,success:true,admissionId:record.accepted.id,replyId:'reply_'+record.accepted.id,userMessage:user,history,turn:record.accepted.turn,config:executionConfig(config),executionPolicy:config.rules[0]?.config.executionPolicy||{},tavernRules:require('./contracts.generated.cjs').sharedEffectiveRules([...(config.rules[0]?.config.tavernRules||[]),...(config.owner.config.tavernRules||[])],config.owner.config.ruleOverrides||{}),...extra};
@@ -347,15 +352,34 @@ class SharedExecution {
   for(const record of Object.values(this.state.requests))if(record.projection&&record.projection.state!=='saved'){const mapping=this.runtime.mappings().find(m=>m.sharedId===record.sharedId);if(mapping)try{await this.startProjection(record,mapping);}catch{/* Retain original accepted identity; no model replay. */}}
   await this.runtime.recoverSharedCompactionPrepares?.();for(const intent of Object.values(this.state.compactions||{}))if(intent.phase==='publishing')await this.run('compaction:'+intent.body.id,()=>this.runtime.finishSharedCompaction(intent));for(const record of Object.values(this.state.requests))if(this.needsRecordReconcile(record)){
   if(record.remote&&!record.steeringV1){await this.steering.refresh(record);continue;}if(record.steeringV1){if(!record.accepted)await this.refresh(record);if(!record.accepted)continue;if(!record.config&&!record.remote){const value=await this.runtime.send(endpoint+'request-config?'+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,admissionId:record.accepted.id}));record.config=value.config;await this.save();}await this.steering.reconcile(record);continue;}
-  if(record.config?.owner.kind==='group'){await this.run(record.sharedId,async()=>{await this.refresh(record);if(final.has(record.phase))return;try{for(const step of record.steps||[])if(step.reply&&!step.accepted&&!isInterruptedGroupReplyPendingReview(record,step))await this.finishStep(record,step);const allAccepted=record.steps?.length===record.accepted.turn.plan.length&&record.steps.every(s=>s.accepted);if(record.groupFinishing||allAccepted)await this.finishGroup(record);}catch(error){if(error.code!=='SHARED_NATIVE_TERMINAL_REQUIRED')throw error;}});}
+  if(record.config?.owner.kind==='group'){await this.run(record.sharedId,async()=>{await this.refresh(record);if(final.has(record.phase))return;try{if(record.accepted?.groupHandoff){await this.reconcileGroupHandoff(record);return;}for(const step of record.steps||[])if(step.reply&&!step.accepted&&!isInterruptedGroupReplyPendingReview(record,step))await this.finishStep(record,step);const allAccepted=record.steps?.length===record.accepted.turn.plan.length&&record.steps.every(s=>s.accepted);if(record.groupFinishing||allAccepted)await this.finishGroup(record);}catch(error){if(error.code!=='SHARED_NATIVE_TERMINAL_REQUIRED')throw error;}});}
   else if(record.reply){const mapping=this.runtime.mappings().find(m=>m.sharedId===record.sharedId);if(mapping)await this.complete(record,record.reply,mapping);}else await this.run(record.sharedId,()=>this.refresh(record));
  }}
- async abandon({descriptor,requestId,confirmed}){
-  if(confirmed!==true)throw fail('SHARED_REVIEW_CONFIRMATION_REQUIRED');const mapping=this.mapping(descriptor),record=this.state.requests[requestId];
-  if(!record||record.sharedId!==mapping.sharedId||!record.accepted)throw fail('SHARED_REQUEST_NOT_FOUND');
-  return this.run(mapping.sharedId,async()=>{await this.runtime.send(endpoint+'abandon',{body:{sharedSpaceId:this.runtime.connection.sharedSpaceId,admissionId:record.accepted.id,opId:'desktop-abandon_'+record.accepted.id,confirm:true}});record.phase='abandoned';this.freshAdmissions.delete(record.accepted.id);if(record.serverSession){const known=await this.query(record);if(known.request)record.accepted=known.request;record.serverProjectionPending=true;await this.runtime.sessions.persist(record);await this.runtime.sessions.project(record,mapping);return {success:true};}await this.save();await this.refresh(record);return {success:true};});
+ async abandon({descriptor,requestId,workId,confirmed}){
+  if(confirmed!==true)throw fail('SHARED_REVIEW_CONFIRMATION_REQUIRED');
+  const mapping=this.mapping(descriptor);
+  const adopted=typeof workId==='string'&&this.state.requests['group-handoff:'+workId];
+  const record=adopted?.adoptGroupWork?adopted:this.state.requests[requestId];
+  if(!record?.accepted||record.sharedId!==mapping.sharedId||record.body.requestId!==requestId
+   ||workId!==undefined&&record.accepted.id!==workId)throw fail('SHARED_REQUEST_NOT_FOUND');
+  const r=this.runtime,isGroupHandoff=record.body.controlMode===groupHandoff.capability;
+  if(isGroupHandoff&&(!workId||descriptor.itemType!=='group'))throw fail('SHARED_REQUEST_NOT_FOUND');
+  return this.run(mapping.sharedId,async()=>{
+   if(isGroupHandoff){
+    const known=await this.refresh(record);
+    if(known?.id!==workId||known.requestId!==requestId||known.sharedId!==mapping.sharedId)throw fail('SHARED_REQUEST_NOT_FOUND');
+    if(known.groupHandoff?.executor!==groupHandoff.executor(r))throw fail('SHARED_REQUEST_OWNER_REQUIRED');
+   }
+   await r.send(endpoint+'abandon',{body:{sharedSpaceId:r.connection.sharedSpaceId,admissionId:record.accepted.id,opId:'desktop-abandon_'+record.accepted.id,confirm:true}});
+   record.phase='abandoned';this.freshAdmissions.delete(record.accepted.id);
+   if(record.serverSession){
+    const known=await this.query(record);if(known.request)record.accepted=known.request;record.serverProjectionPending=true;
+    await r.sessions.persist(record);await r.sessions.project(record,mapping);return {success:true};
+   }
+   await this.save();await this.refresh(record);return {success:true};
+  });
  }
- localInputs(d){return Object.values(this.state.requests).filter(v=>v.descriptor&&stable(v.descriptor)===stable(d)&&v.localMessage&&v.phase!=='input_applied'&&((this.state.localInputs[v.localMessage.id]&&v.accepted)||(v.projection&&v.projection.state!=='saved')||(!v.accepted&&(!final.has(v.phase)||v.rejected))||v.isSteeringInput)).sort((a,b)=>(a.localInputSeq||0)-(b.localInputSeq||0)).map(v=>({inputId:v.localMessage.id,content:v.localMessage.content,attachments:(v.localMessage.attachments||[]).map(a=>({name:a.name,size:a.size,type:a.type})),phase:v.phase,accepted:Boolean(v.accepted),projectionPending:Boolean(v.serverProjectionPending||v.projection&&v.projection.state!=='saved'),received:Boolean(v.inputReceipt||v.accepted),errorCode:v.failureCode||v.rejected||null,modelSaveRef:v.modelSaveRef||v.steeringBody?.modelSaveRef||null,parentInputId:v.parentLocalInputId||null,targetFinished:v.targetFinished===true}));}
+ localInputs(d){return Object.values(this.state.requests).filter(v=>v.descriptor&&stable(v.descriptor)===stable(d)&&v.localMessage&&v.phase!=='input_applied'&&v.body?.controlMode!==groupHandoff.capability&&((this.state.localInputs[v.localMessage.id]&&v.accepted)||(v.projection&&v.projection.state!=='saved')||(!v.accepted&&(!final.has(v.phase)||v.rejected))||v.isSteeringInput)).sort((a,b)=>(a.localInputSeq||0)-(b.localInputSeq||0)).map(v=>({inputId:v.localMessage.id,content:v.localMessage.content,attachments:(v.localMessage.attachments||[]).map(a=>({name:a.name,size:a.size,type:a.type})),phase:v.phase,accepted:Boolean(v.accepted),projectionPending:Boolean(v.serverProjectionPending||v.projection&&v.projection.state!=='saved'),received:Boolean(v.inputReceipt||v.accepted),errorCode:v.failureCode||v.rejected||null,modelSaveRef:v.modelSaveRef||v.steeringBody?.modelSaveRef||null,parentInputId:v.parentLocalInputId||null,targetFinished:v.targetFinished===true}));}
  async status(d,{refresh=true}={}){
   const r=this.runtime;let mapping,queryError=null,queried=false;
   try{mapping=this.mapping(d);}catch(error){queryError=error.code||'SHARED_LOCAL_MAPPING_PENDING';}
@@ -367,7 +391,7 @@ class SharedExecution {
 
 
  groupStep(record,memberId){
-  const ordinal=(record.steps||[]).filter(s=>s.accepted).length;
+  const ordinal=record.accepted.groupHandoff?.nextOrdinal??(record.steps||[]).filter(s=>s.accepted).length;
   if(record.accepted.turn.plan[ordinal]!==memberId)throw fail('SHARED_GROUP_PLAN_CHANGED');
   return {id:'group_'+record.accepted.id+'_'+ordinal,ordinal,memberId};
  }
@@ -376,15 +400,19 @@ class SharedExecution {
   return this.run(record.sharedId,async()=>{
    const known=await this.refresh(record);if(!known||['abandoned','completed','review_required'].includes(known.state))throw fail('SHARED_RESULT_REQUIRES_REVIEW');
    const slot=this.groupStep(record,memberId);record.steps||=[];
-   let step=record.steps[slot.ordinal];if(!step){step={...slot,body:JSON.parse(JSON.stringify(body))};record.steps.push(step);await this.save();}
+   const controlled=known.groupHandoff;
+   if(controlled&&(controlled.executor!==groupHandoff.executor(this.runtime)||!groupHandoff.canDispatch(known,slot.ordinal)))throw fail('SHARED_RESULT_REQUIRES_REVIEW');
+   let step=record.steps.find(s=>s.ordinal===slot.ordinal);if(!step){step={...slot,body:JSON.parse(JSON.stringify(body))};record.steps.push(step);await this.save();}
    if(step.id!==body.requestId||step.memberId!==memberId)throw fail('SHARED_GROUP_PLAN_CHANGED');
    if(known.nativeRequests.some(n=>n.id!==step.id&&n.state!=='model_terminal')||known.nativeRequests.some(n=>n.id===step.id&&n.state!=='prepared'))throw fail('SHARED_RESULT_REQUIRES_REVIEW');
    await this.runtime.send(endpoint+'native-request',{body:{sharedSpaceId:this.runtime.connection.sharedSpaceId,admissionId:record.accepted.id,requestId:step.id,memberId,bodyHash:sha256(stable(step.body))}});
-   if(this.runtime.closed)throw fail('APPLICATION_SHUTTING_DOWN');record.phase='dispatching';await this.save();this.runtime.assertSharedAccess?.();return {body:step.body,headers:{...require('./runtime').syncHeaders(this.runtime.connection),'X-NativeSync-Capabilities':'shared-space-v1','X-NativeSync-Admission':record.accepted.id}};
+   if(this.runtime.closed)throw fail('APPLICATION_SHUTTING_DOWN');record.phase='dispatching';await this.save();this.runtime.assertSharedAccess?.();return {body:step.body,headers:{...require('./runtime').syncHeaders(this.runtime.connection),'X-NativeSync-Capabilities':'shared-space-v1'+(controlled?','+groupHandoff.capability:''),'X-NativeSync-Admission':record.accepted.id}};
   });
  }
  async groupReply(record,message){
   return this.run(record.sharedId,async()=>{
+   const handoff=record.accepted.groupHandoff;
+   if(handoff&&(message.finishReason==='failed'||message.errorCode&&message.finishReason!=='interrupted'))throw fail('SHARED_GROUP_RESULT_UNCONFIRMED');
    const step=(record.steps||[]).find(s=>'reply_'+s.id===message.id);if(!step)throw fail('INVALID_SHARED_REPLY');
    const mapping=this.runtime.mappings().find(m=>m.sharedId===record.sharedId),raw={...message,agentId:step.memberId,groupId:record.config.owner.id};
    const ids=[...new Set((step.body.vcpchatExtensions?.messageTimestampBindings||[]).map(m=>m.messageId).filter(Boolean))];
@@ -393,6 +421,10 @@ class SharedExecution {
    const value=this.runtime.adapter.canonical(raw,mapping.shared.topicId);
    if(step.reply&&stable(step.reply)!==stable(value))throw fail('SHARED_REPLY_INTENT_CHANGED');
    step.reply=value;record.phase='publishing';await this.save();
+   if(handoff&&value.finishReason==='interrupted'){
+    await this.refresh(record);
+    throw fail('SHARED_GROUP_RESULT_UNCONFIRMED');
+   }
    try{await this.finishStep(record,step);}
    catch(error){
     if(value.finishReason==='interrupted'&&error.code==='SHARED_NATIVE_TERMINAL_REQUIRED'){
@@ -409,8 +441,27 @@ class SharedExecution {
   });
  }
  async finishStep(record,step){
-  await this.runtime.send(endpoint+'complete',{body:{sharedSpaceId:this.runtime.connection.sharedSpaceId,admissionId:record.accepted.id,opId:'desktop-step_'+step.id,nativeRequestId:step.id,message:step.reply}});
+  const result=await this.runtime.send(endpoint+'complete',{body:{sharedSpaceId:this.runtime.connection.sharedSpaceId,admissionId:record.accepted.id,opId:'desktop-step_'+step.id,nativeRequestId:step.id,message:step.reply}});
+  if(result.request?.groupHandoff)record.accepted={...record.accepted,...result.request};
   step.accepted=true;record.phase='accepted';record.timings.accepted=Date.now();await this.save();
+ }
+ async reconcileGroupHandoff(record){
+  const request=record.accepted,control=request.groupHandoff,r=this.runtime;
+  const owned=control.executor===groupHandoff.executor(r);
+  for(const step of record.steps||[]){
+   if(step.accepted||!step.reply||['failed','interrupted'].includes(step.reply.finishReason))continue;
+   if(step.ordinal===0&&control.firstReplySeq||step.ordinal===1&&request.replySeq>control.firstReplySeq){
+    step.accepted=true;record.phase='accepted';await this.save();continue;
+   }
+   if(owned&&control.state!=='review_required'&&request.nativeRequests?.some(native=>native.id===step.id&&native.state==='model_terminal')){
+    await this.finishStep(record,step);
+   }
+  }
+  if(owned&&control.state!=='review_required'&&record.steps?.some(step=>step.ordinal===1&&step.accepted)){
+   const mapping=r.mappings().find(value=>value.sharedId===record.sharedId);
+   if(mapping)await r.syncExecutionTopic(mapping,{minSeq:record.accepted.replySeq});
+   await this.finishGroup(record);
+  }
  }
  async finishGroup(record){
   await this.runtime.send(endpoint+'complete',{body:{sharedSpaceId:this.runtime.connection.sharedSpaceId,admissionId:record.accepted.id,opId:'desktop-finish_'+record.accepted.id,finish:true}});

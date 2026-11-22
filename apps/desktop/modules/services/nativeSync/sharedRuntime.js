@@ -390,6 +390,7 @@ class SharedRuntime {
   this.accessController.abort();
   this.waitClient.close();
   this.nativeTaskViews?.clear();
+  this.execution?.groupHandoffObserved?.clear();
   this.sessions?.invalidateAccess();
   this.planTick();
  }
@@ -837,7 +838,21 @@ class SharedRuntime {
    value.serverSessions=this.sessions.values(d);
    await this.refreshNativeTaskViews(value,d,options.refresh!==false);
   }if(this.backgroundDenied)return unavailable();let mapping;try{mapping=this.execution.mapping(d);}catch{this.dirty=true;return value;}
-  if(this.matching.fenced(mapping.sharedId)||this.matching.fenced(this.state.objects[mapping.sharedId].parentId))return {...value,readOnly:true,configurationError:'SHARED_MATCH_PREPARING'};return {...value,controlledTextAvailable:this.capabilities.features?.includes('shared-controlled-text-v1')===true,controlledAAAvailable:this.capabilities.features?.includes('shared-controlled-aa-v1')===true,controlledToolsAvailable:this.capabilities.features?.includes('shared-controlled-tools-v1')===true};
+  if(this.matching.fenced(mapping.sharedId)||this.matching.fenced(this.state.objects[mapping.sharedId].parentId))return {...value,readOnly:true,configurationError:'SHARED_MATCH_PREPARING'};
+  if(d.itemType==='group'){
+   const handoff=require('./sharedGroupHandoff'),group=this.configs.state.objects[this.state.objects[mapping.sharedId].parentId];
+   const access=this.accessController?.signal;
+   value.groupHandoff=await handoff.observe(this.execution,mapping,{refresh:options.refresh!==false,connection:value.connection});
+   if(this.backgroundDenied||access?.aborted)return unavailable();
+   value.groupHandoffAvailable=handoff.enabled(this)&&(Boolean(value.groupHandoff)||group?.config?.mode==='sequential'&&group.config.members?.length===2);
+   const groupWork=value.groupHandoff;
+   for(const job of value.executions.filter(job=>job.controlMode===handoff.capability)){
+    job.canResume=false;
+    job.canAbandon=job.id===groupWork?.id&&groupWork.owned&&groupWork.fresh&&groupWork.state==='review_required';
+    if(job.id===groupWork?.id)job.state=groupWork.state==='abandoned'?'cancelled':groupWork.state;
+   }
+  }
+  return {...value,controlledTextAvailable:this.capabilities.features?.includes('shared-controlled-text-v1')===true,controlledAAAvailable:this.capabilities.features?.includes('shared-controlled-aa-v1')===true,controlledToolsAvailable:this.capabilities.features?.includes('shared-controlled-tools-v1')===true};
  }
 
  async refreshNativeTaskViews(value, descriptor, refresh) {
