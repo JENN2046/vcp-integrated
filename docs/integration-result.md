@@ -120,3 +120,7 @@ Android 首次配对立即强停已定位到隔离 WebView 的 Cookie 写盘时�
 TopicSponsor 的 River 引用对齐作者的最近消息窗口。两位成员同文和一条无名短消息经工具派发、桌面投递和冷重开后仍逐行对应；旧 V1 与作者 V2 均能读取。共享目标在提交后丢回执时仍按原收据恢复。[工具对照、History 与冷开截图](evidence/river-quote/README.md)
 
 在群聊接力原故障库的隔离副本中，当前执行端人工结清了乙已派发、结果未知的原 Work。丢失结清回执后重开，桌面同时显示接力已结束和乙结果未知。甲的正式回复仍只有一份；新的普通群聊轮次在同一话题完成。只读会话能观察原 Work，三项代办操作均被拒绝。[改前改后回执及截图](evidence/group-review-closeout/e2e/README.md)
+
+普通共享单聊遇到上游 502 时，错误说明在流读取入口截断，Work 与准入进入待核对，Journal 和桌面 History 保留用户输入。原作者人工结清后，可在原右键菜单删除这类无正式回复的输入，中央按原消息 ID、版本和 hash 追加墓碑。两端删除及重开、原提交重投、同话题新请求和旧版遗留的待发布意图均已核对。[502 收尾](evidence/shared-upstream-closeout/desktop/README.md) · [删除与权限](evidence/shared-upstream-closeout/delete/README.md)
+
+共享单聊已验一份 67 字节 UTF-8 文本跨端续问：A 的本地原件和缓存移离后，B 重开原话题且未附加文件，中央 worker 的 Handler 与 Provider 各收到一次原附件正文。A 首轮桌面原生请求仍含本机路径，B 的服务端续问请求没有。私有实时引用只携带引用元数据，跨空间读取共享附件被拒绝。[双桌面收包、权限对照与截图](evidence/shared-attachment-continuation/README.md)

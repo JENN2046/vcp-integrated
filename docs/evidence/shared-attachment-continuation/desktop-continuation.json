@@ -1,0 +1,439 @@
+{
+  "revision": "be8ce56e44412fa962689d63750e26264113e4e3",
+  "topic": "shared_8baec8802fc24c46bc7756a3b74a47c2",
+  "file": {
+    "name": "synthetic-continuity.txt",
+    "digest": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+    "bytes": 67
+  },
+  "chooser": "fixture-selected synthetic file via real desktop attachment IPC",
+  "BDownloadCacheEnabled": false,
+  "turns": [
+    {
+      "role": "A",
+      "work": {
+        "id": "request_a0f88df78132402897bb3c7cbc6f5e33",
+        "request_id": "msg_1795370933527_user_b1pa8y1",
+        "principal": "desktop:deviceA",
+        "state": "completed",
+        "dispatched": 1,
+        "native_terminal": 1,
+        "user_message_id": "msg_1795370933527_user_b1pa8y1",
+        "reply_message_id": "reply_request_a0f88df78132402897bb3c7cbc6f5e33"
+      },
+      "receipt": {
+        "route": "/api/v1/sync/shared/admit",
+        "device": "deviceA",
+        "status": 200,
+        "requestId": "msg_1795370933527_user_b1pa8y1",
+        "messageId": "msg_1795370933527_user_b1pa8y1",
+        "attachmentIds": [
+          "attachment_f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e"
+        ],
+        "workId": "request_a0f88df78132402897bb3c7cbc6f5e33",
+        "replayed": false
+      },
+      "desktopIpc": {
+        "chooser": 1,
+        "nativeProvider": 1
+      },
+      "handler": {
+        "route": "/v1/chat/completions",
+        "workId": "request_a0f88df78132402897bb3c7cbc6f5e33",
+        "requestId": "reply_request_a0f88df78132402897bb3c7cbc6f5e33",
+        "messages": [
+          {
+            "role": "system",
+            "content": "当前聊天记录文件路径: /isolated-fixture/profile-A/UserData/ns_1bd6047af1ecde3440f0039d\\topics\\ns_2486499d34339e68c2e7a6e4\\history.json\n\nFROZEN_SHARED_PROMPT"
+          },
+          {
+            "role": "user",
+            "content": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: file:///isolated-fixture/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]",
+            "name": "用户"
+          }
+        ]
+      },
+      "provider": {
+        "id": "reply_request_a0f88df78132402897bb3c7cbc6f5e33",
+        "stream": false,
+        "at": 1795370933662,
+        "messages": [
+          {
+            "role": "system",
+            "content": "当前聊天记录文件路径: /isolated-fixture/profile-A/UserData/ns_1bd6047af1ecde3440f0039d\\topics\\ns_2486499d34339e68c2e7a6e4\\history.json\n\nFROZEN_SHARED_PROMPT"
+          },
+          {
+            "role": "user",
+            "content": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: file:///isolated-fixture/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]"
+          }
+        ],
+        "model": "synthetic"
+      },
+      "projected": [
+        {
+          "id": "msg_1795370933527_user_b1pa8y1",
+          "role": "user",
+          "content": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。",
+          "attachments": [
+            {
+              "id": "attachment_f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+              "name": "synthetic-continuity.txt",
+              "hash": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+              "size": 67,
+              "type": "text/plain",
+              "localPathPresent": true
+            }
+          ]
+        },
+        {
+          "id": "reply_request_a0f88df78132402897bb3c7cbc6f5e33",
+          "role": "assistant",
+          "content": "已读取附件。"
+        }
+      ],
+      "bodyChecks": [
+        {
+          "stage": "native handler",
+          "markerCount": 1,
+          "fileTextCount": 1,
+          "localPathPresent": true
+        },
+        {
+          "stage": "loopback provider",
+          "markerCount": 1,
+          "fileTextCount": 1,
+          "localPathPresent": true
+        }
+      ]
+    },
+    {
+      "role": "B",
+      "work": {
+        "id": "request_eae8152c9161489a8a84d623d378a3cd",
+        "request_id": "msg_1795370936499_user_lkdot09qym",
+        "principal": "desktop:deviceB",
+        "state": "completed",
+        "dispatched": 1,
+        "native_terminal": 1,
+        "attempts": 1,
+        "request_dispatched": 1,
+        "user_message_id": "msg_1795370936499_user_lkdot09qym",
+        "reply_message_id": "reply_request_eae8152c9161489a8a84d623d378a3cd"
+      },
+      "receipt": {
+        "route": "/api/v1/sync/shared/session-send",
+        "device": "deviceB",
+        "status": 200,
+        "requestId": "msg_1795370936499_user_lkdot09qym",
+        "messageId": "msg_1795370936499_user_lkdot09qym",
+        "attachmentIds": [],
+        "workId": "request_eae8152c9161489a8a84d623d378a3cd",
+        "replayed": false
+      },
+      "desktopIpc": {
+        "chooser": 0,
+        "nativeProvider": 0
+      },
+      "handler": {
+        "route": "/v1/chat/completions",
+        "workId": "request_eae8152c9161489a8a84d623d378a3cd",
+        "requestId": "request_eae8152c9161489a8a84d623d378a3cd",
+        "messages": [
+          {
+            "role": "system",
+            "content": "FROZEN_SHARED_PROMPT"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: synthetic-continuity.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]"
+              }
+            ],
+            "name": "用户"
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "已读取附件。"
+              }
+            ],
+            "name": "Synthetic shared"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "SYNTHETIC ATTACHMENT CONTINUITY B — 上一个文件的样本编号是多少？"
+              }
+            ],
+            "name": "用户"
+          }
+        ]
+      },
+      "provider": {
+        "id": "request_eae8152c9161489a8a84d623d378a3cd",
+        "stream": false,
+        "at": 1795370936564,
+        "messages": [
+          {
+            "role": "system",
+            "content": "FROZEN_SHARED_PROMPT"
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: synthetic-continuity.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "已读取附件。"
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "SYNTHETIC ATTACHMENT CONTINUITY B — 上一个文件的样本编号是多少？"
+              }
+            ]
+          }
+        ],
+        "model": "synthetic"
+      },
+      "projected": [
+        {
+          "id": "msg_1795370933527_user_b1pa8y1",
+          "role": "user",
+          "content": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。",
+          "attachments": [
+            {
+              "id": "attachment_f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+              "name": "synthetic-continuity.txt",
+              "hash": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+              "size": 67,
+              "type": "text/plain",
+              "localPathPresent": false
+            }
+          ]
+        },
+        {
+          "id": "reply_request_a0f88df78132402897bb3c7cbc6f5e33",
+          "role": "assistant",
+          "content": "已读取附件。"
+        },
+        {
+          "id": "msg_1795370936499_user_lkdot09qym",
+          "role": "user",
+          "content": "SYNTHETIC ATTACHMENT CONTINUITY B — 上一个文件的样本编号是多少？"
+        },
+        {
+          "id": "reply_request_eae8152c9161489a8a84d623d378a3cd",
+          "role": "assistant",
+          "content": "原文件的样本编号是 73。"
+        }
+      ],
+      "bodyChecks": [
+        {
+          "stage": "native handler",
+          "markerCount": 1,
+          "fileTextCount": 1,
+          "localPathPresent": false
+        },
+        {
+          "stage": "loopback provider",
+          "markerCount": 1,
+          "fileTextCount": 1,
+          "localPathPresent": false
+        }
+      ]
+    }
+  ],
+  "initialAttachment": [
+    {
+      "id": "attachment_f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "name": "synthetic-continuity.txt",
+      "hash": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "size": 67,
+      "type": "text/plain",
+      "localPathPresent": true
+    }
+  ],
+  "uploadBeforeB": [
+    {
+      "id": "61e44299-9c30-4a66-84e6-3e101c2ab499",
+      "principal": "desktop:deviceA",
+      "expected_hash": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "hash": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "state": "ready",
+      "size": 67,
+      "offset": 67,
+      "msg_id": "msg_1795370933527_user_b1pa8y1",
+      "attachment_id": "attachment_f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "execution_id": null,
+      "actual_type": "text/plain"
+    }
+  ],
+  "originalPathUnavailable": true,
+  "ACachedPathUnavailable": true,
+  "ARuntimeClosedBeforeBRestart": true,
+  "uploads": [
+    {
+      "id": "61e44299-9c30-4a66-84e6-3e101c2ab499",
+      "principal": "desktop:deviceA",
+      "expected_hash": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "hash": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "state": "ready",
+      "size": 67,
+      "offset": 67,
+      "msg_id": "msg_1795370933527_user_b1pa8y1",
+      "attachment_id": "attachment_f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "execution_id": null,
+      "actual_type": "text/plain"
+    }
+  ],
+  "links": [
+    {
+      "msg_id": "msg_1795370933527_user_b1pa8y1",
+      "attachment_id": "attachment_f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "hash": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e"
+    }
+  ],
+  "blobs": [
+    {
+      "hash": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "size": 67,
+      "type": "text/plain",
+      "state": "ready"
+    }
+  ],
+  "casDigest": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+  "canonicalAttachment": {
+    "id": "attachment_f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+    "hash": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+    "extractedTextDigest": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+    "localPathPresent": false
+  },
+  "journal": [
+    {
+      "seq": 1,
+      "msg_id": "msg_1795370933527_user_b1pa8y1",
+      "action": "upsert",
+      "hash": "5786804907dd199c282db0aa9ff830256eac0ae6a19309638eaac104adb238a2"
+    },
+    {
+      "seq": 2,
+      "msg_id": "reply_request_a0f88df78132402897bb3c7cbc6f5e33",
+      "action": "upsert",
+      "hash": "1780bb5de4fecd9983d1c404ce8d0067e89ee78aba2acbf98af4bb2c756ad9b0"
+    },
+    {
+      "seq": 3,
+      "msg_id": "msg_1795370936499_user_lkdot09qym",
+      "action": "upsert",
+      "hash": "ab6ee73f8922a7daff732d51ae6926a65c06e404fce826bf2576ab2fb90a6d01"
+    },
+    {
+      "seq": 4,
+      "msg_id": "reply_request_eae8152c9161489a8a84d623d378a3cd",
+      "action": "upsert",
+      "hash": "a340fc14437ef084756f12fc57c35ca8b1b98170f2817864e6e72a7ea82b3053"
+    }
+  ],
+  "admissions": [
+    {
+      "id": "request_a0f88df78132402897bb3c7cbc6f5e33",
+      "request_id": "msg_1795370933527_user_b1pa8y1",
+      "principal": "desktop:deviceA",
+      "state": "completed",
+      "dispatched": 1,
+      "native_terminal": 1
+    },
+    {
+      "id": "request_eae8152c9161489a8a84d623d378a3cd",
+      "request_id": "msg_1795370936499_user_lkdot09qym",
+      "principal": "desktop:deviceB",
+      "state": "completed",
+      "dispatched": 1,
+      "native_terminal": 1
+    }
+  ],
+  "nativeRequests": [
+    {
+      "id": "reply_request_a0f88df78132402897bb3c7cbc6f5e33",
+      "admission_id": "request_a0f88df78132402897bb3c7cbc6f5e33",
+      "state": "model_terminal"
+    },
+    {
+      "id": "request_eae8152c9161489a8a84d623d378a3cd",
+      "admission_id": "request_eae8152c9161489a8a84d623d378a3cd",
+      "state": "model_terminal"
+    }
+  ],
+  "attachmentRequests": [
+    {
+      "route": "/api/plugins/NativeSync/source/shared-attachments/shared_8baec8802fc24c46bc7756a3b74a47c2/uploads",
+      "method": "POST",
+      "status": 201,
+      "device": "deviceA"
+    },
+    {
+      "route": "/api/plugins/NativeSync/source/shared-attachments/shared_8baec8802fc24c46bc7756a3b74a47c2/uploads/61e44299-9c30-4a66-84e6-3e101c2ab499/chunks",
+      "method": "POST",
+      "status": 200,
+      "device": "deviceA"
+    },
+    {
+      "route": "/api/plugins/NativeSync/source/shared-attachments/shared_8baec8802fc24c46bc7756a3b74a47c2/uploads/61e44299-9c30-4a66-84e6-3e101c2ab499/finish",
+      "method": "POST",
+      "status": 200,
+      "device": "deviceA"
+    },
+    {
+      "route": "/api/plugins/NativeSync/source/shared-attachments/shared_8baec8802fc24c46bc7756a3b74a47c2/messages/msg_1795370933527_user_b1pa8y1/attachment_f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "method": "GET",
+      "status": 200,
+      "device": "deviceA"
+    }
+  ],
+  "runtime": {
+    "electron": "44.9.3",
+    "sandboxed": true,
+    "distinctProfiles": true,
+    "reusedBProfile": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+    "loadedBackendSourceCount": 34
+  },
+  "exits": {
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B-reopened": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "failures": []
+}

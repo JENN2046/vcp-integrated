@@ -283,7 +283,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                     row.complete = response.complete;
                 });
             }
-            if (missingCase && route.includes('/shared-attachments/')) requests.push(row);
+            if ((missingCase || observedContext?.observeAttachments) && route.includes('/shared-attachments/')) requests.push(row);
             if (mode === 'idle' && process.env.NS_IDLE_OBSERVE_TOPIC === 'yes' && route.endsWith('/shared/session-events')) {
                 requests.push({ ...row, scope: url.searchParams.get('scope') });
             }
