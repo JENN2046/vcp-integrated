@@ -87,14 +87,34 @@ class SharedNative {
    }
   }
  }
+ toolLedger(workId){
+  return this.db.prepare(`SELECT invocation_id,native_request_id,plugin_name,record_id,state
+   FROM mobile_native_invocations WHERE execution_id=? ORDER BY rowid`).all(workId);
+ }
  verifiedToolBoundary(workId,requestId,savedProof){
-  const ledger=this.db.prepare('SELECT invocation_id,native_request_id,plugin_name,record_id,state FROM mobile_native_invocations WHERE execution_id=?').all(workId);
-  const [call]=ledger;
-  if(ledger.length!==1||call.native_request_id!==requestId||call.state!=='returned')throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
-  const proof=savedProof||this.checkpointProof(workId,requestId,[call.invocation_id]);
-  const receipts=this.continuations.compactionToolResults(requestId,workId,proof),receipt=receipts[0]?.result;
-  if(receipts.length!==1||receipt.invocationId!==call.invocation_id||receipt.pluginName!==call.plugin_name||receipt.recordId!==call.record_id||!Object.hasOwn(receipt,'result'))throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
-  return proof;
+  return this.checkedToolCheckpoint(workId,requestId,savedProof).proof;
+ }
+ checkedToolCheckpoint(workId,requestId,savedProof){
+  const ledger=this.toolLedger(workId);
+  const reject=()=>fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
+  if(!ledger.length||ledger.length>2||ledger.some(call=>call.native_request_id!==requestId||call.state!=='returned'))throw reject();
+  if(ledger.length===2){
+   const admission=this.db.prepare('SELECT user_op FROM shared_admissions WHERE id=?').get(workId);
+   const turn=admission&&require('./sharedTurns').intent(admission);
+   if(turn?.controlMode!==controlled.TOOLS_MODE||turn.toolBatchLimit!==2)throw reject();
+  }
+  const ids=ledger.map(call=>call.invocation_id);
+  const proof=savedProof||this.checkpointProof(workId,requestId,ids);
+  if(stable(proof.settledInvocationIds)!==stable(ids))throw reject();
+  const receipts=this.continuations.compactionToolResults(requestId,workId,proof);
+  if(receipts.length!==ledger.length)throw reject();
+  for(const [index,call] of ledger.entries()){
+   const receipt=receipts[index].result;
+   if(receipt.invocationId!==call.invocation_id||receipt.pluginName!==call.plugin_name||
+      receipt.recordId!==call.record_id||!Object.hasOwn(receipt,'result')||
+      (ledger.length===2&&receipt.batchOrdinal!==index))throw reject();
+  }
+  return {proof,receipts};
  }
  prepare(actor,body,{session=false}={}){
   if(this.draining||this.closed)throw fail('HOST_DRAINING',503);
@@ -209,7 +229,10 @@ class SharedNative {
    }
    if(previous){const inputs=this.db.prepare('SELECT input_id FROM shared_work_inputs WHERE work_id=? AND input_seq>? AND input_seq<=? ORDER BY input_seq').all(admission.id,previous.consumed_seq,generation.consumed_seq);
     const link=this.db.prepare('SELECT * FROM shared_compaction_native_links WHERE request_id=? AND proof_hash=? ORDER BY journal_seq DESC LIMIT 1').get(previous.request_id,proof.hash);
-    if(turn.controlMode===controlled.TOOLS_MODE&&!link)throw fail('NATIVE_COMPACTION_CHECKPOINT_MISSING');
+    if(turn.controlMode===controlled.TOOLS_MODE){
+     if(!link)throw fail('NATIVE_COMPACTION_CHECKPOINT_MISSING');
+     this.verifiedToolBoundary(admission.id,previous.request_id,proof);
+    }
     if(link){const checkpoint=this.shared.store.readProjected(()=>{const value=this.shared.store.findMessage.get(topic.owner_type,topic.owner_id,topic.topic_id,link.checkpoint_id);return value?[value]:[];})[0]?.message;if(!checkpoint)throw fail('NATIVE_COMPACTION_CHECKPOINT_MISSING');
      const after=this.db.prepare('SELECT input_id FROM shared_work_inputs WHERE work_id=? AND input_seq>? AND input_seq<=? ORDER BY input_seq').all(admission.id,Math.max(previous.consumed_seq,link.through_input_seq),generation.consumed_seq);
      continuedBody=this.continuations.mergeCompactedBody(previous.request_id,req.body,{workId:admission.id,expectedHash:proof.hash,checkpoint,inputIds:after.map(v=>v.input_id)});
@@ -227,10 +250,16 @@ class SharedNative {
    this.db.prepare("UPDATE shared_admissions SET state='dispatched',dispatched=1 WHERE id=?").run(admission.id);
   });
   const base=this.engine.nativeTasks.hooks(admission.id,row.id);
-  let settledTool=false,pausedAtFence=false;
+  let batchNames=null,settledCount=0,pausedAtFence=false;
+  const beginToolBatch=safeTools?names=>{
+   fence();
+   if(batchNames||!names.length||names.length>(turn.toolBatchLimit===2?2:1))throw fail('CONTROLLED_TOOL_CALL_LIMIT');
+   if(names.some(name=>!safeTools.has(name))||new Set(names).size!==names.length)throw fail('CONTROLLED_TOOL_FORBIDDEN');
+   batchNames=names;
+  }:null;
   const fence=()=>{
    if(this.closed)throw fail('SHARED_NATIVE_CLOSED',503);
-   if(settledTool){pausedAtFence=true;throw fail('WORK_SAFE_TOOL_BOUNDARY');}
+   if(batchNames&&settledCount===batchNames.length){pausedAtFence=true;throw fail('WORK_SAFE_TOOL_BOUNDARY');}
    this.shared.steering.fence(admission.id,generation?.generation||0,actor.principal);
    const current=this.db.prepare('SELECT state FROM shared_admissions WHERE id=?').get(admission.id);
    if(!current||current.state!=='dispatched')throw fail('SHARED_REQUEST_FENCED');
@@ -241,12 +270,26 @@ class SharedNative {
     fence();
     if(safeTools){
      if(!safeTools.has(event.pluginName))throw fail('CONTROLLED_TOOL_FORBIDDEN');
-     if(this.db.prepare('SELECT 1 FROM mobile_native_invocations WHERE execution_id=?').get(admission.id))throw fail('CONTROLLED_TOOL_CALL_LIMIT');
+     const prior=this.toolLedger(admission.id);
+     if(!batchNames||event.batchNames!==batchNames||event.batchSize!==batchNames.length||
+        event.batchOrdinal!==settledCount||prior.length!==settledCount||
+        batchNames[settledCount]!==event.pluginName)throw fail('CONTROLLED_TOOL_CALL_LIMIT');
+     if(settledCount){
+      const previous=prior[0],archive=this.continuations.read(row.id);
+      const receipt=archive?.results[previous.invocation_id];
+      if(archive?.identity.workId!==admission.id||previous.state!=='returned'||previous.native_request_id!==row.id||previous.plugin_name!==batchNames[0]||
+         !receipt||receipt.invocationId!==previous.invocation_id||receipt.recordId!==previous.record_id||
+         receipt.pluginName!==previous.plugin_name||receipt.batchOrdinal!==0||receipt.batchSize!==2||
+         stable(receipt.batchNames)!==stable(batchNames)||!Object.hasOwn(receipt,'result'))throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
+     }
     }
     const value=base.onToolDispatch(event);hint(event,'started');return value;
    },
    onTaskAccepted:event=>{fence();if(safeTools)throw fail('CONTROLLED_TOOL_FORBIDDEN');const value=base.onTaskAccepted(event);hint(event,'accepted');return value;},
-   onToolSettled:event=>{const value=base.onToolSettled(event);if(safeTools&&event.outcome==='returned')settledTool=true;hint(event,'settled');this.checkTerminal(admission.id);return value;},
+   onToolSettled:event=>{const value=base.onToolSettled(event);if(safeTools&&event.outcome==='returned'){
+    if(event.batchNames!==batchNames||event.batchOrdinal!==settledCount)throw fail('NATIVE_INVOCATION_IDENTITY_MISMATCH');
+    settledCount++;
+   }hint(event,'settled');this.checkTerminal(admission.id);return value;},
    onTaskObserved:event=>{const value=base.onTaskObserved(event);hint(event,'observed');this.checkTerminal(admission.id);return value;}
   };
   let ended=false;
@@ -329,7 +372,7 @@ class SharedNative {
    if(!success&&!steered){this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE id=? AND state='dispatched'").run(admission.id);this.engine.emitEvent?.(admission.id,'state',{state:'review_required'});}
    else this.checkTerminal(admission.id);
   };
-  return {textOnly,safeTools,observeAssistantText,sponsorAuthority:{actor,admissionId:admission.id,spaceId:admission.space_id,routeHash:JSON.parse(admission.user_op||'{}').sponsorRouteHash},phase:name=>this.phase(admission.id,row.id,name),steeringEnabled,workId:admission.id,generation:generation?.generation||0,fence,applied,continuation:()=>continuedBody,checkpoint:steeringEnabled?{finalReply,completion:value=>this.continuations.completion(row.id,value),assistant:content=>this.continuations.assistant(row.id,content),result:(invocation,value)=>this.continuations.result(row.id,invocation,value)}:null,sessionFinalReply,bridge:hooks,finish,
+  return {textOnly,safeTools,beginToolBatch,observeAssistantText,sponsorAuthority:{actor,admissionId:admission.id,spaceId:admission.space_id,routeHash:JSON.parse(admission.user_op||'{}').sponsorRouteHash},phase:name=>this.phase(admission.id,row.id,name),steeringEnabled,workId:admission.id,generation:generation?.generation||0,fence,applied,continuation:()=>continuedBody,checkpoint:steeringEnabled?{finalReply,completion:value=>this.continuations.completion(row.id,value),assistant:content=>this.continuations.assistant(row.id,content),result:(invocation,value)=>this.continuations.result(row.id,invocation,value)}:null,sessionFinalReply,bridge:hooks,finish,
    settleToolPause:()=>{
     if(!pausedAtFence)return false;
     finish(false);

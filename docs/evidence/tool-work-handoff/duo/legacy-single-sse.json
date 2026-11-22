@@ -1,0 +1,79 @@
+{
+  "mode": "tool-handoff-stream",
+  "command": "node tests/integration/run.cjs tool-handoff-stream",
+  "work": {
+    "id": "request_fddd2a0e576f465aa1bd17b42d2dad93",
+    "intakeRequestId": "controlled_f7a3f4ce83314ca9b66972e4694e0e5d",
+    "initialState": "accepted",
+    "finalState": "completed",
+    "finalJournalSeq": 6
+  },
+  "pause": {
+    "transport": "SSE",
+    "httpStatus": 200,
+    "state": "paused",
+    "code": "WORK_SAFE_TOOL_BOUNDARY",
+    "requestId": "reply_request_fddd2a0e576f465aa1bd17b42d2dad93",
+    "rendererFinishReason": "interrupted"
+  },
+  "invocations": [
+    {
+      "invocationId": "57e1917a-7f67-46fe-9734-c4526dec5fdd",
+      "requestId": "reply_request_fddd2a0e576f465aa1bd17b42d2dad93",
+      "recordId": "tcr-1795330102574-e9c616ae-19eb-469c-bec3-673acab7b70d",
+      "pluginName": "OrdinaryToolCounter",
+      "state": "returned"
+    }
+  ],
+  "settledInvocationIds": [
+    "57e1917a-7f67-46fe-9734-c4526dec5fdd"
+  ],
+  "providerCallCount": 3,
+  "provider": [
+    {
+      "requestId": "reply_request_fddd2a0e576f465aa1bd17b42d2dad93",
+      "phase": "initial",
+      "stream": true
+    },
+    {
+      "requestId": "compaction_1795330103327_8aqbud30yn",
+      "phase": "summary",
+      "stream": true
+    },
+    {
+      "requestId": "reply_request_fddd2a0e576f465aa1bd17b42d2dad93_g1",
+      "phase": "resumed",
+      "stream": true
+    }
+  ],
+  "effectCountByPlugin": {
+    "OrdinaryToolCounter": 1
+  },
+  "recovery": {
+    "handoffHttpStatus": 200,
+    "handoffResponseDropped": true,
+    "executorAfterDesktopRestart": "desktop:deviceB",
+    "generations": [
+      {
+        "number": 0,
+        "requestId": "reply_request_fddd2a0e576f465aa1bd17b42d2dad93",
+        "executor": "desktop:deviceA",
+        "state": "paused"
+      },
+      {
+        "number": 1,
+        "requestId": "reply_request_fddd2a0e576f465aa1bd17b42d2dad93_g1",
+        "executor": "desktop:deviceB",
+        "state": "completed"
+      }
+    ],
+    "finalReplyMessageId": "reply_request_fddd2a0e576f465aa1bd17b42d2dad93_g1",
+    "finalHistoryCopies": 1,
+    "finalJournalCopies": 1
+  },
+  "legacySingleTool": {
+    "controlMode": "safe-tools-v1",
+    "pairCapabilityForwarded": false,
+    "persistedToolBatchLimitPresent": false
+  }
+}

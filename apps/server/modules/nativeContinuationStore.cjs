@@ -45,7 +45,9 @@ function createNativeContinuationStore(directory) {
         completion(requestId,response){const data=read(requestId);if(!data)throw fail('NATIVE_CHECKPOINT_REQUIRED');if(data.completion&&hash(data.completion)!==hash(response))throw fail('NATIVE_COMPLETION_CHANGED');if(!data.completion){data.completion=response;data.revision++;write(data);}},
         result(requestId, invocation, result) {
             const data = read(requestId); if (!data || invocation.nativeRequestId !== requestId) throw fail('NATIVE_CHECKPOINT_IDENTITY_CHANGED');
-            const value = { invocationId: invocation.invocationId, pluginName: invocation.pluginName, recordId: invocation.recordId, result };
+            const { invocationId, pluginName, recordId, batchOrdinal, batchSize, batchNames } = invocation;
+            const value = { invocationId, pluginName, recordId, result,
+                ...(batchOrdinal !== undefined && { batchOrdinal, batchSize, batchNames }) };
             const prior = data.results[invocation.invocationId];
             if (prior && hash(prior) !== hash(value)) throw fail('NATIVE_CHECKPOINT_RESULT_CHANGED');
             if (!prior) { data.results[invocation.invocationId] = value; data.events.push({kind:'result',invocationId:invocation.invocationId}); data.revision++; write(data); }
@@ -63,16 +65,29 @@ function createNativeContinuationStore(directory) {
             const data = proofSource(requestId, workId, proof.settledInvocationIds);
             if (proof.requestId !== requestId || hash(data) !== proof.hash) throw fail('NATIVE_CHECKPOINT_CHANGED');
             const settled = new Set(proof.settledInvocationIds);
+            if (settled.size !== proof.settledInvocationIds.length) throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
             const results = [];
             for (const [index, event] of data.events.entries()) {
                 // Assistant events belong to the generation's one Journal reply.
                 // Only independently settled tool invocations supply extra rows.
                 if (event.kind === 'assistant') continue;
                 const result = data.results[event.invocationId];
-                if (event.kind !== 'result' || !settled.has(event.invocationId) || result?.invocationId !== event.invocationId) {
+                if (event.kind !== 'result' || !settled.delete(event.invocationId) || result?.invocationId !== event.invocationId) {
                     throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
                 }
                 results.push({ index, result });
+            }
+            if (settled.size || results.length !== Object.keys(data.results).length) throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
+            if (results.some(({ result }) => ['batchOrdinal', 'batchSize', 'batchNames'].some(key => Object.hasOwn(result, key)))) {
+                const { batchNames } = results[0].result;
+                if (!Array.isArray(batchNames) || batchNames.length !== results.length || batchNames.length > 2 ||
+                    new Set(batchNames).size !== batchNames.length ||
+                    results.some(({ result }, ordinal) => result.batchOrdinal !== ordinal ||
+                        result.batchSize !== batchNames.length || result.pluginName !== batchNames[ordinal] ||
+                        !Array.isArray(result.batchNames) || result.batchNames.length !== batchNames.length ||
+                        result.batchNames.some((name, index) => name !== batchNames[index]))) {
+                    throw fail('NATIVE_CHECKPOINT_RESULTS_UNCONFIRMED');
+                }
             }
             return results;
         },

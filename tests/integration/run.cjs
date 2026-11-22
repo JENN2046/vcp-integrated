@@ -27,7 +27,8 @@ const readbackModes = ['tool-final-readback-json', 'tool-final-readback-stream',
     'tool-final-readback-json-delete', 'tool-final-readback-stream-edit'];
 const legacyReadbackMode = 'tool-final-readback-legacy';
 const beforeFinalReadback = 'aa19a637831c1a7fabd3ec0de858d08084097ef7';
-const toolHandoffModes = ['tool-handoff-baseline', 'tool-handoff', 'tool-handoff-unknown', 'tool-handoff-stream',
+const duoModes = ['tool-duo-baseline-returned', 'tool-duo-baseline-unknown', 'tool-duo-returned', 'tool-duo-returned-stream', 'tool-duo-unknown'];
+const toolHandoffModes = [...duoModes, 'tool-handoff-baseline', 'tool-handoff', 'tool-handoff-unknown', 'tool-handoff-stream',
     'tool-final-publication-ack', legacyReadbackMode, ...new Set([...readbackModes, ...Object.keys(finalReceiptModes)])];
 const toolHandoffMode = toolHandoffModes.includes(requested) ? requested : undefined;
 const toolHandoffFixture = toolHandoffMode && require('../tool-work-handoff/fixture.cjs');
@@ -56,7 +57,7 @@ if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.n
     throw Error('Integration requires Linux x64 and Node 24');
 }
 if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', compactionRetryMode, 'local-stream-interrupt', 'desktop-stream-close'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|tool-final-receipt-lost|tool-final-receipt-unknown|tool-final-publication-ack|' + [...readbackModes, legacyReadbackMode].join('|') + '|local-stream-interrupt|desktop-stream-close]');
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|' + duoModes.join('|') + '|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|tool-final-receipt-lost|tool-final-receipt-unknown|tool-final-publication-ack|' + [...readbackModes, legacyReadbackMode].join('|') + '|local-stream-interrupt|desktop-stream-close]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -175,15 +176,17 @@ async function runCase(root, mode) {
     fs.mkdirSync(out, { mode: 0o700 });
     let service, aa;
     const toolHandoff = toolHandoffFixture?.create(out, {
-        unknown: mode === 'tool-handoff-unknown',
-        loseHandoff: ['tool-handoff', 'tool-handoff-stream', 'tool-final-publication-ack', legacyReadbackMode].includes(mode) ||
+        duo: duoModes.includes(mode),
+        duoBaseline: mode.startsWith('tool-duo-baseline-'),
+        unknown: ['tool-duo-baseline-unknown', 'tool-duo-unknown', 'tool-handoff-unknown'].includes(mode),
+        loseHandoff: ['tool-duo-returned', 'tool-duo-returned-stream', 'tool-handoff', 'tool-handoff-stream', 'tool-final-publication-ack', legacyReadbackMode].includes(mode) ||
             readbackModes.includes(mode) || Boolean(finalReceiptModes[mode]),
         losePublication: mode === 'tool-final-publication-ack',
         readback: readbackModes.includes(mode),
         loseReadback: mode === 'tool-final-readback-query-lost',
         legacyReadback: mode === legacyReadbackMode,
         finalMutation: { 'tool-final-readback-json-delete': 'delete', 'tool-final-readback-stream-edit': 'upsert' }[mode],
-        stream: ['tool-handoff-stream', 'tool-final-readback-stream', 'tool-final-readback-stream-edit'].includes(mode) ||
+        stream: ['tool-duo-returned-stream', 'tool-handoff-stream', 'tool-final-readback-stream', 'tool-final-readback-stream-edit'].includes(mode) ||
             (finalReceiptModes[mode] === 'terminal' && process.env.VCP_TEST_FINAL_STREAM === '1'),
         finalReceipt: finalReceiptModes[mode],
     });

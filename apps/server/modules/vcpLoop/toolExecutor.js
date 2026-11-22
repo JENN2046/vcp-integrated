@@ -7,6 +7,7 @@ const { getEmbeddingsBatch, cosineSimilarity } = require('../../EmbeddingUtils')
 const toolCallRecordStore = require('../toolCallRecordStore');
 const jevRiverReranker = require('../jevRiverReranker'); // river semantic:N 的级联第二阶段
 const jevToolCallExp = require('../jevToolCallExp');
+const nativeExecution = require('../requestExecutionContext');
 
 const VCP_TIMED_CONTACTS_DIR = path.join(__dirname, '..', '..', 'VCPTimedContacts');
 const RESIDENT_TOOL_NAME = 'AGENTSOSResident';
@@ -248,7 +249,7 @@ class ToolExecutor {
    */
   async execute(toolCall, clientIp, contextMessages = [], requestExecutionContext = {}) {
     const { name, args, river, vref, archeryNoReply } = toolCall;
-    require('../requestExecutionContext').assertToolsAllowed(name, args, {
+    nativeExecution.assertToolsAllowed(name, args, {
       indirect: Boolean(river || vref || archeryNoReply || jevToolCallExp.isVirtualToolName(name))
     });
     const residentProposalCall = isResidentProposalCall(toolCall);
@@ -554,9 +555,22 @@ class ToolExecutor {
    * 批量执行工具调用
    */
   async executeAll(toolCalls, clientIp, contextMessages = [], requestExecutionContext = {}) {
-    return Promise.all(
-      toolCalls.map(tc => this.execute(tc, clientIp, contextMessages, requestExecutionContext))
-    );
+    const execute = call => this.execute(call, clientIp, contextMessages, requestExecutionContext);
+    if (!nativeExecution.controlledToolWork()) return Promise.all(toolCalls.map(execute));
+    nativeExecution.assertToolBatch(toolCalls);
+    if (toolCalls.length === 2) {
+      for (const { name, args, river, vref, archeryNoReply } of toolCalls) {
+        nativeExecution.assertToolsAllowed(name, args, {
+          indirect: Boolean(river || vref || archeryNoReply || jevToolCallExp.isVirtualToolName(name) ||
+            preparations.get(this.pluginManager.executionBridgeRegistry)?.has(name))
+        });
+        this.pluginManager.assertControlledDirectTool(name, { requireLoaded: true });
+        if (this.vcpToolCode && !(await this._verifyAuth({ ...args })).valid) {
+          throw Object.assign(Error('CONTROLLED_TOOL_FORBIDDEN'), { code: 'CONTROLLED_TOOL_FORBIDDEN' });
+        }
+      }
+    }
+    return nativeExecution.executeControlledToolBatch(toolCalls, execute);
   }
 
   _attachRecordIdToResult(result, recordHandle) {

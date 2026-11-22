@@ -1,0 +1,351 @@
+{
+  "mode": "tool-duo-unknown",
+  "toolBoxBaseline": null,
+  "desktops": {
+    "A": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cds": {
+        "pid": 718505,
+        "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "profileDigest": "e00ba0ca84ee85d4bc3da96b80dcbf6714ed5d6c8e51d64a3616fb17f1223227"
+    },
+    "B": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cds": {
+        "pid": 718526,
+        "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "profileDigest": "94b7474269071d07994d375f4021b0a2ebfa8420572fb5f5dc0d03fedfa657ce"
+    },
+    "B-review": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cds": {
+        "pid": 718922,
+        "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "profileDigest": "94b7474269071d07994d375f4021b0a2ebfa8420572fb5f5dc0d03fedfa657ce"
+    }
+  },
+  "exits": {
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B-review": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "provider": [
+    {
+      "id": "reply_request_9c0fd746fd6c4e829209ac3f44c45b18",
+      "toolHandoffPhase": "initial",
+      "toolsRequested": [
+        "OrdinaryToolCounter",
+        "OrdinaryToolSecondCounter"
+      ]
+    }
+  ],
+  "backendSources": [
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "67ebe7b9c787fc7eb1aea3fa780ea317beebd0927699baca1fedbe788a2ce97e"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "209531cb5d725ebd295d654ea0a6e26354e62c9668e2c2f4de51e3613321ecd4"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "71053495f7562deeca6438a2265c5a55b2af1d5fe75afefbaedc8f843ce08688"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "e8f4de3c5f0b60a629c1238f906926eb6ce0e5569d1bd5d94cfc25d830f67de6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "2e637687e88f05d3ae23cb19e663b3a0e5998f424df4101cb7663f9fb41e5481"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+      "sha256": "a2a1ef154641000c3abc8ca185b499fcf29c44161fcc74557fb2a8f70dec65b0"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+      "sha256": "44881d09b207d0d1296ed02671ec9280989e6c6f353903e71df44f40f1b61ff0"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+      "sha256": "8061147f80eddffa2862bf0ef191f6a87588ee170335e447698db7c4a7c4a7ae"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "53d7d237b960df6897ee8efa70c44fa8eb0269b104710d2c70fbf568b9b5444e"
+    },
+    {
+      "file": "apps/server/modules/nativeContinuationStore.cjs",
+      "sha256": "ab225ef3873bc8bd7731c3c1f30e3d2d43eacf3298978afbb6167e1a6e176835"
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2"
+    }
+  ],
+  "heldFirst": {
+    "counters": {
+      "first": [
+        {
+          "marker": "ORDINARY_TOOL_LOCAL"
+        }
+      ],
+      "second": []
+    },
+    "invocations": [
+      {
+        "invocation_id": "d3f0c469-35cc-4e75-9191-21907cf7fcd9",
+        "execution_id": "request_9c0fd746fd6c4e829209ac3f44c45b18",
+        "native_request_id": "reply_request_9c0fd746fd6c4e829209ac3f44c45b18",
+        "plugin_name": "OrdinaryToolCounter",
+        "record_id": "tcr-1795330009397-023fc4f7-f8ae-41b5-bf53-17f856c9a9cd",
+        "state": "started",
+        "error_code": null
+      }
+    ]
+  },
+  "toolHandoff": {
+    "original": {
+      "id": "request_9c0fd746fd6c4e829209ac3f44c45b18",
+      "request_id": "controlled_1868e7bec06140c8b8c7d233e8b9b46e",
+      "principal": "desktop:deviceA",
+      "state": "accepted",
+      "dispatched": 0,
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "final": {
+      "id": "request_9c0fd746fd6c4e829209ac3f44c45b18",
+      "request_id": "controlled_1868e7bec06140c8b8c7d233e8b9b46e",
+      "principal": "desktop:deviceA",
+      "state": "review_required",
+      "dispatched": 1,
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "ownership": {
+      "revision": 0,
+      "generation": 0,
+      "executor": "desktop:deviceA"
+    },
+    "invocations": [
+      {
+        "invocation_id": "d3f0c469-35cc-4e75-9191-21907cf7fcd9",
+        "execution_id": "request_9c0fd746fd6c4e829209ac3f44c45b18",
+        "native_request_id": "reply_request_9c0fd746fd6c4e829209ac3f44c45b18",
+        "plugin_name": "OrdinaryToolCounter",
+        "record_id": "tcr-1795330009397-023fc4f7-f8ae-41b5-bf53-17f856c9a9cd",
+        "state": "returned",
+        "error_code": null
+      },
+      {
+        "invocation_id": "c5c116fe-e142-4c3e-be60-a870e37c62ff",
+        "execution_id": "request_9c0fd746fd6c4e829209ac3f44c45b18",
+        "native_request_id": "reply_request_9c0fd746fd6c4e829209ac3f44c45b18",
+        "plugin_name": "OrdinaryToolSecondCounter",
+        "record_id": "tcr-1795330009649-f3973a2d-1b29-40b1-947c-6d7690b8eeef",
+        "state": "started",
+        "error_code": null
+      }
+    ],
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_9c0fd746fd6c4e829209ac3f44c45b18",
+        "state": "running",
+        "checkpoint_json": null
+      }
+    ],
+    "interruption": {
+      "backendBefore": 718133,
+      "exit": {
+        "code": null,
+        "signal": "SIGKILL"
+      },
+      "backendAfter": 718760,
+      "archive": {
+        "identity": {
+          "workId": "request_9c0fd746fd6c4e829209ac3f44c45b18",
+          "requestId": "reply_request_9c0fd746fd6c4e829209ac3f44c45b18",
+          "generation": 0,
+          "controlRevision": 0
+        },
+        "events": [
+          {
+            "kind": "assistant",
+            "content": "Synthetic A requested the isolated counter.\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」OrdinaryToolCounter「末」,\ncommand:「始」Count「末」,\nmarker:「始」ORDINARY_TOOL_LOCAL「末」\n<<<[END_TOOL_REQUEST]>>>\nSynthetic A requested the isolated counter.\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」OrdinaryToolSecondCounter「末」,\ncommand:「始」Count「末」,\nmarker:「始」ORDINARY_TOOL_LOCAL「末」\n<<<[END_TOOL_REQUEST]>>>"
+          },
+          {
+            "kind": "result",
+            "invocationId": "d3f0c469-35cc-4e75-9191-21907cf7fcd9"
+          }
+        ],
+        "results": [
+          {
+            "invocationId": "d3f0c469-35cc-4e75-9191-21907cf7fcd9",
+            "pluginName": "OrdinaryToolCounter",
+            "recordId": "tcr-1795330009397-023fc4f7-f8ae-41b5-bf53-17f856c9a9cd",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "ordinary tool invocation recorded for ORDINARY_TOOL_LOCAL"
+                }
+              ],
+              "timestamp": "2026-11-22T06:46:49.645+00:00"
+            },
+            "batchOrdinal": 0,
+            "batchSize": 2,
+            "batchNames": [
+              "OrdinaryToolCounter",
+              "OrdinaryToolSecondCounter"
+            ]
+          }
+        ]
+      }
+    },
+    "blockedOperations": {
+      "compactPrepare": {
+        "device": "deviceA",
+        "httpStatus": 409,
+        "error": "WORK_SAFE_BOUNDARY_PENDING"
+      },
+      "continue": {
+        "device": "deviceB",
+        "httpStatus": 409,
+        "error": "SHARED_REQUEST_FENCED"
+      }
+    },
+    "review": "原任务需要核对 · 执行端：另一设备",
+    "callStatus": "OrdinaryToolSecondCounter · 工具已开始，结果待核对 · 调用 c5c116fe-e142-4c3e-be60-a870e37c62ff",
+    "callStatuses": [
+      "OrdinaryToolCounter · 工具调用已返回 · 调用 d3f0c469-35cc-4e75-9191-21907cf7fcd9",
+      "OrdinaryToolSecondCounter · 工具已开始，结果待核对 · 调用 c5c116fe-e142-4c3e-be60-a870e37c62ff"
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "compact-same-1",
+        "action": "upsert",
+        "hash": "f3c57e0d650b340c79f1efa3ba2bb9ce40d68c3f052ff34c59a1f5304a70797c"
+      },
+      {
+        "seq": 2,
+        "msg_id": "compact-same-2",
+        "action": "upsert",
+        "hash": "3eceefe4a1f408b204d6cbfe2d8d5394ae00c554adcdf7872acd47c9cd803236"
+      },
+      {
+        "seq": 3,
+        "msg_id": "controlled_1868e7bec06140c8b8c7d233e8b9b46e",
+        "action": "upsert",
+        "hash": "5141f159d955cb95b3e824498293e7636bcca47b9f226481390fc192e10ceff8"
+      }
+    ],
+    "visibleButtons": {
+      "新建受控任务": false,
+      "新建工具任务": false,
+      "补充到此任务": true,
+      "接管到本端": false,
+      "本端继续执行": false,
+      "核对任务": true
+    },
+    "rejectedHandoff": {
+      "httpStatus": 409,
+      "error": "WORK_SAFE_BOUNDARY_PENDING"
+    },
+    "counter": {
+      "first": [
+        {
+          "marker": "ORDINARY_TOOL_LOCAL"
+        }
+      ],
+      "second": [
+        {
+          "marker": "ORDINARY_TOOL_LOCAL"
+        }
+      ]
+    },
+    "desktopSources": {
+      "main": [
+        {
+          "file": "apps/desktop/modules/ipc/chatHandlers.js",
+          "sha256": "80163e3b8a0120a030fd866f7dd09d40f6d4180b6053c0b102d332f781d8996d"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/syncRequest.js",
+          "sha256": "a5325a925bf1e071e6b4871bef1ceed937a57d45e2b81081c26a6aee37b5780d"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+          "sha256": "0eede772271e4549e20ff2170f53c9430372448c5811922be7782d407bc1e145"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+          "sha256": "dfd46c401a68a24bbef6e42356a71a1816bf6202001e6543f0b695b8ee39b114"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+          "sha256": "2fc1700e4d7b47ed9fd6a9e693ce44d63a5332698d382966eb972ec3d3b58e86"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/modules/chat/chatHistoryPersistence.js",
+          "bytes": 8337,
+          "sha256": "aece6ac53eee0bf1a6616d6f394ed724b823337c6687d92d845aa227cefb2466"
+        },
+        {
+          "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+          "bytes": 6970,
+          "sha256": "f7379f242fb60012ca172c204c06666db1a300fd7130692e4d12ba3bef3a8936"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+          "bytes": 10994,
+          "sha256": "692768db496c93e73f8444bd66c35be537958082faa07ba8d40252b130dba22d"
+        },
+        {
+          "file": "apps/desktop/modules/chatManager.js",
+          "bytes": 178272,
+          "sha256": "49e0bcb455046bad7c78dd29ad0bdcc219ad94fe30c9f2c72d80dd13cc6ac164"
+        },
+        {
+          "file": "apps/desktop/modules/renderer/mainChatSurfaceAdapter.js",
+          "bytes": 13362,
+          "sha256": "655bc01ad0c93edc2e0eadc8eea7b38eb39aaaa62b565fae5133249ffd69b20b"
+        }
+      ]
+    }
+  }
+}

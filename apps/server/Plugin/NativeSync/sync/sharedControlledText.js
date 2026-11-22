@@ -1,6 +1,7 @@
 'use strict';
 const MODE='text-only-v1',CAPABILITY='shared-controlled-text-v1';
 const TOOLS_MODE='safe-tools-v1',TOOLS_CAPABILITY='shared-controlled-tools-v1';
+const TOOL_PAIR_CAPABILITY='shared-controlled-tool-pair-v1';
 const TOOLS_HISTORY_CAPABILITY='shared-controlled-tools-history-v1';
 const isControlled=mode=>mode===MODE||mode===TOOLS_MODE;
 function allowedTools(raw='[]'){
@@ -25,7 +26,9 @@ function admit(shared,actor,topic,config,body,turn){
  if(!isControlled(body.controlMode))throw fail('CONTROLLED_MODE_UNSUPPORTED');
  if(!shared.native?.engine||!enabled(shared,body.controlMode)||actor.kind!=='desktop'||!String(actor.capabilities||'').split(',').includes(body.controlMode===TOOLS_MODE?TOOLS_CAPABILITY:CAPABILITY)||config.owner.kind!=='agent'||turn.kind!=='message')throw fail('CONTROLLED_TEXT_UNAVAILABLE');
  if(typeof body.message?.content!=='string'||!body.message.content.trim())throw fail('INVALID_SHARED_SUBMISSION');
- assertPortable(shared,topic,config,body.message);return true;
+ assertPortable(shared,topic,config,body.message);
+ if(body.controlMode===TOOLS_MODE&&actor.capabilities.split(',').includes(TOOL_PAIR_CAPABILITY))turn.toolBatchLimit=2;
+ return true;
 }
 function assertWork(shared,row,topic,actor,message={content:'',attachments:[]}){if(isControlled(require('./sharedTurns').intent(row).controlMode))assertPortable(shared,topic,shared.freezeForExecution(actor,topic),message);}
-module.exports={MODE,CAPABILITY,TOOLS_MODE,TOOLS_CAPABILITY,TOOLS_HISTORY_CAPABILITY,isControlled,enabled,allowedTools,admit,assertPortable,assertWork,local};
+module.exports={MODE,CAPABILITY,TOOLS_MODE,TOOLS_CAPABILITY,TOOL_PAIR_CAPABILITY,TOOLS_HISTORY_CAPABILITY,isControlled,enabled,allowedTools,admit,assertPortable,assertWork,local};

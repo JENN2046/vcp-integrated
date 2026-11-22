@@ -96,7 +96,7 @@ function middleware(req, res, next) {
     const finishNative=success=>{if(!scope)return;scope.transportEnded=true;scope.transportSuccess=success;outcome.check();};
     res.once('finish', () => { releaseContext();finishNative(res.statusCode>=200&&res.statusCode<300);req.removeListener('aborted', abort); res.removeListener('close', abort); });
     if(shared)res.once('close',()=>{if(!res.writableFinished)finishNative(false);});
-    scope={ toolRun: { waiting: 0 },finishNative,requestId, signal: controller.signal, ...snapshot,...(shared?{bridge:shared.bridge,sponsorAuthority:shared.sponsorAuthority,sponsorBoundary:sharedBoundary,textOnly:shared.textOnly===true,safeTools:shared.safeTools,settleToolPause:shared.settleToolPause,canSteer:shared.steeringEnabled===true,workId:shared.workId,generation:shared.generation,phase:shared.phase,fence:shared.fence,applied:shared.applied,continuation:shared.continuation,checkpoint:shared.checkpoint,sessionFinalReply:shared.sessionFinalReply}:{}) };
+    scope={ toolRun: { waiting: 0 },finishNative,requestId, signal: controller.signal, ...snapshot,...(shared?{bridge:shared.bridge,sponsorAuthority:shared.sponsorAuthority,sponsorBoundary:sharedBoundary,textOnly:shared.textOnly===true,safeTools:shared.safeTools,beginToolBatch:shared.beginToolBatch,settleToolPause:shared.settleToolPause,canSteer:shared.steeringEnabled===true,workId:shared.workId,generation:shared.generation,phase:shared.phase,fence:shared.fence,applied:shared.applied,continuation:shared.continuation,checkpoint:shared.checkpoint,sessionFinalReply:shared.sessionFinalReply}:{}) };
     return local.run(scope,next);
 }
 async function waitForApproval(promise, onCancel) {
@@ -152,10 +152,33 @@ function assertToolsAllowed(pluginName, args, { indirect = false } = {}) {
 }
 
 function controlledToolWork() { return Boolean(local.getStore()?.safeTools); }
+function toolError(code) { return Object.assign(Error(code), { code }); }
 function assertToolBatch(calls) {
-    if (controlledToolWork() && (calls.length>1 || calls[0]?.archery)) {
-        throw Object.assign(Error('CONTROLLED_TOOL_CALL_LIMIT'), { code: 'CONTROLLED_TOOL_CALL_LIMIT' });
+    if (!controlledToolWork()) return;
+    const scope = local.getStore();
+    if (calls.length > 2 || calls.some(call => call.archery) ||
+        (calls.length === 2 && (typeof scope.beginToolBatch !== 'function' || typeof scope.checkpoint?.result !== 'function' ||
+            calls[0].name === calls[1].name))) {
+        throw toolError('CONTROLLED_TOOL_CALL_LIMIT');
     }
+}
+
+async function executeControlledToolBatch(calls, execute) {
+    const scope = local.getStore();
+    const names = Object.freeze(calls.map(call => call.name));
+    scope.beginToolBatch?.(names);
+    const results = [];
+    for (const [ordinal, call] of calls.entries()) {
+        const toolBatch = { names, ordinal, dispatched: false, settled: false };
+        results.push(await local.run({ ...scope, toolBatch }, () => execute(call)));
+        if (names.length === 2) {
+            // ToolExecutor can turn transport failures into displayable errors.
+            // Only a durable native settlement lets the batch advance.
+            assertToolOutcomeKnown();
+            if (!toolBatch.settled) throw toolError('CONTROLLED_TOOL_BATCH_UNSETTLED');
+        }
+    }
+    return results;
 }
 
 function assertToolBoundary() {
@@ -180,10 +203,16 @@ async function trackToolInvocation({ pluginName, recordId = null }, process, isU
     const dispatch = async fn => {
         assertToolOutcomeKnown();
         throwIfCancelled();
+        const batch = context.toolBatch;
+        if (batch) {
+            if (batch.dispatched || batch.names[batch.ordinal] !== pluginName) throw toolError('CONTROLLED_TOOL_CALL_LIMIT');
+            batch.dispatched = true;
+        }
         const identity = Object.freeze({
             requestId: context.requestId, nativeRequestId: context.requestId,
             invocationId: randomUUID(), pluginName,
-            recordId: typeof recordId === 'string' && recordId ? recordId : null
+            recordId: typeof recordId === 'string' && recordId ? recordId : null,
+            ...(batch && { batchOrdinal: batch.ordinal, batchSize: batch.names.length, batchNames: batch.names })
         });
         await context.bridge.onToolDispatch(identity);
         invocation = identity;
@@ -216,9 +245,12 @@ async function trackToolInvocation({ pluginName, recordId = null }, process, isU
     } finally {
         if (invocation && !unconfirmed) {
             try {
-                if (outcome === 'returned') context.checkpoint?.result(invocation, value);
-                else if (!began) context.checkpoint?.result(invocation, { nativeOutcome: 'not_executed', errorCode });
+                if (outcome === 'returned') {
+                    if (context.toolBatch?.names.length === 2 && value === undefined) throw toolError('NATIVE_TOOL_RESULT_UNCONFIRMED');
+                    context.checkpoint?.result(invocation, value);
+                } else if (!began) context.checkpoint?.result(invocation, { nativeOutcome: 'not_executed', errorCode });
                 await confirmToolSettlement(context.bridge, { ...invocation, outcome, errorCode });
+                if (context.toolBatch && outcome === 'returned') context.toolBatch.settled = true;
             } catch (error) {
                 context.toolRun.unconfirmed = error;
                 throw error;
@@ -340,7 +372,7 @@ module.exports = {
     checkpointAssistant: content => local.getStore()?.checkpoint?.assistant(content),
     markModelTerminal: () => { const scope=local.getStore();if(scope)scope.modelTerminalKnown=true; },
     currentSignal: () => local.getStore()?.signal, currentWork: () => local.getStore()?.workId || null,
-    assertToolsAllowed, controlledToolWork, assertToolBatch, assertToolBoundary, trackToolInvocation,
+    assertToolsAllowed, controlledToolWork, assertToolBatch, assertToolBoundary, executeControlledToolBatch, trackToolInvocation,
     settleToolPause: () => local.getStore()?.settleToolPause?.(),
     currentTopicSponsorCall, approvalOwner,
     runToolInvocation, acceptNativeTask, registerNativeTaskProvider, queryNativeTask,

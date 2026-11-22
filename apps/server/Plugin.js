@@ -1840,6 +1840,16 @@ class PluginManager extends EventEmitter {
         };
     }
 
+    assertControlledDirectTool(toolName, { requireLoaded = false } = {}) {
+        const plugin = this.getPlugin(toolName);
+        if (!plugin || plugin.isDistributed || plugin.requiresAdmin
+            || plugin.pluginType !== 'hybridservice' || plugin.communication?.protocol !== 'direct'
+            || ['AgentAssistant', 'ChromeControl', RESIDENT_TOOL_NAME].includes(toolName)
+            || (requireLoaded && typeof this.getServiceModule(toolName)?.processToolCall !== 'function')) {
+            throw Object.assign(Error('CONTROLLED_TOOL_FORBIDDEN'), { code: 'CONTROLLED_TOOL_FORBIDDEN' });
+        }
+    }
+
     async processToolCall(toolName, toolArgs, requestIp = null, sourceNode = null, executionOptions = {}) {
         nativeExecution.assertToolsAllowed(toolName, toolArgs, { indirect: !!executionOptions?.archeryNoReply });
         const shouldManageToolCallRecord = !executionOptions?.toolCallRecordHandle;
@@ -1879,11 +1889,7 @@ class PluginManager extends EventEmitter {
             throw notFoundError;
         }
 
-        if (nativeExecution.controlledToolWork() && (plugin.isDistributed || plugin.requiresAdmin
-            || plugin.pluginType !== 'hybridservice' || plugin.communication?.protocol !== 'direct'
-            || ['AgentAssistant', 'ChromeControl', RESIDENT_TOOL_NAME].includes(toolName))) {
-            throw Object.assign(Error('CONTROLLED_TOOL_FORBIDDEN'), { code: 'CONTROLLED_TOOL_FORBIDDEN' });
-        }
+        if (nativeExecution.controlledToolWork()) this.assertControlledDirectTool(toolName);
 
         const maidNameFromArgs = toolArgs && toolArgs.maid ? toolArgs.maid : null;
         const pluginSpecificArgs = { ...toolArgs };

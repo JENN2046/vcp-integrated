@@ -1,0 +1,78 @@
+{
+  "mode": "tool-handoff",
+  "command": "node tests/integration/run.cjs tool-handoff",
+  "work": {
+    "id": "request_fec77f5461ae443ab1fde2f966eba9e1",
+    "intakeRequestId": "controlled_255ac10201e549a39628ad4abf7e1203",
+    "initialState": "accepted",
+    "finalState": "completed",
+    "finalJournalSeq": 6
+  },
+  "pause": {
+    "transport": "HTTP",
+    "httpStatus": 409,
+    "state": "paused",
+    "code": "WORK_SAFE_TOOL_BOUNDARY",
+    "requestId": "reply_request_fec77f5461ae443ab1fde2f966eba9e1"
+  },
+  "invocations": [
+    {
+      "invocationId": "580e7f8f-fb08-429a-bb84-159d080b2099",
+      "requestId": "reply_request_fec77f5461ae443ab1fde2f966eba9e1",
+      "recordId": "tcr-1795330088091-323274ba-663f-41e6-a97f-2da9d9183251",
+      "pluginName": "OrdinaryToolCounter",
+      "state": "returned"
+    }
+  ],
+  "settledInvocationIds": [
+    "580e7f8f-fb08-429a-bb84-159d080b2099"
+  ],
+  "providerCallCount": 3,
+  "provider": [
+    {
+      "requestId": "reply_request_fec77f5461ae443ab1fde2f966eba9e1",
+      "phase": "initial",
+      "stream": false
+    },
+    {
+      "requestId": "compaction_1795330088754_zoebpwj7a7",
+      "phase": "summary",
+      "stream": true
+    },
+    {
+      "requestId": "reply_request_fec77f5461ae443ab1fde2f966eba9e1_g1",
+      "phase": "resumed",
+      "stream": false
+    }
+  ],
+  "effectCountByPlugin": {
+    "OrdinaryToolCounter": 1
+  },
+  "recovery": {
+    "handoffHttpStatus": 200,
+    "handoffResponseDropped": true,
+    "executorAfterDesktopRestart": "desktop:deviceB",
+    "generations": [
+      {
+        "number": 0,
+        "requestId": "reply_request_fec77f5461ae443ab1fde2f966eba9e1",
+        "executor": "desktop:deviceA",
+        "state": "paused"
+      },
+      {
+        "number": 1,
+        "requestId": "reply_request_fec77f5461ae443ab1fde2f966eba9e1_g1",
+        "executor": "desktop:deviceB",
+        "state": "completed"
+      }
+    ],
+    "finalReplyMessageId": "reply_request_fec77f5461ae443ab1fde2f966eba9e1_g1",
+    "finalHistoryCopies": 1,
+    "finalJournalCopies": 1
+  },
+  "legacySingleTool": {
+    "controlMode": "safe-tools-v1",
+    "pairCapabilityForwarded": false,
+    "persistedToolBatchLimitPresent": false
+  }
+}

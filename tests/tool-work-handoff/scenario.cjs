@@ -14,12 +14,13 @@ const panel = '.native-sync-controlled-work';
 const quote = JSON.stringify;
 const checkpointMarker = 'COMPACT_DESKTOP_CHECKPOINT';
 
-function createApi(service, out, role) {
+function createApi(service, out, role, duo = false) {
     const connection = JSON.parse(fs.readFileSync(path.join(out, 'seed', 'desktop' + role, '.native-sync', 'connection.json'), 'utf8'));
     const headers = {
         'content-type': 'application/json', authorization: 'Bearer synthetic-only',
         'x-nativesync-space': connection.spaceId, 'x-nativesync-source': 'source' + role, 'x-nativesync-device': 'device' + role,
-        'x-nativesync-capabilities': 'shared-space-v1,shared-context-v1,shared-controlled-text-v1,shared-controlled-tools-v1,shared-steering-v1,message-intents-v1',
+        'x-nativesync-capabilities': 'shared-space-v1,shared-context-v1,shared-controlled-text-v1,shared-controlled-tools-v1,shared-steering-v1,message-intents-v1' +
+            (duo ? ',shared-controlled-tool-pair-v1' : ''),
     };
     return (route, body) => fetch(service.wsOrigin + '/api/v1/sync/shared/' + route, {
         method: body ? 'POST' : 'GET', headers, body: body && JSON.stringify(body),
@@ -51,6 +52,7 @@ async function loadedDesktop(client, sha, root) {
         main: [
             'apps/desktop/modules/ipc/chatHandlers.js',
             'apps/desktop/modules/services/nativeSync/sharedRuntime.js',
+            'apps/desktop/modules/services/nativeSync/syncRequest.js',
             'apps/desktop/modules/services/nativeSync/sharedExecution.js',
             'apps/desktop/modules/services/nativeSync/sharedSteeringClient.js',
         ],
@@ -70,7 +72,10 @@ async function loadedDesktop(client, sha, root) {
 }
 
 async function candidate({ result, service, out, clients: { A, B }, picture, click, evalJs, waitUntil, stop, start, quitBeforeFinalReceipt, profiles, sha, toolHandoff, db }) {
-    const { marker, loseHandoff, stream, finalReceipt, receipt } = toolHandoff;
+    const {
+        marker, duo, duoBaseline, unknown, counts, expectedCounts, secondResult, loseHandoff, stream, finalReceipt, receipt,
+        firstEffectReady, releaseFirstReceipt, secondEffectReady,
+    } = toolHandoff;
     const read = {};
     const ledgerFile = path.join(profiles.B, '.native-sync', 'shared', sharedSpaceId, 'executions.json');
     const expectedObservedHash = createHash('sha256').update(fixture.finalText).digest('hex');
@@ -131,8 +136,24 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
     const admissions = () => db.prepare('SELECT id,request_id,principal,state,dispatched,native_terminal,reply_seq FROM shared_admissions WHERE topic_id=?').all(sharedId);
     const control = id => db.prepare('SELECT revision,generation,executor FROM shared_work_controls WHERE work_id=?').get(id);
     const generations = id => db.prepare('SELECT generation,executor,request_id,state,checkpoint_json FROM shared_work_generations WHERE work_id=? ORDER BY generation').all(id);
-    const invocations = id => db.prepare('SELECT invocation_id,execution_id,native_request_id,plugin_name,record_id,state,error_code FROM mobile_native_invocations WHERE execution_id=?').all(id);
+    const invocations = id => db.prepare(`
+        SELECT invocation_id,execution_id,native_request_id,plugin_name,record_id,state,error_code
+        FROM mobile_native_invocations WHERE execution_id=? ORDER BY rowid
+    `).all(id);
     const journal = () => db.prepare('SELECT seq,msg_id,action,hash FROM journal WHERE topic_id=? ORDER BY seq').all(topicId);
+    function archiveSnapshot(requestId, rows) {
+        const file = path.join(out, 'runtime-box', '.state', 'native-continuations',
+            createHash('sha256').update(JSON.stringify(requestId)).digest('hex') + '.json');
+        const archive = JSON.parse(fs.readFileSync(file, 'utf8'));
+        assert.equal(archive.identity.workId, workId);
+        assert.equal(archive.identity.requestId, requestId);
+        const returned = rows.filter(row => row.state === 'returned');
+        assert.deepEqual(archive.events.map(event => event.kind), ['assistant', ...returned.map(() => 'result')]);
+        assert.deepEqual(archive.events.slice(1).map(event => event.invocationId), returned.map(row => row.invocation_id));
+        assert.deepEqual(Object.values(archive.results).map(row => [row.invocationId, row.recordId]),
+            returned.map(row => [row.invocation_id, row.record_id]));
+        return { identity: archive.identity, events: archive.events, results: Object.values(archive.results) };
+    }
     const initialJournal = journal();
     await evalJs(A, `(() => {
         const input = document.querySelector(${quote(panel + ' textarea')});
@@ -142,21 +163,92 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
     })()`);
     await action(A, '新建工具任务');
     const original = await waitUntil(() => admissions().at(0), 'A admits one controlled tool Work');
+    if (['tool-handoff', 'tool-handoff-stream'].includes(result.mode)) {
+        const { user_op } = db.prepare('SELECT user_op FROM shared_admissions WHERE id=?').get(original.id);
+        const turn = JSON.parse(user_op).sharedTurn;
+        assert.equal(turn.controlMode, 'safe-tools-v1');
+        assert.equal(Object.hasOwn(turn, 'toolBatchLimit'), false, 'single-tool compatibility uses an unnegotiated Work');
+    }
     assert.equal(original.principal, 'desktop:deviceA');
     assert.equal(original.state, 'accepted');
     assert.equal(original.dispatched, 0);
-    assert.deepEqual(tool.counts(out), []);
+    const noEffects = duo ? { first: [], second: [] } : [];
+    assert.deepEqual(counts(), noEffects);
     const workId = original.id;
     await action(A, '本端继续执行');
-    await waitUntil(() => tool.counts(out).length === 1, 'A invokes the isolated fsync counter exactly once');
+    if (duoBaseline) {
+        const attempted = await waitUntil(() => service.requests.find(row => row.nativeError === 'CONTROLLED_TOOL_CALL_LIMIT'), 'baseline rejects the two-tool batch');
+        assert.equal(attempted.device, 'deviceA');
+        assert.equal(attempted.status, 500);
+        assert.deepEqual(counts(), noEffects);
+        assert.deepEqual(invocations(workId), []);
+        assert.deepEqual(service.calls.map(call => call.toolsRequested), [[tool.name, fixture.secondName]]);
+        assert.equal(generations(workId).length, 1);
+        await waitUntil(async () => (await status(A))?.includes('原任务需要核对'), 'A displays review after the original limit');
+        await picture(A, 'A-baseline-two-tool-limit');
+        await stop('A');
+        const observer = await start('B-baseline', 'B');
+        await select(observer, 'B');
+        const statusB = await waitUntil(async () => {
+            const value = await status(observer);
+            return value?.includes('原任务需要核对') && value;
+        }, 'B reads the original rejected Work');
+        await picture(observer, 'B-baseline-observes-rejected-work');
+        assert.deepEqual(counts(), noEffects);
+        result.toolHandoff = { original, attempted, native: admissions().at(0), generations: generations(workId),
+            invocations: invocations(workId), counters: counts(), statusB,
+            desktopSources: await loadedDesktop(observer, sha, result.candidate) };
+        return;
+    }
+    if (duo) {
+        await waitUntil(firstEffectReady, 'first tool fsync completes while its receipt is held');
+        await delay(200);
+        const heldFirst = { counters: counts(), invocations: invocations(workId) };
+        assert.deepEqual(heldFirst.counters, { first: [{ marker }], second: [] });
+        assert.deepEqual(heldFirst.invocations.map(row => [row.plugin_name, row.state]), [[tool.name, 'started']]);
+        result.heldFirst = heldFirst;
+        releaseFirstReceipt();
+    }
+    await waitUntil(() => duo ? counts().second.length === 1 : counts().length === 1,
+        'A invokes the isolated fsync counter(s) exactly once');
 
-    if (result.mode === 'tool-handoff-unknown') {
+    if (unknown) {
+        let interruption;
+        if (duo) {
+            await waitUntil(secondEffectReady, 'second counter fsync completed without returning a receipt');
+            const before = invocations(workId);
+            const generation = generations(workId).at(0);
+            assert.equal(admissions().at(0).state, 'dispatched');
+            assert.deepEqual(before.map(row => [row.plugin_name, row.state, row.native_request_id]), [
+                [tool.name, 'returned', generation.request_id],
+                [fixture.secondName, 'started', generation.request_id],
+            ]);
+            assert.deepEqual(counts(), expectedCounts);
+            const archive = archiveSnapshot(generation.request_id, before);
+            const backendBefore = service.backendPid;
+            const exit = await service.restartAfterCrash();
+            assert.notEqual(service.backendPid, backendBefore);
+            assert.deepEqual(invocations(workId), before);
+            assert.deepEqual(archiveSnapshot(generation.request_id, before), archive);
+            interruption = { backendBefore, exit, backendAfter: service.backendPid, archive };
+        }
         await waitUntil(() => admissions().at(0)?.state === 'review_required', 'ToolBox quarantines the unknown external outcome');
         const before = invocations(workId);
-        assert.equal(before.length, 1);
-        assert.equal(before[0].state, 'started', 'external result remains unconfirmed in the invocation ledger');
-        await waitUntil(async () => (await status(A))?.includes('原任务需要核对'), 'A displays unresolved side effects');
-        await picture(A, 'A-side-effect-needs-review');
+        assert.deepEqual(before.map(row => [row.plugin_name, row.state]), duo
+            ? [[tool.name, 'returned'], [fixture.secondName, 'started']]
+            : [[tool.name, 'started']]);
+        assert.equal(before.at(-1).state, 'started', 'external result remains unconfirmed in the invocation ledger');
+        if (duo) {
+            const final = admissions().at(0);
+            assert.equal(final.native_terminal, 0);
+            assert.equal(final.reply_seq, null);
+            assert.equal(generations(workId).at(0).checkpoint_json, null);
+            assert.equal(db.prepare('SELECT count(*) AS n FROM shared_native_checkpoints WHERE work_id=?').get(workId).n, 0);
+        }
+        if (!duo) {
+            await waitUntil(async () => (await status(A))?.includes('原任务需要核对'), 'A displays unresolved side effects');
+            await picture(A, 'A-side-effect-needs-review');
+        }
         await stop('A');
         const other = await start('B-review', 'B');
         await select(other, 'B');
@@ -168,7 +260,7 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         assert.equal(visibleButtons['接管到本端'], false);
         assert.equal(visibleButtons['本端继续执行'], false);
         const ownership = control(workId);
-        const api = createApi(service, out, 'B');
+        const api = createApi(service, out, 'B', duo);
         const rejected = await api('steer-handoff', {
             sharedSpaceId, workId, opId: 'test-unsafe-handoff', expectedRevision: ownership.revision,
             expectedGeneration: ownership.generation, expectedExecutor: ownership.executor,
@@ -176,24 +268,54 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         assert.equal(rejected.ok, false);
         const { error } = await rejected.json();
         assert.equal(error.code, 'WORK_SAFE_BOUNDARY_PENDING');
+        let blockedOperations;
+        if (duo) {
+            const scope = { sharedSpaceId, sharedId };
+            const originalApi = createApi(service, out, 'A', duo);
+            const context = await originalApi('context?' + new URLSearchParams(scope));
+            assert.equal(context.status, 200);
+            const { head, hash } = await context.json();
+            const rejectedCompaction = await originalApi('compact-prepare', {
+                ...scope, expectedHead: head, opId: 'test-unknown-compact-prepare',
+            });
+            const compactionCode = (await rejectedCompaction.json()).error?.code;
+            assert.equal(rejectedCompaction.status, 409);
+            assert.equal(compactionCode, 'WORK_SAFE_BOUNDARY_PENDING');
+            const rejectedContinue = await api('steer-prepare', {
+                sharedSpaceId, workId, opId: 'test-unknown-continue', expectedRevision: ownership.revision,
+                expectedGeneration: ownership.generation, expectedHead: head, configHash: hash,
+            });
+            const continueCode = (await rejectedContinue.json()).error?.code;
+            assert.equal(rejectedContinue.ok, false);
+            assert.equal(continueCode, 'SHARED_REQUEST_FENCED');
+            assert.equal(db.prepare('SELECT count(*) AS n FROM shared_compaction_intents WHERE work_id=?').get(workId).n, 0);
+            blockedOperations = {
+                compactPrepare: { device: 'deviceA', httpStatus: rejectedCompaction.status, error: compactionCode },
+                continue: { device: 'deviceB', httpStatus: rejectedContinue.status, error: continueCode },
+            };
+        }
         assert.equal(admissions().length, 1);
         assert.equal(generations(workId).length, 1);
         assert.deepEqual(control(workId), ownership);
         assert.deepEqual(invocations(workId), before);
-        assert.deepEqual(tool.counts(out), [{ marker }]);
+        assert.deepEqual(counts(), expectedCounts);
         assert.deepEqual(service.calls.map(row => row.toolHandoffPhase), ['initial']);
         assert.deepEqual(journal().slice(0, initialJournal.length), initialJournal);
+        if (duo) assert.deepEqual(journal().slice(initialJournal.length).map(row => row.msg_id), [original.request_id]);
         const job = 'li[data-work-id="' + workId + '"]';
         await click(other, 'button', '查看并核对原请求');
-        await click(other, job + ' details summary', '原生工具调用 1 项（返回不等于 AA 完成）');
-        const callStatus = await waitUntil(async () => {
-            const value = await evalJs(other, `document.querySelector(${quote(job + ' ul li')})?.innerText`);
-            return value?.includes(before[0].invocation_id) && value;
+        await click(other, job + ' details summary', '原生工具调用 ' + before.length + ' 项（返回不等于 AA 完成）');
+        const callStatuses = await waitUntil(async () => {
+            const values = await evalJs(other, `[...document.querySelectorAll(${quote(job + ' ul li')})].map(row => row.innerText)`);
+            return values.some(value => value.includes(before.at(-1).invocation_id)) && values;
         }, 'B displays the original uncertain tool invocation ID');
+        const callStatus = callStatuses.find(value => value.includes(before.at(-1).invocation_id));
         assert.ok(callStatus.includes('结果待核对'));
+        if (duo) assert.ok(callStatuses.some(value => value.includes(before[0].invocation_id) && value.includes('工具调用已返回')));
         result.toolHandoff = {
             original, final: admissions().at(0), ownership, invocations: before, generations: generations(workId),
-            review, callStatus, visibleButtons, rejectedHandoff: { httpStatus: rejected.status, error: error.code }, counter: tool.counts(out),
+            ...(interruption && { interruption, blockedOperations }),
+            review, callStatus, ...(duo && { callStatuses, journal: journal() }), visibleButtons, rejectedHandoff: { httpStatus: rejected.status, error: error.code }, counter: counts(),
             desktopSources: await loadedDesktop(other, sha, result.candidate),
         };
         await picture(other, 'B-side-effect-needs-review');
@@ -205,14 +327,20 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         return row?.state === 'paused' && row.checkpoint_json && row;
     }, 'A durably pauses at the native tool boundary');
     const invocationsAtPause = invocations(workId);
-    assert.equal(invocationsAtPause.length, 1);
+    assert.equal(invocationsAtPause.length, duo ? 2 : 1);
     const [invocation] = invocationsAtPause;
     assert.equal(invocation.native_request_id, paused.request_id);
     assert.equal(invocation.state, 'returned');
     assert.equal(invocation.plugin_name, tool.name);
-    const nativeProof = JSON.parse(db.prepare('SELECT proof_json FROM shared_native_checkpoints WHERE work_id=? AND generation=?')
+    const archive = duo ? archiveSnapshot(paused.request_id, invocationsAtPause) : undefined;
+    const readNativeProof = () => JSON.parse(db.prepare('SELECT proof_json FROM shared_native_checkpoints WHERE work_id=? AND generation=?')
         .get(workId, paused.generation).proof_json);
-    assert.deepEqual(nativeProof.settledInvocationIds, [invocation.invocation_id]);
+    const nativeProof = readNativeProof();
+    assert.deepEqual(nativeProof.settledInvocationIds, invocationsAtPause.map(row => row.invocation_id));
+    assert.deepEqual(invocationsAtPause.map(row => [row.plugin_name, row.state, row.native_request_id]), [
+        [tool.name, 'returned', paused.request_id],
+        ...(duo ? [[fixture.secondName, 'returned', paused.request_id]] : []),
+    ]);
     assert.deepEqual(service.calls.map(row => row.toolHandoffPhase), ['initial']);
     await waitUntil(() => evalJs(A, `document.querySelector('[data-message-id="' + ${quote(paused.request_id)} + '"]')?.checkVisibility()`),
         'A renders the interrupted native Work before compaction');
@@ -231,7 +359,7 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
     }, 'A displays a confirmed tool receipt and waits for compaction');
     await waitUntil(() => evalJs(A, `!['VCP错误','原生执行中'].some(text => document.body.innerText.includes(text))`),
         'A clears the native error and live execution banners at a safe pause');
-    const early = await createApi(service, out, 'B')('steer-handoff', {
+    const early = await createApi(service, out, 'B', duo)('steer-handoff', {
         sharedSpaceId, workId, opId: 'test-handoff-before-compaction',
         expectedRevision: control(workId).revision, expectedGeneration: paused.generation, expectedExecutor: 'desktop:deviceA',
     });
@@ -239,6 +367,22 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
     const earlyHandoff = { httpStatus: early.status, error: (await early.json()).error.code };
     assert.equal(earlyHandoff.error, 'WORK_SAFE_BOUNDARY_PENDING');
     await picture(A, 'A-settled-tool-boundary');
+    if (duo) {
+        const backendBefore = service.backendPid;
+        const beforeRestart = { admission: admissions().at(0), control: control(workId), journal: journal() };
+        const exit = await service.restartWithUpgrade();
+        assert.deepEqual(exit, { code: 0, signal: null });
+        assert.notEqual(service.backendPid, backendBefore);
+        assert.deepEqual(admissions().at(0), beforeRestart.admission);
+        assert.deepEqual(control(workId), beforeRestart.control);
+        assert.deepEqual(journal(), beforeRestart.journal);
+        assert.deepEqual(generations(workId), [paused]);
+        assert.deepEqual(invocations(workId), invocationsAtPause);
+        assert.deepEqual(archiveSnapshot(paused.request_id, invocationsAtPause), archive);
+        assert.deepEqual(readNativeProof(), nativeProof);
+        assert.deepEqual(counts(), expectedCounts);
+        result.pausedRestart = { backendBefore, exit, backendAfter: service.backendPid, proof: readNativeProof() };
+    }
     const point = await evalJs(A, `(() => {
         const row = document.querySelector('[data-message-id="' + ${quote(paused.request_id)} + '"]');
         row.scrollIntoView({block:'center',behavior:'instant'});
@@ -289,7 +433,7 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
     await waitUntil(async () => (await buttons(recovered))['本端继续执行'], 'B recovers ownership by reading the original Work');
     await picture(recovered, 'B-recovered-handoff-after-lost-receipt');
     assert.equal(service.requests.filter(row => row.route.endsWith('/steer-handoff')).length, 1);
-    assert.deepEqual(tool.counts(out), [{ marker }]);
+    assert.deepEqual(counts(), expectedCounts);
     await action(recovered, '本端继续执行');
     const publicationsByB = () => service.requests.filter(row => row.device === 'deviceB' && row.route.endsWith('/steer-turn-complete'));
     const readbacks = () => service.requests.filter(row => row.device === 'deviceB' && row.route.endsWith('/final-reply'));
@@ -342,7 +486,7 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
                 historyFinishReasons: physicalFinal.map(row => row.finishReason),
                 archive: { identity: archive.identity, assistant: archive.assistant, completion: archive.completion ?? null },
                 phases: db.prepare('SELECT stage,at FROM shared_request_phases WHERE request_id=? ORDER BY at').all(requestId),
-                counter: tool.counts(out), providerCalls: service.calls.map(row => ({ id: row.id, phase: row.toolHandoffPhase })),
+                counter: counts(), providerCalls: service.calls.map(row => ({ id: row.id, phase: row.toolHandoffPhase })),
                 ...(client && { status: await status(client), buttons: await buttons(client), renderedFinal: await renderedFinal(client, requestId),
                     nativePreview: await observedPreview(client) }),
             };
@@ -426,7 +570,7 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
             publishedBeforeReopen, publishedByB: publicationsByB().length,
         };
         assert.deepEqual(invocations(workId), invocationsAtPause);
-        assert.deepEqual(tool.counts(out), [{ marker }]);
+        assert.deepEqual(counts(), expectedCounts);
         assert.equal(admissions().length, 1);
         assert.equal(admissions()[0].request_id, original.request_id);
         assert.deepEqual(generations(workId).map(({generation, executor, request_id}) => [generation, executor, request_id]),
@@ -511,13 +655,21 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
     assert.equal(service.requests.filter(row => row.route.endsWith('/admit') && row.device === 'deviceB').length, 0);
     assert.equal(final.request_id, original.request_id);
     assert.deepEqual(invocations(workId), invocationsAtPause);
-    assert.deepEqual(tool.counts(out), [{ marker }]);
+    assert.deepEqual(counts(), expectedCounts);
     assert.deepEqual(service.calls.map(row => row.toolHandoffPhase), ['initial', 'summary', 'resumed']);
     const resumed = service.calls.at(-1);
     const resumedContext = JSON.stringify(resumed.messages);
     assert.ok(resumedContext.includes(invocation.invocation_id));
     assert.ok(resumedContext.includes(invocation.record_id));
     assert.ok(resumedContext.includes(fixture.toolResult(marker)));
+    if (duo) {
+        const second = invocationsAtPause[1];
+        assert.equal(summary.toolReceipts[1].invocationId, second.invocation_id);
+        assert.equal(summary.toolReceipts[1].recordId, second.record_id);
+        assert.ok(resumedContext.includes(second.invocation_id));
+        assert.ok(resumedContext.includes(second.record_id));
+        assert.ok(resumedContext.includes(secondResult));
+    }
     assert.equal(resumedContext.split(checkpointMarker).length, 2);
     assert.ok(!resumedContext.includes('SYNTHETIC SAME TEXT'));
     assert.ok(!resumedContext.includes('<<<[TOOL_REQUEST]>>>'));
@@ -601,7 +753,7 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         assert.deepEqual(rows.map(({ msg_id, action }) => [msg_id, action]), [[replyId, 'upsert'], [replyId, action]]);
         assert.equal(publicationsByB().length, 0);
         assert.deepEqual(invocations(workId), invocationsAtPause);
-        assert.deepEqual(tool.counts(out), [{ marker }]);
+        assert.deepEqual(counts(), expectedCounts);
         assert.equal(service.calls.length, 3);
         result.finalMutation = {
             workId, replyId, originalRequestId: original.request_id, originalReplySeq: final.reply_seq, action,
@@ -652,18 +804,39 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         return rows.some(item => item.textShown) && rows;
     }, 'B renders the completed original Work result');
     assert.deepEqual(rendered, [{ textShown: true }]);
+    if (duo) {
+        const beforeRestart = { providerCalls: service.calls.length, journal: journal(), invocations: invocations(workId) };
+        await stop('B-recovered');
+        finalReader = await start('B-reopened-final', 'B');
+        await select(finalReader, 'B');
+        const reopened = await waitUntil(async () => {
+            const rows = await renderedFinal(finalReader, finalReplyId);
+            return rows.some(item => item.textShown) && rows;
+        }, 'B reopens the single original Work result');
+        assert.equal(result.B.profileDigest, result['B-reopened-final'].profileDigest);
+        assert.deepEqual(reopened, rendered);
+        assert.deepEqual(read.B(), saved);
+        assert.equal(service.calls.length, beforeRestart.providerCalls);
+        assert.deepEqual(journal(), beforeRestart.journal);
+        assert.deepEqual(invocations(workId), beforeRestart.invocations);
+        assert.deepEqual(counts(), expectedCounts);
+        result.completedRestart = {
+            providerCalls: beforeRestart.providerCalls, journalRows: beforeRestart.journal.length, counters: counts(),
+            chatFinalBubbleCount: reopened.length, historyFinalCount: read.B().filter(row => row.id === finalReplyId).length,
+        };
+    }
     result.toolHandoff = {
-        original, final, paused, nativeProof, committed, generations: finished, invocations: invocationsAtPause,
+        original, final, paused, nativeProof, committed, generations: finished, invocations: invocationsAtPause, ...(archive && { archive }),
         waitingCompaction, earlyHandoff, ...(streamTerminal && { streamTerminal: streamTerminal.data.modelFinishReason }), nativePause: { transport: transport.pauseTransport, httpStatus: transport.status, ...transport.nativePause },
         droppedHandoff: { workId, status: dropped.status, executor: control(workId).executor, dropped: dropped.dropped, opId: dropped.body.opId, clientError: unavailable.data.error },
         desktopSources: await loadedDesktop(finalReader, sha, result.candidate),
-        counter: tool.counts(out), history: saved, journal: journal(), summaryReceipt: summary.toolReceipt,
+        counter: counts(), history: saved, journal: journal(), summaryReceipt: duo ? summary.toolReceipts : summary.toolReceipt,
     };
     await picture(finalReader, 'B-completed-original-tool-work');
     if (result.finalReadback) {
         assert.equal(publicationsByB().length, 0, 'B never submits a completion mutation in readback mode');
         assert.equal(service.calls.length, 3);
-        assert.deepEqual(tool.counts(out), [{ marker }]);
+        assert.deepEqual(counts(), expectedCounts);
         const historyReplies = saved.filter(row => row.id === finalReplyId);
         assert.deepEqual(historyReplies.map(row => [row.content, row.finishReason]), [[fixture.finalText, 'completed']]);
         const desktopLedger = await checkFinalLedger(workId, finalReplyId, { observed: true });
@@ -676,7 +849,7 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         assert.equal(service.calls.length,result.publicationAck.before.calls);
         const desktopLedger = await checkFinalLedger(workId, finalReplyId, { legacy: true });
         Object.assign(result.publicationAck, { exit:result.exits['B-recovered'], postAttempts:attempts.length, desktopLedger,
-            workState:final.state, finalHistoryIds:saved.map(row=>row.id), chatFinalBubbleCount:rendered.length, counter:tool.counts(out).length });
+            workState:final.state, finalHistoryIds:saved.map(row=>row.id), chatFinalBubbleCount:rendered.length, counter:counts().length });
     }
 }
 

@@ -456,6 +456,11 @@ class SharedSteering {
             if(safeToolMode&&(c.generation!==0||c.executor!==row.principal||actor.principal===row.principal||current.state!=='paused'||!current.checkpoint_json||!this.hasToolCompaction(row.id)))throw fail('WORK_SAFE_BOUNDARY_PENDING');
             if(native.needsReview(row.id)||native.uncertainTools(row.id)||this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state IN ('dispatched','unknown')").get(row.id))throw fail('WORK_SAFE_BOUNDARY_PENDING');
             if(native.unsettledTools(row.id,current.request_id))throw fail('WORK_SAFE_BOUNDARY_PENDING');
+            if(safeToolMode){
+                const saved=this.db.prepare('SELECT proof_json FROM shared_native_checkpoints WHERE work_id=? AND generation=0').get(row.id);
+                if(!saved)throw fail('WORK_SAFE_BOUNDARY_PENDING');
+                this.shared.native.verifiedToolBoundary(row.id,current.request_id,JSON.parse(saved.proof_json));
+            }
             // Local-only resource references have no verified receiver-side grant.
             const messages=this.shared.store.readProjected(()=>this.db.prepare('SELECT * FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND deleted=0').all(topic.owner_type,topic.owner_id,topic.topic_id));
             if(messages.some(v=>v.message?.desktopReferences?.length)||this.db.prepare('SELECT message_json FROM shared_work_inputs WHERE work_id=? AND journal_seq IS NULL').all(row.id).some(v=>JSON.parse(v.message_json).desktopReferences?.length))throw fail('WORK_HANDOFF_REQUIRES_ORIGINAL_DEVICE');

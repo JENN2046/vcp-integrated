@@ -104,3 +104,5 @@ Android 首次配对立即强停已定位到隔离 WebView 的 Cookie 写盘时�
 `nativeRules` 剩余三个入口已完成归属复审。实测后，普通单聊时间戳标注归到原生 History 包，群聊模型选择和流片正文提取归到共享规则包。统一模型 ID 带首尾空格时，共享派发与获准图片的准入恢复；模型授权仍按规整后的精确 ID 校验。所有旧入口保留兼容转发。[复审与前后回执](evidence/remaining-rules/README.md)
 
 固定候选 `9890ce016598` 完成干净重建和三端隔离收口。Linux、原 Windows R16 虚拟机和原 Android 手机上的已安装 Firefox PWA 在重开后各自读回同一已完成 Work 和同两条消息；中央一次尝试、一次派发、一次合成 Provider 请求。手机隔离用户 12 按 Jenn 的选择保留。[构建哈希、三端核对与截图](evidence/release-9890ce016598/README.md)
+
+显式共享工具单聊已支持第一代在同一个模型响应中顺序执行两个不同的名单内直连工具。新桌面与 ToolBox 协商后在接纳时冻结上限，旧 Work 和旧客户端保持单工具语义。原生回执与调用账本逐项核对后，A 才能压缩、B 才能接管原 Work 并显式继续。真实双桌面对照中，第二个计数落盘后丢失回执时，ToolBox 重启保留第一项 returned、第二项 started 和原 Work 的 review_required；压缩、接管、继续均被拒绝。[同一代双工具前后对照、截图及重跑命令](evidence/tool-work-handoff/duo/README.md)

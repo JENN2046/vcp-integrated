@@ -39,7 +39,10 @@ class SharedCompaction{
    const stored=this.db.prepare('SELECT proof_json FROM shared_native_checkpoints WHERE work_id=? AND generation=?').get(generation.work_id,generation.generation);
    if(!stored)throw fail('NATIVE_CHECKPOINT_REQUIRED');
    const proof=JSON.parse(stored.proof_json);
-   const results=s.native.continuations.compactionToolResults(generation.request_id,generation.work_id,proof);
+   const isToolBoundary=generation.generation===0&&work?.id===generation.work_id&&
+    require('./sharedTurns').intent(work).controlMode===controlled.TOOLS_MODE;
+   const results=isToolBoundary?s.native.checkedToolCheckpoint(work.id,generation.request_id,proof).receipts:
+    s.native.continuations.compactionToolResults(generation.request_id,generation.work_id,proof);
    nativeProofs.push({requestId:generation.request_id,workId:generation.work_id,hash:proof.hash});
    if(this.db.prepare('SELECT 1 FROM shared_compaction_native_links WHERE request_id=? AND proof_hash=? AND journal_seq<=?').get(generation.request_id,proof.hash,lastCheckpoint))continue;
    for(const {index,result} of results){

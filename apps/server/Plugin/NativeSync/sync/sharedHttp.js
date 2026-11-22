@@ -53,7 +53,7 @@ function sharedInfo(shared,sourceId){
   ...(shared.native?.engine?[require('./sharedSession').CAPABILITY,'shared-execution-trace-v1','shared-session-cancel-v1',require('./sharedTopicSponsor').CAPABILITY]:[]),
   ...(shared.events&&!shared.events.closed?['shared-events-v1']:[]),
   ...(policy.sharedSteering?['shared-steering-v1']:[]),
-  ...(shared.native?.engine&&require('./sharedControlledText').enabled(shared,require('./sharedControlledText').TOOLS_MODE)?[require('./sharedControlledText').TOOLS_CAPABILITY,require('./sharedControlledText').TOOLS_HISTORY_CAPABILITY]:[]),
+  ...(shared.native?.engine&&require('./sharedControlledText').enabled(shared,require('./sharedControlledText').TOOLS_MODE)?[require('./sharedControlledText').TOOLS_CAPABILITY,require('./sharedControlledText').TOOL_PAIR_CAPABILITY,require('./sharedControlledText').TOOLS_HISTORY_CAPABILITY]:[]),
   ...(shared.native?.engine&&policy.sharedControlledText?[require('./sharedControlledText').CAPABILITY]:[]),
  );
  return {capability:SHARED_SPACE_CAPABILITY,schemaVersion:1,features,readOnly:shared.readOnly,spaces:[...shared.grants].filter(([,sources])=>sources.has(sourceId)).map(([id])=>({id}))};

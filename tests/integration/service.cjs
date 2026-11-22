@@ -227,7 +227,12 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         const observeRecoveredRequest = ['compact-cross-device', 'compact-history-identity'].includes(mode) && requestLookup &&
             lostRequestId && row.query.requestId === lostRequestId;
         const isLocalChat = route === '/v1/local-chat/completions';
-        const upstream = http.request({host:'127.0.0.1',port:backendPort,path:isLocalChat?'/v1/chat/completions':req.url,method:req.method,headers:{...req.headers, 'x-forwarded-proto':'https'}},async response => {
+        const upstreamHeaders = { ...req.headers, 'x-forwarded-proto': 'https' };
+        if (['tool-handoff', 'tool-handoff-stream'].includes(mode) && typeof row.capabilities === 'string') {
+            upstreamHeaders['x-nativesync-capabilities'] = row.capabilities.split(',')
+                .filter(capability => capability !== 'shared-controlled-tool-pair-v1').join(',');
+        }
+        const upstream = http.request({host:'127.0.0.1',port:backendPort,path:isLocalChat?'/v1/chat/completions':req.url,method:req.method,headers:upstreamHeaders},async response => {
             if (relevant || observeRecoveredRequest) {
                 const chunks=[];
                 for await (const chunk of response) chunks.push(chunk);
@@ -411,14 +416,14 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         return { htmlStatus: page.status, bundleStatus: bundle.status, connectionStatus: connection.status };
     }
     return { checkMobile, startupError, get backendPid(){return backend.pid;},
-        ...((ordinaryTools || delegation || groupRelay || toolHandoff?.finalReceipt) && { async restartAfterCrash() {
+        ...((ordinaryTools || delegation || groupRelay || toolHandoff?.finalReceipt || toolHandoff?.duo) && { async restartAfterCrash() {
             const crashed = await stopBackend('SIGKILL');
             assert.deepEqual(crashed, {code:null,signal:'SIGKILL'});
             await startBackend();
             return crashed;
         }, async restartWithUpgrade(beforeStart) {
             const stopped = await stopBackend('SIGTERM');
-            await beforeStart();
+            await beforeStart?.();
             await startBackend();
             return stopped;
         }}), origin:'https://127.0.0.1:'+proxyPort,wsOrigin:'http://127.0.0.1:'+backendPort,calls,requests,topics:{preSubmit:source,lostAck:target,interrupted:stopTopic,...ordinaryTopics},descriptors,data,gates,streamInterrupt,

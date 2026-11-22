@@ -1,0 +1,97 @@
+{
+  "mode": "tool-duo-returned-stream",
+  "command": "node tests/integration/run.cjs tool-duo-returned-stream",
+  "work": {
+    "id": "request_b9b4a107232340df94f7f0233f277ddd",
+    "intakeRequestId": "controlled_0b26a63387f84eb6b9ca4a411d042acc",
+    "initialState": "accepted",
+    "finalState": "completed",
+    "finalJournalSeq": 6
+  },
+  "pause": {
+    "transport": "SSE",
+    "httpStatus": 200,
+    "state": "paused",
+    "code": "WORK_SAFE_TOOL_BOUNDARY",
+    "requestId": "reply_request_b9b4a107232340df94f7f0233f277ddd",
+    "rendererFinishReason": "interrupted"
+  },
+  "invocations": [
+    {
+      "invocationId": "d4d25c8b-62f0-4c85-b078-0e181a6003b2",
+      "requestId": "reply_request_b9b4a107232340df94f7f0233f277ddd",
+      "recordId": "tcr-1795330031675-d2c220b6-28cf-4d22-9040-7ef5521df89a",
+      "pluginName": "OrdinaryToolCounter",
+      "state": "returned"
+    },
+    {
+      "invocationId": "0d37f993-b023-4409-a413-a8c37010dc4b",
+      "requestId": "reply_request_b9b4a107232340df94f7f0233f277ddd",
+      "recordId": "tcr-1795330031939-580b5cf2-4f44-4162-8bf6-50779ae84442",
+      "pluginName": "OrdinaryToolSecondCounter",
+      "state": "returned"
+    }
+  ],
+  "settledInvocationIds": [
+    "d4d25c8b-62f0-4c85-b078-0e181a6003b2",
+    "0d37f993-b023-4409-a413-a8c37010dc4b"
+  ],
+  "providerCallCount": 3,
+  "provider": [
+    {
+      "requestId": "reply_request_b9b4a107232340df94f7f0233f277ddd",
+      "phase": "initial",
+      "stream": true
+    },
+    {
+      "requestId": "compaction_1795330033758_4jiu0k5wju",
+      "phase": "summary",
+      "stream": true
+    },
+    {
+      "requestId": "reply_request_b9b4a107232340df94f7f0233f277ddd_g1",
+      "phase": "resumed",
+      "stream": true
+    }
+  ],
+  "effectCountByPlugin": {
+    "OrdinaryToolCounter": 1,
+    "OrdinaryToolSecondCounter": 1
+  },
+  "recovery": {
+    "handoffHttpStatus": 200,
+    "handoffResponseDropped": true,
+    "executorAfterDesktopRestart": "desktop:deviceB",
+    "generations": [
+      {
+        "number": 0,
+        "requestId": "reply_request_b9b4a107232340df94f7f0233f277ddd",
+        "executor": "desktop:deviceA",
+        "state": "paused"
+      },
+      {
+        "number": 1,
+        "requestId": "reply_request_b9b4a107232340df94f7f0233f277ddd_g1",
+        "executor": "desktop:deviceB",
+        "state": "completed"
+      }
+    ],
+    "finalReplyMessageId": "reply_request_b9b4a107232340df94f7f0233f277ddd_g1",
+    "finalHistoryCopies": 1,
+    "finalJournalCopies": 1,
+    "pausedBackendRestart": {
+      "processChanged": true,
+      "exitCode": 0,
+      "proofUnchanged": true
+    },
+    "completedDesktopRestart": {
+      "providerCallCount": 3,
+      "effectCountByPlugin": {
+        "OrdinaryToolCounter": 1,
+        "OrdinaryToolSecondCounter": 1
+      },
+      "finalChatBubbles": 1,
+      "finalHistoryCopies": 1
+    }
+  }
+}

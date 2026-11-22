@@ -1,0 +1,207 @@
+{
+  "mode": "tool-duo-baseline-unknown",
+  "toolBoxBaseline": "54ed2b9fd41363623ebec0e93521df72dfb0d9cd",
+  "desktops": {
+    "B": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cds": {
+        "pid": 696184,
+        "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "profileDigest": "93aa72e25c3d9e35b1540e8fdb74ba2dff1c902c0f9ed0038f2a4c0a272027c7"
+    },
+    "A": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cds": {
+        "pid": 696161,
+        "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "profileDigest": "7c27364894d0b3278931aeb3c3cbf4d1d95a2eb62c9dd859d99779dd863d5dad"
+    },
+    "B-baseline": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "cds": {
+        "pid": 696453,
+        "sha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "profileDigest": "93aa72e25c3d9e35b1540e8fdb74ba2dff1c902c0f9ed0038f2a4c0a272027c7"
+    }
+  },
+  "exits": {
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B-baseline": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "provider": [
+    {
+      "id": "reply_request_439172152c5a4f4c956a0732886ec88c",
+      "toolHandoffPhase": "initial",
+      "toolsRequested": [
+        "OrdinaryToolCounter",
+        "OrdinaryToolSecondCounter"
+      ]
+    }
+  ],
+  "backendSources": [
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "5fe109606e02b4101c8da15c5a810cd2d83a1796117dfcac91979491c52d3339"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "f81257e9ec5f4bfd2d2a1215eb4ac55f4223b4b8fc6fe83cc1c28e41a53bbff7"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "3efd8bf1b4c4411d7f8ec5c648ded72bc19f8e836058c644aa8050684baed133"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "2e637687e88f05d3ae23cb19e663b3a0e5998f424df4101cb7663f9fb41e5481"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+      "sha256": "580884bdced290388783b091e7373fa15660c698da6575902a94358fb14febfc"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+      "sha256": "a1b166d894a7e697a54a226b78d381388e1fffe39c0984bf20441069beba4fa3"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+      "sha256": "c0be485ee31ed3d50db0e5a7e5e72aa38110434fe63c23606a7855a05ca7d512"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "072cf520ebb2638b85ea2bfe84b0226a216d9996748697c9e1324b3f88156793"
+    },
+    {
+      "file": "apps/server/modules/nativeContinuationStore.cjs",
+      "sha256": "f6774df34bdcc60346f4ed49f5dccaa2e0da5645b5b60ea29f364f89a5090ee6"
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2"
+    }
+  ],
+  "toolHandoff": {
+    "original": {
+      "id": "request_439172152c5a4f4c956a0732886ec88c",
+      "request_id": "controlled_b9d0d8e89e8a4a2f9cebdf5dda597a83",
+      "principal": "desktop:deviceA",
+      "state": "accepted",
+      "dispatched": 0,
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "attempted": {
+      "route": "/v1/chat/completions",
+      "method": "POST",
+      "at": 1795329046623,
+      "device": "deviceA",
+      "capabilities": "shared-space-v1,shared-context-v1,shared-steering-v1",
+      "status": 500,
+      "nativeError": "CONTROLLED_TOOL_CALL_LIMIT",
+      "downstreamFinished": true
+    },
+    "native": {
+      "id": "request_439172152c5a4f4c956a0732886ec88c",
+      "request_id": "controlled_b9d0d8e89e8a4a2f9cebdf5dda597a83",
+      "principal": "desktop:deviceA",
+      "state": "review_required",
+      "dispatched": 1,
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_439172152c5a4f4c956a0732886ec88c",
+        "state": "running",
+        "checkpoint_json": null
+      }
+    ],
+    "invocations": [],
+    "counters": {
+      "first": [],
+      "second": []
+    },
+    "statusB": "原任务需要核对 · 执行端：另一设备",
+    "desktopSources": {
+      "main": [
+        {
+          "file": "apps/desktop/modules/ipc/chatHandlers.js",
+          "sha256": "80163e3b8a0120a030fd866f7dd09d40f6d4180b6053c0b102d332f781d8996d"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+          "sha256": "0eede772271e4549e20ff2170f53c9430372448c5811922be7782d407bc1e145"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+          "sha256": "dfd46c401a68a24bbef6e42356a71a1816bf6202001e6543f0b695b8ee39b114"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+          "sha256": "2fc1700e4d7b47ed9fd6a9e693ce44d63a5332698d382966eb972ec3d3b58e86"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/modules/chat/chatHistoryPersistence.js",
+          "bytes": 8337,
+          "sha256": "aece6ac53eee0bf1a6616d6f394ed724b823337c6687d92d845aa227cefb2466"
+        },
+        {
+          "file": "apps/desktop/modules/chatManager.js",
+          "bytes": 178272,
+          "sha256": "49e0bcb455046bad7c78dd29ad0bdcc219ad94fe30c9f2c72d80dd13cc6ac164"
+        },
+        {
+          "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+          "bytes": 6970,
+          "sha256": "f7379f242fb60012ca172c204c06666db1a300fd7130692e4d12ba3bef3a8936"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+          "bytes": 10994,
+          "sha256": "692768db496c93e73f8444bd66c35be537958082faa07ba8d40252b130dba22d"
+        },
+        {
+          "file": "apps/desktop/modules/renderer/mainChatSurfaceAdapter.js",
+          "bytes": 13362,
+          "sha256": "655bc01ad0c93edc2e0eadc8eea7b38eb39aaaa62b565fae5133249ffd69b20b"
+        }
+      ]
+    }
+  }
+}
