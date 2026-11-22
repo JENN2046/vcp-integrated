@@ -43,6 +43,8 @@ const jevThirdPartyRegistry = require('./modules/jevThirdPartyRegistry');
 
 const PLUGIN_DIR = path.join(__dirname, 'Plugin');
 const manifestFileName = 'plugin-manifest.json';
+// Only wrappers created by this bridge qualify for scalar model projection.
+const scalarToolResultWrappers = new WeakSet();
 const EXTERNAL_LEGACY_PLUGIN_DIRS_ENV = 'VCP_PLUGIN_DIRS';
 const EXTERNAL_PLUGIN_ALLOWLIST_ENV = 'VCP_EXTERNAL_PLUGIN_ALLOWLIST';
 const RESIDENT_TOOL_NAME = 'AGENTSOSResident';
@@ -253,6 +255,10 @@ class PluginManager extends EventEmitter {
 
     getCurrentNativeManifest(runtimeEntry) {
         return getCurrentNativeManifest(runtimeEntry);
+    }
+
+    isScalarToolResultWrapper(result) {
+        return scalarToolResultWrappers.has(result);
     }
 
     _sanitizeToolResultForAi(result) {
@@ -2101,6 +2107,9 @@ class PluginManager extends EventEmitter {
                 ) {
                     shortCircuitResult.tool_call_record_id = managedToolCallRecord.id;
                 }
+                if (approvalFeedback && typeof originalShortCircuitResult === 'string') {
+                    scalarToolResultWrappers.add(shortCircuitResult);
+                }
                 return shortCircuitResult;
             }
 
@@ -2167,6 +2176,9 @@ class PluginManager extends EventEmitter {
             });
             if (managedToolCallRecord?.id && sanitizedResult && typeof sanitizedResult === 'object' && !sanitizedResult.tool_call_record_id) {
                 sanitizedResult.tool_call_record_id = managedToolCallRecord.id;
+            }
+            if (typeof resultFromPlugin === 'string') {
+                scalarToolResultWrappers.add(sanitizedResult);
             }
             return sanitizedResult;
 

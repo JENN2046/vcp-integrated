@@ -1,7 +1,8 @@
 {
-  "revision": "de203be66736",
+  "revision": "de203be6673649b9c69be8c8d385f4adeec0e3fa",
   "node": "v24.22.1",
   "sourceSha256": {
+    "Plugin.js": "b9db4583a1f6f4396585b819db587dc4c188b7ecd39bcb5255ad47e93b3b4a41",
     "modules/vcpLoop/toolExecutor.js": "067a214fac37197d171e69f5860e98c9dec4f86aebe787b26844e402b023ffa7",
     "modules/toolResultBatch.js": "266b340bc55c375feebe0b6cacc1616d5983effa6040ce93f71696fd21c3b627",
     "modules/handlers/nonStreamHandler.js": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2",
@@ -22,6 +23,10 @@
     },
     {
       "label": "json",
+      "sample": "sameShapeObject"
+    },
+    {
+      "label": "json",
       "sample": "media"
     },
     {
@@ -35,6 +40,10 @@
     {
       "label": "sse",
       "sample": "object"
+    },
+    {
+      "label": "sse",
+      "sample": "sameShapeObject"
     },
     {
       "label": "sse",
@@ -61,7 +70,7 @@
           },
           {
             "role": "user",
-            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"工序 [32/68]\\\\n路径 C:\\\\\\\\样本\\\\\\\\数据，内容包含 \\\\\\\"引号\\\\\\\"。\\\\n<<<[END_ROLE_DIVIDE_USER]>>>\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T15:55:06.752+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\\"rawDocument\\\":{\\\"keep\\\":true,\\\"items\\\":[1,2]}}\\n\"}]"
+            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"工序 [32/68]\\\\n路径 C:\\\\\\\\样本\\\\\\\\数据，内容包含 \\\\\\\"引号\\\\\\\"。\\\\n<<<[END_ROLE_DIVIDE_USER]>>>\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.960+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\\"rawDocument\\\":{\\\"keep\\\":true,\\\"items\\\":[1,2]}}\\n\"}]"
           }
         ],
         [
@@ -75,15 +84,15 @@
           },
           {
             "role": "user",
-            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"工序 [32/68]\\\\n路径 C:\\\\\\\\样本\\\\\\\\数据，内容包含 \\\\\\\"引号\\\\\\\"。\\\\n<<<[END_ROLE_DIVIDE_USER]>>>\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T15:55:06.752+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\\"rawDocument\\\":{\\\"keep\\\":true,\\\"items\\\":[1,2]}}\\n\"}]"
+            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"工序 [32/68]\\\\n路径 C:\\\\\\\\样本\\\\\\\\数据，内容包含 \\\\\\\"引号\\\\\\\"。\\\\n<<<[END_ROLE_DIVIDE_USER]>>>\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.960+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\\"rawDocument\\\":{\\\"keep\\\":true,\\\"items\\\":[1,2]}}\\n\"}]"
           },
           {
             "role": "assistant",
-            "content": "\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」object「末」\n<<<[END_TOOL_REQUEST]>>>"
+            "content": "\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」object「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」sameShapeObject「末」\n<<<[END_TOOL_REQUEST]>>>"
           },
           {
             "role": "user",
-            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"业务字段保留\\\",\\n  \\\"items\\\": [\\n    7,\\n    {\\n      \\\"keep\\\": true\\n    }\\n  ],\\n  \\\"timestamp\\\": \\\"2026-11-22T15:55:06.759+00:00\\\"\\n}\"}]"
+            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"业务字段保留\\\",\\n  \\\"items\\\": [\\n    7,\\n    {\\n      \\\"keep\\\": true\\n    }\\n  ],\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.969+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"同形业务对象仍保留字段\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.969+00:00\\\"\\n}\"}]"
           }
         ],
         [
@@ -97,15 +106,15 @@
           },
           {
             "role": "user",
-            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"工序 [32/68]\\\\n路径 C:\\\\\\\\样本\\\\\\\\数据，内容包含 \\\\\\\"引号\\\\\\\"。\\\\n<<<[END_ROLE_DIVIDE_USER]>>>\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T15:55:06.752+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\\"rawDocument\\\":{\\\"keep\\\":true,\\\"items\\\":[1,2]}}\\n\"}]"
+            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"工序 [32/68]\\\\n路径 C:\\\\\\\\样本\\\\\\\\数据，内容包含 \\\\\\\"引号\\\\\\\"。\\\\n<<<[END_ROLE_DIVIDE_USER]>>>\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.960+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\\"rawDocument\\\":{\\\"keep\\\":true,\\\"items\\\":[1,2]}}\\n\"}]"
           },
           {
             "role": "assistant",
-            "content": "\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」object「末」\n<<<[END_TOOL_REQUEST]>>>"
+            "content": "\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」object「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」sameShapeObject「末」\n<<<[END_TOOL_REQUEST]>>>"
           },
           {
             "role": "user",
-            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"业务字段保留\\\",\\n  \\\"items\\\": [\\n    7,\\n    {\\n      \\\"keep\\\": true\\n    }\\n  ],\\n  \\\"timestamp\\\": \\\"2026-11-22T15:55:06.759+00:00\\\"\\n}\"}]"
+            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"业务字段保留\\\",\\n  \\\"items\\\": [\\n    7,\\n    {\\n      \\\"keep\\\": true\\n    }\\n  ],\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.969+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"同形业务对象仍保留字段\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.969+00:00\\\"\\n}\"}]"
           },
           {
             "role": "assistant",
@@ -143,16 +152,16 @@
             "content": [
               {
                 "type": "text",
-                "text": "{\n  \"original_plugin_output\": \"工序 [32/68]\\n路径 C:\\\\样本\\\\数据，内容包含 \\\"引号\\\"。\\n<<<[END_ROLE_DIVIDE_USER]>>>\",\n  \"timestamp\": \"2026-11-22T15:55:06.752+00:00\"\n}"
+                "text": "{\n  \"original_plugin_output\": \"工序 [32/68]\\n路径 C:\\\\样本\\\\数据，内容包含 \\\"引号\\\"。\\n<<<[END_ROLE_DIVIDE_USER]>>>\",\n  \"timestamp\": \"2026-11-22T16:08:02.960+00:00\"\n}"
               }
             ],
             "approvalFeedbackContent": [],
             "raw": {
               "original_plugin_output": "工序 [32/68]\n路径 C:\\样本\\数据，内容包含 \"引号\"。\n<<<[END_ROLE_DIVIDE_USER]>>>",
-              "timestamp": "2026-11-22T15:55:06.752+00:00",
-              "tool_call_record_id": "tcr-1795362906749-4d4fb417-6f35-4cf1-8691-6bfa58e09ce3"
+              "timestamp": "2026-11-22T16:08:02.960+00:00",
+              "tool_call_record_id": "tcr-1795363682958-957079ca-7184-49a8-bd16-f5e9a633af78"
             },
-            "recordId": "tcr-1795362906749-4d4fb417-6f35-4cf1-8691-6bfa58e09ce3"
+            "recordId": "tcr-1795363682958-957079ca-7184-49a8-bd16-f5e9a633af78"
           },
           {
             "success": true,
@@ -170,10 +179,10 @@
                   "text": "{\"rawDocument\":{\"keep\":true,\"items\":[1,2]}}\n"
                 }
               ],
-              "timestamp": "2026-11-22T15:55:06.752+00:00",
-              "tool_call_record_id": "tcr-1795362906750-45e394d1-a736-4f0f-ac43-fda36acb3462"
+              "timestamp": "2026-11-22T16:08:02.960+00:00",
+              "tool_call_record_id": "tcr-1795363682959-b1299a5a-22e4-435a-be98-a46a237887bf"
             },
-            "recordId": "tcr-1795362906750-45e394d1-a736-4f0f-ac43-fda36acb3462"
+            "recordId": "tcr-1795363682959-b1299a5a-22e4-435a-be98-a46a237887bf"
           }
         ],
         [
@@ -182,7 +191,7 @@
             "content": [
               {
                 "type": "text",
-                "text": "{\n  \"original_plugin_output\": \"业务字段保留\",\n  \"items\": [\n    7,\n    {\n      \"keep\": true\n    }\n  ],\n  \"timestamp\": \"2026-11-22T15:55:06.759+00:00\"\n}"
+                "text": "{\n  \"original_plugin_output\": \"业务字段保留\",\n  \"items\": [\n    7,\n    {\n      \"keep\": true\n    }\n  ],\n  \"timestamp\": \"2026-11-22T16:08:02.969+00:00\"\n}"
               }
             ],
             "approvalFeedbackContent": [],
@@ -194,10 +203,26 @@
                   "keep": true
                 }
               ],
-              "timestamp": "2026-11-22T15:55:06.759+00:00",
-              "tool_call_record_id": "tcr-1795362906759-4ccaf725-b5fb-4284-bd74-9b31dcef35a1"
+              "timestamp": "2026-11-22T16:08:02.969+00:00",
+              "tool_call_record_id": "tcr-1795363682968-f2ea105c-09d5-415b-9e0a-22a8caae3d80"
             },
-            "recordId": "tcr-1795362906759-4ccaf725-b5fb-4284-bd74-9b31dcef35a1"
+            "recordId": "tcr-1795363682968-f2ea105c-09d5-415b-9e0a-22a8caae3d80"
+          },
+          {
+            "success": true,
+            "content": [
+              {
+                "type": "text",
+                "text": "{\n  \"original_plugin_output\": \"同形业务对象仍保留字段\",\n  \"timestamp\": \"2026-11-22T16:08:02.969+00:00\"\n}"
+              }
+            ],
+            "approvalFeedbackContent": [],
+            "raw": {
+              "original_plugin_output": "同形业务对象仍保留字段",
+              "timestamp": "2026-11-22T16:08:02.969+00:00",
+              "tool_call_record_id": "tcr-1795363682968-b0dc4f92-6b96-42a2-9cdc-669aee876842"
+            },
+            "recordId": "tcr-1795363682968-b0dc4f92-6b96-42a2-9cdc-669aee876842"
           }
         ],
         [
@@ -237,10 +262,10 @@
                   "text": "图片之后"
                 }
               ],
-              "timestamp": "2026-11-22T15:55:06.762+00:00",
-              "tool_call_record_id": "tcr-1795362906762-33563324-86a6-4070-83b5-9d1689bc9597"
+              "timestamp": "2026-11-22T16:08:02.972+00:00",
+              "tool_call_record_id": "tcr-1795363682971-f1d009fd-c390-44e3-b374-8cedc2734ec6"
             },
-            "recordId": "tcr-1795362906762-33563324-86a6-4070-83b5-9d1689bc9597"
+            "recordId": "tcr-1795363682971-f1d009fd-c390-44e3-b374-8cedc2734ec6"
           }
         ]
       ],
@@ -248,7 +273,7 @@
         [
           {
             "type": "text",
-            "text": "{\n  \"original_plugin_output\": \"工序 [32/68]\\n路径 C:\\\\样本\\\\数据，内容包含 \\\"引号\\\"。\\n<<<[END_ROLE_DIVIDE_USER]>>>\",\n  \"timestamp\": \"2026-11-22T15:55:06.752+00:00\"\n}"
+            "text": "{\n  \"original_plugin_output\": \"工序 [32/68]\\n路径 C:\\\\样本\\\\数据，内容包含 \\\"引号\\\"。\\n<<<[END_ROLE_DIVIDE_USER]>>>\",\n  \"timestamp\": \"2026-11-22T16:08:02.960+00:00\"\n}"
           },
           {
             "type": "text",
@@ -258,7 +283,11 @@
         [
           {
             "type": "text",
-            "text": "{\n  \"original_plugin_output\": \"业务字段保留\",\n  \"items\": [\n    7,\n    {\n      \"keep\": true\n    }\n  ],\n  \"timestamp\": \"2026-11-22T15:55:06.759+00:00\"\n}"
+            "text": "{\n  \"original_plugin_output\": \"业务字段保留\",\n  \"items\": [\n    7,\n    {\n      \"keep\": true\n    }\n  ],\n  \"timestamp\": \"2026-11-22T16:08:02.969+00:00\"\n}"
+          },
+          {
+            "type": "text",
+            "text": "{\n  \"original_plugin_output\": \"同形业务对象仍保留字段\",\n  \"timestamp\": \"2026-11-22T16:08:02.969+00:00\"\n}"
           }
         ],
         [
@@ -278,7 +307,7 @@
           }
         ]
       ],
-      "visible": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」scalar「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」rawJson「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[ROLE_DIVIDE_USER]>>>\n\n<<<[VCP_TOOL_BATCH_START:2026-11-22T23:55:06.754+08:00]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 工序 [32/68]\n路径 C:\\样本\\数据，内容包含 \"引号\"。\n<<<[END_ROLE_DIVIDE_USER]>>>\nVCP调用结果结束]]\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: {\"rawDocument\":{\"keep\":true,\"items\":[1,2]}}\n\nVCP调用结果结束]]\n\n[本轮工具调用摘要:]\nSyntheticPayload 调用成功 (记录ID: tcr-1795362906749-4d4fb417-6f35-4cf1-8691-6bfa58e09ce3)；SyntheticPayload 调用成功 (记录ID: tcr-1795362906750-45e394d1-a736-4f0f-ac43-fda36acb3462)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-22T23:55:06.754+08:00]>>>\n\n<<<[END_ROLE_DIVIDE_USER]>>>\n\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」object「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[ROLE_DIVIDE_USER]>>>\n\n<<<[VCP_TOOL_BATCH_START:2026-11-22T23:55:06.760+08:00]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 业务字段保留\nVCP调用结果结束]]\n\n[本轮工具调用摘要:]\nSyntheticPayload 调用成功 (记录ID: tcr-1795362906759-4ccaf725-b5fb-4284-bd74-9b31dcef35a1)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-22T23:55:06.760+08:00]>>>\n\n<<<[END_ROLE_DIVIDE_USER]>>>\n\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」media「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[ROLE_DIVIDE_USER]>>>\n\n<<<[VCP_TOOL_BATCH_START:2026-11-22T23:55:06.763+08:00]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 图片之前\n图片之后\nVCP调用结果结束]]\n\n[本轮工具调用摘要:]\nSyntheticPayload 调用成功 (记录ID: tcr-1795362906762-33563324-86a6-4070-83b5-9d1689bc9597)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-22T23:55:06.763+08:00]>>>\n\n<<<[END_ROLE_DIVIDE_USER]>>>\n\nPAYLOAD_FIXTURE_COMPLETE"
+      "visible": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」scalar「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」rawJson「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[ROLE_DIVIDE_USER]>>>\n\n<<<[VCP_TOOL_BATCH_START:2026-11-23T00:08:02.962+08:00]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 工序 [32/68]\n路径 C:\\样本\\数据，内容包含 \"引号\"。\n<<<[END_ROLE_DIVIDE_USER]>>>\nVCP调用结果结束]]\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: {\"rawDocument\":{\"keep\":true,\"items\":[1,2]}}\n\nVCP调用结果结束]]\n\n[本轮工具调用摘要:]\nSyntheticPayload 调用成功 (记录ID: tcr-1795363682958-957079ca-7184-49a8-bd16-f5e9a633af78)；SyntheticPayload 调用成功 (记录ID: tcr-1795363682959-b1299a5a-22e4-435a-be98-a46a237887bf)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-23T00:08:02.962+08:00]>>>\n\n<<<[END_ROLE_DIVIDE_USER]>>>\n\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」object「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」sameShapeObject「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[ROLE_DIVIDE_USER]>>>\n\n<<<[VCP_TOOL_BATCH_START:2026-11-23T00:08:02.969+08:00]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 业务字段保留\nVCP调用结果结束]]\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 同形业务对象仍保留字段\nVCP调用结果结束]]\n\n[本轮工具调用摘要:]\nSyntheticPayload 调用成功 (记录ID: tcr-1795363682968-f2ea105c-09d5-415b-9e0a-22a8caae3d80)；SyntheticPayload 调用成功 (记录ID: tcr-1795363682968-b0dc4f92-6b96-42a2-9cdc-669aee876842)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-23T00:08:02.969+08:00]>>>\n\n<<<[END_ROLE_DIVIDE_USER]>>>\n\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」json「末」,\nsample:「始」media「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[ROLE_DIVIDE_USER]>>>\n\n<<<[VCP_TOOL_BATCH_START:2026-11-23T00:08:02.972+08:00]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 图片之前\n图片之后\nVCP调用结果结束]]\n\n[本轮工具调用摘要:]\nSyntheticPayload 调用成功 (记录ID: tcr-1795363682971-f1d009fd-c390-44e3-b374-8cedc2734ec6)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-23T00:08:02.972+08:00]>>>\n\n<<<[END_ROLE_DIVIDE_USER]>>>\n\nPAYLOAD_FIXTURE_COMPLETE"
     },
     "sse": {
       "providerRequests": [
@@ -299,7 +328,7 @@
           },
           {
             "role": "user",
-            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"工序 [32/68]\\\\n路径 C:\\\\\\\\样本\\\\\\\\数据，内容包含 \\\\\\\"引号\\\\\\\"。\\\\n<<<[END_ROLE_DIVIDE_USER]>>>\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T15:55:06.776+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\\"rawDocument\\\":{\\\"keep\\\":true,\\\"items\\\":[1,2]}}\\n\"}]"
+            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"工序 [32/68]\\\\n路径 C:\\\\\\\\样本\\\\\\\\数据，内容包含 \\\\\\\"引号\\\\\\\"。\\\\n<<<[END_ROLE_DIVIDE_USER]>>>\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.986+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\\"rawDocument\\\":{\\\"keep\\\":true,\\\"items\\\":[1,2]}}\\n\"}]"
           }
         ],
         [
@@ -313,15 +342,15 @@
           },
           {
             "role": "user",
-            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"工序 [32/68]\\\\n路径 C:\\\\\\\\样本\\\\\\\\数据，内容包含 \\\\\\\"引号\\\\\\\"。\\\\n<<<[END_ROLE_DIVIDE_USER]>>>\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T15:55:06.776+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\\"rawDocument\\\":{\\\"keep\\\":true,\\\"items\\\":[1,2]}}\\n\"}]"
+            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"工序 [32/68]\\\\n路径 C:\\\\\\\\样本\\\\\\\\数据，内容包含 \\\\\\\"引号\\\\\\\"。\\\\n<<<[END_ROLE_DIVIDE_USER]>>>\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.986+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\\"rawDocument\\\":{\\\"keep\\\":true,\\\"items\\\":[1,2]}}\\n\"}]"
           },
           {
             "role": "assistant",
-            "content": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」object「末」\n<<<[END_TOOL_REQUEST]>>>"
+            "content": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」object「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」sameShapeObject「末」\n<<<[END_TOOL_REQUEST]>>>"
           },
           {
             "role": "user",
-            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"业务字段保留\\\",\\n  \\\"items\\\": [\\n    7,\\n    {\\n      \\\"keep\\\": true\\n    }\\n  ],\\n  \\\"timestamp\\\": \\\"2026-11-22T15:55:06.779+00:00\\\"\\n}\"}]"
+            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"业务字段保留\\\",\\n  \\\"items\\\": [\\n    7,\\n    {\\n      \\\"keep\\\": true\\n    }\\n  ],\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.989+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"同形业务对象仍保留字段\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.989+00:00\\\"\\n}\"}]"
           }
         ],
         [
@@ -335,15 +364,15 @@
           },
           {
             "role": "user",
-            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"工序 [32/68]\\\\n路径 C:\\\\\\\\样本\\\\\\\\数据，内容包含 \\\\\\\"引号\\\\\\\"。\\\\n<<<[END_ROLE_DIVIDE_USER]>>>\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T15:55:06.776+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\\"rawDocument\\\":{\\\"keep\\\":true,\\\"items\\\":[1,2]}}\\n\"}]"
+            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"工序 [32/68]\\\\n路径 C:\\\\\\\\样本\\\\\\\\数据，内容包含 \\\\\\\"引号\\\\\\\"。\\\\n<<<[END_ROLE_DIVIDE_USER]>>>\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.986+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\\"rawDocument\\\":{\\\"keep\\\":true,\\\"items\\\":[1,2]}}\\n\"}]"
           },
           {
             "role": "assistant",
-            "content": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」object「末」\n<<<[END_TOOL_REQUEST]>>>"
+            "content": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」object「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」sameShapeObject「末」\n<<<[END_TOOL_REQUEST]>>>"
           },
           {
             "role": "user",
-            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"业务字段保留\\\",\\n  \\\"items\\\": [\\n    7,\\n    {\\n      \\\"keep\\\": true\\n    }\\n  ],\\n  \\\"timestamp\\\": \\\"2026-11-22T15:55:06.779+00:00\\\"\\n}\"}]"
+            "content": "<!-- VCP_TOOL_PAYLOAD -->\n[{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"业务字段保留\\\",\\n  \\\"items\\\": [\\n    7,\\n    {\\n      \\\"keep\\\": true\\n    }\\n  ],\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.989+00:00\\\"\\n}\"},{\"type\":\"text\",\"text\":\"{\\n  \\\"original_plugin_output\\\": \\\"同形业务对象仍保留字段\\\",\\n  \\\"timestamp\\\": \\\"2026-11-22T16:08:02.989+00:00\\\"\\n}\"}]"
           },
           {
             "role": "assistant",
@@ -381,16 +410,16 @@
             "content": [
               {
                 "type": "text",
-                "text": "{\n  \"original_plugin_output\": \"工序 [32/68]\\n路径 C:\\\\样本\\\\数据，内容包含 \\\"引号\\\"。\\n<<<[END_ROLE_DIVIDE_USER]>>>\",\n  \"timestamp\": \"2026-11-22T15:55:06.776+00:00\"\n}"
+                "text": "{\n  \"original_plugin_output\": \"工序 [32/68]\\n路径 C:\\\\样本\\\\数据，内容包含 \\\"引号\\\"。\\n<<<[END_ROLE_DIVIDE_USER]>>>\",\n  \"timestamp\": \"2026-11-22T16:08:02.986+00:00\"\n}"
               }
             ],
             "approvalFeedbackContent": [],
             "raw": {
               "original_plugin_output": "工序 [32/68]\n路径 C:\\样本\\数据，内容包含 \"引号\"。\n<<<[END_ROLE_DIVIDE_USER]>>>",
-              "timestamp": "2026-11-22T15:55:06.776+00:00",
-              "tool_call_record_id": "tcr-1795362906775-ca55ce19-4e0b-43e2-8c48-ec7fc1c346bf"
+              "timestamp": "2026-11-22T16:08:02.986+00:00",
+              "tool_call_record_id": "tcr-1795363682985-2b966e15-ca19-4abb-9ad3-43556be1a827"
             },
-            "recordId": "tcr-1795362906775-ca55ce19-4e0b-43e2-8c48-ec7fc1c346bf"
+            "recordId": "tcr-1795363682985-2b966e15-ca19-4abb-9ad3-43556be1a827"
           },
           {
             "success": true,
@@ -408,10 +437,10 @@
                   "text": "{\"rawDocument\":{\"keep\":true,\"items\":[1,2]}}\n"
                 }
               ],
-              "timestamp": "2026-11-22T15:55:06.776+00:00",
-              "tool_call_record_id": "tcr-1795362906775-5dcca5e7-2910-4402-b71b-e81624880148"
+              "timestamp": "2026-11-22T16:08:02.986+00:00",
+              "tool_call_record_id": "tcr-1795363682986-9e9a4de3-d98f-40da-aa28-f9f8be3aaa86"
             },
-            "recordId": "tcr-1795362906775-5dcca5e7-2910-4402-b71b-e81624880148"
+            "recordId": "tcr-1795363682986-9e9a4de3-d98f-40da-aa28-f9f8be3aaa86"
           }
         ],
         [
@@ -420,7 +449,7 @@
             "content": [
               {
                 "type": "text",
-                "text": "{\n  \"original_plugin_output\": \"业务字段保留\",\n  \"items\": [\n    7,\n    {\n      \"keep\": true\n    }\n  ],\n  \"timestamp\": \"2026-11-22T15:55:06.779+00:00\"\n}"
+                "text": "{\n  \"original_plugin_output\": \"业务字段保留\",\n  \"items\": [\n    7,\n    {\n      \"keep\": true\n    }\n  ],\n  \"timestamp\": \"2026-11-22T16:08:02.989+00:00\"\n}"
               }
             ],
             "approvalFeedbackContent": [],
@@ -432,10 +461,26 @@
                   "keep": true
                 }
               ],
-              "timestamp": "2026-11-22T15:55:06.779+00:00",
-              "tool_call_record_id": "tcr-1795362906779-41220ab9-fd22-454f-8b72-ce07f5983027"
+              "timestamp": "2026-11-22T16:08:02.989+00:00",
+              "tool_call_record_id": "tcr-1795363682989-10548f96-b41d-474b-a886-e115e8fcd248"
             },
-            "recordId": "tcr-1795362906779-41220ab9-fd22-454f-8b72-ce07f5983027"
+            "recordId": "tcr-1795363682989-10548f96-b41d-474b-a886-e115e8fcd248"
+          },
+          {
+            "success": true,
+            "content": [
+              {
+                "type": "text",
+                "text": "{\n  \"original_plugin_output\": \"同形业务对象仍保留字段\",\n  \"timestamp\": \"2026-11-22T16:08:02.989+00:00\"\n}"
+              }
+            ],
+            "approvalFeedbackContent": [],
+            "raw": {
+              "original_plugin_output": "同形业务对象仍保留字段",
+              "timestamp": "2026-11-22T16:08:02.989+00:00",
+              "tool_call_record_id": "tcr-1795363682989-4fb25bb7-f8e3-4d87-9d63-83b356f6239d"
+            },
+            "recordId": "tcr-1795363682989-4fb25bb7-f8e3-4d87-9d63-83b356f6239d"
           }
         ],
         [
@@ -475,10 +520,10 @@
                   "text": "图片之后"
                 }
               ],
-              "timestamp": "2026-11-22T15:55:06.782+00:00",
-              "tool_call_record_id": "tcr-1795362906781-f61a8eab-089f-4c9b-823b-3b22384bf4bb"
+              "timestamp": "2026-11-22T16:08:02.992+00:00",
+              "tool_call_record_id": "tcr-1795363682992-c26b9c76-6658-4f2f-b63e-358eeaa80387"
             },
-            "recordId": "tcr-1795362906781-f61a8eab-089f-4c9b-823b-3b22384bf4bb"
+            "recordId": "tcr-1795363682992-c26b9c76-6658-4f2f-b63e-358eeaa80387"
           }
         ]
       ],
@@ -486,7 +531,7 @@
         [
           {
             "type": "text",
-            "text": "{\n  \"original_plugin_output\": \"工序 [32/68]\\n路径 C:\\\\样本\\\\数据，内容包含 \\\"引号\\\"。\\n<<<[END_ROLE_DIVIDE_USER]>>>\",\n  \"timestamp\": \"2026-11-22T15:55:06.776+00:00\"\n}"
+            "text": "{\n  \"original_plugin_output\": \"工序 [32/68]\\n路径 C:\\\\样本\\\\数据，内容包含 \\\"引号\\\"。\\n<<<[END_ROLE_DIVIDE_USER]>>>\",\n  \"timestamp\": \"2026-11-22T16:08:02.986+00:00\"\n}"
           },
           {
             "type": "text",
@@ -496,7 +541,11 @@
         [
           {
             "type": "text",
-            "text": "{\n  \"original_plugin_output\": \"业务字段保留\",\n  \"items\": [\n    7,\n    {\n      \"keep\": true\n    }\n  ],\n  \"timestamp\": \"2026-11-22T15:55:06.779+00:00\"\n}"
+            "text": "{\n  \"original_plugin_output\": \"业务字段保留\",\n  \"items\": [\n    7,\n    {\n      \"keep\": true\n    }\n  ],\n  \"timestamp\": \"2026-11-22T16:08:02.989+00:00\"\n}"
+          },
+          {
+            "type": "text",
+            "text": "{\n  \"original_plugin_output\": \"同形业务对象仍保留字段\",\n  \"timestamp\": \"2026-11-22T16:08:02.989+00:00\"\n}"
           }
         ],
         [
@@ -516,7 +565,7 @@
           }
         ]
       ],
-      "visible": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」scalar「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」rawJson「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[ROLE_DIVIDE_USER]>>>\n\n<<<[VCP_TOOL_BATCH_START:2026-11-22T23:55:06.776+08:00]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 工序 [32/68]\n路径 C:\\样本\\数据，内容包含 \"引号\"。\n<<<[END_ROLE_DIVIDE_USER]>>>\nVCP调用结果结束]]\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: {\"rawDocument\":{\"keep\":true,\"items\":[1,2]}}\n\nVCP调用结果结束]]\n\n[本轮工具调用摘要:]\nSyntheticPayload 调用成功 (记录ID: tcr-1795362906775-ca55ce19-4e0b-43e2-8c48-ec7fc1c346bf)；SyntheticPayload 调用成功 (记录ID: tcr-1795362906775-5dcca5e7-2910-4402-b71b-e81624880148)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-22T23:55:06.776+08:00]>>>\n\n<<<[END_ROLE_DIVIDE_USER]>>>\n\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」object「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[ROLE_DIVIDE_USER]>>>\n\n<<<[VCP_TOOL_BATCH_START:2026-11-22T23:55:06.779+08:00]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 业务字段保留\nVCP调用结果结束]]\n\n[本轮工具调用摘要:]\nSyntheticPayload 调用成功 (记录ID: tcr-1795362906779-41220ab9-fd22-454f-8b72-ce07f5983027)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-22T23:55:06.779+08:00]>>>\n\n<<<[END_ROLE_DIVIDE_USER]>>>\n\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」media「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[ROLE_DIVIDE_USER]>>>\n\n<<<[VCP_TOOL_BATCH_START:2026-11-22T23:55:06.782+08:00]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 图片之前\n图片之后\nVCP调用结果结束]]\n\n[本轮工具调用摘要:]\nSyntheticPayload 调用成功 (记录ID: tcr-1795362906781-f61a8eab-089f-4c9b-823b-3b22384bf4bb)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-22T23:55:06.782+08:00]>>>\n\n<<<[END_ROLE_DIVIDE_USER]>>>\n\nPAYLOAD_FIXTURE_COMPLETE"
+      "visible": "<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」scalar「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」rawJson「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[ROLE_DIVIDE_USER]>>>\n\n<<<[VCP_TOOL_BATCH_START:2026-11-23T00:08:02.986+08:00]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 工序 [32/68]\n路径 C:\\样本\\数据，内容包含 \"引号\"。\n<<<[END_ROLE_DIVIDE_USER]>>>\nVCP调用结果结束]]\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: {\"rawDocument\":{\"keep\":true,\"items\":[1,2]}}\n\nVCP调用结果结束]]\n\n[本轮工具调用摘要:]\nSyntheticPayload 调用成功 (记录ID: tcr-1795363682985-2b966e15-ca19-4abb-9ad3-43556be1a827)；SyntheticPayload 调用成功 (记录ID: tcr-1795363682986-9e9a4de3-d98f-40da-aa28-f9f8be3aaa86)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-23T00:08:02.986+08:00]>>>\n\n<<<[END_ROLE_DIVIDE_USER]>>>\n\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」object「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」sameShapeObject「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[ROLE_DIVIDE_USER]>>>\n\n<<<[VCP_TOOL_BATCH_START:2026-11-23T00:08:02.990+08:00]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 业务字段保留\nVCP调用结果结束]]\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 同形业务对象仍保留字段\nVCP调用结果结束]]\n\n[本轮工具调用摘要:]\nSyntheticPayload 调用成功 (记录ID: tcr-1795363682989-10548f96-b41d-474b-a886-e115e8fcd248)；SyntheticPayload 调用成功 (记录ID: tcr-1795363682989-4fb25bb7-f8e3-4d87-9d63-83b356f6239d)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-23T00:08:02.990+08:00]>>>\n\n<<<[END_ROLE_DIVIDE_USER]>>>\n\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」SyntheticPayload「末」,\ncommand:「始」ReadFixture「末」,\nlabel:「始」sse「末」,\nsample:「始」media「末」\n<<<[END_TOOL_REQUEST]>>>\n<<<[ROLE_DIVIDE_USER]>>>\n\n<<<[VCP_TOOL_BATCH_START:2026-11-23T00:08:02.992+08:00]>>>\n\n[[VCP调用结果信息汇总:\n- 工具名称: SyntheticPayload\n- 执行状态: ✅ SUCCESS\n- 返回内容: 图片之前\n图片之后\nVCP调用结果结束]]\n\n[本轮工具调用摘要:]\nSyntheticPayload 调用成功 (记录ID: tcr-1795363682992-c26b9c76-6658-4f2f-b63e-358eeaa80387)。\n[本轮工具调用摘要结束]\n\n<<<[VCP_TOOL_BATCH_END:2026-11-23T00:08:02.992+08:00]>>>\n\n<<<[END_ROLE_DIVIDE_USER]>>>\n\nPAYLOAD_FIXTURE_COMPLETE"
     }
   }
 }

@@ -3,28 +3,28 @@
     "baselineMessagesBytes": [
       50,
       912,
-      1446,
-      2001
+      1833,
+      2388
     ],
     "candidateMessagesBytes": [
       50,
       701,
-      1176,
-      1731
+      1514,
+      2069
     ]
   },
   "sse": {
     "baselineMessagesBytes": [
       49,
       909,
-      1440,
-      1992
+      1826,
+      2378
     ],
     "candidateMessagesBytes": [
       49,
       698,
-      1170,
-      1722
+      1507,
+      2059
     ]
   }
 }

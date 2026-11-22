@@ -685,14 +685,9 @@ class ToolExecutor {
       ? JSON.stringify(displayResult, null, 2)
       : String(displayResult)) + suffix;
     
-    // The plugin bridge wraps a scalar result with these metadata fields. For the model
-    // only, expose its body directly. Do not parse JSON embedded in existing text parts
-    // or strip fields from a business object that merely happens to use the same key.
-    const scalarOutput = typeof displayResult === 'object' &&
-      Object.hasOwn(displayResult, 'original_plugin_output') &&
-      typeof displayResult.original_plugin_output === 'string' &&
-      Object.keys(displayResult).every(key =>
-        ['original_plugin_output', 'MaidName', 'timestamp', 'tool_call_record_id'].includes(key));
+    // Only the bridge can distinguish a wrapped scalar from a same-shaped business object.
+    const scalarOutput = this.pluginManager?.isScalarToolResultWrapper?.(result)
+      && typeof displayResult.original_plugin_output === 'string';
     return {
       text,
       content: [{ type: 'text', text }],

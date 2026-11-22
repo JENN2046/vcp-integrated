@@ -9,12 +9,12 @@ const { createHash } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { start } = require('../integration/service.cjs');
 const { waitUntil } = require('../aa-delegation/fixture.cjs');
-const { scalar, jsonText, image, object } = require('./plugin.cjs');
+const { scalar, jsonText, image, object, sameShapeObject } = require('./plugin.cjs');
 
 const name = 'SyntheticPayload';
 const header = '<!-- VCP_TOOL_PAYLOAD -->';
 const final = 'PAYLOAD_FIXTURE_COMPLETE';
-const rounds = [['scalar', 'rawJson'], ['object'], ['media']];
+const rounds = [['scalar', 'rawJson'], ['object', 'sameShapeObject'], ['media']];
 const candidate = path.resolve(__dirname, '../..');
 const evidencePath = process.argv[2];
 const serverRevision = process.argv[3];
@@ -138,7 +138,7 @@ async function main() {
         }
         const invocations = readRows(path.join(out, 'runtime-box/Plugin', name, 'invocations.jsonl'));
         const samples = rounds.flat().sort();
-        assert.equal(invocations.length, 8);
+        assert.equal(invocations.length, samples.length * 2);
         for (const label of ['json', 'sse']) {
             assert.deepEqual(invocations.filter(row => row.label === label).map(row => row.sample).sort(), samples);
         }
@@ -152,16 +152,21 @@ async function main() {
             const trace = observations.slice(index * 6, (index + 1) * 6);
             const executor = trace.filter(row => row.kind === 'executor').map(row => row.value);
             const rag = trace.filter(row => row.kind === 'rag').map(row => row.value);
-            assert.deepEqual(executor.map(round => round.length), [2, 1, 1]);
+            assert.deepEqual(executor.map(round => round.length), rounds.map(round => round.length));
             assert.deepEqual(JSON.parse(executor[0][0].content[0].text).original_plugin_output, scalar);
             assert.equal(executor[0][1].content[0].text, jsonText);
             assert.equal(JSON.parse(executor[1][0].content[0].text).original_plugin_output, object.original_plugin_output);
+            const collision = executor[1][1];
+            const { timestamp, tool_call_record_id, ...collisionBusinessData } = JSON.parse(collision.content[0].text);
+            assert.deepEqual(collisionBusinessData, sameShapeObject);
+            assert.equal(collision.contentForAI, undefined);
             assert.deepEqual(rag[2][1], { ...image, image_url: { url: '[Omitted]' } });
             assert.deepEqual(actual[2].slice(1), executor[2][0].content);
             assert.equal(actual[2][2].image_url.url, image.image_url.url);
             const visible = responseCases[label];
             assert.ok(visible.includes('VCP_TOOL_BATCH_START') && visible.includes('VCP_TOOL_BATCH_END'));
             assert.ok(visible.includes(scalar) && visible.includes('rawDocument') && visible.includes(object.original_plugin_output), visible);
+            assert.ok(visible.includes(sameShapeObject.original_plugin_output));
             assert.ok(visible.includes('图片之前'));
             assert.ok(!visible.includes(header));
             for (let round = 1; round < providerRequests.length; round++) {
@@ -175,12 +180,12 @@ async function main() {
                 assert.deepEqual(executor[0][0].contentForAI, [{ type: 'text', text: scalar }]);
                 assert.equal(executor[1][0].contentForAI, undefined);
                 assert.equal(actual[0], header + '\nResults: ' + scalar + '\n\n' + jsonText);
-                assert.equal(actual[1], header + '\nResults: ' + executor[1][0].content[0].text);
+                assert.equal(actual[1], header + '\nResults: ' + executor[1].map(result => result.content[0].text).join('\n\n'));
             }
             cases[label] = { providerRequests, executor, rag, visible };
         }
         const box = path.join(out, 'runtime-box');
-        const files = ['modules/vcpLoop/toolExecutor.js', 'modules/toolResultBatch.js',
+        const files = ['Plugin.js', 'modules/vcpLoop/toolExecutor.js', 'modules/toolResultBatch.js',
             'modules/handlers/nonStreamHandler.js', 'modules/handlers/streamHandler.js'];
         const sourceSha256 = Object.fromEntries(files.map(file => [file, createHash('sha256').update(fs.readFileSync(path.join(box, file))).digest('hex')]));
         fs.writeFileSync(evidencePath, JSON.stringify({

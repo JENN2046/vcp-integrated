@@ -10,10 +10,12 @@ const image = {
     image_url: { url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jMioAAAAASUVORK5CYII=' },
 };
 const object = { original_plugin_output: '业务字段保留', items: [7, { keep: true }] };
+const sameShapeObject = { original_plugin_output: '同形业务对象仍保留字段' };
 const outputs = {
     scalar,
     rawJson: { content: [{ type: 'text', text: jsonText }] },
     object,
+    sameShapeObject,
     media: { content: [{ type: 'text', text: '图片之前' }, image, { type: 'text', text: '图片之后' }] },
 };
 
@@ -24,4 +26,4 @@ async function processToolCall({ command, label, sample }) {
     fs.appendFileSync(path.join(__dirname, 'invocations.jsonl'), JSON.stringify({ label, sample }) + '\n');
     return structuredClone(outputs[sample]);
 }
-module.exports = { processToolCall, scalar, jsonText, image, object };
+module.exports = { processToolCall, scalar, jsonText, image, object, sameShapeObject };
