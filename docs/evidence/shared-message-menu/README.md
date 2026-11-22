@@ -29,3 +29,12 @@ NS_MENU_BASELINE=0 node \
   --require ./docs/evidence/shared-message-menu/menu-probe.cjs \
   tests/integration/run.cjs lost-only
 ```
+
+## 普通本机单聊对照
+
+最终组合版本 `9f00f62` 的 A 使用未加入共享空间的本机资料。A 通过原右键菜单编辑正式助手回复，磁盘上的本机 History 保留同一回复 ID 和原用户消息。确认删除后，界面和本机 History 只剩原用户消息。同一资料重开并进入同一个话题后结果保持一致。原发送发生一次本机请求和一次 Provider 调用。此后 Provider 计数保持 1，中央 Journal、Work、共享原生请求、共享提交与准入均为 0。 [本机逐步回执](./local-receipt.json) · [编辑后](./local-menu-edited.png) · [重开后](./local-menu-reopened.png)
+
+```bash
+node --require ./docs/evidence/shared-message-menu/local-menu-probe.cjs \
+  tests/integration/run.cjs local-only
+```

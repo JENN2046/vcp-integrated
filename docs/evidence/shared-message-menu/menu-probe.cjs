@@ -77,38 +77,14 @@ globalThis.nsWatchFaultScenario = async ({
     assert.equal(service.calls[1].hasToolResult, true);
     assert.equal(initial.submitPosts, 1);
     assert.equal(initial.executions[0].attempts, 1);
-    const selector = '#chatMessages .message-item[data-message-id="' + reply.id + '"]';
-    const visible = (client, expected) => waitUntil(() => evalIn(client, `(() => {
-        const matches = [...document.querySelectorAll(${JSON.stringify(selector)})];
-        if (${expected === null}) return matches.length === 0;
-        return matches.length === 1 && matches[0].checkVisibility() && matches[0].innerText.includes(${JSON.stringify(expected)});
-    })()`), 'visible expected reply ' + expected, 12000);
+    const { visible, rightClick, edit } = require('./menu-controls.cjs')({ id: reply.id, waitUntil, click });
     await visible(A, ordinaryTool.finalText);
     await visible(B, ordinaryTool.finalText);
     await picture(B, 'B-before');
-    const rightClick = async () => {
-        const point = await waitUntil(() => evalIn(A, `(() => {
-            const item = document.querySelector(${JSON.stringify(selector)});
-            if (!item || !item.checkVisibility()) return false;
-            item.scrollIntoView({block:"center",behavior:"instant"});
-            const rect = item.getBoundingClientRect();
-            const x = Math.round(rect.left + rect.width/2);
-            const y = Math.round(rect.top + rect.height/2);
-            return item.contains(document.elementFromPoint(x,y)) && {x,y};
-        })()`), 'reply hit target', 5000);
-        await A.command('mouse-right', point);
-    };
-    await rightClick();
+    await rightClick(A);
     await waitUntil(() => evalIn(A, "document.querySelector('#chatContextMenu')?.checkVisibility()"), 'original menu visible');
     await picture(A, 'A-original-menu');
-    await click(A, '#chatContextMenu .context-menu-item', '编辑消息');
-    await evalIn(A, `(() => {
-        const input = document.querySelector('.message-edit-textarea');
-        input.value = ${JSON.stringify(edited)};
-        input.dispatchEvent(new Event('input', {bubbles:true}));
-        return true;
-    })()`);
-    await click(A, '.message-edit-controls button', '保存');
+    await edit(A, edited);
     if (baseline) {
         receipt.editError = await refusal('[EditMode] Save failed:');
         assert.match(receipt.editError, /SHARED_NATIVE_ADMISSION_REQUIRED/);
@@ -123,7 +99,7 @@ globalThis.nsWatchFaultScenario = async ({
         await picture(B, 'B-edited');
     }
     receipt.afterEdit = snapshot();
-    await rightClick();
+    await rightClick(A);
     await click(A, '#chatContextMenu .context-menu-item', '删除消息');
     await picture(A, 'A-delete-confirmation');
     await click(A, '#confirm-dialog-overlay .confirm-dialog-confirm', '删除');

@@ -36,7 +36,7 @@
 
 ## 复现
 
-使用 README 所述的已构建 Linux 检出、Node 24、Xvfb 及能启用沙箱的 Electron。保留同一版 `tests/context-chain` 夹具。在基线的隔离副本可用 `git apply --reverse --check docs/evidence/request-envelope/host.patch` 核对反向差异，再用 `git apply --reverse docs/evidence/request-envelope/host.patch` 单独还原本次产品改动。候选使用当前产品源码。
+使用 README 所述的已构建 Linux 检出、Node 24、Xvfb 及能启用沙箱的 Electron。保留同一版 `tests/context-chain` 夹具。在基线的隔离副本可用 `git apply --unidiff-zero --reverse --check docs/evidence/request-envelope/host.patch` 核对反向差异，再用 `git apply --unidiff-zero --reverse docs/evidence/request-envelope/host.patch` 单独还原本次产品改动。候选使用当前产品源码。
 
 ```sh
 # 基线宿主

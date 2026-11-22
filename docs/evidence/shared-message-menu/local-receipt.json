@@ -1,0 +1,181 @@
+{
+  "combinedRevision": "9f00f62c205f79504cb4b93799b3804eb70d8adb",
+  "runtime": {
+    "A": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "profileDigest": "f2d59925f434afdfce2ded66999215f67de0fdfacdfc9c362c800daa14024e22"
+    },
+    "A-reopened": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "profileDigest": "f2d59925f434afdfce2ded66999215f67de0fdfacdfc9c362c800daa14024e22"
+    }
+  },
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "A-reopened": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "local": {
+    "scope": {
+      "itemId": "local-agent",
+      "itemType": "agent",
+      "topicId": "local-topic"
+    },
+    "kind": "local",
+    "loaded": {
+      "main": [
+        {
+          "file": "apps/desktop/modules/ipc/chatHandlers.js",
+          "sha256": "80163e3b8a0120a030fd866f7dd09d40f6d4180b6053c0b102d332f781d8996d"
+        },
+        {
+          "file": "apps/desktop/modules/ipc/nativeHistoryHandlers.js",
+          "sha256": "fe4cff13d5cb3719f16d6cc7fe896bc0c1535e78cf2dec2e9f169987c39769ad"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/modules/renderer/messageContextMenu.js",
+          "bytes": 69476,
+          "sha256": "6264ce2f739d9c3cbb68cb9c9a80cf6dfa28ae6dc7c6baad383c6892ff08acaf"
+        },
+        {
+          "file": "apps/desktop/modules/chat/chatHistoryMutationAuthority.js",
+          "bytes": 7999,
+          "sha256": "63728622fc464d97b9a94ea0fbef7d4892cd64a07a27442f93c961b31c675935"
+        },
+        {
+          "file": "apps/desktop/modules/messageRenderer.js",
+          "bytes": 246762,
+          "sha256": "e3741c4ae084be080e4d76dc49c636a22a99bd7f224f93cedf99bed3cdd9b480"
+        }
+      ]
+    },
+    "initial": {
+      "rows": [
+        {
+          "role": "user",
+          "name": "用户",
+          "content": "Send-recovery compare 02: accept exactly once.",
+          "timestamp": 1795323540811,
+          "id": "msg_1795323540782_user_ceki5rl0zk",
+          "attachments": []
+        },
+        {
+          "id": "admission_52775192-730a-459a-bbf1-cc8c57f05547",
+          "role": "assistant",
+          "name": "Synthetic local",
+          "agentId": "local-agent",
+          "admissionToken": "52775192-730a-459a-bbf1-cc8c57f05547",
+          "admissionTerminal": true,
+          "avatarUrl": null,
+          "content": "合成回复完成。",
+          "timestamp": 1795323540892,
+          "finishReason": "completed",
+          "isThinking": false
+        }
+      ],
+      "counters": {
+        "journal": 0,
+        "work": 0,
+        "nativeRequests": 0,
+        "sharedAdmissions": 0,
+        "provider": 1,
+        "localPosts": 1,
+        "sharedPosts": []
+      }
+    },
+    "afterEdit": {
+      "rows": [
+        {
+          "role": "user",
+          "name": "用户",
+          "content": "Send-recovery compare 02: accept exactly once.",
+          "timestamp": 1795323540811,
+          "id": "msg_1795323540782_user_ceki5rl0zk",
+          "attachments": []
+        },
+        {
+          "id": "admission_52775192-730a-459a-bbf1-cc8c57f05547",
+          "role": "assistant",
+          "name": "Synthetic local",
+          "agentId": "local-agent",
+          "admissionToken": "52775192-730a-459a-bbf1-cc8c57f05547",
+          "admissionTerminal": true,
+          "avatarUrl": null,
+          "content": "Synthetic local assistant reply edited from its original menu",
+          "timestamp": 1795323540892,
+          "finishReason": "completed",
+          "isThinking": false,
+          "updatedAt": 1795323541710
+        }
+      ],
+      "counters": {
+        "journal": 0,
+        "work": 0,
+        "nativeRequests": 0,
+        "sharedAdmissions": 0,
+        "provider": 1,
+        "localPosts": 1,
+        "sharedPosts": []
+      }
+    },
+    "afterDelete": {
+      "rows": [
+        {
+          "role": "user",
+          "name": "用户",
+          "content": "Send-recovery compare 02: accept exactly once.",
+          "timestamp": 1795323540811,
+          "id": "msg_1795323540782_user_ceki5rl0zk",
+          "attachments": []
+        }
+      ],
+      "counters": {
+        "journal": 0,
+        "work": 0,
+        "nativeRequests": 0,
+        "sharedAdmissions": 0,
+        "provider": 1,
+        "localPosts": 1,
+        "sharedPosts": []
+      }
+    },
+    "afterReopen": {
+      "rows": [
+        {
+          "role": "user",
+          "name": "用户",
+          "content": "Send-recovery compare 02: accept exactly once.",
+          "timestamp": 1795323540811,
+          "id": "msg_1795323540782_user_ceki5rl0zk",
+          "attachments": []
+        }
+      ],
+      "counters": {
+        "journal": 0,
+        "work": 0,
+        "nativeRequests": 0,
+        "sharedAdmissions": 0,
+        "provider": 1,
+        "localPosts": 1,
+        "sharedPosts": []
+      }
+    }
+  }
+}
