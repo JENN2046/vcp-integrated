@@ -1,0 +1,2663 @@
+{
+  "baseRevision": "1eb2a27",
+  "onlyChangedSource": "apps/desktop/modules/services/nativeSync/nativeConfigSave.js",
+  "summary": {
+    "conflict": {
+      "preSaveNormalizeCallsBefore": 4,
+      "preSaveNormalizeCallsAfter": 2
+    },
+    "lostReceipt": {
+      "preSaveNormalizeCallsBefore": 2,
+      "preSaveNormalizeCallsAfter": 1
+    },
+    "shared": {
+      "preSaveNormalizeCallsBefore": 2,
+      "preSaveNormalizeCallsAfter": 1
+    }
+  },
+  "before": {
+    "shared": {
+      "mode": "config-only",
+      "runtime": {
+        "A": {
+          "electron": "44.9.3",
+          "sandbox": true
+        },
+        "B": {
+          "electron": "44.9.3",
+          "sandbox": true
+        }
+      },
+      "loadedMain": [
+        {
+          "file": "apps/desktop/modules/services/nativeSync/nativeConfigSave.js",
+          "sha256": "869d1bc6d052c7341ce171c16cd70dc3a7138c15e38d7b0302eaa677b9f84c20"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedHost.js",
+          "sha256": "a4269cc0e6e1e85e4862a06e5ef4247cc6daec4c6d57f7efa0082c1f98122f19"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+          "sha256": "0eede772271e4549e20ff2170f53c9430372448c5811922be7782d407bc1e145"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedConfigReplica.js",
+          "sha256": "1fcbde92f82f9baeea20df6d4dc066e060e26fc29662cae33d05f254a1d572f6"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedConfigVersion.js",
+          "sha256": "4ba624ef84274c852c008653097f950dbdb54012a4c36c0003c6aed35b56ee70"
+        }
+      ],
+      "providerCalls": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "cases": {
+        "conflict": {
+          "id": "shared_a32252c6c67140348e219e0e99139648",
+          "before": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "49d0cc13d09d3d2bb019e82e90719d1712a1b2abd8d65165c66b0b31f4e8170e"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 5,
+                  "kind": "created",
+                  "version": 1
+                }
+              ],
+              "receipts": []
+            },
+            "disks": {
+              "A": {
+                "name": "Synthetic interrupted single",
+                "topics": [
+                  "ns_3e8df7e5ae0b44f1a0ba719f"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 478,
+                    "sha256": "7ef5c3f1e7a84beda9e5e5e60f4dfa047c739913363f2ec51fe2695d1e077ea9"
+                  },
+                  "config.json.backup": {
+                    "bytes": 306,
+                    "sha256": "7a0a5b2c502b0d5f0985b701adbe74bc83f377962c876f76cc530d492eb6db73"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "49d0cc13d09d3d2bb019e82e90719d1712a1b2abd8d65165c66b0b31f4e8170e"
+                },
+                "draft": null
+              },
+              "B": {
+                "name": "Synthetic interrupted single",
+                "topics": [
+                  "ns_3e8df7e5ae0b44f1a0ba719f"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 478,
+                    "sha256": "7ef5c3f1e7a84beda9e5e5e60f4dfa047c739913363f2ec51fe2695d1e077ea9"
+                  },
+                  "config.json.backup": {
+                    "bytes": 306,
+                    "sha256": "7a0a5b2c502b0d5f0985b701adbe74bc83f377962c876f76cc530d492eb6db73"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "49d0cc13d09d3d2bb019e82e90719d1712a1b2abd8d65165c66b0b31f4e8170e"
+                },
+                "draft": null
+              }
+            }
+          },
+          "after": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "49d0cc13d09d3d2bb019e82e90719d1712a1b2abd8d65165c66b0b31f4e8170e"
+                },
+                {
+                  "version": 2,
+                  "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 5,
+                  "kind": "created",
+                  "version": 1
+                },
+                {
+                  "seq": 8,
+                  "kind": "config",
+                  "version": 2
+                }
+              ],
+              "receipts": [
+                {
+                  "principal": "desktop:deviceB",
+                  "op_id": "native_6c9cee7406beec7a950ac7d8bdf5610d3c8baddc",
+                  "request_hash": "3389313d35e79848e67bafdb92468df3471e6abe13403249cd6f682f3a7be6d8",
+                  "version": 2
+                }
+              ]
+            },
+            "disks": {
+              "A": {
+                "name": "Desktop B synthetic accepted rename",
+                "topics": [
+                  "ns_3e8df7e5ae0b44f1a0ba719f"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 485,
+                    "sha256": "353145f50bca823b4905fabe5b178b42dbd0c8bf3eeef6bd5abc7fdff1bdb339"
+                  },
+                  "config.json.backup": {
+                    "bytes": 478,
+                    "sha256": "7ef5c3f1e7a84beda9e5e5e60f4dfa047c739913363f2ec51fe2695d1e077ea9"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166"
+                },
+                "draft": {
+                  "opId": "native_43d23ca572beccd838db4b9592ad796cc3ff4a79",
+                  "expectedVersion": 1,
+                  "submitted": false,
+                  "conflict": true,
+                  "name": "Desktop A synthetic retained conflict"
+                }
+              },
+              "B": {
+                "name": "Desktop B synthetic accepted rename",
+                "topics": [
+                  "ns_3e8df7e5ae0b44f1a0ba719f"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 485,
+                    "sha256": "353145f50bca823b4905fabe5b178b42dbd0c8bf3eeef6bd5abc7fdff1bdb339"
+                  },
+                  "config.json.backup": {
+                    "bytes": 478,
+                    "sha256": "7ef5c3f1e7a84beda9e5e5e60f4dfa047c739913363f2ec51fe2695d1e077ea9"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166"
+                },
+                "draft": null
+              }
+            }
+          },
+          "observed": {
+            "A": [
+              {
+                "event": "config-probe-save",
+                "saveId": 1,
+                "localId": "ns_7dac77123b24256462c4100d",
+                "name": "Desktop A synthetic retained conflict",
+                "sharedId": "shared_a32252c6c67140348e219e0e99139648",
+                "baseVersion": 1
+              },
+              {
+                "event": "config-probe-host-write",
+                "kind": "agent",
+                "localId": "ns_7dac77123b24256462c4100d",
+                "method": "writeOwner",
+                "name": "Desktop B synthetic accepted rename"
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 1,
+                "ref": 1,
+                "id": "shared_a32252c6c67140348e219e0e99139648",
+                "version": 2,
+                "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedRuntime.observeConfigs (modules/services/nativeSync/sharedRuntime.js:85:4)",
+                  "at modules/services/nativeSync/sharedRuntime.js:61:16",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:137:36)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)"
+                ],
+                "hasKnownVersion": true,
+                "hasDirectoryVersion": true,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 1,
+                "ref": 1,
+                "id": "shared_a32252c6c67140348e219e0e99139648",
+                "version": 2,
+                "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at saveShared (modules/services/nativeSync/nativeConfigSave.js:142:25)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-result",
+                "saveId": 1,
+                "success": false,
+                "error": "SHARED_CONFIG_CONFLICT"
+              }
+            ],
+            "B": [
+              {
+                "event": "config-probe-save",
+                "saveId": 1,
+                "localId": "ns_7dac77123b24256462c4100d",
+                "name": "Desktop B synthetic accepted rename",
+                "sharedId": "shared_a32252c6c67140348e219e0e99139648",
+                "baseVersion": 1
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 1,
+                "ref": 1,
+                "id": "shared_a32252c6c67140348e219e0e99139648",
+                "version": 1,
+                "hash": "49d0cc13d09d3d2bb019e82e90719d1712a1b2abd8d65165c66b0b31f4e8170e",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedRuntime.observeConfigs (modules/services/nativeSync/sharedRuntime.js:85:4)",
+                  "at modules/services/nativeSync/sharedRuntime.js:61:16",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:137:36)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)"
+                ],
+                "hasKnownVersion": true,
+                "hasDirectoryVersion": true,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 1,
+                "ref": 1,
+                "id": "shared_a32252c6c67140348e219e0e99139648",
+                "version": 1,
+                "hash": "49d0cc13d09d3d2bb019e82e90719d1712a1b2abd8d65165c66b0b31f4e8170e",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at saveShared (modules/services/nativeSync/nativeConfigSave.js:142:25)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)",
+                  "at async /tmp/ns-menu.pJgDuS/config/config-electron.cjs:55:32",
+                  "at async modules/ipc/agentHandlers.js:491:19"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 1,
+                "ref": 2,
+                "id": "shared_a32252c6c67140348e219e0e99139648",
+                "version": 2,
+                "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:93:9)",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:159:17)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 1,
+                "ref": 2,
+                "id": "shared_a32252c6c67140348e219e0e99139648",
+                "version": 2,
+                "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.receiveNow (modules/services/nativeSync/sharedConfigReplica.js:60:8)",
+                  "at SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:101:25)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:159:17)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 1,
+                "ref": 3,
+                "id": "shared_a32252c6c67140348e219e0e99139648",
+                "version": 2,
+                "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.checkCurrent (modules/services/nativeSync/sharedConfigReplica.js:28:8)",
+                  "at SharedConfigReplica.recover (modules/services/nativeSync/sharedConfigReplica.js:34:8)",
+                  "at SharedConfigReplica.receiveNow (modules/services/nativeSync/sharedConfigReplica.js:70:132)",
+                  "at async SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:101:14)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:159:17)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-native-write",
+                "saveId": 1,
+                "localId": "ns_7dac77123b24256462c4100d",
+                "method": "writeAgentConfigLocked",
+                "name": "Desktop B synthetic accepted rename",
+                "callSite": [
+                  "at value.<computed> (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:82:103)",
+                  "at AgentConfigManager.processQueue (modules/utils/agentConfigManager.js:241:42)"
+                ]
+              },
+              {
+                "event": "config-probe-host-write",
+                "saveId": 1,
+                "kind": "agent",
+                "localId": "ns_7dac77123b24256462c4100d",
+                "method": "writeOwner",
+                "name": "Desktop B synthetic accepted rename"
+              },
+              {
+                "event": "config-probe-result",
+                "saveId": 1,
+                "success": true,
+                "sharedVersion": 2
+              }
+            ]
+          },
+          "preSaveChecks": {
+            "A": [
+              {
+                "saveId": 1,
+                "observed": 1,
+                "repeated": 1,
+                "other": 0
+              }
+            ],
+            "B": [
+              {
+                "saveId": 1,
+                "observed": 1,
+                "repeated": 1,
+                "other": 3
+              }
+            ]
+          },
+          "posts": [
+            {
+              "status": 200,
+              "dropped": false,
+              "opId": "native_6c9cee7406beec7a950ac7d8bdf5610d3c8baddc",
+              "expectedVersion": 1,
+              "name": "Desktop B synthetic accepted rename"
+            },
+            {
+              "status": 409,
+              "dropped": false,
+              "opId": "native_43d23ca572beccd838db4b9592ad796cc3ff4a79",
+              "expectedVersion": 1,
+              "name": "Desktop A synthetic retained conflict"
+            }
+          ]
+        },
+        "lostReceipt": {
+          "id": "shared_4a3b573c8de44615bf5853d20470bbb4",
+          "before": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 3,
+                  "kind": "created",
+                  "version": 1
+                }
+              ],
+              "receipts": []
+            },
+            "disks": {
+              "A": {
+                "name": "Synthetic lost receipt",
+                "topics": [
+                  "ns_4c8294be0a24dad232887e54"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 478,
+                    "sha256": "5765018e0eddaf9a717334e50f85d3b8cd7782a1a13ac2f315a287150d2fd79f"
+                  },
+                  "config.json.backup": {
+                    "bytes": 306,
+                    "sha256": "7dcd149e2d17100dd0e3c9f91b6c2c94321b65ae7fd832814d6ec68211cf2913"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                },
+                "draft": null
+              },
+              "B": {
+                "name": "Synthetic lost receipt",
+                "topics": [
+                  "ns_4c8294be0a24dad232887e54"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 478,
+                    "sha256": "5765018e0eddaf9a717334e50f85d3b8cd7782a1a13ac2f315a287150d2fd79f"
+                  },
+                  "config.json.backup": {
+                    "bytes": 306,
+                    "sha256": "7dcd149e2d17100dd0e3c9f91b6c2c94321b65ae7fd832814d6ec68211cf2913"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                },
+                "draft": null
+              }
+            }
+          },
+          "pending": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                },
+                {
+                  "version": 2,
+                  "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 3,
+                  "kind": "created",
+                  "version": 1
+                },
+                {
+                  "seq": 9,
+                  "kind": "config",
+                  "version": 2
+                }
+              ],
+              "receipts": [
+                {
+                  "principal": "desktop:deviceA",
+                  "op_id": "native_6d396cdb5173b6325da5c0b828cf471d42dd2e5e",
+                  "request_hash": "59fe7d46881de1220624ada33fc72e3cfd0019728fc5ee5cf94fbd1ef1aec01f",
+                  "version": 2
+                }
+              ]
+            },
+            "disks": {
+              "A": {
+                "name": "Synthetic lost receipt",
+                "topics": [
+                  "ns_4c8294be0a24dad232887e54"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 478,
+                    "sha256": "5765018e0eddaf9a717334e50f85d3b8cd7782a1a13ac2f315a287150d2fd79f"
+                  },
+                  "config.json.backup": {
+                    "bytes": 306,
+                    "sha256": "7dcd149e2d17100dd0e3c9f91b6c2c94321b65ae7fd832814d6ec68211cf2913"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                },
+                "draft": {
+                  "opId": "native_6d396cdb5173b6325da5c0b828cf471d42dd2e5e",
+                  "expectedVersion": 1,
+                  "submitted": true,
+                  "conflict": false,
+                  "name": "Synthetic name lost acknowledgement"
+                }
+              },
+              "B": {
+                "name": "Synthetic name lost acknowledgement",
+                "topics": [
+                  "ns_4c8294be0a24dad232887e54"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 491,
+                    "sha256": "145ceb61764c4c3840bdbc9320d42f823d3704257aa96f614e75f15f15f95bed"
+                  },
+                  "config.json.backup": {
+                    "bytes": 478,
+                    "sha256": "5765018e0eddaf9a717334e50f85d3b8cd7782a1a13ac2f315a287150d2fd79f"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8"
+                },
+                "draft": null
+              }
+            }
+          },
+          "after": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                },
+                {
+                  "version": 2,
+                  "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 3,
+                  "kind": "created",
+                  "version": 1
+                },
+                {
+                  "seq": 9,
+                  "kind": "config",
+                  "version": 2
+                }
+              ],
+              "receipts": [
+                {
+                  "principal": "desktop:deviceA",
+                  "op_id": "native_6d396cdb5173b6325da5c0b828cf471d42dd2e5e",
+                  "request_hash": "59fe7d46881de1220624ada33fc72e3cfd0019728fc5ee5cf94fbd1ef1aec01f",
+                  "version": 2
+                }
+              ]
+            },
+            "disks": {
+              "A": {
+                "name": "Synthetic name lost acknowledgement",
+                "topics": [
+                  "ns_4c8294be0a24dad232887e54"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 491,
+                    "sha256": "145ceb61764c4c3840bdbc9320d42f823d3704257aa96f614e75f15f15f95bed"
+                  },
+                  "config.json.backup": {
+                    "bytes": 478,
+                    "sha256": "5765018e0eddaf9a717334e50f85d3b8cd7782a1a13ac2f315a287150d2fd79f"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8"
+                },
+                "draft": null
+              },
+              "B": {
+                "name": "Synthetic name lost acknowledgement",
+                "topics": [
+                  "ns_4c8294be0a24dad232887e54"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 491,
+                    "sha256": "145ceb61764c4c3840bdbc9320d42f823d3704257aa96f614e75f15f15f95bed"
+                  },
+                  "config.json.backup": {
+                    "bytes": 478,
+                    "sha256": "5765018e0eddaf9a717334e50f85d3b8cd7782a1a13ac2f315a287150d2fd79f"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8"
+                },
+                "draft": null
+              }
+            }
+          },
+          "observed": {
+            "A": [
+              {
+                "event": "config-probe-save",
+                "saveId": 2,
+                "localId": "ns_d3777e7525df5a809b59192b",
+                "name": "Synthetic name lost acknowledgement",
+                "sharedId": "shared_4a3b573c8de44615bf5853d20470bbb4",
+                "baseVersion": 1
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 2,
+                "ref": 2,
+                "id": "shared_4a3b573c8de44615bf5853d20470bbb4",
+                "version": 1,
+                "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedRuntime.observeConfigs (modules/services/nativeSync/sharedRuntime.js:85:4)",
+                  "at modules/services/nativeSync/sharedRuntime.js:61:16",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:137:36)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)"
+                ],
+                "hasKnownVersion": true,
+                "hasDirectoryVersion": true,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 2,
+                "ref": 2,
+                "id": "shared_4a3b573c8de44615bf5853d20470bbb4",
+                "version": 1,
+                "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at saveShared (modules/services/nativeSync/nativeConfigSave.js:142:25)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)",
+                  "at async /tmp/ns-menu.pJgDuS/config/config-electron.cjs:55:32",
+                  "at async modules/ipc/agentHandlers.js:491:19"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-result",
+                "saveId": 2,
+                "success": false,
+                "error": "SHARED_CONFIG_PENDING_CONFIRMATION"
+              },
+              {
+                "event": "config-probe-save",
+                "saveId": 3,
+                "localId": "ns_d3777e7525df5a809b59192b",
+                "name": "Synthetic name lost acknowledgement",
+                "sharedId": "shared_4a3b573c8de44615bf5853d20470bbb4",
+                "baseVersion": 1
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 3,
+                "ref": 3,
+                "id": "shared_4a3b573c8de44615bf5853d20470bbb4",
+                "version": 2,
+                "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:93:9)",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:126:13)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 3,
+                "ref": 3,
+                "id": "shared_4a3b573c8de44615bf5853d20470bbb4",
+                "version": 2,
+                "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.receiveNow (modules/services/nativeSync/sharedConfigReplica.js:60:8)",
+                  "at SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:101:25)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:126:13)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 3,
+                "ref": 4,
+                "id": "shared_4a3b573c8de44615bf5853d20470bbb4",
+                "version": 2,
+                "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.checkCurrent (modules/services/nativeSync/sharedConfigReplica.js:28:8)",
+                  "at SharedConfigReplica.recover (modules/services/nativeSync/sharedConfigReplica.js:34:8)",
+                  "at SharedConfigReplica.receiveNow (modules/services/nativeSync/sharedConfigReplica.js:70:132)",
+                  "at async SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:101:14)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:126:13)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-native-write",
+                "saveId": 3,
+                "localId": "ns_d3777e7525df5a809b59192b",
+                "method": "writeAgentConfigLocked",
+                "name": "Synthetic name lost acknowledgement",
+                "callSite": [
+                  "at value.<computed> (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:82:103)",
+                  "at AgentConfigManager.processQueue (modules/utils/agentConfigManager.js:241:42)"
+                ]
+              },
+              {
+                "event": "config-probe-host-write",
+                "saveId": 3,
+                "kind": "agent",
+                "localId": "ns_d3777e7525df5a809b59192b",
+                "method": "writeOwner",
+                "name": "Synthetic name lost acknowledgement"
+              },
+              {
+                "event": "config-probe-result",
+                "saveId": 3,
+                "success": true,
+                "sharedVersion": 2
+              }
+            ],
+            "B": [
+              {
+                "event": "config-probe-host-write",
+                "kind": "agent",
+                "localId": "ns_d3777e7525df5a809b59192b",
+                "method": "writeOwner",
+                "name": "Synthetic name lost acknowledgement"
+              }
+            ]
+          },
+          "preSaveChecks": {
+            "A": [
+              {
+                "saveId": 2,
+                "observed": 1,
+                "repeated": 1,
+                "other": 0
+              },
+              {
+                "saveId": 3,
+                "observed": 0,
+                "repeated": 0,
+                "other": 3
+              }
+            ],
+            "B": []
+          },
+          "posts": [
+            {
+              "status": 200,
+              "dropped": true,
+              "opId": "native_6d396cdb5173b6325da5c0b828cf471d42dd2e5e",
+              "expectedVersion": 1,
+              "name": "Synthetic name lost acknowledgement"
+            },
+            {
+              "status": 200,
+              "dropped": false,
+              "opId": "native_6d396cdb5173b6325da5c0b828cf471d42dd2e5e",
+              "expectedVersion": 1,
+              "name": "Synthetic name lost acknowledgement"
+            }
+          ]
+        },
+        "shared": {
+          "id": "shared_7ab1356cb97348e2961d8f67e166b067",
+          "before": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "113be176f659dbe5ec224d2afc4eabdd756abcc74ae986d903b892a1c9db6d28"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 1,
+                  "kind": "created",
+                  "version": 1
+                }
+              ],
+              "receipts": []
+            },
+            "disks": {
+              "A": {
+                "name": "Synthetic shared",
+                "topics": [
+                  "ns_ca117603c6de078b97ae226f"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 452,
+                    "sha256": "9494c3809c89216d0633df7cc7c4381326d84cb2827f782165b0f6ba257ec9bc"
+                  },
+                  "config.json.backup": {
+                    "bytes": 298,
+                    "sha256": "e0c696069b3f0750727da113b0e964bd1b82de56c96d3224ae3bc5ded2deb71c"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "113be176f659dbe5ec224d2afc4eabdd756abcc74ae986d903b892a1c9db6d28"
+                },
+                "draft": null
+              },
+              "B": {
+                "name": "Synthetic shared",
+                "topics": [
+                  "ns_ca117603c6de078b97ae226f"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 452,
+                    "sha256": "9494c3809c89216d0633df7cc7c4381326d84cb2827f782165b0f6ba257ec9bc"
+                  },
+                  "config.json.backup": {
+                    "bytes": 298,
+                    "sha256": "e0c696069b3f0750727da113b0e964bd1b82de56c96d3224ae3bc5ded2deb71c"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "113be176f659dbe5ec224d2afc4eabdd756abcc74ae986d903b892a1c9db6d28"
+                },
+                "draft": null
+              }
+            }
+          },
+          "after": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "113be176f659dbe5ec224d2afc4eabdd756abcc74ae986d903b892a1c9db6d28"
+                },
+                {
+                  "version": 2,
+                  "hash": "7d3347fd546337cd2a24f964f25b3b54935242170fd2b404e39c14968970c494"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 1,
+                  "kind": "created",
+                  "version": 1
+                },
+                {
+                  "seq": 10,
+                  "kind": "config",
+                  "version": 2
+                }
+              ],
+              "receipts": [
+                {
+                  "principal": "desktop:deviceA",
+                  "op_id": "native_7546464057db294e50bfc3d9ab89813219795067",
+                  "request_hash": "c8287cca4e5fb415b30245b125d06b00ecadcd8cf312b75fd1ec26877df185fa",
+                  "version": 2
+                }
+              ]
+            },
+            "disks": {
+              "A": {
+                "name": "Synthetic name and avatar saved together",
+                "topics": [
+                  "ns_ca117603c6de078b97ae226f"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "avatar.png": {
+                    "bytes": 5775,
+                    "sha256": "4fdc2aeeecf0016aff42028894eb9d3dfa2bf50b86da962a882e6d0f80a6c71c"
+                  },
+                  "config.json": {
+                    "bytes": 1655,
+                    "sha256": "9a770bef502e6dca5f628929c15e77208b564bba235fd24281b7c9ba189f5b1a"
+                  },
+                  "config.json.backup": {
+                    "bytes": 476,
+                    "sha256": "3f991356b4015c9644db01fb944b0f6ec39fbd903ea2fdc88677e9ac066732f8"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "7d3347fd546337cd2a24f964f25b3b54935242170fd2b404e39c14968970c494"
+                },
+                "draft": null
+              },
+              "B": {
+                "name": "Synthetic name and avatar saved together",
+                "topics": [
+                  "ns_ca117603c6de078b97ae226f"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "avatar.png": {
+                    "bytes": 5775,
+                    "sha256": "4fdc2aeeecf0016aff42028894eb9d3dfa2bf50b86da962a882e6d0f80a6c71c"
+                  },
+                  "config.json": {
+                    "bytes": 476,
+                    "sha256": "3f991356b4015c9644db01fb944b0f6ec39fbd903ea2fdc88677e9ac066732f8"
+                  },
+                  "config.json.backup": {
+                    "bytes": 452,
+                    "sha256": "9494c3809c89216d0633df7cc7c4381326d84cb2827f782165b0f6ba257ec9bc"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "7d3347fd546337cd2a24f964f25b3b54935242170fd2b404e39c14968970c494"
+                },
+                "draft": null
+              }
+            }
+          },
+          "observed": {
+            "A": [
+              {
+                "event": "config-probe-save",
+                "saveId": 4,
+                "localId": "ns_916c61e7a3b33ba9a7d03288",
+                "name": "Synthetic name and avatar saved together",
+                "sharedId": "shared_7ab1356cb97348e2961d8f67e166b067",
+                "baseVersion": 1
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 4,
+                "ref": 5,
+                "id": "shared_7ab1356cb97348e2961d8f67e166b067",
+                "version": 1,
+                "hash": "113be176f659dbe5ec224d2afc4eabdd756abcc74ae986d903b892a1c9db6d28",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedRuntime.observeConfigs (modules/services/nativeSync/sharedRuntime.js:85:4)",
+                  "at modules/services/nativeSync/sharedRuntime.js:61:16",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:137:36)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)"
+                ],
+                "hasKnownVersion": true,
+                "hasDirectoryVersion": true,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 4,
+                "ref": 5,
+                "id": "shared_7ab1356cb97348e2961d8f67e166b067",
+                "version": 1,
+                "hash": "113be176f659dbe5ec224d2afc4eabdd756abcc74ae986d903b892a1c9db6d28",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at saveShared (modules/services/nativeSync/nativeConfigSave.js:142:25)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)",
+                  "at async /tmp/ns-menu.pJgDuS/config/config-electron.cjs:55:32",
+                  "at async modules/ipc/agentHandlers.js:491:19"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 4,
+                "ref": 6,
+                "id": "shared_7ab1356cb97348e2961d8f67e166b067",
+                "version": 2,
+                "hash": "7d3347fd546337cd2a24f964f25b3b54935242170fd2b404e39c14968970c494",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:93:9)",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:159:17)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 4,
+                "ref": 6,
+                "id": "shared_7ab1356cb97348e2961d8f67e166b067",
+                "version": 2,
+                "hash": "7d3347fd546337cd2a24f964f25b3b54935242170fd2b404e39c14968970c494",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.receiveNow (modules/services/nativeSync/sharedConfigReplica.js:60:8)",
+                  "at SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:101:25)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:159:17)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 4,
+                "ref": 7,
+                "id": "shared_7ab1356cb97348e2961d8f67e166b067",
+                "version": 2,
+                "hash": "7d3347fd546337cd2a24f964f25b3b54935242170fd2b404e39c14968970c494",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.checkCurrent (modules/services/nativeSync/sharedConfigReplica.js:28:8)",
+                  "at SharedConfigReplica.recover (modules/services/nativeSync/sharedConfigReplica.js:34:8)",
+                  "at SharedConfigReplica.receiveNow (modules/services/nativeSync/sharedConfigReplica.js:70:132)",
+                  "at async SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:101:14)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:159:17)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-native-write",
+                "saveId": 4,
+                "localId": "ns_916c61e7a3b33ba9a7d03288",
+                "method": "writeAgentConfigLocked",
+                "name": "Synthetic name and avatar saved together",
+                "callSite": [
+                  "at value.<computed> (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:82:103)",
+                  "at AgentConfigManager.processQueue (modules/utils/agentConfigManager.js:241:42)"
+                ]
+              },
+              {
+                "event": "config-probe-host-write",
+                "saveId": 4,
+                "kind": "agent",
+                "localId": "ns_916c61e7a3b33ba9a7d03288",
+                "method": "writeOwner",
+                "name": "Synthetic name and avatar saved together"
+              },
+              {
+                "event": "config-probe-native-write",
+                "saveId": 4,
+                "localId": "ns_916c61e7a3b33ba9a7d03288",
+                "method": "writeAgentConfigLocked",
+                "name": "Synthetic name and avatar saved together",
+                "callSite": [
+                  "at value.<computed> (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:82:103)",
+                  "at AgentConfigManager.processQueue (modules/utils/agentConfigManager.js:241:42)"
+                ]
+              },
+              {
+                "event": "config-probe-host-write",
+                "saveId": 4,
+                "kind": "agent",
+                "localId": "ns_916c61e7a3b33ba9a7d03288",
+                "method": "writeNativeExtras",
+                "name": "Synthetic name and avatar saved together"
+              },
+              {
+                "event": "config-probe-result",
+                "saveId": 4,
+                "success": true,
+                "sharedVersion": 2
+              }
+            ],
+            "B": [
+              {
+                "event": "config-probe-host-write",
+                "kind": "agent",
+                "localId": "ns_916c61e7a3b33ba9a7d03288",
+                "method": "writeOwner",
+                "name": "Synthetic name and avatar saved together"
+              }
+            ]
+          },
+          "preSaveChecks": {
+            "A": [
+              {
+                "saveId": 4,
+                "observed": 1,
+                "repeated": 1,
+                "other": 3
+              }
+            ],
+            "B": []
+          },
+          "posts": [
+            {
+              "status": 200,
+              "dropped": false,
+              "opId": "native_7546464057db294e50bfc3d9ab89813219795067",
+              "expectedVersion": 1,
+              "name": "Synthetic name and avatar saved together"
+            }
+          ]
+        }
+      }
+    },
+    "local": {
+      "mode": "local-only",
+      "runtime": {
+        "A": {
+          "electron": "44.9.3",
+          "sandbox": true
+        },
+        "B": {
+          "electron": "44.9.3",
+          "sandbox": true
+        }
+      },
+      "loadedMain": [
+        {
+          "file": "apps/desktop/modules/services/nativeSync/nativeConfigSave.js",
+          "sha256": "869d1bc6d052c7341ce171c16cd70dc3a7138c15e38d7b0302eaa677b9f84c20"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedHost.js",
+          "sha256": "a4269cc0e6e1e85e4862a06e5ef4247cc6daec4c6d57f7efa0082c1f98122f19"
+        }
+      ],
+      "providerCalls": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "cases": {
+        "local": {
+          "before": {
+            "name": "Synthetic local",
+            "topics": [
+              "local-topic"
+            ],
+            "model": "synthetic",
+            "files": {
+              "config.json": {
+                "bytes": 218,
+                "sha256": "7303b9ab95bcef26a2961f95e696169be1906f653a4df2c42b06d6668d972a49"
+              }
+            }
+          },
+          "after": {
+            "name": "Synthetic local native form rename",
+            "topics": [
+              "local-topic"
+            ],
+            "model": "synthetic",
+            "files": {
+              "config.json": {
+                "bytes": 1554,
+                "sha256": "0dfd0c908c0c18314555a09f0e812fa22e1a21ab6ac4d07b9210cc82f358d851"
+              },
+              "config.json.backup": {
+                "bytes": 218,
+                "sha256": "7303b9ab95bcef26a2961f95e696169be1906f653a4df2c42b06d6668d972a49"
+              }
+            }
+          },
+          "central": {
+            "versions": 7,
+            "receipts": 26
+          },
+          "observed": [
+            {
+              "event": "config-probe-save",
+              "saveId": 1,
+              "localId": "local-agent",
+              "name": "Synthetic local native form rename"
+            },
+            {
+              "event": "config-probe-local-owner",
+              "saveId": 1,
+              "localId": "local-agent"
+            },
+            {
+              "event": "config-probe-native-write",
+              "saveId": 1,
+              "localId": "local-agent",
+              "method": "writeAgentConfigLocked",
+              "name": "Synthetic local native form rename",
+              "callSite": [
+                "at value.<computed> (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:82:103)",
+                "at AgentConfigManager.processQueue (modules/utils/agentConfigManager.js:241:42)"
+              ]
+            },
+            {
+              "event": "config-probe-result",
+              "saveId": 1,
+              "success": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  "after": {
+    "shared": {
+      "mode": "config-only",
+      "runtime": {
+        "A": {
+          "electron": "44.9.3",
+          "sandbox": true
+        },
+        "B": {
+          "electron": "44.9.3",
+          "sandbox": true
+        }
+      },
+      "loadedMain": [
+        {
+          "file": "apps/desktop/modules/services/nativeSync/nativeConfigSave.js",
+          "sha256": "335f8201b65e1cbda03117a74e5c3d3ead0e8d597a03c25286cd83bd58bb7732"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedHost.js",
+          "sha256": "a4269cc0e6e1e85e4862a06e5ef4247cc6daec4c6d57f7efa0082c1f98122f19"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+          "sha256": "0eede772271e4549e20ff2170f53c9430372448c5811922be7782d407bc1e145"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedConfigReplica.js",
+          "sha256": "1fcbde92f82f9baeea20df6d4dc066e060e26fc29662cae33d05f254a1d572f6"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedConfigVersion.js",
+          "sha256": "4ba624ef84274c852c008653097f950dbdb54012a4c36c0003c6aed35b56ee70"
+        }
+      ],
+      "providerCalls": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "cases": {
+        "conflict": {
+          "id": "shared_565fabd1a13342839be4802c21ea4985",
+          "before": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "49d0cc13d09d3d2bb019e82e90719d1712a1b2abd8d65165c66b0b31f4e8170e"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 5,
+                  "kind": "created",
+                  "version": 1
+                }
+              ],
+              "receipts": []
+            },
+            "disks": {
+              "A": {
+                "name": "Synthetic interrupted single",
+                "topics": [
+                  "ns_c8674135e5ac399050d0207e"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 478,
+                    "sha256": "e678aa56b7ef375b6d224ba38da71f3f2566facaf8b9e6bc3ced2a8140c1d89c"
+                  },
+                  "config.json.backup": {
+                    "bytes": 306,
+                    "sha256": "7a0a5b2c502b0d5f0985b701adbe74bc83f377962c876f76cc530d492eb6db73"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "49d0cc13d09d3d2bb019e82e90719d1712a1b2abd8d65165c66b0b31f4e8170e"
+                },
+                "draft": null
+              },
+              "B": {
+                "name": "Synthetic interrupted single",
+                "topics": [
+                  "ns_c8674135e5ac399050d0207e"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 478,
+                    "sha256": "e678aa56b7ef375b6d224ba38da71f3f2566facaf8b9e6bc3ced2a8140c1d89c"
+                  },
+                  "config.json.backup": {
+                    "bytes": 306,
+                    "sha256": "7a0a5b2c502b0d5f0985b701adbe74bc83f377962c876f76cc530d492eb6db73"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "49d0cc13d09d3d2bb019e82e90719d1712a1b2abd8d65165c66b0b31f4e8170e"
+                },
+                "draft": null
+              }
+            }
+          },
+          "after": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "49d0cc13d09d3d2bb019e82e90719d1712a1b2abd8d65165c66b0b31f4e8170e"
+                },
+                {
+                  "version": 2,
+                  "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 5,
+                  "kind": "created",
+                  "version": 1
+                },
+                {
+                  "seq": 8,
+                  "kind": "config",
+                  "version": 2
+                }
+              ],
+              "receipts": [
+                {
+                  "principal": "desktop:deviceB",
+                  "op_id": "native_9e4218f4bd6e35b9c7bf325aff8f12773a12492f",
+                  "request_hash": "f720edc93eb9f871d37434179eddebadcb514148519ede625bc2722eb2c6156b",
+                  "version": 2
+                }
+              ]
+            },
+            "disks": {
+              "A": {
+                "name": "Desktop B synthetic accepted rename",
+                "topics": [
+                  "ns_c8674135e5ac399050d0207e"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 485,
+                    "sha256": "e36048fbfa43358cbcb9923af1cf94ca4cb5a82ef682b89a30b6ddae9a1a95a7"
+                  },
+                  "config.json.backup": {
+                    "bytes": 478,
+                    "sha256": "e678aa56b7ef375b6d224ba38da71f3f2566facaf8b9e6bc3ced2a8140c1d89c"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166"
+                },
+                "draft": {
+                  "opId": "native_e37d9301e481904e320457c8d1334d023d22d1db",
+                  "expectedVersion": 1,
+                  "submitted": false,
+                  "conflict": true,
+                  "name": "Desktop A synthetic retained conflict"
+                }
+              },
+              "B": {
+                "name": "Desktop B synthetic accepted rename",
+                "topics": [
+                  "ns_c8674135e5ac399050d0207e"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 485,
+                    "sha256": "e36048fbfa43358cbcb9923af1cf94ca4cb5a82ef682b89a30b6ddae9a1a95a7"
+                  },
+                  "config.json.backup": {
+                    "bytes": 478,
+                    "sha256": "e678aa56b7ef375b6d224ba38da71f3f2566facaf8b9e6bc3ced2a8140c1d89c"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166"
+                },
+                "draft": null
+              }
+            }
+          },
+          "observed": {
+            "A": [
+              {
+                "event": "config-probe-save",
+                "saveId": 1,
+                "localId": "ns_b010d242e2cf7f787aa220c9",
+                "name": "Desktop A synthetic retained conflict",
+                "sharedId": "shared_565fabd1a13342839be4802c21ea4985",
+                "baseVersion": 1
+              },
+              {
+                "event": "config-probe-host-write",
+                "kind": "agent",
+                "localId": "ns_b010d242e2cf7f787aa220c9",
+                "method": "writeOwner",
+                "name": "Desktop B synthetic accepted rename"
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 1,
+                "ref": 1,
+                "id": "shared_565fabd1a13342839be4802c21ea4985",
+                "version": 2,
+                "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedRuntime.observeConfigs (modules/services/nativeSync/sharedRuntime.js:85:4)",
+                  "at modules/services/nativeSync/sharedRuntime.js:61:16",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:137:36)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)"
+                ],
+                "hasKnownVersion": true,
+                "hasDirectoryVersion": true,
+                "ok": true
+              },
+              {
+                "event": "config-probe-result",
+                "saveId": 1,
+                "success": false,
+                "error": "SHARED_CONFIG_CONFLICT"
+              }
+            ],
+            "B": [
+              {
+                "event": "config-probe-save",
+                "saveId": 1,
+                "localId": "ns_b010d242e2cf7f787aa220c9",
+                "name": "Desktop B synthetic accepted rename",
+                "sharedId": "shared_565fabd1a13342839be4802c21ea4985",
+                "baseVersion": 1
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 1,
+                "ref": 1,
+                "id": "shared_565fabd1a13342839be4802c21ea4985",
+                "version": 1,
+                "hash": "49d0cc13d09d3d2bb019e82e90719d1712a1b2abd8d65165c66b0b31f4e8170e",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedRuntime.observeConfigs (modules/services/nativeSync/sharedRuntime.js:85:4)",
+                  "at modules/services/nativeSync/sharedRuntime.js:61:16",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:137:36)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)"
+                ],
+                "hasKnownVersion": true,
+                "hasDirectoryVersion": true,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 1,
+                "ref": 2,
+                "id": "shared_565fabd1a13342839be4802c21ea4985",
+                "version": 2,
+                "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:93:9)",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:159:17)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 1,
+                "ref": 2,
+                "id": "shared_565fabd1a13342839be4802c21ea4985",
+                "version": 2,
+                "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.receiveNow (modules/services/nativeSync/sharedConfigReplica.js:60:8)",
+                  "at SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:101:25)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:159:17)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 1,
+                "ref": 3,
+                "id": "shared_565fabd1a13342839be4802c21ea4985",
+                "version": 2,
+                "hash": "2f3c07b59807efbe379ebf906c0c88617b1f3a7e16365571fb7ec2d4ac3dc166",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.checkCurrent (modules/services/nativeSync/sharedConfigReplica.js:28:8)",
+                  "at SharedConfigReplica.recover (modules/services/nativeSync/sharedConfigReplica.js:34:8)",
+                  "at SharedConfigReplica.receiveNow (modules/services/nativeSync/sharedConfigReplica.js:70:132)",
+                  "at async SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:101:14)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:159:17)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-native-write",
+                "saveId": 1,
+                "localId": "ns_b010d242e2cf7f787aa220c9",
+                "method": "writeAgentConfigLocked",
+                "name": "Desktop B synthetic accepted rename",
+                "callSite": [
+                  "at value.<computed> (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:82:103)",
+                  "at AgentConfigManager.processQueue (modules/utils/agentConfigManager.js:241:42)"
+                ]
+              },
+              {
+                "event": "config-probe-host-write",
+                "saveId": 1,
+                "kind": "agent",
+                "localId": "ns_b010d242e2cf7f787aa220c9",
+                "method": "writeOwner",
+                "name": "Desktop B synthetic accepted rename"
+              },
+              {
+                "event": "config-probe-result",
+                "saveId": 1,
+                "success": true,
+                "sharedVersion": 2
+              }
+            ]
+          },
+          "preSaveChecks": {
+            "A": [
+              {
+                "saveId": 1,
+                "observed": 1,
+                "repeated": 0,
+                "other": 0
+              }
+            ],
+            "B": [
+              {
+                "saveId": 1,
+                "observed": 1,
+                "repeated": 0,
+                "other": 3
+              }
+            ]
+          },
+          "posts": [
+            {
+              "status": 200,
+              "dropped": false,
+              "opId": "native_9e4218f4bd6e35b9c7bf325aff8f12773a12492f",
+              "expectedVersion": 1,
+              "name": "Desktop B synthetic accepted rename"
+            },
+            {
+              "status": 409,
+              "dropped": false,
+              "opId": "native_e37d9301e481904e320457c8d1334d023d22d1db",
+              "expectedVersion": 1,
+              "name": "Desktop A synthetic retained conflict"
+            }
+          ]
+        },
+        "lostReceipt": {
+          "id": "shared_94e6c6c71f2c430d9cf1ed9df4b484bb",
+          "before": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 3,
+                  "kind": "created",
+                  "version": 1
+                }
+              ],
+              "receipts": []
+            },
+            "disks": {
+              "A": {
+                "name": "Synthetic lost receipt",
+                "topics": [
+                  "ns_22863484673e5cb05addcec0"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 478,
+                    "sha256": "0b6af5ef194eebd071d65fc40ad6f0c22921e914655f99f26f727f88707e08d0"
+                  },
+                  "config.json.backup": {
+                    "bytes": 306,
+                    "sha256": "7dcd149e2d17100dd0e3c9f91b6c2c94321b65ae7fd832814d6ec68211cf2913"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                },
+                "draft": null
+              },
+              "B": {
+                "name": "Synthetic lost receipt",
+                "topics": [
+                  "ns_22863484673e5cb05addcec0"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 478,
+                    "sha256": "0b6af5ef194eebd071d65fc40ad6f0c22921e914655f99f26f727f88707e08d0"
+                  },
+                  "config.json.backup": {
+                    "bytes": 306,
+                    "sha256": "7dcd149e2d17100dd0e3c9f91b6c2c94321b65ae7fd832814d6ec68211cf2913"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                },
+                "draft": null
+              }
+            }
+          },
+          "pending": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                },
+                {
+                  "version": 2,
+                  "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 3,
+                  "kind": "created",
+                  "version": 1
+                },
+                {
+                  "seq": 9,
+                  "kind": "config",
+                  "version": 2
+                }
+              ],
+              "receipts": [
+                {
+                  "principal": "desktop:deviceA",
+                  "op_id": "native_022bd184e8824936cc200f5fad6d28d8b057642c",
+                  "request_hash": "94daaec9b07dd149bf9c34135ba5bce891e637d46d528228b6a74c7ef6839c68",
+                  "version": 2
+                }
+              ]
+            },
+            "disks": {
+              "A": {
+                "name": "Synthetic lost receipt",
+                "topics": [
+                  "ns_22863484673e5cb05addcec0"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 478,
+                    "sha256": "0b6af5ef194eebd071d65fc40ad6f0c22921e914655f99f26f727f88707e08d0"
+                  },
+                  "config.json.backup": {
+                    "bytes": 306,
+                    "sha256": "7dcd149e2d17100dd0e3c9f91b6c2c94321b65ae7fd832814d6ec68211cf2913"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                },
+                "draft": {
+                  "opId": "native_022bd184e8824936cc200f5fad6d28d8b057642c",
+                  "expectedVersion": 1,
+                  "submitted": true,
+                  "conflict": false,
+                  "name": "Synthetic name lost acknowledgement"
+                }
+              },
+              "B": {
+                "name": "Synthetic name lost acknowledgement",
+                "topics": [
+                  "ns_22863484673e5cb05addcec0"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 491,
+                    "sha256": "cd0197b1e7b5de7b3d383eb288de0d588f0fb265c3bac033b561a20290cc98f5"
+                  },
+                  "config.json.backup": {
+                    "bytes": 478,
+                    "sha256": "0b6af5ef194eebd071d65fc40ad6f0c22921e914655f99f26f727f88707e08d0"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                },
+                "draft": null
+              }
+            }
+          },
+          "after": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7"
+                },
+                {
+                  "version": 2,
+                  "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 3,
+                  "kind": "created",
+                  "version": 1
+                },
+                {
+                  "seq": 9,
+                  "kind": "config",
+                  "version": 2
+                }
+              ],
+              "receipts": [
+                {
+                  "principal": "desktop:deviceA",
+                  "op_id": "native_022bd184e8824936cc200f5fad6d28d8b057642c",
+                  "request_hash": "94daaec9b07dd149bf9c34135ba5bce891e637d46d528228b6a74c7ef6839c68",
+                  "version": 2
+                }
+              ]
+            },
+            "disks": {
+              "A": {
+                "name": "Synthetic name lost acknowledgement",
+                "topics": [
+                  "ns_22863484673e5cb05addcec0"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 491,
+                    "sha256": "cd0197b1e7b5de7b3d383eb288de0d588f0fb265c3bac033b561a20290cc98f5"
+                  },
+                  "config.json.backup": {
+                    "bytes": 478,
+                    "sha256": "0b6af5ef194eebd071d65fc40ad6f0c22921e914655f99f26f727f88707e08d0"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8"
+                },
+                "draft": null
+              },
+              "B": {
+                "name": "Synthetic name lost acknowledgement",
+                "topics": [
+                  "ns_22863484673e5cb05addcec0"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 491,
+                    "sha256": "cd0197b1e7b5de7b3d383eb288de0d588f0fb265c3bac033b561a20290cc98f5"
+                  },
+                  "config.json.backup": {
+                    "bytes": 478,
+                    "sha256": "0b6af5ef194eebd071d65fc40ad6f0c22921e914655f99f26f727f88707e08d0"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8"
+                },
+                "draft": null
+              }
+            }
+          },
+          "observed": {
+            "A": [
+              {
+                "event": "config-probe-save",
+                "saveId": 2,
+                "localId": "ns_7faf97a1b18390b34e5ac2c6",
+                "name": "Synthetic name lost acknowledgement",
+                "sharedId": "shared_94e6c6c71f2c430d9cf1ed9df4b484bb",
+                "baseVersion": 1
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 2,
+                "ref": 2,
+                "id": "shared_94e6c6c71f2c430d9cf1ed9df4b484bb",
+                "version": 1,
+                "hash": "9ed3f1b35c1a36be8699cabe22578f5359fd6c9f1f9be3ed09b47cb1d46a3ad7",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedRuntime.observeConfigs (modules/services/nativeSync/sharedRuntime.js:85:4)",
+                  "at modules/services/nativeSync/sharedRuntime.js:61:16",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:137:36)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)"
+                ],
+                "hasKnownVersion": true,
+                "hasDirectoryVersion": true,
+                "ok": true
+              },
+              {
+                "event": "config-probe-result",
+                "saveId": 2,
+                "success": false,
+                "error": "SHARED_CONFIG_PENDING_CONFIRMATION"
+              },
+              {
+                "event": "config-probe-save",
+                "saveId": 3,
+                "localId": "ns_7faf97a1b18390b34e5ac2c6",
+                "name": "Synthetic name lost acknowledgement",
+                "sharedId": "shared_94e6c6c71f2c430d9cf1ed9df4b484bb",
+                "baseVersion": 1
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 3,
+                "ref": 3,
+                "id": "shared_94e6c6c71f2c430d9cf1ed9df4b484bb",
+                "version": 2,
+                "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:93:9)",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:126:13)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 3,
+                "ref": 3,
+                "id": "shared_94e6c6c71f2c430d9cf1ed9df4b484bb",
+                "version": 2,
+                "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.receiveNow (modules/services/nativeSync/sharedConfigReplica.js:60:8)",
+                  "at SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:101:25)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:126:13)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 3,
+                "ref": 4,
+                "id": "shared_94e6c6c71f2c430d9cf1ed9df4b484bb",
+                "version": 2,
+                "hash": "732089b2d36c01a046b5c8c79dbd3231d795ec7035923120af04c66aac4537e8",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.checkCurrent (modules/services/nativeSync/sharedConfigReplica.js:28:8)",
+                  "at SharedConfigReplica.recover (modules/services/nativeSync/sharedConfigReplica.js:34:8)",
+                  "at SharedConfigReplica.receiveNow (modules/services/nativeSync/sharedConfigReplica.js:70:132)",
+                  "at async SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:101:14)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:126:13)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-native-write",
+                "saveId": 3,
+                "localId": "ns_7faf97a1b18390b34e5ac2c6",
+                "method": "writeAgentConfigLocked",
+                "name": "Synthetic name lost acknowledgement",
+                "callSite": [
+                  "at value.<computed> (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:82:103)",
+                  "at AgentConfigManager.processQueue (modules/utils/agentConfigManager.js:241:42)"
+                ]
+              },
+              {
+                "event": "config-probe-host-write",
+                "saveId": 3,
+                "kind": "agent",
+                "localId": "ns_7faf97a1b18390b34e5ac2c6",
+                "method": "writeOwner",
+                "name": "Synthetic name lost acknowledgement"
+              },
+              {
+                "event": "config-probe-result",
+                "saveId": 3,
+                "success": true,
+                "sharedVersion": 2
+              }
+            ],
+            "B": [
+              {
+                "event": "config-probe-host-write",
+                "kind": "agent",
+                "localId": "ns_7faf97a1b18390b34e5ac2c6",
+                "method": "writeOwner",
+                "name": "Synthetic name lost acknowledgement"
+              }
+            ]
+          },
+          "preSaveChecks": {
+            "A": [
+              {
+                "saveId": 2,
+                "observed": 1,
+                "repeated": 0,
+                "other": 0
+              },
+              {
+                "saveId": 3,
+                "observed": 0,
+                "repeated": 0,
+                "other": 3
+              }
+            ],
+            "B": []
+          },
+          "posts": [
+            {
+              "status": 200,
+              "dropped": true,
+              "opId": "native_022bd184e8824936cc200f5fad6d28d8b057642c",
+              "expectedVersion": 1,
+              "name": "Synthetic name lost acknowledgement"
+            },
+            {
+              "status": 200,
+              "dropped": false,
+              "opId": "native_022bd184e8824936cc200f5fad6d28d8b057642c",
+              "expectedVersion": 1,
+              "name": "Synthetic name lost acknowledgement"
+            }
+          ]
+        },
+        "shared": {
+          "id": "shared_908e74d77002406fb1256aad1ccac199",
+          "before": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "113be176f659dbe5ec224d2afc4eabdd756abcc74ae986d903b892a1c9db6d28"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 1,
+                  "kind": "created",
+                  "version": 1
+                }
+              ],
+              "receipts": []
+            },
+            "disks": {
+              "A": {
+                "name": "Synthetic shared",
+                "topics": [
+                  "ns_fe71bf071b183b463db57b4a"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 452,
+                    "sha256": "a95e0b12a453cbe109630c860fcfd58459091f3a85696b5966169488a0d6f976"
+                  },
+                  "config.json.backup": {
+                    "bytes": 298,
+                    "sha256": "e0c696069b3f0750727da113b0e964bd1b82de56c96d3224ae3bc5ded2deb71c"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "113be176f659dbe5ec224d2afc4eabdd756abcc74ae986d903b892a1c9db6d28"
+                },
+                "draft": null
+              },
+              "B": {
+                "name": "Synthetic shared",
+                "topics": [
+                  "ns_fe71bf071b183b463db57b4a"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "config.json": {
+                    "bytes": 452,
+                    "sha256": "a95e0b12a453cbe109630c860fcfd58459091f3a85696b5966169488a0d6f976"
+                  },
+                  "config.json.backup": {
+                    "bytes": 298,
+                    "sha256": "e0c696069b3f0750727da113b0e964bd1b82de56c96d3224ae3bc5ded2deb71c"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 1,
+                  "hash": "113be176f659dbe5ec224d2afc4eabdd756abcc74ae986d903b892a1c9db6d28"
+                },
+                "draft": null
+              }
+            }
+          },
+          "after": {
+            "central": {
+              "versions": [
+                {
+                  "version": 1,
+                  "hash": "113be176f659dbe5ec224d2afc4eabdd756abcc74ae986d903b892a1c9db6d28"
+                },
+                {
+                  "version": 2,
+                  "hash": "7d3347fd546337cd2a24f964f25b3b54935242170fd2b404e39c14968970c494"
+                }
+              ],
+              "changes": [
+                {
+                  "seq": 1,
+                  "kind": "created",
+                  "version": 1
+                },
+                {
+                  "seq": 10,
+                  "kind": "config",
+                  "version": 2
+                }
+              ],
+              "receipts": [
+                {
+                  "principal": "desktop:deviceA",
+                  "op_id": "native_8c413b68dfd372fc38dc9a31928491d7133e1dfb",
+                  "request_hash": "e15089a17e346c9415be5edaf900eb5afba8486e52dd289eb8ecb324cb0dae83",
+                  "version": 2
+                }
+              ]
+            },
+            "disks": {
+              "A": {
+                "name": "Synthetic name and avatar saved together",
+                "topics": [
+                  "ns_fe71bf071b183b463db57b4a"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "avatar.png": {
+                    "bytes": 5775,
+                    "sha256": "4fdc2aeeecf0016aff42028894eb9d3dfa2bf50b86da962a882e6d0f80a6c71c"
+                  },
+                  "config.json": {
+                    "bytes": 1655,
+                    "sha256": "0af41baeb91425c0eaff34e18420e941dd5b0f5ddf5a5febcc079ff037b4cf32"
+                  },
+                  "config.json.backup": {
+                    "bytes": 476,
+                    "sha256": "8e8dc252519284f26fbf5083136360800c9e851ba0813ca1ee427e3585c9a74f"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "7d3347fd546337cd2a24f964f25b3b54935242170fd2b404e39c14968970c494"
+                },
+                "draft": null
+              },
+              "B": {
+                "name": "Synthetic name and avatar saved together",
+                "topics": [
+                  "ns_fe71bf071b183b463db57b4a"
+                ],
+                "model": "synthetic",
+                "files": {
+                  "avatar.png": {
+                    "bytes": 5775,
+                    "sha256": "4fdc2aeeecf0016aff42028894eb9d3dfa2bf50b86da962a882e6d0f80a6c71c"
+                  },
+                  "config.json": {
+                    "bytes": 476,
+                    "sha256": "8e8dc252519284f26fbf5083136360800c9e851ba0813ca1ee427e3585c9a74f"
+                  },
+                  "config.json.backup": {
+                    "bytes": 452,
+                    "sha256": "a95e0b12a453cbe109630c860fcfd58459091f3a85696b5966169488a0d6f976"
+                  },
+                  "regex_rules.json": {
+                    "bytes": 2,
+                    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+                  }
+                },
+                "projection": {
+                  "version": 2,
+                  "hash": "7d3347fd546337cd2a24f964f25b3b54935242170fd2b404e39c14968970c494"
+                },
+                "draft": null
+              }
+            }
+          },
+          "observed": {
+            "A": [
+              {
+                "event": "config-probe-save",
+                "saveId": 4,
+                "localId": "ns_d165c133e6325809c4192e08",
+                "name": "Synthetic name and avatar saved together",
+                "sharedId": "shared_908e74d77002406fb1256aad1ccac199",
+                "baseVersion": 1
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 4,
+                "ref": 5,
+                "id": "shared_908e74d77002406fb1256aad1ccac199",
+                "version": 1,
+                "hash": "113be176f659dbe5ec224d2afc4eabdd756abcc74ae986d903b892a1c9db6d28",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedRuntime.observeConfigs (modules/services/nativeSync/sharedRuntime.js:85:4)",
+                  "at modules/services/nativeSync/sharedRuntime.js:61:16",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:137:36)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)"
+                ],
+                "hasKnownVersion": true,
+                "hasDirectoryVersion": true,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 4,
+                "ref": 6,
+                "id": "shared_908e74d77002406fb1256aad1ccac199",
+                "version": 2,
+                "hash": "7d3347fd546337cd2a24f964f25b3b54935242170fd2b404e39c14968970c494",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:93:9)",
+                  "at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:159:17)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)",
+                  "at async saveNativeOwnerConfig (modules/services/nativeSync/nativeConfigSave.js:67:16)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 4,
+                "ref": 6,
+                "id": "shared_908e74d77002406fb1256aad1ccac199",
+                "version": 2,
+                "hash": "7d3347fd546337cd2a24f964f25b3b54935242170fd2b404e39c14968970c494",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.receiveNow (modules/services/nativeSync/sharedConfigReplica.js:60:8)",
+                  "at SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:101:25)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:159:17)",
+                  "at async save (modules/services/nativeSync/nativeConfigSave.js:38:32)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-validate",
+                "saveId": 4,
+                "ref": 7,
+                "id": "shared_908e74d77002406fb1256aad1ccac199",
+                "version": 2,
+                "hash": "7d3347fd546337cd2a24f964f25b3b54935242170fd2b404e39c14968970c494",
+                "callSite": [
+                  "at value.validateConfig (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:31:27)",
+                  "at SharedConfigReplica.validate (modules/services/nativeSync/sharedConfigReplica.js:26:19)",
+                  "at SharedConfigReplica.checkCurrent (modules/services/nativeSync/sharedConfigReplica.js:28:8)",
+                  "at SharedConfigReplica.recover (modules/services/nativeSync/sharedConfigReplica.js:34:8)",
+                  "at SharedConfigReplica.receiveNow (modules/services/nativeSync/sharedConfigReplica.js:70:132)",
+                  "at async SharedConfigReplica.publishNow (modules/services/nativeSync/sharedConfigReplica.js:101:14)",
+                  "at async saveShared (modules/services/nativeSync/nativeConfigSave.js:159:17)"
+                ],
+                "hasKnownVersion": false,
+                "hasDirectoryVersion": false,
+                "ok": true
+              },
+              {
+                "event": "config-probe-native-write",
+                "saveId": 4,
+                "localId": "ns_d165c133e6325809c4192e08",
+                "method": "writeAgentConfigLocked",
+                "name": "Synthetic name and avatar saved together",
+                "callSite": [
+                  "at value.<computed> (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:82:103)",
+                  "at AgentConfigManager.processQueue (modules/utils/agentConfigManager.js:241:42)"
+                ]
+              },
+              {
+                "event": "config-probe-host-write",
+                "saveId": 4,
+                "kind": "agent",
+                "localId": "ns_d165c133e6325809c4192e08",
+                "method": "writeOwner",
+                "name": "Synthetic name and avatar saved together"
+              },
+              {
+                "event": "config-probe-native-write",
+                "saveId": 4,
+                "localId": "ns_d165c133e6325809c4192e08",
+                "method": "writeAgentConfigLocked",
+                "name": "Synthetic name and avatar saved together",
+                "callSite": [
+                  "at value.<computed> (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:82:103)",
+                  "at AgentConfigManager.processQueue (modules/utils/agentConfigManager.js:241:42)"
+                ]
+              },
+              {
+                "event": "config-probe-host-write",
+                "saveId": 4,
+                "kind": "agent",
+                "localId": "ns_d165c133e6325809c4192e08",
+                "method": "writeNativeExtras",
+                "name": "Synthetic name and avatar saved together"
+              },
+              {
+                "event": "config-probe-result",
+                "saveId": 4,
+                "success": true,
+                "sharedVersion": 2
+              }
+            ],
+            "B": [
+              {
+                "event": "config-probe-host-write",
+                "kind": "agent",
+                "localId": "ns_d165c133e6325809c4192e08",
+                "method": "writeOwner",
+                "name": "Synthetic name and avatar saved together"
+              }
+            ]
+          },
+          "preSaveChecks": {
+            "A": [
+              {
+                "saveId": 4,
+                "observed": 1,
+                "repeated": 0,
+                "other": 3
+              }
+            ],
+            "B": []
+          },
+          "posts": [
+            {
+              "status": 200,
+              "dropped": false,
+              "opId": "native_8c413b68dfd372fc38dc9a31928491d7133e1dfb",
+              "expectedVersion": 1,
+              "name": "Synthetic name and avatar saved together"
+            }
+          ]
+        }
+      }
+    },
+    "local": {
+      "mode": "local-only",
+      "runtime": {
+        "A": {
+          "electron": "44.9.3",
+          "sandbox": true
+        },
+        "B": {
+          "electron": "44.9.3",
+          "sandbox": true
+        }
+      },
+      "loadedMain": [
+        {
+          "file": "apps/desktop/modules/services/nativeSync/nativeConfigSave.js",
+          "sha256": "335f8201b65e1cbda03117a74e5c3d3ead0e8d597a03c25286cd83bd58bb7732"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedHost.js",
+          "sha256": "a4269cc0e6e1e85e4862a06e5ef4247cc6daec4c6d57f7efa0082c1f98122f19"
+        }
+      ],
+      "providerCalls": 0,
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "cases": {
+        "local": {
+          "before": {
+            "name": "Synthetic local",
+            "topics": [
+              "local-topic"
+            ],
+            "model": "synthetic",
+            "files": {
+              "config.json": {
+                "bytes": 218,
+                "sha256": "7303b9ab95bcef26a2961f95e696169be1906f653a4df2c42b06d6668d972a49"
+              }
+            }
+          },
+          "after": {
+            "name": "Synthetic local native form rename",
+            "topics": [
+              "local-topic"
+            ],
+            "model": "synthetic",
+            "files": {
+              "config.json": {
+                "bytes": 1554,
+                "sha256": "0dfd0c908c0c18314555a09f0e812fa22e1a21ab6ac4d07b9210cc82f358d851"
+              },
+              "config.json.backup": {
+                "bytes": 218,
+                "sha256": "7303b9ab95bcef26a2961f95e696169be1906f653a4df2c42b06d6668d972a49"
+              }
+            }
+          },
+          "central": {
+            "versions": 7,
+            "receipts": 26
+          },
+          "observed": [
+            {
+              "event": "config-probe-save",
+              "saveId": 1,
+              "localId": "local-agent",
+              "name": "Synthetic local native form rename"
+            },
+            {
+              "event": "config-probe-local-owner",
+              "saveId": 1,
+              "localId": "local-agent"
+            },
+            {
+              "event": "config-probe-native-write",
+              "saveId": 1,
+              "localId": "local-agent",
+              "method": "writeAgentConfigLocked",
+              "name": "Synthetic local native form rename",
+              "callSite": [
+                "at value.<computed> (/tmp/ns-menu.pJgDuS/config/config-electron.cjs:82:103)",
+                "at AgentConfigManager.processQueue (modules/utils/agentConfigManager.js:241:42)"
+              ]
+            },
+            {
+              "event": "config-probe-result",
+              "saveId": 1,
+              "success": true
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -137,9 +137,9 @@ async function saveShared(runtime, object, localId, raw, avatar, avatarOnly) {
         const { object: latest } = await runtime.send(configRoute + '?' + new URLSearchParams({
             sharedSpaceId: runtime.connection.sharedSpaceId, sharedId: id,
         }));
+        // The shared config GET verifies the response hash and version before returning.
         if (latest?.id !== id || latest.kind !== kind) throw fail('SHARED_CONFIG_RESPONSE_INVALID');
         if (latest.deleted) throw fail('SHARED_OBJECT_DELETED');
-        runtime.configs.validate(latest);
         if (avatarOnly && marker.version !== latest.version) throw fail('SHARED_CONFIG_CONFLICT');
         // The launcher changes one field. Preserve the server's remaining
         // configuration while the observed version still governs the write.

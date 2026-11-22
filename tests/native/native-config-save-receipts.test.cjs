@@ -283,3 +283,33 @@ test('keeping an advanced conflict draft commits a fresh operation on the rebase
     assert.equal((await readJson(file)).name, staleForm.name);
     assert.equal(await readDraft(), undefined);
 });
+
+test('a malformed config GET is rejected before an Agent form can submit or write locally', async t => {
+    const service = await fixture(t);
+    const desktop = await service.desktop('A');
+    const {runtime, data, descriptor} = desktop;
+    const filename = path.join(data, 'Agents', descriptor.itemId, 'config.json');
+    const before = await fs.readFile(filename, 'utf8');
+    const original = service.shared.get(service.actor('A'), 'sharedAB', service.owner.id);
+    const form = runtime.decorateNativeConfig('agent', descriptor.itemId, JSON.parse(before));
+    let reads = 0, posts = 0, localSaves = 0;
+    service.control.beforeRequest = (req, res, next) => {
+        if (!req.path.endsWith('/shared/config')) return next();
+        if (req.method === 'POST') posts++;
+        if (req.method === 'GET' && req.query.sharedId === original.id) {
+            reads++;
+            return res.json({object:{...original, config:{...original.config, name:'Unverified label'}}});
+        }
+        return next();
+    };
+    const result = await saveNativeOwnerConfig({
+        root:data, kind:'agent', localId:descriptor.itemId, config:{...form,name:'Edited label'},
+        saveLocal:()=>{localSaves++;},
+    });
+    assert.deepEqual(result, {success:false,error:'SHARED_CONFIG_RESPONSE_INVALID'});
+    assert.equal(reads, 1);
+    assert.equal(posts, 0);
+    assert.equal(localSaves, 0);
+    assert.equal(await fs.readFile(filename, 'utf8'), before);
+    assert.deepEqual(service.shared.get(service.actor('A'), 'sharedAB', original.id), original);
+});
