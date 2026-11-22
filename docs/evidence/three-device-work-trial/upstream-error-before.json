@@ -1,0 +1,75 @@
+{
+  "first": {
+    "work": {
+      "kind": "shared_session",
+      "state": "publishing",
+      "attempts": 1,
+      "error_code": null,
+      "user_message_id": "upstream-error-stream-shared-session",
+      "reply_message_id": null,
+      "pending_operation": "{\"ownerType\":\"agent\",\"ownerId\":\"shared_27b399bf812f4bbe8c5fd2ce9dae4b1d\",\"topicId\":\"shared_f3bfcbfadeb84d659529242b48d5697e\",\"msgId\":\"reply_request_0a47d3aada40477b9f1272ecdb6a8fcb\",\"deviceId\":\"server:native-execution\",\"opId\":\"reply:request_0a47d3aada40477b9f1272ecdb6a8fcb\",\"action\":\"upsert\",\"baseHash\":null,\"message\":{\"id\":\"reply_request_0a47d3aada40477b9f1272ecdb6a8fcb\",\"role\":\"assistant\",\"content\":\"[UPSTREAM_ERROR] 上游API返回状态码 502，错误信息: {\\\"error\\\":{\\\"message\\\":\\\"SYNTHETIC_UPSTREAM_502\\\"}}\",\"timestamp\":1795368830197,\"agentId\":\"shared_27b399bf812f4bbe8c5fd2ce9dae4b1d\",\"name\":\"Synthetic shared\",\"continuity\":{\"version\":1,\"known\":true,\"requestId\":\"upstream-error-stream-shared-session\",\"executionId\":\"request_0a47d3aada40477b9f1272ecdb6a8fcb\",\"dependsOnMessageIds\":[\"upstream-error-stream-shared-session\"]}},\"metadata\":{\"version\":1,\"hash\":\"eb1e00dcb0ec45dcdd61530597dfa571d5793bfb8ba9c6deeec65bf386f7505e\",\"fields\":{\"continuity\":{\"version\":1,\"known\":true,\"requestId\":\"upstream-error-stream-shared-session\",\"executionId\":\"request_0a47d3aada40477b9f1272ecdb6a8fcb\",\"dependsOnMessageIds\":[\"upstream-error-stream-shared-session\"]}}}}",
+      "native_final_operation": null
+    },
+    "admission": {
+      "state": "review_required",
+      "dispatched": 1,
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "native": [
+      {
+        "state": "unknown"
+      }
+    ],
+    "history": [
+      {
+        "id": "upstream-error-stream-shared-session",
+        "action": "upsert"
+      }
+    ],
+    "providerStreams": [
+      true
+    ]
+  },
+  "afterReplay": {
+    "work": {
+      "kind": "shared_session",
+      "state": "publishing",
+      "attempts": 1,
+      "error_code": null,
+      "user_message_id": "upstream-error-stream-shared-session",
+      "reply_message_id": null,
+      "pending_operation": "{\"ownerType\":\"agent\",\"ownerId\":\"shared_27b399bf812f4bbe8c5fd2ce9dae4b1d\",\"topicId\":\"shared_f3bfcbfadeb84d659529242b48d5697e\",\"msgId\":\"reply_request_0a47d3aada40477b9f1272ecdb6a8fcb\",\"deviceId\":\"server:native-execution\",\"opId\":\"reply:request_0a47d3aada40477b9f1272ecdb6a8fcb\",\"action\":\"upsert\",\"baseHash\":null,\"message\":{\"id\":\"reply_request_0a47d3aada40477b9f1272ecdb6a8fcb\",\"role\":\"assistant\",\"content\":\"[UPSTREAM_ERROR] 上游API返回状态码 502，错误信息: {\\\"error\\\":{\\\"message\\\":\\\"SYNTHETIC_UPSTREAM_502\\\"}}\",\"timestamp\":1795368830197,\"agentId\":\"shared_27b399bf812f4bbe8c5fd2ce9dae4b1d\",\"name\":\"Synthetic shared\",\"continuity\":{\"version\":1,\"known\":true,\"requestId\":\"upstream-error-stream-shared-session\",\"executionId\":\"request_0a47d3aada40477b9f1272ecdb6a8fcb\",\"dependsOnMessageIds\":[\"upstream-error-stream-shared-session\"]}},\"metadata\":{\"version\":1,\"hash\":\"eb1e00dcb0ec45dcdd61530597dfa571d5793bfb8ba9c6deeec65bf386f7505e\",\"fields\":{\"continuity\":{\"version\":1,\"known\":true,\"requestId\":\"upstream-error-stream-shared-session\",\"executionId\":\"request_0a47d3aada40477b9f1272ecdb6a8fcb\",\"dependsOnMessageIds\":[\"upstream-error-stream-shared-session\"]}}}}",
+      "native_final_operation": null
+    },
+    "admission": {
+      "state": "review_required",
+      "dispatched": 1,
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "native": [
+      {
+        "state": "unknown"
+      }
+    ],
+    "history": [
+      {
+        "id": "upstream-error-stream-shared-session",
+        "action": "upsert"
+      }
+    ],
+    "providerStreams": [
+      true
+    ]
+  },
+  "wireFrames": [
+    {
+      "status": 200,
+      "upstreamStatus": 502,
+      "contentType": "text/event-stream",
+      "chunk": "data: {\"id\":\"chatcmpl-VCP-upstream-error-1795368830188\",\"object\":\"chat.completion.chunk\",\"created\":1795368830,\"model\":\"synthetic\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"[UPSTREAM_ERROR] 上游API返回状态码 502，错误信息: {\\\"error\\\":{\\\"message\\\":\\\"SYNTHETIC_UPSTREAM_502\\\"}}\"},\"finish_reason\":\"stop\"}]}\n\n"
+    }
+  ],
+  "replayed": true
+}

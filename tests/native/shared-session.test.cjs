@@ -10,6 +10,22 @@ test('JSON requires an explicit terminal for streaming and explicit non-streamin
  await assert.rejects(run(true),{code:'STREAM_INCOMPLETE_REVIEW_REQUIRED'});
  reason='stop';assert.equal((await run(true)).content,'synthetic text');reason=undefined;await assert.rejects(run(false),{code:'STREAM_INCOMPLETE_REVIEW_REQUIRED'});
 });
+test('a ToolBox SSE rejection is neither an assistant delta nor terminal reply evidence',async t=>{
+ const http=require('node:http'),{nativeResponse}=require(BOX+'/Plugin/NativeSync/mobile/nativeResponse');
+ const server=http.createServer((req,res)=>{
+  req.resume();
+  res.writeHead(200,{'content-type':'text/event-stream','X-VCP-Upstream-Status':'401'});
+  res.end('data: {"choices":[{"delta":{"content":"synthetic provider error body"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const deltas=[],chunks=[],observations=[];
+ const result=await nativeResponse({endpoint:{url:`http://127.0.0.1:${server.address().port}/v1/chat/completions`,key:'synthetic-only'},
+  body:{stream:true},controller:new AbortController(),onDelta:delta=>deltas.push(delta),
+  observation:{chunk:chunk=>chunks.push(chunk),finish:outcome=>observations.push(outcome)}});
+ assert.deepEqual(result,{modelError:true,httpStatus:401,content:''});
+ assert.deepEqual(deltas,[]);assert.deepEqual(chunks,[]);
+ assert.deepEqual(observations,[{error:{name:'NativeExecution',message:'MODEL_RESPONSE_UNCONFIRMED'}}]);
+});
 function submission(f,id='session-user-request'){
  const context=f.shared.executionConfig(f.actor('A'),{sharedSpaceId:'sharedAB',sharedId:f.topic.id});
  return {sharedSpaceId:'sharedAB',sharedId:f.topic.id,requestId:id,expectedHead:context.head,configHash:context.hash,message:{id:'user_'+id,role:'user',content:'one immutable session input',timestamp:1}};

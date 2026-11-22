@@ -28,10 +28,18 @@ async function nativeResponse({endpoint,body,controller,headerTimeoutMs=120000,i
  };
  try{
   const response=await fetch(endpoint.url,{method:'POST',headers:{...headers,Authorization:`Bearer ${endpoint.key}`,'Content-Type':'application/json'},redirect:'error',signal:controller.signal,body:JSON.stringify(body)});
-  if(!response.ok){const status=response.status;try{await response.body?.cancel();}catch{}return {modelError:true,httpStatus:status,content:''};}
-  phase='body';arm();
   const type=response.headers.get('content-type')||'';
-  if(!body.stream||!type.includes('text/event-stream')){
+  const streaming=body.stream&&type.includes('text/event-stream');
+  // ToolBox wraps upstream rejections in SSE with HTTP 200 for native clients.
+  // The wrapped text is an error notice, so discard it before observing deltas.
+  const upstreamStatus=streaming?response.headers.get('x-vcp-upstream-status'):null;
+  if(!response.ok||(/^[1-5]\d{2}$/.test(upstreamStatus)&&upstreamStatus!=='200')){
+   const status=response.ok?Number(upstreamStatus):response.status;
+   try{await response.body?.cancel();}catch{}
+   return {modelError:true,httpStatus:status,content:''};
+  }
+  phase='body';arm();
+  if(!streaming){
    let raw='';const decoder=new TextDecoder('utf-8',{fatal:true});for await(const chunk of response.body){arm();raw+=decoder.decode(chunk,{stream:true});if(Buffer.byteLength(raw)>MAX_OUTPUT)throw error('MODEL_RESPONSE_BUDGET_REVIEW_REQUIRED');}raw+=decoder.decode();
    let value;try{value=JSON.parse(raw);}catch{throw error('INVALID_MODEL_RESULT_REVIEW_REQUIRED');}
    if(!value||typeof value!=='object'||Array.isArray(value))throw error('INVALID_MODEL_RESULT_REVIEW_REQUIRED');

@@ -1,0 +1,32 @@
+{
+  "workId": "request_e1863a6577144c34843d58c856a46dfd",
+  "modelError": "ECONNREFUSED",
+  "before": {
+    "id": "request_e1863a6577144c34843d58c856a46dfd",
+    "request_id": "msg_1795368587893_user_1mn9kgmv1q",
+    "state": "publishing",
+    "kind": "shared_session",
+    "attempts": 1,
+    "request_dispatched": 1,
+    "user_message_id": "msg_1795368587893_user_1mn9kgmv1q",
+    "user_seq": 3,
+    "reply_message_id": null,
+    "error_code": null
+  },
+  "after": {
+    "id": "request_e1863a6577144c34843d58c856a46dfd",
+    "request_id": "msg_1795368587893_user_1mn9kgmv1q",
+    "state": "cancelled",
+    "kind": "shared_session",
+    "attempts": 1,
+    "request_dispatched": 1,
+    "user_message_id": "msg_1795368587893_user_1mn9kgmv1q",
+    "user_seq": 3,
+    "reply_message_id": null,
+    "error_code": null
+  },
+  "journalUnchanged": true,
+  "providerCountBefore": 2,
+  "providerCountAfter": 2,
+  "userConfirmed": true
+}

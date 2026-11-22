@@ -1,0 +1,75 @@
+{
+  "first": {
+    "work": {
+      "kind": "shared_session",
+      "state": "review_required",
+      "attempts": 1,
+      "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+      "user_message_id": "upstream-error-stream-shared-session",
+      "reply_message_id": null,
+      "pending_operation": null,
+      "native_final_operation": null
+    },
+    "admission": {
+      "state": "review_required",
+      "dispatched": 1,
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "native": [
+      {
+        "state": "unknown"
+      }
+    ],
+    "history": [
+      {
+        "id": "upstream-error-stream-shared-session",
+        "action": "upsert"
+      }
+    ],
+    "providerStreams": [
+      true
+    ]
+  },
+  "afterReplay": {
+    "work": {
+      "kind": "shared_session",
+      "state": "review_required",
+      "attempts": 1,
+      "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+      "user_message_id": "upstream-error-stream-shared-session",
+      "reply_message_id": null,
+      "pending_operation": null,
+      "native_final_operation": null
+    },
+    "admission": {
+      "state": "review_required",
+      "dispatched": 1,
+      "native_terminal": 0,
+      "reply_seq": null
+    },
+    "native": [
+      {
+        "state": "unknown"
+      }
+    ],
+    "history": [
+      {
+        "id": "upstream-error-stream-shared-session",
+        "action": "upsert"
+      }
+    ],
+    "providerStreams": [
+      true
+    ]
+  },
+  "wireFrames": [
+    {
+      "status": 200,
+      "upstreamStatus": 502,
+      "contentType": "text/event-stream",
+      "chunk": "data: {\"id\":\"chatcmpl-VCP-upstream-error-1795368827545\",\"object\":\"chat.completion.chunk\",\"created\":1795368827,\"model\":\"synthetic\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"[UPSTREAM_ERROR] 上游API返回状态码 502，错误信息: {\\\"error\\\":{\\\"message\\\":\\\"SYNTHETIC_UPSTREAM_502\\\"}}\"},\"finish_reason\":\"stop\"}]}\n\n"
+    }
+  ],
+  "replayed": true
+}
