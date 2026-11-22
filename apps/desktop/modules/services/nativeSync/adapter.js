@@ -382,7 +382,7 @@ class NativeSyncAdapter {
         return record;
     }
     async confirmLocal(d,id,revision,history) {
-        let changes;
+        let changes, hasWireOperations;
         await this.transaction(next=>{
             const key=this.topicKey(d),record=next.localCommits[key];
             if(!record||record.id!==id||record.afterRevision!==revision)throw fail('LOCAL_COMMIT_CONFIRMATION_MISMATCH');
@@ -390,6 +390,7 @@ class NativeSyncAdapter {
             for(const op of record.operations)if(!ids.has(op.opId))next.outbox.push(op);
             next.receipts[id]={id,source:record.source,beforeRevision:record.beforeRevision,afterRevision:record.afterRevision,opIds:record.operations.map(op=>op.opId),state:record.operations.length?'saved_pending':'local_only'};
             changes=record.attachmentChanges;
+            hasWireOperations=record.operations.length>0;
             delete next.localCommits[key];
             const completed=Object.keys(next.receipts).filter(k=>['synced','local_only'].includes(next.receipts[k].state));
             while(completed.length>256)delete next.receipts[completed.shift()];
@@ -398,6 +399,7 @@ class NativeSyncAdapter {
             const saved=new Map(history.map(m=>[m.id,m]));
             for (const {id,ids} of changes) this.attachmentCommitted(d,id,ids,saved.get(id),true);
         }
+        if (hasWireOperations) this.onLocalWork?.();
     }
     attachmentCommitted(d,id,ids,message,upload) {
         if (!ids.length || !this.attachmentRecovery) return;

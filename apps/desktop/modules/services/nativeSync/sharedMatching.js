@@ -8,7 +8,7 @@ class SharedMatching {
  static async open(r){const m=new SharedMatching(r),loaded=await ownedJson(r.root,m.file,{optional:true});if(loaded){if(loaded.version!==1||stable(loaded.binding)!==stable(r.binding()))throw fail('SHARED_BINDING_CHANGED');m.state=loaded;}return m;}
  constructor(r){this.r=r;this.file=path.join(r.dir,'matching.json');this.state={version:1,binding:r.binding(),plans:{}};this.tail=Promise.resolve();}
  serial(fn){const next=this.tail.catch(()=>{}).then(fn);this.tail=next;return next;}
- save(){return durableJson(this.file,this.state);}
+ async save(){await durableJson(this.file,this.state);this.r.planTick?.();}
  fenced(id){return Object.values(this.state.plans).some(p=>!done.has(p.status)&&p.plan.objects.some(o=>o.id===id));}
  assert(ids){if(ids.some(id=>this.fenced(id)))throw fail('SHARED_MATCH_PREPARING');}
  viewScope(){const local=new Set(),shared=new Set();for(const p of Object.values(this.state.plans).filter(p=>!done.has(p.status)))for(const o of p.plan.objects){shared.add(o.id);for(const l of [p.before?.locals[o.id],this.r.state.locals[o.id]])if(l)local.add(l.kind==='topic'?l.localParent:l.localId);}return {localIds:[...local],sharedIds:[...shared]};}

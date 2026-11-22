@@ -53,12 +53,12 @@ class SharedDirectory {
    try { await this.bindings(); }
    catch(error) { return {removed:mode,sharedId,warning:'已移除，本机绑定列表尚未刷新：'+(error.code||error.message)}; }
    return {removed:mode,sharedId};
-  }finally{r.directoryPaused=false;}
+  }finally{r.directoryPaused=false;r.scheduleTick();}
  }
  async tombstones(){const r=this.r;for(const kind of ['agent','group','topic'])for(const o of Object.values(r.state.objects).filter(o=>o.kind===kind&&o.deleted&&r.state.locals[o.id]&&!r.state.locals[o.id].aliasOf)){const old=r.state.localRemovals[o.id];if(old?.stage==='removed')continue;const operation=r.state.localRemovals[o.id]={stage:'accepted',moves:this.paths(o.id),tombstone:true};await r.save();await this.archive(o.id,operation);}}
  async restore({sharedId,confirmed}){
   const r=this.r;r.matching?.assert([sharedId]);const o=r.state.objects[sharedId];if(!o||o.deleted)throw fail('SHARED_OBJECT_DELETED');if(confirmed!==true)throw fail('SHARED_RESTORE_CONFIRMATION_REQUIRED');if(o.parentId&&!this.visible(o.parentId))throw fail('SHARED_PARENT_NOT_LOCAL');const operation=r.state.localRemovals[sharedId];if(!operation||operation.stage!=='removed')throw fail('SHARED_LOCAL_REMOVAL_REQUIRED');
-  r.directoryPaused=true;await r.running;try{operation.restoreOpId||=randomUUID();operation.stage='restoring';await r.save();await this.restoreNow(sharedId,operation);return {restored:true,sharedId};}finally{r.directoryPaused=false;}
+  r.directoryPaused=true;await r.running;try{operation.restoreOpId||=randomUUID();operation.stage='restoring';await r.save();await this.restoreNow(sharedId,operation);return {restored:true,sharedId};}finally{r.directoryPaused=false;r.scheduleTick();}
  }
  async restoreNow(id,operation){
   if(authorityControl.authorityFor(this.r))return authorityControl.withAuthority(authorityControl.authorityFor(this.r),'shared-directory-restoreNow',()=>this.restoreNowPrepared(id,operation));

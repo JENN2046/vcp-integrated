@@ -21,8 +21,29 @@ class AttachmentWork {
         this.owner = owner;
         this.groups = new Map();
         this.nextCheck = 0;
+        this.inventoried = false;
+        this.inventoryRetryAt = 0;
     }
     shouldRun() { return Boolean(this.running) || this.owner.now() >= this.nextCheck; }
+
+    // The attachment queue uses a monotonic clock. Expose a wall-clock
+    // deadline only at the boundary to the shared desktop scheduler.
+    nextDueAt() {
+        const now = this.owner.now();
+        let earliest = this.inventoried ? Infinity : 0;
+        for (const group of this.groups.values()) {
+            if (!group.scanned) earliest = 0;
+            for (const job of group.jobs.values()) earliest = Math.min(earliest, job.due);
+        }
+        if (this.inventoryRetryAt) earliest = Math.max(this.inventoryRetryAt, earliest === Infinity ? 0 : earliest);
+        return earliest === Infinity ? Infinity : Date.now() + Math.max(0, earliest - now);
+    }
+
+    changed() {
+        this.nextCheck = 0;
+        this.inventoryRetryAt = 0;
+        this.onWake?.();
+    }
 
     group(d) {
         const key = topicKey(d);
@@ -35,7 +56,6 @@ class AttachmentWork {
     }
     offer(d, messageId, ids, message, upload) {
         if (!ids.length) return;
-        this.nextCheck=0;
         const g = this.group(d), refs = references(message);
         for (const id of ids) {
             const key = workKey(messageId,id), ref = refs.get(id);
@@ -45,6 +65,7 @@ class AttachmentWork {
             const raw = {id:messageId, attachments:[ref], _nativeSyncMetadata:message._nativeSyncMetadata};
             g.jobs.set(key,{id,messageId,raw,upload,due:0});
         }
+        this.changed();
     }
     missingOnOpen(d, message, ref) {
         const key=workKey(message.id,attachmentId(ref));
@@ -52,13 +73,14 @@ class AttachmentWork {
         if (!group.jobs.has(key)) this.offer(d,message.id,[attachmentId(ref)],message,false);
     }
     invalidate(topic) {
-        this.nextCheck=0;
         for (const [key,g] of this.groups) if (g.topic===topic) this.groups.delete(key);
+        this.inventoried = false;
+        this.changed();
     }
     wakeReference(topic, messageId, id) {
         for (const g of this.groups.values()) if (g.topic===topic) {
             const job=g.jobs.get(workKey(messageId,id));
-            if (job) {this.nextCheck=0;job.due=0;job.wake=(job.wake || 0)+1;}
+            if (job) {job.due=0;job.wake=(job.wake || 0)+1;this.changed();}
         }
     }
     removeMessage(d,messageId) {
@@ -71,10 +93,10 @@ class AttachmentWork {
         }
     }
     wake(topic) {
-        this.nextCheck=0;
         for (const g of this.groups.values()) if (topic === undefined || g.topic === topic) {
             for (const job of g.jobs.values()) { job.due=0; job.wake=(job.wake || 0)+1; }
         }
+        this.changed();
     }
     async inventory(g) {
         const touched = g.duringScan = new Set();
@@ -90,7 +112,13 @@ class AttachmentWork {
     }
     run(topics, options={}) {
         if (this.running) return this.running;
-        this.running=this.drain(topics,options).finally(()=>{this.running=null;});
+        this.running=this.drain(topics,options).then(()=>{
+            this.inventoried = true;
+            this.inventoryRetryAt = 0;
+        },error=>{
+            this.inventoryRetryAt = this.owner.now() + 5000;
+            throw error;
+        }).finally(()=>{this.running=null;});
         return this.running;
     }
     async drain(topics,{readOnly=false}={}) {

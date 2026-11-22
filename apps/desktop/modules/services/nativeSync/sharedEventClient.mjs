@@ -44,7 +44,7 @@ async function nativeSnapshot(request, values, previous, maxChars) {
 
 // Shared execution events are projections, never History writes or dispatches.
 // The same parser runs in Electron's main process and the mobile browser.
-export async function consumeSharedEvents(response, onEvent, {signal, maxFrameBytes = 2 * 1024 * 1024, idleMs = 45000} = {}) {
+export async function consumeSharedEvents(response, onEvent, {signal, maxFrameBytes = 2 * 1024 * 1024, idleMs = 45000, onComment, envelope = false} = {}) {
     if (!response.ok || !response.headers.get('content-type')?.includes('text/event-stream')) {
         const code = response.status === 401 || response.status === 403 ? 'SHARED_EVENT_PERMISSION_REQUIRED' : 'SHARED_EVENTS_UNAVAILABLE';
         await response.body?.cancel(); throw problem(code);
@@ -62,11 +62,14 @@ export async function consumeSharedEvents(response, onEvent, {signal, maxFrameBy
     let buffer = '';
     const frame = async raw => {
         const lines = raw.split(/\r?\n/), data = lines.filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
-        if (!data) return;
+        if (!data) {
+            if (lines.some(line => line.startsWith(':'))) await onComment?.();
+            return;
+        }
         let event; try { event = JSON.parse(data); } catch { throw problem('SHARED_EVENT_MALFORMED'); }
         const type = lines.find(line => line.startsWith('event:'))?.slice(6).trim();
-        if (!event || typeof event !== 'object' || Array.isArray(event) || (type && event.type !== type)) throw problem('SHARED_EVENT_MALFORMED');
-        await onEvent(event);
+        if (!event || typeof event !== 'object' || Array.isArray(event) || (!envelope && type && event.type !== type)) throw problem('SHARED_EVENT_MALFORMED');
+        await onEvent(event, type);
     };
     try {
         while (!signal?.aborted) {

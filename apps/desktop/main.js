@@ -1812,6 +1812,7 @@ if (!gotTheLock) {
             const result = await historyWatcherLeases.start(ownerId, token, {
                 filePath,
                 callback: (changedPath) => {
+                    historyMutationQueue?.syncPolicy?.externalHistoryChanged?.(changedPath);
                     if (!sender.isDestroyed()) {
                         sender.send('history-file-updated', { path: changedPath, agentId, topicId });
                     }

@@ -38,26 +38,95 @@ async function readBody(req){
  const chunks=[];let size=0;for await(const chunk of req){size+=Buffer.byteLength(chunk);if(size>512*1024)throw fail('BODY_TOO_LARGE',413);chunks.push(Buffer.from(chunk));}
  try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw fail('INVALID_SHARED_REQUEST');}
 }
+function desktopBinding(req){
+ return {sourceId:req.headers?.['x-nativesync-source'],deviceId:req.headers?.['x-nativesync-device'],spaceId:req.headers?.['x-nativesync-space'],scopeHash:req.headers?.['x-nativesync-scope']};
+}
+function sharedInfo(shared,sourceId){
+ const policy=require('./releasePolicy.cjs');
+ const wait=require('./sharedWait');
+ const features=typeof shared.db.function==='function'?[wait.capability,wait.watchCapability]:[];
+ features.push('shared-model-save-v1');
+ if(!shared.configurationOnly)features.push(
+  'shared-compaction-v1','shared-topic-history-v1','shared-attachments-v1','shared-merge-v1','shared-context-v1',
+  require('./sharedInline.cjs').CAP,
+  ...(shared.native?[require('./sharedNative').NATIVE_INLINE_CAPABILITY]:[]),
+  ...(shared.native?.engine?[require('./sharedSession').CAPABILITY,'shared-execution-trace-v1','shared-session-cancel-v1',require('./sharedTopicSponsor').CAPABILITY]:[]),
+  ...(shared.events&&!shared.events.closed?['shared-events-v1']:[]),
+  ...(policy.sharedSteering?['shared-steering-v1']:[]),
+  ...(shared.native?.engine&&require('./sharedControlledText').enabled(shared,require('./sharedControlledText').TOOLS_MODE)?[require('./sharedControlledText').TOOLS_CAPABILITY,require('./sharedControlledText').TOOLS_HISTORY_CAPABILITY]:[]),
+  ...(shared.native?.engine&&policy.sharedControlledText?[require('./sharedControlledText').CAPABILITY]:[]),
+ );
+ return {capability:SHARED_SPACE_CAPABILITY,schemaVersion:1,features,readOnly:shared.readOnly,spaces:[...shared.grants].filter(([,sources])=>sources.has(sourceId)).map(([id])=>({id}))};
+}
+function openSharedWatch(store,req,res,url,onClose,heartbeatMs=15000){
+ const shared=store.shared;
+ if(!shared||typeof shared.db.function!=='function')throw fail('SHARED_WATCH_UNAVAILABLE',404);
+ const query=Object.fromEntries(url.searchParams);
+ fields(query,['sharedSpaceId','since']);
+ if(url.searchParams.size!==Object.keys(query).length)throw fail('INVALID_SHARED_REQUEST');
+ const {sharedSpaceId:space}=query;
+ const binding=desktopBinding(req),clientCapabilities=req.headers['x-nativesync-capabilities'];
+ const actor=shared.desktop(binding,clientCapabilities);
+ shared.authorize(actor,space);
+ const info=JSON.stringify(sharedInfo(shared,actor.sourceId));
+ const hub=require('./sharedWait').hub(shared);
+ let token=query.since,closed=false,timer,unsubscribe;
+ const close=()=>{
+  if(closed)return;
+  closed=true;
+  clearInterval(timer);
+  unsubscribe?.();
+  req.off('aborted',close);
+  res.off('close',close);
+  if(!res.writableEnded&&!res.destroyed)res.end();
+  onClose();
+ };
+ const write=frame=>{
+  if(!res.write(frame)){
+   // Hints need no backlog. Reconnect compares against the last received token.
+   res.destroy();
+   close();
+  }
+ };
+ const invalidate=reason=>{
+  write(`event: invalidate\ndata: ${JSON.stringify({reason})}\n\n`);
+  close();
+ };
+ const check=heartbeat=>{
+  if(closed)return;
+  if(res.destroyed||res.writableEnded){close();return;}
+  try{
+   if(store.shared!==shared){invalidate('capabilities_changed');return;}
+   if(shared.db.isTransaction)return;
+   try{shared.authorize(shared.desktop(binding,clientCapabilities),space);}
+   catch{invalidate('authorization_lost');return;}
+   if(JSON.stringify(sharedInfo(shared,actor.sourceId))!==info){invalidate('capabilities_changed');return;}
+   const value=hub.snapshot(actor,space,token);
+   if(value.changed.length){
+    token=value.token;
+    write(`event: hint\ndata: ${JSON.stringify(value)}\n\n`);
+   }else if(heartbeat)write(': heartbeat\n\n');
+  }catch{close();}
+ };
+ unsubscribe=hub.subscribe(actor,space,token,check);
+ try{
+  req.once('aborted',close);
+  res.once('close',close);
+  res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-store, no-transform','X-Accel-Buffering':'no'});
+  res.flushHeaders?.();
+  timer=setInterval(()=>check(true),heartbeatMs);
+  timer.unref?.();
+  check(true);
+ }catch(error){close();throw error;}
+ return {close};
+}
 async function sharedRequest(store,req,url,mobileActor,signal){
  const shared=store.shared;if(!shared)throw fail('SHARED_SPACE_UNAVAILABLE',409);
  const name=url.pathname.replace(/^\/shared\//,'');
- const binding={sourceId:req.headers?.['x-nativesync-source'],deviceId:req.headers?.['x-nativesync-device'],spaceId:req.headers?.['x-nativesync-space'],scopeHash:req.headers?.['x-nativesync-scope']};
+ const binding=desktopBinding(req);
  if(name==='info'&&req.method==='GET'&&!mobileActor){
   shared.catalog.binding(binding);
-  const policy=require('./releasePolicy.cjs');
-  const features=typeof shared.db.function==='function'?[require('./sharedWait').capability]:[];
-  features.push('shared-model-save-v1');
-  if(!shared.configurationOnly)features.push(
-   'shared-compaction-v1','shared-topic-history-v1','shared-attachments-v1','shared-merge-v1','shared-context-v1',
-   require('./sharedInline.cjs').CAP,
-   ...(shared.native?[require('./sharedNative').NATIVE_INLINE_CAPABILITY]:[]),
-   ...(shared.native?.engine?[require('./sharedSession').CAPABILITY,'shared-execution-trace-v1','shared-session-cancel-v1',require('./sharedTopicSponsor').CAPABILITY]:[]),
-   ...(shared.events&&!shared.events.closed?['shared-events-v1']:[]),
-   ...(policy.sharedSteering?['shared-steering-v1']:[]),
-   ...(shared.native?.engine&&require('./sharedControlledText').enabled(shared,require('./sharedControlledText').TOOLS_MODE)?[require('./sharedControlledText').TOOLS_CAPABILITY,require('./sharedControlledText').TOOLS_HISTORY_CAPABILITY]:[]),
-   ...(shared.native?.engine&&policy.sharedControlledText?[require('./sharedControlledText').CAPABILITY]:[]),
-  );
-  return {capability:SHARED_SPACE_CAPABILITY,schemaVersion:1,features,readOnly:shared.readOnly,spaces:[...shared.grants].filter(([,sources])=>sources.has(binding.sourceId)).map(([id])=>({id}))};
+  return sharedInfo(shared,binding.sourceId);
  }
  const actor=mobileActor||shared.desktop(binding,req.headers?.['x-nativesync-capabilities']);
  if(shared.configurationOnly&&!((req.method==='GET'&&configurationReads.has(name))||
@@ -133,4 +202,4 @@ async function sharedRequest(store,req,url,mobileActor,signal){
  }
  throw fail('METHOD_NOT_ALLOWED',405);
 }
-module.exports={sharedRequest};
+module.exports={sharedRequest,openSharedWatch};

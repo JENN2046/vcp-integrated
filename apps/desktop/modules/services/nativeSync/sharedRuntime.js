@@ -4,6 +4,11 @@ const path=require('node:path'),fs=require('node:fs/promises');
 const {randomUUID}=require('node:crypto');
 const {stable,sha256,fail,messageKey,messageHash,descriptor}=require('./protocol');
 const {ownedJson,readSettledSource,inspectShared}=require('./sharedLocal');
+const {SharedWaitClient,auditMs,lanes}=require('./sharedWaitClient');
+const recoveryDelay=1000;
+const denied=e=>[401,403].includes(e.status)||e.code==='SHARED_SPACE_NOT_APPROVED';
+const membershipDenied=e=>e.status===401||['SHARED_SPACE_NOT_APPROVED','SHARED_MEMBERSHIP_REQUIRED','SOURCE_SCOPE_REQUIRED','SOURCE_BINDING_REQUIRED'].includes(e.code);
+const permissionError=()=>fail('SHARED_WATCH_PERMISSION_REQUIRED');
 const {durableJson}=require('./durableJson');
 const {sourceDirectory}=require('./sourceDirectory');
 const {sharedConfig}=require('./contracts.generated.cjs');
@@ -36,12 +41,20 @@ class SharedRuntime {
   }
   return runtime;
  }
- constructor({queue,appDataRoot,connection,sharedHost,send,openEvents,notify=()=>{},notifyExecutionStatus=()=>{},intervalMs=1000,agentConfigEvents,download,storeAttachment,isStopping=()=>false,historyAuthority=authorityControl.authorityForQueue(queue)}){
-  Object.assign(this,{queue,root:path.resolve(appDataRoot),connection,host:sharedHost,send,openEvents,notify,notifyExecutionStatus,intervalMs,download,storeAttachment,isStopping});
+ constructor({queue,appDataRoot,connection,sharedHost,send,openEvents,openWatch,notify=()=>{},notifyExecutionStatus=()=>{},intervalMs=1000,agentConfigEvents,download,storeAttachment,isStopping=()=>false,historyAuthority=authorityControl.authorityForQueue(queue)}){
+  Object.assign(this,{queue,root:path.resolve(appDataRoot),connection,host:sharedHost,notify,notifyExecutionStatus,intervalMs,storeAttachment,isStopping});
+  this.accessController=new AbortController();
+  this.download=download&&((route,options)=>this.withSharedAccess(download,route,options));
+  this.openEvents=openEvents&&((query,options)=>this.withSharedAccess(openEvents,query,options));
+  this.proveMembership=()=>send(endpoint+'bindings?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId}));
   // All remote config GETs, including the settings editor and pre-save reads,
   // use the same acceptance rule before the caller can consume the response.
   this.send=(route,options)=>{
-   const response=send(route,options);
+   if(this.readOnly&&options?.body!==undefined)return Promise.reject(fail('SHARED_READ_ONLY'));
+   const response=route===endpoint+'info'?send(route,options):this.withSharedAccess(send,route,options).catch(error=>{
+    if(membershipDenied(error))this.denyShared();
+    throw error;
+   });
    if(options?.body)return response;
    if(route.startsWith(endpoint+'config?'))return response.then(async result=>{
     const id=new URLSearchParams(route.slice(route.indexOf('?')+1)).get('sharedId');
@@ -54,7 +67,12 @@ class SharedRuntime {
    return response;
   };
   this.trajectorySource=require('./trajectorySource').createTrajectorySource(this);
-  this.waitClient=new (require('./sharedWaitClient').SharedWaitClient)(send,connection.sharedSpaceId,()=>this.scheduleTick());
+  this.waitClient=new SharedWaitClient(send,connection.sharedSpaceId,reason=>{
+   if(reason==='reconnect')this.capabilityInvalidated=true;
+   this.scheduleTick();
+  },{openWatch,invalidate:error=>{
+   if(denied(error))this.denyShared();else{this.capabilityInvalidated=true;this.scheduleTick();}
+  }});
   authorityControl.bindAuthority(this,historyAuthority);
   this.dir=path.join(this.root,'.native-sync/shared',connection.sharedSpaceId);this.file=path.join(this.dir,'registry.json');
   this.closed=false;this.ready=false;this.error=null;this.optimisticEnabled=true;
@@ -68,7 +86,7 @@ class SharedRuntime {
   }
   await observeConfigVersions(this.root,this.connection,objects);
  }
- save(){const next=(this.registryDisk||Promise.resolve()).catch(()=>{}).then(()=>durableJson(this.file,this.state));this.registryDisk=next;return next;}
+ save(){const next=(this.registryDisk||Promise.resolve()).catch(()=>{}).then(async()=>{await durableJson(this.file,this.state);this.planTick();});this.registryDisk=next;return next;}
  async command(action,body){
   if(this.state.pending){const p=this.state.pending;if(p.action!==action||stable(p.body)!==stable(body))throw fail('SHARED_PENDING_REGISTRATION');}
   else{this.state.pending={action,body};await this.save();}
@@ -137,7 +155,7 @@ class SharedRuntime {
   this.configureHistoryPolicy(adapter);
   const diagnostics=adapter.diagnostics.bind(adapter);adapter.diagnostics=()=>{
    const ids=Object.keys(this.configs.state.drafts),blocking=ids.filter(id=>require('./sharedExecution').blocksExecution(this,id));
-   return {...diagnostics(),readOnly:false,configurationError:this.error||(blocking.length?'SHARED_CONFIG_CONFLICT':null),shared:{transportError:this.waitClient?.transportError,spaceId:this.connection.sharedSpaceId,objects:this.directoryEntries().length,ready:this.ready,configurationDrafts:ids.length,configurationConflicts:ids.filter(id=>this.configs.state.drafts[id].conflict===true).length,executionBlockingDrafts:blocking.length,steeringEnabled:this.capabilities.features?.includes('shared-steering-v1')===true}};
+   return {...diagnostics(),readOnly:this.readOnly,configurationError:this.error||(blocking.length?'SHARED_CONFIG_CONFLICT':null),shared:{transportError:this.waitClient?.transportError,spaceId:this.connection.sharedSpaceId,objects:this.directoryEntries().length,ready:this.ready,configurationDrafts:ids.length,configurationConflicts:ids.filter(id=>this.configs.state.drafts[id].conflict===true).length,executionBlockingDrafts:blocking.length,steeringEnabled:this.capabilities.features?.includes('shared-steering-v1')===true}};
   };
   await this.matching.poll();await this.directoryState.tombstones();
   await this.backfill({verifyExisting:true});await this.replica.sync();
@@ -152,12 +170,13 @@ class SharedRuntime {
   this.topicSponsor=new (require('./sharedTopicSponsor').SharedTopicSponsor)(this);
   this.topicSponsorRecovery=this.topicSponsor.recover().catch(error=>console.warn('[NativeSync] TopicSponsor recovery pending:',error.code||'UNKNOWN'));
   if(this.isStopping())throw fail('APPLICATION_SHUTTING_DOWN');
-  this.changed=()=>{this.dirty=true;};this.agentConfigEvents?.on?.('agent-config-updated',this.changed);adapter.directoryChanged=this.changed;
-  if(this.intervalMs>0){this.timer=setInterval(()=>this.scheduleTick(),this.intervalMs);this.timer.unref?.();}
+  this.changed=()=>{this.dirty=true;this.scheduleTick();};this.agentConfigEvents?.on?.('agent-config-updated',this.changed);adapter.directoryChanged=this.changed;
+  this.startScheduler();
  }
  configureHistoryPolicy(adapter){
   const beforeMutation=adapter.beforeMutation.bind(adapter),beforeWrite=adapter.beforeWrite.bind(adapter);
   adapter.beforeInitialize=async d=>{
+   this.assertSharedAccess();
    if(this.readOnly)throw fail('SHARED_READ_ONLY');
    if(this.closed||!this.ready)throw fail('SHARED_STARTUP_PENDING');
    const mapping=this.mappings().find(m=>m.shared.itemType===(d.itemType||'agent')&&m.shared.itemId===d.itemId&&m.shared.topicId===d.topicId);
@@ -194,6 +213,7 @@ class SharedRuntime {
   const result=await this.command(action,full);await this.recordCommand({action,body:full},result);await this.finishCommand();if((this.configs?.state.objects[result.object.id]?.version||0)>result.object.version)return (await this.send(endpoint+'config?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,sharedId:result.object.id}))).object;return result.object;
  }
  notifyDirectory(object,extra={}){
+  if(this.backgroundDenied)return;
   const local=object&&this.state.locals[object.id];if(!local||local.kind!==object.kind||local.aliasOf)return false;
   const change={...extra,kind:object.kind,id:local.localId,sharedId:object.id,sharedSpaceId:this.connection.sharedSpaceId,version:object.version,deleted:object.deleted===true};
   if(object.kind==='topic'){
@@ -336,25 +356,140 @@ class SharedRuntime {
  // transfer runs outside it; its eventual native history write rejoins this owner.
  serialCore(fn){const next=(this.coreTail||Promise.resolve()).catch(()=>{}).then(fn);this.coreTail=next;return next;}
  async mutateAttachment(d,change,options){return this.serialCore(async()=>{
+  this.assertSharedAccess();
   if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');
   const mapping=this.execution.mapping(d),owner=this.state.objects[mapping.sharedId]?.parentId;
   if(!this.isLocalVisible(mapping.sharedId))throw fail('SHARED_LOCAL_REMOVED');
   this.matching.assert([mapping.sharedId,owner]);
   return this.queue.mutate(d,change,options);
  });}
- scheduleTick(){
-  if(this.running||this.closed||this.directoryPaused)return;
-  this.running=Promise.resolve().then(()=>this.tick({background:true})).catch(e=>{this.waitClient.all();this.error=e.code||'SHARED_SYNC_FAILED'}).finally(()=>{this.running=null;});
+ startScheduler(){
+  if(this.intervalMs<=0)return;
+  this.nextAudit=Date.now()+auditMs-(parseInt(sha256(this.connection.deviceId).slice(0,8),16)%30000);
+  this.configureWatch();
+  this.adapter.onLocalWork=()=>this.scheduleTick('pull');
+  this.adapter.onHistoryHint=()=>this.scheduleTick();
+  if(this.attachments)this.attachments.work.onWake=()=>this.scheduleTick('attachments');
+  this.scheduleTick();
  }
- async tickCore({forceLocal=false,background=false}={}){
+ assertSharedAccess(){
+  if(this.backgroundDenied)throw permissionError();
+ }
+ async withSharedAccess(transport,query,options={}){
+  this.assertSharedAccess();
+  const access=this.accessController.signal;
+  const signal=options.signal?AbortSignal.any([access,options.signal]):access;
+  const result=await transport(query,{...options,signal});
+  if(access.aborted)throw permissionError();
+  return result;
+ }
+ denyShared(){
+  if(this.backgroundDenied)return;
+  this.backgroundDenied=true;this.capabilityInvalidated=true;
+  this.error=permissionError().code;
+  this.accessController.abort();
+  this.waitClient.close();
+  this.nativeTaskViews?.clear();
+  this.sessions?.invalidateAccess();
+  this.planTick();
+ }
+ configureWatch(){
+  const features=this.capabilities.features||[];
+  this.waitClient.configure(this.waitClient.openWatch&&features.includes('shared-watch-v1')?'watch':features.includes('shared-wait-v1'));
+ }
+ recoverableMessages(){
+  const a=this.adapter;
+  return Boolean(a?.degraded||a?.state.pending||a?.state.inbox.length||(!this.readOnly&&a?.state.outbox.some(op=>!op.status&&!a.outboundBlocked(op))));
+ }
+ recoverableDirectory(){
+  return !this.readOnly&&(this.state.pending||this.capabilities.features?.includes('shared-merge-v1')&&this.matching?.needsPoll()||
+   Object.values(this.state.localRemovals||{}).some(operation=>['pending','accepted','restoring'].includes(operation.stage))||
+   this.mappings().some(mapping=>this.isLocalVisible(mapping.sharedId)&&!this.state.baselines[mapping.sharedId]?.complete));
+ }
+ recoverableExecution(){
+  return !this.readOnly&&(this.execution?.needsReconcile()||this.sessions?.needsReconcile());
+ }
+ planTick(){
+  clearTimeout(this.timer);
+  if(this.closed||!this.nextAudit||this.directoryPaused||this.running)return;
+  // Legacy hosts retain their previous cadence. Watch hosts sleep until a
+  // notification, an unfinished obligation's deadline, or the repair audit.
+  const now=Date.now(),legacy=this.waitClient.mode!=='watch';
+  const attachmentDue=this.attachments?.work.nextDueAt?.()??Infinity;
+  const workDue=this.recoverableMessages()||this.recoverableDirectory()||this.recoverableExecution();
+  let due=Math.min(this.nextAudit,attachmentDue,workDue?(this.nextRecovery||now):Infinity,legacy?(this.nextLegacy||now):Infinity);
+  if(this.tickRequested)due=now;
+  if(this.backgroundDenied)due=this.nextAudit;
+  due=Math.max(this.retryTickAt||0,due);
+  this.timer=setTimeout(()=>this.runTick(),Math.max(0,due-now));this.timer.unref?.();
+ }
+ scheduleTick(lane){
+  if(this.closed||!this.nextAudit)return;
+  if(lanes.includes(lane))this.waitClient.dirty.add(lane);
+  if(lane==='attachments')this.attachmentsRequested=true;
+  this.tickRequested=true;this.planTick();
+ }
+ runTick(){
+  if(this.closed||this.running||this.directoryPaused)return;
+  this.tickRequested=false;
+  const now=Date.now(),audit=now>=this.nextAudit,legacy=this.waitClient.mode!=='watch';
+  const attachmentRequested=this.attachmentsRequested||(this.attachments?.work.nextDueAt?.()??Infinity)<=Date.now();this.attachmentsRequested=false;
+  if(audit)this.nextAudit=now+auditMs;
+  this.nextLegacy=now+this.intervalMs;
+  const recovery=now>=(this.nextRecovery||0);
+  if(recovery)this.nextRecovery=now+recoveryDelay;
+  this.running=Promise.resolve().then(async()=>{
+   if(audit||this.capabilityInvalidated||(legacy&&now-(this.lastCapabilityCheck||0)>=5000)){
+    await this.refreshCapabilities();
+    if(this.backgroundDenied){
+     const result=await this.proveMembership();
+     if(!Array.isArray(result?.bindings))throw fail('SHARED_BINDINGS_INVALID');
+     this.accessController=new AbortController();
+     this.backgroundDenied=false;
+    }
+    this.capabilityInvalidated=false;
+    this.configureWatch();
+   }
+   const hints=this.waitClient.take({audit});
+   await this.tick({background:true,hints,forceLocal:audit,skipExecution:!legacy&&!audit&&!hints.has('pull')&&!(recovery&&this.recoverableExecution()),forceAttachments:attachmentRequested||audit||!legacy&&(hints.has('changes')||hints.has('matches'))});
+   if(this.waitClient.mode==='watch'&&!this.closed){
+    await this.serialCore(()=>this.replica.auditLocalHistories?.(audit,id=>
+     this.isLocalVisible(id)&&!this.state.objects[id]?.deleted&&!this.matching.fenced(id)&&this.state.baselines[id]?.complete));
+   }
+   this.retryTickAt=0;this.tickFailures=0;
+  }).catch(error=>{
+   this.waitClient.all();
+   this.error=error.code||'SHARED_SYNC_FAILED';
+   if(membershipDenied(error)){
+    this.denyShared();
+   }else{
+    this.retryTickAt=Date.now()+Math.min(30000,recoveryDelay*2**Math.min(this.tickFailures||0,5));
+    this.tickFailures=(this.tickFailures||0)+1;
+    // Watch reconnect already supplies an independent wake while disconnected.
+    if(this.waitClient.mode!=='watch'||this.waitClient.online)this.tickRequested=true;
+   }
+  }).finally(()=>{this.running=null;this.planTick();});
+ }
+ async refreshCapabilities(){
+  const next=await inspectShared(this.connection,this.legacy,this.send,{allowReadOnly:true});
+  this.lastCapabilityCheck=Date.now();
+  if(next.readOnly&&!this.readOnly){
+   this.readOnly=true;
+   this.nativeTaskViews?.clear();
+   this.sessions?.invalidateAccess();
+  }
+  const changed=stable(next.features)!==stable(this.capabilities.features);
+  this.capabilities=next;
+  if(changed)this.notifyExecutionStatus?.({capabilities:{steeringEnabled:next.features?.includes('shared-steering-v1')===true}});
+ }
+ async tickCore({forceLocal=false,background=false,hints=null}={}){
   if(this.closed)return;
-  const hints=background?this.waitClient.take():null;
   await this.recoverRegistration();
   if(!hints||hints.has('matches')||this.matching.needsPoll())await this.matching.poll();
   await this.directoryState.recover();
   if(!hints||hints.has('changes'))await this.pollDirectory();
   await this.directoryState.tombstones();await this.materialize();
-  const localScan=forceLocal||this.dirty||!this.lastLocalScan||Date.now()-this.lastLocalScan>=5000;
+  const localScan=forceLocal||this.dirty||!this.lastLocalScan||(!background||this.waitClient.mode!=='watch')&&Date.now()-this.lastLocalScan>=5000;
   let scannedTopics;
   if(localScan){
    this.dirty=false;this.lastLocalScan=Date.now();
@@ -379,16 +514,20 @@ class SharedRuntime {
    const object={...metadata,config:known.config},current=await this.readLocal(object);
    if(current&&stable(current)!==stable(known.materialized||known.config))await this.configs.edit(id,known.kind,current);
   }
-  const a=this.replica.adapter;
-  if(!hints||hints.has('pull')||a.degraded||a.state.outbox.length||a.state.pending||a.state.inbox.length)await this.replica.sync();
-  else a.retryNotifications();
+  if(!hints||hints.has('pull')||this.recoverableMessages())await this.replica.sync();
+  else this.adapter.retryNotifications();
   this.error=null;
  }
- async tick({forceLocal=false,skipExecution=false,skipAttachments=false,background=false}={}){
-  if(!this.lastCapabilityCheck||Date.now()-this.lastCapabilityCheck>=5000){this.lastCapabilityCheck=Date.now();const next=await inspectShared(this.connection,this.legacy,this.send,{allowReadOnly:true});if(next.readOnly)this.readOnly=true;const changed=stable(next.features)!==stable(this.capabilities.features);this.capabilities=next;if(changed)this.notifyExecutionStatus?.({capabilities:{steeringEnabled:next.features?.includes('shared-steering-v1')===true}});}
-  if(background)this.waitClient.configure(this.capabilities.features?.includes('shared-wait-v1'));
-  await this.serialCore(()=>this.tickCore({forceLocal,background}));if(this.closed)return;
-  if(!skipAttachments && this.attachments?.work.shouldRun()){
+ async tick({forceLocal=false,skipExecution=false,skipAttachments=false,background=false,hints=null,forceAttachments=false}={}){
+  if(this.closed)return;
+  this.assertSharedAccess();
+  if(!background&&Date.now()-(this.lastCapabilityCheck||0)>=5000)await this.refreshCapabilities();
+  if(this.readOnly){
+   await this.serialCore(()=>require('./sharedReadonly').tick(this,{hints,forceAttachments,skipAttachments}));
+   return;
+  }
+  await this.serialCore(()=>this.tickCore({forceLocal,background,hints}));if(this.closed)return;
+  if(!skipAttachments && this.attachments && (forceAttachments||this.attachments.work.shouldRun())){
    const topics=this.mappings().filter(m=>this.isLocalVisible(m.sharedId)&&!this.matching?.fenced(m.sharedId))
        .map(m=>({...m.local,attachmentBinding:m.sharedId}));
    this.attachments.connection.topics=topics;
@@ -398,7 +537,7 @@ class SharedRuntime {
   if(!skipExecution&&!this.closed){await this.execution?.reconcile();await this.sessions?.reconcile();}
  }
  get adapter(){return this.replica?.adapter||null;}
- async nativeTrajectory(scope,{limit=200}={}){
+ async nativeTrajectory(scope,{limit=200}={}){this.assertSharedAccess();
   if(!this.capabilities.features?.includes('shared-execution-trace-v1'))return {records:[],total:0,truncated:false,initiatorOnly:true,unsupported:true};
   this.trajectoryCache||=new Map();
   const owned=Object.values(this.execution.state.requests).some(r=>r.serverSession&&!r.remote&&r.descriptor?.itemId===scope?.itemId&&r.descriptor?.topicId===scope?.topicId&&r.accepted?.id);
@@ -417,7 +556,7 @@ class SharedRuntime {
   const unique=[...new Map(records.map(r=>[r.id,r])).values()].sort((a,b)=>a.startedAt-b.startedAt);
   return {records:unique.slice(-Math.min(200,Math.max(1,limit))),total:unique.length,truncated:budgetLimited||held.length>100||unique.length>limit,missingHistoricalTraces:missing.length,initiatorOnly:true};
  }
- async cancelNativeSession({descriptor,executionId,operationId}){
+ async cancelNativeSession({descriptor,executionId,operationId}){this.assertSharedAccess();
   require('./contracts.generated.cjs').sharedIdentity(executionId);
   if(!this.capabilities.features?.includes('shared-session-cancel-v1'))throw fail('SHARED_SESSION_CONTROL_UPGRADE_REQUIRED');
   if(this.readOnly)throw fail('SHARED_READ_ONLY');
@@ -429,7 +568,7 @@ class SharedRuntime {
   await this.execution.refresh(record);return receipt;
  }
  nativeRulesContext(){const object=Object.values(this.state.objects).find(o=>o.kind==='rules'&&!o.deleted),known=object&&this.configs.state.objects[object.id];if(!known)throw fail('SHARED_CONFIG_BASE_REQUIRED');return {sharedId:object.id,version:known.version};}
- async saveNativeRules(store){
+ async saveNativeRules(store){this.assertSharedAccess();
   if(this.readOnly)throw fail('SHARED_READ_ONLY');
   const marker=store?.__nativeSyncSharedBase,base=this.nativeRulesContext();
   if(!marker||marker.sharedId!==base.sharedId||!Number.isSafeInteger(marker.version))throw fail('SHARED_CONFIG_BASE_REQUIRED');
@@ -437,7 +576,7 @@ class SharedRuntime {
   await this.configs.submit(base.sharedId,'rules',{...latest.config,tavernRules:this.host.projectRuleStore(store.rules)},{expectedVersion:marker.version,opId:store.__nativeSyncSharedOpId||'native_rules_'+sha256(stable({base:marker,rules:store.rules})).slice(0,40)});
   return {success:true,store:{version:3,rules:await this.host.readRules(),__nativeSyncSharedBase:this.nativeRulesContext()}};
  }
- saveNativeRuleOverride(owner,patch){
+ saveNativeRuleOverride(owner,patch){this.assertSharedAccess();
   // Directory materialization holds History authority before entering the
   // config replica. Keep that tick out while the native save materializes.
   return this.serialCore(async()=>{
@@ -448,16 +587,16 @@ class SharedRuntime {
    return this.saveNativeConfigPrepared(kind,id,{...raw,conversationOverrides:{...raw.conversationOverrides,rules},__nativeSyncSharedBase:patch.__nativeSyncSharedBase});
   });
  }
- nativeDeletionContext(scope){return require('./nativeOperations').deletionContext(this,scope);}
- removeNativeObject(scope,options,callbacks){return require('./nativeOperations').remove(this,scope,options,callbacks);}
- renameNativeTopic(scope,name,options){return require('./nativeOperations').renameTopic(this,scope,name,options);}
- saveNativeAvatar(kind,id,data){return require('./nativeOperations').avatar(this,kind,id,data);}
+ nativeDeletionContext(scope){this.assertSharedAccess();return require('./nativeOperations').deletionContext(this,scope);}
+ removeNativeObject(scope,options,callbacks){this.assertSharedAccess();return require('./nativeOperations').remove(this,scope,options,callbacks);}
+ renameNativeTopic(scope,name,options){this.assertSharedAccess();return require('./nativeOperations').renameTopic(this,scope,name,options);}
+ saveNativeAvatar(kind,id,data){this.assertSharedAccess();return require('./nativeOperations').avatar(this,kind,id,data);}
  directoryEntries(){
   return Object.values(this.state.objects).filter(o=>!o.deleted&&!o.retired&&
    (o.kind!=='topic'||(this.state.objects[o.parentId]&&!this.state.objects[o.parentId].deleted&&!this.state.objects[o.parentId].retired)));
  }
- async sharedConfigContext(){const owner=Object.values(this.state.objects).find(o=>['agent','group'].includes(o.kind)&&!o.deleted);return {enabled:this.ready&&!this.closed,topic:{sharedSpaceId:this.connection.sharedSpaceId,sharedOwnerId:owner?.id},context:{entryId:this.connection.spaceId,sessionMarker:'desktop:'+this.connection.deviceId}};}
- async sharedConfigRequest({route,body}){
+ async sharedConfigContext(){this.assertSharedAccess();const owner=Object.values(this.state.objects).find(o=>['agent','group'].includes(o.kind)&&!o.deleted);return {enabled:this.ready&&!this.closed,topic:{sharedSpaceId:this.connection.sharedSpaceId,sharedOwnerId:owner?.id},context:{entryId:this.connection.spaceId,sessionMarker:'desktop:'+this.connection.deviceId}};}
+ async sharedConfigRequest({route,body}){this.assertSharedAccess();
   if(this.closed||!this.ready)throw fail('SHARED_STARTUP_PENDING');
   if(this.readOnly&&body)throw fail('SHARED_READ_ONLY');
   const url=new URL('/'+route,'https://shared.invalid');if(!['/shared/match-preview','/shared/match-prepare','/shared/match-confirm','/shared/match-cancel','/shared/matches','/shared/matching-local','/shared/directory-view','/shared/match-state','/shared/directory','/shared/config','/shared/config-resolution','/shared/local-remove','/shared/local-restore'].includes(url.pathname))throw fail('SHARED_ROUTE_NOT_APPROVED');
@@ -500,11 +639,11 @@ class SharedRuntime {
  }
  isLocalVisible(id){return this.directoryState?this.directoryState.visible(id):true;}
  isLocalTopicVisible(kind,ownerId,topicId){const match=Object.entries(this.state.locals).find(([,l])=>l.kind==='topic'&&l.localParent===ownerId&&l.localId===topicId);return !match||this.isLocalVisible(match[0]);}
- assertNativeMutation(kind,localId,topicId){if(this.readOnly)throw fail('SHARED_READ_ONLY');const owner=this.nativeObject(kind,localId);if(!owner)return;if(owner.retired||owner.deleted)throw fail('SHARED_OBJECT_MERGED');const topic=topicId&&Object.entries(this.state.locals).find(([,l])=>l.kind==='topic'&&!l.aliasOf&&l.localParent===localId&&l.localId===topicId);this.matching.assert([owner.id,topic?.[0]]);}
+ assertNativeMutation(kind,localId,topicId){this.assertSharedAccess();if(this.readOnly)throw fail('SHARED_READ_ONLY');const owner=this.nativeObject(kind,localId);if(!owner)return;if(owner.retired||owner.deleted)throw fail('SHARED_OBJECT_MERGED');const topic=topicId&&Object.entries(this.state.locals).find(([,l])=>l.kind==='topic'&&!l.aliasOf&&l.localParent===localId&&l.localId===topicId);this.matching.assert([owner.id,topic?.[0]]);}
  nativeObject(kind,localId){const all=Object.entries(this.state.locals).filter(([,l])=>l.kind===kind&&l.localId===localId),entry=all.find(([id,l])=>!l.aliasOf&&!this.state.objects[id]?.deleted);if(entry)return this.state.objects[entry[0]];const retired=this.state.retiredOwners?.[kind+':'+localId];return retired?{...this.state.objects[retired],retired:true}:all[0]?this.state.objects[all[0][0]]:null;}
  isLocalOwnerVisible(kind,id){const object=this.nativeObject(kind,id);return !object||!object.retired&&this.isLocalVisible(object.id);}
  decorateNativeConfig(kind,localId,value){if(!value||value.error)return value;const object=this.nativeObject(kind,localId),known=object&&this.configs?.state.objects[object.id];return known?{...value,...(value.topics?{topics:value.topics.filter(t=>this.isLocalTopicVisible(kind,localId,t.id))}:{}),__nativeSyncSharedBase:{sharedId:object.id,version:known.version}}:value;}
- saveNativeConfig(kind,localId,raw){
+ saveNativeConfig(kind,localId,raw){this.assertSharedAccess();
   // A directory tick can materialize a group while holding History authority.
   // Serialize group saves with that tick before entering the config replica queue.
   const save=()=>this.saveNativeConfigPrepared(kind,localId,raw);
@@ -525,7 +664,7 @@ class SharedRuntime {
   if(!this.capabilities.features?.includes('shared-topic-history-v1')){await this.replica.sync();await this.verifyHistory(mapping);return {legacy:true};}
   const result=await this.replica.syncTopic(mapping,{after:this.state.baselines[mapping.sharedId]?.remote?.watermark||0,minSeq});await this.verifyHistory(mapping);return result;
  }
- async refreshForExecution(d,{forceFresh=false,sharedSessionHistory=false}={}){
+ async refreshForExecution(d,{forceFresh=false,sharedSessionHistory=false}={}){this.assertSharedAccess();
   if(this.closed||!this.ready)throw fail('SHARED_STARTUP_PENDING');
   if(!this.capabilities.features?.includes('shared-topic-history-v1')){await this.serialCore(()=>this.tickCore({forceLocal:true}));const mapping=this.execution.mapping(d),context=await this.send(endpoint+'context?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId}),{sharedSessionHistory});return {...context,model:this.configs.state.objects[this.state.objects[mapping.sharedId].parentId]?.config.model,legacy:true};}
   const mapping=this.execution.mapping(d);this.matching.assert([mapping.sharedId,this.state.objects[mapping.sharedId].parentId]);
@@ -563,7 +702,7 @@ class SharedRuntime {
   const mapping=this.mappings().find(m=>m.sharedId===object.id);if(!mapping)throw fail('SHARED_LOCAL_MAPPING_REQUIRED');await this.replica.add(mapping);await this.backfill({only:object.id});return this.execution.mapping(d);
  }
 
- async submitSharedSteering({descriptor,message,observedWorkId,...options}){if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');let record;
+ async submitSharedSteering({descriptor,message,observedWorkId,...options}){this.assertSharedAccess();if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');let record;
  if(options.parentInputId){const input=this.execution.state.requests[message.id],parent=this.execution.state.requests[options.parentInputId];if(!input||input.parentLocalInputId!==options.parentInputId||stable(input.descriptor)!==stable(descriptor))throw fail('SHARED_LOCAL_INTENT_CHANGED');
   if(!parent?.accepted){input.phase='waiting_parent';await this.execution.save();return {handled:true,success:true,pendingParent:true,inputId:message.id,localState:'saved'};}record=parent;
  }else record=await this.execution.steering.active(descriptor,observedWorkId);if(!record)throw fail('STEERING_NO_ACTIVE_WORK');if(!record.steeringV1)throw fail('SHARED_STEERING_TARGET_UNSUPPORTED');return this.execution.steering.submit(record,descriptor,message,options);}
@@ -583,7 +722,7 @@ class SharedRuntime {
   }
   for(const [id,prepared]of Object.entries(this.execution.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.activeCompactions.has(id)&&!this.execution.state.compactions?.[id]?.body)await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:this.closed});
  }
- async prepareSharedCompaction({descriptor,retryId}){
+ async prepareSharedCompaction({descriptor,retryId}){this.assertSharedAccess();
   if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(descriptor);if(!this.capabilities.features?.includes('shared-compaction-v1'))throw fail('SHARED_COMPACTION_UPGRADE_REQUIRED');const context=await this.refreshForExecution(descriptor,{forceFresh:true});if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');
   const publications=this.execution.state.compactions||{};
   if(retryId!==undefined){
@@ -610,7 +749,7 @@ class SharedRuntime {
   }catch(error){if(intent.receipt)this.activeCompactions.delete(intent.receipt.id);throw error;}finally{this.activeCompactionPrepares.delete(opId);}
  }
 
- async cancelSharedCompaction({descriptor,id,closing=false}){if(this.closed&&!closing)throw fail('APPLICATION_SHUTTING_DOWN');
+ async cancelSharedCompaction({descriptor,id,closing=false}){this.assertSharedAccess();if(this.closed&&!closing)throw fail('APPLICATION_SHUTTING_DOWN');
   const prepared=this.execution.state.compactionPreparations?.[id];if(!prepared||stable(prepared.descriptor)!==stable(descriptor))throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
   const intent=this.execution.state.compactions?.[id];if(intent&&['publishing','completed'].includes(intent.phase)){await this.execution.run('compaction:'+id,()=>this.finishSharedCompaction(intent));return {success:true,alreadyCommitted:true};}
   const result=await this.send(endpoint+'compact-cancel',{body:{sharedSpaceId:this.connection.sharedSpaceId,id,opId:'compact_cancel_'+id}});prepared.cancelled=true;this.activeCompactions.delete(id);await this.execution.save();if(result.alreadyCommitted)await this.syncExecutionTopic(this.execution.mapping(descriptor),{minSeq:result.seq});return result;
@@ -639,7 +778,7 @@ class SharedRuntime {
    return {handled:true,success:true,recovered,id:body.id,messageId:message.id,message,history};
   });
  }
- async commitSharedCompaction({descriptor,id,sourceHash,message}){
+ async commitSharedCompaction({descriptor,id,sourceHash,message}){this.assertSharedAccess();
   if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(descriptor),body={sharedSpaceId:this.connection.sharedSpaceId,id,sourceHash,opId:'compact_commit_'+id,message:this.adapter.canonical(message,mapping.shared.topicId)};
   const preparation=this.execution.state.compactionPreparations?.[id];if(!preparation||stable(preparation.descriptor)!==stable(descriptor)||preparation.sharedId!==mapping.sharedId||preparation.sourceHash!==sourceHash||preparation.messageId!==message.id)throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
   this.execution.state.compactions||={};let intent=this.execution.state.compactions[id];if(intent&&(stable(intent.body)!==stable(body)||stable(intent.descriptor)!==stable(descriptor)))throw fail('SHARED_CHECKPOINT_INTENT_CHANGED');
@@ -647,8 +786,8 @@ class SharedRuntime {
   return this.confirmSharedCompaction(intent);
  }
 
- async handoffSharedWork({descriptor,workId}){if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.steering.handoff(descriptor,workId);}
- async noteSharedSendFailure({descriptor,requestId,code,message}){
+ async handoffSharedWork({descriptor,workId}){this.assertSharedAccess();if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.steering.handoff(descriptor,workId);}
+ async noteSharedSendFailure({descriptor,requestId,code,message}){this.assertSharedAccess();
   const found=this.execution.steering.find(requestId)||(()=>{const record=Object.values(this.execution.state.requests).find(v=>v.accepted&&'reply_'+v.accepted.id===requestId);return record?{record,step:record}:null;})();if(!found)return {handled:false};
   const {record,step}=found,mapping=this.execution.mapping(descriptor);if(mapping.sharedId!==record.sharedId)throw fail('SHARED_REQUEST_NOT_FOUND');step.errorCode=/^[A-Z][A-Z0-9_]{0,79}$/.test(code||'')?code:'REQUEST_FAILED';
   let known;try{known=await this.execution.refresh(record);}catch{record.phase='review_required';if(message?.id===requestId&&message.role==='assistant'&&typeof message.content==='string'){step.localFailure=this.adapter.canonical(message,mapping.shared.topicId);step.failureDisposition='unknown';}await this.execution.save();return {handled:true,classification:'unknown'};}
@@ -659,7 +798,7 @@ class SharedRuntime {
   if(message&&['not_started','unknown'].includes(classification)){if(message.id!==requestId||message.role!=='assistant'||typeof message.content!=='string')throw fail('INVALID_SHARED_REPLY');step.localFailure=this.adapter.canonical(message,mapping.shared.topicId);step.failureDisposition=classification;}
   await this.execution.save();return {handled:true,classification};
  }
- async confirmSharedModelSave({itemId,reference}){
+ async confirmSharedModelSave({itemId,reference}){this.assertSharedAccess();
   if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const object=this.nativeObject('agent',itemId);if(!object||!reference?.opId||!reference.model)throw fail('MODEL_SAVE_REFERENCE_CHANGED');
   const draft=this.configs.state.drafts[object.id];let opId;
   if(draft){if(draft.config.model!==reference.model||draft.opId!==reference.opId&&!draft.opId.startsWith('model_confirm_'))throw fail('SHARED_CONFIG_PENDING_CONFIRMATION');opId=draft.opId;await this.configs.publish(object.id);}
@@ -668,7 +807,7 @@ class SharedRuntime {
   if(!opId){opId='model_confirm_'+randomUUID();await this.configs.submit(object.id,'agent',current.config,{expectedVersion:current.version,opId});}
   return {success:true,reference:{opId,model:reference.model}};
  }
- async retrySharedInput({descriptor,inputId,modelSaveResolutionRef}){
+ async retrySharedInput({descriptor,inputId,modelSaveResolutionRef}){this.assertSharedAccess();
   if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const input=this.execution.state.requests[inputId];if(!input||stable(input.descriptor)!==stable(descriptor)||!input.localMessage)throw fail('SHARED_INPUT_NOT_FOUND');
   if(modelSaveResolutionRef){const original=input.modelSaveRef||input.steeringBody?.modelSaveRef;if(!original||modelSaveResolutionRef.model!==original.model)throw fail('MODEL_SAVE_REFERENCE_CHANGED');input.modelSaveResolutionRef=modelSaveResolutionRef;input.dependencyReady=true;await this.execution.save();}
   if(input.isSteeringInput){if(!input.inputReceipt)await this.submitSharedSteering({descriptor,message:input.localMessage,observedWorkId:input.workId,modelSaveRef:input.steeringBody.modelSaveRef,deferReady:true});await this.execution.steering.finishInput(input);return {success:true,inputAccepted:true,inputId};}
@@ -677,25 +816,27 @@ class SharedRuntime {
   if(input.rejected&&!input.accepted){input.phase='local_pending';if(!input.serverSession){delete input.sharedId;delete input.signature;}await this.execution.save();}
   return this.prepareSharedSend({descriptor,message:input.localMessage,...(input.body?.controlMode?{controlMode:input.body.controlMode}:{}),...(input.modelSaveRef?{modelSaveRef:input.modelSaveRef}:{}),...(input.modelSaveResolutionRef?{modelSaveResolutionRef:input.modelSaveResolutionRef}:{})});
  }
- async readySharedInput({inputId,modelSaveRef}){const input=this.execution.state.requests[inputId];if(!input)throw fail('SHARED_INPUT_NOT_FOUND');if(stable(input.modelSaveRef||input.steeringBody?.modelSaveRef||null)!==stable(modelSaveRef||null))throw fail('MODEL_SAVE_REFERENCE_CHANGED');input.dependencyReady=true;await this.execution.save();if(!input.isSteeringInput)return {success:true,pendingParent:true};return {success:true,...await this.execution.steering.finishInput(input)};}
+ async readySharedInput({inputId,modelSaveRef}){this.assertSharedAccess();const input=this.execution.state.requests[inputId];if(!input)throw fail('SHARED_INPUT_NOT_FOUND');if(stable(input.modelSaveRef||input.steeringBody?.modelSaveRef||null)!==stable(modelSaveRef||null))throw fail('MODEL_SAVE_REFERENCE_CHANGED');input.dependencyReady=true;await this.execution.save();if(!input.isSteeringInput)return {success:true,pendingParent:true};return {success:true,...await this.execution.steering.finishInput(input)};}
 
- async prepareSharedContinuation({descriptor,...options}){if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');
+ async prepareSharedContinuation({descriptor,...options}){this.assertSharedAccess();if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');
   const record=Object.values(this.execution.state.requests).find(value=>value.accepted?.id===options.workId&&!value.isSteeringInput),control=record&&await this.execution.steering.query(record);
   const mode=record?.accepted?.turn?.controlMode;
   if(['text-only-v1','safe-tools-v1'].includes(mode)&&control?.generation===0&&control.revision===0&&control.executor==='desktop:'+this.connection.deviceId&&control.generations?.[0]?.state==='prepared'&&record.localMessage)return this.execution.prepare(descriptor,record.localMessage,{controlMode:mode});
   return this.execution.steering.prepare(descriptor,options);
  }
- async stageLocalSharedInput({descriptor,message,...options}){if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.stageLocal(descriptor,message,options);}
- async prepareSharedSend({descriptor,message,localOnly=false,serverSession=false,...options}){if(options.controlMode!==undefined){const tools=options.controlMode==='safe-tools-v1';
+ async stageLocalSharedInput({descriptor,message,...options}){this.assertSharedAccess();if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.stageLocal(descriptor,message,options);}
+ async prepareSharedSend({descriptor,message,localOnly=false,serverSession=false,...options}){this.assertSharedAccess();if(options.controlMode!==undefined){const tools=options.controlMode==='safe-tools-v1';
    if(!tools&&options.controlMode!=='text-only-v1')throw fail('CONTROLLED_MODE_UNSUPPORTED');
    if(!this.capabilities.features?.includes(tools?'shared-controlled-tools-v1':'shared-controlled-text-v1'))throw fail(tools?'CONTROLLED_TOOLS_UNAVAILABLE':'CONTROLLED_TEXT_UNAVAILABLE');if(serverSession||this.execution.state.requests[message?.id]&&this.execution.state.requests[message.id].body?.controlMode!==options.controlMode)throw fail('CONTROLLED_MODE_IMMUTABLE');}if(localOnly)return this.execution.stageLocal(descriptor,message,options);if(this.readOnly)throw fail('SHARED_READ_ONLY');const mapping=await this.executionMapping(descriptor);this.matching.assert([mapping.sharedId,this.state.objects[mapping.sharedId].parentId]);if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');if(!options.controlMode&&(serverSession||this.execution.state.requests[message?.id]?.serverSession)&&this.sessions?.enabled()){const accepted=await this.sessions.prepare(descriptor,message,options);if(accepted)return accepted;}try{return await this.execution.prepare(descriptor,message,options);}catch(error){if(error.code!=='SHARED_CONTEXT_CHANGED'||error.status!==409||!error.knownAdmissionRejected)throw error;return this.execution.prepare(descriptor,message,options,{forceFresh:true});}}
- async abandonSharedSend(payload){if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.abandon(payload);}
+ async abandonSharedSend(payload){this.assertSharedAccess();if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.abandon(payload);}
  async getExecutionStatus(d,options={}){
+  const unavailable=()=>({enabled:true,readOnly:true,connection:'error',configurationError:permissionError().code,executions:[]});
+  if(this.backgroundDenied)return unavailable();
   if(this.readOnly){this.nativeTaskViews?.clear();return {enabled:true,readOnly:true,configurationError:'SHARED_READ_ONLY',executions:[],connection:'online'};}if(!d?.itemId||!d?.topicId)return {enabled:true,readOnly:false};
   if(this.capabilities.features?.includes('shared-controlled-text-v1')&&(d.itemType||'agent')==='agent'){await this.execution.steering.active(d);await this.execution.reconcile();}if(this.sessions?.enabled())await this.sessions.observe(d,{refresh:options.refresh!==false});const value=await this.execution.status(d,this.sessions?.enabled()?{...options,refresh:false}:options);if(this.sessions?.enabled()){
    value.serverSessions=this.sessions.values(d);
    await this.refreshNativeTaskViews(value,d,options.refresh!==false);
-  }let mapping;try{mapping=this.execution.mapping(d);}catch{this.dirty=true;return value;}
+  }if(this.backgroundDenied)return unavailable();let mapping;try{mapping=this.execution.mapping(d);}catch{this.dirty=true;return value;}
   if(this.matching.fenced(mapping.sharedId)||this.matching.fenced(this.state.objects[mapping.sharedId].parentId))return {...value,readOnly:true,configurationError:'SHARED_MATCH_PREPARING'};return {...value,controlledTextAvailable:this.capabilities.features?.includes('shared-controlled-text-v1')===true,controlledToolsAvailable:this.capabilities.features?.includes('shared-controlled-tools-v1')===true};
  }
 
@@ -730,7 +871,7 @@ class SharedRuntime {
   }));
   value.displayJobs = require('./sharedTaskList').sharedTaskList(value.executions, value.reportJobs);
  }
- async stopNativeTask({descriptor, workId, nativeTaskId} = {}) {
+ async stopNativeTask({descriptor, workId, nativeTaskId} = {}) {this.assertSharedAccess();
   if (this.closed || !this.ready) throw fail('APPLICATION_SHUTTING_DOWN');
   if (this.readOnly) throw fail('SHARED_READ_ONLY');
   require('./contracts.generated.cjs').sharedIdentity(workId);
@@ -743,7 +884,7 @@ class SharedRuntime {
   await this.send(endpoint + 'task-stop', {body});
   return {success: true};
  }
- async getNativeTaskResult(d,workId,nativeTaskId){if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(d);const known=await this.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId}));if(known.request?.sharedId!==mapping.sharedId)throw fail('NATIVE_TASK_RESULT_MISMATCH');const value=await this.send(endpoint+'task-result?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId,nativeTaskId}));return {...value,topic:{ownerType:d.itemType||'agent',ownerId:d.itemId,topicId:d.topicId}};}
- async close(){if(this.closed)return;this.closed=true;this.nativeTaskViews?.clear();this.waitClient.close();clearInterval(this.timer);await this.sessions?.close();try{await this.recoverSharedCompactionPrepares();}catch{}for(const [id,prepared]of Object.entries(this.execution?.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.execution.state.compactions?.[id]?.body)try{await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:true});}catch{}clearInterval(this.timer);if(this.changed)this.agentConfigEvents?.off?.('agent-config-updated',this.changed);await Promise.allSettled([this.running,this.refreshing,this.attachments?.work?.running,this.coreTail,this.registrationTail,this.registryDisk,this.topicSponsorRecovery]);await this.execution?.close();await this.replica?.close();this.releaseHost?.();}
+ async getNativeTaskResult(d,workId,nativeTaskId){this.assertSharedAccess();if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(d);const known=await this.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId}));if(known.request?.sharedId!==mapping.sharedId)throw fail('NATIVE_TASK_RESULT_MISMATCH');const value=await this.send(endpoint+'task-result?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId,nativeTaskId}));return {...value,topic:{ownerType:d.itemType||'agent',ownerId:d.itemId,topicId:d.topicId}};}
+ async close(){if(this.closed)return;this.closed=true;this.nativeTaskViews?.clear();const watchClosed=this.waitClient.close();clearTimeout(this.timer);await this.sessions?.close();try{await this.recoverSharedCompactionPrepares();}catch{}for(const [id,prepared]of Object.entries(this.execution?.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.execution.state.compactions?.[id]?.body)try{await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:true});}catch{}clearTimeout(this.timer);if(this.changed)this.agentConfigEvents?.off?.('agent-config-updated',this.changed);await Promise.allSettled([watchClosed,this.running,this.refreshing,this.attachments?.work?.running,this.coreTail,this.registrationTail,this.registryDisk,this.topicSponsorRecovery]);await this.execution?.close();await this.replica?.close();this.releaseHost?.();}
 }
 module.exports={SharedRuntime,startupFence};

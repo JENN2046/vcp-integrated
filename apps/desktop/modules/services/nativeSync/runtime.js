@@ -17,15 +17,15 @@ function reserveOwner(queue, root) {
 const { createSyncRequest, syncHeaders } = require('./syncRequest');
 
 function createSyncDownload(connection){
-    return (async route=>{
+    return (async (route,{signal}={})=>{
         route=require('./connection').sourceRoute(connection,route);
-        let response;try{response=await fetch(connection.url+route,{headers:{...syncHeaders(connection),Authorization:`Bearer ${connection.token}`,'X-NativeSync-Protocol':'2','X-NativeSync-Capabilities':'attachments-v1,message-intents-v1'+(connection.sharedSpaceId?',shared-space-v1,shared-merge-v1,shared-attachments-v1,shared-context-v1,shared-steering-v1,shared-controlled-text-v1,shared-controlled-tools-v1,shared-model-save-v1,shared-inline-receipts-v1,shared-native-inline-v1,shared-session-v1,shared-events-v1':'')},redirect:'error',signal:AbortSignal.timeout(30000)});}catch{throw fail('NETWORK_UNAVAILABLE');}
+        let response;try{response=await fetch(connection.url+route,{headers:{...syncHeaders(connection),Authorization:`Bearer ${connection.token}`,'X-NativeSync-Protocol':'2','X-NativeSync-Capabilities':'attachments-v1,message-intents-v1'+(connection.sharedSpaceId?',shared-space-v1,shared-merge-v1,shared-attachments-v1,shared-context-v1,shared-steering-v1,shared-controlled-text-v1,shared-controlled-tools-v1,shared-model-save-v1,shared-inline-receipts-v1,shared-native-inline-v1,shared-session-v1,shared-events-v1':'')},redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)});}catch{throw fail('NETWORK_UNAVAILABLE');}
         if(!response.ok){let code;try{code=(await response.json()).error?.code;}catch{}throw Object.assign(fail(/^ATTACHMENT_[A-Z_]+$/.test(code||'')?code:'ATTACHMENT_DOWNLOAD_FAILED'), {status:response.status});}
         try {const chunks=[];let size=0;for await(const chunk of response.body){size+=chunk.length;if(size>20*1024*1024)throw fail('ATTACHMENT_FILE_TOO_LARGE');chunks.push(chunk);}return Buffer.concat(chunks);}
         catch(error){if(error.code==='ATTACHMENT_FILE_TOO_LARGE')throw error;throw fail('NETWORK_UNAVAILABLE');}
     });
 }
-async function createNativeSyncRuntime({ queue, appDataRoot, args = [], isolated = false, notify, notifyExecutionStatus, intervalMs = 250, executionIntervalMs = 5000, readSettings, readAgentConfig, readGroupConfig, readTavernRules, readEffectiveTavernRules, readExecutionPolicy, thumbnail, request, requestBinary, requestEvents, storeAttachment, ipcMain, getMainWindow, sourceFault, agentConfigEvents, sharedHost, historyAuthority = authorityControl.authorityForQueue(queue), localHistoryAuthority, waitForHistoryAuthority, isStopping = () => false }) {
+async function createNativeSyncRuntime({ queue, appDataRoot, args = [], isolated = false, notify, notifyExecutionStatus, intervalMs = 250, executionIntervalMs = 5000, readSettings, readAgentConfig, readGroupConfig, readTavernRules, readEffectiveTavernRules, readExecutionPolicy, thumbnail, request, requestBinary, requestEvents, requestWatch, storeAttachment, ipcMain, getMainWindow, sourceFault, agentConfigEvents, sharedHost, historyAuthority = authorityControl.authorityForQueue(queue), localHistoryAuthority, waitForHistoryAuthority, isStopping = () => false }) {
     const poc = args.includes('--native-sync-poc');
     if (poc && !isolated) throw fail('ISOLATED_APP_DATA_REQUIRED');
     if (!poc && !appDataRoot) return null;
@@ -47,7 +47,7 @@ async function createNativeSyncRuntime({ queue, appDataRoot, args = [], isolated
         let shared;
         try{
             await waitForHistoryAuthority?.();
-            shared=await require('./sharedRuntime').SharedRuntime.open({queue,appDataRoot,connection,sharedHost,historyAuthority,isStopping,send:request||createSyncRequest(connection),openEvents:requestEvents||(!request?require('./sharedSessionClient').createSharedEventRequest(connection):null),notify,notifyExecutionStatus,intervalMs,agentConfigEvents,download:requestBinary||createSyncDownload(connection),storeAttachment});
+            shared=await require('./sharedRuntime').SharedRuntime.open({queue,appDataRoot,connection,sharedHost,historyAuthority,isStopping,send:request||createSyncRequest(connection),openEvents:requestEvents||(!request?require('./sharedSessionClient').createSharedEventRequest(connection):null),openWatch:requestWatch||(!request?require('./sharedWaitClient').createSharedWatchRequest(connection):null),notify,notifyExecutionStatus,intervalMs,agentConfigEvents,download:requestBinary||createSyncDownload(connection),storeAttachment});
             if(ipcMain&&!isStopping())queries=registerNativeSyncQueries({ipcMain,getMainWindow,queue,getRuntime:()=>shared});
             const close=shared.close.bind(shared);shared.close=async()=>{await close();await queries?.close();releaseOwner();};return shared;
         }catch(error){

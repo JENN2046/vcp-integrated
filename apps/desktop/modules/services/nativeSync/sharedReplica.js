@@ -80,9 +80,40 @@ async function openSharedReplica({queue,statePath,connection,mappings,send,notif
   });
   return adapter.applyRemote(event,false,false);
  };
- return {adapter,queue:mapped,syncTopic:topicSync,applyCommitted,
+ // The host watches only its selected History. Foreign writes are evidence of
+ // drift, not send intents. Resolve the path against this replica's bindings;
+ // never read a path supplied by the window or advance a Journal cursor here.
+ const observedFiles=new Set();
+ const fileKey=file=>process.platform==='win32'?file.toLowerCase():file;
+ adapter.externalHistoryChanged=file=>{
+  if(!adapter.onHistoryHint||typeof file!=='string')return;
+  const key=fileKey(file);
+  if(!adapter.bindings.has(key))return;
+  observedFiles.add(key);
+  adapter.onHistoryHint();
+ };
+ async function auditLocalHistories(all,eligible=()=>true){
+  if(!all&&!observedFiles.size)return;
+  const hinted=new Set(observedFiles);
+  observedFiles.clear();
+  for(const {sharedId,local,shared} of mappings){
+   if(!eligible(sharedId)||(!all&&!hinted.has(fileKey(queue.getHistoryPath(local.itemId,local.topicId)))))continue;
+   const key=adapter.topicKey(shared);
+   await mapped.run(shared,async()=>{
+    const {pending,inbox,localCommits}=adapter.state;
+    if(localCommits[key]||(pending&&adapter.sameTopic(pending.event,shared))||inbox.some(row=>adapter.sameTopic(row.event,shared)))return;
+    try{await adapter.capture(shared,await mapped.read(shared));}
+    catch(error){
+     if(error.syncStatePersistenceFailure)throw error;
+     const code=error.code||'HISTORY_READ_FAILED';
+     if(adapter.state.drift[key]?.code!==code)await adapter.transaction(next=>{next.drift[key]={code};});
+    }
+   });
+  }
+ }
+ return {adapter,queue:mapped,syncTopic:topicSync,applyCommitted,auditLocalHistories,
   rebind:next=>serial(()=>mapSerial(async()=>{await adapter.transaction(state=>{state.topics=next.map(m=>({itemId:m.shared.itemId,itemType:m.shared.itemType||'agent',topicId:m.shared.topicId}));});mapped.reset(next);adapter.topics=adapter.state.topics.map(t=>({...t}));mappings.splice(0,mappings.length,...next);adapter.bindings.clear();for(const m of next){const file=mapped.getHistoryPath(m.shared.itemId,m.shared.topicId);adapter.bindings.set(process.platform==='win32'?file.toLowerCase():file,JSON.stringify(require('./protocol').wireTopic(m.shared)));}})),
   add:mapping=>mapSerial(async()=>{if(mappings.some(m=>m.sharedId===mapping.sharedId))return;mapped.add(mapping);await adapter.addSharedTopic(mapping.shared);mappings.push(mapping);}),
-  sync:()=>serial(()=>adapter.synchronize()),close:()=>serial(async()=>{await Promise.allSettled([...topicTails.values(),projection,mappingTail]);return adapter.close();})};
+  sync:({pullOnly=false}={})=>serial(()=>pullOnly?adapter.pull():adapter.synchronize()),close:()=>serial(async()=>{await Promise.allSettled([...topicTails.values(),projection,mappingTail]);return adapter.close();})};
 }
 module.exports={openSharedReplica};

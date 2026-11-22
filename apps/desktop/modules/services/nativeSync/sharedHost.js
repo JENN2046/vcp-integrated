@@ -74,7 +74,21 @@ function createSharedHost({appDataRoot,agentConfigManager,groupChat,tavernHandle
     applyRuleStore=tavernHandlers.setRuleProvider(root,provider);
    }
    activeRoots.set(root,runtime);
+   const policyChanged=settings=>{
+    if(runtime.closed||runtime.readOnly||runtime.waitClient?.mode!=='watch')return;
+    const rules=Object.values(runtime.configs.state.objects).find(object=>object.kind==='rules');
+    const expected=(rules?.materialized||rules?.config)?.executionPolicy;
+    if(!settings||!require('node:util').isDeepStrictEqual(policyProjection(settings),expected))runtime.changed?.();
+   };
+   const externalSettings=event=>policyChanged(event?.settings);
+   const uncertainSettings=()=>policyChanged(null);
+   settingsManager?.on?.('settings-updated',policyChanged);
+   settingsManager?.on?.('settings-external-updated',externalSettings);
+   settingsManager?.on?.('settings-external-error',uncertainSettings);
    return ()=>{
+    settingsManager?.off?.('settings-updated',policyChanged);
+    settingsManager?.off?.('settings-external-updated',externalSettings);
+    settingsManager?.off?.('settings-external-error',uncertainSettings);
     if(activeRoots.get(root)!==runtime)return;
     tavernHandlers?.setRuleProvider?.(root,null);applyRuleStore=null;activeRoots.delete(root);
    };

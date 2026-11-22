@@ -30,7 +30,7 @@ class SharedSessionClient{
   if(record.sharedId){let records=this.activeByTopic.get(record.sharedId);if(!records){records=new Set();this.activeByTopic.set(record.sharedId,records);}if(!['completed','abandoned','local_pending'].includes(record.phase))records.add(record);else records.delete(record);}
   if(record.serverSession&&(record.admitStarted||record.accepted)&&(!terminal.has(record.phase)||record.serverProjectionPending))this.activeRecords.add(record);else this.activeRecords.delete(record);
  }
- async persist(record){await this.store.save(record);this.index(record);}
+ async persist(record){await this.store.save(record);this.index(record);this.runtime.planTick?.();}
  preview(record,mapping,{validateOnly=false}={}){
   const saved=record.partialPreview,p=saved?.partialResult;
   if(!p||!validateOnly&&(record.phase!=='review_required'||record.accepted?.state!=='review_required'))return null;
@@ -49,7 +49,7 @@ class SharedSessionClient{
   try{this.preview(record,mapping,{validateOnly:true});if(prior&&(stable(prior.partialResult)!==stable(next.partialResult)||prior.text!==next.text))throw fail('SHARED_EVENT_PARTIAL_CONFLICT');}
   catch(error){record.partialPreview=prior;throw error;}
  }
- enabled(){return this.runtime.capabilities.features?.includes('shared-session-v1')===true;}
+ enabled(){return !this.runtime.backgroundDenied&&!this.runtime.readOnly&&this.runtime.capabilities.features?.includes('shared-session-v1')===true;}
  async warm(descriptor,{forceFresh=false}={}){
   if(!this.enabled()||this.closed||this.runtime.readOnly)return;
   const r=this.runtime,mapping=r.execution.mapping(descriptor);if(mapping.shared.itemType!=='agent')return;
@@ -100,8 +100,10 @@ class SharedSessionClient{
   });
  }
  async accepted(record,mapping,history){
+  this.runtime.assertSharedAccess?.();
   this.watch(mapping,record.accepted.id);this.project(record,mapping).catch(()=>{});
   const rows=history||this.contexts.get(mapping.sharedId)?.history||await this.runtime.replica.queue.read(mapping.shared);
+  this.runtime.assertSharedAccess?.();
   return {handled:true,success:true,admissionId:record.accepted.id,replyId:'reply_'+record.accepted.id,userMessage:record.localMessage,history:rows.some(m=>m.id===record.localMessage.id)?rows:[...rows,record.localMessage],projectionPending:true,serverSession:{executionId:record.accepted.id}};
  }
  project(record,mapping,{minSeq=record?.accepted?.userSeq||0,completed=false,request=record?.accepted,settledReplay=false}={}){
@@ -122,10 +124,11 @@ class SharedSessionClient{
    // append or edit while projection yields. Refresh through the existing API.
    this.contexts.delete(key);
    if(completed&&record?.accepted?.id){const observer=this.observers.get(record.accepted.id);if(observer)observer.projectionSynced=true;}this.notify(mapping,record?.accepted?.id,{projectionSynced:completed});
-  }).finally(()=>{if(this.projections.get(key)===task)this.projections.delete(key);});
+  }).finally(()=>{if(this.projections.get(key)===task)this.projections.delete(key);this.runtime.planTick?.();});
   this.projections.set(key,task);return task;
  }
  notify(mapping,executionId,extra={}){
+  if(this.runtime.backgroundDenied||this.runtime.readOnly)return;
   const observer=executionId&&this.observers.get(executionId),record=executionId&&this.byExecution.get(executionId),session=observer?.projection?.value()||(record&&this.preview(record,mapping));
   try{this.runtime.notifyExecutionStatus?.({enabled:true,readOnly:false,topic:{ownerType:mapping.local.itemType||'agent',ownerId:mapping.local.itemId,topicId:mapping.local.topicId},serverSession:{...session,...extra,executionId,canCancel:Boolean(record?.serverSession&&!record.remote&&!this.runtime.readOnly&&this.runtime.capabilities.features?.includes('shared-session-cancel-v1'))}});}catch{}
  }
@@ -148,7 +151,7 @@ class SharedSessionClient{
   this.runtime.notifyExecutionStatus?.({topic:{ownerId:mapping.local.itemId,ownerType:mapping.local.itemType||'agent',topicId:mapping.local.topicId},reportListChanged:true});
  }
  watchTopic(mapping){
-  if(!this.openEvents||this.closed||this.topicObservers.has(mapping.sharedId))return;
+  if(!this.openEvents||this.closed||this.runtime.backgroundDenied||this.topicObservers.has(mapping.sharedId))return;
   if(this.topicObservers.size>=8){const [id,old]=this.topicObservers.entries().next().value;old.controller.abort();this.topicObservers.delete(id);}
   const controller=new AbortController(),entry={controller,ready:false,task:null,discovered:new Set()};this.topicObservers.set(mapping.sharedId,entry);
   entry.task=(async()=>{
@@ -172,7 +175,7 @@ class SharedSessionClient{
   })().catch(()=>{}).finally(()=>{if(this.topicObservers.get(mapping.sharedId)===entry)this.topicObservers.delete(mapping.sharedId);});
  }
  watch(mapping,executionId){
-  if(!this.openEvents||this.closed)return;
+  if(!this.openEvents||this.closed||this.runtime.backgroundDenied)return;
   // The submitting desktop already renders this native Group work. Only its
   // peers need the separate observation view; neither path gains dispatch rights.
   if(mapping.shared.itemType==='group'&&Object.values(this.runtime.execution.state.requests).some(record=>!record.remote&&!record.serverSession&&record.sharedId===mapping.sharedId&&record.accepted?.id===executionId))return;
@@ -227,7 +230,7 @@ class SharedSessionClient{
      await pause(Math.min(10000,250*2**Math.min(attempts++,5)),controller.signal);
     }
    }
-  })().catch(()=>{}).finally(()=>{entry.stopped=true;if(this.observers.get(executionId)===entry)this.observers.delete(executionId);});
+  })().catch(()=>{}).finally(()=>{entry.stopped=true;if(this.observers.get(executionId)===entry)this.observers.delete(executionId);this.runtime.planTick?.();});
  }
  async observe(descriptor,{refresh=false}={}){
   if(!this.enabled()||this.closed)return;
@@ -243,6 +246,14 @@ class SharedSessionClient{
    await this.warm(descriptor);
   }
  }
+ needsReconcile(){
+  if(this.closed||!this.enabled())return false;
+  for(const record of this.activeRecords){
+   if(!record.accepted||record.serverProjectionPending&&!this.projections.has(record.sharedId)||
+    this.openEvents&&!this.observers.has(record.accepted.id))return true;
+  }
+  return false;
+ }
  async reconcile(){
   const r=this.runtime;if(this.closed||!this.enabled())return;
   for(const record of [...this.activeRecords]){
@@ -251,7 +262,7 @@ class SharedSessionClient{
    const mapping=r.mappings().find(value=>value.sharedId===record.sharedId);if(!mapping)continue;
    if(!record.accepted){const result=await r.execution.query(record);if(!result.request)continue;record.accepted=result.request;record.phase=result.request.state;record.serverProjectionPending=true;await this.persist(record);}
    this.watch(mapping,record.accepted.id);
-   if(record.serverProjectionPending)this.project(record,mapping,{minSeq:record.accepted.replySeq||record.accepted.userSeq||0,completed:record.accepted.state==='completed'}).catch(()=>{});
+   if(record.serverProjectionPending&&!this.projections.has(mapping.sharedId))this.project(record,mapping,{minSeq:record.accepted.replySeq||record.accepted.userSeq||0,completed:record.accepted.state==='completed'}).catch(()=>{});
   }
  }
  async waitProjection(descriptor){
@@ -263,6 +274,10 @@ class SharedSessionClient{
   for(const record of this.byExecution.values())if(record.sharedId===mapping.sharedId){const saved=this.preview(record,mapping);if(saved)values.set(saved.executionId,saved);}
   for(const observer of this.observers.values())if(observer.projection?.sharedId===mapping.sharedId){const live=observer.projection.value();if(!values.has(live.executionId)||live.partialResult||live.request?.state==='completed'||live.request?.state==='abandoned')values.set(live.executionId,{...live,projectionSynced:observer.projectionSynced===true,canCancel:Boolean(this.byExecution.get(live.executionId)?.serverSession&&!this.byExecution.get(live.executionId)?.remote&&!this.runtime.readOnly&&this.runtime.capabilities.features?.includes('shared-session-cancel-v1'))});}
   return [...values.values()];
+ }
+ invalidateAccess(){
+  for(const observer of [...this.observers.values(),...this.topicObservers.values()])observer.controller.abort();
+  this.observers.clear();this.topicObservers.clear();this.contexts.clear();
  }
  async close(){this.closed=true;for(const observer of [...this.observers.values(),...this.topicObservers.values()])observer.controller.abort();await Promise.allSettled([...this.observers.values(),...this.topicObservers.values()].map(v=>v.task));await Promise.allSettled([...this.projections.values(),...this.warming.values()]);this.observers.clear();this.topicObservers.clear();}
 }

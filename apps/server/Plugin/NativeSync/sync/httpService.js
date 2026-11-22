@@ -18,6 +18,14 @@ function createSyncHttpService(store) {
         active++;
         try {
             const url = new URL(req.url, 'http://localhost');
+            if (url.pathname === '/shared/watch') {
+                if (quiescing) throw Object.assign(Error('HOST_DRAINING'),{code:'HOST_DRAINING',status:503});
+                if (req.method !== 'GET') throw Object.assign(Error('METHOD_NOT_ALLOWED'),{code:'METHOD_NOT_ALLOWED',status:405});
+                let stream;
+                stream=require('./sharedHttp').openSharedWatch(store,req,res,url,()=>eventStreams.delete(stream));
+                if(!res.writableEnded&&!res.destroyed)eventStreams.add(stream);
+                return;
+            }
             if (url.pathname === '/shared/session-events') {
                 if (quiescing) throw Object.assign(Error('HOST_DRAINING'),{code:'HOST_DRAINING',status:503});
                 if (req.method !== 'GET') throw Object.assign(Error('METHOD_NOT_ALLOWED'),{code:'METHOD_NOT_ALLOWED',status:405});

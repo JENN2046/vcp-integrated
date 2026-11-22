@@ -39,10 +39,14 @@ async function open(r){
   r.attachments=new (require('./attachments').DesktopAttachments)({queue:r.queue,appDataRoot:r.root,connection:{...r.connection,topics:r.mappings().filter(m=>r.isLocalVisible(m.sharedId)).map(m=>m.local)},send:r.send,download:r.download,storeAttachment:r.storeAttachment,routeBase:'/api/plugins/NativeSync/shared-attachments/',localOnly:true,getMapping:()=>r.mappings().map(m=>({key:m.sharedId,ownerType:m.local.itemType,ownerId:m.local.itemId,topicId:m.local.topicId})),onMaterialized:(d,result)=>r.notify({agentId:d.itemId,ownerId:d.itemId,ownerType:d.itemType,topicId:d.topicId,revision:result.revision,source:'native-sync'})});
   adapter.attachmentRecovery = r.attachments;
  }
- r.tick=async({background=false}={})=>{
+ await tick(r);
+ if(r.isStopping())throw fail('APPLICATION_SHUTTING_DOWN');
+ r.ready=true;
+ r.startScheduler();
+}
+
+async function tick(r,{hints=null,forceAttachments=false,skipAttachments=false}={}){
   if(r.closed)return;
-  if(background)r.waitClient.configure(r.capabilities.features?.includes('shared-wait-v1'));
-  const hints=background?r.waitClient.take():null;
   let after='';
   if(!hints||hints.has('changes')||hints.has('matches'))for(;;){
    const page=await r.send(endpoint+'directory?'+new URLSearchParams({sharedSpaceId:r.connection.sharedSpaceId,after,limit:'128'}));
@@ -51,17 +55,21 @@ async function open(r){
     if(!r.state.locals[object.id]){r.error='SHARED_READ_ONLY_REPLICA_INCOMPLETE';continue;}
     const old=r.state.objects[object.id];if(!old||object.deleted!==old.deleted)throw fail('SHARED_READ_ONLY_REPLICA_CHANGED');
     if(!object.deleted&&r.isLocalVisible(object.id))await r.configs.receive(object);
-    r.state.objects[object.id]=r.summary(object);
+    const summary=r.summary(object);
+    if(stable(old)!==stable(summary)){
+     r.state.objects[object.id]=summary;
+     r.readOnlyRegistryDirty=true;
+    }
    }
    if(!page.hasMore)break;if(!page.next||page.next===after)throw fail('SHARED_DIRECTORY_INVALID');after=page.next;
   }
-  if(!hints||hints.has('changes')||hints.has('matches'))await r.save();
-  if(!hints||hints.has('pull')||r.adapter.degraded||r.adapter.state.inbox.length||r.adapter.state.pending)await r.replica.sync();
-  if(r.attachments?.work.shouldRun())await r.attachments.work.run(r.mappings().filter(m=>r.isLocalVisible(m.sharedId)).map(m=>({...m.local,attachmentBinding:m.sharedId})),{readOnly:true});
- };
- await r.tick();
- if(r.isStopping())throw fail('APPLICATION_SHUTTING_DOWN');
- r.ready=true;
- if(r.intervalMs>0){r.timer=setInterval(()=>r.scheduleTick(),r.intervalMs);r.timer.unref?.();}
+  if(r.readOnlyRegistryDirty){
+   await r.save();
+   r.readOnlyRegistryDirty=false;
+  }
+  if(!hints||hints.has('pull')||r.recoverableMessages())await r.replica.sync({pullOnly:true});
+  else r.adapter.retryNotifications();
+  if(!skipAttachments&&r.attachments&&(forceAttachments||r.attachments.work.shouldRun()))await r.attachments.work.run(r.mappings().filter(m=>r.isLocalVisible(m.sharedId)).map(m=>({...m.local,attachmentBinding:m.sharedId})),{readOnly:true});
+  r.error=null;
 }
-module.exports={open};
+module.exports={open,tick};
