@@ -1,0 +1,27 @@
+{
+  "context": {
+    "itemId": "ns_cdbb202e6edb4e22fa9d0d6f",
+    "itemType": "agent",
+    "topicId": "ns_28871355e93d37e2c8be60b6",
+    "historyRevision": 18
+  },
+  "text": "用户\n2026-11-22 14:14\n\nSend-recovery compare 02: accept exactly once.\n\nSynthetic lost receipt\n2026-11-22 14:14\n\n合成回复完成。",
+  "composer": "",
+  "selectionText": "",
+  "selectionInTranscript": false,
+  "reading": {
+    "scrollTop": 0,
+    "height": 704,
+    "scrollHeight": 704
+  },
+  "history": [
+    {
+      "id": "msg_1795328083067_user_o0iyw2caho",
+      "role": "user"
+    },
+    {
+      "id": "reply_request_f7b2304e20c34928ada744ca1637ab19",
+      "role": "assistant"
+    }
+  ]
+}

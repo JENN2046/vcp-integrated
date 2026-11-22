@@ -1,0 +1,55 @@
+{
+  "status": "PASS",
+  "sameProfile": true,
+  "newElectronProcess": true,
+  "sameHistory": true,
+  "sameDom": true,
+  "sameWork": true,
+  "workId": "request_f7b2304e20c34928ada744ca1637ab19",
+  "sharedTopicId": "shared_0842d8c75e70433ab4f24e9588e2189a",
+  "sendAttempts": 0,
+  "portableFiles": [
+    {
+      "source": "packages/core-rules/group/modelSelection.js",
+      "installedPath": "apps/desktop/node_modules/@vcp/core-rules/group/modelSelection.js",
+      "expectedSha256": "5a978002a9aa78580e1cc806b0cd70eb6e109271e9bd61775a0bfb9eb5e5dab1",
+      "actualSha256": "5a978002a9aa78580e1cc806b0cd70eb6e109271e9bd61775a0bfb9eb5e5dab1"
+    },
+    {
+      "source": "packages/core-rules/group/streamDelta.js",
+      "installedPath": "apps/desktop/node_modules/@vcp/core-rules/group/streamDelta.js",
+      "expectedSha256": "e817c037fd1c5a19ec28af1b29ae61b77cfc5f7f565f5f4b86094480287e3f0f",
+      "actualSha256": "e817c037fd1c5a19ec28af1b29ae61b77cfc5f7f565f5f4b86094480287e3f0f"
+    },
+    {
+      "source": "packages/core-rules/requestEnvelope.cjs",
+      "installedPath": "apps/desktop/node_modules/@vcp/core-rules/requestEnvelope.cjs",
+      "expectedSha256": "c6ce91b16a59910f5dac0392b2e3b7e9816cfcc234d19f87a316a9dd8165c896",
+      "actualSha256": "c6ce91b16a59910f5dac0392b2e3b7e9816cfcc234d19f87a316a9dd8165c896"
+    },
+    {
+      "source": "apps/desktop/modules/chat/historyWindow/index.mjs",
+      "installedPath": "apps/desktop/modules/chat/historyWindow/index.mjs",
+      "expectedSha256": "bc6ac15b2431321340508a8d5510f1d89f1c50bc62c8ff2906400d049db75338",
+      "actualSha256": "bc6ac15b2431321340508a8d5510f1d89f1c50bc62c8ff2906400d049db75338"
+    },
+    {
+      "source": "apps/desktop/modules/chat/historyWindow/package.json",
+      "installedPath": "apps/desktop/modules/chat/historyWindow/package.json",
+      "expectedSha256": "7df6542bea94235adbb44f2a9f04d77326fe0a2ebbefc973a642999a2e9ce4c4",
+      "actualSha256": "7df6542bea94235adbb44f2a9f04d77326fe0a2ebbefc973a642999a2e9ce4c4"
+    },
+    {
+      "source": "apps/desktop/modules/chat/historyWindow/requestMetadata.mjs",
+      "installedPath": "apps/desktop/modules/chat/historyWindow/requestMetadata.mjs",
+      "expectedSha256": "4f7179ddbe4a45dc32dfbb84b3a9d79282ce027c48d5f911b6f1913ee12f0bcd",
+      "actualSha256": "4f7179ddbe4a45dc32dfbb84b3a9d79282ce027c48d5f911b6f1913ee12f0bcd"
+    },
+    {
+      "source": "apps/desktop/modules/chat/historyWindow/tavernContext.mjs",
+      "installedPath": "apps/desktop/modules/chat/historyWindow/tavernContext.mjs",
+      "expectedSha256": "ad9368e3772f92a591e9deff2321f303b6eeb02ea231927aacef553ac39f71f4",
+      "actualSha256": "ad9368e3772f92a591e9deff2321f303b6eeb02ea231927aacef553ac39f71f4"
+    }
+  ]
+}

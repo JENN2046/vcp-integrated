@@ -1,0 +1,17 @@
+{
+  "pid": "24269",
+  "focus": "  mCurrentFocus=Window{328b874 u12 org.mozilla.firefox/org.mozilla.fenix.customtabs.ExternalAppBrowserActivity}",
+  "secure": true,
+  "visible": true,
+  "standalone": true,
+  "origin": "https://127.0.0.1:18443",
+  "connection": "服务可达",
+  "bundle": "/mobile/assets/index-COF_fHbg.js",
+  "workerControlled": true,
+  "isPrivate": false,
+  "browsingContextID": 2,
+  "readback": {
+    "status": 401,
+    "sessionMarker": null
+  }
+}

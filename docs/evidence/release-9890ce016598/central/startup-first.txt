@@ -1,0 +1,2 @@
+{"event":"trust-ready","publicCa":"/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/release-9890ce0-1mb9zc/.runs/hardware/run-yd8pBX/hardware-ca.pem","publicCaDer":"/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/release-9890ce0-1mb9zc/.runs/hardware/run-yd8pBX/hardware-ca.der","publicLeaf":"/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/release-9890ce0-1mb9zc/.runs/hardware/run-yd8pBX/loopback-cert.pem"}
+Backend exited 1

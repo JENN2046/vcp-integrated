@@ -102,3 +102,5 @@ Android 首次配对立即强停已定位到隔离 WebView 的 Cookie 写盘时�
 以上三项合并后的原生套件 256 项通过、6 项因原压缩夹具未提供而跳过，协作套件 60 项通过。另跑的侧聊删除夹具有 7 项在创建测试 History 时返回 HISTORY_OWNER_MISSING；干净的改前基线也在同一处失败。
 
 `nativeRules` 剩余三个入口已完成归属复审。实测后，普通单聊时间戳标注归到原生 History 包，群聊模型选择和流片正文提取归到共享规则包。统一模型 ID 带首尾空格时，共享派发与获准图片的准入恢复；模型授权仍按规整后的精确 ID 校验。所有旧入口保留兼容转发。[复审与前后回执](evidence/remaining-rules/README.md)
+
+固定候选 `9890ce016598` 完成干净重建和三端隔离收口。Linux、原 Windows R16 虚拟机和原 Android 手机上的已安装 Firefox PWA 在重开后各自读回同一已完成 Work 和同两条消息；中央一次尝试、一次派发、一次合成 Provider 请求。手机隔离用户 12 按 Jenn 的选择保留。[构建哈希、三端核对与截图](evidence/release-9890ce016598/README.md)

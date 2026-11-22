@@ -1,0 +1,34 @@
+{
+  "result": "PASS",
+  "fixed": "9890ce016598b0814d7ee09fce07766a45356352",
+  "sharedTopicId": "shared_0842d8c75e70433ab4f24e9588e2189a",
+  "workId": "request_f7b2304e20c34928ada744ca1637ab19",
+  "requestId": "msg_1795328083067_user_o0iyw2caho",
+  "state": "completed",
+  "workCount": 1,
+  "attempts": 1,
+  "dispatched": 1,
+  "totalProviderRequests": 1,
+  "journal": [
+    {
+      "seq": 1,
+      "id": "msg_1795328083067_user_o0iyw2caho",
+      "role": "user",
+      "utf8Bytes": 46,
+      "contentSha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "seq": 2,
+      "id": "reply_request_f7b2304e20c34928ada744ca1637ab19",
+      "role": "assistant",
+      "utf8Bytes": 21,
+      "contentSha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "reopened": {
+    "linuxPid": 681331,
+    "windowsPid": 9628,
+    "androidFirefoxPid": "26120"
+  },
+  "linuxDomSuffix": "one verified Markdown LF per message"
+}

@@ -1,0 +1,16 @@
+{
+  "url": "https://127.0.0.1:18443/mobile/",
+  "agent": "Synthetic lost receipt",
+  "topic": "Sponsor target existing topic",
+  "sharedTopicId": "shared_0842d8c75e70433ab4f24e9588e2189a",
+  "desktopDescriptor": {
+    "itemType": "agent",
+    "itemId": "ns_cdbb202e6edb4e22fa9d0d6f",
+    "topicId": "ns_28871355e93d37e2c8be60b6"
+  },
+  "windowsDescriptor": {
+    "itemType": "agent",
+    "itemId": "ns_cdbb202e6edb4e22fa9d0d6f",
+    "topicId": "ns_28871355e93d37e2c8be60b6"
+  }
+}

@@ -1,0 +1,2 @@
+[Physical mobile fixture] Empty diary watcher unavailable due to host inotify exhaustion.
+[Physical mobile fixture] RAG parameter watcher unavailable due to host inotify exhaustion.

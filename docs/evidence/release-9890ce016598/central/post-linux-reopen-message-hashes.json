@@ -1,0 +1,46 @@
+{
+  "sharedTopicId": "shared_0842d8c75e70433ab4f24e9588e2189a",
+  "topicId": "ns_28871355e93d37e2c8be60b6",
+  "work": {
+    "id": "request_f7b2304e20c34928ada744ca1637ab19",
+    "request_id": "msg_1795328083067_user_o0iyw2caho",
+    "state": "completed",
+    "attempts": 1,
+    "request_dispatched": 1,
+    "user_message_id": "msg_1795328083067_user_o0iyw2caho",
+    "user_seq": 1,
+    "reply_message_id": "reply_request_f7b2304e20c34928ada744ca1637ab19"
+  },
+  "sequences": [
+    1,
+    2
+  ],
+  "journal": [
+    {
+      "id": "msg_1795328083067_user_o0iyw2caho",
+      "role": "user",
+      "utf8Bytes": 46,
+      "contentSha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "id": "reply_request_f7b2304e20c34928ada744ca1637ab19",
+      "role": "assistant",
+      "utf8Bytes": 21,
+      "contentSha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "desktop": [
+    {
+      "id": "msg_1795328083067_user_o0iyw2caho",
+      "role": "user",
+      "utf8Bytes": 46,
+      "contentSha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "id": "reply_request_f7b2304e20c34928ada744ca1637ab19",
+      "role": "assistant",
+      "utf8Bytes": 21,
+      "contentSha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ]
+}

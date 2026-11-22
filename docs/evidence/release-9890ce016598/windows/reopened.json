@@ -1,0 +1,146 @@
+{
+  "status": "PASS",
+  "phase": "reopened",
+  "candidate": "9890ce016598b0814d7ee09fce07766a45356352",
+  "sharedTopicId": "shared_0842d8c75e70433ab4f24e9588e2189a",
+  "platform": "win32",
+  "arch": "x64",
+  "osRelease": "10.0.22631",
+  "ordinaryTestAccount": true,
+  "https": {
+    "strict": true,
+    "statusCode": 200,
+    "observedUtc": "2026-11-22T06:15:55.640Z"
+  },
+  "electron": {
+    "pid": 9628,
+    "version": "44.9.3",
+    "sandbox": true
+  },
+  "nativeSync": {
+    "ready": true,
+    "readOnly": false
+  },
+  "desktopTopic": {
+    "itemId": "ns_cdbb202e6edb4e22fa9d0d6f",
+    "itemType": "agent",
+    "topicId": "ns_28871355e93d37e2c8be60b6",
+    "historyRevision": 6
+  },
+  "work": {
+    "id": "request_f7b2304e20c34928ada744ca1637ab19",
+    "state": "completed",
+    "source": "Windows B authenticated read-only GET /api/v1/sync/shared/work",
+    "rendererStatus": {
+      "success": true,
+      "topic": {
+        "ownerType": "agent",
+        "ownerId": "ns_cdbb202e6edb4e22fa9d0d6f",
+        "topicId": "ns_28871355e93d37e2c8be60b6"
+      },
+      "connection": "online"
+    }
+  },
+  "dom": [
+    {
+      "id": "msg_1795328083067_user_o0iyw2caho",
+      "text": "Send-recovery compare 02: accept exactly once.",
+      "visible": true,
+      "bytes": 46,
+      "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "id": "reply_request_f7b2304e20c34928ada744ca1637ab19",
+      "text": "合成回复完成。",
+      "visible": true,
+      "bytes": 21,
+      "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "history": [
+    {
+      "id": "msg_1795328083067_user_o0iyw2caho",
+      "role": "user",
+      "bytes": 46,
+      "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "id": "reply_request_f7b2304e20c34928ada744ca1637ab19",
+      "role": "assistant",
+      "bytes": 21,
+      "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "executableDigests": {
+    "electron": "61f45e6f522c666c6156222680712870b38f3a4acbd2e847b987f53ddb613544",
+    "cds": "8fd97cfe18abf25a707fe50f760b9065939913a38612e762568d21db6401a9ed"
+  },
+  "loaded": {
+    "main": [
+      {
+        "file": "apps\\desktop\\main.js",
+        "sha256": "7027975eacea21ba1d4259121b0c53960333c1ba1cd44e0c84bfca673a79a7db"
+      },
+      {
+        "file": "apps\\desktop\\modules\\ipc\\chatHandlers.js",
+        "sha256": "80163e3b8a0120a030fd866f7dd09d40f6d4180b6053c0b102d332f781d8996d"
+      },
+      {
+        "file": "apps\\desktop\\modules\\services\\nativeSync\\queries.js",
+        "sha256": "33b1c89ee9d48383e96e04adc0d786f07305c3bf03c5aeecfe2cc22a0e1b2579"
+      },
+      {
+        "file": "apps\\desktop\\modules\\services\\nativeSync\\sharedRuntime.js",
+        "sha256": "0eede772271e4549e20ff2170f53c9430372448c5811922be7782d407bc1e145"
+      },
+      {
+        "file": "apps\\desktop\\modules\\services\\nativeSync\\sharedSessionClient.js",
+        "sha256": "aefae06d0bc48e601da231bd9a75140f75b860e08d1b909860a5a5f8a01fe879"
+      }
+    ],
+    "renderer": [
+      {
+        "file": "apps\\desktop\\modules\\renderer\\nativeExecutionStatus.js",
+        "bytes": 24298,
+        "sha256": "11000b421265d9d6a79b80adbe644da30ffae0a21747a1aab2b218b320e3b3b2"
+      },
+      {
+        "file": "apps\\desktop\\modules\\messageRenderer.js",
+        "bytes": 246762,
+        "sha256": "e3741c4ae084be080e4d76dc49c636a22a99bd7f224f93cedf99bed3cdd9b480"
+      },
+      {
+        "file": "apps\\desktop\\modules\\renderer\\mainChatSendOwner.js",
+        "bytes": 9043,
+        "sha256": "b1c8836bbeb62dc96db5e81439a01ee28d69c36382b441663e7707928ddea0ef"
+      }
+    ],
+    "configuredPreload": {
+      "file": "preloads\\bundled\\dist\\chat.cjs",
+      "sha256": "4784579532125df77b8f8d1def627201ffb1569555d490a76bcc725ef8287c46",
+      "source": "candidate main BrowserWindow preload path and renderer-ready"
+    }
+  },
+  "processesWhileVisible": {
+    "electron": [
+      9628,
+      10184,
+      9572,
+      1112,
+      2644
+    ],
+    "cds": [
+      5968
+    ]
+  },
+  "exit": {
+    "code": 0,
+    "signal": null
+  },
+  "electronQuit": true,
+  "sendAttempts": 0,
+  "processesAfterQuit": {
+    "electron": [],
+    "cds": []
+  }
+}

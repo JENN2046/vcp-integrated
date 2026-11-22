@@ -1,0 +1,6 @@
+{
+  "status": "FAIL",
+  "progress": "first-hashes-and-picture",
+  "code": "ERR_ASSERTION",
+  "message": "The \"to\" argument must be of type string. Received undefined"
+}

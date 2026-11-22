@@ -1,0 +1,134 @@
+[
+  {
+    "file": "apps/server/server.js",
+    "sha256": "c60113f95d9d007536329890254593accc08e25118b9de229b7c73f7f6f8fcd0"
+  },
+  {
+    "file": "apps/server/Plugin.js",
+    "sha256": "5fe109606e02b4101c8da15c5a810cd2d83a1796117dfcac91979491c52d3339"
+  },
+  {
+    "file": "apps/server/WebSocketServer.js",
+    "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+  },
+  {
+    "file": "apps/server/modules/requestExecutionContext.js",
+    "sha256": "ff4c4116a9c6d072801c9f8212efe60db93cc0e4809b79da1391e3dcc19370e6"
+  },
+  {
+    "file": "apps/server/modules/chatCompletionHandler.js",
+    "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+    "sha256": "f81257e9ec5f4bfd2d2a1215eb4ac55f4223b4b8fc6fe83cc1c28e41a53bbff7"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+    "sha256": "3efd8bf1b4c4411d7f8ec5c648ded72bc19f8e836058c644aa8050684baed133"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+    "sha256": "8601d3070ba9c92ac5288560ed6d4890d2bc308633363a70e1e3046aca180672"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+    "sha256": "2e637687e88f05d3ae23cb19e663b3a0e5998f424df4101cb7663f9fb41e5481"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+    "sha256": "3d7e244833f4ae60c30e6b932752f2cdf9b09f06df628604792bda0078197218"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+    "sha256": "580884bdced290388783b091e7373fa15660c698da6575902a94358fb14febfc"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/httpService.js",
+    "sha256": "55bf6eb3188466d8fbe4d8d7eef974eeb6126a5e094d1084e4d207b8d78ab736"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedWait.js",
+    "sha256": "b3759186f90387d8bb75033ecb8e007fbda2a23d3f15c03f13b4304051edea6a"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+    "sha256": "bc11d752b51c71223f038fb07636fa2f5b24d06afcbcc356d4a3870198b38384"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+    "sha256": "a1b166d894a7e697a54a226b78d381388e1fffe39c0984bf20441069beba4fa3"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+    "sha256": "c0be485ee31ed3d50db0e5a7e5e72aa38110434fe63c23606a7855a05ca7d512"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/mobile/effectiveContext.js",
+    "sha256": "537a2c00f7c6400324bb9f4a0ddfac09eb79c862b751b9803846342e9b0f704b"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+    "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+    "sha256": "bfa37eafa91b3e1891569a3bfb3bd039bd02426dd4118110f747b06758047040"
+  },
+  {
+    "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+    "sha256": "072cf520ebb2638b85ea2bfe84b0226a216d9996748697c9e1324b3f88156793"
+  },
+  {
+    "file": "apps/server/modules/nativeContinuationStore.cjs",
+    "sha256": "f6774df34bdcc60346f4ed49f5dccaa2e0da5645b5b60ea29f364f89a5090ee6"
+  },
+  {
+    "file": "apps/server/modules/handlers/streamHandler.js",
+    "sha256": "77e127138074731dae6a3a134cdb5758955e7c99484f6fc659712c8506d063ec"
+  },
+  {
+    "file": "apps/server/modules/handlers/nonStreamHandler.js",
+    "sha256": "6707aec0a74cb5af8887a4e726ccfc89d6da57c93bfd4d5a3d19691f359cc9f2"
+  },
+  {
+    "file": "apps/server/modules/pluginBridgeRegistry.js",
+    "sha256": "635c94f249a0f67cb085ae51f1a53e08dc49ddf2aaadb30e434fe6a9a36900f3"
+  },
+  {
+    "file": "apps/server/modules/toolCallRecordStore.js",
+    "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+    "sha256": "447c7a61ff0730e8c55154c7597a38c6c3043e9f5870b918e539489850ab729c"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+    "sha256": "299fc48e0a1a0687a59f8c19adb91398ea61e40115f5a482a89caadf6d1d03a5"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/mobile/groupTurn.js",
+    "sha256": "7d37337452fd8428aff74a40f621631a70b7f1bf9584ef6bd3538bac0de3d3f7"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/mobile/portal.js",
+    "sha256": "fd4ff20987a5410ee1ed65fa358226ef869e727238daf8cbb704cce09a7fa307"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedTurns.js",
+    "sha256": "7df79649f69c57b7ce800a8e85f3345d604b93bda81f45e58dcbee2aa7a6b2a7"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sharedEvents.js",
+    "sha256": "62e81d32e6e963554cdce3343ba3942a62414e91cc723170356b54cda7ed3a81"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/native-sync.js",
+    "sha256": "e992d5e8cdcad4a1330062d1f552337428c70b7d2e8d08225eba38bc11dbc3f9"
+  },
+  {
+    "file": "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js",
+    "sha256": "3995577964cfb7844d251680055480197a73dacafdf5bf9464c2c52ac9b5bfb2"
+  }
+]
