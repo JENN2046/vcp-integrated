@@ -1,0 +1,156 @@
+{
+  "before": {
+    "revision": "b5648e96d883",
+    "first": {
+      "work": {
+        "kind": "shared_session",
+        "state": "publishing",
+        "attempts": 1,
+        "error_code": null,
+        "user_message_id": "upstream-error-stream-shared-session",
+        "reply_message_id": null,
+        "pending_operation": "{\"ownerType\":\"agent\",\"ownerId\":\"shared_02c7c4d677b04d82ad033ed302deb9b0\",\"topicId\":\"shared_feead19d629b4dd2bab3aff303c454ad\",\"msgId\":\"reply_request_6550688a2fc547cdab75585330cc4985\",\"deviceId\":\"server:native-execution\",\"opId\":\"reply:request_6550688a2fc547cdab75585330cc4985\",\"action\":\"upsert\",\"baseHash\":null,\"message\":{\"id\":\"reply_request_6550688a2fc547cdab75585330cc4985\",\"role\":\"assistant\",\"content\":\"[UPSTREAM_ERROR] 上游API返回状态码 502，错误信息: {\\\"error\\\":{\\\"message\\\":\\\"SYNTHETIC_UPSTREAM_502\\\"}}\",\"timestamp\":1795369928628,\"agentId\":\"shared_02c7c4d677b04d82ad033ed302deb9b0\",\"name\":\"Synthetic shared\",\"continuity\":{\"version\":1,\"known\":true,\"requestId\":\"upstream-error-stream-shared-session\",\"executionId\":\"request_6550688a2fc547cdab75585330cc4985\",\"dependsOnMessageIds\":[\"upstream-error-stream-shared-session\"]}},\"metadata\":{\"version\":1,\"hash\":\"5fb1be2897cc962d6a70208f86b04e7da74b88cb2be7cf1c27b158d95683293a\",\"fields\":{\"continuity\":{\"version\":1,\"known\":true,\"requestId\":\"upstream-error-stream-shared-session\",\"executionId\":\"request_6550688a2fc547cdab75585330cc4985\",\"dependsOnMessageIds\":[\"upstream-error-stream-shared-session\"]}}}}",
+        "native_final_operation": null
+      },
+      "admission": {
+        "state": "review_required",
+        "dispatched": 1,
+        "native_terminal": 0,
+        "reply_seq": null
+      },
+      "native": [
+        {
+          "state": "unknown"
+        }
+      ],
+      "history": [
+        {
+          "id": "upstream-error-stream-shared-session",
+          "action": "upsert"
+        }
+      ],
+      "providerStreams": [
+        true
+      ]
+    },
+    "afterReplay": {
+      "work": {
+        "kind": "shared_session",
+        "state": "publishing",
+        "attempts": 1,
+        "error_code": null,
+        "user_message_id": "upstream-error-stream-shared-session",
+        "reply_message_id": null,
+        "pending_operation": "{\"ownerType\":\"agent\",\"ownerId\":\"shared_02c7c4d677b04d82ad033ed302deb9b0\",\"topicId\":\"shared_feead19d629b4dd2bab3aff303c454ad\",\"msgId\":\"reply_request_6550688a2fc547cdab75585330cc4985\",\"deviceId\":\"server:native-execution\",\"opId\":\"reply:request_6550688a2fc547cdab75585330cc4985\",\"action\":\"upsert\",\"baseHash\":null,\"message\":{\"id\":\"reply_request_6550688a2fc547cdab75585330cc4985\",\"role\":\"assistant\",\"content\":\"[UPSTREAM_ERROR] 上游API返回状态码 502，错误信息: {\\\"error\\\":{\\\"message\\\":\\\"SYNTHETIC_UPSTREAM_502\\\"}}\",\"timestamp\":1795369928628,\"agentId\":\"shared_02c7c4d677b04d82ad033ed302deb9b0\",\"name\":\"Synthetic shared\",\"continuity\":{\"version\":1,\"known\":true,\"requestId\":\"upstream-error-stream-shared-session\",\"executionId\":\"request_6550688a2fc547cdab75585330cc4985\",\"dependsOnMessageIds\":[\"upstream-error-stream-shared-session\"]}},\"metadata\":{\"version\":1,\"hash\":\"5fb1be2897cc962d6a70208f86b04e7da74b88cb2be7cf1c27b158d95683293a\",\"fields\":{\"continuity\":{\"version\":1,\"known\":true,\"requestId\":\"upstream-error-stream-shared-session\",\"executionId\":\"request_6550688a2fc547cdab75585330cc4985\",\"dependsOnMessageIds\":[\"upstream-error-stream-shared-session\"]}}}}",
+        "native_final_operation": null
+      },
+      "admission": {
+        "state": "review_required",
+        "dispatched": 1,
+        "native_terminal": 0,
+        "reply_seq": null
+      },
+      "native": [
+        {
+          "state": "unknown"
+        }
+      ],
+      "history": [
+        {
+          "id": "upstream-error-stream-shared-session",
+          "action": "upsert"
+        }
+      ],
+      "providerStreams": [
+        true
+      ]
+    },
+    "wireFrames": [
+      {
+        "status": 200,
+        "upstreamStatus": 502,
+        "contentType": "text/event-stream",
+        "chunk": "data: {\"id\":\"chatcmpl-VCP-upstream-error-1795369928614\",\"object\":\"chat.completion.chunk\",\"created\":1795369928,\"model\":\"synthetic\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"[UPSTREAM_ERROR] 上游API返回状态码 502，错误信息: {\\\"error\\\":{\\\"message\\\":\\\"SYNTHETIC_UPSTREAM_502\\\"}}\"},\"finish_reason\":\"stop\"}]}\n\n"
+      }
+    ],
+    "replayed": true,
+    "loadedSourceCount": 33
+  },
+  "after": {
+    "revision": "526809f27e1a",
+    "first": {
+      "work": {
+        "kind": "shared_session",
+        "state": "review_required",
+        "attempts": 1,
+        "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+        "user_message_id": "upstream-error-stream-shared-session",
+        "reply_message_id": null,
+        "pending_operation": null,
+        "native_final_operation": null
+      },
+      "admission": {
+        "state": "review_required",
+        "dispatched": 1,
+        "native_terminal": 0,
+        "reply_seq": null
+      },
+      "native": [
+        {
+          "state": "unknown"
+        }
+      ],
+      "history": [
+        {
+          "id": "upstream-error-stream-shared-session",
+          "action": "upsert"
+        }
+      ],
+      "providerStreams": [
+        true
+      ]
+    },
+    "afterReplay": {
+      "work": {
+        "kind": "shared_session",
+        "state": "review_required",
+        "attempts": 1,
+        "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+        "user_message_id": "upstream-error-stream-shared-session",
+        "reply_message_id": null,
+        "pending_operation": null,
+        "native_final_operation": null
+      },
+      "admission": {
+        "state": "review_required",
+        "dispatched": 1,
+        "native_terminal": 0,
+        "reply_seq": null
+      },
+      "native": [
+        {
+          "state": "unknown"
+        }
+      ],
+      "history": [
+        {
+          "id": "upstream-error-stream-shared-session",
+          "action": "upsert"
+        }
+      ],
+      "providerStreams": [
+        true
+      ]
+    },
+    "wireFrames": [
+      {
+        "status": 200,
+        "upstreamStatus": 502,
+        "contentType": "text/event-stream",
+        "chunk": "data: {\"id\":\"chatcmpl-VCP-upstream-error-1795369925461\",\"object\":\"chat.completion.chunk\",\"created\":1795369925,\"model\":\"synthetic\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"[UPSTREAM_ERROR] 上游API返回状态码 502，错误信息: {\\\"error\\\":{\\\"message\\\":\\\"SYNTHETIC_UPSTREAM_502\\\"}}\"},\"finish_reason\":\"stop\"}]}\n\n"
+      }
+    ],
+    "replayed": true,
+    "loadedSourceCount": 33
+  }
+}

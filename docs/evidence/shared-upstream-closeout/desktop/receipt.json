@@ -1,0 +1,339 @@
+{
+  "desktopRevision": "526809f27e1a1b8dfaa49fbaf736c1ce9a998b15",
+  "electron": "44.9.3",
+  "sandbox": true,
+  "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+  "baseline": {
+    "serverRevision": "b5648e96d8832818fce03e50da5415b05f9f1487",
+    "observedAfterErrorRendered": {
+      "work": [
+        {
+          "id": "request_56eef532438c487dac32336d4692cd06",
+          "request_id": "msg_1795370132306_user_2ij8zsc5q9",
+          "state": "publishing",
+          "attempts": 1,
+          "error_code": null,
+          "user_message_id": "msg_1795370132306_user_2ij8zsc5q9",
+          "reply_message_id": null,
+          "pending_operation": "[UPSTREAM_ERROR] 上游API返回状态码 502，错误信息: {\"error\":{\"message\":\"SYNTHETIC_UPSTREAM_502\"}}",
+          "native_final_operation": null,
+          "review_resolved": 0
+        }
+      ],
+      "admissions": [
+        {
+          "id": "request_56eef532438c487dac32336d4692cd06",
+          "principal": "desktop:deviceA",
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "user_seq": 1,
+          "reply_seq": null
+        }
+      ],
+      "nativeRequests": [
+        [
+          {
+            "id": "request_56eef532438c487dac32336d4692cd06",
+            "state": "unknown"
+          }
+        ]
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "id": "msg_1795370132306_user_2ij8zsc5q9",
+          "role": "user",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT"
+        }
+      ],
+      "physicalHistory": [
+        {
+          "id": "msg_1795370132306_user_2ij8zsc5q9",
+          "role": "user",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT"
+        }
+      ],
+      "provider": [
+        {
+          "id": "request_56eef532438c487dac32336d4692cd06",
+          "input": "SYNTHETIC_502_ORIGINAL_INPUT",
+          "stream": true,
+          "httpStatus": 502
+        }
+      ]
+    },
+    "exits": {
+      "A": {
+        "code": 0,
+        "signal": null
+      },
+      "backend": {
+        "code": 0,
+        "signal": null
+      }
+    }
+  },
+  "candidate": {
+    "serverRevision": "526809f27e1a1b8dfaa49fbaf736c1ce9a998b15",
+    "before": {
+      "work": [
+        {
+          "id": "request_d5f440e29b604428b4b42180867ffeb6",
+          "request_id": "msg_1795370146451_user_le7d59xjs7",
+          "state": "review_required",
+          "attempts": 1,
+          "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+          "user_message_id": "msg_1795370146451_user_le7d59xjs7",
+          "reply_message_id": null,
+          "pending_operation": null,
+          "native_final_operation": null,
+          "review_resolved": 0
+        }
+      ],
+      "admissions": [
+        {
+          "id": "request_d5f440e29b604428b4b42180867ffeb6",
+          "principal": "desktop:deviceA",
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "user_seq": 1,
+          "reply_seq": null
+        }
+      ],
+      "nativeRequests": [
+        [
+          {
+            "id": "request_d5f440e29b604428b4b42180867ffeb6",
+            "state": "unknown"
+          }
+        ]
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "id": "msg_1795370146451_user_le7d59xjs7",
+          "role": "user",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT"
+        }
+      ],
+      "physicalHistory": [
+        {
+          "id": "msg_1795370146451_user_le7d59xjs7",
+          "role": "user",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT"
+        }
+      ],
+      "provider": [
+        {
+          "id": "request_d5f440e29b604428b4b42180867ffeb6",
+          "input": "SYNTHETIC_502_ORIGINAL_INPUT",
+          "stream": true,
+          "httpStatus": 502
+        }
+      ]
+    },
+    "reviewUi": "需要核对 · 请求 msg_1795370146451_user_le7d59xjs7我已核对可能的工具副作用，放弃此请求剩余工作确认放弃并解除暂停",
+    "confirmation": {
+      "device": "deviceA",
+      "body": {
+        "sharedSpaceId": "sharedAB",
+        "admissionId": "request_d5f440e29b604428b4b42180867ffeb6",
+        "opId": "desktop-abandon_request_d5f440e29b604428b4b42180867ffeb6",
+        "confirm": true
+      }
+    },
+    "settled": {
+      "work": [
+        {
+          "id": "request_d5f440e29b604428b4b42180867ffeb6",
+          "request_id": "msg_1795370146451_user_le7d59xjs7",
+          "state": "cancelled",
+          "attempts": 1,
+          "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+          "user_message_id": "msg_1795370146451_user_le7d59xjs7",
+          "reply_message_id": null,
+          "pending_operation": null,
+          "native_final_operation": null,
+          "review_resolved": 1
+        }
+      ],
+      "admissions": [
+        {
+          "id": "request_d5f440e29b604428b4b42180867ffeb6",
+          "principal": "desktop:deviceA",
+          "state": "abandoned",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "user_seq": 1,
+          "reply_seq": null
+        }
+      ],
+      "nativeRequests": [
+        [
+          {
+            "id": "request_d5f440e29b604428b4b42180867ffeb6",
+            "state": "unknown"
+          }
+        ]
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "id": "msg_1795370146451_user_le7d59xjs7",
+          "role": "user",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT"
+        }
+      ],
+      "physicalHistory": [
+        {
+          "id": "msg_1795370146451_user_le7d59xjs7",
+          "role": "user",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT"
+        }
+      ],
+      "provider": [
+        {
+          "id": "request_d5f440e29b604428b4b42180867ffeb6",
+          "input": "SYNTHETIC_502_ORIGINAL_INPUT",
+          "stream": true,
+          "httpStatus": 502
+        }
+      ]
+    },
+    "next": {
+      "work": [
+        {
+          "id": "request_d5f440e29b604428b4b42180867ffeb6",
+          "request_id": "msg_1795370146451_user_le7d59xjs7",
+          "state": "cancelled",
+          "attempts": 1,
+          "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+          "user_message_id": "msg_1795370146451_user_le7d59xjs7",
+          "reply_message_id": null,
+          "pending_operation": null,
+          "native_final_operation": null,
+          "review_resolved": 1
+        },
+        {
+          "id": "request_fb7faf79f0a64ab7bb0bc0159d599cdc",
+          "request_id": "msg_1795370147656_user_kibmmw9cko",
+          "state": "completed",
+          "attempts": 1,
+          "error_code": null,
+          "user_message_id": "msg_1795370147656_user_kibmmw9cko",
+          "reply_message_id": "reply_request_fb7faf79f0a64ab7bb0bc0159d599cdc",
+          "pending_operation": null,
+          "native_final_operation": null,
+          "review_resolved": 0
+        }
+      ],
+      "admissions": [
+        {
+          "id": "request_d5f440e29b604428b4b42180867ffeb6",
+          "principal": "desktop:deviceA",
+          "state": "abandoned",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "user_seq": 1,
+          "reply_seq": null
+        },
+        {
+          "id": "request_fb7faf79f0a64ab7bb0bc0159d599cdc",
+          "principal": "desktop:deviceA",
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "user_seq": 2,
+          "reply_seq": 3
+        }
+      ],
+      "nativeRequests": [
+        [
+          {
+            "id": "request_d5f440e29b604428b4b42180867ffeb6",
+            "state": "unknown"
+          }
+        ],
+        [
+          {
+            "id": "request_fb7faf79f0a64ab7bb0bc0159d599cdc",
+            "state": "model_terminal"
+          }
+        ]
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "id": "msg_1795370146451_user_le7d59xjs7",
+          "role": "user",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT"
+        },
+        {
+          "seq": 2,
+          "id": "msg_1795370147656_user_kibmmw9cko",
+          "role": "user",
+          "content": "SYNTHETIC_502_NEXT_INPUT"
+        },
+        {
+          "seq": 3,
+          "id": "reply_request_fb7faf79f0a64ab7bb0bc0159d599cdc",
+          "role": "assistant",
+          "content": "SYNTHETIC_502_NEXT_FINAL"
+        }
+      ],
+      "physicalHistory": [
+        {
+          "id": "msg_1795370146451_user_le7d59xjs7",
+          "role": "user",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT"
+        },
+        {
+          "id": "msg_1795370147656_user_kibmmw9cko",
+          "role": "user",
+          "content": "SYNTHETIC_502_NEXT_INPUT"
+        },
+        {
+          "id": "reply_request_fb7faf79f0a64ab7bb0bc0159d599cdc",
+          "role": "assistant",
+          "content": "SYNTHETIC_502_NEXT_FINAL"
+        }
+      ],
+      "provider": [
+        {
+          "id": "request_d5f440e29b604428b4b42180867ffeb6",
+          "input": "SYNTHETIC_502_ORIGINAL_INPUT",
+          "stream": true,
+          "httpStatus": 502
+        },
+        {
+          "id": "request_fb7faf79f0a64ab7bb0bc0159d599cdc",
+          "input": "SYNTHETIC_502_NEXT_INPUT",
+          "stream": true,
+          "httpStatus": 200
+        }
+      ]
+    },
+    "replay": {
+      "status": 200,
+      "workId": "request_d5f440e29b604428b4b42180867ffeb6",
+      "requestId": "msg_1795370146451_user_le7d59xjs7",
+      "state": "abandoned",
+      "replayed": true,
+      "executionState": "cancelled",
+      "reviewResolved": true,
+      "providerCountAfterReplay": 2
+    },
+    "exits": {
+      "A": {
+        "code": 0,
+        "signal": null
+      },
+      "backend": {
+        "code": 0,
+        "signal": null
+      }
+    }
+  }
+}
