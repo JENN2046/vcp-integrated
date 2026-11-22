@@ -1,0 +1,19 @@
+{
+  "sourceCommit": "95e3f56cfdf5c9d0f59f7a96903ce976cbfbed0f",
+  "platform": "linux",
+  "fileOperator": {
+    "attachmentAbsoluteRead": "success",
+    "attachmentRawFileUriRead": "ENOENT",
+    "historyPosixRead": "success",
+    "historyPosixUpdate": "first matching assistant only",
+    "historyMixedSeparatorRead": "ENOENT",
+    "historyMixedSeparatorUpdate": "ENOENT",
+    "historyWindowsPath": "matches Windows path syntax"
+  },
+  "fileFetcher": {
+    "localFileUriResolution": "original file URI returned",
+    "remoteAdapterOperand": "original file URI",
+    "remoteResolution": "cache file URI with expected bytes",
+    "remoteAdapterCallsAfterRepeat": 1
+  }
+}

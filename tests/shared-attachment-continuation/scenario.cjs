@@ -12,18 +12,19 @@ const fixture = require('./fixture.cjs');
 const quote = JSON.stringify;
 const fileMarker = 'SYNTHETIC_FILE_SENTINEL_73';
 const digest = createHash('sha256').update(fixture.content).digest('hex');
+const baseline = process.env.NS_ATTACHMENT_PATH_BASELINE === '1';
 const textParts = messages => messages.flatMap(({ content }) => Array.isArray(content)
     ? content.filter(part => part.type === 'text').map(part => part.text)
     : [content]).filter(value => typeof value === 'string');
 
-module.exports = async ({ clients:{ A, B }, out, result, service, picture, click, evalJs, waitUntil, start, stop, profiles }) => {
+module.exports = async ({ clients:{ A, B, L }, cert, out, result, service, picture, click, evalJs, waitUntil, start, stop, profiles }) => {
     const topic = service.topics.preSubmit.id;
     const db = new DatabaseSync(path.join(service.data, 'central.sqlite'), { readOnly:true });
     const evidence = result.attachmentContinuation = {
         revision:execFileSync('git', ['rev-parse', 'HEAD'], {cwd:result.candidate,encoding:'utf8'}).trim(),
         topic, file:{ name:fixture.filename, digest, bytes:Buffer.byteLength(fixture.content) },
         chooser:'fixture-selected synthetic file via real desktop attachment IPC',
-        BDownloadCacheEnabled:false, turns:[],
+        BDownloadCacheEnabled:false, toolsForbidden:fixture.toolsForbidden, turns:[],
     };
     const works = () => db.prepare(`SELECT id,request_id,state,attempts,request_dispatched,user_message_id,reply_message_id
         FROM mobile_executions WHERE topic_key=? ORDER BY rowid`).all(topic);
@@ -37,6 +38,87 @@ module.exports = async ({ clients:{ A, B }, out, result, service, picture, click
     const preview = client => evalJs(client,
         "[...document.querySelectorAll('#attachmentPreviewArea .attachment-preview-item')].map(row => row.innerText)");
 
+    const handlerInputs = () => fs.existsSync(fixture.capture(out)) ? fs.readFileSync(fixture.capture(out), 'utf8')
+        .trim().split('\n').filter(Boolean).map(JSON.parse).filter(row => row.kind === 'handler-input') : [];
+    const requestStages = async (client, handler, provider, desktopDispatched) => {
+        const { renderer, ipc } = await client.command('read-request-output');
+        assert.equal(renderer.length, Number(desktopDispatched));
+        assert.deepEqual(renderer, ipc, 'renderer packets match sendToVCP IPC input');
+        return [
+            ...(desktopDispatched ? [['renderer output', renderer[0]], ['sendToVCP IPC', ipc[0]]] : []),
+            ['ToolBox handler', handler], ['loopback provider', provider],
+        ].map(([stage, packet]) => {
+            assert.ok(Array.isArray(packet?.messages), 'captured messages at ' + stage);
+            const userText = textParts(packet.messages.filter(row => row.role === 'user')).join('\n');
+            const systemText = textParts(packet.messages.filter(row => row.role === 'system')).join('\n');
+            return { stage, requestId:packet.messageId || packet.requestId || packet.id,
+                markerCount:userText.split(fileMarker).length - 1,
+                fileTextCount:userText.split(fixture.content.trimEnd()).length - 1,
+                localPathPresent:userText.includes('file://') || userText.includes(out) || userText.includes('internalPath'),
+                systemLocalPathPresent:systemText.includes(out),
+                forbiddenDirectivePresent:systemText.includes(fixture.forbiddenDirective),
+                attachmentHeader:userText.match(/^\[附加文件: .+\]$/m)?.[0].replaceAll(out, '<isolated-run>'),
+                userText:userText.replaceAll(out, '<isolated-run>'),
+            };
+        });
+    };
+    function assertStages(stages, attachmentPath, historyPath) {
+        assert.ok(stages[0].requestId);
+        for (const row of stages) {
+            assert.equal(row.requestId, stages[0].requestId, row.stage);
+            assert.equal(row.markerCount, 1, row.stage);
+            assert.equal(row.fileTextCount, 1, row.stage);
+            assert.equal(row.localPathPresent, attachmentPath, row.stage);
+            assert.equal(row.systemLocalPathPresent, historyPath, row.stage);
+            assert.equal(row.forbiddenDirectivePresent, fixture.toolsForbidden && row.stage !== 'loopback provider', row.stage);
+            assert.equal(row.userText, stages[0].userText, row.stage);
+            if (attachmentPath) {
+                assert.match(row.attachmentHeader, /^\[附加文件: file:\/\//, row.stage);
+                assert.ok(row.attachmentHeader.endsWith('/' + digest + '.txt]'), row.stage);
+            } else {
+                assert.equal(row.attachmentHeader, '[附加文件: ' + fixture.filename + ']', row.stage);
+            }
+        }
+    }
+    async function attach(client) {
+        await click(client, '#attachFileBtn');
+        await waitUntil(async () => (await preview(client)).some(text => text.includes(fixture.filename.slice(0, 17))),
+            'composer shows synthetic text attachment');
+    }
+    async function submit(client, prompt) {
+        await click(client, '#messageInput');
+        await client.command('type-composer', prompt);
+        await click(client, '#sendMessageBtn');
+    }
+    async function localControl() {
+        await click(L, '#agentList > li .agent-name', 'Synthetic local control');
+        await waitUntil(async () => (await evalJs(L, 'window.VCPStateChannels.get("conversation.current").get()')).topicId === 'local-topic',
+            'selected ordinary local topic');
+        const target = { itemType:'agent', itemId:'local-agent', topicId:'local-topic' };
+        const ownership = await evalJs(L, `window.chatAPI.getNativeDeletionContext(${quote(target)})`);
+        assert.equal(ownership.kind, 'local');
+        await attach(L);
+        await submit(L, fixture.prompts[0]);
+        const nativeHistory = path.join(profiles.L, 'UserData', 'local-agent', 'topics', 'local-topic', 'history.json');
+        const rows = await waitUntil(() => {
+            const saved = JSON.parse(fs.readFileSync(nativeHistory, 'utf8'));
+            return saved.find(row => row.role === 'assistant' && row.content === fixture.replies[0]) && saved;
+        }, 'local ordinary native History terminal');
+        await waitUntil(async () => (await transcript(L)).includes(fixture.replies[0]), 'local renderer terminal');
+        assert.equal(rows.find(row => row.role === 'user').attachments[0]._fileManagerData.hash, digest);
+        assert.deepEqual(admissions(), []);
+        assert.deepEqual(works(), []);
+        assert.equal(service.calls.length, 1);
+        assert.equal(handlerInputs().length, 1);
+        const [handler] = handlerInputs();
+        assert.equal(handler.workId, null);
+        evidence.localControl = { ownership:ownership.kind,
+            stages:await requestStages(L, handler, service.calls[0], true),
+            nativeHistory:rows.map(({ role, id }) => ({ role, id })),
+        };
+        assertStages(evidence.localControl.stages, true, true);
+        await picture(L, 'local-reply');
+    }
     async function select(client, role) {
         const target = service.descriptors[role].preSubmit;
         if (!await evalJs(client, "document.querySelector('#tabContentAgents').classList.contains('active')")) {
@@ -57,9 +139,8 @@ module.exports = async ({ clients:{ A, B }, out, result, service, picture, click
 
     async function send(client, role, index) {
         const prompt = fixture.prompts[index];
-        await click(client, '#messageInput');
-        await client.command('type-composer', prompt);
-        await click(client, '#sendMessageBtn');
+        const eventOffset = client.events.length;
+        await submit(client, prompt);
         const terminal = await waitUntil(() => {
             const current = admissions()[index];
             if (current?.state !== 'completed') return false;
@@ -73,17 +154,17 @@ module.exports = async ({ clients:{ A, B }, out, result, service, picture, click
         const work = { ...current, ...execution, user_message_id:user.id, reply_message_id:reply.id };
         const endpoint = index === 0 ? '/admit' : '/session-send';
         const receipt = service.requests.find(row => row.route.endsWith(endpoint) && row.body?.requestId === work.request_id);
-        const handlerRows = fs.existsSync(fixture.capture(out)) ? fs.readFileSync(fixture.capture(out), 'utf8')
-            .trim().split('\n').filter(Boolean).map(JSON.parse).filter(row => row.kind === 'handler-input') : [];
-        const handler = handlerRows.find(row => row.workId === work.id);
-        const provider = service.calls[index];
-        const ipc = client.events.filter(row => row.event === 'ipc').map(row => row.data.channel);
+        const handler = handlerInputs().find(row => row.workId === work.id);
+        const provider = service.calls[index + 1];
+        const ipc = client.events.slice(eventOffset).filter(row => row.event === 'ipc').map(row => row.data.channel);
         const turn = { role, work, receipt, desktopIpc:{
-            chooser:ipc.filter(channel => channel === 'select-files-to-send').length,
+            chooser:client.events.filter(row => row.event === 'ipc' && row.data.channel === 'select-files-to-send').length,
             nativeProvider:ipc.filter(channel => channel === 'send-to-vcp').length,
         }, handler:handler && { route:handler.route, workId:handler.workId, requestId:handler.requestId,
             messages:handler.messages }, provider };
         evidence.turns.push(turn);
+        turn.stages = await requestStages(client, handler, provider, index === 0);
+        assertStages(turn.stages, index === 0 && (baseline || !fixture.toolsForbidden), baseline && index === 0);
         assert.equal(work.state, 'completed');
         assert.equal(work.dispatched, 1);
         assert.equal(work.native_terminal, 1);
@@ -109,14 +190,35 @@ module.exports = async ({ clients:{ A, B }, out, result, service, picture, click
         return saved;
     }
 
+    async function observeRenderer(client) {
+        const modules = [
+            'apps/desktop/modules/chat/chatContextPipeline.js',
+            'apps/desktop/modules/chat/singleChatRequestOrchestrator.js',
+            'apps/desktop/modules/chatManager.js',
+        ];
+        const { renderer } = await client.command('loaded-sources', { main:[], renderer:modules });
+        const loaded = renderer.sort((a, b) => a.file.localeCompare(b.file));
+        assert.deepEqual(loaded.map(row => row.file), modules);
+        for (const row of loaded) {
+            assert.equal(row.sha256, createHash('sha256').update(fs.readFileSync(path.join(result.candidate, row.file))).digest('hex'));
+        }
+        return { loaded, observer:await client.command('observe-request-output') };
+    }
+
     try {
         assert.notEqual(result.A.profileDigest, result.B.profileDigest);
         await select(B, 'B');
         assert.deepEqual(history('B'), []);
         await stop('B');
+        const observed = await observeRenderer(A);
+        evidence.rendererSources = observed.loaded;
+        evidence.rendererObserver = observed.observer;
         await select(A, 'A');
-        await click(A, '#attachFileBtn');
-        await waitUntil(async () => (await preview(A)).some(text => text.includes(fixture.filename.slice(0, 17))), 'A composer shows synthetic text attachment');
+        assert.deepEqual(await observeRenderer(L), observed);
+        await localControl();
+        await stop('L');
+        await select(A, 'A');
+        await attach(A);
         await picture(A, 'A-attached');
         const aHistory = await send(A, 'A', 0);
         const first = evidence.turns[0].work;
@@ -140,6 +242,7 @@ module.exports = async ({ clients:{ A, B }, out, result, service, picture, click
         assert.ok(evidence.ACachedPathUnavailable);
         const reopened = await start('B-reopened', 'B');
         assert.equal(result.B.profileDigest, result['B-reopened'].profileDigest);
+        assert.deepEqual(await observeRenderer(reopened), observed);
         await select(reopened, 'B');
         await waitUntil(() => history('B').some(row => row.id === first.reply_message_id), 'B has A reply in physical native History');
         await waitUntil(async () => (await transcript(reopened)).includes(fixture.replies[0]), 'B sees A reply');
@@ -184,7 +287,7 @@ module.exports = async ({ clients:{ A, B }, out, result, service, picture, click
             row.device, row.status, row.route.split('/').at(-1),
         ]), [['deviceA',201,'uploads'],['deviceA',200,'chunks'],['deviceA',200,'finish']]);
         assert.equal(evidence.attachmentRequests.filter(row => row.device === 'deviceB' && row.method === 'POST').length, 0);
-        assert.equal(service.calls.length, 2);
+        assert.equal(service.calls.length, 3);
         assert.equal(service.requests.filter(row => row.route.endsWith('/session-send')).length, 1);
         assert.equal(service.requests.filter(row => row.route.endsWith('/admit')).length, 1);
         assert.equal(works().length, 1);
@@ -223,6 +326,7 @@ module.exports = async ({ clients:{ A, B }, out, result, service, picture, click
                 }
             }
         }
+        evidence.toolDirectiveProbe = await fixture.verifyToolDirective({ service, out, cert });
     } finally {
         db.close();
     }

@@ -106,3 +106,33 @@ test('four entry points delegate and cannot own Tavern/system/workspace assembly
         assert.doesNotMatch(source, /\.applySystemSuffix\(|\.applyContextInject\(|\.expandWorkspacePlaceholders\(/, path);
     }
 });
+test('shared send keeps creation time and user text, but omits the physical History hint', async () => {
+    const f = fixture('Keep the user-supplied /user/example/history.json');
+    const text = 'literal file:///user/example.txt';
+    const { messagesForVCP } = await assembleRequestMessages({
+        ...f, sharedTopic: true, context, history: [{ role: 'user', content: text }], tavernRules: [],
+    });
+    assert.doesNotMatch(messagesForVCP[0].content, /当前聊天记录文件路径/);
+    assert.match(messagesForVCP[0].content, /当前话题创建于:/);
+    assert.ok(messagesForVCP[0].content.includes('/user/example/history.json'));
+    assert.equal(messagesForVCP[1].content[0].text, text);
+});
+
+test('an explicit system tool ban removes only the inline text file locator on shared sends', async () => {
+    const marker = '[[VCPToolUse=Forbidden]]';
+    const f = fixture('persona');
+    const text = 'a\nb\n';
+    const attachment = { name:'note.txt', type:'text/plain', internalPath:'file:///private/note.txt', extractedText:text };
+    const history = [{ id:'one', role:'user', content:marker, attachments:[attachment] }];
+    const original = structuredClone(history);
+    async function packet(rules) {
+        return (await assembleRequestMessages({ ...f, sharedTopic:true, context, history, tavernRules:rules, tavernEngine:engine }))
+            .messagesForVCP.at(-1).content[0].text;
+    }
+    assert.ok((await packet([])).includes('[附加文件: file:///private/note.txt]'));
+    const noTools = [rule('system_suffix', marker)];
+    assert.equal(await packet(noTools), marker + '\n\n[附加文件: note.txt]\n' + text + '\n[/附加文件结束: note.txt]');
+    assert.deepEqual(history, original);
+    attachment.isLiveReference = true;
+    assert.ok((await packet(noTools)).includes('file:///private/note.txt'));
+});

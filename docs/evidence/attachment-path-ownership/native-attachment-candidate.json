@@ -1,0 +1,256 @@
+{
+  "result": "PASS",
+  "revision": "95e3f56cfdf5c9d0f59f7a96903ce976cbfbed0f",
+  "file": {
+    "name": "synthetic-continuity.txt",
+    "digest": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+    "bytes": 67
+  },
+  "electron": "44.9.3",
+  "sandbox": true,
+  "toolsForbidden": false,
+  "rendererObserver": {
+    "module": "modules/chat/singleChatRequestOrchestrator.js",
+    "line": 20,
+    "sha256": "68d52c96bfc3891b8085ce110f47cb1d25d5d5cbdc3e67f0247da484b24eaf77"
+  },
+  "rendererSources": [
+    {
+      "file": "apps/desktop/modules/chat/chatContextPipeline.js",
+      "bytes": 19076,
+      "sha256": "95e04f1676ac965729eb062c1a7a681d690397093b31616bab1aded164754375"
+    },
+    {
+      "file": "apps/desktop/modules/chat/singleChatRequestOrchestrator.js",
+      "bytes": 2401,
+      "sha256": "68d52c96bfc3891b8085ce110f47cb1d25d5d5cbdc3e67f0247da484b24eaf77"
+    },
+    {
+      "file": "apps/desktop/modules/chatManager.js",
+      "bytes": 179635,
+      "sha256": "f6d021a8a4923c1feb1651809e2a4f26671e1d016612cac0da337797ad87ee44"
+    }
+  ],
+  "localControl": {
+    "ownership": "local",
+    "stages": [
+      {
+        "stage": "renderer output",
+        "requestId": "admission_93fc8406-ec69-42ab-b5ea-8642833aa34f",
+        "markerCount": 1,
+        "fileTextCount": 1,
+        "localPathPresent": true,
+        "systemLocalPathPresent": true,
+        "forbiddenDirectivePresent": false,
+        "attachmentHeader": "[附加文件: file://<isolated-run>/profile-L/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+        "userText": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: file://<isolated-run>/profile-L/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]"
+      },
+      {
+        "stage": "sendToVCP IPC",
+        "requestId": "admission_93fc8406-ec69-42ab-b5ea-8642833aa34f",
+        "markerCount": 1,
+        "fileTextCount": 1,
+        "localPathPresent": true,
+        "systemLocalPathPresent": true,
+        "forbiddenDirectivePresent": false,
+        "attachmentHeader": "[附加文件: file://<isolated-run>/profile-L/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+        "userText": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: file://<isolated-run>/profile-L/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]"
+      },
+      {
+        "stage": "ToolBox handler",
+        "requestId": "admission_93fc8406-ec69-42ab-b5ea-8642833aa34f",
+        "markerCount": 1,
+        "fileTextCount": 1,
+        "localPathPresent": true,
+        "systemLocalPathPresent": true,
+        "forbiddenDirectivePresent": false,
+        "attachmentHeader": "[附加文件: file://<isolated-run>/profile-L/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+        "userText": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: file://<isolated-run>/profile-L/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]"
+      },
+      {
+        "stage": "loopback provider",
+        "requestId": "admission_93fc8406-ec69-42ab-b5ea-8642833aa34f",
+        "markerCount": 1,
+        "fileTextCount": 1,
+        "localPathPresent": true,
+        "systemLocalPathPresent": true,
+        "forbiddenDirectivePresent": false,
+        "attachmentHeader": "[附加文件: file://<isolated-run>/profile-L/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+        "userText": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: file://<isolated-run>/profile-L/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]"
+      }
+    ],
+    "nativeHistory": [
+      {
+        "role": "user",
+        "id": "msg_1795374372767_user_i9yfbkc"
+      },
+      {
+        "role": "assistant",
+        "id": "admission_93fc8406-ec69-42ab-b5ea-8642833aa34f"
+      }
+    ]
+  },
+  "sharedTurns": [
+    {
+      "role": "A",
+      "desktopIpc": {
+        "chooser": 1,
+        "nativeProvider": 1
+      },
+      "stages": [
+        {
+          "stage": "renderer output",
+          "requestId": "reply_request_b9a6540b1ea94e63b2743b30ae063ee8",
+          "markerCount": 1,
+          "fileTextCount": 1,
+          "localPathPresent": true,
+          "systemLocalPathPresent": false,
+          "forbiddenDirectivePresent": false,
+          "attachmentHeader": "[附加文件: file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+          "userText": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]"
+        },
+        {
+          "stage": "sendToVCP IPC",
+          "requestId": "reply_request_b9a6540b1ea94e63b2743b30ae063ee8",
+          "markerCount": 1,
+          "fileTextCount": 1,
+          "localPathPresent": true,
+          "systemLocalPathPresent": false,
+          "forbiddenDirectivePresent": false,
+          "attachmentHeader": "[附加文件: file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+          "userText": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]"
+        },
+        {
+          "stage": "ToolBox handler",
+          "requestId": "reply_request_b9a6540b1ea94e63b2743b30ae063ee8",
+          "markerCount": 1,
+          "fileTextCount": 1,
+          "localPathPresent": true,
+          "systemLocalPathPresent": false,
+          "forbiddenDirectivePresent": false,
+          "attachmentHeader": "[附加文件: file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+          "userText": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]"
+        },
+        {
+          "stage": "loopback provider",
+          "requestId": "reply_request_b9a6540b1ea94e63b2743b30ae063ee8",
+          "markerCount": 1,
+          "fileTextCount": 1,
+          "localPathPresent": true,
+          "systemLocalPathPresent": false,
+          "forbiddenDirectivePresent": false,
+          "attachmentHeader": "[附加文件: file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+          "userText": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]"
+        }
+      ],
+      "workId": "request_b9a6540b1ea94e63b2743b30ae063ee8",
+      "admissionPrincipal": "desktop:deviceA",
+      "state": "completed",
+      "endpoint": "/api/v1/sync/shared/admit"
+    },
+    {
+      "role": "B",
+      "desktopIpc": {
+        "chooser": 0,
+        "nativeProvider": 0
+      },
+      "stages": [
+        {
+          "stage": "ToolBox handler",
+          "requestId": "request_d9296518814541c1b1403c7944261cdb",
+          "markerCount": 1,
+          "fileTextCount": 1,
+          "localPathPresent": false,
+          "systemLocalPathPresent": false,
+          "forbiddenDirectivePresent": false,
+          "attachmentHeader": "[附加文件: synthetic-continuity.txt]",
+          "userText": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: synthetic-continuity.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]\nSYNTHETIC ATTACHMENT CONTINUITY B — 上一个文件的样本编号是多少？"
+        },
+        {
+          "stage": "loopback provider",
+          "requestId": "request_d9296518814541c1b1403c7944261cdb",
+          "markerCount": 1,
+          "fileTextCount": 1,
+          "localPathPresent": false,
+          "systemLocalPathPresent": false,
+          "forbiddenDirectivePresent": false,
+          "attachmentHeader": "[附加文件: synthetic-continuity.txt]",
+          "userText": "SYNTHETIC ATTACHMENT CONTINUITY A — 请读附件并确认。\n\n[附加文件: synthetic-continuity.txt]\n合成附件基线：北桥样本 73。\nSYNTHETIC_FILE_SENTINEL_73\n\n[/附加文件结束: synthetic-continuity.txt]\nSYNTHETIC ATTACHMENT CONTINUITY B — 上一个文件的样本编号是多少？"
+        }
+      ],
+      "workId": "request_d9296518814541c1b1403c7944261cdb",
+      "admissionPrincipal": "desktop:deviceB",
+      "state": "completed",
+      "endpoint": "/api/v1/sync/shared/session-send"
+    }
+  ],
+  "continuation": {
+    "originalPathUnavailable": true,
+    "aCachePathUnavailable": true,
+    "aClosedBeforeBRestart": true,
+    "bDownloadCacheEnabled": false,
+    "canonicalAttachment": {
+      "id": "attachment_f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "hash": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "extractedTextDigest": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "localPathPresent": false
+    },
+    "uploadCount": 1,
+    "blobCount": 1,
+    "casDigest": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+    "journalActions": [
+      "upsert",
+      "upsert",
+      "upsert",
+      "upsert"
+    ],
+    "nativeRequestStates": [
+      "model_terminal",
+      "model_terminal"
+    ]
+  },
+  "attachmentProviderCalls": 3,
+  "toolDirectiveProbe": [
+    {
+      "forbidden": false,
+      "requestId": "attachment-tool-probe-allowed",
+      "phases": [
+        "tool-request",
+        "continuation"
+      ],
+      "invocationDelta": 1,
+      "returnedInertToolSyntax": false
+    },
+    {
+      "forbidden": true,
+      "requestId": "attachment-tool-probe-forbidden",
+      "phases": [
+        "tool-request"
+      ],
+      "invocationDelta": 0,
+      "returnedInertToolSyntax": true
+    }
+  ],
+  "processExits": {
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "L": {
+      "code": 0,
+      "signal": null
+    },
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B-reopened": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  }
+}

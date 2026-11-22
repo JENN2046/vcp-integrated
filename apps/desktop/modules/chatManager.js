@@ -2517,6 +2517,7 @@ export const chatManager = (() => {
             ];
             const requestTextOptions = createRequestTextOptions(agentConfig, historySnapshotForVCP, userMessage.id);
             const orchestrated = await singleChatRequestOrchestrator.buildRequest({
+                sharedTopic: sendAuthority.kind === 'shared',
                 settings: sharedSubmission ? {...globalSettings,...sharedSubmission.executionPolicy} : globalSettings,
                 ...(sharedSubmission ? {tavernRules:sharedSubmission.tavernRules} : {}),
                 agentConfig,

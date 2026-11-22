@@ -21,12 +21,19 @@ replace("'local-stream-interrupt', 'desktop-stream-close'].includes(requested)",
     "'local-stream-interrupt', 'desktop-stream-close', 'shared-attachment-continuation'].includes(requested)");
 replace("...(desktopStreamClose ? { NS_DESKTOP_STREAM_CLOSE: '1' } : {}) };",
     "...(desktopStreamClose ? { NS_DESKTOP_STREAM_CLOSE: '1' } : {}),\n" +
-    "        ...(role === 'A' && { NS_ATTACHMENT_FIXTURE_FILE: attachmentContinuation.file(out) }) };");
+    "        ...((role === 'A' || role === 'L') && { NS_ATTACHMENT_FIXTURE_FILE: attachmentContinuation.file(out) }) };");
 replace("path.join(here, './electron.cjs')", "require.resolve('../shared-attachment-continuation/electron.cjs')");
 replace("compaction?.observe(out, crossDeviceCompaction),",
     "compaction?.observe(out, crossDeviceCompaction) || attachmentContinuation.observe(out),");
+replace("ordinaryTools: ordinaryFixture, serverRevision", "ordinaryTools: attachmentContinuation.probeTool, serverRevision");
 replace("if (mode === 'idle') {\n                const connectionFile",
     "if (role === 'A') {\n                const connectionFile");
+replace("? ['A'] : ['A', 'B'];", "? ['A'] : ['A', 'B', 'L'];");
+replace("if (desktopStreamClose || mode==='local-only' && role==='A')", "if (role==='L')");
+replace("id:'local-agent',name:'Synthetic local',model:'synthetic',systemPrompt:'Synthetic test',streamOutput:Boolean(desktopStreamClose),...streamInterrupt?.agent,",
+    `...read(path.join(profiles.A, 'Agents', service.descriptors.A.preSubmit.itemId, 'config.json')),
+                    id:'local-agent',name:'Synthetic local control',`);
+replace("&& (mode!=='local-only'||role==='B')", "&& role!=='L'");
 replace("((compaction || toolHandoff)?'/v1/chat/completions':'/v1/local-chat/completions')",
     "'/v1/chat/completions'");
 replace("if (!approvalRestore && !compaction && !streamInterrupt", "if (false && !approvalRestore && !compaction && !streamInterrupt");

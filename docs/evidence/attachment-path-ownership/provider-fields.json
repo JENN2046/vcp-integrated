@@ -1,0 +1,130 @@
+{
+  "before": {
+    "local": {
+      "requestId": "admission_4a39df45-c3b8-49c3-b153-a5326eef7569",
+      "systemMessages": [
+        "当前聊天记录文件路径: <isolated-run>/profile-L/UserData/local-agent\\topics\\local-topic\\history.json\n当前话题创建于: 1970-01-01 08:00\n\nFROZEN_SHARED_PROMPT"
+      ],
+      "attachmentHeader": "[附加文件: file://<isolated-run>/profile-L/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+      "exactAttachmentBodyOccurrences": 1,
+      "attachmentSha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "sharedTopicTotalFileUploads": 0
+    },
+    "sharedA": {
+      "requestId": "reply_request_f3bc2b8145fa4c2692aaf6abf66f1c85",
+      "systemMessages": [
+        "当前聊天记录文件路径: <isolated-run>/profile-A/UserData/ns_489193c6d2821e85f758bc29\\topics\\ns_ac3ed0205a04899eb3f4c3c9\\history.json\n\nFROZEN_SHARED_PROMPT"
+      ],
+      "attachmentHeader": "[附加文件: file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+      "exactAttachmentBodyOccurrences": 1,
+      "attachmentSha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "sharedTopicTotalFileUploads": 1
+    },
+    "sharedB": {
+      "requestId": "request_6c396cc4fe7a4984ab651e832371e1d0",
+      "systemMessages": [
+        "FROZEN_SHARED_PROMPT"
+      ],
+      "attachmentHeader": "[附加文件: synthetic-continuity.txt]",
+      "exactAttachmentBodyOccurrences": 1,
+      "attachmentSha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "sharedTopicTotalFileUploads": 1
+    }
+  },
+  "beforeForbidden": {
+    "local": {
+      "requestId": "admission_decd7ef2-fedb-4059-9452-4b6717c4d0f3",
+      "systemMessages": [
+        "当前聊天记录文件路径: <isolated-run>/profile-L/UserData/local-agent\\topics\\local-topic\\history.json\n当前话题创建于: 1970-01-01 08:00\n\n\nFROZEN_SHARED_PROMPT"
+      ],
+      "attachmentHeader": "[附加文件: file://<isolated-run>/profile-L/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+      "exactAttachmentBodyOccurrences": 1,
+      "attachmentSha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "sharedTopicTotalFileUploads": 0
+    },
+    "sharedA": {
+      "requestId": "reply_request_b8dc6f19677b42798e9bce04a0cf50a8",
+      "systemMessages": [
+        "当前聊天记录文件路径: <isolated-run>/profile-A/UserData/ns_f8b9609ed29498739f69117d\\topics\\ns_d03276ef29a3be69ec90b166\\history.json\n\n\nFROZEN_SHARED_PROMPT"
+      ],
+      "attachmentHeader": "[附加文件: file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+      "exactAttachmentBodyOccurrences": 1,
+      "attachmentSha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "sharedTopicTotalFileUploads": 1
+    },
+    "sharedB": {
+      "requestId": "request_53485514e3bf485c81ff90359fed553d",
+      "systemMessages": [
+        "FROZEN_SHARED_PROMPT"
+      ],
+      "attachmentHeader": "[附加文件: synthetic-continuity.txt]",
+      "exactAttachmentBodyOccurrences": 1,
+      "attachmentSha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "sharedTopicTotalFileUploads": 1
+    }
+  },
+  "after": {
+    "local": {
+      "requestId": "admission_93fc8406-ec69-42ab-b5ea-8642833aa34f",
+      "systemMessages": [
+        "当前聊天记录文件路径: <isolated-run>/profile-L/UserData/local-agent\\topics\\local-topic\\history.json\n当前话题创建于: 1970-01-01 08:00\n\nFROZEN_SHARED_PROMPT"
+      ],
+      "attachmentHeader": "[附加文件: file://<isolated-run>/profile-L/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+      "exactAttachmentBodyOccurrences": 1,
+      "attachmentSha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "sharedTopicTotalFileUploads": 0
+    },
+    "sharedA": {
+      "requestId": "reply_request_b9a6540b1ea94e63b2743b30ae063ee8",
+      "systemMessages": [
+        "FROZEN_SHARED_PROMPT"
+      ],
+      "attachmentHeader": "[附加文件: file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+      "exactAttachmentBodyOccurrences": 1,
+      "attachmentSha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "sharedTopicTotalFileUploads": 1
+    },
+    "sharedB": {
+      "requestId": "request_d9296518814541c1b1403c7944261cdb",
+      "systemMessages": [
+        "FROZEN_SHARED_PROMPT"
+      ],
+      "attachmentHeader": "[附加文件: synthetic-continuity.txt]",
+      "exactAttachmentBodyOccurrences": 1,
+      "attachmentSha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "sharedTopicTotalFileUploads": 1
+    }
+  },
+  "afterForbidden": {
+    "local": {
+      "requestId": "admission_e7db5020-4339-4101-929b-14feaaebde42",
+      "systemMessages": [
+        "当前聊天记录文件路径: <isolated-run>/profile-L/UserData/local-agent\\topics\\local-topic\\history.json\n当前话题创建于: 1970-01-01 08:00\n\n\nFROZEN_SHARED_PROMPT"
+      ],
+      "attachmentHeader": "[附加文件: file://<isolated-run>/profile-L/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt]",
+      "exactAttachmentBodyOccurrences": 1,
+      "attachmentSha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "sharedTopicTotalFileUploads": 0
+    },
+    "sharedA": {
+      "requestId": "reply_request_15249e6b0e6b4641ad2e11c7cf158bc8",
+      "systemMessages": [
+        "FROZEN_SHARED_PROMPT"
+      ],
+      "attachmentHeader": "[附加文件: synthetic-continuity.txt]",
+      "exactAttachmentBodyOccurrences": 1,
+      "attachmentSha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "sharedTopicTotalFileUploads": 1
+    },
+    "sharedB": {
+      "requestId": "request_41960d36b942486daec042ceba06c734",
+      "systemMessages": [
+        "FROZEN_SHARED_PROMPT"
+      ],
+      "attachmentHeader": "[附加文件: synthetic-continuity.txt]",
+      "exactAttachmentBodyOccurrences": 1,
+      "attachmentSha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "sharedTopicTotalFileUploads": 1
+    }
+  }
+}

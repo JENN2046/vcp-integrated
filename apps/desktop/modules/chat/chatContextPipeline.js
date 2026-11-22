@@ -93,7 +93,7 @@ async function refreshLiveReferenceText(electronAPI, attachment, data) {
     }
 }
 
-function appendAttachmentContext(text, attachment, data, liveText = null) {
+function appendAttachmentContext(text, attachment, data, liveText, omitInlineTextFilePath) {
     const path = getAttachmentPath(attachment, data);
     const name = attachment?.name || data?.name || '未知文件';
     const type = getAttachmentType(attachment, data);
@@ -115,7 +115,8 @@ function appendAttachmentContext(text, attachment, data, liveText = null) {
         return `${text}\n\n[附加文件: ${path} ${pageHint}]${summary}`;
     }
     if (extractedText) {
-        return `${text}\n\n[附加文件: ${path}]\n${extractedText}\n[/附加文件结束: ${name}]`;
+        const label = omitInlineTextFilePath && type === 'text/plain' ? name : path;
+        return `${text}\n\n[附加文件: ${label}]\n${extractedText}\n[/附加文件结束: ${name}]`;
     }
     if (type.startsWith('image/')) {
         return `${text}\n\n[附加图片: ${path}]`;
@@ -165,7 +166,7 @@ async function readAttachmentFrames(electronAPI, attachment, data) {
     }
 }
 
-async function buildDefaultMessageContent({ message, electronAPI }) {
+async function buildDefaultMessageContent({ message, electronAPI, omitInlineTextFilePath = false }) {
     const originalParts = normalizeContentParts(message?.content);
     let text = stripHiddenToolResults(originalParts.filter(part => part?.type === 'text').map(part => normalizeText(part.text)).join('\n'));
     const attachments = Array.isArray(message?.attachments) ? message.attachments : [];
@@ -174,7 +175,7 @@ async function buildDefaultMessageContent({ message, electronAPI }) {
     for (const attachment of attachments) {
         const data = getAttachmentData(attachment);
         const liveText = await refreshLiveReferenceText(electronAPI, attachment, data);
-        text = appendAttachmentContext(text, attachment, data, liveText);
+        text = appendAttachmentContext(text, attachment, data, liveText, omitInlineTextFilePath);
         const framePayload = await readAttachmentFrames(electronAPI, attachment, data);
         if (!framePayload) continue;
 
@@ -289,7 +290,7 @@ async function assembleRequestMessages({
     electronAPI, tavernEngine = null, agentConfig = {}, history,
     context = {}, currentUserMessageId, currentUserMessage = null,
     temporaryPrompt, conversationSnapshot,
-    systemPromptAppend, systemPromptPrefix,
+    systemPromptAppend, systemPromptPrefix, sharedTopic = false,
     transformMessageText = null, buildMessageContent = null,
     postProcessMessageContent = null, tavernRules = null,
 } = {}) {
@@ -314,6 +315,26 @@ async function assembleRequestMessages({
             : snapshot ? (Array.isArray(snapshot.rules) ? snapshot.rules : []) : await loadTavernRules(electronAPI);
         const contentBuilder = buildMessageContent || buildDefaultMessageContent;
         const effectiveHistory = effectiveContextHistory(history);
+        const agentName = agentConfig.name || context.agentName || context.agentId;
+        const baseSystemPrompt = normalizeText(agentConfig.systemPrompt)
+            .replace(/\{\{AgentName\}\}/g, agentName);
+        const prefix = systemPromptPrefix === undefined
+            ? buildConversationSystemPrefix(agentConfig, context.topicId, !sharedTopic) : systemPromptPrefix;
+        const append = systemPromptAppend === undefined
+            ? await resolveRequestEmotionPrompt(electronAPI, context.agentId, agentConfig) : systemPromptAppend;
+        const systemParts = [
+            normalizeText(prefix).trim(),
+            baseSystemPrompt.trim(),
+            normalizeText(append).trim(),
+        ].filter(Boolean);
+        // 先追加 Tavern system_suffix，再展开工作区占位符，使预设规则中的占位符同样生效。
+        const systemPrompt = await expandWorkspacePlaceholdersInPrompt(
+            electronAPI,
+            applySystemRules(systemParts.join('\n\n'), rules, engine),
+            snapshot
+        );
+        // A tool-capable desktop turn can still pass its cache URI to a file tool.
+        const omitInlineTextFilePath = sharedTopic && systemPrompt.includes('[[VCPToolUse=Forbidden]]');
         const messages = [];
 
         for (let index = 0; index < effectiveHistory.length; index += 1) {
@@ -325,6 +346,7 @@ async function assembleRequestMessages({
                 index,
                 history: effectiveHistory,
                 electronAPI,
+                omitInlineTextFilePath,
             });
             content = normalizeContentParts(content);
 
@@ -359,24 +381,6 @@ async function assembleRequestMessages({
             }, historyMessage));
         }
 
-        const agentName = agentConfig.name || context.agentName || context.agentId;
-        const baseSystemPrompt = normalizeText(agentConfig.systemPrompt)
-            .replace(/\{\{AgentName\}\}/g, agentName);
-        const prefix = systemPromptPrefix === undefined
-            ? buildConversationSystemPrefix(agentConfig, context.topicId) : systemPromptPrefix;
-        const append = systemPromptAppend === undefined
-            ? await resolveRequestEmotionPrompt(electronAPI, context.agentId, agentConfig) : systemPromptAppend;
-        const systemParts = [
-            normalizeText(prefix).trim(),
-            baseSystemPrompt.trim(),
-            normalizeText(append).trim(),
-        ].filter(Boolean);
-        // 先追加 Tavern system_suffix，再展开工作区占位符，使预设规则中的占位符同样生效。
-        const systemPrompt = await expandWorkspacePlaceholdersInPrompt(
-            electronAPI,
-            applySystemRules(systemParts.join('\n\n'), rules, engine),
-            snapshot
-        );
         if (systemPrompt.trim()) {
             messages.unshift({ role: 'system', content: systemPrompt });
         }
@@ -385,10 +389,10 @@ async function assembleRequestMessages({
         return { messagesForVCP, conversationSnapshot: snapshot };
 }
 
-function buildConversationSystemPrefix(agentConfig, topicId) {
+function buildConversationSystemPrefix(agentConfig, topicId, includeHistoryPath = true) {
     if (!agentConfig.systemPrompt) return '';
     const lines = [];
-    if (agentConfig.agentDataPath && topicId) {
+    if (includeHistoryPath && agentConfig.agentDataPath && topicId) {
         lines.push(`当前聊天记录文件路径: ${agentConfig.agentDataPath}\\topics\\${topicId}\\history.json`);
     }
     const topic = agentConfig.topics?.find(item => item.id === topicId);

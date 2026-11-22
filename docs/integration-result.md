@@ -124,3 +124,5 @@ TopicSponsor 的 River 引用对齐作者的最近消息窗口。两位成员同
 普通共享单聊遇到上游 502 时，错误说明在流读取入口截断，Work 与准入进入待核对，Journal 和桌面 History 保留用户输入。原作者人工结清后，可在原右键菜单删除这类无正式回复的输入，中央按原消息 ID、版本和 hash 追加墓碑。两端删除及重开、原提交重投、同话题新请求和旧版遗留的待发布意图均已核对。[502 收尾](evidence/shared-upstream-closeout/desktop/README.md) · [删除与权限](evidence/shared-upstream-closeout/delete/README.md)
 
 共享单聊已验一份 67 字节 UTF-8 文本跨端续问：A 的本地原件和缓存移离后，B 重开原话题且未附加文件，中央 worker 的 Handler 与 Provider 各收到一次原附件正文。A 首轮桌面原生请求仍含本机路径，B 的服务端续问请求没有。私有实时引用只携带引用元数据，跨空间读取共享附件被拒绝。[双桌面收包、权限对照与截图](evidence/shared-attachment-continuation/README.md)
+
+普通桌面和桌面执行的共享单聊均在原生 renderer 生成 History 提示与附件标题。共享首轮已移除本机 History 投影路径；显式禁工具时，已内联正文的文本附件只带文件名，默认可调用工具时保留定位 URI。A 退出后的 B 续问仍只得到一份原文件正文。[本机与共享收包前后对照、文件工具实测](evidence/attachment-path-ownership/README.md)
