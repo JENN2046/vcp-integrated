@@ -25,6 +25,17 @@ const compactionRace = process.env.NS_COMPACTION_HISTORY_RACE === '1'
     ? require('../compact-e2e/history-race.cjs').install(process.env.VCPCHAT_APP_DATA_DIR, log) : null;
 app.setAppPath(process.env.NS_HOST);
 const Module = require('node:module');
+const loadedMainEsm = new Map();
+const eventModule = require('node:url').pathToFileURL(path.join(process.env.NS_HOST, 'modules/services/nativeSync/sharedEventClient.mjs')).href;
+Module.registerHooks?.({
+    load(url, context, nextLoad) {
+        const loaded = nextLoad(url, context);
+        if (url === eventModule && loaded.source != null) {
+            loadedMainEsm.set(require('node:url').fileURLToPath(url), crypto.createHash('sha256').update(loaded.source).digest('hex'));
+        }
+        return loaded;
+    },
+});
 const load = Module._load;
 const instrumented = new WeakSet();
 Module._load = function (request, parent, ...rest) {
@@ -120,6 +131,7 @@ app.on('web-contents-created', (_event, contents) => {
                 type:channel === 'vcp-stream-event' ? payload?.type : undefined,
                 messageId:process.env.NS_DESKTOP_STREAM_CLOSE === '1' && channel === 'vcp-stream-event' ? payload?.messageId : undefined,
                 modelFinishReason:channel === 'vcp-stream-event' ? payload?.modelFinishReason : undefined,
+                awaitingNativeTask:channel === 'vcp-stream-event' ? payload?.awaitingNativeTask : undefined,
                 code:channel === 'vcp-stream-event' ? payload?.code : undefined,
                 textLength:typeof session?.text === 'string' ? session.text.length : undefined,
                 executionId:session?.executionId,
@@ -222,6 +234,10 @@ input.on('line', async line => {
                     file: path.relative(sourceRoot, file),
                     sha256: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
                 }));
+            for (const [file, sha256] of loadedMainEsm) {
+                const relative = path.relative(sourceRoot,file);
+                if (script.main.includes(relative)) main.push({file:relative,sha256});
+            }
             if (action === 'loaded-main-sources') {
                 log('answer',{ id,result:{main} });
                 return;

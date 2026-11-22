@@ -1047,6 +1047,13 @@ function initialize(mainWindow, context) {
                 return null;
             });
             if (!message) return null;
+            if (message.awaitingNativeTask && message.requestId === messageId) {
+                trajectoryCall.finish({ aborted: true });
+                if (modelConfig.stream === true) sendStreamPayload({
+                    type: 'end', messageId, context, modelFinishReason: 'interrupted', awaitingNativeTask: true,
+                });
+                return { awaitingNativeTask: true, context };
+            }
             trajectoryCall.finish({ aborted: true });
             if (modelConfig.stream === true) sendStreamPayload({
                 type: 'end', messageId, context, aborted: true, modelFinishReason: 'interrupted',

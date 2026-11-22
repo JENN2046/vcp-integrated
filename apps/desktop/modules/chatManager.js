@@ -2483,6 +2483,18 @@ export const chatManager = (() => {
                 return null;
             }
         };
+        const releaseDelegationPreview = async () => {
+            await removeThinkingFromSource();
+            // The verified child report can arrive while we retire the parent's
+            // placeholder. Keep an already-published generation in the view.
+            const saved = await getHistory(sendContext.agentId, sendContext.itemType, sendContext.topicId);
+            if (!isSendContextCurrent() || !Array.isArray(saved)) return;
+            const paused = saved.find(row => row.id === thinkingMessage.id && row.finishReason === 'interrupted');
+            if (paused) {
+                sendHistoryRef.set(saved);
+                await renderTarget?.renderMessage?.(paused);
+            }
+        };
 
         const cancelPreparedSend = async () => {
             await removeThinkingFromSource();
@@ -2526,6 +2538,7 @@ export const chatManager = (() => {
                     ).call(renderTarget, message, thinkingMessageItem);
                     releaseStreamConsumerRoute = streamConsumerRegistry?.register?.(thinkingMessage.id, {
                         kind: request?.domRenderer ? 'independent-surface' : 'main-chat',
+                        discardPending: releaseDelegationPreview,
                         start: startOwnedStreamProjection,
                         ...(request?.domRenderer ? {
                             append: (messageId, chunk, streamContext) => request.domRenderer.appendStreaming(messageId, chunk, streamContext),
@@ -2637,6 +2650,11 @@ export const chatManager = (() => {
                      else renderTarget?.removeMessageById?.(thinkingMessage.id);
                  }
 
+                if (vcpResponse?.awaitingNativeTask) {
+                    await releaseDelegationPreview();
+                    settleOwnedStreamOperation?.({ event: { type:'cancelled', reason:'awaiting_native_task' } });
+                    return { handled:true, awaitingNativeTask:true, messageId:thinkingMessage.id };
+                }
                 if (vcpResponse?.pausedWorkMessage?.id === thinkingMessage.id) {
                     const saved = await getHistory(sendContext.agentId, sendContext.itemType, sendContext.topicId);
                     if (isSendContextCurrent() && Array.isArray(saved)) {
@@ -3246,7 +3264,14 @@ export const chatManager = (() => {
         let history=orderSharedHistory(prepared.history);
         const isActive=()=>currentSelectedItemRef.get()?.id===d.itemId&&currentTopicIdRef.get()===d.topicId;
         const historyRef={get:()=>isActive()?currentChatHistoryRef.get():history,set:value=>{history=value;if(isActive())currentChatHistoryRef.set(value);}};
-        const dom={renderMessage:(...args)=>isActive()?messageRenderer.renderMessage(...args):Promise.resolve(null),startStreamingMessage:(...args)=>streamProjection.startStreamingMessage(...args),appendStreaming:(...args)=>streamProjection.appendStreamChunk(...args),projectStreamTerminal:(...args)=>streamProjection.projectStreamTerminal(...args),removeMessageById:(...args)=>isActive()?messageRenderer.removeMessageById?.(...args):undefined};
+        const dom = {
+            renderMessage: (...args) => isActive() ? messageRenderer.renderMessage(...args) : Promise.resolve(null),
+            startStreamingMessage: (...args) => streamProjection.startStreamingMessage(...args),
+            appendStreaming: (...args) => streamProjection.appendStreamChunk(...args),
+            projectStreamTerminal: (...args) => streamProjection.projectStreamTerminal(...args),
+            discardStreaming: id => streamProjection.discardStreamingMessage(id),
+            removeMessageById: (...args) => isActive() ? messageRenderer.removeMessageById?.(...args) : undefined,
+        };
         return handleSendMessage({content:prepared.userMessage.content,attachments:[],preserveComposer:true,sharedSubmission:{...prepared,history},domRenderer:dom,
             conversation:{selectedItemRef:{get:()=>item,set(){}},topicIdRef:{get:()=>d.topicId,set(){}},historyRef,isActive},propagateError:true});
     }

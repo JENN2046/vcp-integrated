@@ -6,6 +6,16 @@ const nativeTerminalStates = { Succeed: 'completed', Failed: 'failed', Cancelled
 const liveStates = new Set(['accepted', 'running', 'waiting', 'cancelling', 'unknown']);
 const stoppableStates = new Set(['accepted', 'running', 'waiting']);
 const fail = (code, status = 409) => Object.assign(new Error(code), { code, status });
+const archiveConflicts = new Set([
+    'NATIVE_TASK_IDENTITY_INVALID', 'NATIVE_RESULT_INVALID', 'NATIVE_RESULT_IDENTITY_MISMATCH',
+    'NATIVE_RESULT_HASH_MISMATCH', 'NATIVE_RESULT_TOO_LARGE', 'NATIVE_RESULT_UNCONFIRMED', 'NATIVE_RESULT_CONFLICT',
+]);
+function archiveReadError(error, storageFailure) {
+    if (archiveConflicts.has(error.code)) return fail(error.code);
+    if (error.code === 'ENOENT') return fail('NATIVE_RESULT_ARCHIVE_MISSING');
+    if (storageFailure) return fail('NATIVE_ARCHIVE_STORAGE_UNAVAILABLE', 503);
+    return error;
+}
 const identifier = value => typeof value === 'string' && /^[a-zA-Z0-9_.:-]{1,160}$/.test(value);
 const hash = value => createHash('sha256').update(value, 'utf8').digest('hex');
 
@@ -217,19 +227,30 @@ class NativeTaskLinks {
         this.nextReconcile = Date.now() + 2000;
         const rows = this.db.prepare("SELECT * FROM mobile_native_tasks WHERE state NOT IN ('completed','failed','cancelled','stopped')").all();
         this.pending = (async () => {
+            const unavailable = new Set();
             for (const row of rows) {
                 if (this.closed) return;
+                const native = this.engine.store?.shared?.native;
+                if (native?.delegations?.pendingBoundaries.has(row.execution_id) &&
+                    !nativeContext.hasNativeTaskProvider(row.plugin_name)) continue;
                 try {
                     const proof = await nativeContext.queryNativeTask(row.plugin_name, this.queryInput(row));
                     if (this.closed) return;
                     if (!proof) this.markUnknown(this.get(row.plugin_name,row.native_task_id), 'NATIVE_TASK_RESULT_UNKNOWN');
                     else this.observe(this.get(row.plugin_name,row.native_task_id), proof);
                 } catch (error) {
+                    if (native?.isStorageFailure?.(error) && native.delegations?.ownsWork(row.execution_id)) {
+                        unavailable.add(row.execution_id);
+                        continue;
+                    }
                     if (!this.closed) this.markUnknown(this.get(row.plugin_name,row.native_task_id),
                         error.code === 'NATIVE_TASK_PROVIDER_UNAVAILABLE' ? error.code : 'NATIVE_TASK_RESULT_UNVERIFIED');
                 }
             }
-            if (!this.closed) this.engine.wake();
+            if (!this.closed) {
+                this.engine.store?.shared?.native?.delegations?.reconcile(unavailable);
+                this.engine.wake();
+            }
         })().finally(() => { this.pending = null; });
         return this.pending;
     }
@@ -289,7 +310,12 @@ class NativeTaskLinks {
         this.assertOpen();
         const job = this.engine.get(executionId)||this.engine.store?.shared?.nativeJob(executionId), row = this.get('AgentAssistant', nativeTaskId);
         if (!job || job.topic_key !== topicKey || !row || row.execution_id !== executionId) throw fail('NATIVE_TASK_NOT_FOUND', 404);
-        const proof = await nativeContext.queryNativeTask(row.plugin_name, this.queryInput(row, true));
+        let proof;
+        try {
+            proof = await nativeContext.queryNativeTask(row.plugin_name, this.queryInput(row, true));
+        } catch (error) {
+            throw archiveReadError(error, this.engine.store?.shared?.native?.isStorageFailure?.(error));
+        }
         this.assertOpen();
         if (!proof || !this.matches(row, proof) || !terminalStates.has(proof.state) || typeof proof.resultContent !== 'string' || hash(proof.resultContent) !== proof.resultHash) throw fail('NATIVE_TASK_RESULT_UNVERIFIED');
         if(Buffer.byteLength(proof.resultContent,'utf8')>2*1024*1024)throw fail('NATIVE_TASK_RESULT_TOO_LARGE',413);
@@ -299,4 +325,4 @@ class NativeTaskLinks {
     }
     close() { this.closed = true; }
 }
-module.exports = { NativeTaskLinks, terminalStates };
+module.exports = { NativeTaskLinks, terminalStates, archiveReadError };

@@ -78,6 +78,7 @@ function initialize(config, dependencies) {
     unregisterTaskProvider?.();
     unregisterTaskProvider = nativeExecution.registerNativeTaskProvider('AgentAssistant', {
         read: readNativeDelegation,
+        readArchive: identity => continuity.read(identity, { includeResult: true }),
         control(identity, request) {
             if (request?.action !== 'stop') throw Error('NATIVE_TASK_CONTROL_UNAVAILABLE');
             const state = activeDelegations.get(identity.nativeTaskId);
@@ -692,6 +693,7 @@ function throwToolError(message) {
  * @returns {Promise<object>} A promise that resolves to the result of the tool call.
  */
 async function processToolCall(args) {
+    const controlled = nativeExecution.assertDelegationInvocation(args);
     if (!VCP_SERVER_PORT || !VCP_SERVER_ACCESS_KEY) {
         const errorMsg = "AgentAssistant Critical Error: VCP Server PORT or Access Key is not configured.";
         if (DEBUG_MODE) console.error(`[AgentAssistant Service] ${errorMsg}`);
@@ -767,7 +769,7 @@ async function processToolCall(args) {
         throwToolError("Missing 'agent_name' or 'prompt' in request.");
     }
 
-    const agentConfig = AGENTS[agent_name];
+    const agentConfig = Object.hasOwn(AGENTS, agent_name) ? AGENTS[agent_name] : null;
     if (!agentConfig) {
         const availableAgentNames = Object.keys(AGENTS);
         let errorMessage = `请求的 Agent '${agent_name}' 未找到。`;
@@ -860,6 +862,8 @@ async function processToolCall(args) {
             activeDelegations.delete(delegationId);
             console.error('[AgentAssistant] Background delegation finalization failed:', err.code || 'NATIVE_RESULT_UNCONFIRMED');
         });
+
+        if (controlled) return createTextResult(`委托任务 (ID: ${delegationId}) 已提交给 ${agent_name}。`);
 
         const successMessage = `委托任务 (ID: ${delegationId}) 已成功提交给 ${agent_name} 进行后台处理。\n您可以使用带有 \`query_delegation: "${delegationId}"\` 参数的工具调用来查询其进度。\n这是一个动态上下文占位符，当任务完全完成时，它会被自动替换为实际的最终报告。\n请在你的回复中包含以下占位符原文：{{VCP_ASYNC_RESULT::AgentAssistant::${delegationId}}}`;
 

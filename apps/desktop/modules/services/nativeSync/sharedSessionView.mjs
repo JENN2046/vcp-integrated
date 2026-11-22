@@ -84,7 +84,7 @@ export function createSharedSessionView(container, createObservedFrame, { api, s
             // Work is not proof of deletion. Existing execution status does
             // explicitly identify closed local Works and can retire their UI.
             for (const execution of change.executions || []) {
-                if (execution.controlMode === 'safe-tools-v1') {
+                if (['safe-tools-v1','agent-assistant-v1'].includes(execution.controlMode)) {
                     for (const generation of execution.steering?.generations || []) {
                         if (generation.state !== 'paused' || generation.noDispatch) continue;
                         const previewId = execution.id + '/' + generation.requestId;

@@ -2012,9 +2012,11 @@ class ChatCompletionHandler {
         console.log(`[Abort] Caught AbortError for request ${id}. Execution halted. reason=${abortReason}`);
         return; // Stop processing and allow the 'finally' block to clean up.
       }
-      if (error.code === 'WORK_SAFE_TOOL_BOUNDARY' && nativeContext.settleToolPause()) {
+      const toolBoundary = error.code === 'WORK_SAFE_TOOL_BOUNDARY' && nativeContext.settleToolPause();
+      if (toolBoundary) {
         res.__vcpDisableReplayCache?.();
-        const payload = { nativeSync: { state: 'paused', code: error.code, requestId: originalBody.requestId } };
+        const state = toolBoundary === 'awaiting_native_task' ? toolBoundary : 'paused';
+        const payload = { nativeSync: { state, code: error.code, requestId: originalBody.requestId } };
         if (!res.writableEnded && !res.destroyed) {
           if (res.headersSent) {
             res.end(`event: nativesync_work_paused\ndata: ${JSON.stringify(payload)}\n\ndata: [DONE]\n\n`);

@@ -1,0 +1,161 @@
+{
+  "status": "PASS",
+  "desktop": {
+    "A": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "profileDigest": "e4c246390a5fc444c3f5e312f2754604f8e455bfd72b5608621a6c6cf2667649"
+    },
+    "B": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "profileDigest": "890a1e58734397d540bc0d901976877eaaa5efc9a0142fe8096a92de5efcbdd0"
+    }
+  },
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "sources": [
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "b9db4583a1f6f4396585b819db587dc4c188b7ecd39bcb5255ad47e93b3b4a41"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "e0965eb464dad61dfa0441c2a4bdb345208c8208ba2f80cb28b40adfe311f23e"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "28e142ddc467aa4c9487b1f28222af54ee77429a1984268a1ae99745d8f59f28"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "5cba8b32ada0cd687507f9d10902aaedc360d4abdf0077a042e2522a9eafff52"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "6e0b78a14665d6201094fc78f2488f21af4d18afefd1e20bd437beb31ee9d82b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "7527344c6996616057d83aa8a88f867854711e4759d4b4e32397f691b53ab312"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+      "sha256": "88b57faed9e2ab44875dfc63e572b85e52bf3765c35b5ba645d7883ec71272b4"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "d60157de3496eb64fd0ff4a39c2429299fbf5158e0dacac01f2045ea1e46f671"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+      "sha256": "3c3874bbd73e31f594bf7899d2ae0d0d184f62f827666409a683d22f3c138faf"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+      "sha256": "068ca6c5be59baaf786d15955063d3ba2cb10d81f22c786a14cd966c83eb777c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "4ba8bfccf267ff5ad384046da81ff7e64a7d53a6c58a4f31bca8af3373773923"
+    },
+    {
+      "file": "apps/server/Plugin/AgentAssistant/AgentAssistant.js",
+      "sha256": "6f99683ebe7757a8710c757282b72e5f60895993b5ae7fe2b9793573e1070758"
+    },
+    {
+      "file": "apps/server/Plugin/AgentAssistant/delegationContinuity.js",
+      "sha256": "b7ea27e0304d4da83d8c2f992321bd4f78d71ab5d284b775a3441c5848a241c5"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "d85c2847904b8220c54b0823f0ba50af47372310f6fa2faf9ff2c870f7420d6e"
+    }
+  ],
+  "candidate": true,
+  "order": "parent-first",
+  "report": {
+    "status": 409,
+    "code": "NATIVE_RESULT_HASH_MISMATCH"
+  },
+  "handoff": {
+    "status": 409,
+    "code": "NATIVE_RESULT_HASH_MISMATCH"
+  },
+  "final": {
+    "work": [
+      {
+        "id": "request_d29016a5454e40e8b255aa7211502922",
+        "principal": "desktop:deviceA",
+        "state": "review_required",
+        "dispatched": 1,
+        "native_terminal": 0,
+        "reply_seq": null
+      }
+    ],
+    "tasks": [
+      {
+        "native_task_id": "aa-delegation-1795333420722-f3336083",
+        "execution_id": "request_d29016a5454e40e8b255aa7211502922",
+        "native_request_id": "reply_request_d29016a5454e40e8b255aa7211502922",
+        "invocation_id": "0bbe0293-8aa6-4a4b-a458-42ed29e6570b",
+        "record_id": "tcr-1795333420713-7bfa6251-b8f4-4dfe-bcbb-0058484efc04",
+        "state": "completed",
+        "result_hash": "261243622218aff6abad4805d8d2f4b273db70d7042ad36e978b613d2c2c5673"
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "0bbe0293-8aa6-4a4b-a458-42ed29e6570b",
+        "plugin_name": "AgentAssistant",
+        "record_id": "tcr-1795333420713-7bfa6251-b8f4-4dfe-bcbb-0058484efc04",
+        "state": "returned"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "d98362e7-8d56-48e8-bfa5-db7377f06bb9",
+        "action": "upsert",
+        "hash": "405271c7367d3c22ac3adb6b8b78e8a145a842768e6f4875886d700147bf387c"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_request_d29016a5454e40e8b255aa7211502922",
+        "action": "upsert",
+        "hash": "e4b3ea6d669b37e553d369dfa15d7ae64f168f226846898d799d659a4d0dcf0d"
+      }
+    ],
+    "provider": [
+      {
+        "role": "parent",
+        "round": 1
+      },
+      {
+        "role": "child",
+        "round": 1,
+        "launch": true
+      }
+    ]
+  },
+  "generations": [
+    {
+      "generation": 0,
+      "executor": "desktop:deviceA",
+      "request_id": "reply_request_d29016a5454e40e8b255aa7211502922",
+      "state": "paused"
+    }
+  ]
+}

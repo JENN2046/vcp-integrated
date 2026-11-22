@@ -96,7 +96,7 @@ function middleware(req, res, next) {
     const finishNative=success=>{if(!scope)return;scope.transportEnded=true;scope.transportSuccess=success;outcome.check();};
     res.once('finish', () => { releaseContext();finishNative(res.statusCode>=200&&res.statusCode<300);req.removeListener('aborted', abort); res.removeListener('close', abort); });
     if(shared)res.once('close',()=>{if(!res.writableFinished)finishNative(false);});
-    scope={ toolRun: { waiting: 0 },finishNative,requestId, signal: controller.signal, ...snapshot,...(shared?{bridge:shared.bridge,sponsorAuthority:shared.sponsorAuthority,sponsorBoundary:sharedBoundary,textOnly:shared.textOnly===true,safeTools:shared.safeTools,beginToolBatch:shared.beginToolBatch,settleToolPause:shared.settleToolPause,canSteer:shared.steeringEnabled===true,workId:shared.workId,generation:shared.generation,phase:shared.phase,fence:shared.fence,applied:shared.applied,continuation:shared.continuation,checkpoint:shared.checkpoint,sessionFinalReply:shared.sessionFinalReply}:{}) };
+    scope={ toolRun: { waiting: 0 },finishNative,requestId, signal: controller.signal, ...snapshot,...(shared?{bridge:shared.bridge,sponsorAuthority:shared.sponsorAuthority,sponsorBoundary:sharedBoundary,textOnly:shared.textOnly===true,safeTools:shared.safeTools,delegation:shared.delegation,beginToolBatch:shared.beginToolBatch,settleToolPause:shared.settleToolPause,canSteer:shared.steeringEnabled===true,workId:shared.workId,generation:shared.generation,phase:shared.phase,fence:shared.fence,applied:shared.applied,continuation:shared.continuation,checkpoint:shared.checkpoint,sessionFinalReply:shared.sessionFinalReply}:{}) };
     return local.run(scope,next);
 }
 async function waitForApproval(promise, onCancel) {
@@ -140,22 +140,65 @@ function agentPrompt(alias) {
     return context && context.agentAlias === alias ? context.agentPrompt : undefined;
 }
 
-function assertToolsAllowed(pluginName, args, { indirect = false } = {}) {
+function assertDelegationArgs(scope, pluginName, args, allowToolPassword = false) {
+    if (pluginName !== 'AgentAssistant' || !args ||
+        Object.keys(args).some(key => !['agent_name', 'prompt', 'task_delegation'].includes(key) &&
+            !(allowToolPassword && key === 'tool_password')) ||
+        !['agent_name', 'prompt', 'task_delegation'].every(key => Object.hasOwn(args, key)) ||
+        args.agent_name !== scope.delegation.agentName || typeof args.prompt !== 'string' ||
+        args.prompt !== scope.delegation.prompt || ![true, 'true'].includes(args.task_delegation)) {
+        throw toolError('CONTROLLED_TOOL_FORBIDDEN');
+    }
+}
+
+function assertToolsAllowed(pluginName, args, { indirect = false, allowToolPassword = false } = {}) {
     assertToolOutcomeKnown();
     throwIfCancelled();
     const scope = local.getStore();
     if (scope?.textOnly) throw Object.assign(Error('CONTROLLED_TEXT_TOOLS_FORBIDDEN'), { code: 'CONTROLLED_TEXT_TOOLS_FORBIDDEN' });
     if (scope?.safeTools && (!scope.safeTools.has(pluginName) || scope.invocation || indirect
         || Object.hasOwn(args || {}, 'timely_contact') || /file:\/\//i.test(JSON.stringify(args || {})))) {
-        throw Object.assign(Error('CONTROLLED_TOOL_FORBIDDEN'), { code: 'CONTROLLED_TOOL_FORBIDDEN' });
+        throw toolError('CONTROLLED_TOOL_FORBIDDEN');
     }
+    if (scope?.delegation) assertDelegationArgs(scope, pluginName, args, allowToolPassword);
+}
+
+function controlledDelegation() { return Boolean(local.getStore()?.delegation); }
+
+function assertDelegationDispatch(pluginName) {
+    const scope = local.getStore();
+    if (scope?.delegation && (pluginName !== 'AgentAssistant' || !scope.toolBatch || scope.invocation)) {
+        throw toolError('CONTROLLED_TOOL_FORBIDDEN');
+    }
+}
+
+function assertDelegationInvocation(args) {
+    const scope = local.getStore();
+    if (scope?.textOnly) throw toolError('CONTROLLED_TEXT_TOOLS_FORBIDDEN');
+    if (!scope?.delegation) return false;
+    if (scope.invocation?.pluginName !== 'AgentAssistant' || !scope.toolBatch?.dispatched) {
+        throw toolError('CONTROLLED_TOOL_FORBIDDEN');
+    }
+    assertDelegationArgs(scope, 'AgentAssistant', args);
+    return true;
 }
 
 function controlledToolWork() { return Boolean(local.getStore()?.safeTools); }
 function toolError(code) { return Object.assign(Error(code), { code }); }
 function assertToolBatch(calls) {
-    if (!controlledToolWork()) return;
     const scope = local.getStore();
+    if (scope?.textOnly && scope.sharedAuthority?.kind === 'native-task' && calls.length) {
+        throw toolError('CONTROLLED_TEXT_TOOLS_FORBIDDEN');
+    }
+    if (!controlledToolWork()) return;
+    if (scope.delegation) {
+        if (calls.length !== 1) throw toolError('CONTROLLED_TOOL_CALL_LIMIT');
+        const [call] = calls;
+        assertToolsAllowed(call.name, call.args, {
+            indirect: Boolean(call.archery || call.archeryNoReply || call.markHistory || call.river || call.vref),
+            allowToolPassword: true
+        });
+    }
     if (calls.length > 2 || calls.some(call => call.archery) ||
         (calls.length === 2 && (typeof scope.beginToolBatch !== 'function' || typeof scope.checkpoint?.result !== 'function' ||
             calls[0].name === calls[1].name))) {
@@ -291,7 +334,8 @@ async function confirmToolSettlement(bridge, event) {
 
 async function acceptNativeTask({ pluginName, nativeTaskId, agentBaseName }) {
     const context = local.getStore();
-    if(context?.safeTools)throw Object.assign(Error('CONTROLLED_TOOL_FORBIDDEN'),{code:'CONTROLLED_TOOL_FORBIDDEN'});
+    if (context?.safeTools && (!context.delegation || pluginName !== 'AgentAssistant' ||
+        !context.toolBatch?.dispatched || context.toolBatch.accepted)) throw toolError('CONTROLLED_TOOL_FORBIDDEN');
     if(context?.textOnly)throw Object.assign(Error('CONTROLLED_TEXT_TOOLS_FORBIDDEN'),{code:'CONTROLLED_TEXT_TOOLS_FORBIDDEN'});
     if (!context?.bridge) return null;
     if (!context.invocation || context.invocation.pluginName !== pluginName) {
@@ -299,6 +343,7 @@ async function acceptNativeTask({ pluginName, nativeTaskId, agentBaseName }) {
     }
     throwIfCancelled();
     const identity = Object.freeze({ ...context.invocation, pluginName, nativeTaskId, agentBaseName });
+    if (context.delegation) context.toolBatch.accepted = true;
     await context.bridge.onTaskAccepted(identity);
     // The child outlives the parent response. Each new model round still
     // passes through the original Work's request registry and dispatch fence.
@@ -332,6 +377,18 @@ async function queryNativeTask(pluginName, identity) {
     const entry = nativeTaskProviders.get(pluginName);
     if (!entry) return { ...identity, pluginName, state: 'unknown', revision: 0, code: 'NATIVE_TASK_PROVIDER_UNAVAILABLE' };
     return (typeof entry.provider === 'function' ? entry.provider : entry.provider.read)({ ...identity, pluginName });
+}
+
+function hasNativeTaskProvider(pluginName) {
+    return nativeTaskProviders.has(pluginName);
+}
+
+function verifyNativeTaskArchive(pluginName, identity) {
+    const provider = nativeTaskProviders.get(pluginName)?.provider;
+    const receipt = provider?.readArchive?.({ ...identity, pluginName });
+    if (receipt?.revision !== 1 || !['completed', 'failed', 'cancelled', 'stopped'].includes(receipt.state) ||
+        typeof receipt.resultContent !== 'string') return null;
+    return receipt;
 }
 
 async function controlNativeTask(pluginName, identity, request) {
@@ -375,7 +432,8 @@ module.exports = {
     assertToolsAllowed, controlledToolWork, assertToolBatch, assertToolBoundary, executeControlledToolBatch, trackToolInvocation,
     settleToolPause: () => local.getStore()?.settleToolPause?.(),
     currentTopicSponsorCall, approvalOwner,
-    runToolInvocation, acceptNativeTask, registerNativeTaskProvider, queryNativeTask,
+    controlledDelegation, assertDelegationDispatch, assertDelegationInvocation,
+    runToolInvocation, acceptNativeTask, registerNativeTaskProvider, queryNativeTask, hasNativeTaskProvider, verifyNativeTaskArchive,
     toolStarted: () => note('tool', { started: true }),
     run: (requestId, signal, fn) => local.run({ toolRun: { waiting: 0 }, requestId, signal, ...registered.get(requestId) }, fn)
 };

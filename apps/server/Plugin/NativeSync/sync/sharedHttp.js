@@ -1,7 +1,7 @@
 'use strict';
 const {SHARED_SPACE_CAPABILITY} = require('./contracts.generated.cjs');
 const fail=(code,status=400)=>Object.assign(Error(code),{code,status});
-const posts={join:['join',['sharedSpaceId','opId']],objects:['create',['sharedSpaceId','opId','kind','localId','localParent','parentId','config']],adopt:['adopt',['sharedSpaceId','opId','kind','ownerType','localId','localParent','parentId','config']],bind:['bind',['sharedSpaceId','opId','sharedId','localId','localParent','restore']],config:['saveConfig',['sharedSpaceId','opId','sharedId','expectedVersion','config']],remove:['remove',['sharedSpaceId','opId','sharedId','mode','confirm','expectedVersion']],admit:['admit',['sharedSpaceId','sharedId','requestId','expectedHead','configHash','message','kind','targetId','memberId','modelSaveRef','modelSaveResolutionRef','controlMode','sponsorRouteHash']],complete:['complete',['sharedSpaceId','admissionId','opId','message','nativeRequestId','finish']],abandon:['abandon',['sharedSpaceId','admissionId','opId','confirm']],message:['editMessage',['sharedSpaceId','sharedId','operation']], 'match-preview':['previewMatch',['sharedSpaceId','leftId','rightId']], 'match-prepare':['prepareMatch',['sharedSpaceId','leftId','rightId','planHash','proof','preparationId']], 'match-confirm':['confirmMatch',['sharedSpaceId','leftId','rightId','planHash','opId','keepId','configChoice','preparationId']]};
+const posts={join:['join',['sharedSpaceId','opId']],objects:['create',['sharedSpaceId','opId','kind','localId','localParent','parentId','config']],adopt:['adopt',['sharedSpaceId','opId','kind','ownerType','localId','localParent','parentId','config']],bind:['bind',['sharedSpaceId','opId','sharedId','localId','localParent','restore']],config:['saveConfig',['sharedSpaceId','opId','sharedId','expectedVersion','config']],remove:['remove',['sharedSpaceId','opId','sharedId','mode','confirm','expectedVersion']],admit:['admit',['sharedSpaceId','sharedId','requestId','expectedHead','configHash','message','kind','targetId','memberId','modelSaveRef','modelSaveResolutionRef','controlMode','delegation','sponsorRouteHash']],complete:['complete',['sharedSpaceId','admissionId','opId','message','nativeRequestId','finish']],abandon:['abandon',['sharedSpaceId','admissionId','opId','confirm']],message:['editMessage',['sharedSpaceId','sharedId','operation']], 'match-preview':['previewMatch',['sharedSpaceId','leftId','rightId']], 'match-prepare':['prepareMatch',['sharedSpaceId','leftId','rightId','planHash','proof','preparationId']], 'match-confirm':['confirmMatch',['sharedSpaceId','leftId','rightId','planHash','opId','keepId','configChoice','preparationId']]};
 posts['native-request']=['prepareNative',['sharedSpaceId','admissionId','requestId','bodyHash','memberId','generation','consumedInputSeq']];
 posts['match-cancel']=['cancelMatch',['sharedSpaceId','planHash','preparationId','leftId','rightId']];
 posts['match-applied']=['appliedMatch',['sharedSpaceId','planHash','preparationId','stateHash']];
@@ -43,7 +43,7 @@ function desktopBinding(req){
 }
 function sharedInfo(shared,sourceId){
  const policy=require('./releasePolicy.cjs');
- const wait=require('./sharedWait');
+ const wait=require('./sharedWait'),controlled=require('./sharedControlledText');
  const features=typeof shared.db.function==='function'?[wait.capability,wait.watchCapability]:[];
  features.push('shared-model-save-v1');
  if(!shared.configurationOnly)features.push(
@@ -54,6 +54,7 @@ function sharedInfo(shared,sourceId){
   ...(shared.events&&!shared.events.closed?['shared-events-v1']:[]),
   ...(policy.sharedSteering?['shared-steering-v1']:[]),
   ...(shared.native?.engine&&require('./sharedControlledText').enabled(shared,require('./sharedControlledText').TOOLS_MODE)?[require('./sharedControlledText').TOOLS_CAPABILITY,require('./sharedControlledText').TOOL_PAIR_CAPABILITY,require('./sharedControlledText').TOOLS_HISTORY_CAPABILITY]:[]),
+  ...(shared.native?.engine&&controlled.enabled(shared,controlled.AA_MODE)?[controlled.AA_CAPABILITY]:[]),
   ...(shared.native?.engine&&policy.sharedControlledText?[require('./sharedControlledText').CAPABILITY]:[]),
  );
  return {capability:SHARED_SPACE_CAPABILITY,schemaVersion:1,features,readOnly:shared.readOnly,spaces:[...shared.grants].filter(([,sources])=>sources.has(sourceId)).map(([id])=>({id}))};

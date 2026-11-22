@@ -1,0 +1,343 @@
+{
+  "status": "PASS",
+  "desktop": {
+    "A": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "profileDigest": "0167cea56a914abd6f3905c262a74868f648c3ea6df9363331725eaed456cdd5"
+    },
+    "B": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "profileDigest": "ca60eb36a72982b9b38873276e58174e0bc533c5a1cc5544a5f64a33d3790b6e"
+    },
+    "B-report": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "profileDigest": "ca60eb36a72982b9b38873276e58174e0bc533c5a1cc5544a5f64a33d3790b6e"
+    }
+  },
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "B-report": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "sources": [
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "67ebe7b9c787fc7eb1aea3fa780ea317beebd0927699baca1fedbe788a2ce97e"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "209531cb5d725ebd295d654ea0a6e26354e62c9668e2c2f4de51e3613321ecd4"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "7249581eb42c217e01dafebe5d5fcb8cf491ac6692dc7a127ce2d01c33916ec6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "71053495f7562deeca6438a2265c5a55b2af1d5fe75afefbaedc8f843ce08688"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "e8f4de3c5f0b60a629c1238f906926eb6ce0e5569d1bd5d94cfc25d830f67de6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "2e637687e88f05d3ae23cb19e663b3a0e5998f424df4101cb7663f9fb41e5481"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+      "sha256": "a2a1ef154641000c3abc8ca185b499fcf29c44161fcc74557fb2a8f70dec65b0"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "bc11d752b51c71223f038fb07636fa2f5b24d06afcbcc356d4a3870198b38384"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+      "sha256": "44881d09b207d0d1296ed02671ec9280989e6c6f353903e71df44f40f1b61ff0"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+      "sha256": "8061147f80eddffa2862bf0ef191f6a87588ee170335e447698db7c4a7c4a7ae"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "e45493e4cdece3e4ce7c619af445b74f49c3e5cd1c0497563830f214091a58fa"
+    },
+    {
+      "file": "apps/server/Plugin/AgentAssistant/AgentAssistant.js",
+      "sha256": "775909dc425b00a364aa3b46044a4ab32071e32e51fe32df1052f644db4d8927"
+    },
+    {
+      "file": "apps/server/Plugin/AgentAssistant/delegationContinuity.js",
+      "sha256": "b7ea27e0304d4da83d8c2f992321bd4f78d71ab5d284b775a3441c5848a241c5"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "53d7d237b960df6897ee8efa70c44fa8eb0269b104710d2c70fbf568b9b5444e"
+    }
+  ],
+  "revision": "c9008bde429d",
+  "candidate": false,
+  "order": "child-first",
+  "liveObservation": {
+    "afterAExit": true,
+    "task": {
+      "id": "aa-delegation-1795333499738-574d53bb",
+      "work": "request_3473ddfea24e406ab557819a329a1f29",
+      "state": "running",
+      "stopAllowed": false
+    },
+    "desktopTaskState": null
+  },
+  "verifiedReport": {
+    "work": "request_3473ddfea24e406ab557819a329a1f29",
+    "id": "aa-delegation-1795333499738-574d53bb",
+    "status": 200,
+    "hash": "261243622218aff6abad4805d8d2f4b273db70d7042ad36e978b613d2c2c5673"
+  },
+  "verifiedReportBeforeParent": {
+    "status": 200,
+    "work": "request_3473ddfea24e406ab557819a329a1f29",
+    "id": "aa-delegation-1795333499738-574d53bb",
+    "hash": "261243622218aff6abad4805d8d2f4b273db70d7042ad36e978b613d2c2c5673"
+  },
+  "finalGenerations": [],
+  "beforeAExit": {
+    "task": {
+      "id": "aa-delegation-1795333499738-574d53bb",
+      "state": "running",
+      "heading": "AA 运行中 · SYNTHETIC",
+      "work": "request_3473ddfea24e406ab557819a329a1f29"
+    },
+    "parents": [
+      {
+        "id": "request_3473ddfea24e406ab557819a329a1f29",
+        "state": "dispatched"
+      }
+    ],
+    "children": [
+      {
+        "id": "aa-delegation-1795333499738-574d53bb-round-1",
+        "task_id": "aa-delegation-1795333499738-574d53bb",
+        "state": "dispatched"
+      }
+    ],
+    "generations": [],
+    "work": [
+      {
+        "id": "request_3473ddfea24e406ab557819a329a1f29",
+        "principal": "desktop:deviceA",
+        "state": "dispatched",
+        "dispatched": 1,
+        "native_terminal": 0,
+        "reply_seq": null
+      }
+    ],
+    "tasks": [
+      {
+        "native_task_id": "aa-delegation-1795333499738-574d53bb",
+        "execution_id": "request_3473ddfea24e406ab557819a329a1f29",
+        "native_request_id": "request_3473ddfea24e406ab557819a329a1f29",
+        "invocation_id": "dee20b4e-6e9f-4c6f-93c3-b70a3fa6fd15",
+        "record_id": "tcr-1795333499731-e76aa1be-606d-41ca-9bef-aa2ac5035fcc",
+        "state": "running",
+        "result_hash": null
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "dee20b4e-6e9f-4c6f-93c3-b70a3fa6fd15",
+        "plugin_name": "AgentAssistant",
+        "record_id": "tcr-1795333499731-e76aa1be-606d-41ca-9bef-aa2ac5035fcc",
+        "state": "returned"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "msg_1795333499547_user_uzor93jlsd",
+        "action": "upsert",
+        "hash": "79733af5be7681ce4f4c0169ffdd61096e6756a3a7ce187cd3efc1686928b66d"
+      }
+    ],
+    "provider": [
+      {
+        "role": "parent",
+        "round": 1
+      },
+      {
+        "role": "parent",
+        "round": 2
+      },
+      {
+        "role": "child",
+        "round": 1,
+        "launch": true
+      }
+    ]
+  },
+  "childTerminalBeforeParent": {
+    "parents": [
+      {
+        "id": "request_3473ddfea24e406ab557819a329a1f29",
+        "state": "dispatched"
+      }
+    ],
+    "children": [
+      {
+        "id": "aa-delegation-1795333499738-574d53bb-round-1",
+        "task_id": "aa-delegation-1795333499738-574d53bb",
+        "state": "model_terminal"
+      }
+    ],
+    "work": [
+      {
+        "id": "request_3473ddfea24e406ab557819a329a1f29",
+        "principal": "desktop:deviceA",
+        "state": "dispatched",
+        "dispatched": 1,
+        "native_terminal": 0,
+        "reply_seq": null
+      }
+    ],
+    "tasks": [
+      {
+        "native_task_id": "aa-delegation-1795333499738-574d53bb",
+        "execution_id": "request_3473ddfea24e406ab557819a329a1f29",
+        "native_request_id": "request_3473ddfea24e406ab557819a329a1f29",
+        "invocation_id": "dee20b4e-6e9f-4c6f-93c3-b70a3fa6fd15",
+        "record_id": "tcr-1795333499731-e76aa1be-606d-41ca-9bef-aa2ac5035fcc",
+        "state": "completed",
+        "result_hash": "261243622218aff6abad4805d8d2f4b273db70d7042ad36e978b613d2c2c5673"
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "dee20b4e-6e9f-4c6f-93c3-b70a3fa6fd15",
+        "plugin_name": "AgentAssistant",
+        "record_id": "tcr-1795333499731-e76aa1be-606d-41ca-9bef-aa2ac5035fcc",
+        "state": "returned"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "msg_1795333499547_user_uzor93jlsd",
+        "action": "upsert",
+        "hash": "79733af5be7681ce4f4c0169ffdd61096e6756a3a7ce187cd3efc1686928b66d"
+      }
+    ],
+    "provider": [
+      {
+        "role": "parent",
+        "round": 1
+      },
+      {
+        "role": "parent",
+        "round": 2
+      },
+      {
+        "role": "child",
+        "round": 1,
+        "launch": true
+      }
+    ]
+  },
+  "reportBeforeChildTerminal": {
+    "status": 409,
+    "code": "NATIVE_TASK_RESULT_UNVERIFIED"
+  },
+  "handoffWhileChildActive": {
+    "status": 409,
+    "code": "SHARED_STEERING_TARGET_UNSUPPORTED"
+  },
+  "continueWhileChildActive": {
+    "status": 409,
+    "code": "SHARED_STEERING_TARGET_UNSUPPORTED"
+  },
+  "handoffAfterVerifiedReport": {
+    "status": 409,
+    "code": "SHARED_STEERING_TARGET_UNSUPPORTED"
+  },
+  "continueAfterVerifiedReport": {
+    "status": 409,
+    "code": "SHARED_STEERING_TARGET_UNSUPPORTED"
+  },
+  "final": {
+    "work": [
+      {
+        "id": "request_3473ddfea24e406ab557819a329a1f29",
+        "principal": "desktop:deviceA",
+        "state": "completed",
+        "dispatched": 1,
+        "native_terminal": 1,
+        "reply_seq": 2
+      }
+    ],
+    "tasks": [
+      {
+        "native_task_id": "aa-delegation-1795333499738-574d53bb",
+        "execution_id": "request_3473ddfea24e406ab557819a329a1f29",
+        "native_request_id": "request_3473ddfea24e406ab557819a329a1f29",
+        "invocation_id": "dee20b4e-6e9f-4c6f-93c3-b70a3fa6fd15",
+        "record_id": "tcr-1795333499731-e76aa1be-606d-41ca-9bef-aa2ac5035fcc",
+        "state": "completed",
+        "result_hash": "261243622218aff6abad4805d8d2f4b273db70d7042ad36e978b613d2c2c5673"
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "dee20b4e-6e9f-4c6f-93c3-b70a3fa6fd15",
+        "plugin_name": "AgentAssistant",
+        "record_id": "tcr-1795333499731-e76aa1be-606d-41ca-9bef-aa2ac5035fcc",
+        "state": "returned"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "msg_1795333499547_user_uzor93jlsd",
+        "action": "upsert",
+        "hash": "79733af5be7681ce4f4c0169ffdd61096e6756a3a7ce187cd3efc1686928b66d"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_request_3473ddfea24e406ab557819a329a1f29",
+        "action": "upsert",
+        "hash": "9454443be262c7299acbc3f4c69f5da04d9f224d1d24fc25da8deb9639c28786"
+      }
+    ],
+    "provider": [
+      {
+        "role": "parent",
+        "round": 1
+      },
+      {
+        "role": "parent",
+        "round": 2
+      },
+      {
+        "role": "child",
+        "round": 1,
+        "launch": true
+      }
+    ]
+  }
+}

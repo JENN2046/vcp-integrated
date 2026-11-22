@@ -108,3 +108,23 @@ test('an archived pause with an empty prefix replaces transient text without per
         ['state', paused.id, 'saved'],
     ]);
 });
+
+test('an awaiting AA report retires only the owned stream preview', async () => {
+    const { createMainChatStreamConsumer } = await import('../modules/renderer/mainChatStreamConsumer.js');
+    const { createStreamConsumerRegistry } = await import('../modules/chat/streamConsumerRegistry.js');
+    const registry = createStreamConsumerRegistry();
+    const events = [];
+    registry.register('parent', { discardPending: () => events.push('discard-preview') });
+    const consumer = createMainChatStreamConsumer({messageId:'parent', context:{}}, {
+        resolveProjection: id => registry.claim(id),
+        onProjectionSettled: () => events.push('release'),
+        persistTerminal: () => assert.fail('the child has not produced a verified report'),
+        projectTerminal: () => assert.fail('waiting is not a native final reply'),
+    });
+    assert.equal(await consumer.persist({
+        terminal:{kind:'cancelled', finishReason:'interrupted', awaitingNativeTask:true},
+        snapshot:{text:'transient preview'},
+    }), null);
+    assert.deepEqual(events, ['discard-preview', 'release']);
+    registry.dispose();
+});

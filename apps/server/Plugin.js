@@ -1844,7 +1844,8 @@ class PluginManager extends EventEmitter {
         const plugin = this.getPlugin(toolName);
         if (!plugin || plugin.isDistributed || plugin.requiresAdmin
             || plugin.pluginType !== 'hybridservice' || plugin.communication?.protocol !== 'direct'
-            || ['AgentAssistant', 'ChromeControl', RESIDENT_TOOL_NAME].includes(toolName)
+            || ['ChromeControl', RESIDENT_TOOL_NAME].includes(toolName)
+            || (toolName === 'AgentAssistant' && !nativeExecution.controlledDelegation())
             || (requireLoaded && typeof this.getServiceModule(toolName)?.processToolCall !== 'function')) {
             throw Object.assign(Error('CONTROLLED_TOOL_FORBIDDEN'), { code: 'CONTROLLED_TOOL_FORBIDDEN' });
         }
@@ -1852,6 +1853,7 @@ class PluginManager extends EventEmitter {
 
     async processToolCall(toolName, toolArgs, requestIp = null, sourceNode = null, executionOptions = {}) {
         nativeExecution.assertToolsAllowed(toolName, toolArgs, { indirect: !!executionOptions?.archeryNoReply });
+        nativeExecution.assertDelegationDispatch(toolName);
         const shouldManageToolCallRecord = !executionOptions?.toolCallRecordHandle;
         const managedToolCallRecord = shouldManageToolCallRecord
             ? toolCallRecordStore.beginRecord({ toolName, args: toolArgs || {}, requestIp, sourceNode })

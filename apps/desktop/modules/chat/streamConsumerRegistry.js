@@ -20,6 +20,7 @@ export function createStreamConsumerRegistry() {
                 ...(typeof route.projectTerminal === 'function' ? {
                     projectTerminal(...args) { if (lease.active) return route.projectTerminal(...args); },
                 } : {}),
+                discardPending(...args) { if (lease.active) return route.discardPending?.(...args); },
                 settle(...args) { return route.settle?.(...args); },
                 release(...args) {
                     if (!lease.active) {

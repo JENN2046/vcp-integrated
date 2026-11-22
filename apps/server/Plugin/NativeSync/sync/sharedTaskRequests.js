@@ -2,6 +2,8 @@
 const {sha256,stable}=require('./protocol');
 const fail=code=>Object.assign(Error(code),{code});
 const context=require('../../../modules/requestExecutionContext');
+const controlled=require('./sharedControlledText');
+const {intent}=require('./sharedTurns');
 
 /** A trusted AA child request, not a second scheduler or client-supplied authority. */
 class SharedTaskRequests{
@@ -15,8 +17,14 @@ class SharedTaskRequests{
  resumeAllowed(workId){return !this.db.prepare("SELECT 1 FROM shared_admissions WHERE id=? AND state='review_required'").get(workId)&&!this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state='unknown'").get(workId)&&!this.db.prepare("SELECT 1 FROM shared_native_child_requests WHERE work_id=? AND state='unknown'").get(workId)&&!this.db.prepare("SELECT 1 FROM mobile_native_invocations WHERE execution_id=? AND state='error' AND coalesce(error_code,'')<>'NATIVE_CANCELLED_BEFORE_EXECUTION'").get(workId);}
  fence(workId,identity,revision){
   if(this.native.closed||this.native.draining)throw fail('HOST_DRAINING');
-  const row=this.native.taskControls.row(workId,identity),control=this.native.taskControls.ensure(workId,identity),work=this.db.prepare('SELECT state FROM shared_admissions WHERE id=?').get(workId),current=this.db.prepare('SELECT revision FROM shared_work_controls WHERE work_id=?').get(workId)?.revision||0;
+  const row=this.native.taskControls.row(workId,identity),control=this.native.taskControls.ensure(workId,identity),work=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(workId);
+  const lease=this.db.prepare('SELECT revision,generation,executor FROM shared_work_controls WHERE work_id=?').get(workId);
+  const current=lease?.revision||0;
   if(!work||work.state!=='dispatched'||['completed','failed','cancelled','stopped'].includes(row.state)||control.final_revision!==null)throw fail('NATIVE_TASK_CONTROL_CLOSED');
+  const turn=intent(work);
+  if(turn.controlMode===controlled.AA_MODE&&(!controlled.enabled(this.shared,controlled.AA_MODE)||
+   !this.shared.delegationAgents.has(turn.delegation.agentName)||lease?.generation!==0||
+   lease.executor!==work.principal||identity.pluginName!=='AgentAssistant'))throw fail('NATIVE_TASK_CONTROL_CLOSED');
   if(!this.resumeAllowed(workId))throw fail('NATIVE_TASK_RESULT_REQUIRES_REVIEW');
   if(current!==revision||control.applied_revision!==revision)throw fail('WORK_STEERING_PENDING');
  }
@@ -69,11 +77,13 @@ class SharedTaskRequests{
   if(row.state!=='prepared')throw fail('SHARED_REQUEST_ALREADY_DISPATCHED');
   this.native.continuations.begin({workId,requestId:row.id,generation:row.control_revision,controlRevision:row.control_revision},req.body.messages,req.body.vcpchatExtensions||{});
   this.db.prepare("UPDATE shared_native_child_requests SET state='dispatched' WHERE id=?").run(row.id);
+  const textOnly=intent(admission).controlMode===controlled.AA_MODE;
   const base=this.native.engine.nativeTasks.hooks(workId,row.id),fence=()=>this.fence(workId,identity,row.control_revision);
-  const bridge={...base,onToolDispatch:event=>{fence();return base.onToolDispatch(event)},onTaskAccepted:event=>{fence();return base.onTaskAccepted(event)},
+  const allowTools=()=>{fence();if(textOnly)throw fail('CONTROLLED_TEXT_TOOLS_FORBIDDEN');};
+  const bridge={...base,onToolDispatch:event=>{allowTools();return base.onToolDispatch(event)},onTaskAccepted:event=>{allowTools();return base.onTaskAccepted(event)},
    onToolSettled:event=>{const result=base.onToolSettled(event);this.native.checkTerminal(workId);return result;}};
   const steeringEnabled=require('./sharedTurns').intent(admission).steeringCapable===true;let ended=false;
-  return {phase:name=>this.native.phase(workId,row.id,name),steeringEnabled,workId,generation:row.control_revision,fence,bridge,continuation:body=>body,
+  return {textOnly,phase:name=>this.native.phase(workId,row.id,name),steeringEnabled,workId,generation:row.control_revision,fence,bridge,continuation:body=>body,
    checkpoint:{completion:value=>this.native.continuations.completion(row.id,value),assistant:content=>this.native.continuations.assistant(row.id,content),result:(invocation,value)=>this.native.continuations.result(row.id,invocation,value)},
    finish:success=>{if(ended)return;ended=true;const current=this.db.prepare('SELECT revision FROM shared_work_controls WHERE work_id=?').get(workId)?.revision||0;this.db.prepare('UPDATE shared_native_child_requests SET state=? WHERE id=?').run(success||current>row.control_revision?'model_terminal':'unknown',row.id);this.native.checkTerminal(workId);},
   };

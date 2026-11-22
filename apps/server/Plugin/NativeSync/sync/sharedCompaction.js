@@ -1,6 +1,7 @@
 'use strict';
 const {stable,sha256}=require('./protocol');
 const controlled=require('./sharedControlledText');
+const {linkageHash}=require('./sharedDelegation');
 const fail=code=>Object.assign(Error(code),{code,status:409});
 /** Shared versions authorize publication. Private execution evidence stays in VCP. */
 class SharedCompaction{
@@ -17,7 +18,10 @@ class SharedCompaction{
  snapshot(actor,topic){
   const s=this.shared,work=s.active(topic.id);let control=null,frozenHash=null;
   if(work){
-   if(!s.steering.enabled||!require('./sharedTurns').intent(work).steeringCapable)throw fail('WORK_SAFE_BOUNDARY_PENDING');
+   const turn=require('./sharedTurns').intent(work);
+   if(!s.steering.enabled||!turn.steeringCapable)throw fail('WORK_SAFE_BOUNDARY_PENDING');
+   controlled.assertAAClient(actor,turn.controlMode);
+   if(turn.controlMode===controlled.AA_MODE&&!controlled.enabled(s,turn.controlMode))throw fail('SHARED_STEERING_UNAVAILABLE');
    control=s.steering.control(work);const generation=s.steering.generation(work.id,control.generation),native=s.native.engine.nativeTasks;
    if(control.executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');frozenHash=JSON.parse(generation.config_json).hash;
    if(!generation.checkpoint_json||!['paused','paused_terminal','completed'].includes(generation.state)||native.needsReview(work.id)||native.uncertainTools(work.id)||native.unsettledTools(work.id,generation.request_id)||this.db.prepare("SELECT 1 FROM shared_native_requests WHERE admission_id=? AND state IN ('dispatched','unknown')").get(work.id)||this.db.prepare('SELECT 1 FROM shared_work_inputs WHERE work_id=? AND (attachments_ready=0 OR journal_seq IS NULL)').get(work.id))throw fail('WORK_SAFE_BOUNDARY_PENDING');
@@ -39,12 +43,22 @@ class SharedCompaction{
    const stored=this.db.prepare('SELECT proof_json FROM shared_native_checkpoints WHERE work_id=? AND generation=?').get(generation.work_id,generation.generation);
    if(!stored)throw fail('NATIVE_CHECKPOINT_REQUIRED');
    const proof=JSON.parse(stored.proof_json);
-   const isToolBoundary=generation.generation===0&&work?.id===generation.work_id&&
-    require('./sharedTurns').intent(work).controlMode===controlled.TOOLS_MODE;
+   const hash=linkageHash(proof);
+   nativeProofs.push({requestId:generation.request_id,workId:generation.work_id,hash});
+   const alreadyCompacted=this.db.prepare('SELECT 1 FROM shared_compaction_native_links WHERE request_id=? AND proof_hash=? AND journal_seq<=?').get(generation.request_id,hash,lastCheckpoint);
+   const origin=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(generation.work_id);
+   const mode=require('./sharedTurns').intent(origin).controlMode;
+   if(generation.generation===0&&mode===controlled.AA_MODE){
+    const {report}=s.native.settledBoundary(origin,generation.request_id,proof);
+    if(!alreadyCompacted)history.push({id:'native_evidence_'+sha256(generation.request_id).slice(0,32),role:'user',
+     content:'[已归档的原生 AgentAssistant 报告]\n'+JSON.stringify({receipt:proof.delegationReceipt,report}),
+     name:'AgentAssistant 原生归档'});
+    continue;
+   }
+   const isToolBoundary=generation.generation===0&&work?.id===generation.work_id&&mode===controlled.TOOLS_MODE;
    const results=isToolBoundary?s.native.checkedToolCheckpoint(work.id,generation.request_id,proof).receipts:
     s.native.continuations.compactionToolResults(generation.request_id,generation.work_id,proof);
-   nativeProofs.push({requestId:generation.request_id,workId:generation.work_id,hash:proof.hash});
-   if(this.db.prepare('SELECT 1 FROM shared_compaction_native_links WHERE request_id=? AND proof_hash=? AND journal_seq<=?').get(generation.request_id,proof.hash,lastCheckpoint))continue;
+   if(alreadyCompacted)continue;
    for(const {index,result} of results){
     history.push({id:'native_evidence_'+sha256(stable([generation.request_id,index])).slice(0,32),role:'user',
      content:'[已结清的原生工具结果，不得重复执行]\n'+JSON.stringify(result),name:'原生检查点证据'});
@@ -58,7 +72,7 @@ class SharedCompaction{
  }
  prepare(actor,body){const topic=this.topic(actor,body.sharedSpaceId,body.sharedId);return this.shared.receipt(actor,body,'compact-prepare',()=>{
   if(!Number.isSafeInteger(body.expectedHead)||body.expectedHead!==this.shared.head(topic))throw fail('SHARED_COMPACTION_SOURCE_CHANGED');
-  const active=this.shared.active(topic.id);if(active){const control=this.shared.steering.control(active);if(control.executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');if(require('./sharedTurns').intent(active).controlMode!==controlled.TOOLS_MODE)this.shared.steering.quiesceUnstarted(active,control);}
+  const active=this.shared.active(topic.id);if(active){const control=this.shared.steering.control(active);if(control.executor!==actor.principal)throw fail('WORK_EXECUTOR_HANDOFF_REQUIRED');if(!controlled.transferable(require('./sharedTurns').intent(active).controlMode))this.shared.steering.quiesceUnstarted(active,control);}
   this.db.prepare("UPDATE shared_compaction_intents SET state='superseded' WHERE topic_id=? AND principal=? AND state='prepared'").run(topic.id,actor.principal);
   const snapshot=this.snapshot(actor,topic),id='compact_'+sha256(stable([actor.principal,body.opId])).slice(0,40),messageId='checkpoint_'+id;
   this.db.prepare("INSERT INTO shared_compaction_intents(id,principal,topic_id,proof_json,message_id,committed_seq,work_id,state) VALUES(?,?,?,?,?,NULL,?,'prepared')").run(id,actor.principal,topic.id,JSON.stringify(snapshot.proof),messageId,snapshot.proof.work?.id||null);

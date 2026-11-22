@@ -106,3 +106,5 @@ Android 首次配对立即强停已定位到隔离 WebView 的 Cookie 写盘时�
 固定候选 `9890ce016598` 完成干净重建和三端隔离收口。Linux、原 Windows R16 虚拟机和原 Android 手机上的已安装 Firefox PWA 在重开后各自读回同一已完成 Work 和同两条消息；中央一次尝试、一次派发、一次合成 Provider 请求。手机隔离用户 12 按 Jenn 的选择保留。[构建哈希、三端核对与截图](evidence/release-9890ce016598/README.md)
 
 显式共享工具单聊已支持第一代在同一个模型响应中顺序执行两个不同的名单内直连工具。新桌面与 ToolBox 协商后在接纳时冻结上限，旧 Work 和旧客户端保持单工具语义。原生回执与调用账本逐项核对后，A 才能压缩、B 才能接管原 Work 并显式继续。真实双桌面对照中，第二个计数落盘后丢失回执时，ToolBox 重启保留第一项 returned、第二项 started 和原 Work 的 review_required；压缩、接管、继续均被拒绝。[同一代双工具前后对照、截图及重跑命令](evidence/tool-work-handoff/duo/README.md)
+
+第 2 项显式 AA 父子任务接续已通过隔离双桌面验收。A 退出后 B 能观察原生子任务；只有父调用结算、子任务成功终止并核对原报告后才能接管。B 丢接管回执后使用同一 Profile 找回原 Work，完成压缩和续写。子模型派发后强停、报告哈希冲突均保留原身份待核对，未重新委托。[前后回执、故障对照、截图与复跑](evidence/aa-handoff/README.md)

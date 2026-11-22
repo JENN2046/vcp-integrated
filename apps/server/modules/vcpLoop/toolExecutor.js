@@ -249,9 +249,14 @@ class ToolExecutor {
    */
   async execute(toolCall, clientIp, contextMessages = [], requestExecutionContext = {}) {
     const { name, args, river, vref, archeryNoReply } = toolCall;
+    const controlledDelegation = nativeExecution.controlledDelegation();
     nativeExecution.assertToolsAllowed(name, args, {
-      indirect: Boolean(river || vref || archeryNoReply || jevToolCallExp.isVirtualToolName(name))
+      indirect: Boolean(river || vref || archeryNoReply || jevToolCallExp.isVirtualToolName(name) ||
+        (controlledDelegation && (toolCall.archery || toolCall.markHistory ||
+          preparations.get(this.pluginManager.executionBridgeRegistry)?.has(name)))),
+      allowToolPassword: Boolean(this.vcpToolCode)
     });
+    if (controlledDelegation) this.pluginManager.assertControlledDirectTool(name, { requireLoaded: true });
     const residentProposalCall = isResidentProposalCall(toolCall);
 
     // === JEV 实验性虚拟工具展开 ===

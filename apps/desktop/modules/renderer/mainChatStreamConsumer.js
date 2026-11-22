@@ -99,6 +99,13 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
             if (terminal.phase === 'projection') {
                 throw terminal.error || new Error(`Stream projection failed: ${messageId}`);
             }
+            // This generation stopped after its AA launch receipt. The child is
+            // still authoritative for the report; there is no History reply yet.
+            if (terminal.awaitingNativeTask === true) {
+                await projection?.discardPending?.();
+                capabilities.onProjectionSettled?.({ terminal, context, messageId });
+                return null;
+            }
             const pausedMessage = terminal.pausedWorkMessage;
             const receivedText = pausedMessage ? pausedMessage.content : terminal.fullResponse || value.snapshot?.text || '';
             let fullResponse = receivedText;

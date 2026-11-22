@@ -1,0 +1,449 @@
+{
+  "status": "PASS",
+  "desktop": {
+    "B": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "profileDigest": "6a98f98fc522449c09add35074cb5c35203061cc596395218d2fbe150c64562b"
+    },
+    "A": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "profileDigest": "e769c9b46234cd40f48ef4240b9230bbd7b4d229408e35a527a91d2079c5787b"
+    },
+    "B-report": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "profileDigest": "6a98f98fc522449c09add35074cb5c35203061cc596395218d2fbe150c64562b"
+    },
+    "B-recovered": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "profileDigest": "6a98f98fc522449c09add35074cb5c35203061cc596395218d2fbe150c64562b"
+    },
+    "B-final-reopened": {
+      "electron": "44.9.3",
+      "sandbox": true,
+      "profileDigest": "6a98f98fc522449c09add35074cb5c35203061cc596395218d2fbe150c64562b"
+    }
+  },
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "B-report": {
+      "code": 0,
+      "signal": null
+    },
+    "B-recovered": {
+      "code": 0,
+      "signal": null
+    },
+    "B-final-reopened": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "sources": [
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "b9db4583a1f6f4396585b819db587dc4c188b7ecd39bcb5255ad47e93b3b4a41"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "e0965eb464dad61dfa0441c2a4bdb345208c8208ba2f80cb28b40adfe311f23e"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "28e142ddc467aa4c9487b1f28222af54ee77429a1984268a1ae99745d8f59f28"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "dcd603b0f63bf03e5592a712d2143dee60e8daa6bee2981951ff682f99b913ba"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+      "sha256": "6e0b78a14665d6201094fc78f2488f21af4d18afefd1e20bd437beb31ee9d82b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+      "sha256": "6001739ddda7ce0c3cf94feb5cf50d8440f82565f2e42940cdabeeb8306126aa"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+      "sha256": "88b57faed9e2ab44875dfc63e572b85e52bf3765c35b5ba645d7883ec71272b4"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "d60157de3496eb64fd0ff4a39c2429299fbf5158e0dacac01f2045ea1e46f671"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+      "sha256": "3c3874bbd73e31f594bf7899d2ae0d0d184f62f827666409a683d22f3c138faf"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+      "sha256": "068ca6c5be59baaf786d15955063d3ba2cb10d81f22c786a14cd966c83eb777c"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedDelegation.js",
+      "sha256": "e96f4cc72e5ed76fd2481f60d257985e8ae05876ce635c98de418cb860d7215a"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+      "sha256": "4ba8bfccf267ff5ad384046da81ff7e64a7d53a6c58a4f31bca8af3373773923"
+    },
+    {
+      "file": "apps/server/Plugin/AgentAssistant/AgentAssistant.js",
+      "sha256": "6f99683ebe7757a8710c757282b72e5f60895993b5ae7fe2b9793573e1070758"
+    },
+    {
+      "file": "apps/server/Plugin/AgentAssistant/delegationContinuity.js",
+      "sha256": "b7ea27e0304d4da83d8c2f992321bd4f78d71ab5d284b775a3441c5848a241c5"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "d85c2847904b8220c54b0823f0ba50af47372310f6fa2faf9ff2c870f7420d6e"
+    },
+    {
+      "file": "apps/desktop/modules/ipc/chatHandlers.js",
+      "sha256": "3f72379e438e2cadbb904bc7893175b0a3e69481795bfa59ab18e3e059e88ab7"
+    },
+    {
+      "file": "apps/desktop/modules/services/nativeSync/syncRequest.js",
+      "sha256": "2fab30b3748ae64c1e71fab5ac767faaf5b016493c05c653fc7e866dc202a61c"
+    },
+    {
+      "file": "apps/desktop/modules/services/nativeSync/sharedRuntime.js",
+      "sha256": "630006587e0fc83482357b94135531df71466c46e71793a4c572198183a81c4f"
+    },
+    {
+      "file": "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+      "sha256": "18cbe2588a130c2c7c80d45e0be4dfc19db9bf8bc9c87732d405e879451349f7"
+    },
+    {
+      "file": "apps/desktop/modules/services/nativeSync/sharedSteeringClient.js",
+      "sha256": "51a31096e7647f87733e80f9ac8b49d724ee0244f0bdeac5b97bf7cc7b274e60"
+    },
+    {
+      "file": "apps/desktop/modules/services/nativeSync/sharedEventClient.mjs",
+      "sha256": "f796f6d8fd5b302d61b4b954f77c225bad7609cf1a252429c30c465a46849183"
+    },
+    {
+      "file": "apps/desktop/modules/chatManager.js",
+      "sha256": "bbbadedcf46f7c2753acfbd161561f89a655f579cd0e9a390d67df59250410ce"
+    },
+    {
+      "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+      "sha256": "828dfc5874c17771dd0b5acada3ea4b16140901048e3411c72ca60198bc02b60"
+    },
+    {
+      "file": "apps/desktop/modules/services/nativeSync/sharedSessionView.mjs",
+      "sha256": "90e89e77f58401715a6612943a2172fdb97cae2619a2c0e4bb610d3fe5c66bd2"
+    },
+    {
+      "file": "apps/desktop/modules/chat/streamConsumerRegistry.js",
+      "sha256": "55a32b5f8438e3b45b78d5efddac5422191ddb99073f3d0dec45f5f82605c5ba"
+    },
+    {
+      "file": "apps/desktop/modules/renderer/mainChatStreamConsumer.js",
+      "sha256": "bf2dec7996aca0b89226db8819a2050202e2c9a9bd828e3e7362313f93777934"
+    },
+    {
+      "file": "apps/desktop/modules/chat/vcpStreamBridge.js",
+      "sha256": "8404d0c15a1c31c49030a539b84305c8cb2e9033dd3641fedf30f1593062be3d"
+    }
+  ],
+  "candidate": true,
+  "order": "parent-first",
+  "liveObservation": {
+    "afterAExit": true,
+    "task": {
+      "id": "aa-delegation-1795335456304-a6ec8bfe",
+      "work": "request_6b7b6c5f3f8e4712aec265b936c4de85",
+      "state": "running",
+      "stopAllowed": false
+    },
+    "desktopTaskState": "running"
+  },
+  "nativeWaitBeforeChild": {
+    "status": 409,
+    "value": {
+      "state": "awaiting_native_task",
+      "code": "WORK_SAFE_TOOL_BOUNDARY",
+      "requestId": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85"
+    },
+    "providerStream": false
+  },
+  "parentYieldedWithoutFinal": {
+    "assistantRows": 0,
+    "persistedReplies": 0,
+    "journalReplies": 0
+  },
+  "verifiedReport": {
+    "work": "request_6b7b6c5f3f8e4712aec265b936c4de85",
+    "id": "aa-delegation-1795335456304-a6ec8bfe",
+    "status": 200,
+    "hash": "261243622218aff6abad4805d8d2f4b273db70d7042ad36e978b613d2c2c5673"
+  },
+  "pauseHistory": {
+    "id": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85",
+    "finishReason": "interrupted",
+    "work": "request_6b7b6c5f3f8e4712aec265b936c4de85"
+  },
+  "finalGenerations": [
+    {
+      "generation": 0,
+      "executor": "desktop:deviceA",
+      "request_id": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85",
+      "state": "paused"
+    },
+    {
+      "generation": 1,
+      "executor": "desktop:deviceB",
+      "request_id": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85_g1",
+      "state": "completed"
+    }
+  ],
+  "finalReadbacks": [
+    {
+      "device": "deviceB",
+      "requestId": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85_g1",
+      "seq": 4
+    },
+    {
+      "device": "deviceB",
+      "requestId": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85_g1",
+      "seq": 4
+    },
+    {
+      "device": "deviceB",
+      "requestId": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85_g1",
+      "seq": 4
+    }
+  ],
+  "beforeAExit": {
+    "task": {
+      "id": "aa-delegation-1795335456304-a6ec8bfe",
+      "state": "running",
+      "heading": "AA 运行中 · SYNTHETIC",
+      "work": "request_6b7b6c5f3f8e4712aec265b936c4de85"
+    },
+    "parents": [
+      {
+        "id": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85",
+        "state": "model_terminal"
+      }
+    ],
+    "children": [
+      {
+        "id": "aa-delegation-1795335456304-a6ec8bfe-round-1",
+        "task_id": "aa-delegation-1795335456304-a6ec8bfe",
+        "state": "dispatched"
+      }
+    ],
+    "generations": [
+      {
+        "generation": 0,
+        "executor": "desktop:deviceA",
+        "request_id": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85",
+        "state": "awaiting_native_task"
+      }
+    ],
+    "work": [
+      {
+        "id": "request_6b7b6c5f3f8e4712aec265b936c4de85",
+        "principal": "desktop:deviceA",
+        "state": "dispatched",
+        "dispatched": 1,
+        "native_terminal": 0,
+        "reply_seq": null
+      }
+    ],
+    "tasks": [
+      {
+        "native_task_id": "aa-delegation-1795335456304-a6ec8bfe",
+        "execution_id": "request_6b7b6c5f3f8e4712aec265b936c4de85",
+        "native_request_id": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85",
+        "invocation_id": "224d4741-e2f6-4cbf-9cdb-1b3075db69e6",
+        "record_id": "tcr-1795335456298-7fb8659f-854f-43e6-bfa3-c758de53e664",
+        "state": "running",
+        "result_hash": null
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "224d4741-e2f6-4cbf-9cdb-1b3075db69e6",
+        "plugin_name": "AgentAssistant",
+        "record_id": "tcr-1795335456298-7fb8659f-854f-43e6-bfa3-c758de53e664",
+        "state": "returned"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "controlled_a47dbe77d07243efa7cf01f1a4ac2f72",
+        "action": "upsert",
+        "hash": "b8f403959fb79be0e047409912d7dc1377d2917ef70e4baac7a2d63c95c8cf72"
+      }
+    ],
+    "provider": [
+      {
+        "role": "parent",
+        "round": 1
+      },
+      {
+        "role": "child",
+        "round": 1,
+        "launch": true
+      }
+    ]
+  },
+  "reportBeforeChildTerminal": {
+    "status": 409,
+    "code": "NATIVE_TASK_RESULT_UNVERIFIED"
+  },
+  "handoffWhileChildActive": {
+    "status": 409,
+    "code": "WORK_SAFE_BOUNDARY_PENDING"
+  },
+  "continueWhileChildActive": {
+    "status": 409,
+    "code": "WORK_EXECUTOR_HANDOFF_REQUIRED"
+  },
+  "compactWhileChildActive": {
+    "status": 409,
+    "code": "WORK_SAFE_BOUNDARY_PENDING"
+  },
+  "continueBeforeCompaction": {
+    "status": 409,
+    "code": "WORK_SAFE_BOUNDARY_PENDING"
+  },
+  "oldExecutorContinue": {
+    "status": 409,
+    "code": "WORK_EXECUTOR_HANDOFF_REQUIRED"
+  },
+  "checkpoint": {
+    "hash": "1e320cb39ca99f431b64cff9551cee4d758d4318ae942d1aca07f8a8ad2d8a4e",
+    "settledInvocationIds": [
+      "224d4741-e2f6-4cbf-9cdb-1b3075db69e6"
+    ],
+    "delegationReceipt": {
+      "version": 1,
+      "kind": "AgentAssistantReport",
+      "workId": "request_6b7b6c5f3f8e4712aec265b936c4de85",
+      "parentRequestId": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85",
+      "nativeTaskId": "aa-delegation-1795335456304-a6ec8bfe",
+      "invocationId": "224d4741-e2f6-4cbf-9cdb-1b3075db69e6",
+      "recordId": "tcr-1795335456298-7fb8659f-854f-43e6-bfa3-c758de53e664",
+      "agentBaseName": "SYNTHETIC",
+      "resultHash": "261243622218aff6abad4805d8d2f4b273db70d7042ad36e978b613d2c2c5673",
+      "archiveHash": "7d694dd445dfd14a36980546e7be980d9089e39fb231359f890e3617b4ae19c7",
+      "childRequests": [
+        {
+          "requestId": "aa-delegation-1795335456304-a6ec8bfe-round-1",
+          "hash": "0affb2f48f3ae6ae57a0248f8c5bb0245ccbf756474b79d8d2ab35987ec75132"
+        }
+      ]
+    }
+  },
+  "handoff": {
+    "status": 200,
+    "dropped": true,
+    "owner": "desktop:deviceB",
+    "workId": "request_6b7b6c5f3f8e4712aec265b936c4de85"
+  },
+  "compaction": {
+    "message_id": "checkpoint_compact_86225f12178a531e00aafec6fd6d4684c7c92c77",
+    "committed_seq": 3
+  },
+  "final": {
+    "work": [
+      {
+        "id": "request_6b7b6c5f3f8e4712aec265b936c4de85",
+        "principal": "desktop:deviceA",
+        "state": "completed",
+        "dispatched": 1,
+        "native_terminal": 1,
+        "reply_seq": 4
+      }
+    ],
+    "tasks": [
+      {
+        "native_task_id": "aa-delegation-1795335456304-a6ec8bfe",
+        "execution_id": "request_6b7b6c5f3f8e4712aec265b936c4de85",
+        "native_request_id": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85",
+        "invocation_id": "224d4741-e2f6-4cbf-9cdb-1b3075db69e6",
+        "record_id": "tcr-1795335456298-7fb8659f-854f-43e6-bfa3-c758de53e664",
+        "state": "completed",
+        "result_hash": "261243622218aff6abad4805d8d2f4b273db70d7042ad36e978b613d2c2c5673"
+      }
+    ],
+    "invocations": [
+      {
+        "invocation_id": "224d4741-e2f6-4cbf-9cdb-1b3075db69e6",
+        "plugin_name": "AgentAssistant",
+        "record_id": "tcr-1795335456298-7fb8659f-854f-43e6-bfa3-c758de53e664",
+        "state": "returned"
+      }
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "controlled_a47dbe77d07243efa7cf01f1a4ac2f72",
+        "action": "upsert",
+        "hash": "b8f403959fb79be0e047409912d7dc1377d2917ef70e4baac7a2d63c95c8cf72"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85",
+        "action": "upsert",
+        "hash": "cc076df94a2b2860b53c4d2ea9ab4c6cc8af3a0ca55a37f1620d7fd5f54c08b7"
+      },
+      {
+        "seq": 3,
+        "msg_id": "checkpoint_compact_86225f12178a531e00aafec6fd6d4684c7c92c77",
+        "action": "upsert",
+        "hash": "199c9fa8acc10609b070d95156579708721ca25fd95bf3753b3a2413f89d5f23"
+      },
+      {
+        "seq": 4,
+        "msg_id": "reply_request_6b7b6c5f3f8e4712aec265b936c4de85_g1",
+        "action": "upsert",
+        "hash": "6e09295d0c666fc3b7110ca6e9f31e458aec5da02e1916c56f131af9970f9542"
+      }
+    ],
+    "provider": [
+      {
+        "role": "parent",
+        "round": 1
+      },
+      {
+        "role": "child",
+        "round": 1,
+        "launch": true
+      },
+      {
+        "role": "summary",
+        "round": 1,
+        "summaryReportCount": 1,
+        "summaryHasTypedReceipt": true
+      },
+      {
+        "role": "parent",
+        "round": 2,
+        "resumedReportMarkerCount": 1,
+        "resumedWithCommittedCheckpoint": true
+      }
+    ]
+  }
+}

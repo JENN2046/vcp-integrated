@@ -13,7 +13,9 @@ class SharedSpace {
  constructor(store,config={}, {configurationOnly=false}={}) {
   this.store=store;this.db=store.db;this.catalog=store.sourceCatalog;
   this.configurationOnly=configurationOnly;
-  this.safeTools=require('./sharedControlledText').allowedTools(config.NativeSyncSharedSafeTools);
+  const controlled=require('./sharedControlledText');
+  this.safeTools=controlled.allowedTools(config.NativeSyncSharedSafeTools);
+  this.delegationAgents=controlled.allowedAgents(config.NativeSyncSharedAgentAssistantAgents);
   this.readOnly=config.NativeSyncSharedReadOnly===true||require('./releasePolicy.cjs').sharedReadOnly;
   let grants;try{grants=JSON.parse(config.NativeSyncSharedSpaces||'[]');}catch{throw fail('INVALID_SHARED_GRANTS',400);}
   if(!Array.isArray(grants)||grants.length>32)throw fail('INVALID_SHARED_GRANTS',400);
@@ -66,7 +68,7 @@ class SharedSpace {
    AND (native_terminal=1${recoverableTask}))`:'';
   // A committed tool pause remains transferable across restarts.
   const safePause=tables.has('shared_native_requests')?` AND NOT (
-   coalesce(json_extract(user_op,'$.sharedTurn.controlMode'),'')='safe-tools-v1' AND EXISTS (
+   coalesce(json_extract(user_op,'$.sharedTurn.controlMode'),'') IN ('safe-tools-v1','agent-assistant-v1') AND EXISTS (
     SELECT 1 FROM shared_work_generations g JOIN shared_native_requests r ON r.id=g.request_id
      JOIN shared_native_checkpoints p ON p.work_id=g.work_id AND p.generation=g.generation
      JOIN shared_work_controls c ON c.work_id=g.work_id
@@ -79,18 +81,25 @@ class SharedSpace {
   // Leave this narrow dispatch shape to SharedNative. Only its native archive
   // and the tool ledger can distinguish a durable final reply from a lost one.
   const nativeFinal=tables.has('shared_native_requests')?` AND NOT (
-   coalesce(json_extract(user_op,'$.sharedTurn.controlMode'),'')='safe-tools-v1' AND EXISTS (
+   coalesce(json_extract(user_op,'$.sharedTurn.controlMode'),'') IN ('safe-tools-v1','agent-assistant-v1') AND EXISTS (
     SELECT 1 FROM shared_work_generations g
      JOIN shared_work_controls c ON c.work_id=g.work_id AND c.generation=g.generation
      JOIN shared_native_requests r ON r.id=g.request_id AND r.admission_id=g.work_id
     WHERE g.work_id=shared_admissions.id AND g.generation=1 AND g.state='running'
       AND r.state IN ('dispatched','model_terminal')
    ))`:'';
+  const awaitingDelegation=tables.has('shared_native_requests')?` AND NOT (
+   coalesce(json_extract(user_op,'$.sharedTurn.controlMode'),'')='agent-assistant-v1' AND EXISTS (
+    SELECT 1 FROM shared_work_generations g JOIN shared_native_requests r ON r.id=g.request_id
+    JOIN shared_work_controls c ON c.work_id=g.work_id AND c.generation=0
+    WHERE g.work_id=shared_admissions.id AND g.generation=0 AND g.state='awaiting_native_task'
+      AND r.state='model_terminal'
+   ))`:'';
   const sessionFinal=tables.has('mobile_executions')&&this.db.prepare('PRAGMA table_info(mobile_executions)').all().some(c=>c.name==='native_final_operation')?`
    AND NOT (native_terminal=1 AND EXISTS (SELECT 1 FROM mobile_executions e
      WHERE e.id=shared_admissions.id AND (e.kind IS NULL OR e.kind='shared_session') AND e.state='running'
       AND e.cancel_requested=0 AND e.native_final_operation IS NOT NULL))`:'';
-  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing+safePause+nativeFinal+sessionFinal).run();
+  this.db.prepare("UPDATE shared_admissions SET state='review_required' WHERE state='dispatched'"+publishing+safePause+nativeFinal+awaitingDelegation+sessionFinal).run();
  }
  atomic(fn){
   const own=!this.db.isTransaction;
@@ -421,6 +430,7 @@ class SharedSpace {
    const row=this.admission(actor,body.sharedSpaceId,body.admissionId);
    if(!session&&this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mobile_executions'").get()&&this.db.prepare("SELECT 1 FROM mobile_executions WHERE id=? AND kind='shared_session'").get(row.id))throw fail('SHARED_SESSION_COMPLETION_ONLY');
    if(row.principal!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
+   if(require('./sharedTurns').intent(row).controlMode===require('./sharedControlledText').AA_MODE)throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
    if(this.db.prepare('SELECT 1 FROM shared_work_controls WHERE work_id=? AND (revision>0 OR generation>0)').get(row.id))throw fail('SHARED_CLIENT_UPGRADE_REQUIRED');
    const groupResult=require('./sharedTurns').complete(this,actor,body,row);if(groupResult)return groupResult;
    if(row.state!=='dispatched'||!row.native_terminal)throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
