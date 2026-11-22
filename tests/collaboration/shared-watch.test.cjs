@@ -199,3 +199,33 @@ test('watch independently hints match preparations and committed shared History'
     assert.deepEqual(Object.keys(pull.data).sort(), ['changed', 'token']);
     await stream.close();
 });
+
+test('quiet space heartbeats check authority and change tokens without reading conversation rows', async t => {
+    const f = await fixture(t, { heartbeatMs: 100 });
+    const stream = await frames(await f.request(route));
+    assert.equal((await stream.next()).event, 'hint');
+
+    const prototype = Object.getPrototypeOf(f.store.db.prepare('SELECT 1'));
+    const reads = {};
+    const writes = [];
+    for (const method of ['get', 'all', 'iterate', 'run']) {
+        const original = prototype[method];
+        t.mock.method(prototype, method, function (...args) {
+            const sql = this.sourceSQL;
+            if (!/^\s*SELECT\b/i.test(sql)) writes.push(method);
+            for (const match of sql.matchAll(/\b(?:FROM|JOIN)\s+(\w+)/gi)) {
+                const table = match[1];
+                reads[table] = (reads[table] || 0) + 1;
+            }
+            return original.apply(this, args);
+        });
+    }
+    for (let i = 0; i < 2; i++) assert.equal((await stream.next()).event, 'heartbeat');
+    await stream.close();
+    assert.equal(writes.length, 0);
+    assert(reads.shared_members >= 2);
+    assert(reads.ns_wait_versions >= 2);
+    assert.equal(reads.journal, undefined);
+    assert.equal(reads.messages, undefined);
+    t.diagnostic(JSON.stringify({heartbeatComments:2, tableReads:reads, writes:writes.length}));
+});

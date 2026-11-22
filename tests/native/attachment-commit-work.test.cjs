@@ -42,6 +42,27 @@ test('local commits process only changed references, with no History scan for or
     await l.a.work.run([topic]);assert.deepEqual(l.uploads.slice(2),[['m','one',newOne.hash]]);
     for(let i=0;i<8;i++)await l.a.work.run([topic]);assert.equal(l.reads(),firstReads);
 });
+test('local work wakes only after its wire intent is durable, and settled attachment work has no deadline', async t => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(),'ns-commit-wake-'));
+    const l = await local(root);
+    t.after(async () => { await l.close(); await fs.rm(root,{recursive:true,force:true}); });
+    const wakes = [];
+    l.adapter.onLocalWork = () => {
+        const disk = JSON.parse(require('node:fs').readFileSync(path.join(root,'state.json'),'utf8'));
+        wakes.push(disk.outbox.map(operation => operation.msgId));
+    };
+    await l.a.work.run([topic]);
+    assert.equal(l.a.work.nextDueAt(), Infinity);
+    const ref = await file(root,'wake','fixture');
+    const row = {id:'after-durable',role:'user',content:'commit with attachment',timestamp:1,attachments:[ref]};
+    await l.queue.mutate(topic, () => [row]);
+    assert.deepEqual(wakes, [['after-durable']]);
+    assert(l.a.work.nextDueAt() <= Date.now());
+    await l.a.work.run([topic]);
+    assert.equal(l.a.work.nextDueAt(), Infinity);
+    assert.deepEqual(wakes, [['after-durable']]);
+});
+
 test('abrupt exit after native History write but before its observer recovers the attachment once', async t=>{
     const root=await fs.mkdtemp(path.join(os.tmpdir(),'ns-attach-crash-'));
     t.after(()=>fs.rm(root,{recursive:true,force:true}));

@@ -81,6 +81,8 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     fs.writeFileSync(path.join(seed, 'L4-SYNTHETIC-ONLY'), 'NativeSync L4 synthetic process fixture\n');
     let source, target, stopTopic, ordinaryTopics;
     const descriptors = {};
+    const missingCase = mode === 'idle' && process.env.NS_IDLE_SCENARIOS === 'attachment';
+    const idleScale = mode === 'idle' && process.env.NS_IDLE_SCALE === 'large';
     try {
         const f = await fixture({ after: fn => cleanup.push(fn) }, { syntheticRoot: seed, agentConfig: toolHandoff?.agentConfig });
         source = f.topic;
@@ -89,11 +91,15 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         target = f.shared.create(actor, {sharedSpaceId:'sharedAB',opId:'sponsor-target-topic',kind:'topic',parentId:targetAgent.id,localId:'sponsor-target-topic',localParent:'sponsor-target-agent',config:{name:'Sponsor target existing topic'}}).object;
         const stopAgent = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-agent',kind:'agent',localId:'stop-agent',config:{...f.owner.config,name:'Synthetic interrupted single',systemPrompt:'SYNTHETIC_PARTIAL',streamOutput:true}}).object;
         stopTopic = f.shared.create(actor,{sharedSpaceId:'sharedAB',opId:'stop-topic',kind:'topic',parentId:stopAgent.id,localId:'stop-topic',localParent:'stop-agent',config:{name:'Partial single existing topic'}}).object;
+        if (missingCase) require('./idle-attachment.cjs').seed(f,source);
+        if (idleScale) require('./idle-scale.cjs').seedScale(f, [source,target,stopTopic]);
         ordinaryTopics = { ...ordinaryTools?.seed?.(f), ...groupRelay?.seed?.(f) };
         if (hardwareStream) hardwareStream.seedHistory(f.store, stopTopic.topic);
         if (observedContext) await observedContext.seed(f, source, out);
+        const idleDesktops = [];
         for (const p of ['A','B']) {
             const desktop = await f.desktop(p);
+            if (mode === 'idle') idleDesktops.push(desktop);
             const boundTarget = desktop.runtime.localFor(target.id);
             const boundTargetAgent = desktop.runtime.localFor(targetAgent.id);
             descriptors[p] = {preSubmit:desktop.descriptor,
@@ -102,11 +108,13 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             for (const [subject, descriptor] of Object.entries(descriptors[p])) {
                 await desktop.queue.initializeIfMissing(descriptor, []);
                 const seeded=await desktop.queue.read(descriptor);
+                const idleMessages = idleScale || (missingCase && subject === 'preSubmit') ? 1 : 0;
                 const expected = observedContext && subject === 'preSubmit' ? observedContext.seedCount
-                    : hardwareStream && subject === 'interrupted' ? hardwareStream.seedCount : 0;
+                    : hardwareStream && subject === 'interrupted' ? hardwareStream.seedCount : idleMessages;
                 assert.equal(seeded.length, expected, 'seeded synthetic History count');
             }
         }
+        for (const desktop of idleDesktops) await desktop.runtime.tick();
     } finally {
         for (const fn of cleanup.reverse()) await fn();
     }
@@ -257,6 +265,10 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 return res.writeHead(response.statusCode,response.headers).end(payload);
             }
             row.status=response.statusCode;
+            if (missingCase && route.includes('/shared-attachments/')) requests.push(row);
+            if (mode === 'idle' && process.env.NS_IDLE_OBSERVE_TOPIC === 'yes' && route.endsWith('/shared/session-events')) {
+                requests.push({ ...row, scope: url.searchParams.get('scope') });
+            }
             if (detachFinal) {
                 toolHandoff.observeFinalNativeResponse(response, row);
                 return;
@@ -302,7 +314,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             ...(observedContext ? ['--require',observedContext.preload] : []),'server.js'], {
             cwd:box,stdio:['ignore',log,log],env:{
                 PATH:'/usr/bin:/bin',HOME:out,LANG:'C.UTF-8',TZ:'UTC',NS_LOADED_REPORT:path.join(out,'backend-loaded.json'),
-                ...(mode === 'idle' ? { NS_METER_BACKEND:'1', NS_METER_PREFIX:path.join(out,'backend') } : {}),
+                ...(mode === 'idle' && process.env.NS_IDLE_METER !== 'off' ? { NS_METER_BACKEND:'1', NS_METER_PREFIX:path.join(out,'backend') } : {}),
                 ...(observedContext ? { NS_CONTEXT_HANDLER_LOG: observedContext.handlerLog, NS_CONTEXT_INPUT: observedContext.input } : {}),
                 PORT:String(backendPort),VCP_LOCAL_LISTEN_HOST:'127.0.0.1',Key:auth,API_Key:'synthetic-provider',VCP_Key:'synthetic-sponsor-ws',
                 API_URL:'http://127.0.0.1:'+providerPort,...(mode==='transport-only'?{}:{ApiRetries:'1'}),MaxVCPLoopNonStream:'4',MaxVCPLoopStream:'4',
@@ -311,6 +323,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 NativeSyncEnabled:'true',NativeSyncDataDir:data,NativeMobileEnabled:'true',
                 NativeMobileOrigin:'https://127.0.0.1:'+proxyPort,NativeMobileStartDelayMs:'0',
                 ...(delegation ? { AdminUsername:'synthetic-admin', AdminPassword:'synthetic-admin-only' } : {}),
+                ...(mode === 'idle' ? { NativeMobileConfigSync:'true', NativeMobileAttachments:'true' } : {}),
                 ...(observedContext ? { NativeMobileConfigSync:'true', NativeMobileAttachments:'true' } : {}),
                 ...toolHandoff?.env,
                 ...(streamInterrupt ? { EnableRoleDivider:String(streamInterrupt.roleDivider) } : {}),

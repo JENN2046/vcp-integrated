@@ -95,7 +95,7 @@ function launch(profile, role, mode) {
         NS_HOST: host, VCPCHAT_APP_DATA_DIR: profile, VCPCHAT_E2E_TEST: '1',
         NODE_EXTRA_CA_CERTS: cert, NS_CERT_FINGERPRINT: fingerprint,
         ...(mode === compactionRetryMode && role === 'A' ? { NS_COMPACTION_HISTORY_RACE: '1' } : {}),
-        ...(mode === 'idle' ? { NS_METER_PREFIX: path.join(out, role) } : {}),
+        ...(mode === 'idle' && process.env.NS_IDLE_METER !== 'off' ? { NS_METER_PREFIX: path.join(out, role) } : {}),
         ...(mode === 'shutdown-only' ? { NS_CHECK_QUIT_ADMISSION: '1' } : {}),
         ...(desktopStreamClose ? { NS_DESKTOP_STREAM_CLOSE: '1' } : {}) };
     const args = ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1', '--disable-background-networking', '--ozone-platform=x11', '--disable-gpu', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', path.join(here, './electron.cjs')];
@@ -284,7 +284,7 @@ async function runCase(root, mode) {
         }
         result.exits[role] = value;
         delete clients[role];
-        if(!desktopStreamClose && (mode!=='local-only'||role==='B')) assert(client.events.some(event=>event.event==='runtime-close-end'),'NativeSync normal close');
+        if(!desktopStreamClose && !(mode === 'idle' && result.disabledBeforeMeasurement) && (mode!=='local-only'||role==='B')) assert(client.events.some(event=>event.event==='runtime-close-end'),'NativeSync normal close');
         assert(client.events.some(event=>event.event==='electron-quit'),'Electron normal quit hook');
         if (result[role]?.cds) assert.equal(fs.existsSync(path.join('/proc',String(result[role].cds.pid))),false,'C1 CDS child exited');
         assert.deepEqual(result.exits[role],{code:0,signal:null});
@@ -312,6 +312,10 @@ async function runCase(root, mode) {
                     });
                 }
             } else await restoreProfile(path.join(out,'seed','desktop'+role),profile,service.origin,role);
+            if (mode === 'idle') {
+                const connectionFile = path.join(profile, '.native-sync/connection.json');
+                fs.writeFileSync(connectionFile, json({ ...read(connectionFile), syncAttachments: true }));
+            }
             const settingsFile=path.join(profile,'settings.json');
             fs.writeFileSync(settingsFile,json({...read(settingsFile),ChatDataServiceEnabled:true,ChatDataServiceNotifyEnabled:false,ChatDataServiceTantivyEnabled:false,vcpServerUrl:service.origin+((compaction || toolHandoff)?'/v1/chat/completions':'/v1/local-chat/completions'),
                 ...compaction?.settings,...toolHandoffFixture?.settings,...streamInterrupt?.settings,...(desktopStreamClose && { enableVcpToolInjection:false, enableContextCompaction:false }),userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
@@ -332,7 +336,10 @@ async function runCase(root, mode) {
                 B.exit.then(resolve);
             });
         } else if (mode === 'idle') {
-            result.idle = await require('./idle.cjs').measure({out, waitUntil, pids:{ A:A.proc.pid, B:B.proc.pid, backend:service.backendPid }});
+            await require('./idle.cjs').run({
+                out, candidate, profiles, desktops: { A, B }, service, cert, result,
+                start, stop, click, evalJs, waitUntil, sha,
+            });
         } else if (mode !== 'ready') {
             const runScenario = desktopStreamClose ? require('../desktop-stream-close/scenario.cjs') : toolHandoff ? require('../tool-work-handoff/scenario.cjs')
                 : compaction ? require('../compact-e2e/scenario.cjs')

@@ -11,8 +11,12 @@ function install(role){
  function sync(tag,fn){const prev=current;switchTo(tag);try{return fn()}finally{switchTo(prev)}}
  function within(tag,fn){const w=bucket();if(w)w.invocations[tag]=(w.invocations[tag]||0)+1;return als.run(tag,()=>sync(tag,fn))}
  const stack=[];ah.createHook({before(){const next=als.getStore()||null;stack.push(current);switchTo(next)},after(){switchTo(stack.pop()||null)}}).enable();
- function route(raw){const p=raw.split('?')[0];if(p.startsWith('/api/plugins/NativeSync/'))return p.includes('attachment')?'attachment':'plugin-other';
- if(p.startsWith('/api/v1/sync/')){const parts=p.slice(13).split('/');const whitelist=/^(shared|source|changes|pull|push|info|matches|wait|session-events|session-status|config|join|bind|baselines|projections|ack|execution-trace|match-state|progress|directory|bindings|work|active|status|baselines|baseline|topic-history|session-send|mobile|feed|capabilities)$/;return parts.slice(0,2).filter(Boolean).map(x=>whitelist.test(x)?x:'other').join('/')||'root'}
+ function route(raw){const p=raw.split('?')[0];
+ if(p.endsWith('/shared/session-events')){
+   const scope=new URLSearchParams(raw.slice(p.length+1)).get('scope');
+   return scope==='topic'?'shared/session-events/topic':'shared/session-events/work';
+ }if(p.startsWith('/api/plugins/NativeSync/'))return p.includes('attachment')?'attachment':'plugin-other';
+ if(p.startsWith('/api/v1/sync/')){const parts=p.slice(13).split('/');const whitelist=/^(shared|source|changes|pull|push|info|matches|wait|watch|session-events|session-status|config|join|bind|baselines|projections|ack|execution-trace|match-state|progress|directory|bindings|work|active|status|baselines|baseline|topic-history|session-send|mobile|feed|capabilities)$/;return parts.slice(0,2).filter(Boolean).map(x=>whitelist.test(x)?x:'other').join('/')||'root'}
  if(p.startsWith('/mobile'))return 'mobile';return null}
  function bytes(v,enc){return !v?0:typeof v==='string'?Buffer.byteLength(v,typeof enc==='string'?enc:undefined):v.byteLength||0}
  if(role==='backend'){
@@ -23,7 +27,23 @@ function install(role){
   function cell(){const w=bucket();return w&&(w.http[k]||=( {requests:0,finished:0,requestBytes:0,responseBytes:0,codes:{},verbs:{}}))}
   const row=cell();if(row){row.requests++;row.verbs[req.method]=(row.verbs[req.method]||0)+1;const w=bucket(),id=req.headers['x-nativesync-source-id']||req.headers['x-nativesync-source'];const key=k==='mobile'?'mobile':id?String(id).endsWith('_peer')?'peer':'source':'unspecified';w.origins[key]=(w.origins[key]||0)+1;}
   const em=req.emit;req.emit=function(e,...a){if(e==='data'){const b=cell();if(b)b.requestBytes+=bytes(a[0])}return em.call(this,e,...a)};
-  for(const name of ['write','end']){const orig=res[name];res[name]=function(v,enc,...a){const n=bytes(v,enc),b=n&&cell();if(b)b.responseBytes+=n;return orig.call(this,v,enc,...a)}}
+  for (const name of ['write', 'end']) {
+   const original = res[name];
+   res[name] = function (value, encoding, ...args) {
+    const size = bytes(value, encoding);
+    const metrics = size && cell();
+    if (metrics) {
+     metrics.responseBytes += size;
+     if (String(res.getHeader('content-type')).includes('text/event-stream')) {
+      const data = Buffer.isBuffer(value) ? value.toString('utf8') : String(value);
+      metrics.sseBytes = (metrics.sseBytes || 0) + size;
+      metrics.sseDataFrames = (metrics.sseDataFrames || 0) + (data.match(/^data:/gm) || []).length;
+      metrics.sseCommentFrames = (metrics.sseCommentFrames || 0) + (data.match(/^:/gm) || []).length;
+     }
+    }
+    return original.call(this, value, encoding, ...args);
+   };
+  }
   res.once('finish',()=>{const b=cell();if(b){b.finished++;b.codes[res.statusCode]=(b.codes[res.statusCode]||0)+1}});
   return within(k,()=>emit.call(this,ev,...args))
  };
@@ -38,7 +58,19 @@ function install(role){
  for(const k of ['readFile','writeFile','appendFile'])fileMethod(fs.promises,k);
  const open=fs.promises.open;fs.promises.open=function(p,...args){if(!als.getStore())return open.call(this,p,...args);return open.call(this,p,...args).then(h=>{handles.set(h,p);const proto=Object.getPrototypeOf(h);if(!hooked.has(proto)){hooked.add(proto);for(const k of ['readFile','writeFile','appendFile','read','write'])fileMethod(proto,k,true)}return h})};
  for(const k of ['readFileSync','writeFileSync']){const orig=fs[k];fs[k]=function(p,...args){const v=orig.call(this,p,...args);const tag=als.getStore();if(tag)addFile(tag,k,p,k==='readFileSync'?bytes(v):bytes(args[0],args[1]));return v}}
- const methods={AttachmentWork:['run','inventory','offer'],SharedRuntime:['tick','tickCore','discover','materialize','readLocal','pollDirectory','backfill','recoverRegistration','getExecutionStatus','nativeTrajectory'],DesktopAttachments:['restoreRemote','uploadLocal'],SharedMatching:['poll'],SharedExecution:['reconcile'],SharedSessionClient:['reconcile','watch','watchTopic'],NativeSyncAdapter:['synchronize']};
+ const methods = {
+  SharedWaitClient: ['watch', 'listen', 'configure', 'take'],
+  AttachmentWork: ['run', 'inventory', 'offer'],
+  SharedRuntime: [
+   'tick', 'tickCore', 'runTick', 'planTick', 'scheduleTick', 'configureWatch', 'discover',
+   'materialize', 'readLocal', 'pollDirectory', 'backfill', 'recoverRegistration', 'getExecutionStatus', 'nativeTrajectory',
+  ],
+  DesktopAttachments: ['restoreRemote', 'uploadLocal'],
+  SharedMatching: ['poll'],
+  SharedExecution: ['reconcile'],
+  SharedSessionClient: ['reconcile', 'watch', 'watchTopic'],
+  NativeSyncAdapter: ['synchronize'],
+ };
  if(role==='main'){
  const load=Module._load;Module._load=function(id,parent,...rest){
   const exp=load.call(this,id,parent,...rest);
@@ -55,8 +87,26 @@ function install(role){
  }
  const safeWrite=(key,value)=>{const p=base+role+'-'+key+'.json';fs.writeFileSync(p+'.tmp',JSON.stringify(value));fs.renameSync(p+'.tmp',p)};
  let saved=0;safeWrite('ready',{pid:process.pid,role});
- setInterval(()=>{
-  if(!schedule){try{schedule=JSON.parse(fs.readFileSync(base+'schedule.json','utf8'));for(let i=0;i<schedule.n;i++)windows.push(blank());safeWrite('armed',{pid:process.pid,patched:[...patched]})}catch{return}}
-  while(saved<schedule.n&&Date.now()>schedule.start+(saved+1)*60000+500){const w=windows[saved];w.snapshotTopics=Object.fromEntries(Object.entries(w.snapshotTopics).map(([k,v])=>[k,v.size]));safeWrite('w'+(++saved),w)}
- },250).unref()
+ const scheduleFile = base + 'schedule.json';
+ const change = fs.watch(require('node:path').dirname(scheduleFile), { persistent: false }, () => arm());
+ function arm() {
+  if (schedule) return;
+  try {
+   schedule = JSON.parse(fs.readFileSync(scheduleFile, 'utf8'));
+  } catch {
+   return;
+  }
+  change.close();
+  for (let i = 0; i < schedule.n; i++) windows.push(blank());
+  safeWrite('armed', { pid: process.pid, patched: [...patched] });
+  for (let i = 0; i < schedule.n; i++) {
+   const deadline = schedule.start + (i + 1) * 60000 + 500;
+   setTimeout(() => {
+    const window = windows[i];
+    window.snapshotTopics = Object.fromEntries(Object.entries(window.snapshotTopics).map(([k, v]) => [k, v.size]));
+    safeWrite('w' + (i + 1), window);
+   }, Math.max(0, deadline - Date.now())).unref();
+  }
+ }
+ arm();
 }

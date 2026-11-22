@@ -214,7 +214,7 @@ input.on('line', async line => {
                 await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',button,buttons:0,clickCount:1,...script});
             }
         }
-        if (action === 'loaded-sources') {
+        if (action === 'loaded-sources' || action === 'loaded-main-sources') {
             const { fileURLToPath } = require('node:url');
             const sourceRoot = path.resolve(process.env.NS_HOST, "../..");
             const main = Object.keys(require.cache).filter(file => file.startsWith(sourceRoot + '/') &&
@@ -222,6 +222,10 @@ input.on('line', async line => {
                     file: path.relative(sourceRoot, file),
                     sha256: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
                 }));
+            if (action === 'loaded-main-sources') {
+                log('answer',{ id,result:{main} });
+                return;
+            }
             const debuggerApi = win.webContents.debugger;
             if (!debuggerApi.isAttached()) debuggerApi.attach('1.3');
             const parsed = [];
