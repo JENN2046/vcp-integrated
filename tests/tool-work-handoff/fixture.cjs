@@ -19,7 +19,7 @@ const initialAnswer = (marker, name = tool.name) => [
 ].join('\n');
 
 function create(out, {
-    duo = false, duoBaseline = false, unknown = false, loseHandoff = false, stream = false, losePublication = false,
+    duo = false, duoBaseline = false, unknown = false, loseHandoff = false, stream = false, losePublication = false, loseCompactionAck = false,
     readback = false, loseReadback = false, legacyReadback = false, finalMutation, finalReceipt,
 } = {}) {
     const marker = !duo && unknown ? 'ORDINARY_TOOL_THROW' : 'ORDINARY_TOOL_LOCAL';
@@ -36,12 +36,15 @@ function create(out, {
     } : tool.counts(out);
     const expectedCounts = duo ? { first: [{ marker }], second: [{ marker: secondMarker }] } : [{ marker }];
     const observed = compaction.observe(out);
+    let compactionAckBlocked = loseCompactionAck;
     let dropped = false, droppedReadback = false;
     const receipt = {};
     return {
         marker, duo, duoBaseline, unknown, counts, expectedCounts, secondResult,
         firstEffectReady, releaseFirstReceipt, secondEffectReady,
         loseHandoff,
+        loseCompactionAck,
+        releaseCompactionAck() { compactionAckBlocked = false; },
         losePublication,
         stream,
         readback,
@@ -206,6 +209,7 @@ function create(out, {
             });
         },
         dropResponse(row) {
+            if (compactionAckBlocked && row.route.endsWith('/compact-commit') && row.status === 200) return true;
             if (loseReadback && !droppedReadback && row.device === 'deviceB' && row.route.endsWith('/final-reply') &&
                 row.status === 200 && Number(row.query?.generation) === 1 && row.response?.state === 'committed') {
                 droppedReadback = true;

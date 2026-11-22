@@ -50,6 +50,10 @@ export const advancedFeaturesSection = section('advanced-features', '高级功�
                 label: '上下文压缩模型', hint: '填写模型 ID；使用当前 VCP 服务器和密钥。',
                 when: ['enableContextCompaction'], save: { trim: true },
             }),
+            text('contextCompactionFallbackModel', {
+                label: '备用压缩模型', hint: '可留空。主模型遇到可重试错误时，使用同一 VCP 服务器尝试该模型一次。',
+                when: ['enableContextCompaction'], save: { trim: true },
+            }),
             textarea('contextCompactionPrompt', {
                 label: '压缩提示词（引擎职责与输出规范）', defaultValue: '',
                 placeholder: '留空使用默认压缩提示词',

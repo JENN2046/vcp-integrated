@@ -14,7 +14,7 @@ const text = row => Array.isArray(row.content)
 const checkpointMessage = row => row.contextCompaction?.kind === 'vchat-context-checkpoint';
 const checkpointText = row => text(row)?.includes('COMPACT_DESKTOP_CHECKPOINT');
 
-module.exports = async ({ clients: { A, B }, out, result, service, picture, click, evalJs, waitUntil, start, stop, profiles, sha }) => {
+module.exports = async ({ clients: { A, B }, out, result, service, picture, click, evalJs, waitUntil, start, stop, profiles, sha, compactionFallback }) => {
     const db = new DatabaseSync(path.join(service.data, 'central.sqlite'), { readOnly:true });
     const descriptor = service.descriptors.A.preSubmit;
     const topicId = service.topics.preSubmit.id;
@@ -74,15 +74,16 @@ module.exports = async ({ clients: { A, B }, out, result, service, picture, clic
         await select(A);
         const controlled = result.controlledTurns;
         const [editedTurn, deletedTurn] = controlled;
-        const priorIds = [...fixture.priorRows.map(row => row.id), editedTurn.userId, editedTurn.requestId, deletedTurn.userId];
+        const seeded = [...fixture.priorRows, ...(compactionFallback?.historyRows || [])];
+        const priorIds = [...seeded.map(row => row.id), editedTurn.userId, editedTurn.requestId, deletedTurn.userId];
         const prior = await waitUntil(() => JSON.stringify(history().map(row => row.id)) === JSON.stringify(priorIds) && history(),
             'physical History received controlled edits and tombstone');
         assert.deepEqual(prior.map(text), [
-            ...fixture.priorRows.map(text), fixture.inputs[0], fixture.edited, fixture.inputs[1],
+            ...seeded.map(text), fixture.inputs[0], fixture.edited, fixture.inputs[1],
         ]);
         const originalJournal = journal();
         assert.deepEqual(originalJournal.map(row => [row.msg_id, row.action]), [
-            ...fixture.priorRows.map(row => [row.id, 'upsert']),
+            ...seeded.map(row => [row.id, 'upsert']),
             [editedTurn.userId, 'upsert'], [editedTurn.requestId, 'upsert'], [editedTurn.requestId, 'upsert'],
             [deletedTurn.userId, 'upsert'], [deletedTurn.requestId, 'upsert'], [deletedTurn.requestId, 'delete'],
         ]);
@@ -91,6 +92,10 @@ module.exports = async ({ clients: { A, B }, out, result, service, picture, clic
         assert.equal(callsBefore, 2);
         assert.ok(service.calls.every(row => row.fixtureControlled));
         await waitUntil(async () => (await transcript(A)).includes(fixture.edited), 'visible edit in shared History');
+        if (compactionFallback?.fault === 'history') {
+            return await compactionFallback.verifyHistory({ A, result, service, journal, history, originalJournal, prior,
+                send, start, stop, select, evalJs, out, intents, works, picture, sha });
+        }
         async function manualCompact(screenshot) {
             const point = await evalJs(A, `(() => {
                 const row = document.querySelector('[data-message-id="${editedTurn.requestId}"]');
@@ -103,6 +108,8 @@ module.exports = async ({ clients: { A, B }, out, result, service, picture, clic
             await click(A, '.context-menu-item', '压缩前文');
         }
         await manualCompact('manual-menu');
+        if (await compactionFallback?.verifyAttempt({ A, result, service, intents, journal, history, originalJournal,
+            prior, compactIpc, waitUntil, evalJs, picture, sha })) return;
         const committed = await waitUntil(() => intents().find(row => row.state === 'committed'), 'durable checkpoint commit');
         const compacted = await waitUntil(() => history().find(checkpointMessage) && history(), 'physical checkpoint projection');
         const checkpoint = compacted.find(checkpointMessage);
@@ -125,9 +132,11 @@ module.exports = async ({ clients: { A, B }, out, result, service, picture, clic
             assert.equal(link.proof_hash, turn.proofHash);
             assert.equal(link.journal_seq, committed.committed_seq);
         }
-        assert.equal(service.calls.length, callsBefore + 1);
-        const summaryCall = service.calls[callsBefore];
-        assert.equal(summaryCall.model, fixture.summaryModel);
+        const fallbackUsed = compactionFallback?.fault === '404';
+        const effectiveSummaryIndex = callsBefore + Number(fallbackUsed);
+        assert.equal(service.calls.length, effectiveSummaryIndex + 1);
+        const summaryCall = service.calls[effectiveSummaryIndex];
+        assert.equal(summaryCall.model, fallbackUsed ? compactionFallback.settings.contextCompactionFallbackModel : fixture.summaryModel);
         assert.ok(!summaryCall.messages.some(row => fixture.replies.some(marker => text(row)?.includes(marker))));
         assert.deepEqual(summaryCall.messages.slice(1, -1).map(row => [row.role,text(row)]), prior.map(row => [row.role,text(row)]));
         if (result.mode === 'compact-history-identity') {
@@ -167,14 +176,17 @@ module.exports = async ({ clients: { A, B }, out, result, service, picture, clic
         const modelHandler = handler.filter(row => row.kind === 'handler-input');
         const selectors = handler.filter(row => row.kind === 'checkpoint-selection');
         assert.equal(modelHandler.length, 2);
-        assert.equal(service.calls.length, callsBefore + 3);
+        assert.equal(service.calls.length, effectiveSummaryIndex + 3);
         const requestViews = [first, final].map((saved, index) => {
             const work = works()[index];
             const native = modelHandler[index];
-            const provider = service.calls[callsBefore + index + 1];
-            const selector = selectors.find(row => row.beforeIds.at(-1) === work.user_message_id);
+            const provider = service.calls[effectiveSummaryIndex + index + 1];
             const tail = saved.slice(prior.length + 1, -1);
-            assert.deepEqual(selector.afterIds, [checkpoint.id, ...tail.map(row => row.id)]);
+            const stagedBase = saved.slice(0, -2).map(row => row.id);
+            const selector = selectors.find(row => row.beforeIds.at(-1) === work.user_message_id) ||
+                selectors.find(row => JSON.stringify(row.beforeIds) === JSON.stringify(stagedBase));
+            const selectedTail = selector.beforeIds.at(-1) === work.user_message_id ? tail : tail.slice(0, -1);
+            assert.deepEqual(selector.afterIds, [checkpoint.id, ...selectedTail.map(row => row.id)]);
             assert.equal(native.workId, work.id);
             assert.equal(work.attempts, 1);
             assert.equal(work.request_dispatched, 1);

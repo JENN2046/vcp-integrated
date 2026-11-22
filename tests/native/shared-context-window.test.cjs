@@ -19,6 +19,7 @@ test('shared assembly reads content only for retained non-checkpoint rows and le
     const history = [
         checkpoint('older'), {id:'archived',role:'user',content:'old',attachments:[{id:'old-file'}]},
         checkpoint('latest'), {id:'placeholder',role:'assistant',isThinking:true,content:'…'},
+        checkpoint('[UPSTREAM_ERROR] 503'),
         {id:'retained',role:'assistant',content:'reply',attachments:[{id:'current-file'}]},
         checkpoint('unsupported-version', 2), {id:'current',role:'user',content:'hello'},
     ];

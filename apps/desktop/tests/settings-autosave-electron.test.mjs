@@ -73,6 +73,7 @@ test('mainChatSettingsOwner.merge safely hot-reloads committed patches and deep-
         initial: {
             enableContextCompaction: false,
             contextCompactionModel: '',
+            contextCompactionFallbackModel: '',
             userAvatarUrl: 'assets/runtime-avatar.png',
             appearanceProfile: { theme: 'dark', customRadius: 8 },
         },
@@ -83,12 +84,14 @@ test('mainChatSettingsOwner.merge safely hot-reloads committed patches and deep-
     settingsOwner.merge({
         enableContextCompaction: true,
         contextCompactionModel: 'deepseek-chat',
+        contextCompactionFallbackModel: 'backup-compressor',
         appearanceProfile: { sidebarRowHeight: 42 },
     });
 
     const afterEnable = settingsOwner.get();
     assert.equal(afterEnable.enableContextCompaction, true, '上下文压缩开关应即时热重载为 true');
     assert.equal(afterEnable.contextCompactionModel, 'deepseek-chat', '上下文压缩模型应即时更新');
+    assert.equal(afterEnable.contextCompactionFallbackModel, 'backup-compressor');
     assert.equal(afterEnable.userAvatarUrl, 'assets/runtime-avatar.png', '未持久化的衍生头像字段应完好保留');
     assert.equal(afterEnable.appearanceProfile.customRadius, 8, '原有的外观圆角衍生配置应完好保留');
     assert.equal(afterEnable.appearanceProfile.sidebarRowHeight, 42, '新增的外观行高应正确合入');
@@ -98,4 +101,5 @@ test('mainChatSettingsOwner.merge safely hot-reloads committed patches and deep-
     settingsOwner.merge({ enableContextCompaction: false });
     assert.equal(settingsOwner.get().enableContextCompaction, false, '上下文压缩开关应即时热关闭为 false');
     assert.equal(settingsOwner.get().contextCompactionModel, 'deepseek-chat', '未触碰的同级字段应保持不变');
+    assert.equal(settingsOwner.get().contextCompactionFallbackModel, 'backup-compressor');
 });

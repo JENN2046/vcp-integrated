@@ -1896,6 +1896,11 @@ class ChatCompletionHandler {
           res.setHeader('Cache-Control', 'no-cache');
           res.setHeader('Connection', 'keep-alive');
 
+          // The text frame remains display-compatible. Side requests use the actual status.
+          res.setHeader('X-VCP-Upstream-Status', String(upstreamStatus));
+          const exposed = res.getHeader('Access-Control-Expose-Headers');
+          res.setHeader('Access-Control-Expose-Headers', [exposed, 'X-VCP-Upstream-Status'].filter(Boolean).join(', '));
+
           // Read the error body from the upstream response
           const errorBodyText = await firstAiAPIResponse.text();
           abortController.signal.throwIfAborted();
@@ -1951,7 +1956,7 @@ class ChatCompletionHandler {
         res.status(upstreamStatus);
         firstAiAPIResponse.headers.forEach((value, name) => {
           if (
-            !['content-encoding', 'transfer-encoding', 'connection', 'content-length', 'keep-alive'].includes(
+            !['content-encoding', 'transfer-encoding', 'connection', 'content-length', 'keep-alive', 'x-vcp-upstream-status'].includes(
               name.toLowerCase(),
             )
           ) {

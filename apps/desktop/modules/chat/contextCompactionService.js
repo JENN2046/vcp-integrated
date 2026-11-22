@@ -22,63 +22,6 @@ export function shouldCompactContext(history, agentConfig, pendingText = '') {
     return estimateContextTokens([...effective, { role: 'user', content: pendingText }], agentConfig.systemPrompt || '') >= limit * 0.85;
 }
 
-// Collect transport frames only. Heartbeats are not summary text, reasoning and
-// tool metadata never become the checkpoint, and failure cannot commit a partial.
-async function readCompactionStream(response, signal, fallbackModel) {
-    const reader = response.body?.getReader?.();
-    if (!reader) throw new Error('压缩流没有可读取的响应正文');
-    const decoder = new TextDecoder();
-    let buffer = '', content = '', refusal = '', finishReason = null, model = fallbackModel;
-    let done = false, eof = false;
-    const frame = text => {
-        const data = text.split(/\r?\n/).filter(line => line.startsWith('data:'))
-            .map(line => line.slice(5).trimStart()).join('\n').trim();
-        if (!data) return;
-        if (data === '[DONE]') { done = true; return; }
-        let value;
-        try { value = JSON.parse(data); }
-        catch { throw new Error('压缩流包含无效数据，未生成快照'); }
-        if (value?.error) {
-            const status = Number(value.error.status || value.error.code);
-            throw new Error(Number.isInteger(status) && status >= 400 && status <= 599
-                ? `上下文压缩请求失败（HTTP ${status}）`
-                : '压缩服务器返回错误，未生成快照，请检查模型配置或服务端日志');
-        }
-        const choice = value?.choices?.[0];
-        if (!choice) return;
-        if (typeof value.model === 'string') model = value.model;
-        const delta = choice.delta || {};
-        if (typeof delta.content === 'string') content += delta.content;
-        else if (Array.isArray(delta.content)) content += delta.content.filter(p => p?.type === 'text').map(p => p.text || '').join('');
-        if (typeof delta.refusal === 'string') refusal += delta.refusal;
-        if (choice.finish_reason) finishReason = choice.finish_reason;
-    };
-    const abort = () => { void reader.cancel().catch(() => {}); };
-    signal?.addEventListener('abort', abort, { once: true });
-    try {
-        signal?.throwIfAborted();
-        while (!done) {
-            const part = await reader.read();
-            signal?.throwIfAborted();
-            if (part.done) { eof = true; buffer += decoder.decode(); break; }
-            buffer += decoder.decode(part.value, { stream: true });
-            let separator;
-            while (!done && (separator = /\r?\n\r?\n/.exec(buffer))) {
-                frame(buffer.slice(0, separator.index));
-                buffer = buffer.slice(separator.index + separator[0].length);
-            }
-        }
-        if (!done && buffer.trim()) frame(buffer);
-        signal?.throwIfAborted();
-        if (!done && !finishReason) throw new Error('压缩流意外中断，未生成快照');
-        return { model, choices: [{ message: { content, refusal }, finish_reason: finishReason }] };
-    } finally {
-        signal?.removeEventListener('abort', abort);
-        if (!eof) void reader.cancel().catch(() => {});
-        reader.releaseLock();
-    }
-}
-
 export async function requestContextCompaction({ settings, state, signal, requestId, fetchImpl = globalThis.fetch, onResponse = () => {} }) {
     const config = compactionSettings(settings);
     if (!config.model) throw new Error('请先配置上下文压缩模型');
@@ -100,6 +43,11 @@ export async function requestContextCompaction({ settings, state, signal, reques
         }),
         signal,
     });
+    const status = response.ok ? Number(response.headers?.get('x-vcp-upstream-status')) : response.status;
+    if (status >= 400 && status <= 599) {
+        await response.body?.cancel?.().catch(() => {});
+        throw Object.assign(new Error(`上下文压缩请求失败（HTTP ${status}）`), { rejectionStatus: status });
+    }
     if (!response.ok) throw new Error(`上下文压缩请求失败（HTTP ${response.status}）`);
     return readCompactionResponse(response, { signal, model: config.model, onResponse });
 }
@@ -162,6 +110,7 @@ export function createContextCompactionService({
         let flowlockLease = null;
         let responseDiagnostic = null;
         let returnedContent;
+        let attemptSettings = settings;
         let shared;
         let committed = false;
         let recovered;
@@ -199,10 +148,21 @@ export function createContextCompactionService({
                     snapshot = structuredClone(shared.history);
                     state = prepareCompactionState(snapshot);
                 }
-                return request({
-                    settings, state, signal: controller.signal, requestId: controller.requestId,
+                const attempt = () => request({
+                    settings: attemptSettings, state, signal: controller.signal, requestId: controller.requestId,
                     onResponse: diagnostic => { responseDiagnostic = diagnostic; },
                 });
+                try {
+                    return await attempt();
+                } catch (error) {
+                    const { model, fallbackModel } = compactionSettings(settings);
+                    if (controller.signal.aborted || !fallbackModel || fallbackModel === model ||
+                        ![400, 404, 422, 429].includes(error.rejectionStatus)) throw error;
+                    attemptSettings = { ...settings, contextCompactionModel: fallbackModel };
+                    controller.requestId += '_fallback';
+                    responseDiagnostic = null;
+                    return attempt();
+                }
             };
             const response = await Promise.race([
                 runRequest(),
@@ -211,7 +171,7 @@ export function createContextCompactionService({
             clearTimeout(timer); // The request deadline must not abort durable history persistence.
             if (disposed || controller.signal.aborted) throw new Error('上下文压缩已取消');
             returnedContent = response;
-            const message = recovered?.message ?? createCheckpointMessage(state, response, settings, shared ? {id:shared.messageId} : {});
+            const message = recovered?.message ?? createCheckpointMessage(state, response, attemptSettings, shared ? {id:shared.messageId} : {});
             const original = JSON.stringify(snapshot);
             const outcome = recovered ?? (shared ? await (async () => {
                 controller.committing = true;
@@ -242,7 +202,7 @@ export function createContextCompactionService({
                 const raw = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
                 error.compactionDiagnostic = [
                     shared && controller.committing ? '共享检查点提交结果待核对，请重试「压缩前文」' : '上下文压缩失败诊断（原历史未修改）',
-                    `模型：${responseDiagnostic?.model || compactionSettings(settings).model}`,
+                    `模型：${responseDiagnostic?.model || compactionSettings(attemptSettings).model}`,
                     `服务端结束原因：${responseDiagnostic?.finishReason ?? '未提供'}`,
                     `失败原因：${error.message}`,
                     '',

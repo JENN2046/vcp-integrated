@@ -147,8 +147,11 @@ module.exports = async ({
     assert.equal(handlers.length, 1);
     assert.equal(handlers[0].workId, workId);
     assert.equal(handlers[0].requestId, verified.native[0].id);
-    const selection = captured.find(row => row.kind === 'checkpoint-selection' && row.beforeIds.includes(work.user_message_id));
-    assert.ok(selection, 'observed the loaded native history window');
+    const selectionRows = captured.filter(row => row.kind === 'checkpoint-selection');
+    const beforeDispatch = selectionRows.find(row => row.beforeIds.at(-1) === work.user_message_id);
+    const frozenBaseIds = JSON.stringify(compacted.map(row => row.id));
+    const selection = beforeDispatch || selectionRows.find(row => JSON.stringify(row.beforeIds) === frozenBaseIds);
+    assert.ok(selection, 'observed the loaded native history window for the admitted input');
     const nativeWindow = 'apps/desktop/modules/chat/historyWindow/index.mjs';
     assert.ok(selection.module.endsWith(nativeWindow));
     assert.equal(selection.sha256, sha(path.join(result.candidate, nativeWindow)));
@@ -181,5 +184,5 @@ module.exports = async ({
         assert.deepEqual(leakedCompactedText, [], stage + ' excludes compressed text');
         assert.ok(hasNewInput, stage + ' retains B input');
     }
-    assert.deepEqual(selection.afterIds, [checkpoint.id, work.user_message_id]);
+    assert.deepEqual(selection.afterIds, [checkpoint.id, ...(beforeDispatch ? [work.user_message_id] : [])]);
 };

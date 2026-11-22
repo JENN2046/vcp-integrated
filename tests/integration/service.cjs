@@ -185,12 +185,13 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             return res.writeHead(500).end(JSON.stringify({error:{code:'UNEXPECTED_DESKTOP_LOCAL_EXECUTION'}}));
         }
         const relayAction = groupRelay && req.method === 'POST' && /\/mobile\/api\/executions\/[^/]+\/cancel(?:-remaining)?$/.test(route);
-        const compactionRequest = mode === 'compact-history-identity' && req.method === 'POST' &&
+        const compactionRequest = (mode === 'compact-history-identity' || observedContext?.observeCompaction) && req.method === 'POST' &&
             /\/shared\/compact-(prepare|commit|cancel)$/.test(route);
+        const compactionTransport = observedContext?.summaryModels && req.method === 'POST' && route === '/v1/chat/completions';
         const relevant = compactionRequest || (streamInterrupt && route === '/v1/interrupt') || relayAction || toolHandoff?.observeRequest(req.method, route) || req.method==='POST' && /\/shared\/(session-send|session-cancel|task-stop|admit|complete|config)$/.test(route);
         const row = {route,method:req.method,at:Date.now(),device:req.headers['x-nativesync-device'],capabilities:req.headers['x-nativesync-capabilities']};
         let body;
-        if (relevant) {
+        if (relevant || compactionTransport) {
             const chunks=[];
             for await (const chunk of req) chunks.push(chunk);
             body=Buffer.concat(chunks);
@@ -201,7 +202,10 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 row.body[key+'Sha256']=require('node:crypto').createHash('sha256').update(row.body[key]).digest('hex');
                 delete row.body[key];
             }
-            requests.push(row);
+            if (relevant) requests.push(row);
+            if (compactionTransport && observedContext.summaryModels.includes(row.body.model)) {
+                requests.push(Object.assign(row, {summaryTransport:true, requestId:row.body.requestId, model:row.body.model}));
+            }
             if(route.endsWith('/session-send') && row.body.message?.content===contract.cases.preSubmit) {
                 row.status=409;row.injected=true;row.response={error:{code:'SHARED_CONTEXT_CHANGED'}};
                 return res.writeHead(409,{'content-type':'application/json'}).end(JSON.stringify(row.response));
@@ -270,6 +274,15 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 return res.writeHead(response.statusCode,response.headers).end(payload);
             }
             row.status=response.statusCode;
+            if (row.summaryTransport) {
+                row.upstreamStatus = response.headers['x-vcp-upstream-status'];
+                const chunks = [];
+                response.on('data', chunk => chunks.push(chunk));
+                response.on('close', () => {
+                    row.summaryWire = Buffer.concat(chunks).subarray(0, 16384).toString('utf8');
+                    row.complete = response.complete;
+                });
+            }
             if (missingCase && route.includes('/shared-attachments/')) requests.push(row);
             if (mode === 'idle' && process.env.NS_IDLE_OBSERVE_TOPIC === 'yes' && route.endsWith('/shared/session-events')) {
                 requests.push({ ...row, scope: url.searchParams.get('scope') });
@@ -318,6 +331,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         backend = spawn(node, ['--require',path.join(__dirname,'loopback.cjs'),
             ...(observedContext ? ['--require',observedContext.preload] : []),'server.js'], {
             cwd:box,stdio:['ignore',log,log],env:{
+                ...(process.env.NS_FIXTURE_POLL_WATCHERS === '1' && { CHOKIDAR_USEPOLLING:'true', NS_FIXTURE_POLL_WATCHERS:'1' }),
                 PATH:'/usr/bin:/bin',HOME:out,LANG:'C.UTF-8',TZ:'UTC',NS_LOADED_REPORT:path.join(out,'backend-loaded.json'),
                 ...(mode === 'idle' && process.env.NS_IDLE_METER !== 'off' ? { NS_METER_BACKEND:'1', NS_METER_PREFIX:path.join(out,'backend') } : {}),
                 ...(observedContext ? { NS_CONTEXT_HANDLER_LOG: observedContext.handlerLog, NS_CONTEXT_INPUT: observedContext.input } : {}),

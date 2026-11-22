@@ -73,6 +73,6 @@ load(runner, source => {
     source = replace(source, 'approvalRestore || aaDesktop || nativeQueue', 'approvalRestore || nativeQueue');
     source = replace(source, 'if (!approvalRestore && !compaction && !streamInterrupt && !toolHandoff && !desktopStreamClose) {', 'if (!aaDesktop && !approvalRestore && !compaction && !streamInterrupt && !toolHandoff && !desktopStreamClose) {');
     source = replace(source, '(compaction || toolHandoff)?', '(aaDesktop || compaction || toolHandoff)?');
-    if (process.env.AA_ACCEPTANCE_CANDIDATE === '1') source = replace(source, '...compaction?.settings,...toolHandoffFixture?.settings,', "...compaction?.settings,...toolHandoffFixture?.settings,enableContextCompaction:true,contextCompactionModel:'synthetic-summary',");
+    if (process.env.AA_ACCEPTANCE_CANDIDATE === '1') source = replace(source, '...toolHandoffFixture?.settings,', "...toolHandoffFixture?.settings,enableContextCompaction:true,contextCompactionModel:'synthetic-summary',");
     return source;
 });

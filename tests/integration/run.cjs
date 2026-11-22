@@ -28,13 +28,19 @@ const readbackModes = ['tool-final-readback-json', 'tool-final-readback-stream',
 const legacyReadbackMode = 'tool-final-readback-legacy';
 const beforeFinalReadback = 'aa19a637831c1a7fabd3ec0de858d08084097ef7';
 const duoModes = ['tool-duo-baseline-returned', 'tool-duo-baseline-unknown', 'tool-duo-returned', 'tool-duo-returned-stream', 'tool-duo-unknown'];
-const toolHandoffModes = [...duoModes, 'tool-handoff-baseline', 'tool-handoff', 'tool-handoff-unknown', 'tool-handoff-stream',
+const compactionAckMode = 'compact-fallback-ack';
+const toolHandoffModes = [...duoModes, compactionAckMode, 'tool-handoff-baseline', 'tool-handoff', 'tool-handoff-unknown', 'tool-handoff-stream',
     'tool-final-publication-ack', legacyReadbackMode, ...new Set([...readbackModes, ...Object.keys(finalReceiptModes)])];
 const toolHandoffMode = toolHandoffModes.includes(requested) ? requested : undefined;
 const toolHandoffFixture = toolHandoffMode && require('../tool-work-handoff/fixture.cjs');
 const compactionRetryMode = 'compact-history-identity';
 const crossDeviceCompaction = ['compact-cross-device', compactionRetryMode].includes(requested);
-const compaction = requested === 'compact-e2e' || crossDeviceCompaction ? require('../compact-e2e/fixture.cjs') : undefined;
+const compactionFallbackModes = ['compact-fallback-404', 'compact-fallback-401', 'compact-fallback-403',
+    'compact-fallback-unknown', 'compact-fallback-history'];
+const compactionFallbackMode = compactionFallbackModes.includes(requested);
+const compaction = requested === 'compact-e2e' || crossDeviceCompaction || compactionFallbackMode
+    ? require('../compact-e2e/fixture.cjs') : undefined;
+const compactionFallback = compactionFallbackMode ? require('../compact-e2e/fallback.cjs').create(requested, compaction) : undefined;
 const approvalRestoreModes = { 'approval-restore': 'desktop', 'approval-restore-stale': 'stale' };
 const approvalRestore = Object.hasOwn(approvalRestoreModes, requested) ? approvalRestoreModes[requested] : undefined;
 const serverRevision = requested === legacyReadbackMode ? beforeFinalReadback :
@@ -56,8 +62,8 @@ const ordinaryFixture = ordinaryMode || approvalRestore ? {
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', compactionRetryMode, 'local-stream-interrupt', 'desktop-stream-close'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|' + duoModes.join('|') + '|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|tool-final-receipt-lost|tool-final-receipt-unknown|tool-final-publication-ack|' + [...readbackModes, legacyReadbackMode].join('|') + '|local-stream-interrupt|desktop-stream-close]');
+if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', compactionRetryMode, ...compactionFallbackModes, 'local-stream-interrupt', 'desktop-stream-close'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|' + duoModes.join('|') + '|' + [compactionAckMode, ...compactionFallbackModes].join('|') + '|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|tool-final-receipt-lost|tool-final-receipt-unknown|tool-final-publication-ack|' + [...readbackModes, legacyReadbackMode].join('|') + '|local-stream-interrupt|desktop-stream-close]');
 }
 let out, cert, fingerprint, display;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -96,6 +102,7 @@ function launch(profile, role, mode) {
         NS_HOST: host, VCPCHAT_APP_DATA_DIR: profile, VCPCHAT_E2E_TEST: '1',
         NODE_EXTRA_CA_CERTS: cert, NS_CERT_FINGERPRINT: fingerprint,
         ...(mode === compactionRetryMode && role === 'A' ? { NS_COMPACTION_HISTORY_RACE: '1' } : {}),
+        ...((compactionFallbackMode || mode === compactionAckMode) && { NS_COMPACTION_FALLBACK_FIXTURE:'1' }),
         ...(mode === 'idle' && process.env.NS_IDLE_METER !== 'off' ? { NS_METER_PREFIX: path.join(out, role) } : {}),
         ...(mode === 'shutdown-only' ? { NS_CHECK_QUIT_ADMISSION: '1' } : {}),
         ...(desktopStreamClose ? { NS_DESKTOP_STREAM_CLOSE: '1' } : {}) };
@@ -177,9 +184,10 @@ async function runCase(root, mode) {
     let service, aa;
     const toolHandoff = toolHandoffFixture?.create(out, {
         duo: duoModes.includes(mode),
+        loseCompactionAck: mode === compactionAckMode,
         duoBaseline: mode.startsWith('tool-duo-baseline-'),
         unknown: ['tool-duo-baseline-unknown', 'tool-duo-unknown', 'tool-handoff-unknown'].includes(mode),
-        loseHandoff: ['tool-duo-returned', 'tool-duo-returned-stream', 'tool-handoff', 'tool-handoff-stream', 'tool-final-publication-ack', legacyReadbackMode].includes(mode) ||
+        loseHandoff: [compactionAckMode, 'tool-duo-returned', 'tool-duo-returned-stream', 'tool-handoff', 'tool-handoff-stream', 'tool-final-publication-ack', legacyReadbackMode].includes(mode) ||
             readbackModes.includes(mode) || Boolean(finalReceiptModes[mode]),
         losePublication: mode === 'tool-final-publication-ack',
         readback: readbackModes.includes(mode),
@@ -203,7 +211,7 @@ async function runCase(root, mode) {
         try {
             service = await (desktopStreamClose || require('./service.cjs')).start({
                 out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision, groupRelay, toolHandoff,
-                observedContext: toolHandoff?.observed || compaction?.observe(out, crossDeviceCompaction), streamInterrupt: streamInterrupt?.observe(out),
+                observedContext: toolHandoff?.observed || compactionFallback?.observe(out) || compaction?.observe(out, crossDeviceCompaction), streamInterrupt: streamInterrupt?.observe(out),
             });
         } finally { fs.rmSync(key, { force: true }); }
     }
@@ -321,7 +329,7 @@ async function runCase(root, mode) {
             }
             const settingsFile=path.join(profile,'settings.json');
             fs.writeFileSync(settingsFile,json({...read(settingsFile),ChatDataServiceEnabled:true,ChatDataServiceNotifyEnabled:false,ChatDataServiceTantivyEnabled:false,vcpServerUrl:service.origin+((compaction || toolHandoff)?'/v1/chat/completions':'/v1/local-chat/completions'),
-                ...compaction?.settings,...toolHandoffFixture?.settings,...streamInterrupt?.settings,...(desktopStreamClose && { enableVcpToolInjection:false, enableContextCompaction:false }),userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
+                ...compaction?.settings,...compactionFallback?.settings,...toolHandoffFixture?.settings,...streamInterrupt?.settings,...(desktopStreamClose && { enableVcpToolInjection:false, enableContextCompaction:false }),userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
         }
         const [A,B] = await Promise.all(roles.map(role => start(role)));
         if (!approvalRestore && !compaction && !streamInterrupt && !toolHandoff && !desktopStreamClose) {
@@ -352,7 +360,7 @@ async function runCase(root, mode) {
                 : nativeQueue ? nativeQueue.scenario
                 : ordinaryMode ? require('../ordinary-desktop/scenario.cjs')
                 : mode === 'config-only' ? require('./configuration.cjs') : scenario;
-            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash,quitBeforeFinalReceipt,aa,groupRelay,toolHandoff,desktopStreamClose});
+            await runScenario({clients:{...clients},cert,out,result,picture,click,evalJs,waitUntil,sha,trace,service,stop,start,profiles,crash,quitBeforeFinalReceipt,aa,groupRelay,toolHandoff,desktopStreamClose,compactionFallback});
         }
     } catch(error) {
         result.failures.push(error.stack);

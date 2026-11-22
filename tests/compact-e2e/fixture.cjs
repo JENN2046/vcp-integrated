@@ -36,7 +36,7 @@ function observe(out, crossDevice = false) {
     };
 }
 
-async function respond(body, row, res) {
+async function respond(body, row, res, model = summaryModel) {
     row.model = body.model;
     row.messages = body.messages;
     const control = inputs.indexOf(body.messages.at(-1)?.content);
@@ -48,9 +48,9 @@ async function respond(body, row, res) {
         res.end(JSON.stringify(payload));
         return true;
     }
-    if (body.model !== summaryModel) return false;
+    if (body.model !== model) return false;
     assert.equal(body.stream, true);
-    const frame = JSON.stringify({id:'synthetic-summary-result',object:'chat.completion.chunk',created:1,model:summaryModel,
+    const frame = JSON.stringify({id:'synthetic-summary-result',object:'chat.completion.chunk',created:1,model,
         choices:[{index:0,delta:{role:'assistant',content:checkpoint},finish_reason:'stop'}]});
     res.writeHead(200, {'content-type':'text/event-stream'});
     res.end('data: ' + frame + '\n\ndata: [DONE]\n\n');

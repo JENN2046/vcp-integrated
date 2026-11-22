@@ -7,6 +7,10 @@ net.Server.prototype.listen = function(port, ...args) {
 };
 require('./restrict-network.cjs').restrictNodeNetwork();
 if (process.env.NS_METER_PREFIX) require('./meter.cjs');
+if (process.env.NS_FIXTURE_POLL_WATCHERS === '1') {
+    // The isolated fixture never edits RAG parameters. Skip its recursive watcher on hosts near their per-user limit.
+    require(require('node:path').resolve('KnowledgeBaseManager.js'))._startRagParamsWatcher = () => {};
+}
 const report = process.env.NS_LOADED_REPORT;
 if (report) process.on('exit',()=>{
     const fs=require('node:fs');

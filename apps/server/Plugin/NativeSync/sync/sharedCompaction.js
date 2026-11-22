@@ -2,6 +2,7 @@
 const {stable,sha256}=require('./protocol');
 const controlled=require('./sharedControlledText');
 const {linkageHash}=require('./sharedDelegation');
+const {checkpointFailure,effectiveContextHistory,isContextCheckpoint}=require('@vcp/native-history-window');
 const fail=code=>Object.assign(Error(code),{code,status:409});
 /** Shared versions authorize publication. Private execution evidence stays in VCP. */
 class SharedCompaction{
@@ -34,7 +35,10 @@ class SharedCompaction{
   ) versions ON j.seq=versions.latest_seq ORDER BY versions.first_seq`).all(topic.owner_type,topic.owner_id,topic.topic_id));
   const sourceIds=new Set(latest.map(v=>v.row.msg_id));
   const projected=latest.filter(v=>v.message!==null),history=projected.map(v=>v.message);
-  const lastCheckpoint=projected.filter(v=>v.message.contextCompaction?.kind==='vchat-context-checkpoint').at(-1)?.row.seq||0;
+  const previous=effectiveContextHistory(history)[0];
+  const lastCheckpoint=isContextCheckpoint(previous)?projected.find(v=>v.message===previous).row.seq:0;
+  const broken=history.filter(m=>isContextCheckpoint(m)&&(m.isThinking||checkpointFailure(m.contextCompaction.checkpoint)));
+  const brokenIds=new Set(broken.map(m=>m.id));
   const nativeProofs=[];
   if(s.native)for(const generation of this.db.prepare(`SELECT g.* FROM shared_work_generations g JOIN shared_admissions a ON a.id=g.work_id WHERE a.topic_id=? AND g.checkpoint_json IS NOT NULL ORDER BY a.rowid,g.generation`).all(topic.id)){
    const reply=JSON.parse(generation.checkpoint_json);
@@ -45,7 +49,8 @@ class SharedCompaction{
    const proof=JSON.parse(stored.proof_json);
    const hash=linkageHash(proof);
    nativeProofs.push({requestId:generation.request_id,workId:generation.work_id,hash});
-   const alreadyCompacted=this.db.prepare('SELECT 1 FROM shared_compaction_native_links WHERE request_id=? AND proof_hash=? AND journal_seq<=?').get(generation.request_id,hash,lastCheckpoint);
+   const alreadyCompacted=this.db.prepare('SELECT checkpoint_id FROM shared_compaction_native_links WHERE request_id=? AND proof_hash=? AND journal_seq<=?')
+    .all(generation.request_id,hash,lastCheckpoint).some(row=>!brokenIds.has(row.checkpoint_id));
    const origin=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(generation.work_id);
    const mode=require('./sharedTurns').intent(origin).controlMode;
    if(generation.generation===0&&mode===controlled.AA_MODE){
@@ -67,7 +72,7 @@ class SharedCompaction{
   // A prepare made with the former text-based projection must not authorize
   // a late summary of that old input, even when no Journal writes intervened.
   const proof={topicId:topic.id,head:s.head(topic),configHash:frozenHash||s.freezeForExecution(actor,topic).hash,work:work?{id:work.id,revision:control.revision,generation:control.generation,executor:control.executor}:null,canonical:projected.map(v=>({id:v.row.msg_id,hash:v.row.hash,seq:v.row.seq,metadataHash:v.row.metadata_hash})),native:nativeProofs,
-   ...(nativeProofs.length?{inputVersion:2}:{})};
+   ...(broken.length?{inputVersion:3}:nativeProofs.length?{inputVersion:2}:{})};
   return {proof,history};
  }
  prepare(actor,body){const topic=this.topic(actor,body.sharedSpaceId,body.sharedId);return this.shared.receipt(actor,body,'compact-prepare',()=>{
@@ -96,7 +101,7 @@ class SharedCompaction{
  commit(actor,body){return this.shared.receipt(actor,body,'compact-commit',()=>{
   const intent=this.db.prepare('SELECT * FROM shared_compaction_intents WHERE id=?').get(body.id);if(!intent||intent.principal!==actor.principal)throw fail('SHARED_COMPACTION_NOT_FOUND');if(intent.state!=='prepared')throw fail('SHARED_COMPACTION_SUPERSEDED');const topic=this.topic(actor,body.sharedSpaceId,intent.topic_id),saved=JSON.parse(intent.proof_json),snapshot=this.snapshot(actor,topic);
   if(body.sourceHash!==sha256(stable(saved))||stable(snapshot.proof)!==stable(saved))throw fail('SHARED_COMPACTION_SOURCE_CHANGED');
-  const m=body.message,metadata=require('./metadata');if(m?.id!==intent.message_id||m.role!=='user'||!m.contextCompaction||m.attachments?.length)throw fail('INVALID_CHECKPOINT_METADATA');metadata.fieldsFrom(m);
+  const m=body.message,metadata=require('./metadata');if(m?.id!==intent.message_id||!isContextCheckpoint(m)||m.isThinking||m.attachments?.length||checkpointFailure(m.contextCompaction.checkpoint))throw fail('INVALID_CHECKPOINT_METADATA');metadata.fieldsFrom(m);
   const value={...m};delete value._nativeSyncMetadata;
   const receipt=this.shared.store.apply({ownerType:topic.owner_type,ownerId:topic.owner_id,topicId:topic.topic_id,msgId:m.id,deviceId:actor.principal,opId:'shared-checkpoint:'+intent.id,baseHash:null,action:'upsert',message:value,metadata:metadata.envelopeFor(m,1)},{sharedSpace:topic.space_id,metadataPublisher:true});
   this.db.prepare("UPDATE shared_compaction_intents SET committed_seq=?,state='committed' WHERE id=?").run(receipt.seq,intent.id);

@@ -112,3 +112,7 @@ Android 首次配对立即强停已定位到隔离 WebView 的 Cookie 写盘时�
 显式两成员纯文本顺序群聊已有跨设备成员接力。甲正式回复的 Journal 提交与暂停位置同事务确认，Y 接管并另行继续后，乙才使用原计划和原生请求 ID 派发。丢失接管与继续回执的双桌面复跑中，成员各派发一次；两种成员中断窗口均保留未知原请求。首次使用会写入共享 schema 3，回退边界见[完整实测、请求包及截图](evidence/group-member-handoff/README.md)。
 
 说话人语义已对齐作者的桌面群聊和 ToolBox 出站边界。不同成员同文保留不同身份，历史正文带本人署名时只保留一次；已提供的对话展示名在工具循环内保留，在 Provider 副本清理。双桌面接力的乙请求仍按原消息 ID 绑定甲，两成员各派发一次。[基线、候选、请求摘要与截图](evidence/speaker-semantics/README.md)
+
+工具结果在原生 ToolBox 回填时保留文本、JSON 文档和多模态部件。回环 Provider 逐轮记录了 JSON 与 SSE 两条路径，另有双工具、AA 接续回归。[工具回填前后对照](evidence/tool-payload/README.md)
+
+单聊压缩现在识别 ToolBox 代理返回的上游拒绝状态。配置备用模型时，明确的 HTTP 400、404、422 或 429 可以触发一次备用尝试。鉴权失败和状态未明的断流保留原 History。历史中已有错误摘要时，桌面和共享 worker 从最近有效检查点继续；提交回执丢失后按原意图核对。[压缩、重开与原 Work 接续回执](evidence/compaction-fallback/README.md)

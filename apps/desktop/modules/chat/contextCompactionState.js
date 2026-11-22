@@ -2,7 +2,7 @@ import { readToolRequestField, replaceToolRequestBlocks, findUnclosedToolRequest
 import { collectToolResultRanges, collectCodeDomainsOutsideToolResults, isToolResultHidden } from '../renderer/toolResultRegions.js';
 import { extractAnchors, flattenContent } from './contextCompactionFidelity.js';
 import { extractOpenIssueWindows } from './contextCompactionContinuity.js';
-import { COMPACTION_KIND, effectiveContextHistory, isContextCheckpoint } from './historyWindow/index.mjs';
+import { checkpointFailure, COMPACTION_KIND, effectiveContextHistory, isContextCheckpoint } from './historyWindow/index.mjs';
 
 export { COMPACTION_KIND, effectiveContextHistory, isContextCheckpoint };
 
@@ -183,7 +183,8 @@ export function validateCheckpoint(value) {
         }
         value = value.map(part => part.text).join('');
     }
-    if (typeof value !== 'string' || !value.trim()) throw new Error('压缩模型未返回有效文本，原历史未修改');
+    const failure = checkpointFailure(value);
+    if (failure) throw new Error(failure);
     // Report quality belongs to the prompt. Metadata, not model-authored tags,
     // owns the context boundary. Preserve every character of the returned report.
     return value;

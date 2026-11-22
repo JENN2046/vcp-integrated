@@ -71,7 +71,7 @@ async function loadedDesktop(client, sha, root) {
     return { main: loaded.main, renderer: loaded.renderer };
 }
 
-async function candidate({ result, service, out, clients: { A, B }, picture, click, evalJs, waitUntil, stop, start, quitBeforeFinalReceipt, profiles, sha, toolHandoff, db }) {
+async function candidate({ result, service, out, clients: { A, B }, picture, click, evalJs, waitUntil, stop, start, quitBeforeFinalReceipt, profiles, sha, toolHandoff, db, crash }) {
     const {
         marker, duo, duoBaseline, unknown, counts, expectedCounts, secondResult, loseHandoff, stream, finalReceipt, receipt,
         firstEffectReady, releaseFirstReceipt, secondEffectReady,
@@ -383,30 +383,73 @@ async function candidate({ result, service, out, clients: { A, B }, picture, cli
         assert.deepEqual(counts(), expectedCounts);
         result.pausedRestart = { backendBefore, exit, backendAfter: service.backendPid, proof: readNativeProof() };
     }
-    const point = await evalJs(A, `(() => {
-        const row = document.querySelector('[data-message-id="' + ${quote(paused.request_id)} + '"]');
-        row.scrollIntoView({block:'center',behavior:'instant'});
-        const rect = row.getBoundingClientRect();
-        return {x:Math.round(rect.left + rect.width / 2), y:Math.round(rect.top + rect.height / 2)};
-    })()`);
-    await A.command('mouse-right', point);
-    await click(A, '.context-menu-item', '压缩前文');
-    const committed = await waitUntil(() => db.prepare("SELECT message_id,committed_seq,proof_json FROM shared_compaction_intents WHERE work_id=? AND state='committed'").get(workId),
+    async function compact(client) {
+        const point = await evalJs(client, `(() => {
+            const row = document.querySelector('[data-message-id="' + ${quote(paused.request_id)} + '"]');
+            row.scrollIntoView({block:'center',behavior:'instant'});
+            const rect = row.getBoundingClientRect();
+            return {x:Math.round(rect.left + rect.width / 2), y:Math.round(rect.top + rect.height / 2)};
+        })()`);
+        await client.command('mouse-right', point);
+        await click(client, '.context-menu-item', '压缩前文');
+    }
+    let publisher = A;
+    let publisherRole = 'A';
+    await compact(publisher);
+    const committed = await waitUntil(() => db.prepare("SELECT id,message_id,committed_seq,proof_json FROM shared_compaction_intents WHERE work_id=? AND state='committed'").get(workId),
         'A compacts the original Work with the native receipt');
+    if (toolHandoff.loseCompactionAck) {
+        const route = suffix => service.requests.filter(row => row.route.endsWith('/compact-' + suffix));
+        const ipc = (client, suffix) => client.events.filter(row => row.event === 'ipc-result' && row.data.channel === 'native-sync:compact-' + suffix);
+        const dropped = await waitUntil(() => route('commit').find(row => row.dropped), 'ToolBox commits before the ACK is cut');
+        const failed = await waitUntil(() => ipc(A, 'commit')[0], 'desktop sees failed commit transport');
+        const publicationFile = path.join(profiles.A, '.native-sync', 'shared', sharedSpaceId, 'executions.json');
+        const localIntent = () => JSON.parse(fs.readFileSync(publicationFile, 'utf8')).compactions?.[committed.id];
+        const calls = () => service.calls.filter(row => row.toolHandoffPhase === 'summary');
+        const before = { local:localIntent(), journal:journal(), commit:structuredClone(dropped), ipc:failed.data, summaries:calls().length };
+        assert.equal(before.ipc.success, false);
+        assert.equal(before.local.awaitingConfirmation, true);
+        assert.equal(before.summaries, 1);
+        assert.equal(dropped.response.messageId, committed.message_id);
+        assert.equal(dropped.response.seq, committed.committed_seq);
+        await picture(A, 'A-central-compaction-ack-dropped');
+        const crashReceipt = await crash('A');
+        toolHandoff.releaseCompactionAck();
+        publisherRole = 'A-compaction-reopened';
+        publisher = await start(publisherRole, 'A');
+        await select(publisher, 'A');
+        await compact(publisher);
+        const recovered = await waitUntil(() => ipc(publisher, 'prepare')[0], 'reopened A confirms the original compaction');
+        const workLink = db.prepare('SELECT * FROM shared_work_compactions WHERE checkpoint_id=?').get(committed.message_id);
+        const after = { local:localIntent(), recovered:recovered.data, workLink, journal:journal(), commits:route('commit'), summaries:calls().length };
+        result.compactionAck = { workId, originalRequestId:paused.request_id, committed, before, after, crashReceipt };
+        assert.equal(after.recovered.recovered, true);
+        assert.equal(after.recovered.intentId, committed.id);
+        assert.equal(after.recovered.checkpointId, committed.message_id);
+        assert.equal(after.local.awaitingConfirmation, false);
+        assert.equal(after.local.phase, 'completed');
+        assert.equal(after.workLink.work_id, workId);
+        assert.equal(after.workLink.journal_seq, committed.committed_seq);
+        assert.deepEqual(after.journal, before.journal);
+        assert.equal(after.summaries, 1);
+        assert.ok(route('commit').length >= 2 && route('commit').some(row => !row.dropped));
+        assert.ok(route('commit').every(row => row.bodySha256 === dropped.bodySha256 && row.response.seq === dropped.response.seq));
+        assert.equal(route('prepare').length, 1);
+    }
     assert.deepEqual(JSON.parse(committed.proof_json).native, [{requestId:paused.request_id,workId,hash:nativeProof.hash}]);
     const summary = service.calls.find(row => row.toolHandoffPhase === 'summary');
     assert.equal(summary.toolReceipt.invocationId, invocation.invocation_id);
     assert.equal(summary.toolReceipt.recordId, invocation.record_id);
     assert.ok(JSON.stringify(summary.toolReceipt.result).includes(fixture.toolResult(marker)));
     const card = client => evalJs(client, 'document.querySelector(".vcp-context-checkpoint")?.checkVisibility()');
-    await waitUntil(() => card(A), 'A displays the committed compaction');
+    await waitUntil(() => card(publisher), 'A displays the committed compaction');
     const compactedHistory = read.A();
     const journalOnA = journal();
     assert.deepEqual(journalOnA.slice(0, initialJournal.length), initialJournal);
     assert.deepEqual(journalOnA.slice(initialJournal.length).map(row => row.msg_id),
         [original.request_id, paused.request_id, committed.message_id]);
-    await picture(A, 'A-compacted-original-work');
-    await stop('A');
+    await picture(publisher, 'A-compacted-original-work');
+    await stop(publisherRole);
 
     const other = await start('B-taking-over', 'B');
     assert.equal(result.B.profileDigest, result['B-taking-over'].profileDigest);

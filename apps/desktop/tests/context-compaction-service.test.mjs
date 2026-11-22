@@ -241,3 +241,37 @@ test('compression HTTP body carries the request ID used by Stop reply', async ()
         },
     });
 });
+test('fallback is limited to one distinct model after a definite rejection', async () => {
+    for (const [status, fallback, expected] of [
+        [400, 'backup', 2], [404, 'backup', 2], [422, 'backup', 2], [429, 'backup', 2],
+        [401, 'backup', 1], [403, 'backup', 1], [500, 'backup', 1], [503, 'backup', 1],
+        [404, ' compressor ', 1], [404, '', 1],
+    ]) {
+        const attempts = [];
+        const f = fixture({ request: async ({ settings, state, requestId }) => {
+            attempts.push({ model: settings.contextCompactionModel, state, requestId });
+            throw Object.assign(new Error('rejected'), { rejectionStatus: status });
+        } });
+        await assert.rejects(f.service.compact({ scope, history: f.history(),
+            settings: { ...settings, contextCompactionFallbackModel: fallback } }), /rejected/);
+        assert.equal(attempts.length, expected);
+        if (expected === 2) {
+            assert.equal(attempts[1].model, 'backup');
+            assert.equal(attempts[1].state, attempts[0].state);
+            assert.notEqual(attempts[1].requestId, attempts[0].requestId);
+        }
+        assert.equal(f.history().length, 1);
+    }
+});
+
+test('error text in a successful response cannot authorize another dispatch', async () => {
+    let calls = 0;
+    const f = fixture({ request: async () => {
+        calls++;
+        return '[UPSTREAM_ERROR] 上游API返回状态码 404';
+    } });
+    await assert.rejects(f.service.compact({ scope, history: f.history(),
+        settings: { ...settings, contextCompactionFallbackModel: 'backup' } }), /错误/);
+    assert.equal(calls, 1);
+    assert.equal(f.history().length, 1);
+});

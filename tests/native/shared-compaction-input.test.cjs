@@ -42,12 +42,14 @@ function fixture(t) {
     const continuations = createNativeContinuationStore(path.join(root, 'continuations'));
     shared.native = { engine: {}, continuations };
 
-    function append(id, role, content) {
+    function append(id, role, content, extra = {}) {
+        const message = { id, role, content, timestamp: 1, ...extra };
+        const metadata = require(box + '/Plugin/NativeSync/sync/metadata');
         return store.apply({
             ownerType: topic.owner_type, ownerId: topic.owner_id, topicId: topic.topic_id, msgId: id,
             deviceId: actor.principal, opId: 'append:' + id, baseHash: null, action: 'upsert',
-            message: { id, role, content, timestamp: 1 },
-        }, { sharedSpace: sharedSpaceId });
+            message, ...(extra.contextCompaction ? { metadata: metadata.envelopeFor(message, 1) } : {}),
+        }, { sharedSpace: sharedSpaceId, ...(extra.contextCompaction ? { metadataPublisher: true } : {}) });
     }
     function generation(requestId, { toolIds = [], settledIds = toolIds } = {}) {
         // Seed completed records directly. No tools or steering are dispatched.
@@ -71,11 +73,11 @@ function fixture(t) {
     }
     const prepare = () => shared.compaction.prepare(actor, { ...scope, opId: 'prepare', expectedHead: shared.head(topic) });
     const get = ({ id }) => shared.compaction.get(actor, { ...scope, id });
-    const commit = ({ id, messageId, sourceHash }) => shared.compaction.commit(actor, {
+    const commit = ({ id, messageId, sourceHash }, checkpoint = 'Synthetic checkpoint') => shared.compaction.commit(actor, {
         ...scope, id, sourceHash, opId: 'commit',
         message: {
-            id: messageId, role: 'user', content: 'Synthetic checkpoint', timestamp: 10,
-            contextCompaction: { kind: 'vchat-context-checkpoint', version: 1, checkpoint: 'Synthetic checkpoint' },
+            id: messageId, role: 'user', content: checkpoint, timestamp: 10,
+            contextCompaction: { kind: 'vchat-context-checkpoint', version: 1, checkpoint },
         },
     });
     return { db: store.db, append, generation, prepare, get, commit, shared, actor, scope, head: () => shared.head(topic) };
@@ -185,6 +187,27 @@ test('native results with equal text retain distinct invocation identities in co
     const results = evidence.map(row => JSON.parse(row.content.slice(row.content.indexOf('{'))));
     assert.deepEqual(results.map(value => value.invocationId), ['tool-A', 'tool-B']);
     assert.deepEqual(results.map(value => value.result.text), ['Same result text', 'Same result text']);
+    assert.equal(f.commit(prepared).messageId, prepared.messageId);
+});
+
+test('an old error checkpoint does not suppress its linked native tool evidence', t => {
+    const f = fixture(t);
+    f.append('reply', 'assistant', 'Canonical assistant reply');
+    const { proof } = f.generation('reply', { toolIds: ['tool-A'] });
+    const bad = '[UPSTREAM_ERROR] 503';
+    const oldCheckpoint = checkpoint => ({ kind: 'vchat-context-checkpoint', version: 1, checkpoint });
+    const legacy = f.append('legacy', 'user', bad, { contextCompaction: oldCheckpoint(bad) });
+    f.db.prepare('INSERT INTO shared_compaction_native_links VALUES (?,?,?,?,?)')
+        .run('reply', proof.hash, 'legacy', legacy.seq, 0);
+    f.append('later', 'user', 'Working checkpoint', { contextCompaction: oldCheckpoint('Working checkpoint') });
+
+    const prepared = f.prepare();
+    const loaded = f.get(prepared);
+    assert.equal(loaded.history.filter(row => row.id.startsWith('native_evidence_')).length, 1);
+    const saved = JSON.parse(f.db.prepare('SELECT proof_json FROM shared_compaction_intents WHERE id=?').get(prepared.id).proof_json);
+    assert.equal(saved.inputVersion, 3);
+    assert.throws(() => f.commit(prepared, bad), { code: 'INVALID_CHECKPOINT_METADATA' });
+    assert.equal(f.head(), prepared.head);
     assert.equal(f.commit(prepared).messageId, prepared.messageId);
 });
 

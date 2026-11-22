@@ -18,6 +18,8 @@ test('empty and whitespace prompts use execution defaults without changing custo
     assert.equal(config.prompt, DEFAULT_COMPACTION_PROMPT);
     assert.equal(config.sendPrompt, DEFAULT_COMPACTION_SEND_PROMPT);
     assert.equal(config.mainPrompt, DEFAULT_COMPACTION_MAIN_PROMPT);
+    assert.equal(config.fallbackModel, '');
+    assert.equal(compactionSettings({ contextCompactionFallbackModel: '  backup-v1  ' }).fallbackModel, 'backup-v1');
     assert.equal(compactionSettings({ contextCompactionPrompt: '  custom\n' }).prompt, '  custom\n');
 });
 
@@ -32,7 +34,7 @@ test('compaction settings declare dependencies and show empty-default guidance o
         if (previousDocument === undefined) delete globalThis.document;
         else globalThis.document = previousDocument;
     }
-    const ids = ['contextCompactionModel', 'contextCompactionPrompt', 'contextCompactionSendPrompt', 'contextCompactionMainPrompt'];
+    const ids = ['contextCompactionModel', 'contextCompactionFallbackModel', 'contextCompactionPrompt', 'contextCompactionSendPrompt', 'contextCompactionMainPrompt'];
     for (const enabled of [false, true, false]) {
         form.querySelector('#enableContextCompaction').checked = enabled;
         syncDependentRows(form);
@@ -57,13 +59,14 @@ test('latest diaries are Markdown with verbatim bodies while replay metadata rem
         { fileName: 'a.md', agent: 'Nova', content: body, tag: '工程' },
         { fileName: 'b.md', content: '**第二本**\n正文' },
     ];
-    const message = createCheckpointMessage({ ...state, diaries }, response);
+    const message = createCheckpointMessage({ ...state, diaries }, response, { contextCompactionModel: ' backup-v1 ' });
     assert.ok(message.content.includes(body));
     assert.match(message.content, /### 日记 1/);
     assert.match(message.content, /### 日记 2/);
     assert.match(message.content, /Tag:工程/);
     assert.ok(!message.content.includes(JSON.stringify(diaries, null, 2)));
     assert.deepEqual(message.contextCompaction.diaries, diaries);
+    assert.equal(message.contextCompaction.model, 'backup-v1');
 });
 
 test('manual compaction menu includes a matching icon and remains absent from groups', async () => {

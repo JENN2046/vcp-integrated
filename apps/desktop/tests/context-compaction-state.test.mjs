@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepareCompactionState, effectiveContextHistory } from '../modules/chat/contextCompactionState.js';
+import { prepareCompactionState, effectiveContextHistory, validateCheckpoint } from '../modules/chat/contextCompactionState.js';
 import { createCheckpointMessage, buildCompactionMessages } from '../modules/chat/contextCompactionPrompts.js';
 
 const field = (name, value) => `${name}:「始ESCAPE」${value}「末ESCAPE」`;
@@ -90,8 +90,7 @@ test('protocol examples in fenced code are not interpreted as diary actions', ()
     assert.equal(state.messages[0].content, example);
 });
 
-test('any nonempty report is preserved verbatim without format validation', async () => {
-    const { validateCheckpoint } = await import('../modules/chat/contextCompactionState.js');
+test('valid report text is preserved verbatim without requiring a report tag', () => {
     for (const value of [
         `以下是快照：\n${checkpoint}\n已完成。`,
         `\`\`\`xml\n${checkpoint}\n\`\`\``,
@@ -99,6 +98,7 @@ test('any nonempty report is preserved verbatim without format validation', asyn
         checkpoint + checkpoint,
         '  普通 Markdown 报告，无标签\n',
         '<context_checkpoint> </context_checkpoint>',
+        'Incident record: [UPSTREAM_ERROR] 503',
     ]) assert.equal(validateCheckpoint(value), value);
     assert.equal(validateCheckpoint([
         { type: 'text', text: '报告第一段\n' },
@@ -116,9 +116,36 @@ test('untagged report remains the next compaction boundary through metadata', ()
     assert.equal(prepareCompactionState(history).messages[0].content, report);
 });
 
-test('missing or nontext report cannot create an empty checkpoint', async () => {
-    const { validateCheckpoint } = await import('../modules/chat/contextCompactionState.js');
+test('missing or nontext report cannot create an empty checkpoint', () => {
     for (const value of ['', ' \n', null, undefined, [], [{ type: 'tool_use', text: checkpoint }]]) {
         assert.throws(() => validateCheckpoint(value));
+    }
+});
+
+test('upstream errors are rejected before checkpoint creation, including joined text parts', () => {
+    for (const value of [
+        ' \nupstream_stalled: no worker',
+        ' { "error": {"message": "bad channel"} }',
+        [{ type: 'text', text: '[UPSTREAM_' }, { type: 'output_text', text: 'ERROR] 503' }],
+    ]) assert.throws(() => validateCheckpoint(value), /错误信封/);
+});
+
+test('bad saved summaries neither truncate nor enter the next compaction window', () => {
+    const old = message('原始历史');
+    const tail = message('后续历史');
+    const previous = createCheckpointMessage({ diaries: [], warnings: [], sourceCount: 1 }, checkpoint);
+    const bad = ['[UPSTREAM_ERROR] 503', '   ', '{"error":{}}'].map(text => ({
+        ...previous,
+        content: `宿主快照包装\n${text}`,
+        contextCompaction: { ...previous.contextCompaction, checkpoint: text },
+    }));
+    for (const boundary of [[], [previous]]) {
+        const history = [old, ...boundary, bad[0], tail, bad[1], bad[2], { ...previous, isThinking: true }];
+        const before = structuredClone(history);
+        assert.deepEqual(effectiveContextHistory(history), [boundary[0] ?? old, tail]);
+        assert.deepEqual(prepareCompactionState(history).messages.map(row => row.content), [
+            boundary.length ? checkpoint : old.content, tail.content,
+        ]);
+        assert.deepEqual(history, before);
     }
 });

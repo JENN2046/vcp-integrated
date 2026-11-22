@@ -23,6 +23,7 @@ if (process.env.NS_DESKTOP_STREAM_CLOSE === '1') {
 }
 const compactionRace = process.env.NS_COMPACTION_HISTORY_RACE === '1'
     ? require('../compact-e2e/history-race.cjs').install(process.env.VCPCHAT_APP_DATA_DIR, log) : null;
+const compactionObservation = compactionRace || process.env.NS_COMPACTION_FALLBACK_FIXTURE === '1';
 app.setAppPath(process.env.NS_HOST);
 const Module = require('node:module');
 const loadedMainEsm = new Map();
@@ -104,7 +105,7 @@ ipcMain.handle = (channel, fn) => {
                     ...(value?.authoritativeReply && { authoritativeReply: {
                         state: value.authoritativeReply.state, seq: value.authoritativeReply.seq,
                     } }),
-                    ...(compactionRace && channel.startsWith('native-sync:compact-') && {
+                    ...(compactionObservation && channel.startsWith('native-sync:compact-') && {
                         recovered:value?.recovered, intentId:value?.id, checkpointId:value?.messageId,
                     }),
                     refreshError:value?.refreshError, extrasError:value?.extrasError, sharedVersion:value?.sharedVersion, avatarResult:value?.avatarResult, kind:value?.kind, ready:value?.shared?.ready, replyId:value?.replyId });
