@@ -9,6 +9,7 @@
     "./tavern": "./tavernRulesEngine.cjs",
     "./sanitizer": "./contextSanitizer.cjs",
     "./trajectory": "./modelTrajectory.cjs",
+    "./request-envelope": "./requestEnvelope.cjs",
     "./renderer/*": "./renderer/*.js"
   }
 }

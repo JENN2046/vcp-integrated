@@ -112,6 +112,7 @@ async function main(){
         await command('context-type',spec.input);
         assert.equal(await evaluate("document.querySelector('#messageInput').value"),spec.input);
         await command('context-coverage-start');
+        await command('packet-coverage-start');
         await click('#sendMessageBtn');
         const rows=await until(()=>{
             const found=JSON.parse(fs.readFileSync(path.join(profile,relative),'utf8'));
@@ -126,6 +127,7 @@ async function main(){
         assert.equal(captured[0].messageId,assistant.id);
         assert.equal(captured[0].isGroupCall,false);
         const coverage=await command('context-coverage-take');
+        const packetCoverage=await command('packet-coverage-take');
         const serialized=structuredClone(rows);
         const storedRow=serialized.find(row=>row.id==='ctx-retained-user').attachments[0];
         storedRow.internalPath='isolated-content-addressed:'+storedRow.internalFileName;
@@ -135,7 +137,7 @@ async function main(){
         await command('picture',screenCopy);
         const evidence={variant:'native-desktop',seedIds:seed.map(r=>r.id),inputId:user.id,replyId:assistant.id,
             source:target.origin,attachment:{name:attach.name,bytes:bytes.length,sha256:sha(bytes),storedAt:'ctx-retained-user',realFileManager:true},
-            terminalVisible:await evaluate(`document.querySelector('#chatMessages').innerText.includes(${J(spec.reply)})`), coverage,
+            terminalVisible:await evaluate(`document.querySelector('#chatMessages').innerText.includes(${J(spec.reply)})`), coverage,packetCoverage,
             historyCount:rows.length,renderer:events.find(e=>e.event==='electron-ready')?.data};
         fs.writeFileSync(evidenceFile,J(evidence,null,2)+'\n',{mode:0o600});
         console.log(J(evidence));

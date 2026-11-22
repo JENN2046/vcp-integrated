@@ -5,6 +5,7 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const { fileURLToPath } = require('node:url');
 const [run, mode, baseline] = process.argv.slice(2);
+const packet = mode === 'request-envelope';
 const depth = mode === 'tavern-depth';
 const spec = depth ? require('./tavern-depth.cjs') : require('./input.json');
 if (!run) throw Error('Specify the isolated fixture run path.');
@@ -70,6 +71,12 @@ const check = (item, history) => {
     if (item.body) {
         assert.deepEqual(item.body.messages,item.messages);
         assert.ok(arrivals[0].body);
+        assert.equal(item.body.vcpchatExtensions.schemaVersion, 1);
+        assert.equal(item.body.vcpchatExtensions.messageMetadataMode, 'hash_only');
+        assert.ok(item.messages.every(row => !Object.hasOwn(row, '__vcpchatTimestampMeta') &&
+            !Object.hasOwn(row, '__vcpContextCheckpoint')));
+        assert.equal(item.body.vcpchatExtensions.requestContext.ownerType, 'agent');
+        assert.equal(item.body.vcpchatExtensions.requestContext.isGroupMessage, false);
         const expected = history.slice(1,-1).map(row => [indexOf(token(row)), row.id]).sort((a,b)=>a[0]-b[0]);
         assert.deepEqual(bindings.map(binding=>[binding.sentMessageIndex,binding.messageId]), expected);
         for (const binding of bindings) {
@@ -86,10 +93,16 @@ const sharedProof = check(shared, evidence.journal.map(row=>row.message));
 const nativeText = nativeProof.text;
 const sharedText = sharedProof.text;
 const selections=evidence.handler.filter(row=>row.kind==='checkpoint-selection');
-assert.equal(selections.length,1);
+const historicalTavernBaseline = depth && baseline === '--baseline';
+assert.equal(selections.length, historicalTavernBaseline ? 1 : 2);
 const [selection]=selections;
-assert.deepEqual(selection.beforeIds,evidence.journal.slice(0,-1).map(row=>row.msg_id));
-assert.deepEqual(selection.afterIds,selection.beforeIds.slice(1));
+const expectedHistoryIds=evidence.journal.slice(0,historicalTavernBaseline ? -1 : -2).map(row=>row.msg_id);
+for (const visit of selections) {
+    assert.deepEqual(visit, selection);
+    assert.deepEqual(visit.beforeIds,expectedHistoryIds);
+    assert.deepEqual(visit.afterIds,expectedHistoryIds.slice(1));
+}
+const meterInput = () => createHash('sha256').update(fs.readFileSync(path.join(run, 'input.json'))).digest('hex');
 const metered = rel => createHash('sha256').update(fs.readFileSync(path.join(run,'runtime-box',rel))).digest('hex');
 assert.equal(nativeSignal.attachment.sha256, evidence.attachment.digest);
 assert.ok(nativeSignal.terminalVisible && nativeSignal.renderer.sandbox);
@@ -114,6 +127,25 @@ if (depth) {
         worker: workerCalls,
     };
 }
+let requestEnvelope;
+if (packet) {
+    const [desktop] = nativeSignal.packetCoverage;
+    assert.equal(nativeSignal.packetCoverage.length, 1);
+    const methods = ['buildVcpChatExtensionsFromMessages', 'stripInternalMessageMetadata'];
+    assert.deepEqual(desktop.calls, Object.fromEntries(methods.map(method => [method, 1])));
+    const core = 'packages/core-rules/requestEnvelope.cjs';
+    assert.equal(desktop.module, baseline ? 'apps/desktop/modules/ipc/chatHandlers.js' : core);
+    const worker = evidence.handler.filter(row => row.kind === 'request-envelope');
+    assert.deepEqual(worker.map(row => row.method), methods);
+    assert.ok(worker.every(row => row.sha256 === worker[0].sha256));
+    if (baseline) {
+        assert.ok(worker.every(row => row.module === 'Plugin/NativeSync/nativeRules/modules/chat/requestEnvelope.js'));
+        assert.notEqual(worker[0].sha256, desktop.sha256);
+    } else {
+        assert.ok(worker.every(row => row.module.endsWith('/' + core) && row.sha256 === desktop.sha256));
+    }
+    requestEnvelope = { desktop, worker };
+}
 const selectedPath = path.resolve(run,'runtime-box',selection.module);
 const hashes = {
     handler:metered('modules/chatCompletionHandler.js'),
@@ -130,9 +162,7 @@ if(fs.existsSync(replayPath)){
     const beforePath=path.join(run,'before-replay.json');
     if(fs.existsSync(beforePath)){
         const before=JSON.parse(fs.readFileSync(beforePath));
-        for(const key of ['work','journal']) assert.deepEqual(evidence[key],before[key]);
-        const measured=rows=>rows.filter(row=>row.requestId===work.id);
-        for(const key of ['handler','provider'])assert.deepEqual(measured(evidence[key]),measured(before[key]));
+        for (const key of ['work','journal','handler','provider']) assert.deepEqual(evidence[key],before[key]);
     }
     replay={...receipt,sameWork:true,totalWorks:evidence.work.length,totalJournalRows:evidence.journal.length,
         providerCallsForWork:evidence.provider.filter(row=>row.requestId===work.id).length};
@@ -141,6 +171,14 @@ console.log(JSON.stringify({
     status:'PASS',work, nativeRequestId:native.requestId, handlerPackets:2, providerPackets:2, eachHandlerRoleAndContentMatchesProvider:true,
     attachment:evidence.attachment, selection, hashes, replay,
     ...(tavernDepth ? { tavernDepth } : {}),
+    ...(packet ? {
+        scenario:mode, inputSha256:meterInput(), requestEnvelope,
+        paths:{
+            native:{handler:native, provider:evidence.provider.find(row => row.requestId === native.requestId), persistedHistory:nativeHistory},
+            shared:{handler:shared, provider:evidence.provider.find(row => row.requestId === shared.requestId),
+                persistedJournalMessages:evidence.journal.map(row => row.message)},
+        },
+    } : {}),
     fullSyntheticBodies:capture.every(row=>Boolean(row.body))&&evidence.provider.every(row=>Boolean(row.body)), remainingWireDifferences:{
         system:nativeText[0]!==sharedText[0], historicalAttachmentLabel:nativeText[nativeProof.order.indexOf('CTX_RETAINED_INPUT')]!==sharedText[sharedProof.order.indexOf('CTX_RETAINED_INPUT')],
         handlerCurrentUserName:[native.messages.at(-1).name??null,shared.messages.at(-1).name??null],

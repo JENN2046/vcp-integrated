@@ -2,10 +2,14 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { createHash } = require('node:crypto');
+const { Session } = require('node:inspector/promises');
+const { fileURLToPath } = require('node:url');
 const { install } = require('../integration/electron-fixture-hooks.cjs');
 const evidence = process.env.NS_CONTEXT_HANDLER_EVIDENCE;
 if (!evidence || !path.isAbsolute(evidence)) throw Error('Native context capture requires an absolute evidence path');
 
+const packetInspector = new Session();
 const coverageFiles = ['contextCompactionState.js','historyWindow/index.mjs',
     'chatContextPipeline.js','historyWindow/tavernContext.mjs','tavernRulesEngine.js','singleChatRequestOrchestrator.js','chatManager.js'];
 
@@ -27,6 +31,31 @@ install({
         }) + '\n', { mode:0o600 });
     },
     commands: {
+        async 'packet-coverage-start'() {
+            packetInspector.connect();
+            await packetInspector.post('Profiler.enable');
+            await packetInspector.post('Profiler.startPreciseCoverage', { callCount:true, detailed:true });
+        },
+        async 'packet-coverage-take'() {
+            try {
+                const { result } = await packetInspector.post('Profiler.takePreciseCoverage');
+                return result.filter(script => script.url.startsWith('file:') &&
+                    /\/(?:chatHandlers\.js|requestEnvelope\.cjs)$/.test(script.url))
+                    .map(script => {
+                        const source = fileURLToPath(script.url);
+                        return {
+                            module:path.relative(path.resolve(process.env.NS_HOST, '../..'), source),
+                            sha256:createHash('sha256').update(fs.readFileSync(source)).digest('hex'),
+                            calls:Object.fromEntries(script.functions.filter(fn =>
+                                ['buildVcpChatExtensionsFromMessages', 'stripInternalMessageMetadata'].includes(fn.functionName) &&
+                                fn.ranges[0]?.count > 0).map(fn => [fn.functionName, fn.ranges[0].count])),
+                        };
+                    }).filter(row => Object.keys(row.calls).length);
+            } finally {
+                await packetInspector.post('Profiler.stopPreciseCoverage');
+                packetInspector.disconnect();
+            }
+        },
         async 'context-type'(window, text) {
             await debuggerFor(window).sendCommand('Input.insertText', { text });
         },

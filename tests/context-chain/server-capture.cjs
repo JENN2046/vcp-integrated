@@ -9,6 +9,21 @@ const input = process.env.NS_CONTEXT_INPUT;
 if (!file || !input) throw Error('Context fixture capture requires its isolated log and synthetic input marker');
 
 const original = Module._load;
+const packetMethods = ['buildVcpChatExtensionsFromMessages', 'stripInternalMessageMetadata'];
+
+function observePacket(loaded, resolved) {
+    const sha256 = createHash('sha256').update(fs.readFileSync(resolved)).digest('hex');
+    const view = { ...loaded };
+    for (const method of packetMethods) {
+        view[method] = (...args) => {
+            fs.appendFileSync(file, JSON.stringify({
+                kind:'request-envelope', method, module:path.relative(process.cwd(),resolved), sha256,
+            }) + '\n', {mode:0o600});
+            return loaded[method](...args);
+        };
+    }
+    return view;
+}
 const observed = new WeakSet();
 const selectors = new WeakSet();
 const tavern = new WeakMap();
@@ -30,6 +45,19 @@ function observeTavern(loaded, method, resolved) {
 }
 Module._load = function (request, parent, isMain) {
     const loaded = original.call(this, request, parent, isMain);
+    if (parent?.filename?.endsWith('/mobile/nativePacket.js') && packetMethods.every(method => typeof loaded?.[method] === 'function')) {
+        const facade = Module._resolveFilename(request, parent);
+        const fromFacade = Module.createRequire(facade);
+        const entry = '@vcp/core-rules/request-envelope';
+        let implementation = facade;
+        try {
+            const resolved = fromFacade.resolve(entry);
+            if (require.cache[resolved]?.exports === loaded) implementation = resolved;
+        } catch (error) {
+            if (error.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') throw error;
+        }
+        return observePacket(loaded, implementation);
+    }
     if (parent?.filename?.endsWith('/mobile/effectiveContext.js') && typeof loaded?.effectiveContextHistory === 'function' && !selectors.has(loaded)) {
         selectors.add(loaded);
         const select = loaded.effectiveContextHistory;

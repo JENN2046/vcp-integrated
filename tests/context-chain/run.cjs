@@ -11,9 +11,9 @@ const execute = promisify(execFile);
 
 async function main() {
     const [mode, baseline] = process.argv.slice(2);
-    assert.ok(!mode || mode === 'tavern-depth', 'unknown context chain scenario');
-    assert.ok(!baseline || (mode === 'tavern-depth' && baseline === '--baseline'), 'unknown context chain option');
-    const contract = mode ? require('./tavern-depth.cjs') : require('./input.json');
+    assert.ok(!mode || ['tavern-depth', 'request-envelope'].includes(mode), 'unknown context chain scenario');
+    assert.ok(!baseline || (mode && baseline === '--baseline'), 'unknown context chain option');
+    const contract = mode === 'tavern-depth' ? require('./tavern-depth.cjs') : require('./input.json');
     const fixture = await start({ contract });
     const file = name => path.join(fixture.out, name);
     const snapshot = name => fs.writeFile(file(name), JSON.stringify(fixture.snapshot(), null, 2) + '\n', { mode: 0o600 });
