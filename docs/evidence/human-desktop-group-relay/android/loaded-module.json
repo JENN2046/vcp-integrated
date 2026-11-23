@@ -1,0 +1,31 @@
+{
+  "pid": "2147",
+  "secure": true,
+  "visible": true,
+  "standalone": false,
+  "origin": "https://127.0.0.1:18447",
+  "connection": "服务可达",
+  "bundle": "/mobile/assets/index-BaXgBu8e.js",
+  "workerControlled": true,
+  "isPrivate": false,
+  "browsingContextID": 8,
+  "scriptURL": "https://127.0.0.1:18447/mobile/assets/index-BaXgBu8e.js",
+  "sourceMethod": "Firefox Debugger SourceActor source encoded as UTF-8 and verified byte-for-byte against the HTTPS identity response",
+  "sourceActor": "server0.conn7.child3/source19",
+  "resource": [
+    {
+      "initiatorType": "script",
+      "responseStatus": 200,
+      "decodedBodySize": 196167,
+      "encodedBodySize": 196167,
+      "transferSize": 196467,
+      "deliveryType": "",
+      "workerStart": 0
+    }
+  ],
+  "loadedBytes": 196167,
+  "loadedSha256": "09a7a701e8658060d8283fdede9d7acd344debda84aacf35ac0f169943f8bc38",
+  "servedBytes": 196167,
+  "servedSha256": "09a7a701e8658060d8283fdede9d7acd344debda84aacf35ac0f169943f8bc38",
+  "expectedBuildSha256": "09a7a701e8658060d8283fdede9d7acd344debda84aacf35ac0f169943f8bc38"
+}

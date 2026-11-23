@@ -1,0 +1,182 @@
+{
+  "snapshots": [
+    {
+      "at": "2026-11-23T16:01:09.852Z",
+      "connected": "已连接",
+      "visible": true,
+      "topic": "shared_15635dace11b4acfaad2ab0c8a237f42",
+      "footer": "任务状态",
+      "workPanelVisible": false,
+      "relay": null,
+      "messageIDs": [],
+      "controls": {
+        "sendDisabled": true,
+        "inputDisabled": true,
+        "inviteDisabled": true,
+        "relayButtons": []
+      },
+      "screenshot": "phone-001.png"
+    },
+    {
+      "at": "2026-11-23T16:09:37.602Z",
+      "connected": "已连接",
+      "visible": true,
+      "topic": "shared_15635dace11b4acfaad2ab0c8a237f42",
+      "footer": "桌面接力中",
+      "workPanelVisible": false,
+      "relay": {
+        "id": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "state": "first_member",
+        "title": "等待甲的正式回复",
+        "summary": "桌面群聊接力 · 0 / 2 位成员已确认",
+        "members": [
+          "甲 · 等待正式回复",
+          "乙 · 待轮到"
+        ]
+      },
+      "messageIDs": [
+        "controlled_7b26eb006a974d3bbfabe5d081fca765"
+      ],
+      "controls": {
+        "sendDisabled": true,
+        "inputDisabled": true,
+        "inviteDisabled": true,
+        "relayButtons": []
+      },
+      "screenshot": "phone-002.png"
+    },
+    {
+      "at": "2026-11-23T16:09:38.934Z",
+      "connected": "已连接",
+      "visible": true,
+      "topic": "shared_15635dace11b4acfaad2ab0c8a237f42",
+      "footer": "等待桌面接管",
+      "workPanelVisible": false,
+      "relay": {
+        "id": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "state": "awaiting_handoff",
+        "title": "等待桌面接管",
+        "instruction": "请在另一台有权桌面接管，下一位是乙。",
+        "summary": "桌面群聊接力 · 1 / 2 位成员已确认",
+        "members": [
+          "甲 · 正式回复已确认",
+          "乙 · 待接管"
+        ]
+      },
+      "messageIDs": [
+        "controlled_7b26eb006a974d3bbfabe5d081fca765",
+        "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_0"
+      ],
+      "controls": {
+        "sendDisabled": true,
+        "inputDisabled": true,
+        "inviteDisabled": true,
+        "relayButtons": []
+      },
+      "screenshot": "phone-003.png"
+    },
+    {
+      "at": "2026-11-23T16:14:08.092Z",
+      "connected": "已连接",
+      "visible": true,
+      "topic": "shared_15635dace11b4acfaad2ab0c8a237f42",
+      "footer": "等待桌面继续",
+      "workPanelVisible": false,
+      "relay": {
+        "id": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "state": "awaiting_continue",
+        "title": "等待桌面继续",
+        "instruction": "请在deviceB继续，下一位是乙。",
+        "summary": "桌面群聊接力 · 1 / 2 位成员已确认",
+        "members": [
+          "甲 · 正式回复已确认",
+          "乙 · 待继续"
+        ]
+      },
+      "messageIDs": [
+        "controlled_7b26eb006a974d3bbfabe5d081fca765",
+        "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_0"
+      ],
+      "controls": {
+        "sendDisabled": true,
+        "inputDisabled": true,
+        "inviteDisabled": true,
+        "relayButtons": []
+      },
+      "screenshot": "phone-004.png"
+    },
+    {
+      "at": "2026-11-23T16:14:16.495Z",
+      "connected": "已连接",
+      "visible": true,
+      "topic": "shared_15635dace11b4acfaad2ab0c8a237f42",
+      "footer": "桌面接力中",
+      "workPanelVisible": false,
+      "relay": {
+        "id": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "state": "continuing",
+        "title": "等待乙的正式回复",
+        "instruction": "执行桌面：deviceB",
+        "summary": "桌面群聊接力 · 1 / 2 位成员已确认",
+        "members": [
+          "甲 · 正式回复已确认",
+          "乙 · 等待正式回复"
+        ]
+      },
+      "messageIDs": [
+        "controlled_7b26eb006a974d3bbfabe5d081fca765",
+        "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_0"
+      ],
+      "controls": {
+        "sendDisabled": true,
+        "inputDisabled": true,
+        "inviteDisabled": true,
+        "relayButtons": []
+      },
+      "screenshot": "phone-005.png"
+    },
+    {
+      "at": "2026-11-23T16:14:22.148Z",
+      "connected": "已连接",
+      "visible": true,
+      "topic": "shared_15635dace11b4acfaad2ab0c8a237f42",
+      "footer": "任务状态",
+      "workPanelVisible": false,
+      "relay": {
+        "id": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "state": "completed",
+        "title": "接力已完成",
+        "summary": "桌面群聊接力 · 2 / 2 位成员已确认",
+        "members": [
+          "甲 · 正式回复已确认",
+          "乙 · 正式回复已确认"
+        ]
+      },
+      "messageIDs": [
+        "controlled_7b26eb006a974d3bbfabe5d081fca765",
+        "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_0",
+        "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_1"
+      ],
+      "controls": {
+        "sendDisabled": true,
+        "inputDisabled": true,
+        "inviteDisabled": true,
+        "relayButtons": []
+      },
+      "screenshot": "phone-006.png"
+    }
+  ],
+  "trustedWorkClicks": [],
+  "formalReplies": [
+    {
+      "id": "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_0",
+      "name": "甲",
+      "body": "甲的正式回复：我已确认蓝色信封编号 NS-731。"
+    },
+    {
+      "id": "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_1",
+      "name": "乙",
+      "body": "乙的正式回复：我接续甲确认的蓝色信封 NS-731。"
+    }
+  ]
+}

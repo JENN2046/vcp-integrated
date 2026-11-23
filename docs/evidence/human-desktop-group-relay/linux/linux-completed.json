@@ -1,0 +1,123 @@
+{
+  "panel": "跨端任务\n\n按提交时的群聊顺序逐位发言。每位成员的回复确认后，可在另一设备接管并继续。\n\n开始顺序接力接管到本端本端继续执行核对任务\n\n全部成员回复已保存 · 执行端：另一设备 · 已保存 2/2 份回复",
+  "buttons": [
+    [
+      "开始顺序接力",
+      true
+    ],
+    [
+      "接管到本端",
+      false
+    ],
+    [
+      "本端继续执行",
+      false
+    ],
+    [
+      "核对任务",
+      true
+    ]
+  ],
+  "context": {
+    "itemId": "ns_99781f42225b00312386ca7b",
+    "itemType": "group",
+    "topicId": "ns_6b6a613b28fc851c715cfe18",
+    "historyRevision": 14
+  },
+  "text": "用户\n2026-11-24 00:09\n\n真实跨端接力验收：请甲、乙按顺序各回答一次。\n\n甲\n2026-11-24 00:09\n\n甲的正式回复：我已确认蓝色信封编号 NS-731。\n\n乙\n2026-11-24 00:14\n\n乙的正式回复：我接续甲确认的蓝色信封 NS-731。",
+  "composer": "",
+  "selectionText": "",
+  "selectionInTranscript": false,
+  "reading": {
+    "scrollTop": 0,
+    "height": 482,
+    "scrollHeight": 482
+  },
+  "history": [
+    {
+      "id": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+      "role": "user",
+      "content": "真实跨端接力验收：请甲、乙按顺序各回答一次。",
+      "timestamp": 1795450176709,
+      "_nativeSyncMetadata": {
+        "version": 1,
+        "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "fields": {}
+      }
+    },
+    {
+      "id": "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_0",
+      "role": "assistant",
+      "name": "甲",
+      "content": "甲的正式回复：我已确认蓝色信封编号 NS-731。",
+      "timestamp": 1795450178374,
+      "agentId": "shared_d34d8969cfb243c9aeeee826fbafd09f",
+      "groupId": "shared_f970d95e45c04d7b999e4648072a8e17",
+      "topicId": "shared_15635dace11b4acfaad2ab0c8a237f42",
+      "isGroupMessage": true,
+      "finishReason": "completed",
+      "continuity": {
+        "version": 1,
+        "known": true,
+        "requestId": "group_request_08246eeb4bae436eacdece1bddfa3f19_0",
+        "executionId": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "dependsOnMessageIds": [
+          "controlled_7b26eb006a974d3bbfabe5d081fca765"
+        ]
+      },
+      "_nativeSyncMetadata": {
+        "version": 1,
+        "hash": "763504e7537edba46a971c77d8726e09b9177289aa49e4df4fb38e13a3f253ef",
+        "fields": {
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "group_request_08246eeb4bae436eacdece1bddfa3f19_0",
+            "executionId": "request_08246eeb4bae436eacdece1bddfa3f19",
+            "dependsOnMessageIds": [
+              "controlled_7b26eb006a974d3bbfabe5d081fca765"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_1",
+      "role": "assistant",
+      "name": "乙",
+      "content": "乙的正式回复：我接续甲确认的蓝色信封 NS-731。",
+      "timestamp": 1795450460730,
+      "agentId": "shared_a48c27cf5a9a4b369e2fd3e3bd08f4b2",
+      "groupId": "shared_f970d95e45c04d7b999e4648072a8e17",
+      "topicId": "shared_15635dace11b4acfaad2ab0c8a237f42",
+      "isGroupMessage": true,
+      "finishReason": "completed",
+      "continuity": {
+        "version": 1,
+        "known": true,
+        "requestId": "group_request_08246eeb4bae436eacdece1bddfa3f19_1",
+        "executionId": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "dependsOnMessageIds": [
+          "controlled_7b26eb006a974d3bbfabe5d081fca765",
+          "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_0"
+        ]
+      },
+      "_nativeSyncMetadata": {
+        "version": 1,
+        "hash": "aac1471b315f04da525e1217a2f8b3d690ea36dff958e3c8947e8cfa23b87c01",
+        "fields": {
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "group_request_08246eeb4bae436eacdece1bddfa3f19_1",
+            "executionId": "request_08246eeb4bae436eacdece1bddfa3f19",
+            "dependsOnMessageIds": [
+              "controlled_7b26eb006a974d3bbfabe5d081fca765",
+              "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_0"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

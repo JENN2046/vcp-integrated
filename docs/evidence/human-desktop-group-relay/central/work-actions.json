@@ -1,0 +1,312 @@
+[
+  {
+    "route": "/api/v1/sync/shared/admit",
+    "method": "POST",
+    "device": "deviceA",
+    "status": 200,
+    "at": 1795450176756,
+    "body": {
+      "sharedSpaceId": "sharedAB",
+      "sharedId": "shared_15635dace11b4acfaad2ab0c8a237f42",
+      "requestId": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+      "expectedHead": 0,
+      "configHash": "ef321bd41d8aa4e1bfbf53419b5fb724ae08291eb4d973ceace84e1714d75761",
+      "controlMode": "group-member-handoff-v2",
+      "message": {
+        "id": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+        "role": "user",
+        "content": "真实跨端接力验收：请甲、乙按顺序各回答一次。",
+        "timestamp": 1795450176709
+      }
+    },
+    "response": {
+      "id": "request_08246eeb4bae436eacdece1bddfa3f19",
+      "sharedSpaceId": "sharedAB",
+      "sharedId": "shared_15635dace11b4acfaad2ab0c8a237f42",
+      "requestId": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+      "state": "accepted",
+      "configHash": "ef321bd41d8aa4e1bfbf53419b5fb724ae08291eb4d973ceace84e1714d75761",
+      "contextHead": 0,
+      "userSeq": 1,
+      "replySeq": null,
+      "dispatched": false,
+      "turn": {
+        "kind": "message",
+        "plan": [
+          "shared_d34d8969cfb243c9aeeee826fbafd09f",
+          "shared_a48c27cf5a9a4b369e2fd3e3bd08f4b2"
+        ],
+        "userMessageId": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+        "controlMode": "group-member-handoff-v2"
+      },
+      "groupHandoff": {
+        "state": "first_member",
+        "executor": "desktop:deviceA",
+        "executorVersion": 0,
+        "nextOrdinal": 0,
+        "nextRequestId": "group_request_08246eeb4bae436eacdece1bddfa3f19_0",
+        "previousReplySeq": null,
+        "confirmedReplies": []
+      },
+      "replayed": false
+    }
+  },
+  {
+    "route": "/api/v1/sync/shared/complete",
+    "method": "POST",
+    "device": "deviceA",
+    "status": 200,
+    "at": 1795450178387,
+    "body": {
+      "sharedSpaceId": "sharedAB",
+      "admissionId": "request_08246eeb4bae436eacdece1bddfa3f19",
+      "opId": "desktop-step_group_request_08246eeb4bae436eacdece1bddfa3f19_0",
+      "nativeRequestId": "group_request_08246eeb4bae436eacdece1bddfa3f19_0",
+      "message": {
+        "id": "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_0",
+        "role": "assistant",
+        "name": "甲",
+        "content": "甲的正式回复：我已确认蓝色信封编号 NS-731。",
+        "timestamp": 1795450178374,
+        "agentId": "shared_d34d8969cfb243c9aeeee826fbafd09f",
+        "groupId": "shared_f970d95e45c04d7b999e4648072a8e17",
+        "topicId": "shared_15635dace11b4acfaad2ab0c8a237f42",
+        "isGroupMessage": true,
+        "finishReason": "completed",
+        "continuity": {
+          "version": 1,
+          "known": true,
+          "requestId": "group_request_08246eeb4bae436eacdece1bddfa3f19_0",
+          "executionId": "request_08246eeb4bae436eacdece1bddfa3f19",
+          "dependsOnMessageIds": [
+            "controlled_7b26eb006a974d3bbfabe5d081fca765"
+          ]
+        }
+      }
+    },
+    "response": {
+      "request": {
+        "id": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "sharedSpaceId": "sharedAB",
+        "sharedId": "shared_15635dace11b4acfaad2ab0c8a237f42",
+        "requestId": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+        "state": "dispatched",
+        "configHash": "ef321bd41d8aa4e1bfbf53419b5fb724ae08291eb4d973ceace84e1714d75761",
+        "contextHead": 0,
+        "userSeq": 1,
+        "replySeq": 2,
+        "dispatched": true,
+        "turn": {
+          "kind": "message",
+          "plan": [
+            "shared_d34d8969cfb243c9aeeee826fbafd09f",
+            "shared_a48c27cf5a9a4b369e2fd3e3bd08f4b2"
+          ],
+          "userMessageId": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+          "controlMode": "group-member-handoff-v2"
+        },
+        "groupHandoff": {
+          "state": "awaiting_handoff",
+          "executor": "desktop:deviceA",
+          "executorVersion": 0,
+          "nextOrdinal": 1,
+          "nextRequestId": "group_request_08246eeb4bae436eacdece1bddfa3f19_1",
+          "previousReplySeq": 2,
+          "confirmedReplies": [
+            2
+          ]
+        }
+      },
+      "receipt": {
+        "seq": 2,
+        "hash": "117d23793185584a495aa8e37ea838e294261a4de6e90afb4a775e7040b82c22",
+        "deleted": false,
+        "metadataVersion": 1,
+        "metadataHash": "763504e7537edba46a971c77d8726e09b9177289aa49e4df4fb38e13a3f253ef",
+        "replayed": false
+      },
+      "replayed": false
+    }
+  },
+  {
+    "route": "/api/v1/sync/shared/group-handoff",
+    "method": "POST",
+    "device": "deviceB",
+    "status": 200,
+    "at": 1795450447492,
+    "body": {
+      "sharedSpaceId": "sharedAB",
+      "workId": "request_08246eeb4bae436eacdece1bddfa3f19",
+      "expectedExecutor": "desktop:deviceA",
+      "expectedExecutorVersion": 0,
+      "expectedNextOrdinal": 1,
+      "expectedPreviousReplySeq": 2,
+      "opId": "desktop-group-handoff_a57086711261f51e6f98005ec33eb76e5889bff2e283ebf5"
+    },
+    "response": {
+      "request": {
+        "id": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "sharedSpaceId": "sharedAB",
+        "sharedId": "shared_15635dace11b4acfaad2ab0c8a237f42",
+        "requestId": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+        "state": "dispatched",
+        "configHash": "ef321bd41d8aa4e1bfbf53419b5fb724ae08291eb4d973ceace84e1714d75761",
+        "contextHead": 0,
+        "userSeq": 1,
+        "replySeq": 2,
+        "dispatched": true,
+        "turn": {
+          "kind": "message",
+          "plan": [
+            "shared_d34d8969cfb243c9aeeee826fbafd09f",
+            "shared_a48c27cf5a9a4b369e2fd3e3bd08f4b2"
+          ],
+          "userMessageId": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+          "controlMode": "group-member-handoff-v2"
+        },
+        "groupHandoff": {
+          "state": "awaiting_continue",
+          "executor": "desktop:deviceB",
+          "executorVersion": 1,
+          "nextOrdinal": 1,
+          "nextRequestId": "group_request_08246eeb4bae436eacdece1bddfa3f19_1",
+          "previousReplySeq": 2,
+          "confirmedReplies": [
+            2
+          ]
+        }
+      },
+      "replayed": false
+    }
+  },
+  {
+    "route": "/api/v1/sync/shared/group-continue",
+    "method": "POST",
+    "device": "deviceB",
+    "status": 200,
+    "at": 1795450455929,
+    "body": {
+      "sharedSpaceId": "sharedAB",
+      "workId": "request_08246eeb4bae436eacdece1bddfa3f19",
+      "expectedExecutor": "desktop:deviceB",
+      "expectedExecutorVersion": 1,
+      "expectedNextOrdinal": 1,
+      "expectedPreviousReplySeq": 2,
+      "opId": "desktop-group-continue_90b650c16c7cac6d8acbc38a4ae47765a0dca0e2c185f367"
+    },
+    "response": {
+      "request": {
+        "id": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "sharedSpaceId": "sharedAB",
+        "sharedId": "shared_15635dace11b4acfaad2ab0c8a237f42",
+        "requestId": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+        "state": "dispatched",
+        "configHash": "ef321bd41d8aa4e1bfbf53419b5fb724ae08291eb4d973ceace84e1714d75761",
+        "contextHead": 0,
+        "userSeq": 1,
+        "replySeq": 2,
+        "dispatched": true,
+        "turn": {
+          "kind": "message",
+          "plan": [
+            "shared_d34d8969cfb243c9aeeee826fbafd09f",
+            "shared_a48c27cf5a9a4b369e2fd3e3bd08f4b2"
+          ],
+          "userMessageId": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+          "controlMode": "group-member-handoff-v2"
+        },
+        "groupHandoff": {
+          "state": "continuing",
+          "executor": "desktop:deviceB",
+          "executorVersion": 1,
+          "nextOrdinal": 1,
+          "nextRequestId": "group_request_08246eeb4bae436eacdece1bddfa3f19_1",
+          "previousReplySeq": 2,
+          "confirmedReplies": [
+            2
+          ]
+        }
+      },
+      "replayed": false
+    }
+  },
+  {
+    "route": "/api/v1/sync/shared/complete",
+    "method": "POST",
+    "device": "deviceB",
+    "status": 200,
+    "at": 1795450461505,
+    "body": {
+      "sharedSpaceId": "sharedAB",
+      "admissionId": "request_08246eeb4bae436eacdece1bddfa3f19",
+      "opId": "desktop-step_group_request_08246eeb4bae436eacdece1bddfa3f19_1",
+      "nativeRequestId": "group_request_08246eeb4bae436eacdece1bddfa3f19_1",
+      "message": {
+        "id": "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_1",
+        "role": "assistant",
+        "name": "乙",
+        "content": "乙的正式回复：我接续甲确认的蓝色信封 NS-731。",
+        "timestamp": 1795450460730,
+        "agentId": "shared_a48c27cf5a9a4b369e2fd3e3bd08f4b2",
+        "groupId": "shared_f970d95e45c04d7b999e4648072a8e17",
+        "topicId": "shared_15635dace11b4acfaad2ab0c8a237f42",
+        "isGroupMessage": true,
+        "finishReason": "completed",
+        "continuity": {
+          "version": 1,
+          "known": true,
+          "requestId": "group_request_08246eeb4bae436eacdece1bddfa3f19_1",
+          "executionId": "request_08246eeb4bae436eacdece1bddfa3f19",
+          "dependsOnMessageIds": [
+            "controlled_7b26eb006a974d3bbfabe5d081fca765",
+            "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_0"
+          ]
+        }
+      }
+    },
+    "response": {
+      "request": {
+        "id": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "sharedSpaceId": "sharedAB",
+        "sharedId": "shared_15635dace11b4acfaad2ab0c8a237f42",
+        "requestId": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+        "state": "completed",
+        "configHash": "ef321bd41d8aa4e1bfbf53419b5fb724ae08291eb4d973ceace84e1714d75761",
+        "contextHead": 0,
+        "userSeq": 1,
+        "replySeq": 3,
+        "dispatched": true,
+        "turn": {
+          "kind": "message",
+          "plan": [
+            "shared_d34d8969cfb243c9aeeee826fbafd09f",
+            "shared_a48c27cf5a9a4b369e2fd3e3bd08f4b2"
+          ],
+          "userMessageId": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+          "controlMode": "group-member-handoff-v2"
+        },
+        "groupHandoff": {
+          "state": "completed",
+          "executor": "desktop:deviceB",
+          "executorVersion": 1,
+          "nextOrdinal": null,
+          "nextRequestId": null,
+          "previousReplySeq": 3,
+          "confirmedReplies": [
+            2,
+            3
+          ]
+        }
+      },
+      "receipt": {
+        "seq": 3,
+        "hash": "a0c4dd202be80f3ddea15adf07861ca85135ba21a892e087600c5b0feba327d3",
+        "deleted": false,
+        "metadataVersion": 1,
+        "metadataHash": "aac1471b315f04da525e1217a2f8b3d690ea36dff958e3c8947e8cfa23b87c01",
+        "replayed": false
+      },
+      "replayed": false
+    }
+  }
+]

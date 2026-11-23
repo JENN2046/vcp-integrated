@@ -1,0 +1,92 @@
+{
+  "workId": "request_08246eeb4bae436eacdece1bddfa3f19",
+  "boundView": {
+    "itemType": "group",
+    "itemId": "ns_99781f42225b00312386ca7b",
+    "topicId": "ns_6b6a613b28fc851c715cfe18"
+  },
+  "windowsActionIpc": [
+    {
+      "event": "group-ui-ipc",
+      "time": "2026-11-23T16:14:06.722Z",
+      "pid": 8656,
+      "data": {
+        "action": "handoff",
+        "workId": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "expectedExecutor": "desktop:deviceA",
+        "expectedExecutorVersion": 0,
+        "expectedNextOrdinal": 1,
+        "expectedPreviousReplySeq": 2
+      }
+    },
+    {
+      "event": "group-ui-ipc",
+      "time": "2026-11-23T16:14:15.161Z",
+      "pid": 8656,
+      "data": {
+        "action": "continue",
+        "workId": "request_08246eeb4bae436eacdece1bddfa3f19",
+        "expectedExecutor": "desktop:deviceB",
+        "expectedExecutorVersion": 1,
+        "expectedNextOrdinal": 1,
+        "expectedPreviousReplySeq": 2
+      }
+    }
+  ],
+  "windowsActionResults": [
+    {
+      "event": "group-ui-result",
+      "time": "2026-11-23T16:14:06.804Z",
+      "pid": 8656,
+      "data": {
+        "action": "handoff",
+        "success": true
+      }
+    },
+    {
+      "event": "group-ui-result",
+      "time": "2026-11-23T16:14:21.021Z",
+      "pid": 8656,
+      "data": {
+        "action": "continue",
+        "success": true
+      }
+    }
+  ],
+  "domClickObservations": [],
+  "windowsHistoryMatchesCentral": true,
+  "windowsRendererMessageIdsMatchCentral": true,
+  "providerMemberOrder": [
+    "A",
+    "B"
+  ],
+  "replySlots": [
+    {
+      "ordinal": 0,
+      "reply_seq": 2
+    },
+    {
+      "ordinal": 1,
+      "reply_seq": 3
+    }
+  ],
+  "orderedHistory": [
+    {
+      "id": "controlled_7b26eb006a974d3bbfabe5d081fca765",
+      "role": "user",
+      "content": "真实跨端接力验收：请甲、乙按顺序各回答一次。"
+    },
+    {
+      "id": "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_0",
+      "role": "assistant",
+      "content": "甲的正式回复：我已确认蓝色信封编号 NS-731。",
+      "name": "甲"
+    },
+    {
+      "id": "reply_group_request_08246eeb4bae436eacdece1bddfa3f19_1",
+      "role": "assistant",
+      "content": "乙的正式回复：我接续甲确认的蓝色信封 NS-731。",
+      "name": "乙"
+    }
+  ]
+}

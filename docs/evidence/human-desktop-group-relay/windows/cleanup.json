@@ -1,0 +1,16 @@
+{
+  "time": "2026-11-23T16:18:26.883919+00:00",
+  "guestShutdownConfirmed": true,
+  "qemuExited": true,
+  "desktopQuitObservation": [],
+  "temporaryOverlayRemoved": "/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/human-relay-5MrgFN/run/windows/os.qcow2",
+  "overlayBytesBeforeRemoval": 3212836864,
+  "overlayAbsent": true,
+  "originalBasePresent": true,
+  "originalBaseQmpReadOnly": true,
+  "retained": [
+    "evidence2.img",
+    "vars.fd",
+    "tpm/"
+  ]
+}

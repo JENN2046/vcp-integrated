@@ -1,0 +1,8 @@
+{
+  "linux": "stopped",
+  "coordinator": "stopped",
+  "backend": "stopped",
+  "listener18447": 0,
+  "listener18443": 1,
+  "linuxExit": "Electron quit normally before closing lingering synthetic supervisor input"
+}
