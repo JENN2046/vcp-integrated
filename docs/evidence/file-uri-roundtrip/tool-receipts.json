@@ -1,0 +1,61 @@
+{
+  "tool": {
+    "workId": "request_b12cc4591509438d9b8182fbe3ac5ddf",
+    "nativeRequestId": "reply_request_b12cc4591509438d9b8182fbe3ac5ddf",
+    "journalIds": [
+      "msg_1795405094440_user_24257ny",
+      "reply_request_b12cc4591509438d9b8182fbe3ac5ddf"
+    ],
+    "nativeInvocations": [
+      {
+        "invocation_id": "98df46e4-4a9f-46e9-95d3-587a7873b282",
+        "execution_id": "request_b12cc4591509438d9b8182fbe3ac5ddf",
+        "native_request_id": "reply_request_b12cc4591509438d9b8182fbe3ac5ddf",
+        "plugin_name": "SyntheticFileDigest",
+        "record_id": "tcr-1795405094587-e0c1e4e3-2754-4bda-99c1-05117a2af3bf",
+        "state": "returned"
+      }
+    ],
+    "fileRpcId": "mwspu56n-z7wat2z",
+    "providerCalls": 2,
+    "returnedDigest": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+    "toolPayload": "<!-- VCP_TOOL_PAYLOAD -->\nResults: SYNTHETIC_DIGEST_f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e"
+  },
+  "inline": {
+    "workId": "request_cb3050bb7c6d4390a6b4bdf7fef29759",
+    "nativeRequestId": "reply_request_cb3050bb7c6d4390a6b4bdf7fef29759",
+    "journalIds": [
+      "msg_1795405100495_user_84n1uqg",
+      "reply_request_cb3050bb7c6d4390a6b4bdf7fef29759"
+    ],
+    "nativeInvocations": [],
+    "fileRpcId": null,
+    "providerCalls": 1,
+    "inlineBody": {
+      "bytes": 67,
+      "sha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e"
+    }
+  },
+  "filename": {
+    "workId": "request_d7ad6f771d274b7dbe77f24e5e7fe735",
+    "nativeRequestId": "reply_request_d7ad6f771d274b7dbe77f24e5e7fe735",
+    "journalIds": [
+      "msg_1795405106566_user_r5ezzn6",
+      "reply_request_d7ad6f771d274b7dbe77f24e5e7fe735"
+    ],
+    "nativeInvocations": [
+      {
+        "invocation_id": "1b472a1d-a4d2-4125-b7ca-d80cbdb2295f",
+        "execution_id": "request_d7ad6f771d274b7dbe77f24e5e7fe735",
+        "native_request_id": "reply_request_d7ad6f771d274b7dbe77f24e5e7fe735",
+        "plugin_name": "SyntheticFileDigest",
+        "record_id": "tcr-1795405106703-e5aa0d96-f262-419c-8687-4357825a1383",
+        "state": "returned"
+      }
+    ],
+    "fileRpcId": null,
+    "providerCalls": 2,
+    "toolError": "ENOENT",
+    "returnedDigest": null
+  }
+}

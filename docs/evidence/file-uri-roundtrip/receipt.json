@@ -1,0 +1,559 @@
+{
+  "revision": "0d72d8ef424999fb68525defeaac8f04e27c573b",
+  "node": "24.22.1",
+  "platform": "linux-x64",
+  "cases": {
+    "tool": {
+      "testCase": "tool",
+      "digest": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "bytes": 67,
+      "name": "synthetic-continuity.txt",
+      "cacheCold": true,
+      "rendererObserver": {
+        "module": "modules/chat/singleChatRequestOrchestrator.js",
+        "line": 20,
+        "sha256": "68d52c96bfc3891b8085ce110f47cb1d25d5d5cbdc3e67f0247da484b24eaf77"
+      },
+      "isolation": {
+        "fileUri": "file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt",
+        "privateCacheDir": "<isolated-run>/profile-A/UserData/attachments",
+        "desktop": {
+          "mountNamespace": "mnt:[4026531832]",
+          "access": {
+            "ok": true
+          },
+          "readFile": {
+            "ok": true,
+            "byteLength": 67,
+            "sha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e"
+          }
+        },
+        "toolbox": {
+          "mountNamespace": "mnt:[4026533715]",
+          "access": {
+            "ok": false,
+            "code": "ENOENT"
+          },
+          "readFile": {
+            "ok": false,
+            "code": "ENOENT"
+          }
+        }
+      },
+      "delivery": {
+        "admission": {
+          "id": "request_b12cc4591509438d9b8182fbe3ac5ddf",
+          "request_id": "msg_1795405094440_user_24257ny",
+          "principal": "desktop:deviceA",
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1
+        },
+        "request": {
+          "id": "reply_request_b12cc4591509438d9b8182fbe3ac5ddf",
+          "state": "model_terminal"
+        },
+        "handlerRoute": "/v1/chat/completions",
+        "handlerRequestId": "reply_request_b12cc4591509438d9b8182fbe3ac5ddf",
+        "reply": "Synthetic remote file verified.",
+        "ingress": [
+          {
+            "kind": "native-chat-ingress",
+            "requestId": "reply_request_b12cc4591509438d9b8182fbe3ac5ddf",
+            "socketPeer": "<bound-A-ipv4>",
+            "requestIp": "<bound-A-ipv4>",
+            "forwardedFor": false
+          }
+        ],
+        "historyMessageIds": [
+          "msg_1795405094440_user_24257ny",
+          "reply_request_b12cc4591509438d9b8182fbe3ac5ddf"
+        ],
+        "providerPhases": [
+          "tool-request",
+          "tool-result"
+        ],
+        "providerInline": {
+          "bytes": 67,
+          "sha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e"
+        },
+        "providerToolDigest": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+        "providerToolError": null,
+        "toolArgument": "file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt",
+        "stages": [
+          {
+            "stage": "renderer",
+            "hasInlineBody": true,
+            "hasOriginalUri": true,
+            "hasAnyFileUri": true,
+            "hasNameHeader": false
+          },
+          {
+            "stage": "IPC",
+            "hasInlineBody": true,
+            "hasOriginalUri": true,
+            "hasAnyFileUri": true,
+            "hasNameHeader": false
+          },
+          {
+            "stage": "handler",
+            "hasInlineBody": true,
+            "hasOriginalUri": true,
+            "hasAnyFileUri": true,
+            "hasNameHeader": false
+          },
+          {
+            "stage": "provider",
+            "hasInlineBody": true,
+            "hasOriginalUri": true,
+            "hasAnyFileUri": true,
+            "hasNameHeader": false
+          }
+        ]
+      },
+      "fileCache": {
+        "files": [
+          "7e283a1942d3f77fb68a07790952616e6f2fbd9d0fde779ed9d2928123b977cb.txt"
+        ],
+        "invocations": [
+          {
+            "argument": "relative-to-runtime:.file_cache/7e283a1942d3f77fb68a07790952616e6f2fbd9d0fde779ed9d2928123b977cb.txt",
+            "bytes": 67,
+            "digest": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e"
+          }
+        ]
+      },
+      "desktopWs": {
+        "registration": [
+          {
+            "serverName": "VCPChat-Desktop-Client-Distributed-Server",
+            "toolCount": 32,
+            "localAddress": "<bound-A-ipv4>"
+          }
+        ],
+        "ipReports": [
+          {
+            "serverName": "VCPChat-Desktop-Client-Distributed-Server",
+            "localAddress": "<bound-A-ipv4>",
+            "publicIpReported": false,
+            "reportsSelectedLocalAddress": true
+          }
+        ],
+        "transfers": [
+          {
+            "requestId": "mwspu56n-z7wat2z",
+            "fileUrlSha256": "7e283a1942d3f77fb68a07790952616e6f2fbd9d0fde779ed9d2928123b977cb",
+            "localAddress": "<bound-A-ipv4>",
+            "status": "success",
+            "bytes": 67,
+            "sha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+            "mimeType": "text/plain",
+            "matchesFixture": true
+          }
+        ],
+        "refused": 0,
+        "sourceIp": "<bound-A-ipv4>",
+        "nativeSourceSha256": "10e10f3589c000cc14e1a68a9293984d2262d52a1852cd523f328b29a2830773",
+        "expected": {
+          "sha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+          "bytes": 67,
+          "fileUrlSha256": "7e283a1942d3f77fb68a07790952616e6f2fbd9d0fde779ed9d2928123b977cb"
+        }
+      },
+      "fileFetcher": [
+        "[FileFetcherServer] <isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt not found locally or in cache, initiating pre-fetch...",
+        "[FileFetcherServer] URL缓存未命中: file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt。将尝试从来源服务器获取。",
+        "[FileFetcherServer] 确定文件来源服务器为: VCPChat-Desktop-Client-Distributed-Server (IP: <bound-A-ipv4>)。正在请求文件...",
+        "[FileFetcherServer] 成功从服务器 VCPChat-Desktop-Client-Distributed-Server 获取到文件 file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt 的 Base64 数据。",
+        "[FileFetcherServer] 已将获取的文件缓存到本地: <isolated-run>/runtime-box/.file_cache/7e283a1942d3f77fb68a07790952616e6f2fbd9d0fde779ed9d2928123b977cb.txt",
+        "[FileFetcherServer] Pre-fetched file wrapped to local cache url: file://<isolated-run>/runtime-box/.file_cache/7e283a1942d3f77fb68a07790952616e6f2fbd9d0fde779ed9d2928123b977cb.txt"
+      ],
+      "shutdown": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "runtime": {
+        "electron": "44.9.3",
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "loadedToolBoxSources": [
+        {
+          "file": "apps/server/Plugin.js",
+          "sha256": "c0e8ff13cbbdedf5db103590ca98e1b0e194443e4ac40accf5715cb1aae33950"
+        },
+        {
+          "file": "apps/server/FileFetcherServer.js",
+          "sha256": "9adc194baf1ca647d52197e5afd5775d1adcc73df59754a59bf968fa192db62c"
+        },
+        {
+          "file": "apps/server/WebSocketServer.js",
+          "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+        },
+        {
+          "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+          "sha256": "bb114f2afc05f176ebdf67fa72230c2921ac6c9c84447f31450524f0d90e8817"
+        }
+      ]
+    },
+    "inline": {
+      "testCase": "inline",
+      "digest": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "bytes": 67,
+      "name": "synthetic-continuity.txt",
+      "cacheCold": true,
+      "rendererObserver": {
+        "module": "modules/chat/singleChatRequestOrchestrator.js",
+        "line": 20,
+        "sha256": "68d52c96bfc3891b8085ce110f47cb1d25d5d5cbdc3e67f0247da484b24eaf77"
+      },
+      "isolation": {
+        "fileUri": "file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt",
+        "privateCacheDir": "<isolated-run>/profile-A/UserData/attachments",
+        "desktop": {
+          "mountNamespace": "mnt:[4026531832]",
+          "access": {
+            "ok": true
+          },
+          "readFile": {
+            "ok": true,
+            "byteLength": 67,
+            "sha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e"
+          }
+        },
+        "toolbox": {
+          "mountNamespace": "mnt:[4026533715]",
+          "access": {
+            "ok": false,
+            "code": "ENOENT"
+          },
+          "readFile": {
+            "ok": false,
+            "code": "ENOENT"
+          }
+        }
+      },
+      "delivery": {
+        "admission": {
+          "id": "request_cb3050bb7c6d4390a6b4bdf7fef29759",
+          "request_id": "msg_1795405100495_user_84n1uqg",
+          "principal": "desktop:deviceA",
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1
+        },
+        "request": {
+          "id": "reply_request_cb3050bb7c6d4390a6b4bdf7fef29759",
+          "state": "model_terminal"
+        },
+        "handlerRoute": "/v1/chat/completions",
+        "handlerRequestId": "reply_request_cb3050bb7c6d4390a6b4bdf7fef29759",
+        "reply": "Synthetic inline file verified.",
+        "ingress": [
+          {
+            "kind": "native-chat-ingress",
+            "requestId": "reply_request_cb3050bb7c6d4390a6b4bdf7fef29759",
+            "socketPeer": "<bound-A-ipv4>",
+            "requestIp": "<bound-A-ipv4>",
+            "forwardedFor": false
+          }
+        ],
+        "historyMessageIds": [
+          "msg_1795405100495_user_84n1uqg",
+          "reply_request_cb3050bb7c6d4390a6b4bdf7fef29759"
+        ],
+        "providerPhases": [
+          "inline-only"
+        ],
+        "providerInline": {
+          "bytes": 67,
+          "sha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e"
+        },
+        "providerToolDigest": null,
+        "providerToolError": null,
+        "toolArgument": null,
+        "stages": [
+          {
+            "stage": "renderer",
+            "hasInlineBody": true,
+            "hasOriginalUri": false,
+            "hasAnyFileUri": false,
+            "hasNameHeader": true
+          },
+          {
+            "stage": "IPC",
+            "hasInlineBody": true,
+            "hasOriginalUri": false,
+            "hasAnyFileUri": false,
+            "hasNameHeader": true
+          },
+          {
+            "stage": "handler",
+            "hasInlineBody": true,
+            "hasOriginalUri": false,
+            "hasAnyFileUri": false,
+            "hasNameHeader": true
+          },
+          {
+            "stage": "provider",
+            "hasInlineBody": true,
+            "hasOriginalUri": false,
+            "hasAnyFileUri": false,
+            "hasNameHeader": true
+          }
+        ]
+      },
+      "fileCache": {
+        "files": [],
+        "invocations": []
+      },
+      "desktopWs": {
+        "registration": [
+          {
+            "serverName": "VCPChat-Desktop-Client-Distributed-Server",
+            "toolCount": 32,
+            "localAddress": "<bound-A-ipv4>"
+          }
+        ],
+        "ipReports": [
+          {
+            "serverName": "VCPChat-Desktop-Client-Distributed-Server",
+            "localAddress": "<bound-A-ipv4>",
+            "publicIpReported": false,
+            "reportsSelectedLocalAddress": true
+          }
+        ],
+        "transfers": [],
+        "refused": 0,
+        "sourceIp": "<bound-A-ipv4>",
+        "nativeSourceSha256": "10e10f3589c000cc14e1a68a9293984d2262d52a1852cd523f328b29a2830773",
+        "expected": {
+          "sha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+          "bytes": 67,
+          "fileUrlSha256": "0aadcc1d15bad543302b6eea1dda34b6f01f2cf9c18812e31c1332f29a95f7d2"
+        }
+      },
+      "fileFetcher": [],
+      "shutdown": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "runtime": {
+        "electron": "44.9.3",
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "loadedToolBoxSources": [
+        {
+          "file": "apps/server/Plugin.js",
+          "sha256": "c0e8ff13cbbdedf5db103590ca98e1b0e194443e4ac40accf5715cb1aae33950"
+        },
+        {
+          "file": "apps/server/FileFetcherServer.js",
+          "sha256": "9adc194baf1ca647d52197e5afd5775d1adcc73df59754a59bf968fa192db62c"
+        },
+        {
+          "file": "apps/server/WebSocketServer.js",
+          "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+        },
+        {
+          "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+          "sha256": "bb114f2afc05f176ebdf67fa72230c2921ac6c9c84447f31450524f0d90e8817"
+        }
+      ]
+    },
+    "filename": {
+      "testCase": "filename",
+      "digest": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+      "bytes": 67,
+      "name": "synthetic-continuity.txt",
+      "cacheCold": true,
+      "rendererObserver": {
+        "module": "modules/chat/singleChatRequestOrchestrator.js",
+        "line": 20,
+        "sha256": "68d52c96bfc3891b8085ce110f47cb1d25d5d5cbdc3e67f0247da484b24eaf77"
+      },
+      "isolation": {
+        "fileUri": "file://<isolated-run>/profile-A/UserData/attachments/f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e.txt",
+        "privateCacheDir": "<isolated-run>/profile-A/UserData/attachments",
+        "desktop": {
+          "mountNamespace": "mnt:[4026531832]",
+          "access": {
+            "ok": true
+          },
+          "readFile": {
+            "ok": true,
+            "byteLength": 67,
+            "sha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e"
+          }
+        },
+        "toolbox": {
+          "mountNamespace": "mnt:[4026533713]",
+          "access": {
+            "ok": false,
+            "code": "ENOENT"
+          },
+          "readFile": {
+            "ok": false,
+            "code": "ENOENT"
+          }
+        }
+      },
+      "delivery": {
+        "admission": {
+          "id": "request_d7ad6f771d274b7dbe77f24e5e7fe735",
+          "request_id": "msg_1795405106566_user_r5ezzn6",
+          "principal": "desktop:deviceA",
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1
+        },
+        "request": {
+          "id": "reply_request_d7ad6f771d274b7dbe77f24e5e7fe735",
+          "state": "model_terminal"
+        },
+        "handlerRoute": "/v1/chat/completions",
+        "handlerRequestId": "reply_request_d7ad6f771d274b7dbe77f24e5e7fe735",
+        "reply": "Synthetic filename lookup returned ENOENT.",
+        "ingress": [
+          {
+            "kind": "native-chat-ingress",
+            "requestId": "reply_request_d7ad6f771d274b7dbe77f24e5e7fe735",
+            "socketPeer": "<bound-A-ipv4>",
+            "requestIp": "<bound-A-ipv4>",
+            "forwardedFor": false
+          }
+        ],
+        "historyMessageIds": [
+          "msg_1795405106566_user_r5ezzn6",
+          "reply_request_d7ad6f771d274b7dbe77f24e5e7fe735"
+        ],
+        "providerPhases": [
+          "tool-request",
+          "tool-result"
+        ],
+        "providerInline": {
+          "bytes": 67,
+          "sha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e"
+        },
+        "providerToolDigest": null,
+        "providerToolError": "ENOENT",
+        "toolArgument": "synthetic-continuity.txt",
+        "stages": [
+          {
+            "stage": "renderer",
+            "hasInlineBody": true,
+            "hasOriginalUri": true,
+            "hasAnyFileUri": true,
+            "hasNameHeader": false
+          },
+          {
+            "stage": "IPC",
+            "hasInlineBody": true,
+            "hasOriginalUri": true,
+            "hasAnyFileUri": true,
+            "hasNameHeader": false
+          },
+          {
+            "stage": "handler",
+            "hasInlineBody": true,
+            "hasOriginalUri": true,
+            "hasAnyFileUri": true,
+            "hasNameHeader": false
+          },
+          {
+            "stage": "provider",
+            "hasInlineBody": true,
+            "hasOriginalUri": true,
+            "hasAnyFileUri": true,
+            "hasNameHeader": false
+          }
+        ]
+      },
+      "fileCache": {
+        "files": [],
+        "invocations": [
+          {
+            "argument": "synthetic-continuity.txt",
+            "error": "ENOENT"
+          }
+        ]
+      },
+      "desktopWs": {
+        "registration": [
+          {
+            "serverName": "VCPChat-Desktop-Client-Distributed-Server",
+            "toolCount": 32,
+            "localAddress": "<bound-A-ipv4>"
+          }
+        ],
+        "ipReports": [
+          {
+            "serverName": "VCPChat-Desktop-Client-Distributed-Server",
+            "localAddress": "<bound-A-ipv4>",
+            "publicIpReported": false,
+            "reportsSelectedLocalAddress": true
+          }
+        ],
+        "transfers": [],
+        "refused": 0,
+        "sourceIp": "<bound-A-ipv4>",
+        "nativeSourceSha256": "10e10f3589c000cc14e1a68a9293984d2262d52a1852cd523f328b29a2830773",
+        "expected": {
+          "sha256": "f346e907ed0c3a44347eba4a411e0e891c16d3d43905f1036a63c3156f55fc0e",
+          "bytes": 67,
+          "fileUrlSha256": "4831fa19dbb473753f967cab08c7fa8191b94b11a6dbbca25ad2865d90f75234"
+        }
+      },
+      "fileFetcher": [],
+      "shutdown": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "runtime": {
+        "electron": "44.9.3",
+        "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+      },
+      "loadedToolBoxSources": [
+        {
+          "file": "apps/server/Plugin.js",
+          "sha256": "c0e8ff13cbbdedf5db103590ca98e1b0e194443e4ac40accf5715cb1aae33950"
+        },
+        {
+          "file": "apps/server/FileFetcherServer.js",
+          "sha256": "9adc194baf1ca647d52197e5afd5775d1adcc73df59754a59bf968fa192db62c"
+        },
+        {
+          "file": "apps/server/WebSocketServer.js",
+          "sha256": "7555592f752742fb5460bfa94e968287865a231b701edd409015934264ed949a"
+        },
+        {
+          "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+          "sha256": "bb114f2afc05f176ebdf67fa72230c2921ac6c9c84447f31450524f0d90e8817"
+        }
+      ]
+    }
+  },
+  "notes": [
+    "An earlier inline run reached terminal but the fixture expected a list where the refused counter was numeric.",
+    "The first successful remote file transfer was followed by a fixture timeout because the assertion compared raw native tool markup to visible rendered text. The final fixture checks History markup plus the final visible reply.",
+    "A subsequent tool fixture attempt accidentally shadowed the plugin name with the attachment filename, resulting in a native plugin-not-found tool result and zero file requests. The fixture now uses separate names.",
+    "The first filename attempt threw after a real ENOENT. NativeSync preserved it as NATIVE_TOOL_RESULT_UNCONFIRMED and produced no model terminal. The final fixture reports this known local read error as tool-result content, with no file bytes or digest."
+  ]
+}

@@ -126,3 +126,5 @@ TopicSponsor 的 River 引用对齐作者的最近消息窗口。两位成员同
 共享单聊已验一份 67 字节 UTF-8 文本跨端续问：A 的本地原件和缓存移离后，B 重开原话题且未附加文件，中央 worker 的 Handler 与 Provider 各收到一次原附件正文。A 首轮桌面原生请求仍含本机路径，B 的服务端续问请求没有。私有实时引用只携带引用元数据，跨空间读取共享附件被拒绝。[双桌面收包、权限对照与截图](evidence/shared-attachment-continuation/README.md)
 
 普通桌面和桌面执行的共享单聊均在原生 renderer 生成 History 提示与附件标题。共享首轮已移除本机 History 投影路径；显式禁工具时，已内联正文的文本附件只带文件名，默认可调用工具时保留定位 URI。A 退出后的 B 续问仍只得到一份原文件正文。[本机与共享收包前后对照、文件工具实测](evidence/attachment-path-ownership/README.md)
+
+共享 A 首轮文件工具已验证跨端实取：在 ToolBox 看不见 A 附件缓存的独立挂载中，合成 Provider 以实际收到的完整 URI 发起一次摘要工具调用，A 经原生 WebSocket 返回 67 字节，工具回填与原文件 SHA-256 一致。只读内联正文无需取件；同工具只传显示文件名得到 ENOENT。[三组回执、源端字节及工具账本](evidence/file-uri-roundtrip/README.md)
