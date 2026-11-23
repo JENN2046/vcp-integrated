@@ -1,0 +1,547 @@
+{
+  "portrait-320": {
+    "initial": {
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "scrollWidth": 320,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 61,
+        "bottom": 61,
+        "right": 320,
+        "clientHeight": 61,
+        "scrollHeight": 61,
+        "visibleHeight": 61
+      },
+      "switchLabel": null,
+      "settings": {
+        "x": 259.984375,
+        "y": 14.5,
+        "width": 44.015625,
+        "height": 32,
+        "bottom": 46.5,
+        "right": 304,
+        "clientHeight": 32,
+        "scrollHeight": 32,
+        "visibleHeight": 32
+      },
+      "nav": {
+        "x": 0,
+        "y": 61,
+        "width": 320,
+        "height": 399,
+        "bottom": 460,
+        "right": 320,
+        "clientHeight": 398,
+        "scrollHeight": 398,
+        "visibleHeight": 399
+      },
+      "history": {
+        "x": 0,
+        "y": 460,
+        "width": 320,
+        "height": 18,
+        "bottom": 478,
+        "right": 320,
+        "clientHeight": 18,
+        "scrollHeight": 1265,
+        "visibleHeight": 18
+      },
+      "footer": {
+        "x": 0,
+        "y": 514,
+        "width": 320,
+        "height": 231.78125,
+        "bottom": 745.78125,
+        "right": 320,
+        "clientHeight": 231,
+        "scrollHeight": 231,
+        "visibleHeight": 54
+      },
+      "message": {
+        "x": 10,
+        "y": 642,
+        "width": 216.984375,
+        "height": 62.78125,
+        "bottom": 704.78125,
+        "right": 226.984375,
+        "clientHeight": 61,
+        "scrollHeight": 61,
+        "visibleHeight": 0
+      },
+      "latest": {
+        "x": 12,
+        "y": 386.0625,
+        "width": 296,
+        "height": 68.09375,
+        "bottom": 454.15625,
+        "right": 308,
+        "clientHeight": 68,
+        "scrollHeight": 68,
+        "visibleHeight": 0
+      },
+      "invite": {
+        "x": 90.015625,
+        "y": 527.5,
+        "width": 145.96875,
+        "height": 39,
+        "bottom": 566.5,
+        "right": 235.984375,
+        "clientHeight": 37,
+        "scrollHeight": 37,
+        "visibleHeight": 39
+      },
+      "send": {
+        "x": 239.984375,
+        "y": 654.78125,
+        "width": 66.015625,
+        "height": 46,
+        "bottom": 700.78125,
+        "right": 306,
+        "clientHeight": 46,
+        "scrollHeight": 46,
+        "visibleHeight": 0
+      }
+    }
+  },
+  "portrait-360": {
+    "initial": {
+      "viewport": {
+        "width": 360,
+        "height": 640
+      },
+      "scrollWidth": 360,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 360,
+        "height": 61,
+        "bottom": 61,
+        "right": 360,
+        "clientHeight": 61,
+        "scrollHeight": 61,
+        "visibleHeight": 61
+      },
+      "switchLabel": null,
+      "settings": {
+        "x": 299.984375,
+        "y": 14.5,
+        "width": 44.015625,
+        "height": 32,
+        "bottom": 46.5,
+        "right": 344,
+        "clientHeight": 32,
+        "scrollHeight": 32,
+        "visibleHeight": 32
+      },
+      "nav": {
+        "x": 0,
+        "y": 61,
+        "width": 360,
+        "height": 377,
+        "bottom": 438,
+        "right": 360,
+        "clientHeight": 376,
+        "scrollHeight": 376,
+        "visibleHeight": 377
+      },
+      "history": {
+        "x": 0,
+        "y": 438,
+        "width": 360,
+        "height": 18,
+        "bottom": 456,
+        "right": 360,
+        "clientHeight": 18,
+        "scrollHeight": 1265,
+        "visibleHeight": 18
+      },
+      "footer": {
+        "x": 0,
+        "y": 492,
+        "width": 360,
+        "height": 203.78125,
+        "bottom": 695.78125,
+        "right": 360,
+        "clientHeight": 203,
+        "scrollHeight": 203,
+        "visibleHeight": 148
+      },
+      "message": {
+        "x": 10,
+        "y": 592,
+        "width": 256.984375,
+        "height": 62.78125,
+        "bottom": 654.78125,
+        "right": 266.984375,
+        "clientHeight": 61,
+        "scrollHeight": 61,
+        "visibleHeight": 48
+      },
+      "latest": {
+        "x": 12,
+        "y": 364.0625,
+        "width": 336,
+        "height": 68.09375,
+        "bottom": 432.15625,
+        "right": 348,
+        "clientHeight": 68,
+        "scrollHeight": 68,
+        "visibleHeight": 0
+      },
+      "invite": {
+        "x": 90.015625,
+        "y": 505.5,
+        "width": 185.96875,
+        "height": 39,
+        "bottom": 544.5,
+        "right": 275.984375,
+        "clientHeight": 37,
+        "scrollHeight": 37,
+        "visibleHeight": 39
+      },
+      "send": {
+        "x": 279.984375,
+        "y": 604.78125,
+        "width": 66.015625,
+        "height": 46,
+        "bottom": 650.78125,
+        "right": 346,
+        "clientHeight": 46,
+        "scrollHeight": 46,
+        "visibleHeight": 35.21875
+      }
+    }
+  },
+  "portrait-390": {
+    "initial": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scrollWidth": 390,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 61,
+        "bottom": 61,
+        "right": 390,
+        "clientHeight": 61,
+        "scrollHeight": 61,
+        "visibleHeight": 61
+      },
+      "switchLabel": null,
+      "settings": {
+        "x": 329.984375,
+        "y": 14.5,
+        "width": 44.015625,
+        "height": 32,
+        "bottom": 46.5,
+        "right": 374,
+        "clientHeight": 32,
+        "scrollHeight": 32,
+        "visibleHeight": 32
+      },
+      "nav": {
+        "x": 0,
+        "y": 61,
+        "width": 390,
+        "height": 363,
+        "bottom": 424,
+        "right": 390,
+        "clientHeight": 362,
+        "scrollHeight": 362,
+        "visibleHeight": 363
+      },
+      "history": {
+        "x": 0,
+        "y": 424,
+        "width": 390,
+        "height": 18,
+        "bottom": 442,
+        "right": 390,
+        "clientHeight": 18,
+        "scrollHeight": 1265,
+        "visibleHeight": 18
+      },
+      "footer": {
+        "x": 0,
+        "y": 640.21875,
+        "width": 390,
+        "height": 203.78125,
+        "bottom": 844,
+        "right": 390,
+        "clientHeight": 203,
+        "scrollHeight": 203,
+        "visibleHeight": 203.78125
+      },
+      "message": {
+        "x": 10,
+        "y": 740.21875,
+        "width": 286.984375,
+        "height": 62.78125,
+        "bottom": 803,
+        "right": 296.984375,
+        "clientHeight": 61,
+        "scrollHeight": 61,
+        "visibleHeight": 62.78125
+      },
+      "latest": {
+        "x": 12,
+        "y": 498.0625,
+        "width": 366,
+        "height": 68.09375,
+        "bottom": 566.15625,
+        "right": 378,
+        "clientHeight": 68,
+        "scrollHeight": 68,
+        "visibleHeight": 0
+      },
+      "invite": {
+        "x": 90.015625,
+        "y": 653.71875,
+        "width": 215.96875,
+        "height": 39,
+        "bottom": 692.71875,
+        "right": 305.984375,
+        "clientHeight": 37,
+        "scrollHeight": 37,
+        "visibleHeight": 39
+      },
+      "send": {
+        "x": 309.984375,
+        "y": 753,
+        "width": 66.015625,
+        "height": 46,
+        "bottom": 799,
+        "right": 376,
+        "clientHeight": 46,
+        "scrollHeight": 46,
+        "visibleHeight": 46
+      }
+    }
+  },
+  "landscape-640": {
+    "initial": {
+      "viewport": {
+        "width": 640,
+        "height": 360
+      },
+      "scrollWidth": 640,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 640,
+        "height": 76,
+        "bottom": 76,
+        "right": 640,
+        "clientHeight": 76,
+        "scrollHeight": 76,
+        "visibleHeight": 76
+      },
+      "switchLabel": null,
+      "settings": {
+        "x": 573.984375,
+        "y": 23.5,
+        "width": 44.015625,
+        "height": 32,
+        "bottom": 55.5,
+        "right": 618,
+        "clientHeight": 32,
+        "scrollHeight": 32,
+        "visibleHeight": 32
+      },
+      "nav": {
+        "x": 0,
+        "y": 76,
+        "width": 640,
+        "height": 365,
+        "bottom": 441,
+        "right": 640,
+        "clientHeight": 364,
+        "scrollHeight": 364,
+        "visibleHeight": 284
+      },
+      "history": {
+        "x": 0,
+        "y": 441,
+        "width": 640,
+        "height": 30,
+        "bottom": 471,
+        "right": 640,
+        "clientHeight": 30,
+        "scrollHeight": 1086,
+        "visibleHeight": 0
+      },
+      "footer": {
+        "x": 0,
+        "y": 511,
+        "width": 640,
+        "height": 231.78125,
+        "bottom": 742.78125,
+        "right": 640,
+        "clientHeight": 231,
+        "scrollHeight": 231,
+        "visibleHeight": 0
+      },
+      "message": {
+        "x": 14,
+        "y": 625,
+        "width": 528.984375,
+        "height": 68.78125,
+        "bottom": 693.78125,
+        "right": 542.984375,
+        "clientHeight": 67,
+        "scrollHeight": 67,
+        "visibleHeight": 0
+      },
+      "latest": {
+        "x": 18,
+        "y": 1425.03125,
+        "width": 604,
+        "height": 68.09375,
+        "bottom": 1493.125,
+        "right": 622,
+        "clientHeight": 68,
+        "scrollHeight": 68,
+        "visibleHeight": 0
+      },
+      "invite": {
+        "x": 94.015625,
+        "y": 528.5,
+        "width": 457.96875,
+        "height": 39,
+        "bottom": 567.5,
+        "right": 551.984375,
+        "clientHeight": 37,
+        "scrollHeight": 37,
+        "visibleHeight": 0
+      },
+      "send": {
+        "x": 555.984375,
+        "y": 643.78125,
+        "width": 66.015625,
+        "height": 46,
+        "bottom": 689.78125,
+        "right": 622,
+        "clientHeight": 46,
+        "scrollHeight": 46,
+        "visibleHeight": 0
+      }
+    }
+  },
+  "readonly-360": {
+    "initial": {
+      "viewport": {
+        "width": 360,
+        "height": 640
+      },
+      "scrollWidth": 360,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 360,
+        "height": 61,
+        "bottom": 61,
+        "right": 360,
+        "clientHeight": 61,
+        "scrollHeight": 61,
+        "visibleHeight": 61
+      },
+      "switchLabel": null,
+      "settings": {
+        "x": 299.984375,
+        "y": 14.5,
+        "width": 44.015625,
+        "height": 32,
+        "bottom": 46.5,
+        "right": 344,
+        "clientHeight": 32,
+        "scrollHeight": 32,
+        "visibleHeight": 32
+      },
+      "nav": {
+        "x": 0,
+        "y": 61,
+        "width": 360,
+        "height": 377,
+        "bottom": 438,
+        "right": 360,
+        "clientHeight": 376,
+        "scrollHeight": 376,
+        "visibleHeight": 377
+      },
+      "history": {
+        "x": 0,
+        "y": 438,
+        "width": 360,
+        "height": 18,
+        "bottom": 456,
+        "right": 360,
+        "clientHeight": 18,
+        "scrollHeight": 1265,
+        "visibleHeight": 18
+      },
+      "footer": {
+        "x": 0,
+        "y": 492,
+        "width": 360,
+        "height": 203.78125,
+        "bottom": 695.78125,
+        "right": 360,
+        "clientHeight": 203,
+        "scrollHeight": 203,
+        "visibleHeight": 148
+      },
+      "message": {
+        "x": 10,
+        "y": 592,
+        "width": 256.984375,
+        "height": 62.78125,
+        "bottom": 654.78125,
+        "right": 266.984375,
+        "clientHeight": 61,
+        "scrollHeight": 61,
+        "visibleHeight": 48
+      },
+      "latest": {
+        "x": 12,
+        "y": 364.0625,
+        "width": 336,
+        "height": 68.09375,
+        "bottom": 432.15625,
+        "right": 348,
+        "clientHeight": 68,
+        "scrollHeight": 68,
+        "visibleHeight": 0
+      },
+      "invite": {
+        "x": 90.015625,
+        "y": 505.5,
+        "width": 185.96875,
+        "height": 39,
+        "bottom": 544.5,
+        "right": 275.984375,
+        "clientHeight": 37,
+        "scrollHeight": 37,
+        "visibleHeight": 39
+      },
+      "send": {
+        "x": 279.984375,
+        "y": 604.78125,
+        "width": 66.015625,
+        "height": 46,
+        "bottom": 650.78125,
+        "right": 346,
+        "clientHeight": 46,
+        "scrollHeight": 46,
+        "visibleHeight": 35.21875
+      }
+    }
+  }
+}

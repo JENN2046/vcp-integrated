@@ -1,6 +1,6 @@
 <script setup>
 import SharedAttachmentImage from './SharedAttachmentImage.vue';
-import {ref,computed,onMounted,onUnmounted,nextTick} from 'vue';
+import {ref,computed,watch,onMounted,onUnmounted,nextTick} from 'vue';
 import TextPages from './TextPages.vue';
 import SharedConfigEditor from './SharedConfigEditor.vue';
 import SharedDirectoryView from './SharedDirectoryView.vue';
@@ -19,6 +19,14 @@ import {createSharedSessionObservers,sharedSessionPreviews} from './sharedSessio
 const attachmentPager=createAttachmentStatusPager(),historyCache=createHistoryCache();
 const executionPager=createExecutionPager(),jobsInfo=ref(null),jobsError=ref('');
 const attachmentStates=ref({}),reviewChecks=ref({}),invitedAgent=ref('');
+const conversationPanel=ref(''), topicToggle=ref(null), workToggle=ref(null);
+const navigationVisible=computed(()=>conversationPanel.value==='topics' || !selected.value && conversationPanel.value!=='work');
+function togglePanel(name){conversationPanel.value=conversationPanel.value===name?'':name;}
+function closePanel(){
+ const toggle=conversationPanel.value==='topics'?topicToggle.value:workToggle.value;
+ conversationPanel.value='';
+ nextTick(()=>toggle?.focus());
+}
 const attachmentPreview=ref(null),attachmentDialog=ref(null);let attachmentReadRequest=0,attachmentReadController=null;
 // Ordinary drafts live in this page. Verified rejections also keep editable
 // text and uploaded attachment references in the device recovery store.
@@ -30,6 +38,18 @@ let incomingPairing=consumePairingLink({location:window.location,history:window.
 let connectionInitialized=false;
 const pairingLinkOpen=ref(false);
 const paired=ref(false),pairCode=ref(''),topics=ref([]),selected=ref(''),agentId=ref(''),messages=ref([]),jobs=ref([]),busy=ref(true),notice=ref('正在连接…'),online=ref(false),history=ref(null);
+// When the keyboard shrinks the transcript, keep a bottom-pinned reader on the latest reply.
+watch(history, (area, previous, onCleanup) => {
+ if(!area)return;
+ let height=area.clientHeight;
+ const observer=new ResizeObserver(()=>{
+  const nextHeight=area.clientHeight;
+  if(nextHeight<height && area.scrollHeight-area.scrollTop-height<=2)area.scrollTop=area.scrollHeight;
+  height=nextHeight;
+ });
+ observer.observe(area);
+ onCleanup(()=>observer.disconnect());
+});
 const sharedSpaces=ref([]),sharedFeatures=ref([]),sharedStreams=ref([]);
 const directoryAgents=ref(null),directoryNotice=ref(''),directoryFetchError=ref(''),sourceProgress=ref([]);
 const historyContextReady=ref(false);
@@ -77,6 +97,12 @@ function scheduleSharedRefresh(context){
 }
 function clearSharedObservers(){clearTimeout(sharedRefreshTimer);sharedRefreshTimer=null;sharedRefreshPending=false;sharedObserver.reset();}
 const visibleSharedStreams=computed(()=>sharedSessionPreviews(sharedStreams.value,messages.value.map(message=>message.id)));
+watch(visibleSharedStreams, async () => {
+ const area=history.value, key=selected.value;
+ if(!area || !visibleSharedStreams.value.length || area.scrollHeight-area.clientHeight-area.scrollTop>=80)return;
+ await nextTick();
+ if(area===history.value && key===selected.value)area.scrollTop=area.scrollHeight;
+});
 const sharedActivityLabels={started:'原生工具执行中',accepted:'原生任务已接收',settled:'原生工具已返回',observed:'原生任务状态已更新',waiting_approval:'等待原生审批',running:'原生执行中'};
 const ownerKey=t=>JSON.stringify([t.ownerType||'agent',t.sharedOwnerId||t.ownerId||t.agentName]);
 const labels={accepted:'已受理，等待执行',dispatched:'原生执行中',waiting_approval:'等待原生工具审批',review_required:'执行中断 · 接力已暂停',blocked_config:'上下文或配置不可用 · 接力已暂停',recovering:'正在恢复已保存的结果',interrupted:'已中断 · 不自动重跑',preparing:'正在持久保存',queued:'已接受 · 等待执行',running:'服务端执行中',cancelling:'正在取消',cancelled:'已取消',publishing:'正在保存回复',completed:'回复已保存',failed:'执行失败'};
@@ -142,12 +168,21 @@ const displayJobs=computed(()=>jobs.value.map(job=>{try{if(job.topicKey!==select
 const keyAllowed=computed(()=>Boolean(isSecureContext&&server.value?.credentialExchangeAllowed));
 const pendingSubmission=computed(()=>recoveryRecords.value.find(record=>record.entryId===recoveryContext.value?.entryId&&record.topicKey===selected.value)||null);
 const recoveryBlocker=computed(()=>recoveryError.value||(!validSessionRecovery(recoveryContext.value)?'当前服务端未提供可靠提交恢复信息，暂不能发送。':''));
+const workButtonText=computed(()=>{
+ if(recoveryBlocker.value)return '提交受限';
+ if(pendingSubmission.value)return '提交待确认';
+ if(jobsError.value)return '任务状态待核对';
+ if(displayJobs.value.some(j=>j.state==='waiting_approval'))return '等待审批';
+ if(displayJobs.value.some(needsReview))return '任务待核对';
+ if(displayJobs.value.some(j=>['running','dispatched','continuing','queued','accepted','publishing'].includes(j.state)))return '任务进行中';
+ return '任务状态';
+});
 const newSubmissionBlocked=computed(()=>Boolean(recoveryBlocker.value||pendingSubmission.value||!historyContextReady.value));
 const recoveryMessages={SUBMISSION_LOCK_UNAVAILABLE:'当前浏览器无法取得跨页面提交保护；已有原记录或草稿会继续保留，提交是否受理请先核对。请使用支持此保护的安全浏览器入口。',SUBMISSION_STORE_UNAVAILABLE:'无法保存或读取待确认提交，请检查浏览器存储后再试。',SUBMISSION_STORE_CORRUPT:'本地待确认提交校验失败，原记录已保留，请先核对。',SUBMISSION_STORE_BUDGET:'本地待确认提交已达到保存上限，请先核对已有提交。',SUBMISSION_STORE_UNVERIFIED:'待确认提交未能完成保存校验，本次未获本地确认。',SUBMISSION_CRYPTO_UNAVAILABLE:'当前入口无法校验提交身份，暂不能发送。',SUBMISSION_RECOVERY_UNAVAILABLE:'当前服务端未提供可靠提交恢复信息，暂不能发送。',SUBMISSION_TOPIC_UNAVAILABLE:'当前会话未获此话题授权，原提交继续保留，请使用原有授权核对。',SUBMISSION_CONTEXT_CHANGED:'提交前会话或入口已变化，服务端未受理，原提交保留待核对。',SUBMISSION_PENDING:'本话题有待确认提交，请先核对原提交；其他话题仍可使用。',SUBMISSION_RECORD_CHANGED:'待确认记录已变化，请重新核对，不会另建提交。',SUBMISSION_RECEIPT_UNVERIFIED:'回执未能唯一匹配原提交，已保留记录等待核对。',SUBMISSION_INVALID:'提交内容或身份不完整，本次未发送。'};
 const recoveryReasons={metadata:'缺少可信恢复信息，原提交保留待核对，不会补发。',scope:'执行列表与原话题不一致，原提交保留待核对。',ambiguous:'发现多个同身份候选，原提交保留待核对。',conflict:'云端候选与原提交身份或内容不同，原提交保留待核对。',session:'会话已变更，尚未查到原提交的可信结果；原记录保留，不会在新会话补发。'};
 function recoveryMessage(error){return recoveryMessages[error.code]||error.message||'无法核对原提交，请稍后再试。';}
 function loadRecovery(){try{recoveryRecords.value=submissionStore.load();recoveryError.value='';return true;}catch(error){recoveryError.value=recoveryMessage(error);return false;}}
-function invalidateSession(){clearSharedObservers();sharedFeatures.value=[];lastDirectory=null;historyCache.clear();directoryRequest++;closeNativeResult();closeAttachment();authEpoch++;submissionNoticeHeld=false;recoveryContext.value=null;switchDraft();recoveryDetail.value='';acceptedReceipt.value=null;resetHistory({remember:false});}
+function invalidateSession(){conversationPanel.value='';clearSharedObservers();sharedFeatures.value=[];lastDirectory=null;historyCache.clear();directoryRequest++;closeNativeResult();closeAttachment();authEpoch++;submissionNoticeHeld=false;recoveryContext.value=null;switchDraft();recoveryDetail.value='';acceptedReceipt.value=null;resetHistory({remember:false});}
 function captureContext(){if(!paired.value||!selected.value||!validSessionRecovery(recoveryContext.value))throw Object.assign(Error(recoveryMessages.SUBMISSION_RECOVERY_UNAVAILABLE),{code:'SUBMISSION_RECOVERY_UNAVAILABLE'});return {topicKey:selected.value,recovery:{...recoveryContext.value},generation,authEpoch,draftScope:draftScope()};}
 function sameView(context){return context.topicKey===selected.value&&context.generation===generation&&context.authEpoch===authEpoch&&context.recovery?.entryId===recoveryContext.value?.entryId&&context.recovery?.sessionMarker===recoveryContext.value?.sessionMarker;}
 function newSubmissionContext(){if(!loadRecovery())throw Error(recoveryError.value);const context=captureContext();if(!historyContextReady.value)throw Object.assign(Error('正在载入历史并核对上下文'),{code:'HISTORY_CONTEXT_LOADING'});if(!currentTopic.value)throw Object.assign(Error(recoveryMessages.SUBMISSION_TOPIC_UNAVAILABLE),{code:'SUBMISSION_TOPIC_UNAVAILABLE'});if(submissionStore.current({entryId:context.recovery.entryId,topicKey:context.topicKey}))throw Object.assign(Error(recoveryMessages.SUBMISSION_PENDING),{code:'SUBMISSION_PENDING'});return context;}
@@ -338,7 +373,7 @@ async function postPrepared(record,context){
   const result=await reconcileSubmission(record,[accepted],context);
   if(result.state!=='confirmed')throw Object.assign(Error(recoveryMessages.SUBMISSION_RECEIPT_UNVERIFIED),{code:'SUBMISSION_RECEIPT_UNVERIFIED'});
   if(sameView(context)){
-   notice.value='云端已接受 · '+(labels[accepted.state]||accepted.state);
+   notice.value='云端已接受 · '+executionLabel(accepted);
    await refresh();
   }
  });
@@ -421,6 +456,7 @@ function waitingForGroupTasks(job){
   job.steps.every(step=>step.state==='completed') && job.nativeTasks.some(task=>['accepted','running','waiting','cancelling'].includes(task.state));
 }
 function executionLabel(j){
+ if(j.state==='completed'&&j.kind==='group_message'&&j.stepCount===0)return '消息已保存 · 未触发成员回复';
  if(waitingForGroupTasks(j))return '成员回复已保存，等待原生任务结束';
  if(j.remainingCancelled && j.state==='cancelled')return '剩余接力已取消';
  if(j.state==='cancelled' && j.reviewResolved && j.errorCode==='EXECUTION_INTERRUPTED_REVIEW_REQUIRED')return '已人工结清，剩余工作已放弃';
@@ -491,13 +527,33 @@ onMounted(async()=>{
 onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refreshing?.abort();refreshing=null;clearInterval(timer);window.removeEventListener('hashchange',pairingHashChanged);window.removeEventListener('pagehide',clearTransientKey);window.removeEventListener('pageshow',pageShown);window.removeEventListener('storage',storageChanged);window.removeEventListener('online',reconnect);clearTransientKey();});
 </script>
 <template>
- <div class="shell">
+ <div class="shell" @keydown.esc="conversationPanel && closePanel()">
 <dialog v-if="attachmentPreview" ref="attachmentDialog" id="attachment-viewer" class="attachment-viewer" aria-labelledby="attachment-title" @cancel.prevent="closeAttachment">
    <div class="attachment-viewer-heading"><strong id="attachment-title">{{attachmentPreview.name}}</strong><button id="attachment-close" @click="closeAttachment" autofocus>关闭</button></div>
    <p v-if="attachmentPreview.loading" role="status">正在读取附件…</p><p v-else-if="attachmentPreview.error" role="alert">{{attachmentPreview.error}}</p>
    <template v-else><div class="attachment-viewer-content"><img v-if="attachmentPreview.isImage" :src="attachmentPreview.url" :alt="attachmentPreview.name"><TextPages v-else-if="attachmentPreview.text!==null" :text="attachmentPreview.text" :complete="!attachmentPreview.truncated"/><p v-else>此文件暂无页内预览，可以保存后打开。</p><small v-if="attachmentPreview.truncated">预览已截取，保存文件可查看完整内容。</small></div><button id="attachment-save" @click="downloadAttachment">保存文件</button></template>
   </dialog>
-  <header><img :src="'/mobile/icon.svg'" alt=""><div><strong>VCP Mobile</strong><small>同一段会话，随时接续</small></div><span class="connection" :class="{offline:!online}">{{online?(paired?'已连接':'服务可达'):'离线'}}</span><button id="open-settings" class="settings-toggle" @click="settingsOpen=!settingsOpen">设置</button></header>
+  <header :class="{'chat-header': paired && !settingsOpen}">
+   <img :src="(paired && !settingsOpen && currentTopic?.avatar) || '/mobile/icon.svg'" alt="">
+   <template v-if="paired && !settingsOpen">
+    <button id="topic-toggle" ref="topicToggle" class="conversation-title"
+      aria-controls="conversation-navigation" :aria-expanded="navigationVisible" @click="togglePanel('topics')">
+     <span class="title-lines">
+      <strong>{{ currentTopic?.topicName || '选择话题' }}</strong>
+      <span class="title-meta">
+       <span v-if="currentTopic?.agentName" class="context-name">{{ currentTopic.agentName }}</span>
+       <span class="connection" :class="{offline:!online}">{{ online ? '已连接' : '离线' }}</span>
+      </span>
+     </span>
+     <span class="topic-switch">{{ navigationVisible ? '收起' : '切换' }}<span class="sr-only">话题列表</span></span>
+    </button>
+   </template>
+   <template v-else>
+    <strong>VCP Mobile</strong>
+    <span class="connection" :class="{offline:!online}">{{online?(paired?'已连接':'服务可达'):'离线'}}</span>
+   </template>
+   <button id="open-settings" class="settings-toggle" @click="conversationPanel='';settingsOpen=!settingsOpen">设置</button>
+  </header>
   <main v-if="settingsOpen||!paired" class="pairing settings">
    <div class="intro">连接你的会话</div><p v-if="server?.credentialExchangeAllowed===false">此入口使用电脑生成的一次性配对码，无需输入后端 Key。</p><p v-else>输入 VCPToolBox API Key。服务器和连接参数已自动配置。</p>
    <form @submit.prevent="connect">
@@ -513,19 +569,36 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
    <p v-if="recoveryRecords.length" id="saved-submissions">此设备保留 {{recoveryRecords.length}} 条待确认提交。重新连接后会核对原记录，不会自动重发。</p><p v-if="recoveryError" role="alert">{{recoveryError}}</p><p v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</p><p role="status">{{notice}}</p>
   </main>
   <template v-else>
-   <nav><template v-if="sources.length>1"><label for="source-select">来源</label><select id="source-select" v-model="sourceFilter" @change="selectSource" :disabled="busy"><option value="*">全部已授权来源</option><option v-for="s in sources" :key="s.key" :value="s.key">{{s.label}}</option></select></template><small v-else-if="sources.length" class="source-label">来源：{{sources[0].label}}</small><div class="agent-heading"><img v-if="agents.find(a=>a.id===agentId)?.avatar" :src="agents.find(a=>a.id===agentId).avatar" alt="Agent 头像"><div><label for="agent-select">Agent / 群聊</label><select id="agent-select" v-model="agentId" @change="selectAgent" :disabled="busy"><option v-for="a in visibleAgents" :key="a.id" :value="a.id">{{a.name}}<template v-if="sourceFilter==='*'&&sources.length>1"> · {{sourceName(a)}}</template></option></select></div></div><details class="topic-search-panel"><summary>搜索话题 · 未读计数暂不提供</summary><label for="topic-search">搜索当前 Agent / 群聊的话题</label><input id="topic-search" v-model="topicSearch" type="search" placeholder="话题名称或 ID" maxlength="160"><small class="unread-boundary">列表条数是历史消息总数。</small></details><label for="topic-select">历史话题</label><select id="topic-select" v-model="selected" @change="changeTopic" :disabled="busy"><option v-if="!searchedTopics.some(t=>t.key===selected)" :value="selected" disabled>{{currentTopic?.topicName||'请选择话题'}} · 不在当前筛选结果</option><option v-for="t in searchedTopics" :key="t.key" :value="t.key">{{t.topicName}}<template v-if="t.originLabel"> · 原来源 {{t.originLabel}}</template> · {{t.messageCount}} 条</option></select><small v-if="currentTopic" class="topic-detail"><template v-if="currentTopic.configVersion">配置 v{{currentTopic.configVersion}} · </template>{{currentTopic.topicId}} · {{currentTopic.model||'未配置模型'}} · {{currentTopic.historyReady===false?'等待电脑首次同步':currentTopic.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):'可继续对话'}}<template v-if="currentTopic.updatedAt"> · {{new Date(currentTopic.updatedAt).toLocaleString()}}</template></small><small v-if="visibleTopics.length&&!searchedTopics.length" role="status">没有匹配的话题，当前会话和草稿仍保留。</small><small v-if="!visibleTopics.length">此 Agent 暂无话题；新话题同步后会自动出现。</small><small v-if="directoryNotice" role="status">{{directoryNotice}}</small><small v-if="directoryFetchError" role="status">{{directoryFetchError}}</small><small v-for="progress in sourceProgress" :key="progress.sourceId" class="source-progress">{{progress.sourceLabel||'来源'}} · 最近已知：目录待核对 {{progress.directoryErrors??'未知'}} · 历史待接入 {{progress.pendingImports??'未知'}} · 本地操作待确认 {{progress.pendingOperations??'未知'}} · 冲突 {{progress.conflicts??'未知'}} · 附件待就绪 {{progress.attachmentsPending??'未知'}}<template v-if="progress.configurationPending!==undefined"> · 续聊配置待就绪 {{progress.configurationPending??'核对中'}} · 配置异常 {{progress.configurationErrors}}</template></small></nav>
-   <section ref="history" id="history" aria-label="聊天历史"><div class="start">会话 · 服务端持久保存</div><p v-if="historyProgress" class="history-progress" role="status">{{historyProgress.failed?'历史暂未加载完成，稍后重试':historyProgress.checking?'正在核对历史增量':'正在加载历史'}}<template v-if="historyProgress.total"> · {{historyProgress.loaded}} / {{historyProgress.total}}</template></p><button v-if="historyStart>0" class="earlier-messages" @click="showEarlierMessages">查看更早消息（还有 {{historyStart}} 条）</button><article v-for="m in visibleMessages" :key="m.id" class="message" :class="m.role" :data-message-id="m.id"><small>{{m.role==='user'?'你':(m.name||currentTopic?.agentName||'Agent')}}</small><div v-if="m.content?.length>128000" class="long-message"><button @click="toggleLongText(m)">{{expandedLongText.has(longTextKey(m))?'收起全文':'查看长文本'}} · {{m.content.length}} 字符</button><TextPages v-if="expandedLongText.has(longTextKey(m))" :text="m.content" class="bubble" style="max-height:60vh;overflow:auto"/></div><div v-else class="bubble">{{typeof m.content==='string'?m.content:'此消息包含非文本内容，请在桌面查看'}}</div><details v-if="m.desktopReferences?.length" class="desktop-references"><summary>桌面活引用 {{m.desktopReferences.length}} 项 · 原件和提取文本未同步</summary><div v-for="r in m.desktopReferences" :key="r.id"><strong>{{r.name}}</strong><small>{{r.workspaceRef ? r.workspaceRef.alias+' / '+r.workspaceRef.relPath : r.target}} · 需在来源电脑核对</small></div></details><div v-if="m.attachments?.length" class="attachments"><div v-for="(a,index) in m.attachments" :key="a.id+'/'+index" class="attachment"><template v-if="attachmentStates[m.id+'/'+a.id]?.state==='available'"><SharedAttachmentImage v-if="currentTopic?.sharedSpaceId&&attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :key="generation+'/'+m.id+'/'+a.id" :url="attachmentUrl(m,a)" :alt="a.name||'图片附件'"></SharedAttachmentImage><img v-else-if="attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :src="attachmentUrl(m,a)" :alt="a.name||'图片附件'" loading="lazy"><button class="attachment-open" @click="openAttachment(m,a)">{{a.name||'查看附件'}}</button><details v-if="a.extractedText" class="attachment-text" @toggle="toggleAttachmentText(m,a,index,$event)"><summary>查看文本</summary><TextPages v-if="expandedAttachmentText.has(attachmentTextKey(m,a,index))" :text="a.extractedText"/></details></template><span v-else>{{a.name||'附件'}} · {{attachmentStates[m.id+'/'+a.id]?.state==='unsupported'?'原件类型暂不支持，引用已保留':attachmentStates[m.id+'/'+a.id]?.state==='corrupt'?'完整性校验失败':'附件暂未同步或正在确认'}}</span></div></div></article><p v-if="!messages.length&&!historyProgress" class="empty">{{currentTopic?.historyReady===false?'正在等待电脑同步所选历史，完成后即可接续。':'还没有消息，发送一条开始会话。'}}</p></section>
-   <section v-if="visibleSharedStreams.length" id="shared-live-replies" class="executions" aria-label="正在生成的共享回复">
-    <small>临时观察不会发起新任务，最终内容以会话记录为准。</small>
-    <article v-for="stream in visibleSharedStreams" :key="stream.previewId" class="message assistant" :data-live-execution="stream.executionId" :data-native-request="stream.nativeRequestId"><small>{{stream.memberName||currentTopic?.agentName||'Agent'}}<template v-if="stream.kind==='controlled-text'"> · 第 {{stream.nativeGeneration+1}} 代</template> · {{stream.settled?'正在核对最终记录':stream.activity?sharedActivityLabels[stream.activity.state]||'正在核对原生任务':labels[stream.state]||'正在核对原生任务'}} · {{stream.connection==='online'?'实时观察':stream.connection==='disconnected'?'实时连接已暂停':'正在恢复连接'}}</small><div v-if="stream.text" class="bubble" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:45vh;overflow:auto">{{stream.text}}</div><small v-if="stream.gap">仅显示目前可核对的临时片段，完整内容以保存后的会话为准。</small><small v-if="stream.settled&&stream.request?.state!=='completed'">{{labels[stream.request?.state]||'执行已暂停，请核对原生状态'}} · 已收到的片段暂存于此页。</small></article>
+   <div class="conversation-content">
+   <nav v-show="navigationVisible" id="conversation-navigation" aria-label="切换话题">
+    <div class="panel-heading"><strong>切换话题</strong><button v-if="selected" type="button" @click="closePanel">返回聊天</button></div>
+    <template v-if="sources.length>1"><label for="source-select">来源</label><select id="source-select" v-model="sourceFilter" @change="selectSource" :disabled="busy"><option value="*">全部已授权来源</option><option v-for="s in sources" :key="s.key" :value="s.key">{{s.label}}</option></select></template><small v-else-if="sources.length" class="source-label">来源：{{sources[0].label}}</small><div class="agent-heading"><img v-if="agents.find(a=>a.id===agentId)?.avatar" :src="agents.find(a=>a.id===agentId).avatar" alt="Agent 头像"><div><label for="agent-select">Agent / 群聊</label><select id="agent-select" v-model="agentId" @change="selectAgent" :disabled="busy"><option v-for="a in visibleAgents" :key="a.id" :value="a.id">{{a.name}}<template v-if="sourceFilter==='*'&&sources.length>1"> · {{sourceName(a)}}</template></option></select></div></div><details class="topic-search-panel"><summary>搜索话题</summary><label for="topic-search">搜索当前 Agent / 群聊的话题</label><input id="topic-search" v-model="topicSearch" type="search" placeholder="话题名称或 ID" maxlength="160"><small class="unread-boundary">列表条数是历史消息总数。</small></details><label for="topic-select">历史话题</label><select id="topic-select" v-model="selected" @change="changeTopic();closePanel()" :disabled="busy"><option v-if="!searchedTopics.some(t=>t.key===selected)" :value="selected" disabled>{{currentTopic?.topicName||'请选择话题'}} · 不在当前筛选结果</option><option v-for="t in searchedTopics" :key="t.key" :value="t.key">{{t.topicName}}<template v-if="t.originLabel"> · 原来源 {{t.originLabel}}</template> · {{t.messageCount}} 条</option></select><small v-if="currentTopic" class="topic-detail"><template v-if="currentTopic.configVersion">配置 v{{currentTopic.configVersion}} · </template>{{currentTopic.topicId}} · {{currentTopic.model||'未配置模型'}} · {{currentTopic.historyReady===false?'等待电脑首次同步':currentTopic.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):'可继续对话'}}<template v-if="currentTopic.updatedAt"> · {{new Date(currentTopic.updatedAt).toLocaleString()}}</template></small><small v-if="visibleTopics.length&&!searchedTopics.length" role="status">没有匹配的话题，当前会话和草稿仍保留。</small><small v-if="!visibleTopics.length">此 Agent 暂无话题；新话题同步后会自动出现。</small><small v-if="directoryNotice" role="status">{{directoryNotice}}</small><small v-if="directoryFetchError" role="status">{{directoryFetchError}}</small><small v-for="progress in sourceProgress" :key="progress.sourceId" class="source-progress">{{progress.sourceLabel||'来源'}} · 最近已知：目录待核对 {{progress.directoryErrors??'未知'}} · 历史待接入 {{progress.pendingImports??'未知'}} · 本地操作待确认 {{progress.pendingOperations??'未知'}} · 冲突 {{progress.conflicts??'未知'}} · 附件待就绪 {{progress.attachmentsPending??'未知'}}<template v-if="progress.configurationPending!==undefined"> · 续聊配置待就绪 {{progress.configurationPending??'核对中'}} · 配置异常 {{progress.configurationErrors}}</template></small>
+    <details class="topic-options">
+     <summary>消息与附件</summary>
+     <p>普通草稿暂存于本页。被拒绝的草稿保存在此设备，返回原话题可继续编辑。</p>
+     <p v-if="currentTopic?.attachmentsEnabled">附件支持 PNG、JPEG、WebP、PDF 和文本，最多 8 个，每个 20 MB。</p>
+     <p v-else-if="currentTopic?.sharedSpaceId">此话题尚未启用附件传输。</p>
+    </details>
+   <details v-if="sharedSpaces.length" class="shared-tools"><summary>共享目录与配置</summary>
+   <SharedDirectoryView v-for="space in sharedSpaces" :key="space.id" :space="space" :context="recoveryContext" :api="api" :on-device-visibility="deviceVisibilityChanged" />
+   <SharedConfigEditor v-if="currentTopic?.sharedSpaceId&&sharedSpaces.some(s=>s.id===currentTopic.sharedSpaceId&&s.config)" :key="currentTopic.sharedOwnerId" :topic="currentTopic" :context="recoveryContext" :api="api" />
+   </details>
+   </nav>
+   <section ref="history" id="history" aria-label="聊天历史" :inert="Boolean(conversationPanel) || !selected"><p v-if="historyProgress" class="history-progress" role="status">{{historyProgress.failed?'历史暂未加载完成，稍后重试':historyProgress.checking?'正在核对历史增量':'正在加载历史'}}<template v-if="historyProgress.total"> · {{historyProgress.loaded}} / {{historyProgress.total}}</template></p><button v-if="historyStart>0" class="earlier-messages" @click="showEarlierMessages">查看更早消息（还有 {{historyStart}} 条）</button><article v-for="m in visibleMessages" :key="m.id" class="message" :class="m.role" :data-message-id="m.id"><small>{{m.role==='user'?'你':(m.name||currentTopic?.agentName||'Agent')}}</small><div v-if="m.content?.length>128000" class="long-message"><button @click="toggleLongText(m)">{{expandedLongText.has(longTextKey(m))?'收起全文':'查看长文本'}} · {{m.content.length}} 字符</button><TextPages v-if="expandedLongText.has(longTextKey(m))" :text="m.content" class="bubble" style="max-height:60vh;overflow:auto"/></div><div v-else class="bubble">{{typeof m.content==='string'?m.content:'此消息包含非文本内容，请在桌面查看'}}</div><details v-if="m.desktopReferences?.length" class="desktop-references"><summary>桌面活引用 {{m.desktopReferences.length}} 项 · 原件和提取文本未同步</summary><div v-for="r in m.desktopReferences" :key="r.id"><strong>{{r.name}}</strong><small>{{r.workspaceRef ? r.workspaceRef.alias+' / '+r.workspaceRef.relPath : r.target}} · 需在来源电脑核对</small></div></details><div v-if="m.attachments?.length" class="attachments"><div v-for="(a,index) in m.attachments" :key="a.id+'/'+index" class="attachment"><template v-if="attachmentStates[m.id+'/'+a.id]?.state==='available'"><SharedAttachmentImage v-if="currentTopic?.sharedSpaceId&&attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :key="generation+'/'+m.id+'/'+a.id" :url="attachmentUrl(m,a)" :alt="a.name||'图片附件'"></SharedAttachmentImage><img v-else-if="attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :src="attachmentUrl(m,a)" :alt="a.name||'图片附件'" loading="lazy"><button class="attachment-open" @click="openAttachment(m,a)">{{a.name||'查看附件'}}</button><details v-if="a.extractedText" class="attachment-text" @toggle="toggleAttachmentText(m,a,index,$event)"><summary>查看文本</summary><TextPages v-if="expandedAttachmentText.has(attachmentTextKey(m,a,index))" :text="a.extractedText"/></details></template><span v-else>{{a.name||'附件'}} · {{attachmentStates[m.id+'/'+a.id]?.state==='unsupported'?'原件类型暂不支持，引用已保留':attachmentStates[m.id+'/'+a.id]?.state==='corrupt'?'完整性校验失败':'附件暂未同步或正在确认'}}</span></div></div></article><p v-if="!messages.length&&!historyProgress&&!visibleSharedStreams.length" class="empty">{{currentTopic?.historyReady===false?'正在等待电脑同步所选历史，完成后即可接续。':currentTopic?.executable===false?'还没有消息。':'还没有消息，发送一条开始会话。'}}</p>
+   <section v-if="visibleSharedStreams.length" id="shared-live-replies" aria-label="正在生成的共享回复">
+    <article v-for="stream in visibleSharedStreams" :key="stream.previewId" class="message assistant" :data-live-execution="stream.executionId" :data-native-request="stream.nativeRequestId"><small>{{stream.memberName||currentTopic?.agentName||'Agent'}}<template v-if="stream.kind==='controlled-text'"> · 第 {{stream.nativeGeneration+1}} 代</template> · {{stream.settled?'正在核对最终记录':stream.activity?sharedActivityLabels[stream.activity.state]||'正在核对原生任务':labels[stream.state]||'正在核对原生任务'}} · {{stream.connection==='online'?'实时观察':stream.connection==='disconnected'?'实时连接已暂停':'正在恢复连接'}}</small><div v-if="stream.text" class="bubble">{{stream.text}}</div><small v-if="stream.gap">仅显示目前可核对的临时片段，完整内容以保存后的会话为准。</small><small v-if="stream.settled&&stream.request?.state!=='completed'">{{labels[stream.request?.state]||'执行已暂停，请核对原生状态'}} · 已收到的片段暂存于此页。</small></article>
    </section>
+   </section>
+   <section v-show="conversationPanel==='work'" id="conversation-work" aria-label="任务状态">
+    <div class="panel-heading"><strong>任务状态</strong><button type="button" @click="closePanel">返回聊天</button></div>
+    <p v-if="!jobs.length && !jobsError && !pendingSubmission && !recoveryBlocker && !acceptedReceipt" class="empty">暂无任务记录</p>
    <section v-if="recoveryBlocker||pendingSubmission||acceptedReceipt||recoveryRecords.length" id="submission-recovery" class="submission-recovery" aria-label="提交确认状态" aria-live="polite"><p v-if="recoveryBlocker" role="alert">{{recoveryBlocker}}</p><div v-if="pendingSubmission" id="pending-submission" :data-request-id="pendingSubmission.requestId"><strong>本地已保存 · 云端接受尚待确认</strong><p>{{pendingSubmission.kind==='invitation'?'邀请成员：'+pendingSubmission.payload.agentId:pendingSubmission.payload.text.slice(0,120)||'附件消息'}}</p><small>提交 {{pendingSubmission.requestId}}<template v-if="pendingSubmission.payload.attachments?.length"> · {{pendingSubmission.payload.attachments.length}} 个附件</template></small><p id="submission-recovery-detail">{{recoveryDetail||'原提交已保留。刷新或重连只核对云端记录，不会自动发送。'}}</p></div><p v-else-if="acceptedReceipt" id="accepted-submission" :data-request-id="acceptedReceipt.requestId"><strong>云端已接受</strong> · 提交 {{acceptedReceipt.requestId}}</p><small v-if="recoveryRecords.length>(pendingSubmission?1:0)">此设备另有 {{recoveryRecords.length-(pendingSubmission?1:0)}} 条待确认提交，返回对应入口和话题可核对。</small></section>
    <section class="executions" aria-label="原生执行状态">
     <p v-if="jobsError" role="status">{{jobsError}}</p>
     <div v-if="jobsInfo" class="execution-pages"><small>本页 {{jobs.length}} 项 · 历史范围共 {{jobsInfo.total}} 项 · 待处理／核对范围 {{jobsInfo.attentionTotal}} 项</small><button v-if="jobsInfo.moreAttention" @click="nextExecutions('attention')" :disabled="busy">下一页待处理／核对</button><button v-if="jobsInfo.moreRecent" @click="nextExecutions('recent')" :disabled="busy">更早任务</button><button v-if="jobsInfo.historyPage" @click="latestExecutions" :disabled="busy">返回最新任务</button></div>
     <small v-if="jobs.length">云端已接受 · {{online?'本次查询的原生执行状态':'最近已知状态，联网后重新核对'}}</small>
     <article v-for="j in displayJobs" :key="j.id" class="execution-job" :data-exec-id="j.id" :data-state="j.state">
-     <div class="execution-row"><span>{{executionLabel(j)}}<template v-if="j.steps"> · {{j.steps.filter(s=>s.state==='completed').length}} / {{j.stepCount}} 位成员</template></span><template v-if="j.own && j.steps && supportsCancelRemaining">
+     <div class="execution-row"><span>{{executionLabel(j)}}<template v-if="j.steps?.length"> · {{j.steps.filter(s=>s.state==='completed').length}} / {{j.stepCount}} 位成员</template></span><template v-if="j.own && j.steps && supportsCancelRemaining">
       <button v-if="j.canCancelRemaining" :data-cancel-remaining-id="j.id" :disabled="!online" @click="cancelRemaining(j)">取消剩余接力</button>
      </template>
      <button v-else-if="j.own && ['queued','running','waiting_approval'].includes(j.state)" :data-cancel-id="j.id" @click="cancel(j.id)">{{j.steps?'中止本轮群聊':'请求取消本次回复'}}</button></div>
@@ -545,11 +618,22 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
     </article>
     <section v-if="nativeResult" ref="nativeResultPanel" id="native-task-result" class="native-task-result" aria-label="原生 AA 报告"><p role="status">{{nativeResult.loading?'正在只读核对原生报告…':nativeResult.error||'原生报告已核对，仅本次查看，不作为聊天消息。'}}</p><small>{{nativeResult.taskId}}</small><pre v-if="nativeResult.content!==null">{{nativeResult.content}}</pre><button @click="closeNativeResult">关闭报告</button></section>
    </section>
-   <details v-if="sharedSpaces.length" class="shared-tools"><summary>共享目录与配置</summary>
-   <SharedDirectoryView v-for="space in sharedSpaces" :key="space.id" :space="space" :context="recoveryContext" :api="api" :on-device-visibility="deviceVisibilityChanged" />
-   <SharedConfigEditor v-if="currentTopic?.sharedSpaceId&&sharedSpaces.some(s=>s.id===currentTopic.sharedSpaceId&&s.config)" :key="currentTopic.sharedOwnerId" :topic="currentTopic" :context="recoveryContext" :api="api" />
-   </details>
-   <footer><div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div><div v-if="currentTopic?.attachmentsEnabled" class="upload-area"><label class="attachment-picker">添加图片或文件<input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false"></label><small>最多 8 个，每个 20 MB；断线后可重新选择同一文件续传。</small><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||item.progress+'%'}}</span><button @click="removeDraftFile(i)" :disabled="busy">移除</button></div></div><small v-else-if="currentTopic?.sharedSpaceId" role="status" class="attachment-unavailable">此共享会话尚未启用附件传输，可继续发送文字；文件不会被静默上传。</small><small class="draft-scope">普通草稿暂存于本页。已确认被拒绝的草稿保存在此设备的当前会话和话题。</small><form @submit.prevent="send"><label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" placeholder="输入文字…" rows="2" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form><div class="send-state"><span id="send-state" role="status">{{notice}}</span><span v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</span><button id="retry-last" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
+   </section>
+   </div>
+   <footer>
+    <div class="composer-tools">
+     <div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label class="sr-only" for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择发言成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div>
+     <button id="work-toggle" ref="workToggle" type="button" aria-controls="conversation-work"
+       :aria-expanded="conversationPanel==='work'" :class="{attention:workButtonText!=='任务状态'}" @click="togglePanel('work')">{{workButtonText}}</button>
+    </div>
+    <form class="message-composer" @submit.prevent="send">
+     <label v-if="currentTopic?.attachmentsEnabled" class="attachment-picker" title="添加附件">
+      <span aria-hidden="true">＋</span><span class="sr-only">添加图片或文件</span>
+      <input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false">
+     </label>
+     <label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):'输入消息…'" rows="1" @focus="conversationPanel=''" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form>
+    <div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||item.progress+'%'}}</span><button @click="removeDraftFile(i)" :disabled="busy">移除</button></div>
+    <div class="send-state"><span id="send-state" role="status">{{notice}}</span><span v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</span><button id="retry-last" v-show="pendingSubmission" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
   </template>
  </div>
 </template>

@@ -12,5 +12,15 @@ onUnmounted(()=>{epoch++;editor?.dispose();});
 </script>
 <template><section class="shared-config"><button v-if="!opened" id="shared-config-open" @click="opened=true">{{topic?.configurationEditable===false?'查看共享配置':'编辑共享 Agent／群聊配置'}}</button><template v-else><button @click="opened=false">收起</button><div ref="host"/></template></section></template>
 <style>
-.shared-config{padding:12px;border:1px solid var(--border,#8885);border-radius:8px;margin:8px 0}.heading{display:flex;justify-content:space-between;align-items:center}label{display:block;margin:8px 0}input:not([type=checkbox]),select,textarea{width:100%;box-sizing:border-box;padding:8px}input[type=checkbox]{width:auto}select[multiple]{min-height:100px}textarea{resize:vertical}button{margin:4px;padding:8px}p{font-size:.9rem}.rule,.conflict{border:1px solid #8886;padding:8px;margin:8px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:300px;overflow:auto}
+.shared-config{padding:12px;border:1px solid var(--border,#8885);border-radius:8px;margin:8px 0}
+.shared-config .heading{display:flex;justify-content:space-between;align-items:center}
+.shared-config label{display:block;margin:8px 0}
+.shared-config :is(input:not([type=checkbox]),select,textarea){width:100%;box-sizing:border-box;padding:8px}
+.shared-config input[type=checkbox]{width:auto}
+.shared-config select[multiple]{min-height:100px}
+.shared-config textarea{resize:vertical}
+.shared-config button{margin:4px;padding:8px}
+.shared-config p{font-size:.9rem}
+.shared-config :is(.rule,.conflict){border:1px solid #8886;padding:8px;margin:8px 0}
+.shared-config pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:300px;overflow:auto}
 </style>

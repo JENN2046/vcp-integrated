@@ -1,0 +1,23 @@
+{
+  "topicsPanelOpenedAndClosed": true,
+  "workPanelOpenedAndClosed": true,
+  "inviteMembers": [
+    "选择发言成员",
+    "甲",
+    "乙"
+  ],
+  "work": [
+    {
+      "id": "request_8fcdbd68ddb14957b9c72dd06cef5a17",
+      "state": "completed",
+      "label": "回复已保存 · 1 / 1 位成员",
+      "steps": "乙 · 回复已保存"
+    },
+    {
+      "id": "request_b0503e9fc0d0433b95daf7b9422ed899",
+      "state": "completed",
+      "label": "消息已保存 · 未触发成员回复",
+      "steps": ""
+    }
+  ]
+}

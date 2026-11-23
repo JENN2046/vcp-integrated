@@ -1,0 +1,38 @@
+{
+  "browserScopes": [
+    [
+      "shared:sharedAB:read",
+      "shared:sharedAB:execute"
+    ]
+  ],
+  "tables": {
+    "journal": {
+      "count": 2,
+      "sha256": "98187570b135e9cf00136b9fd018fbd9c367854a12fab3cadcc943fab5d3c5a0"
+    },
+    "mobile_executions": {
+      "count": 2,
+      "sha256": "f68a939b6628b5d0ff9d69186c0a1bed6432d8b30441a03a0b3e12c2227c0da9"
+    },
+    "mobile_execution_steps": {
+      "count": 1,
+      "sha256": "366e9c31755070e1d19c1ad6e36022133e43960d0405eb314f4ba0627807b5aa"
+    },
+    "shared_admissions": {
+      "count": 2,
+      "sha256": "d35899c1109f553835f6047e762970057f87b5d3fc82010a3205a764b90f933c"
+    },
+    "shared_native_requests": {
+      "count": 1,
+      "sha256": "7ac3fb7677cc921557f05b94889a18c61355bc822328728141b9642a3bf6bbdb"
+    },
+    "mobile_sessions": {
+      "count": 1,
+      "sha256": "b12939ae1a3e3001aa62d3d9a39bd0eaa831ca77f17aee74282149778981516b"
+    }
+  },
+  "providerCalls": 0,
+  "provider": [],
+  "blocked": [],
+  "factsEqual": true
+}

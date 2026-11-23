@@ -1,0 +1,95 @@
+{
+  "secure": true,
+  "profile": "isolated headless Chromium",
+  "viewport": {
+    "width": 393,
+    "height": 770
+  },
+  "horizontalOverflow": 0,
+  "topic": "shared_4aaf370ed13b445cb436e0312dd7819f",
+  "history": {
+    "x": 0,
+    "y": 275,
+    "width": 393,
+    "height": 92.421875,
+    "top": 275,
+    "bottom": 367.421875,
+    "right": 393
+  },
+  "footer": {
+    "x": 0,
+    "y": 566.21875,
+    "width": 393,
+    "height": 203.78125,
+    "top": 566.21875,
+    "bottom": 770,
+    "right": 393
+  },
+  "composer": {
+    "x": 10,
+    "y": 666.21875,
+    "width": 289.984375,
+    "height": 62.78125,
+    "top": 666.21875,
+    "bottom": 729,
+    "right": 299.984375
+  },
+  "messages": [
+    {
+      "id": "mobile_job_9a93f378702ff9062b885e453b56b62a",
+      "role": "user",
+      "name": "你",
+      "body": "大家好，晚上开心吗\n",
+      "rect": {
+        "x": 227,
+        "y": 324,
+        "width": 154,
+        "height": 47.09375,
+        "top": 324,
+        "bottom": 371.09375,
+        "right": 381
+      },
+      "visibleFraction": 0.922,
+      "unobscured": true
+    },
+    {
+      "id": "reply_gstep_80c1b0ccbb6632411d7cae70253196182b598674",
+      "role": "assistant",
+      "name": "乙",
+      "body": "乙：收到邀请。这是隔离测试回复。",
+      "rect": {
+        "x": 12,
+        "y": 405.09375,
+        "width": 252,
+        "height": 47.09375,
+        "top": 405.09375,
+        "bottom": 452.1875,
+        "right": 264
+      },
+      "visibleFraction": 0,
+      "unobscured": false
+    }
+  ],
+  "jobs": [
+    {
+      "id": "request_8fcdbd68ddb14957b9c72dd06cef5a17",
+      "state": "completed",
+      "label": "回复已保存 · 1 / 1 位成员",
+      "steps": "乙 · 回复已保存"
+    },
+    {
+      "id": "request_b0503e9fc0d0433b95daf7b9422ed899",
+      "state": "completed",
+      "label": "回复已保存 · 0 / 0 位成员",
+      "steps": ""
+    }
+  ],
+  "inviteMembers": [
+    "选择成员",
+    "甲",
+    "乙"
+  ],
+  "bundle": "/mobile/assets/index-Cuf1bKRk.js",
+  "bytes": 189721,
+  "sha256": "163525d2fd59f47c752b13a0c52218abad4f6665340d2ee3784364a262937420"
+}

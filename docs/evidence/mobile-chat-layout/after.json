@@ -1,0 +1,96 @@
+{
+  "secure": true,
+  "profile": "isolated headless Chromium",
+  "viewport": {
+    "width": 393,
+    "height": 770
+  },
+  "horizontalOverflow": 0,
+  "topic": "shared_4aaf370ed13b445cb436e0312dd7819f",
+  "history": {
+    "x": 0,
+    "y": 57.09375,
+    "width": 393,
+    "height": 587.71875,
+    "top": 57.09375,
+    "bottom": 644.8125,
+    "right": 393
+  },
+  "footer": {
+    "x": 0,
+    "y": 644.8125,
+    "width": 393,
+    "height": 125.1875,
+    "top": 644.8125,
+    "bottom": 770,
+    "right": 393
+  },
+  "composer": {
+    "x": 14,
+    "y": 696.8125,
+    "width": 290.984375,
+    "height": 44,
+    "top": 696.8125,
+    "bottom": 740.8125,
+    "right": 304.984375
+  },
+  "panel": "false",
+  "messages": [
+    {
+      "id": "mobile_job_9a93f378702ff9062b885e453b56b62a",
+      "role": "user",
+      "name": "你",
+      "body": "大家好，晚上开心吗\n",
+      "rect": {
+        "x": 204.984375,
+        "y": 94.09375,
+        "width": 172.015625,
+        "height": 48.796875,
+        "top": 94.09375,
+        "bottom": 142.890625,
+        "right": 377
+      },
+      "visibleFraction": 1,
+      "unobscured": true
+    },
+    {
+      "id": "reply_gstep_80c1b0ccbb6632411d7cae70253196182b598674",
+      "role": "assistant",
+      "name": "乙",
+      "body": "乙：收到邀请。这是隔离测试回复。",
+      "rect": {
+        "x": 16,
+        "y": 175.890625,
+        "width": 284.015625,
+        "height": 48.796875,
+        "top": 175.890625,
+        "bottom": 224.6875,
+        "right": 300.015625
+      },
+      "visibleFraction": 1,
+      "unobscured": true
+    }
+  ],
+  "jobs": [
+    {
+      "id": "request_8fcdbd68ddb14957b9c72dd06cef5a17",
+      "state": "completed",
+      "label": "回复已保存 · 1 / 1 位成员",
+      "steps": "乙 · 回复已保存"
+    },
+    {
+      "id": "request_b0503e9fc0d0433b95daf7b9422ed899",
+      "state": "completed",
+      "label": "消息已保存 · 未触发成员回复",
+      "steps": ""
+    }
+  ],
+  "inviteMembers": [
+    "选择发言成员",
+    "甲",
+    "乙"
+  ],
+  "bundle": "/mobile/assets/index-BgN4Ql_8.js",
+  "bytes": 193332,
+  "sha256": "1a18f6ef135a70f67fcf2957ecd33d63f8f9d2e51e35939685eea552d46d47c0"
+}

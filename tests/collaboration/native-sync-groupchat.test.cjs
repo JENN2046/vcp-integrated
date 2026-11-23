@@ -39,11 +39,15 @@ test('sequential native member parameters, frozen configs and U1/A/B/U2 ordering
 });
 
 test('invite_only saves user input without automatic calls; manual invitation is durable, scoped and has no fake user history',async t=>{
- const f=await fixture(t);await publish(f.engine,configuration({group:{mode:'invite_only'}}));const user=submit(f.engine,'invite_user_1');assert.equal(user.state,'completed');
+ const f=await fixture(t);await publish(f.engine,configuration({group:{mode:'invite_only'}}));const user=submit(f.engine,'invite_user_1');
+ assert.equal(user.kind,'group_message');assert.equal(user.state,'completed');assert.equal(user.stepCount,0);assert.equal(user.replyMessageId,null);
+ assert.deepEqual(submit(f.engine,'invite_user_1'),{...user,replayed:true});
  assert.throws(()=>f.engine.invite('device',{topicKey:'group',requestId:'invite_invalid',agentId:'foreign'}),e=>e.code==='GROUP_MEMBER_UNAVAILABLE');
  const invite=f.engine.invite('device',{topicKey:'group',requestId:'invite_valid_1',agentId:'b'});await f.reopen();let calls=0;
  await f.model(async(req,res)=>{const value=await body(req);calls++;assert.equal(value.model,'model-b');json(res,'invited response');});await until(()=>f.engine.get(invite.id).state==='completed');
- assert.equal(calls,1);assert.equal(f.store.metrics().journalRows,2);assert.equal(f.engine.invite('device',{topicKey:'group',requestId:'invite_valid_1',agentId:'b'}).replayed,true);
+ const replay=f.engine.invite('device',{topicKey:'group',requestId:'invite_valid_1',agentId:'b'});
+ assert.equal(calls,1);assert.equal(f.store.metrics().journalRows,2);assert.equal(replay.replayed,true);
+ assert.equal(replay.kind,'group_invitation');assert.equal(replay.state,'completed');assert.equal(replay.stepCount,1);assert.ok(replay.replyMessageId);
  assert.throws(()=>f.engine.cancel(invite.id,'other-device'),e=>e.status===404);
 });
 
