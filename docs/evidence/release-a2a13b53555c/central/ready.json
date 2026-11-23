@@ -1,0 +1,66 @@
+{
+  "revision": "a2a13b53555c55ca79844544d8802d61fc0cf3e0",
+  "url": "https://127.0.0.1:18443/mobile/",
+  "pairUrl": "https://127.0.0.1:18443/__hardware/pair",
+  "mobile": {
+    "htmlStatus": 200,
+    "bundleStatus": 200,
+    "connectionStatus": 200
+  },
+  "publicCa": "/tmp/ns-r4-central.gBb6t5/hardware-ca.pem",
+  "publicCaDer": "/tmp/ns-r4-central.gBb6t5/hardware-ca.der",
+  "publicLeaf": "/tmp/ns-r4-central.gBb6t5/leaf.pem",
+  "windowsSeed": "/tmp/ns-r4-central.gBb6t5/seed/desktopB",
+  "linuxSeed": "/tmp/ns-r4-central.gBb6t5/seed/desktopA",
+  "status": "/tmp/ns-r4-central.gBb6t5/status.json",
+  "groupTopicId": "shared_14d89b041b7649cfbe8d86023a2bbfc7",
+  "singleTopicId": "shared_ae2de6d7cbcf4c82b732ece72468ac91",
+  "groupName": "Relay fixture A B C",
+  "groupTopic": "Relay round",
+  "groupInput": "GROUP_HANDOFF_BASELINE_INPUT",
+  "assetHashes": {
+    "index.html": "a9bad95168fadd8c51c0a7c21729de463737ab3fcf5f07d6b17f75f5fe77f763",
+    "manifest.webmanifest": "fb11d99176f326ae1c0d49ff8a7b890c599dff37522594f6a8159402bbea7456",
+    "sw.js": "8afa0c7784c977aca738d4045465a04b7cd7a939ea18856d4c1f2f6eb9495fc0",
+    "assets/index-Bsu6-SLg.js": "d39c26825de25edc73a9e1e61dec2a507e7b64c1decd8cb674644f75b4e1f2e7",
+    "assets/index-h-NJxJX1.css": "db91b90765bef8a5e5840355bd07981a9be4cee941aafcac3c9edefcd8b37b11"
+  },
+  "groupReplies": [
+    "RELAY_A_FINAL",
+    "RELAY_B_FINAL",
+    "RELAY_C_FINAL"
+  ],
+  "singleAgent": "Synthetic shared",
+  "singleName": "One history",
+  "singleInputs": [
+    "SYNTHETIC_502_ORIGINAL_INPUT",
+    "SYNTHETIC_502_NEXT_INPUT"
+  ],
+  "singleFinal": "SYNTHETIC_502_NEXT_FINAL",
+  "singleDescriptors": {
+    "A": {
+      "itemType": "agent",
+      "itemId": "ns_798fc3206c3ea27dd34d50a5",
+      "topicId": "ns_0772af97aff033049d258301"
+    },
+    "B": {
+      "itemType": "agent",
+      "itemId": "ns_798fc3206c3ea27dd34d50a5",
+      "topicId": "ns_0772af97aff033049d258301"
+    }
+  },
+  "restoredDbSha256": "5c075b18c6e5eb696bba9d38b715f834ffcb96d4091a98d4b660d8f2e8893b81",
+  "seedSha256": "f4e1ed74d022d3d00d267c306009f3328483c20866206891f1b7cad906a42679",
+  "groupBindings": {
+    "A": {
+      "itemType": "group",
+      "itemId": "ns_72c011434eaa86ceba4fb795",
+      "topicId": "ns_31a334800544b15d2e2c9dee"
+    },
+    "B": {
+      "itemType": "group",
+      "itemId": "ns_72c011434eaa86ceba4fb795",
+      "topicId": "ns_31a334800544b15d2e2c9dee"
+    }
+  }
+}

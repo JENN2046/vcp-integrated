@@ -1,0 +1,25 @@
+{
+  "url": "file:///home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/release-a2a13b-goQQMH/apps/desktop/main.html",
+  "main": [
+    {
+      "file": "apps/desktop/Groupmodules/groupchat.js",
+      "sha256": "038091edbb1de800281501191d15075f4bfa6a138aa389f7314b10957fc8446b"
+    },
+    {
+      "file": "apps/desktop/modules/services/nativeSync/sharedGroupHandoff.js",
+      "sha256": "5bfd4e0aba84d047a8f8f3a589564cfc9da3f0a13585d0c9cd09528d56ae7092"
+    }
+  ],
+  "renderer": [
+    {
+      "file": "apps/desktop/modules/renderer/messageContextMenu.js",
+      "bytes": 69476,
+      "sha256": "6264ce2f739d9c3cbb68cb9c9a80cf6dfa28ae6dc7c6baad383c6892ff08acaf"
+    },
+    {
+      "file": "apps/desktop/modules/renderer/controlledWorkView.mjs",
+      "bytes": 11941,
+      "sha256": "c34006618303c2c89d26ea474c50c6d956b51ebfa248a1c32825f3360c7efcf9"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "group": {
+    "admissions": [],
+    "work": [],
+    "native": [],
+    "handoff": [],
+    "slots": [],
+    "journal": []
+  },
+  "single": {
+    "admissions": [],
+    "work": [],
+    "native": [],
+    "handoff": [],
+    "slots": [],
+    "journal": []
+  },
+  "calls": [],
+  "pairings": 0,
+  "mobileScopes": [],
+  "wires": []
+}

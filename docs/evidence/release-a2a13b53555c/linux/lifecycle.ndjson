@@ -1,0 +1,12 @@
+{"event":"linux-ready","value":{"pid":1544961,"launch":1}}
+{"event":"command-failed","value":{"line":"group","message":"Timed out waiting for group handoff panel"}}
+{"event":"linux-exit","value":{"launch":1,"code":0,"signal":null}}
+{"event":"linux-ready","value":{"pid":1548705,"launch":2}}
+{"event":"linux-exit","value":{"launch":2,"code":null,"signal":"SIGKILL"}}
+{"event":"linux-ready","value":{"pid":1552263,"launch":3}}
+{"event":"command-failed","value":{"line":"settle","message":"Timed out waiting for 确认放弃并解除暂停"}}
+{"event":"linux-exit","value":{"launch":3,"code":0,"signal":null}}
+{"event":"linux-ready","value":{"pid":1557019,"launch":4}}
+{"event":"linux-exit","value":{"launch":4,"code":0,"signal":null}}
+{"event":"linux-ready","value":{"pid":1558120,"launch":5}}
+{"event":"linux-exit","value":{"launch":5,"code":0,"signal":null}}

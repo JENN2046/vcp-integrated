@@ -1,0 +1,20 @@
+{
+  "af17c99e784fd1afd5b127fcf8a467f06ef8423d": {
+    "sync/centralStore.js": "e0a498c73601ea83bc3ca608f375c1c5f1ce2d488eb7eb7c8585e4c2406e7000",
+    "sync/sharedSpace.js": "b9a1bfaeb407904aeb5ef1192ea0d8ad5930a4ceeb99267d86125a311aad0c3d",
+    "sync/sharedGroupHandoff.js": "5e69cf03ff7ae15e233676ac7026af62cd42e2ade428d18ea5e270053155c13c",
+    "sync/sharedNative.js": "2926a9738f9e9e03d8c3672adb8921a76d9df22b84070ec4780b16fecb84b353",
+    "sync/sharedTurns.js": "135794dea398e82799ebd71fde57fcc30bd8b38f23668ac4754c102b2e879faf",
+    "sync/sharedHttp.js": "99a7bbeb26dc7759ab2dbafbe28612b5f737eb249aa9a195f84b47cca6372359",
+    "mobile/portal.js": "fd4ff20987a5410ee1ed65fa358226ef869e727238daf8cbb704cce09a7fa307"
+  },
+  "a2a13b53555c55ca79844544d8802d61fc0cf3e0": {
+    "sync/centralStore.js": "e0a498c73601ea83bc3ca608f375c1c5f1ce2d488eb7eb7c8585e4c2406e7000",
+    "sync/sharedSpace.js": "36fd7c37c41902d4c0816b3d698c5b7334f21c526d7fdf048096a4641620ca2c",
+    "sync/sharedGroupHandoff.js": "93706e669ef11f055103f60a74ed1283837099b81e635a4016fb8cdce58c664c",
+    "sync/sharedNative.js": "a54abffa781698e8dc0eb5d4bf23ba15b380f6775379b33f72d83d2f4ff16815",
+    "sync/sharedTurns.js": "c35a0d9c30a4091ffefe9e6527bd6babadff75273a64e6952144ef7497625496",
+    "sync/sharedHttp.js": "ab9948268251e93994f4f743656b8f5860a7c8dd5f1c21a1d0e88bef7bbf1f08",
+    "mobile/portal.js": "fd4ff20987a5410ee1ed65fa358226ef869e727238daf8cbb704cce09a7fa307"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "launch": 3,
+  "view": {
+    "context": {
+      "itemId": "ns_798fc3206c3ea27dd34d50a5",
+      "itemType": "agent",
+      "topicId": "ns_0772af97aff033049d258301",
+      "historyRevision": 20
+    },
+    "text": "用户\n2026-11-23 13:02\n\nSYNTHETIC_502_ORIGINAL_INPUT",
+    "controlledWork": "",
+    "status": "任务状态"
+  },
+  "history": [
+    {
+      "id": "msg_1795410148688_user_rpgk5zbiun",
+      "role": "user",
+      "name": "用户",
+      "content": "SYNTHETIC_502_ORIGINAL_INPUT",
+      "timestamp": 1795410148691,
+      "continuity": {
+        "version": 1,
+        "known": true,
+        "requestId": "msg_1795410148688_user_rpgk5zbiun",
+        "executionId": "request_74186074863a4b13a132aaaf9907f1f2",
+        "dependsOnMessageIds": []
+      },
+      "_nativeSyncMetadata": {
+        "version": 1,
+        "hash": "aff0bae32db247d699c395bcb2b206e59cd4bdd3cb402afc36f98c43cbddb51b",
+        "fields": {
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "msg_1795410148688_user_rpgk5zbiun",
+            "executionId": "request_74186074863a4b13a132aaaf9907f1f2",
+            "dependsOnMessageIds": []
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "launch": 1,
+  "view": {
+    "context": {
+      "itemId": "ns_72c011434eaa86ceba4fb795",
+      "itemType": "group",
+      "topicId": "ns_31a334800544b15d2e2c9dee",
+      "historyRevision": 9
+    },
+    "text": "",
+    "controlledWork": "当前没有进行中的接力。",
+    "status": "任务状态本地暂无待确认同步操作。以下为最近已知记录，需要联网核对最新状态。尚无可核对的云端执行记录。关闭报告核对云端状态"
+  },
+  "history": []
+}

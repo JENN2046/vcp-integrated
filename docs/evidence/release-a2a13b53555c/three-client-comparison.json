@@ -1,0 +1,51 @@
+{
+  "result": "PASS",
+  "commit": "a2a13b53555c55ca79844544d8802d61fc0cf3e0",
+  "buildManifestSha256": "192d91c81238d7eb95182df4149e40d5c0bbc2766e03ee25a8373276a171b7d3",
+  "restoredOldWork": "request_64d57d14472a40408307e77890f1d894",
+  "restorableBackupAt": "awaiting_handoff",
+  "restorableJournalSeqs": [
+    1,
+    2
+  ],
+  "sameDatabaseThroughHardwareRun": true,
+  "schema": 4,
+  "groupWork": "request_3f478177daa64fd1b83567bab7787f4a",
+  "groupMessages": [
+    [
+      "controlled_2606279cd5a14b3a800bcffd56559145",
+      "user",
+      "GROUP_HANDOFF_BASELINE_INPUT"
+    ],
+    [
+      "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+      "assistant",
+      "RELAY_A_FINAL"
+    ],
+    [
+      "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+      "assistant",
+      "RELAY_B_FINAL"
+    ],
+    [
+      "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2",
+      "assistant",
+      "RELAY_C_FINAL"
+    ]
+  ],
+  "single502": "request_74186074863a4b13a132aaaf9907f1f2",
+  "singleNext": "request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+  "singleMessages": [
+    [
+      "msg_1795410387976_user_ye9clxx2sl",
+      "user",
+      "SYNTHETIC_502_NEXT_INPUT"
+    ],
+    [
+      "reply_request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+      "assistant",
+      "SYNTHETIC_502_NEXT_FINAL"
+    ]
+  ],
+  "providerCalls": 5
+}

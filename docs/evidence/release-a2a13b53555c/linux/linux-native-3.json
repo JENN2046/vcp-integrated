@@ -1,0 +1,26 @@
+{
+  "vexus": {
+    "pid": 1547750,
+    "loadedFile": "/tmp/ns-r4-central.gBb6t5/runtime-box/rust-vexus-lite/vexus-lite.linux-x64-gnu.node",
+    "buildFile": "apps/server/rust-vexus-lite/vexus-lite.linux-x64-gnu.node",
+    "sha256": "37cbcbfdecb3689aa92d7cab8e648184b53498a795ae1e7ea51f5666d91622c2"
+  },
+  "sqlite": {
+    "pid": 1547750,
+    "loadedFile": "/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/release-a2a13b-goQQMH/apps/server/node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+    "buildFile": "apps/server/node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+    "sha256": "90c27dc0d431feef669795799271448d5d9fa4da6dab88724edfb43ad3a85221"
+  },
+  "electron": {
+    "pid": 1552263,
+    "loadedFile": "/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/release-a2a13b-goQQMH/apps/desktop/node_modules/electron/dist/electron",
+    "buildFile": "apps/desktop/node_modules/electron/dist/electron",
+    "sha256": "7b7916ef94fa3380de130f8f1bff79fb339b9caafe134cd9dcb52d83b39ed299"
+  },
+  "cds": {
+    "pid": 1552373,
+    "loadedFile": "/home/jenn/AGENTS_OS_Workspace/projects/vcp-integrated/.runs/release-a2a13b-goQQMH/apps/desktop/modules/services/chatDataService/bin/linux-x64/vcp_chat_data_service",
+    "buildFile": "apps/desktop/modules/services/chatDataService/bin/linux-x64/vcp_chat_data_service",
+    "sha256": "7bf1eba873cf2b4902c661b78d43ba760e234945d22f67f08715efb2fad8c2e8"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "currentAndroidUser": 0,
+  "isolatedAndroidUser": 12,
+  "firefoxPackageRetained": true,
+  "pwaPinnedRetained": true,
+  "publicTestCaRetainedInIsolatedUser": true,
+  "stagedPublicCaDownloadRemoved": true,
+  "removedUsbReversePorts": [
+    18443,
+    18449
+  ],
+  "removedUsbForwardPorts": [
+    18446
+  ],
+  "ownerChromeAccessed": false
+}

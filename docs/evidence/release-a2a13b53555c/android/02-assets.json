@@ -1,0 +1,30 @@
+{
+  "pid": "6113",
+  "secure": true,
+  "visible": true,
+  "standalone": true,
+  "origin": "https://127.0.0.1:18443",
+  "connection": "服务可达",
+  "bundle": "/mobile/assets/index-Bsu6-SLg.js",
+  "workerControlled": true,
+  "isPrivate": false,
+  "browsingContextID": 2,
+  "assets": [
+    {
+      "path": "/mobile/assets/index-Bsu6-SLg.js",
+      "sha256": "d39c26825de25edc73a9e1e61dec2a507e7b64c1decd8cb674644f75b4e1f2e7"
+    },
+    {
+      "path": "/mobile/assets/index-h-NJxJX1.css",
+      "sha256": "db91b90765bef8a5e5840355bd07981a9be4cee941aafcac3c9edefcd8b37b11"
+    },
+    {
+      "path": "/mobile/manifest.webmanifest",
+      "sha256": "fb11d99176f326ae1c0d49ff8a7b890c599dff37522594f6a8159402bbea7456"
+    },
+    {
+      "path": "/mobile/sw.js",
+      "sha256": "8afa0c7784c977aca738d4045465a04b7cd7a939ea18856d4c1f2f6eb9495fc0"
+    }
+  ]
+}

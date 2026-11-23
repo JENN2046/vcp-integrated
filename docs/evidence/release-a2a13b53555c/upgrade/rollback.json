@@ -1,0 +1,153 @@
+{
+  "schema4": [
+    1,
+    3,
+    4
+  ],
+  "schema4BackupSha256": "023948eac8bdc6719a986582970a4801ce412971122459ba5fc4a12817eb3f06",
+  "rejected": "SHARED_SCHEMA_UPGRADE_REQUIRED",
+  "backupHash": "f5a084dff07294e1dc21a3a20360dc6b6a31a1a22912dc9e2e0945e610ce432a",
+  "restored": {
+    "uponOpen": {
+      "work": {
+        "id": "request_64d57d14472a40408307e77890f1d894",
+        "request_id": "old-work-input",
+        "state": "dispatched",
+        "user_seq": 1,
+        "reply_seq": 2,
+        "principal": "desktop:deviceA",
+        "native_terminal": 0
+      },
+      "control": {
+        "work_id": "request_64d57d14472a40408307e77890f1d894",
+        "executor": "desktop:deviceA",
+        "executor_version": 0,
+        "state": "awaiting_handoff",
+        "first_reply_seq": 2
+      },
+      "native": [
+        {
+          "id": "group_request_64d57d14472a40408307e77890f1d894_0",
+          "ordinal": 0,
+          "member_id": "shared_e765b01b50ab4040866827e37cebf854",
+          "principal": "desktop:deviceA",
+          "state": "model_terminal"
+        }
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "old-work-input",
+          "hash": "98628222c600304506d9f1f4dcfba7aaf699173c8bdcb717d5d7a155c04d8809",
+          "action": "upsert",
+          "device_id": "desktop:deviceA"
+        },
+        {
+          "seq": 2,
+          "msg_id": "reply_group_request_64d57d14472a40408307e77890f1d894_0",
+          "hash": "24599fbd1af2f31e4d3b14f0575bd23d77df660cd2d7d52f7c2a6d63b5c041d2",
+          "action": "upsert",
+          "device_id": "desktop:deviceA"
+        }
+      ],
+      "receipts": [
+        {
+          "opId": "synthetic-publish-0",
+          "principal": "desktop:deviceA",
+          "requestHash": "2e1422102d5cb4843e2e91a267d7d1ebe7db2aeb02c86682c23ecd0301af32f9",
+          "resultHash": "447365720bcc03bab825d3e7a9abd83baa4c4f01ad443ac70ba37ddc75ade5f9"
+        }
+      ]
+    },
+    "after": {
+      "work": {
+        "id": "request_64d57d14472a40408307e77890f1d894",
+        "request_id": "old-work-input",
+        "state": "completed",
+        "user_seq": 1,
+        "reply_seq": 3,
+        "principal": "desktop:deviceA",
+        "native_terminal": 1
+      },
+      "control": {
+        "work_id": "request_64d57d14472a40408307e77890f1d894",
+        "executor": "desktop:deviceB",
+        "executor_version": 1,
+        "state": "continuing",
+        "first_reply_seq": 2
+      },
+      "native": [
+        {
+          "id": "group_request_64d57d14472a40408307e77890f1d894_0",
+          "ordinal": 0,
+          "member_id": "shared_e765b01b50ab4040866827e37cebf854",
+          "principal": "desktop:deviceA",
+          "state": "model_terminal"
+        },
+        {
+          "id": "group_request_64d57d14472a40408307e77890f1d894_1",
+          "ordinal": 1,
+          "member_id": "shared_6611a4600c024761ab12cd06789769e1",
+          "principal": "desktop:deviceB",
+          "state": "model_terminal"
+        }
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "old-work-input",
+          "hash": "98628222c600304506d9f1f4dcfba7aaf699173c8bdcb717d5d7a155c04d8809",
+          "action": "upsert",
+          "device_id": "desktop:deviceA"
+        },
+        {
+          "seq": 2,
+          "msg_id": "reply_group_request_64d57d14472a40408307e77890f1d894_0",
+          "hash": "24599fbd1af2f31e4d3b14f0575bd23d77df660cd2d7d52f7c2a6d63b5c041d2",
+          "action": "upsert",
+          "device_id": "desktop:deviceA"
+        },
+        {
+          "seq": 3,
+          "msg_id": "reply_group_request_64d57d14472a40408307e77890f1d894_1",
+          "hash": "ad50f112a2280c1f7329c385ed16de1c5f8eff1e40a82d2b1e5b8bb1cb5fa41f",
+          "action": "upsert",
+          "device_id": "desktop:deviceB"
+        }
+      ],
+      "receipts": [
+        {
+          "opId": "synthetic-publish-0",
+          "principal": "desktop:deviceA",
+          "requestHash": "2e1422102d5cb4843e2e91a267d7d1ebe7db2aeb02c86682c23ecd0301af32f9",
+          "resultHash": "447365720bcc03bab825d3e7a9abd83baa4c4f01ad443ac70ba37ddc75ade5f9"
+        },
+        {
+          "opId": "old-work-continue",
+          "principal": "desktop:deviceB",
+          "requestHash": "600c3d50591abd181659d2c87400b7979f6a451c7bcb9162e53a12a951ebb777",
+          "resultHash": "ca58a2cc909dd17915d7a043560252f4e36bc81bd197b1fad8b949a0a1370bae"
+        },
+        {
+          "opId": "old-work-finish",
+          "principal": "desktop:deviceB",
+          "requestHash": "601e8b2bf4af08c0138a72ae3006ec45a7e362f2b95db9b72603277d2753d4ad",
+          "resultHash": "eda0e2a2f58bf965fb666108f3eccbf18a45023c3f43bb11fbb6c1463d5faf80"
+        },
+        {
+          "opId": "old-work-handoff",
+          "principal": "desktop:deviceB",
+          "requestHash": "201772ac9752195008ed78c60d43edba12e8e397aedf07e6ed203f0ef165dc60",
+          "resultHash": "833c05cadf4fc79ffb38bdd446f414ffa3abfb59da0cd560106ec75850bedd69"
+        },
+        {
+          "opId": "synthetic-publish-1",
+          "principal": "desktop:deviceB",
+          "requestHash": "edcf95571a3b0cbe270e40a2261300b867c667c4d1080040cd3ae1f81644f3b4",
+          "resultHash": "e7b4292fad555e245552542da19fd01718e78aeb32c88b17cc4d987511fec2a6"
+        }
+      ]
+    }
+  },
+  "productionCopyUntouched": true
+}

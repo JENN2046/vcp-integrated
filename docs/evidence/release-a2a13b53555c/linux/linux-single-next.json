@@ -1,0 +1,75 @@
+{
+  "launch": 5,
+  "view": {
+    "context": {
+      "itemId": "ns_798fc3206c3ea27dd34d50a5",
+      "itemType": "agent",
+      "topicId": "ns_0772af97aff033049d258301",
+      "historyRevision": 9
+    },
+    "text": "用户\n2026-11-23 13:06\n\nSYNTHETIC_502_NEXT_INPUT\n\nSynthetic shared\n2026-11-23 13:06\n\nSYNTHETIC_502_NEXT_FINAL",
+    "controlledWork": "",
+    "status": "任务状态"
+  },
+  "history": [
+    {
+      "id": "msg_1795410387976_user_ye9clxx2sl",
+      "role": "user",
+      "name": "用户",
+      "content": "SYNTHETIC_502_NEXT_INPUT",
+      "timestamp": 1795410387979,
+      "continuity": {
+        "version": 1,
+        "known": true,
+        "requestId": "msg_1795410387976_user_ye9clxx2sl",
+        "executionId": "request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+        "dependsOnMessageIds": []
+      },
+      "_nativeSyncMetadata": {
+        "version": 1,
+        "hash": "3e9d50a5c9707f249e2008902940ba562dd80c0f7bd58cd55dc7f2b68427ae39",
+        "fields": {
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "msg_1795410387976_user_ye9clxx2sl",
+            "executionId": "request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+            "dependsOnMessageIds": []
+          }
+        }
+      }
+    },
+    {
+      "id": "reply_request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+      "role": "assistant",
+      "name": "Synthetic shared",
+      "content": "SYNTHETIC_502_NEXT_FINAL",
+      "timestamp": 1795410388051,
+      "agentId": "shared_e765b01b50ab4040866827e37cebf854",
+      "continuity": {
+        "version": 1,
+        "known": true,
+        "requestId": "msg_1795410387976_user_ye9clxx2sl",
+        "executionId": "request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+        "dependsOnMessageIds": [
+          "msg_1795410387976_user_ye9clxx2sl"
+        ]
+      },
+      "_nativeSyncMetadata": {
+        "version": 1,
+        "hash": "d2773fca2b20ae9b08bf3786ecf913b84500279deb69882c05d33643e1dc08a9",
+        "fields": {
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "msg_1795410387976_user_ye9clxx2sl",
+            "executionId": "request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+            "dependsOnMessageIds": [
+              "msg_1795410387976_user_ye9clxx2sl"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

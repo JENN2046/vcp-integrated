@@ -1,0 +1,53 @@
+{
+  "pid": "11818",
+  "focus": "  mCurrentFocus=Window{9cbabec u12 org.mozilla.firefox/org.mozilla.fenix.customtabs.ExternalAppBrowserActivity}",
+  "secure": true,
+  "visible": true,
+  "standalone": true,
+  "origin": "https://127.0.0.1:18443",
+  "connection": "已连接",
+  "bundle": "/mobile/assets/index-Bsu6-SLg.js",
+  "workerControlled": true,
+  "isPrivate": false,
+  "browsingContextID": 2,
+  "observed": {
+    "topicKey": "shared_ae2de6d7cbcf4c82b732ece72468ac91",
+    "topicLabel": "One history · 原来源 sourceC · 2 条",
+    "messages": [
+      {
+        "id": "msg_1795410387976_user_ye9clxx2sl",
+        "role": "user",
+        "name": "你",
+        "body": "SYNTHETIC_502_NEXT_INPUT",
+        "characters": 24,
+        "sha256": "2a344c3ee5cb8aa16c43c68d6fe9150363fbc0d20e8153c37e6bd40837c2ee61"
+      },
+      {
+        "id": "reply_request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+        "role": "assistant",
+        "name": "Synthetic shared",
+        "body": "SYNTHETIC_502_NEXT_FINAL",
+        "characters": 24,
+        "sha256": "1c8a819d8e7c0707b924f08aaa8bffaae1cdb52b7aae71803f68514e95e7f8f6"
+      }
+    ],
+    "executions": [
+      {
+        "id": "request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+        "state": "completed",
+        "details": "回复已保存"
+      },
+      {
+        "id": "request_74186074863a4b13a132aaaf9907f1f2",
+        "state": "cancelled",
+        "details": "执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑\n\n已记录人工核对；这不表示已取消 AA 或撤回工具副作用。"
+      }
+    ],
+    "notice": [],
+    "previews": []
+  },
+  "readback": {
+    "status": 200,
+    "sessionMarker": "1f2085cd01e6950eb52614103dec9f489c41ee550f79ff2f277e77117773eba8"
+  }
+}

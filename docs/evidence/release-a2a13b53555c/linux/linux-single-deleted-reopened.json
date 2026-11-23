@@ -1,0 +1,15 @@
+{
+  "launch": 5,
+  "view": {
+    "context": {
+      "itemId": "ns_798fc3206c3ea27dd34d50a5",
+      "itemType": "agent",
+      "topicId": "ns_0772af97aff033049d258301",
+      "historyRevision": 6
+    },
+    "text": "",
+    "controlledWork": "",
+    "status": "任务状态本地暂无待确认同步操作。上次云端记录时间：11/23/2026, 1:05:03 PM。以下为最近已知记录，需要联网核对最新状态。已取消 · 请求 msg_1795410148688_user_rpgk5zbiun关闭报告核对云端状态"
+  },
+  "history": []
+}

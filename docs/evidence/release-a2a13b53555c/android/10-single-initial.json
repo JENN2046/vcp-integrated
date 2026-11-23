@@ -1,0 +1,25 @@
+{
+  "pid": "8220",
+  "focus": "  mCurrentFocus=Window{c546966 u12 org.mozilla.firefox/org.mozilla.fenix.customtabs.ExternalAppBrowserActivity}",
+  "secure": true,
+  "visible": true,
+  "standalone": true,
+  "origin": "https://127.0.0.1:18443",
+  "connection": "已连接",
+  "bundle": "/mobile/assets/index-Bsu6-SLg.js",
+  "workerControlled": true,
+  "isPrivate": false,
+  "browsingContextID": 2,
+  "observed": {
+    "topicKey": "shared_ae2de6d7cbcf4c82b732ece72468ac91",
+    "topicLabel": "One history · 原来源 sourceC · 0 条",
+    "messages": [],
+    "executions": [],
+    "notice": [],
+    "previews": []
+  },
+  "readback": {
+    "status": 200,
+    "sessionMarker": "1f2085cd01e6950eb52614103dec9f489c41ee550f79ff2f277e77117773eba8"
+  }
+}

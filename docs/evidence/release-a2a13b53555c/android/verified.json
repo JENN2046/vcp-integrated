@@ -1,0 +1,68 @@
+{
+  "verified": true,
+  "revision": "a2a13b53555c55ca79844544d8802d61fc0cf3e0",
+  "bundle": "assets/index-Bsu6-SLg.js",
+  "sameSessionAfterCoordinatorRestart": true,
+  "pwaProcessIds": {
+    "initial": "6113",
+    "groupCold": "8220",
+    "singleCold": "11818"
+  },
+  "scope": [
+    "shared:sharedAB:read"
+  ],
+  "group": {
+    "workId": "request_3f478177daa64fd1b83567bab7787f4a",
+    "journal": [
+      {
+        "seq": 4,
+        "id": "controlled_2606279cd5a14b3a800bcffd56559145",
+        "role": "user",
+        "body": "GROUP_HANDOFF_BASELINE_INPUT",
+        "sha256": "52ad9fa3ad8ff158ebb40ffae949ddb25f73afb8fc355f9fa7ed2c7a866de0c6"
+      },
+      {
+        "seq": 5,
+        "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+        "role": "assistant",
+        "body": "RELAY_A_FINAL",
+        "sha256": "d5866d26aab3a310793d3cdaae200a285d603c288112075e33e3bdd8ae18889b"
+      },
+      {
+        "seq": 6,
+        "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+        "role": "assistant",
+        "body": "RELAY_B_FINAL",
+        "sha256": "841701ceb2714593ed2eceadbe26d8fb27c7b999cbe5f2b54ef7b6fd2367a165"
+      },
+      {
+        "seq": 7,
+        "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2",
+        "role": "assistant",
+        "body": "RELAY_C_FINAL",
+        "sha256": "64befa296ed103094cf188f6b0d3a1af0c8ec9bf124f11265fe27a0e81a8ab46"
+      }
+    ]
+  },
+  "single": {
+    "originalWorkId": "request_74186074863a4b13a132aaaf9907f1f2",
+    "deletedMessageId": "msg_1795410148688_user_rpgk5zbiun",
+    "finalWorkId": "request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+    "journal": [
+      {
+        "seq": 10,
+        "id": "msg_1795410387976_user_ye9clxx2sl",
+        "role": "user",
+        "body": "SYNTHETIC_502_NEXT_INPUT",
+        "sha256": "2a344c3ee5cb8aa16c43c68d6fe9150363fbc0d20e8153c37e6bd40837c2ee61"
+      },
+      {
+        "seq": 11,
+        "id": "reply_request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+        "role": "assistant",
+        "body": "SYNTHETIC_502_NEXT_FINAL",
+        "sha256": "1c8a819d8e7c0707b924f08aaa8bffaae1cdb52b7aae71803f68514e95e7f8f6"
+      }
+    ]
+  }
+}

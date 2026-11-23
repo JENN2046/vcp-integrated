@@ -1,0 +1,27 @@
+{
+  "status": 200,
+  "executionId": "request_3f478177daa64fd1b83567bab7787f4a",
+  "sharedSpaceId": "sharedAB",
+  "sharedId": "shared_14d89b041b7649cfbe8d86023a2bbfc7",
+  "native": null,
+  "request": {
+    "id": "request_3f478177daa64fd1b83567bab7787f4a",
+    "requestId": "controlled_2606279cd5a14b3a800bcffd56559145",
+    "state": "dispatched",
+    "userSeq": 4,
+    "replySeq": 6,
+    "groupHandoff": {
+      "state": "continuing",
+      "executor": "desktop:deviceA",
+      "executorVersion": 2,
+      "nextOrdinal": 2,
+      "nextRequestId": "group_request_3f478177daa64fd1b83567bab7787f4a_2",
+      "previousReplySeq": 6,
+      "confirmedReplies": [
+        5,
+        6
+      ]
+    }
+  },
+  "journalBody": null
+}

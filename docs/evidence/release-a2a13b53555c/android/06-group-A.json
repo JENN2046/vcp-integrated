@@ -1,0 +1,42 @@
+{
+  "pid": "6113",
+  "focus": "  mCurrentFocus=Window{2649320 u12 org.mozilla.firefox/org.mozilla.fenix.customtabs.ExternalAppBrowserActivity}",
+  "secure": true,
+  "visible": true,
+  "standalone": true,
+  "origin": "https://127.0.0.1:18443",
+  "connection": "已连接",
+  "bundle": "/mobile/assets/index-Bsu6-SLg.js",
+  "workerControlled": true,
+  "isPrivate": false,
+  "browsingContextID": 2,
+  "observed": {
+    "topicKey": "shared_14d89b041b7649cfbe8d86023a2bbfc7",
+    "topicLabel": "Relay round · 原来源 sourceC · 2 条",
+    "messages": [
+      {
+        "id": "controlled_2606279cd5a14b3a800bcffd56559145",
+        "role": "user",
+        "name": "你",
+        "body": "GROUP_HANDOFF_BASELINE_INPUT",
+        "characters": 28,
+        "sha256": "52ad9fa3ad8ff158ebb40ffae949ddb25f73afb8fc355f9fa7ed2c7a866de0c6"
+      },
+      {
+        "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+        "role": "assistant",
+        "name": "A",
+        "body": "RELAY_A_FINAL",
+        "characters": 13,
+        "sha256": "d5866d26aab3a310793d3cdaae200a285d603c288112075e33e3bdd8ae18889b"
+      }
+    ],
+    "executions": [],
+    "notice": [],
+    "previews": []
+  },
+  "readback": {
+    "status": 200,
+    "sessionMarker": "1f2085cd01e6950eb52614103dec9f489c41ee550f79ff2f277e77117773eba8"
+  }
+}

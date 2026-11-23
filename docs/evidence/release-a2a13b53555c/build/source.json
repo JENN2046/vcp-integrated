@@ -1,0 +1,17 @@
+{
+  "candidate": "a2a13b53555c55ca79844544d8802d61fc0cf3e0",
+  "tree": "74d0c6dd8fd55b216e9c7f2bf359ca953099a565",
+  "cleanBeforeDependencyInstall": true,
+  "cleanAfterBuild": true,
+  "node": "v24.22.1",
+  "npm": "11.19.1",
+  "cdsToolchain": "rustc 1.96.1 (31fca3adb 2026-06-26)",
+  "vexusToolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "buildCommands": [
+    "npm_config_offline=true npm run deps",
+    "CARGO_NET_OFFLINE=true npm run build"
+  ],
+  "buildExit": 0,
+  "checksumCount": 32,
+  "manifestSha256": "192d91c81238d7eb95182df4149e40d5c0bbc2766e03ee25a8373276a171b7d3"
+}

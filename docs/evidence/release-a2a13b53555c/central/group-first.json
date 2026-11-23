@@ -1,0 +1,226 @@
+{
+  "group": {
+    "admissions": [
+      {
+        "id": "request_3f478177daa64fd1b83567bab7787f4a",
+        "request_id": "controlled_2606279cd5a14b3a800bcffd56559145",
+        "principal": "desktop:deviceA",
+        "state": "dispatched",
+        "dispatched": 1,
+        "user_seq": 4,
+        "reply_seq": 5
+      }
+    ],
+    "work": [],
+    "native": [
+      {
+        "id": "group_request_3f478177daa64fd1b83567bab7787f4a_0",
+        "admission_id": "request_3f478177daa64fd1b83567bab7787f4a",
+        "ordinal": 0,
+        "principal": "desktop:deviceA",
+        "member_id": "shared_2b92081751474076b9dee186164086dc",
+        "state": "model_terminal"
+      }
+    ],
+    "handoff": [
+      {
+        "work_id": "request_3f478177daa64fd1b83567bab7787f4a",
+        "executor": "desktop:deviceA",
+        "executor_version": 0,
+        "state": "awaiting_handoff",
+        "first_reply_seq": null
+      }
+    ],
+    "slots": [
+      {
+        "ordinal": 0,
+        "reply_seq": 5
+      }
+    ],
+    "journal": [
+      {
+        "seq": 4,
+        "msg_id": "controlled_2606279cd5a14b3a800bcffd56559145",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "message": {
+          "id": "controlled_2606279cd5a14b3a800bcffd56559145",
+          "role": "user",
+          "content": "GROUP_HANDOFF_BASELINE_INPUT",
+          "timestamp": 1795409825308,
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "fields": {}
+          }
+        }
+      },
+      {
+        "seq": 5,
+        "msg_id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "message": {
+          "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+          "role": "assistant",
+          "name": "A",
+          "content": "RELAY_A_FINAL",
+          "timestamp": 1795409825663,
+          "agentId": "shared_2b92081751474076b9dee186164086dc",
+          "groupId": "shared_29c4f523979b4880b373a72c12b81d3d",
+          "topicId": "shared_14d89b041b7649cfbe8d86023a2bbfc7",
+          "isGroupMessage": true,
+          "finishReason": "completed",
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "group_request_3f478177daa64fd1b83567bab7787f4a_0",
+            "executionId": "request_3f478177daa64fd1b83567bab7787f4a",
+            "dependsOnMessageIds": [
+              "controlled_2606279cd5a14b3a800bcffd56559145"
+            ]
+          },
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "d237a384e7a9886db091605d39d1419eb6b0a72cbae89147b2f102a161424efc",
+            "fields": {
+              "continuity": {
+                "version": 1,
+                "known": true,
+                "requestId": "group_request_3f478177daa64fd1b83567bab7787f4a_0",
+                "executionId": "request_3f478177daa64fd1b83567bab7787f4a",
+                "dependsOnMessageIds": [
+                  "controlled_2606279cd5a14b3a800bcffd56559145"
+                ]
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "single": {
+    "admissions": [],
+    "work": [],
+    "native": [],
+    "handoff": [],
+    "slots": [],
+    "journal": []
+  },
+  "calls": [
+    {
+      "id": "group_request_3f478177daa64fd1b83567bab7787f4a_0",
+      "stream": true,
+      "at": 1795409825650,
+      "member": "A"
+    }
+  ],
+  "schemaVersion": 4,
+  "retained": [
+    {
+      "id": "shared_c9480ecf37f54a0dbd175f031dc29057",
+      "admissions": [
+        {
+          "id": "request_64d57d14472a40408307e77890f1d894",
+          "request_id": "old-work-input",
+          "principal": "desktop:deviceA",
+          "state": "completed",
+          "dispatched": 1,
+          "user_seq": 1,
+          "reply_seq": 3
+        }
+      ],
+      "work": [],
+      "native": [
+        {
+          "id": "group_request_64d57d14472a40408307e77890f1d894_0",
+          "admission_id": "request_64d57d14472a40408307e77890f1d894",
+          "ordinal": 0,
+          "principal": "desktop:deviceA",
+          "member_id": "shared_e765b01b50ab4040866827e37cebf854",
+          "state": "model_terminal"
+        },
+        {
+          "id": "group_request_64d57d14472a40408307e77890f1d894_1",
+          "admission_id": "request_64d57d14472a40408307e77890f1d894",
+          "ordinal": 1,
+          "principal": "desktop:deviceB",
+          "member_id": "shared_6611a4600c024761ab12cd06789769e1",
+          "state": "model_terminal"
+        }
+      ],
+      "handoff": [
+        {
+          "work_id": "request_64d57d14472a40408307e77890f1d894",
+          "executor": "desktop:deviceB",
+          "executor_version": 1,
+          "state": "continuing",
+          "first_reply_seq": 2
+        }
+      ],
+      "slots": [],
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "old-work-input",
+          "device_id": "desktop:deviceA",
+          "action": "upsert",
+          "message": {
+            "id": "old-work-input",
+            "role": "user",
+            "content": "Synthetic compatibility input",
+            "timestamp": 1,
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+              "fields": {}
+            }
+          }
+        },
+        {
+          "seq": 2,
+          "msg_id": "reply_group_request_64d57d14472a40408307e77890f1d894_0",
+          "device_id": "desktop:deviceA",
+          "action": "upsert",
+          "message": {
+            "id": "reply_group_request_64d57d14472a40408307e77890f1d894_0",
+            "role": "assistant",
+            "agentId": "shared_e765b01b50ab4040866827e37cebf854",
+            "content": "Synthetic reply 0",
+            "timestamp": 2,
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+              "fields": {}
+            }
+          }
+        },
+        {
+          "seq": 3,
+          "msg_id": "reply_group_request_64d57d14472a40408307e77890f1d894_1",
+          "device_id": "desktop:deviceB",
+          "action": "upsert",
+          "message": {
+            "id": "reply_group_request_64d57d14472a40408307e77890f1d894_1",
+            "role": "assistant",
+            "agentId": "shared_6611a4600c024761ab12cd06789769e1",
+            "content": "Synthetic reply 1",
+            "timestamp": 3,
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+              "fields": {}
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "pairings": 1,
+  "mobileScopes": [
+    [
+      "shared:sharedAB:read"
+    ]
+  ],
+  "wires": []
+}

@@ -1,0 +1,134 @@
+[
+  {
+    "member": "A",
+    "packet": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "GROUP_RELAY_MEMBER_A"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "[用户的发言]: GROUP_HANDOFF_BASELINE_INPUT"
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "[系统邀请指令:] 现在轮到你 A 发言了。"
+            }
+          ]
+        }
+      ],
+      "model": "synthetic",
+      "temperature": 0.5,
+      "max_tokens": 128,
+      "stream": true,
+      "messageId": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+      "requestId": "group_request_3f478177daa64fd1b83567bab7787f4a_0"
+    }
+  },
+  {
+    "member": "B",
+    "packet": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "GROUP_RELAY_MEMBER_B"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "[用户的发言]: GROUP_HANDOFF_BASELINE_INPUT"
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "[A的发言]: RELAY_A_FINAL"
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "[系统邀请指令:] 现在轮到你 B 发言了。"
+            }
+          ]
+        }
+      ],
+      "model": "synthetic",
+      "temperature": 0.5,
+      "max_tokens": 128,
+      "stream": true,
+      "messageId": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+      "requestId": "group_request_3f478177daa64fd1b83567bab7787f4a_1"
+    }
+  },
+  {
+    "member": "C",
+    "packet": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "GROUP_RELAY_MEMBER_C"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "[用户的发言]: GROUP_HANDOFF_BASELINE_INPUT"
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "[A的发言]: RELAY_A_FINAL"
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": [
+            {
+              "type": "text",
+              "text": "[B的发言]: RELAY_B_FINAL"
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "[系统邀请指令:] 现在轮到你 C 发言了。"
+            }
+          ]
+        }
+      ],
+      "model": "synthetic",
+      "temperature": 0.5,
+      "max_tokens": 128,
+      "stream": true,
+      "messageId": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2",
+      "requestId": "group_request_3f478177daa64fd1b83567bab7787f4a_2"
+    }
+  }
+]

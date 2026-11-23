@@ -1,0 +1,2 @@
+{"event":"ipc","t":1795410302959,"data":{"channel":"native-sync:abandon-send","sender":1}}
+{"event":"ipc-result","t":1795410302984,"data":{"channel":"native-sync:abandon-send","success":true}}

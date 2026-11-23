@@ -1,0 +1,8 @@
+Starting: Intent { act=mozilla.components.feature.pwa.PWA_LAUNCHER dat=https://127.0.0.1:18443/... flg=0x80000 cmp=org.mozilla.firefox/mozilla.components.feature.pwa.WebAppLauncherActivity }
+Status: ok
+LaunchState: COLD
+Activity: org.mozilla.firefox/mozilla.components.feature.pwa.WebAppLauncherActivity
+TotalTime: 228
+WaitTime: 236
+Complete
+  mCurrentFocus=Window{c546966 u12 org.mozilla.firefox/org.mozilla.fenix.customtabs.ExternalAppBrowserActivity}

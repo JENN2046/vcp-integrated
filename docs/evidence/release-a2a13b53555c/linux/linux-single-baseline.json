@@ -1,0 +1,15 @@
+{
+  "launch": 3,
+  "view": {
+    "context": {
+      "itemId": "ns_798fc3206c3ea27dd34d50a5",
+      "itemType": "agent",
+      "topicId": "ns_0772af97aff033049d258301",
+      "historyRevision": 18
+    },
+    "text": "",
+    "controlledWork": "",
+    "status": "任务状态本地暂无待确认同步操作。以下为最近已知记录，需要联网核对最新状态。尚无可核对的云端执行记录。关闭报告核对云端状态"
+  },
+  "history": []
+}

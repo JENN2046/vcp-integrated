@@ -1,0 +1,77 @@
+{
+  "linux-1-loaded.json": [
+    "apps/desktop/Groupmodules/groupchat.js",
+    "apps/desktop/modules/services/nativeSync/sharedGroupHandoff.js",
+    "apps/desktop/modules/renderer/messageContextMenu.js",
+    "apps/desktop/modules/renderer/controlledWorkView.mjs"
+  ],
+  "linux-2-loaded.json": [
+    "apps/desktop/Groupmodules/groupchat.js",
+    "apps/desktop/modules/services/nativeSync/sharedGroupHandoff.js",
+    "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+    "apps/desktop/modules/renderer/messageContextMenu.js",
+    "apps/desktop/modules/renderer/controlledWorkView.mjs"
+  ],
+  "linux-3-loaded.json": [
+    "apps/desktop/Groupmodules/groupchat.js",
+    "apps/desktop/modules/services/nativeSync/sharedGroupHandoff.js",
+    "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+    "apps/desktop/modules/renderer/messageContextMenu.js",
+    "apps/desktop/modules/renderer/controlledWorkView.mjs"
+  ],
+  "linux-4-loaded.json": [
+    "apps/desktop/Groupmodules/groupchat.js",
+    "apps/desktop/modules/services/nativeSync/sharedGroupHandoff.js",
+    "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+    "apps/desktop/modules/renderer/messageContextMenu.js",
+    "apps/desktop/modules/renderer/controlledWorkView.mjs"
+  ],
+  "linux-5-loaded.json": [
+    "apps/desktop/Groupmodules/groupchat.js",
+    "apps/desktop/modules/services/nativeSync/sharedGroupHandoff.js",
+    "apps/desktop/modules/services/nativeSync/sharedExecution.js",
+    "apps/desktop/modules/renderer/messageContextMenu.js",
+    "apps/desktop/modules/renderer/controlledWorkView.mjs"
+  ],
+  "backend": [
+    "apps/server/server.js",
+    "apps/server/Plugin.js",
+    "apps/server/WebSocketServer.js",
+    "apps/server/modules/requestExecutionContext.js",
+    "apps/server/modules/chatCompletionHandler.js",
+    "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+    "apps/server/Plugin/NativeSync/sync/sharedSteering.js",
+    "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+    "apps/server/Plugin/NativeSync/mobile/nativeTasks.js",
+    "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+    "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+    "apps/server/Plugin/NativeSync/sync/httpService.js",
+    "apps/server/Plugin/NativeSync/sync/sharedWait.js",
+    "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+    "apps/server/Plugin/NativeSync/sync/sharedControlledText.js",
+    "apps/server/Plugin/NativeSync/sync/sharedCompaction.js",
+    "apps/server/Plugin/NativeSync/sync/sharedDelegation.js",
+    "apps/server/Plugin/NativeSync/mobile/effectiveContext.js",
+    "apps/server/Plugin/NativeSync/sync/sharedTaskRequests.js",
+    "apps/server/Plugin/NativeSync/sync/sharedTaskControls.js",
+    "apps/server/modules/vcpLoop/toolExecutor.js",
+    "apps/server/modules/nativeContinuationStore.cjs",
+    "apps/server/modules/handlers/streamHandler.js",
+    "apps/server/modules/handlers/nonStreamHandler.js",
+    "apps/server/modules/pluginBridgeRegistry.js",
+    "apps/server/modules/toolCallRecordStore.js",
+    "apps/server/Plugin/NativeSync/sync/sharedTopicSponsor.js",
+    "apps/server/Plugin/NativeSync/mobile/execution.js",
+    "apps/server/Plugin/NativeSync/mobile/groupTurn.js",
+    "apps/server/Plugin/NativeSync/mobile/portal.js",
+    "apps/server/Plugin/NativeSync/sync/sharedTurns.js",
+    "apps/server/Plugin/NativeSync/sync/sharedEvents.js",
+    "apps/server/Plugin/NativeSync/native-sync.js",
+    "apps/server/Plugin/NativeSync/sync/sponsorExecutionBridge.js"
+  ],
+  "handoff": [
+    "apps/server/Plugin/NativeSync/sync/sharedGroupHandoff.js",
+    "apps/server/Plugin/NativeSync/sync/sharedGroupHandoff.js",
+    "apps/server/Plugin/NativeSync/sync/sharedGroupHandoff.js"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "status": "PASS",
+  "workId": "request_3f478177daa64fd1b83567bab7787f4a",
+  "onlinePid": 9568,
+  "reopenedPid": 4244,
+  "groupMessages": [
+    {
+      "id": "controlled_2606279cd5a14b3a800bcffd56559145",
+      "text": "GROUP_HANDOFF_BASELINE_INPUT"
+    },
+    {
+      "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+      "text": "RELAY_A_FINAL"
+    },
+    {
+      "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+      "text": "RELAY_B_FINAL"
+    },
+    {
+      "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2",
+      "text": "RELAY_C_FINAL"
+    }
+  ],
+  "singleMessages": [
+    {
+      "id": "msg_1795410387976_user_ye9clxx2sl",
+      "text": "SYNTHETIC_502_NEXT_INPUT"
+    },
+    {
+      "id": "reply_request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+      "text": "SYNTHETIC_502_NEXT_FINAL"
+    }
+  ]
+}

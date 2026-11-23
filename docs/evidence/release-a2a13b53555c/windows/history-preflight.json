@@ -1,0 +1,21 @@
+{
+  "time": "2026-11-23T04:55:12.915Z",
+  "guest": {
+    "hostname": "R16-VM",
+    "release": "10.0.22631",
+    "arch": "x64",
+    "account": "R16Limited"
+  },
+  "histories": {
+    "group": {
+      "filename": "UserData\\ns_72c011434eaa86ceba4fb795\\topics\\ns_31a334800544b15d2e2c9dee\\history.json",
+      "missing": true,
+      "rows": []
+    },
+    "single": {
+      "filename": "UserData\\ns_798fc3206c3ea27dd34d50a5\\topics\\ns_0772af97aff033049d258301\\history.json",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "rows": []
+    }
+  }
+}

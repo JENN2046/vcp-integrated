@@ -1,0 +1,48 @@
+{
+  "time": "2026-11-23T05:02:56.551Z",
+  "guest": {
+    "hostname": "R16-VM",
+    "release": "10.0.22631",
+    "arch": "x64",
+    "account": "R16Limited"
+  },
+  "histories": {
+    "group": {
+      "filename": "UserData\\ns_72c011434eaa86ceba4fb795\\topics\\ns_31a334800544b15d2e2c9dee\\history.json",
+      "sha256": "ec4d44cb1120883f58b6fdd8a27c67a2a9dc96b00b9e667db586c4e3f2cc5880",
+      "rows": [
+        {
+          "id": "controlled_2606279cd5a14b3a800bcffd56559145",
+          "role": "user",
+          "content": "GROUP_HANDOFF_BASELINE_INPUT"
+        },
+        {
+          "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+          "role": "assistant",
+          "content": "RELAY_A_FINAL"
+        },
+        {
+          "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+          "role": "assistant",
+          "content": "RELAY_B_FINAL"
+        },
+        {
+          "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2",
+          "role": "assistant",
+          "content": "RELAY_C_FINAL"
+        }
+      ]
+    },
+    "single": {
+      "filename": "UserData\\ns_798fc3206c3ea27dd34d50a5\\topics\\ns_0772af97aff033049d258301\\history.json",
+      "sha256": "c7ad89941aa9d1321661dda58817a1490a16fd25df5ef793d2def1a601a90978",
+      "rows": [
+        {
+          "id": "msg_1795410148688_user_rpgk5zbiun",
+          "role": "user",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT"
+        }
+      ]
+    }
+  }
+}

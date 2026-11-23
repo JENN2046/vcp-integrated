@@ -1,0 +1,67 @@
+{
+  "revision": "a2a13b53555c55ca79844544d8802d61fc0cf3e0",
+  "workId": "request_3f478177daa64fd1b83567bab7787f4a",
+  "groupTopic": "shared_14d89b041b7649cfbe8d86023a2bbfc7",
+  "singleTopic": "shared_ae2de6d7cbcf4c82b732ece72468ac91",
+  "groupJournal": [
+    4,
+    5,
+    6,
+    7
+  ],
+  "context": [
+    {
+      "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+      "bindingIndex": 2,
+      "providerIndex": 2,
+      "sha256": "sha256:18371e499f77e15c5a2e2003b603e2a493773452abe719c64e2bd3b0325f5cee"
+    },
+    {
+      "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+      "bindingIndex": 3,
+      "providerIndex": 3,
+      "sha256": "sha256:bf877a60686da2114d692debb6bb362ff05b9866a231cd118c667796359f056f"
+    }
+  ],
+  "singleWork": [
+    {
+      "id": "request_74186074863a4b13a132aaaf9907f1f2",
+      "state": "cancelled"
+    },
+    {
+      "id": "request_b1a2b7708ceb48eabc3e66a7b717a2f5",
+      "state": "completed"
+    }
+  ],
+  "singleJournal": [
+    [
+      8,
+      "upsert"
+    ],
+    [
+      9,
+      "delete"
+    ],
+    [
+      10,
+      "upsert"
+    ],
+    [
+      11,
+      "upsert"
+    ]
+  ],
+  "providerOrder": [
+    "A",
+    "B",
+    "C",
+    "SYNTHETIC_502_ORIGINAL_INPUT",
+    "SYNTHETIC_502_NEXT_INPUT"
+  ],
+  "pairings": 1,
+  "linuxHistoryMatched": true,
+  "restoredDbSha256": "5c075b18c6e5eb696bba9d38b715f834ffcb96d4091a98d4b660d8f2e8893b81",
+  "retainedWorkIds": [
+    "request_64d57d14472a40408307e77890f1d894"
+  ]
+}

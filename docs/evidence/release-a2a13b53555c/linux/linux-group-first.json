@@ -1,0 +1,63 @@
+{
+  "launch": 2,
+  "view": {
+    "context": {
+      "itemId": "ns_72c011434eaa86ceba4fb795",
+      "itemType": "group",
+      "topicId": "ns_31a334800544b15d2e2c9dee",
+      "historyRevision": 26
+    },
+    "text": "用户\n2026-11-23 12:57\n\nGROUP_HANDOFF_BASELINE_INPUT\n\nA\n2026-11-23 12:57\n\nRELAY_A_FINAL",
+    "controlledWork": "上一位成员回复已确认，可在另一设备接管 · 执行端：本端 · 第2位，共3位",
+    "status": "任务状态"
+  },
+  "history": [
+    {
+      "id": "controlled_2606279cd5a14b3a800bcffd56559145",
+      "role": "user",
+      "content": "GROUP_HANDOFF_BASELINE_INPUT",
+      "timestamp": 1795409825308,
+      "_nativeSyncMetadata": {
+        "version": 1,
+        "hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "fields": {}
+      }
+    },
+    {
+      "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+      "role": "assistant",
+      "name": "A",
+      "content": "RELAY_A_FINAL",
+      "timestamp": 1795409825663,
+      "agentId": "shared_2b92081751474076b9dee186164086dc",
+      "groupId": "shared_29c4f523979b4880b373a72c12b81d3d",
+      "topicId": "shared_14d89b041b7649cfbe8d86023a2bbfc7",
+      "isGroupMessage": true,
+      "finishReason": "completed",
+      "continuity": {
+        "version": 1,
+        "known": true,
+        "requestId": "group_request_3f478177daa64fd1b83567bab7787f4a_0",
+        "executionId": "request_3f478177daa64fd1b83567bab7787f4a",
+        "dependsOnMessageIds": [
+          "controlled_2606279cd5a14b3a800bcffd56559145"
+        ]
+      },
+      "_nativeSyncMetadata": {
+        "version": 1,
+        "hash": "d237a384e7a9886db091605d39d1419eb6b0a72cbae89147b2f102a161424efc",
+        "fields": {
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "group_request_3f478177daa64fd1b83567bab7787f4a_0",
+            "executionId": "request_3f478177daa64fd1b83567bab7787f4a",
+            "dependsOnMessageIds": [
+              "controlled_2606279cd5a14b3a800bcffd56559145"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

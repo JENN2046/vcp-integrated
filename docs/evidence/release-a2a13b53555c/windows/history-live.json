@@ -1,0 +1,42 @@
+{
+  "time": "2026-11-23T05:00:34.152Z",
+  "guest": {
+    "hostname": "R16-VM",
+    "release": "10.0.22631",
+    "arch": "x64",
+    "account": "R16Limited"
+  },
+  "histories": {
+    "group": {
+      "filename": "UserData\\ns_72c011434eaa86ceba4fb795\\topics\\ns_31a334800544b15d2e2c9dee\\history.json",
+      "sha256": "ec4d44cb1120883f58b6fdd8a27c67a2a9dc96b00b9e667db586c4e3f2cc5880",
+      "rows": [
+        {
+          "id": "controlled_2606279cd5a14b3a800bcffd56559145",
+          "role": "user",
+          "content": "GROUP_HANDOFF_BASELINE_INPUT"
+        },
+        {
+          "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+          "role": "assistant",
+          "content": "RELAY_A_FINAL"
+        },
+        {
+          "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+          "role": "assistant",
+          "content": "RELAY_B_FINAL"
+        },
+        {
+          "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2",
+          "role": "assistant",
+          "content": "RELAY_C_FINAL"
+        }
+      ]
+    },
+    "single": {
+      "filename": "UserData\\ns_798fc3206c3ea27dd34d50a5\\topics\\ns_0772af97aff033049d258301\\history.json",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "rows": []
+    }
+  }
+}
