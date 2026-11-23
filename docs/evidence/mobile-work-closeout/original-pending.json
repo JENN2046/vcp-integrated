@@ -1,0 +1,41 @@
+{
+  "pid": "21948",
+  "focus": "  mCurrentFocus=Window{f0eb136 u12 org.mozilla.firefox/org.mozilla.fenix.customtabs.ExternalAppBrowserActivity}",
+  "secure": true,
+  "visible": true,
+  "standalone": true,
+  "origin": "https://127.0.0.1:18443",
+  "connection": "已连接",
+  "bundle": "/mobile/assets/index-Bsu6-SLg.js",
+  "workerControlled": true,
+  "isPrivate": false,
+  "browsingContextID": 2,
+  "observed": {
+    "topicKey": "shared_ae2de6d7cbcf4c82b732ece72468ac91",
+    "topicLabel": "One history · 原来源 sourceC · 1 条",
+    "messages": [
+      {
+        "id": "msg_1795411371875_user_mijkw5x3mm",
+        "role": "user",
+        "name": "你",
+        "body": "SYNTHETIC_502_ORIGINAL_INPUT",
+        "characters": 28,
+        "sha256": "c57bb25b168ee37608e65c4261fa66223d9ef39723f2fe7ef0194df955649459"
+      }
+    ],
+    "executions": [
+      {
+        "id": "request_10d468b861824e2fb440ea22a6f4b4f1",
+        "state": "review_required",
+        "details": "执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑",
+        "buttons": []
+      }
+    ],
+    "notice": [],
+    "previews": []
+  },
+  "readback": {
+    "status": 200,
+    "sessionMarker": "1f2085cd01e6950eb52614103dec9f489c41ee550f79ff2f277e77117773eba8"
+  }
+}

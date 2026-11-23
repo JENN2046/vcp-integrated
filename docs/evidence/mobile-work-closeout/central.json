@@ -1,0 +1,173 @@
+{
+  "pending": {
+    "admissions": [
+      {
+        "id": "request_10d468b861824e2fb440ea22a6f4b4f1",
+        "request_id": "msg_1795411371875_user_mijkw5x3mm",
+        "principal": "desktop:deviceA",
+        "state": "review_required",
+        "dispatched": 1,
+        "user_seq": 1,
+        "reply_seq": null
+      }
+    ],
+    "work": [
+      {
+        "id": "request_10d468b861824e2fb440ea22a6f4b4f1",
+        "request_id": "msg_1795411371875_user_mijkw5x3mm",
+        "state": "review_required",
+        "attempts": 1,
+        "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+        "user_message_id": "msg_1795411371875_user_mijkw5x3mm",
+        "reply_message_id": null,
+        "review_resolved": 0,
+        "pending_operation": null,
+        "native_final_operation": null
+      }
+    ],
+    "native": [
+      {
+        "id": "request_10d468b861824e2fb440ea22a6f4b4f1",
+        "admission_id": "request_10d468b861824e2fb440ea22a6f4b4f1",
+        "ordinal": 0,
+        "principal": "desktop:deviceA",
+        "member_id": null,
+        "state": "unknown"
+      }
+    ],
+    "handoff": [],
+    "slots": [],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "msg_1795411371875_user_mijkw5x3mm",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "message": {
+          "id": "msg_1795411371875_user_mijkw5x3mm",
+          "role": "user",
+          "name": "用户",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT",
+          "timestamp": 1795411371878,
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "msg_1795411371875_user_mijkw5x3mm",
+            "executionId": "request_10d468b861824e2fb440ea22a6f4b4f1",
+            "dependsOnMessageIds": []
+          },
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "3facfac5be198576a52198907b027b3ee9a2f39b907985d0f394ff12d80ac21e",
+            "fields": {
+              "continuity": {
+                "version": 1,
+                "known": true,
+                "requestId": "msg_1795411371875_user_mijkw5x3mm",
+                "executionId": "request_10d468b861824e2fb440ea22a6f4b4f1",
+                "dependsOnMessageIds": []
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "settled": {
+    "admissions": [
+      {
+        "id": "request_10d468b861824e2fb440ea22a6f4b4f1",
+        "request_id": "msg_1795411371875_user_mijkw5x3mm",
+        "principal": "desktop:deviceA",
+        "state": "abandoned",
+        "dispatched": 1,
+        "user_seq": 1,
+        "reply_seq": null
+      }
+    ],
+    "work": [
+      {
+        "id": "request_10d468b861824e2fb440ea22a6f4b4f1",
+        "request_id": "msg_1795411371875_user_mijkw5x3mm",
+        "state": "cancelled",
+        "attempts": 1,
+        "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+        "user_message_id": "msg_1795411371875_user_mijkw5x3mm",
+        "reply_message_id": null,
+        "review_resolved": 1,
+        "pending_operation": null,
+        "native_final_operation": null
+      }
+    ],
+    "native": [
+      {
+        "id": "request_10d468b861824e2fb440ea22a6f4b4f1",
+        "admission_id": "request_10d468b861824e2fb440ea22a6f4b4f1",
+        "ordinal": 0,
+        "principal": "desktop:deviceA",
+        "member_id": null,
+        "state": "unknown"
+      }
+    ],
+    "handoff": [],
+    "slots": [],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "msg_1795411371875_user_mijkw5x3mm",
+        "device_id": "desktop:deviceA",
+        "action": "upsert",
+        "message": {
+          "id": "msg_1795411371875_user_mijkw5x3mm",
+          "role": "user",
+          "name": "用户",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT",
+          "timestamp": 1795411371878,
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "msg_1795411371875_user_mijkw5x3mm",
+            "executionId": "request_10d468b861824e2fb440ea22a6f4b4f1",
+            "dependsOnMessageIds": []
+          },
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "3facfac5be198576a52198907b027b3ee9a2f39b907985d0f394ff12d80ac21e",
+            "fields": {
+              "continuity": {
+                "version": 1,
+                "known": true,
+                "requestId": "msg_1795411371875_user_mijkw5x3mm",
+                "executionId": "request_10d468b861824e2fb440ea22a6f4b4f1",
+                "dependsOnMessageIds": []
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "abandon": {
+    "status": 200,
+    "device": "deviceA",
+    "route": "/api/v1/sync/shared/abandon",
+    "method": "POST",
+    "admissionId": "request_10d468b861824e2fb440ea22a6f4b4f1",
+    "state": "abandoned"
+  },
+  "providerCalls": [
+    {
+      "id": "request_10d468b861824e2fb440ea22a6f4b4f1",
+      "stream": true,
+      "at": 1795411371961,
+      "input": "SYNTHETIC_502_ORIGINAL_INPUT",
+      "httpStatus": 502
+    }
+  ],
+  "pairings": 1,
+  "sessionScopes": [
+    [
+      "shared:sharedAB:read"
+    ]
+  ]
+}

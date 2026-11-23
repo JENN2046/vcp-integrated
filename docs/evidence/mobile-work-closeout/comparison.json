@@ -1,0 +1,39 @@
+{
+  "topic": "shared_ae2de6d7cbcf4c82b732ece72468ac91",
+  "work": "request_10d468b861824e2fb440ea22a6f4b4f1",
+  "userMessage": "msg_1795411371875_user_mijkw5x3mm",
+  "sameReadOnlySession": true,
+  "attempts": 1,
+  "providerCalls": 1,
+  "nativeRequestState": "unknown",
+  "assistantMessages": 0,
+  "runs": {
+    "original-pending": {
+      "phonePid": "21948",
+      "bundle": "/mobile/assets/index-Bsu6-SLg.js",
+      "state": "review_required",
+      "visibleText": "执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑",
+      "visibleWorkActions": [],
+      "centralAdmission": "review_required",
+      "centralReviewResolved": 0
+    },
+    "original-closed": {
+      "phonePid": "27538",
+      "bundle": "/mobile/assets/index-Bsu6-SLg.js",
+      "state": "cancelled",
+      "visibleText": "执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑\n\n已记录人工核对；这不表示已取消 AA 或撤回工具副作用。",
+      "visibleWorkActions": [],
+      "centralAdmission": "abandoned",
+      "centralReviewResolved": 1
+    },
+    "fixed-closed": {
+      "phonePid": "28598",
+      "bundle": "/mobile/assets/index-Cuf1bKRk.js",
+      "state": "cancelled",
+      "visibleText": "已人工结清，剩余工作已放弃\n\n已记录人工核对；这不表示已取消 AA 或撤回工具副作用。",
+      "visibleWorkActions": [],
+      "centralAdmission": "abandoned",
+      "centralReviewResolved": 1
+    }
+  }
+}
