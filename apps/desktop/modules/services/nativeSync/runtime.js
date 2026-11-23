@@ -25,7 +25,7 @@ function createSyncDownload(connection){
         catch(error){if(error.code==='ATTACHMENT_FILE_TOO_LARGE')throw error;throw fail('NETWORK_UNAVAILABLE');}
     });
 }
-async function createNativeSyncRuntime({ queue, appDataRoot, args = [], isolated = false, notify, notifyExecutionStatus, intervalMs = 250, executionIntervalMs = 5000, readSettings, readAgentConfig, readGroupConfig, readTavernRules, readEffectiveTavernRules, readExecutionPolicy, thumbnail, request, requestBinary, requestEvents, requestWatch, storeAttachment, ipcMain, getMainWindow, sourceFault, agentConfigEvents, sharedHost, historyAuthority = authorityControl.authorityForQueue(queue), localHistoryAuthority, waitForHistoryAuthority, isStopping = () => false }) {
+async function createNativeSyncRuntime({ queue, appDataRoot, args = [], isolated = false, notify, notifyExecutionStatus, intervalMs = 250, executionIntervalMs = 5000, readSettings, readAgentConfig, readGroupConfig, readTavernRules, readEffectiveTavernRules, readExecutionPolicy, thumbnail, request, requestBinary, requestEvents, requestWatch, storeAttachment, ipcMain, getMainWindow, sourceFault, agentConfigEvents, sharedHost, historyAuthority = authorityControl.authorityForQueue(queue), localHistoryAuthority, waitForHistoryAuthority, isStopping = () => false, publishRecoveredRuntime }) {
     const poc = args.includes('--native-sync-poc');
     if (poc && !isolated) throw fail('ISOLATED_APP_DATA_REQUIRED');
     if (!poc && !appDataRoot) return null;
@@ -44,19 +44,78 @@ async function createNativeSyncRuntime({ queue, appDataRoot, args = [], isolated
     if(sharedHost)queue.nativeSyncSharedHost=sharedHost;
     let connection;try{connection=poc?null:await require('./connection').readConnection({appDataRoot,readSettings});}catch(error){local=await recoverLocal();throw error;}
     if(connection?.sharedSpaceId){
-        let shared;
+        const { SharedRuntime, startupFence } = require('./sharedRuntime');
+        let current, closeSharedRuntime, retryTimer, retrying, closing;
+        let historyReady = false;
+        let retryDelay = 1000;
+        const stopping = () => Boolean(closing) || isStopping();
+        const open = async () => SharedRuntime.open({
+            queue, appDataRoot, connection, sharedHost, historyAuthority, isStopping: stopping,
+            send: request || createSyncRequest(connection),
+            openEvents: requestEvents || (!request ? require('./sharedSessionClient').createSharedEventRequest(connection) : null),
+            openWatch: requestWatch || (!request ? require('./sharedWaitClient').createSharedWatchRequest(connection) : null),
+            notify, notifyExecutionStatus, intervalMs, agentConfigEvents,
+            download: requestBinary || createSyncDownload(connection), storeAttachment,
+        });
+        const close = () => {
+            clearTimeout(retryTimer);
+            return closing ||= (async () => {
+                await retrying;
+                await closeSharedRuntime?.();
+                await queries?.close();
+                releaseOwner();
+            })();
+        };
+        function own(instance) {
+            // Both the initial degraded handle and the live handle close the
+            // same owner. Keep the runtime's own teardown for that owner.
+            closeSharedRuntime = instance.close.bind(instance);
+            instance.close = close;
+            return instance;
+        }
+        const degraded = {
+            adapter: null,
+            async getExecutionStatus() { return { enabled: false, readOnly: true, degraded: this.startupError }; },
+            async getNativeTaskResult() { throw fail('SHARED_EXECUTION_NOT_READY'); },
+            close,
+        };
+        function recordFailure(error) {
+            degraded.startupError = error.code || 'SHARED_STARTUP_FAILED';
+            queue.configureSync(startupFence(connection.sharedSpaceId, () => degraded.startupError));
+            // HTTP errors carry a status even when their body uses this code.
+            if (!ipcMain || !historyReady || !publishRecoveredRuntime || stopping() ||
+                error.code !== 'NETWORK_UNAVAILABLE' || error.status != null) return;
+            retryTimer = setTimeout(() => {
+                if (stopping()) return;
+                retrying = open().then(instance => {
+                    own(instance);
+                    if (stopping()) return;
+                    current = instance;
+                    publishRecoveredRuntime(instance);
+                }, error => {
+                    if (!stopping()) recordFailure(error);
+                });
+            }, retryDelay);
+            retryTimer.unref?.();
+            retryDelay = Math.min(retryDelay * 2, 30000);
+        }
         try{
             await waitForHistoryAuthority?.();
-            shared=await require('./sharedRuntime').SharedRuntime.open({queue,appDataRoot,connection,sharedHost,historyAuthority,isStopping,send:request||createSyncRequest(connection),openEvents:requestEvents||(!request?require('./sharedSessionClient').createSharedEventRequest(connection):null),openWatch:requestWatch||(!request?require('./sharedWaitClient').createSharedWatchRequest(connection):null),notify,notifyExecutionStatus,intervalMs,agentConfigEvents,download:requestBinary||createSyncDownload(connection),storeAttachment});
-            if(ipcMain&&!isStopping())queries=registerNativeSyncQueries({ipcMain,getMainWindow,queue,getRuntime:()=>shared});
-            const close=shared.close.bind(shared);shared.close=async()=>{await close();await queries?.close();releaseOwner();};return shared;
+            historyReady = true;
+            current = own(await open());
         }catch(error){
             if(error.code==='APPLICATION_SHUTTING_DOWN')throw error;
-            queue.configureSync(require('./sharedRuntime').startupFence(connection.sharedSpaceId,()=>error.code||'SHARED_STARTUP_FAILED'));
+            recordFailure(error);
             if(!ipcMain)throw error;
-            const degraded={adapter:null,startupError:error.code||'SHARED_STARTUP_FAILED',async getExecutionStatus(){return {enabled:false,readOnly:true,degraded:this.startupError};},async getNativeTaskResult(){throw fail('SHARED_EXECUTION_NOT_READY');},async close(){await shared?.close();await queries?.close();releaseOwner();}};
-            if(!isStopping())queries=registerNativeSyncQueries({ipcMain,getMainWindow,queue,getRuntime:()=>degraded});return degraded;
+            current = degraded;
         }
+        try {
+            if (ipcMain && !stopping()) queries = registerNativeSyncQueries({ ipcMain, getMainWindow, queue, getRuntime: () => current });
+        } catch (error) {
+            await close();
+            throw error;
+        }
+        return current;
     }
     local = await recoverLocal();
     if (!poc && !connection) {

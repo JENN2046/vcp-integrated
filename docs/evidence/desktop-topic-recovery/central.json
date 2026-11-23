@@ -1,0 +1,88 @@
+{
+  "work": [
+    {
+      "id": "request_3f478177daa64fd1b83567bab7787f4a",
+      "request_id": "controlled_2606279cd5a14b3a800bcffd56559145",
+      "principal": "desktop:deviceA",
+      "state": "completed",
+      "dispatched": 1,
+      "user_seq": 4,
+      "reply_seq": 7
+    }
+  ],
+  "nativeRequests": [
+    {
+      "id": "group_request_3f478177daa64fd1b83567bab7787f4a_0",
+      "admission_id": "request_3f478177daa64fd1b83567bab7787f4a",
+      "ordinal": 0,
+      "principal": "desktop:deviceA",
+      "member_id": "shared_2b92081751474076b9dee186164086dc",
+      "state": "model_terminal"
+    },
+    {
+      "id": "group_request_3f478177daa64fd1b83567bab7787f4a_1",
+      "admission_id": "request_3f478177daa64fd1b83567bab7787f4a",
+      "ordinal": 1,
+      "principal": "desktop:deviceB",
+      "member_id": "shared_df92d2b62fe547f9bdf37f8315e632c8",
+      "state": "model_terminal"
+    },
+    {
+      "id": "group_request_3f478177daa64fd1b83567bab7787f4a_2",
+      "admission_id": "request_3f478177daa64fd1b83567bab7787f4a",
+      "ordinal": 2,
+      "principal": "desktop:deviceA",
+      "member_id": "shared_761cc85b6677474e98f84659e0f3c06f",
+      "state": "model_terminal"
+    }
+  ],
+  "handoff": [
+    {
+      "work_id": "request_3f478177daa64fd1b83567bab7787f4a",
+      "executor": "desktop:deviceA",
+      "executor_version": 2,
+      "state": "completed",
+      "first_reply_seq": null
+    }
+  ],
+  "journal": [
+    {
+      "seq": 4,
+      "id": "controlled_2606279cd5a14b3a800bcffd56559145",
+      "role": "user",
+      "body": "GROUP_HANDOFF_BASELINE_INPUT"
+    },
+    {
+      "seq": 5,
+      "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+      "role": "assistant",
+      "body": "RELAY_A_FINAL"
+    },
+    {
+      "seq": 6,
+      "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+      "role": "assistant",
+      "body": "RELAY_B_FINAL"
+    },
+    {
+      "seq": 7,
+      "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2",
+      "role": "assistant",
+      "body": "RELAY_C_FINAL"
+    }
+  ],
+  "observations": {
+    "baseline": {
+      "providerCalls": 0,
+      "groupLedgerUnchanged": true
+    },
+    "fixed": {
+      "providerCalls": 0,
+      "groupLedgerUnchanged": true
+    },
+    "fixedWarmRestart": {
+      "providerCalls": 0,
+      "groupLedgerUnchanged": true
+    }
+  }
+}

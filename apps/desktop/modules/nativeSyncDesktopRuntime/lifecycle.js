@@ -2,7 +2,7 @@
 
 const shutdownError = () => Object.assign(Error('APPLICATION_SHUTTING_DOWN'), { code: 'APPLICATION_SHUTTING_DOWN' });
 
-function createDesktopRuntimeLifecycle({ start, waitForHistory, onStartupError }) {
+function createDesktopRuntimeLifecycle({ start, waitForHistory, onStartupError, onRuntimeRecovered }) {
     let runtime = null;
     let stopping = false;
     let closePromise;
@@ -13,6 +13,12 @@ function createDesktopRuntimeLifecycle({ start, waitForHistory, onStartupError }
         assertStarting();
         return start({
             isStopping: () => stopping,
+            publishRecoveredRuntime(instance) {
+                if (stopping) return;
+                runtime = instance;
+                try { onRuntimeRecovered?.(); }
+                catch (error) { onStartupError(error); }
+            },
             async waitForHistoryAuthority() {
                 assertStarting();
                 await Promise.race([waitForHistory(), stoppingSignal]);

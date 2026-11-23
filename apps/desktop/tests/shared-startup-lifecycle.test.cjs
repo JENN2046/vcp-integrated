@@ -110,6 +110,116 @@ async function fixture(t) {
     return root;
 }
 
+async function sharedStartupFixture(t, open) {
+    const appDataRoot = await fixture(t);
+    await fs.mkdir(path.join(appDataRoot, '.native-sync'));
+    await fs.writeFile(path.join(appDataRoot, '.native-sync/connection.json'), JSON.stringify({
+        version: 1, enabled: true, scopeMode: 'source', fullSelectionApproved: true,
+        sourceId: 'sourceA', deviceId: 'deviceA', spaceId: 'spaceA', sourceRoot: appDataRoot,
+        sharedSpaceId: 'sharedA', sharedJoinOpId: 'joinA', topics: [],
+        executionMode: 'all-supported', publishExecutionConfigs: true,
+        serverUrl: 'https://synthetic.invalid', credentialSource: 'existing-vcp-settings',
+    }));
+    const { SharedRuntime } = require('../modules/services/nativeSync/sharedRuntime');
+    const { createNativeSyncRuntime } = require('../modules/services/nativeSync/runtime');
+    const attempts = t.mock.method(SharedRuntime, 'open', open);
+    const handlers = new Map();
+    const ipcMain = {
+        handle(channel, action) {
+            assert.equal(handlers.has(channel), false, 'one IPC owner');
+            handlers.set(channel, action);
+        },
+        removeHandler: channel => handlers.delete(channel),
+    };
+    const frame = { url: require('node:url').pathToFileURL(path.join(__dirname, '../main.html')).href };
+    const contents = { mainFrame: frame };
+    const queue = { configureSync(policy) { this.syncPolicy = policy; } };
+    const recovered = deferred();
+    const life = createDesktopRuntimeLifecycle({
+        async waitForHistory() {},
+        onStartupError: unexpected,
+        onRuntimeRecovered() { recovered.resolve(life.getRuntime()); },
+        start: options => createNativeSyncRuntime({
+            ...options, appDataRoot, queue, ipcMain,
+            getMainWindow: () => ({ isDestroyed: () => false, webContents: contents }),
+            readSettings: () => ({ vcpServerUrl: 'https://synthetic.invalid', vcpApiKey: 'synthetic-only' }),
+        }),
+    });
+    t.after(() => life.close());
+    return { life, queue, attempts, handlers, recovered, event: { sender: contents, senderFrame: frame } };
+}
+
+test('Shared startup retries transport outages with backoff and switches existing IPC once', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    let attempts = 0;
+    let closed = 0;
+    const live = {
+        async getExecutionStatus() { return { enabled: true }; },
+        async close() { closed++; },
+    };
+    const f = await sharedStartupFixture(t, async () => {
+        if (++attempts < 3) throw Object.assign(Error(), { code: 'NETWORK_UNAVAILABLE' });
+        return live;
+    });
+    const degraded = await f.life.ready;
+    assert.equal(degraded.startupError, 'NETWORK_UNAVAILABLE');
+    assert.equal(f.queue.syncPolicy.isRecoveryFence, true);
+    const query = f.handlers.get('native-sync:executions');
+    assert.equal((await query(f.event)).degraded, 'NETWORK_UNAVAILABLE');
+    t.mock.timers.tick(999);
+    assert.equal(attempts, 1);
+    t.mock.timers.tick(1);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(attempts, 2);
+    t.mock.timers.tick(1999);
+    assert.equal(attempts, 2);
+    t.mock.timers.tick(1);
+    assert.equal(await f.recovered.promise, live);
+    assert.equal(f.life.getRuntime(), live);
+    assert.equal(f.handlers.get('native-sync:executions'), query);
+    assert.deepEqual(await query(f.event), { success: true, enabled: true });
+    t.mock.timers.tick(60000);
+    assert.equal(attempts, 3);
+    await f.life.close();
+    assert.equal(closed, 1);
+    assert.equal(f.handlers.size, 0);
+});
+
+test('Shared startup does not retry HTTP responses or start a delayed retry during shutdown', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    for (const status of [403, undefined]) {
+        const f = await sharedStartupFixture(t, async () => {
+            throw Object.assign(Error(), { code: 'NETWORK_UNAVAILABLE', status });
+        });
+        assert.equal((await f.life.ready).startupError, 'NETWORK_UNAVAILABLE');
+        if (status === undefined) f.life.beginShutdown();
+        t.mock.timers.tick(60000);
+        assert.equal(f.attempts.mock.callCount(), 1);
+        await f.life.close();
+        f.attempts.mock.restore();
+    }
+});
+
+test('Shared startup closes an in-flight retry privately after shutdown', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const pending = deferred();
+    let attempts = 0;
+    let closed = 0;
+    const f = await sharedStartupFixture(t, async () => {
+        if (++attempts === 1) throw Object.assign(Error(), { code: 'NETWORK_UNAVAILABLE' });
+        return pending.promise;
+    });
+    await f.life.ready;
+    t.mock.timers.tick(1000);
+    assert.equal(attempts, 2);
+    const shutdown = f.life.close();
+    pending.resolve({ async close() { closed++; } });
+    await shutdown;
+    assert.equal(closed, 1);
+    assert.equal(f.life.getRuntime(), null);
+    assert.equal(f.handlers.size, 0);
+});
+
 for (const disabled of ['NativeSyncSettings', 'NativeSyncDesktopRuntime', null]) {
     test(`real feature discovery honors independent activation (${disabled || 'missing runtime'})`, async t => {
         const root = await fixture(t);

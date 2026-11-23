@@ -27,6 +27,7 @@ function registerIntegrated({ historyQueue, appDataRoot, readSettings, mainWindo
     return createDesktopRuntimeLifecycle({
         waitForHistory,
         onStartupError: error => console.error('[NativeSync] Desktop runtime startup failed:', error.code || 'SYNC_STARTUP_FAILED'),
+        onRuntimeRecovered: () => broadcast('native-sync:executions-changed', { sharedRuntimeRecovered: true }),
         start: async startup => {
             const { createSharedHost } = require('../services/nativeSync/sharedHost');
             const { createNativeSyncRuntime } = require('../services/nativeSync/runtime');

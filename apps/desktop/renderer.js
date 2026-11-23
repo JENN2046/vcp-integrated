@@ -1254,6 +1254,7 @@ mainChatSettingsPresentationOwner.configureStartup({
         subscribeSelection: listener => followConversationSelection(chatManager, listener),
         subscribeHistory: watchConversationHistory,
         onSharedProjectionSettled: event => chatManager.onSharedProjectionSettled(event),
+        onSharedRuntimeRecovered: () => nativeHistoryRefresh?.queueSelected(),
     }));
     ownedRendererSubscriptions.add(createOwnedPreloadSubscription({
         subscribe: chatAPI.onHistoryFileUpdated,

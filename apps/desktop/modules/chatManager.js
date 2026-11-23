@@ -409,6 +409,7 @@ export const chatManager = (() => {
     let isCanvasWindowOpen = false; // State to track if the canvas window is open
     let lastAssistantSuspendAt = 0;
     let activeHistoryLoadToken = 0;
+    let offlineHistoryNotice = null;
     let pendingHistoryLoadToken = null;
     let historySyncGeneration = 0;
     let itemSelectionGeneration = 0;
@@ -1388,6 +1389,7 @@ export const chatManager = (() => {
 
     async function loadChatHistory(itemId, itemType, topicId, ownershipGuard = null, watcherLeaseToken = null) {
         const loadToken = ++activeHistoryLoadToken;
+        offlineHistoryNotice = null;
         pendingHistoryLoadToken = loadToken;
         try {
         setNextUiEmptyStateActive(false);
@@ -1508,7 +1510,12 @@ export const chatManager = (() => {
         }
     
         if (historyResult && historyResult.error) {
-            if (messageRenderer) messageRenderer.renderMessage({ role: 'system', notice: 'error', content: `加载话题 "${topicId}" 的聊天记录失败: ${historyResult.error}`, timestamp: Date.now() });
+            const notice = { role: 'system', notice: 'error', content: `加载话题 "${topicId}" 的聊天记录失败: ${historyResult.error}`, timestamp: Date.now() };
+            if (historyResult.error === 'NETWORK_UNAVAILABLE') {
+                notice.id = 'offline_history_' + crypto.randomUUID();
+                offlineHistoryNotice = { loadToken, id: notice.id };
+            }
+            await messageRenderer?.renderMessage(notice);
         } else if (Array.isArray(historyForProjection) && historyForProjection.length > 0) {
             currentChatHistoryRef.set(historyForProjection);
             notifySendStateChanged();
@@ -3093,6 +3100,12 @@ export const chatManager = (() => {
         if (!newHistory || newHistory.error) {
             console.error("Sync failed: Could not fetch new history.", newHistory?.error);
             return;
+        }
+
+        if (offlineHistoryNotice?.loadToken === loadGeneration) {
+            messageRenderer.removeMessageById(offlineHistoryNotice.id, false);
+            offlineHistoryNotice = null;
+            if (newHistory.length === 0) setNextUiEmptyStateActive(true, 'empty-topic');
         }
 
         const oldHistory = currentChatHistoryRef.get();

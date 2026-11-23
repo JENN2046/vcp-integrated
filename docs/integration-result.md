@@ -136,3 +136,5 @@ TopicSponsor 的 River 引用对齐作者的最近消息窗口。两位成员同
 固定 `a2a13b53555c` 已完成带旧双人 Work 的干净重建及三端收口。Windows 原虚拟机在线收到丙，Linux 丢继续回执后恢复同一 Work；手机 Firefox PWA 只读冷开核对正式 History。单聊 502 结清、删除及续发通过，旧宿主从 schema 3 备份恢复到甲已确认处并继续。[升级、回退、三端回执与截图](evidence/release-a2a13b53555c/README.md)
 
 共享单聊收到 502 后，桌面在刷新同一笔待核对 Work 时保留已勾选的人工结清确认。目标、权限或连接状态改变会清除确认。真实 Electron 点击只提交一次，中央保留原生请求的未知状态，同话题可继续发送。[点击、结清回执与前后截图](evidence/abandon-confirmation/README.md)
+
+中央离线时冷开共享桌面，选中的群话题会在同地址中央恢复后原地读回 History。原故障话题的用户消息和三条成员回复均按原 ID 恢复，未发送草稿保留。[桌面及中央回执、原窗截图](evidence/desktop-topic-recovery/README.md)

@@ -1,0 +1,9 @@
+{
+  "apps/desktop/modules/nativeSyncDesktopRuntime/index.js": "f4dbd6b9714cc23e7941c506d1372d5def616cc60cb3dffb338763f1de3eb2ed",
+  "apps/desktop/modules/nativeSyncDesktopRuntime/lifecycle.js": "6fa92a6cc818cd6a47d2a5275e11cdbd0074b005b730862328dd4c2487a0a0cd",
+  "apps/desktop/modules/services/nativeSync/runtime.js": "b0f9d90cf21880b88dfaf5ede6c8c80e97fab52aeb190ddff46efc250be35919",
+  "apps/desktop/renderer.js": "35530213e8d50b78965c7f420221edb66d918191bdd79b15eb902ebf66085682",
+  "apps/desktop/modules/chat/nativeHistoryRefresh.js": "0445a65dc20506734d8844a41a450e2f6eedd5211b5180e49b48760bfef95b8c",
+  "apps/desktop/modules/renderer/nativeExecutionStatus.js": "3cd6bd748e3026a9ee7d393cea924522193dede40c895d4d55f12bafe8fb19be",
+  "apps/desktop/modules/chatManager.js": "d12da25e553266304bbedff4365ff8173f87539cdcf599b97975e37348e3b102"
+}

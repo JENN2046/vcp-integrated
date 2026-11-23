@@ -39,6 +39,7 @@ export function createNativeHistoryRefresh({ getSelection, getTopicId, syncHisto
     });
     queueSelected();
     return Object.freeze({
+        queueSelected,
         consume(event) {
             if (disposed) return;
             const selected = current();

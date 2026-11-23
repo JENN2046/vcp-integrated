@@ -1,0 +1,119 @@
+{
+  "topic": "ns_31a334800544b15d2e2c9dee",
+  "observations": {
+    "baseline-offline": {
+      "pid": 1580386,
+      "capturedAtMs": 1795412350528,
+      "context": {
+        "itemId": "ns_72c011434eaa86ceba4fb795",
+        "itemType": "group",
+        "topicId": "ns_31a334800544b15d2e2c9dee",
+        "historyRevision": 7
+      },
+      "ids": [
+        "msg_1795412349745_pk1esw8"
+      ],
+      "draft": "RECOVERY_DRAFT",
+      "text": "加载话题 \"ns_31a334800544b15d2e2c9dee\" 的聊天记录失败: NETWORK_UNAVAILABLE",
+      "controlledWork": "",
+      "status": "NativeSync 接入未完成"
+    },
+    "baseline-after-restore": {
+      "pid": 1580386,
+      "capturedAtMs": 1795412399864,
+      "context": {
+        "itemId": "ns_72c011434eaa86ceba4fb795",
+        "itemType": "group",
+        "topicId": "ns_31a334800544b15d2e2c9dee",
+        "historyRevision": 7
+      },
+      "ids": [
+        "msg_1795412349745_pk1esw8"
+      ],
+      "draft": "RECOVERY_DRAFT",
+      "text": "加载话题 \"ns_31a334800544b15d2e2c9dee\" 的聊天记录失败: NETWORK_UNAVAILABLE",
+      "controlledWork": "",
+      "status": "NativeSync 接入未完成"
+    },
+    "fixed-offline": {
+      "pid": 1583657,
+      "capturedAtMs": 1795412541275,
+      "context": {
+        "itemId": "ns_72c011434eaa86ceba4fb795",
+        "itemType": "group",
+        "topicId": "ns_31a334800544b15d2e2c9dee",
+        "historyRevision": 7
+      },
+      "ids": [
+        "offline_history_31d7f1df-d702-480a-b08c-66330c086f26"
+      ],
+      "draft": "RECOVERY_DRAFT",
+      "text": "加载话题 \"ns_31a334800544b15d2e2c9dee\" 的聊天记录失败: NETWORK_UNAVAILABLE",
+      "controlledWork": "",
+      "status": "NativeSync 接入未完成"
+    },
+    "fixed-after-restore": {
+      "pid": 1583657,
+      "capturedAtMs": 1795412583481,
+      "context": {
+        "itemId": "ns_72c011434eaa86ceba4fb795",
+        "itemType": "group",
+        "topicId": "ns_31a334800544b15d2e2c9dee",
+        "historyRevision": 9
+      },
+      "ids": [
+        "controlled_2606279cd5a14b3a800bcffd56559145",
+        "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+        "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+        "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2"
+      ],
+      "draft": "RECOVERY_DRAFT",
+      "text": "用户\n2026-11-23 12:57\n\nGROUP_HANDOFF_BASELINE_INPUT\n\nA\n2026-11-23 12:57\n\nRELAY_A_FINAL\n\nB\n2026-11-23 12:57\n\nRELAY_B_FINAL\n\nC\n2026-11-23 13:00\n\nRELAY_C_FINAL",
+      "controlledWork": "",
+      "status": "任务状态本地暂无待确认同步操作。以下为最近已知记录，需要联网核对最新状态。尚无可核对的云端执行记录。关闭报告核对云端状态"
+    },
+    "warm-stop": {
+      "pid": 1583657,
+      "capturedAtMs": 1795412619786,
+      "context": {
+        "itemId": "ns_72c011434eaa86ceba4fb795",
+        "itemType": "group",
+        "topicId": "ns_31a334800544b15d2e2c9dee",
+        "historyRevision": 9
+      },
+      "ids": [
+        "controlled_2606279cd5a14b3a800bcffd56559145",
+        "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+        "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+        "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2"
+      ],
+      "draft": "RECOVERY_DRAFT",
+      "text": "用户\n2026-11-23 12:57\n\nGROUP_HANDOFF_BASELINE_INPUT\n\nA\n2026-11-23 12:57\n\nRELAY_A_FINAL\n\nB\n2026-11-23 12:57\n\nRELAY_B_FINAL\n\nC\n2026-11-23 13:00\n\nRELAY_C_FINAL",
+      "controlledWork": "",
+      "status": "任务状态本地暂无待确认同步操作。以下为最近已知记录，需要联网核对最新状态。尚无可核对的云端执行记录。关闭报告核对云端状态"
+    },
+    "warm-restart": {
+      "pid": 1583657,
+      "capturedAtMs": 1795412660685,
+      "context": {
+        "itemId": "ns_72c011434eaa86ceba4fb795",
+        "itemType": "group",
+        "topicId": "ns_31a334800544b15d2e2c9dee",
+        "historyRevision": 9
+      },
+      "ids": [
+        "controlled_2606279cd5a14b3a800bcffd56559145",
+        "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+        "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+        "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2"
+      ],
+      "draft": "RECOVERY_DRAFT",
+      "text": "用户\n2026-11-23 12:57\n\nGROUP_HANDOFF_BASELINE_INPUT\n\nA\n2026-11-23 12:57\n\nRELAY_A_FINAL\n\nB\n2026-11-23 12:57\n\nRELAY_B_FINAL\n\nC\n2026-11-23 13:00\n\nRELAY_C_FINAL",
+      "controlledWork": "",
+      "status": "任务状态本地暂无待确认同步操作。以下为最近已知记录，需要联网核对最新状态。尚无可核对的云端执行记录。关闭报告核对云端状态"
+    },
+    "baselineReadyAtMs": 1795412369884,
+    "fixedReadyAtMs": 1795412562568
+  },
+  "persistedHistoryMatchesJournal": true
+}

@@ -3,11 +3,15 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { JSDOM } = require('jsdom');
 
-let compactionDependencies;
+let chatDependencies;
 test.before(async () => {
-    compactionDependencies = {
+    chatDependencies = {
         ...await import('../modules/chat/contextCompactionService.js'),
         ...await import('../modules/chat/contextCompactionState.js'),
+        ...await import('../modules/chat/sharedHistoryOrder.mjs'),
+        ...await import('../modules/chat/composerDrafts.mjs'),
+        ...await import('../modules/chat/recoverTopicAdmission.mjs'),
+        ...await import('../modules/chat/nativeDirectoryActions.mjs'),
     };
 });
 
@@ -44,7 +48,7 @@ function createFixture(options = {}) {
         if (index >= 0) parts[index].text = transform(parts[index].text || '');
         return parts;
     };
-    Object.assign(window, compactionDependencies);
+    Object.assign(window, chatDependencies);
     if (options.compactionService) window.createContextCompactionService = () => options.compactionService;
     const chatManagerSource = fs.readFileSync('modules/chatManager.js', 'utf8')
         .replace(/import\s*\{[^}]*\}\s*from\s*['"]\.\/chat\/contextCompaction(?:Service|State)\.js['"];\s*/g, '')
@@ -125,6 +129,7 @@ function createFixture(options = {}) {
         },
     };
     const electronAPI = {
+        getTopicExecutionAuthority: async () => ({ success: true, kind: 'local' }),
         onCanvasContentUpdate(listener) {
             if (options.failCanvasRegistration) throw new Error('controlled canvas listener failure');
             canvasContentListener = listener;
@@ -809,6 +814,32 @@ test('ChatManager dispose retracts Canvas subscriptions and ignores late Canvas 
     assert.equal(input.value, 'stable');
     assert.equal(fixture.chatManager.isReady(), false);
     fixture.dom.window.close();
+});
+
+test('an empty recovered History clears only the offline notice and preserves the draft', async () => {
+    const fixture = createFixture();
+    try {
+        fixture.setPersistedHistory('agent-b', 'topic-b', { error: 'NETWORK_UNAVAILABLE' });
+        const selected = fixture.chatManager.selectItem('agent-b', 'agent', 'Agent B', null, fixture.configs['agent-b']);
+        await new Promise(resolve => setImmediate(resolve));
+        fixture.topicRequests.get('agent-b').resolve(fixture.configs['agent-b'].topics);
+        await selected;
+
+        const notice = fixture.state().visibleMessageIds.find(id => id.startsWith('offline_history_'));
+        assert.ok(notice);
+        const input = fixture.window.document.getElementById('messageInput');
+        input.value = 'unsent draft';
+        const refresh = () => fixture.chatManager.syncHistoryFromFile('agent-b', 'agent', 'topic-b');
+        await refresh();
+        assert.ok(fixture.state().visibleMessageIds.includes(notice));
+        fixture.setPersistedHistory('agent-b', 'topic-b', []);
+        await refresh();
+        assert.deepEqual(fixture.state().visibleMessageIds, []);
+        assert.equal(input.value, 'unsent draft');
+        assert.equal(fixture.historySaveCount(), 0);
+    } finally {
+        fixture.dom.window.close();
+    }
 });
 
 test('a history-file sync resolving after selection changes cannot mutate the new conversation', async () => {

@@ -35,7 +35,7 @@ function localDeliveryText(delivery) {
 
 // Status stays outside the message list. Explicit local recovery retries only
 // an already accepted projection through the existing snapshot capability.
-export function createNativeExecutionStatus({ container, api, getSelection, getTopicId, subscribeSelection, subscribeHistory, ownerWindow, createObservedFrame, setInterruptTarget, onSharedProjectionSettled, onRetryInput, executePreparedShared }) {
+export function createNativeExecutionStatus({ container, api, getSelection, getTopicId, subscribeSelection, subscribeHistory, ownerWindow, createObservedFrame, setInterruptTarget, onSharedProjectionSettled, onSharedRuntimeRecovered, onRetryInput, executePreparedShared }) {
     if (!container || typeof api?.getNativeExecutionStatus !== 'function') return { dispose() {} };
     const document = container.ownerDocument;
     const sharedSessionView = createSharedSessionView(container, createObservedFrame, { api, setInterruptTarget });
@@ -329,6 +329,11 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
         historyTimer = setTimeout(() => { historyTimer = null; void query(false); }, 100);
     });
     const offChange = api.onNativeExecutionStatusChanged?.(result => {
+        if (result?.sharedRuntimeRecovered && !disposed) {
+            onSharedRuntimeRecovered?.();
+            void refresh();
+            return;
+        }
         if (result?.serverSession) {
             if (!disposed) {
                 settleSharedFlowlock(result);
