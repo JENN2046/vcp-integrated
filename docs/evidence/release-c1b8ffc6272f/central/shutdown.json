@@ -1,0 +1,11 @@
+{
+  "toolboxExited": true,
+  "toolboxTrace": "process.exit(0)",
+  "coordinatorAfterToolbox": "terminated isolated coordinator with remaining loopback listener after all readbacks",
+  "https18443Closed": true,
+  "isolatedXvfbClosed": true,
+  "processes": {
+    "1777130": true,
+    "1776251": true
+  }
+}

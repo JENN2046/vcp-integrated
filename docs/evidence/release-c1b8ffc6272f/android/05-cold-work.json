@@ -1,0 +1,23 @@
+{
+  "status": 200,
+  "executionId": "request_2699fc38ef4b4db6bce39676572afb8e",
+  "sharedSpaceId": "sharedAB",
+  "sharedId": "shared_af1a1479659048af860909c03b268466",
+  "native": {
+    "id": "request_2699fc38ef4b4db6bce39676572afb8e",
+    "state": "completed",
+    "kind": "shared_session"
+  },
+  "request": {
+    "id": "request_2699fc38ef4b4db6bce39676572afb8e",
+    "requestId": "msg_1795441148071_user_xvo56a3007",
+    "state": "completed",
+    "userSeq": 1,
+    "replySeq": 2
+  },
+  "journalBody": {
+    "messageId": "reply_request_2699fc38ef4b4db6bce39676572afb8e",
+    "seq": 2,
+    "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+  }
+}

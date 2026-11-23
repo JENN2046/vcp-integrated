@@ -1,0 +1,39 @@
+{
+  "userId": 12,
+  "android": "16",
+  "firefox": "160.0.1",
+  "topic": "shared_af1a1479659048af860909c03b268466",
+  "work": {
+    "id": "request_2699fc38ef4b4db6bce39676572afb8e",
+    "state": "completed"
+  },
+  "initialFirefoxPid": "32433",
+  "coldFirefoxPid": "5416",
+  "scope": [
+    "shared:sharedAB:read"
+  ],
+  "sessionMarkerSha256": "2d7081919364127ee3b9fd3869567b242de0e6b0e32f4ad685d26c1e4f872acf",
+  "orderedRenderedMessages": [
+    {
+      "id": "msg_1795441148071_user_xvo56a3007",
+      "role": "user",
+      "name": "你",
+      "body": "Send-recovery compare 02: accept exactly once.",
+      "characters": 46,
+      "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "id": "reply_request_2699fc38ef4b4db6bce39676572afb8e",
+      "role": "assistant",
+      "name": "Synthetic lost receipt",
+      "body": "合成回复完成。",
+      "characters": 7,
+      "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "module": {
+    "url": "https://127.0.0.1:18443/mobile/assets/index-Cuf1bKRk.js",
+    "bytes": 189721,
+    "sha256": "163525d2fd59f47c752b13a0c52218abad4f6665340d2ee3784364a262937420"
+  }
+}

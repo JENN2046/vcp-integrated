@@ -1,0 +1,50 @@
+{
+  "candidate": "c1b8ffc6272f64626fc6465434372bcb632aabe4",
+  "tree": "81b3497e17deba0313b0edd7123067dafdb11cda",
+  "source": "git archive candidate",
+  "windowsDependencies": {
+    "command": "ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci --os=win32 --cpu=x64 --install-links=false --no-audit --no-fund --ignore-scripts --offline",
+    "install": "clean Win32 x64 lock installation from npm cache after prewarming",
+    "node": "24.22.3",
+    "packageLockSha256": "84f9d3463f51f99a8c9085d0fbb58914235afa4b3220e5a8640bf534b7702476"
+  },
+  "windowsElectron": {
+    "version": "44.9.3",
+    "releaseZipSha256": "41a1ffa0541cb0f2c9b9fe920dd2cef1793ad0ea2ada1a9582958880f4d1b23c",
+    "executableSha256": "61f45e6f522c666c6156222680712870b38f3a4acbd2e847b987f53ddb613544"
+  },
+  "windowsCDS": {
+    "rustc": "1.96.1",
+    "target": "x86_64-pc-windows-gnu",
+    "cargoFlags": [
+      "--release",
+      "--locked",
+      "--offline"
+    ],
+    "sourceSha256": "dc6cd1f2dea9de92b49d6044c98b6e3ce5a049e0c503b3ab099b0f1a3acbd6ae",
+    "executableSha256": "a0381ae0958ecc586f539b07bdf4d2fea019a55b284b51cfb7fcb4c082770b3c"
+  },
+  "builtChatPreloadSha256": "4e0606e3c6a6e385c308b9e84b40f5cc9a589205edfecac8b5bf2b51b46b955e",
+  "vm": {
+    "qemu": "QEMU emulator version 10.2.1 (Debian 1:10.2.1+ds-1ubuntu3.3)",
+    "acceleration": "KVM",
+    "account": "R16Limited",
+    "publicInternetAccess": false,
+    "baseReadOnly": true,
+    "isolatedOverlayWritable": true,
+    "inputImageReadOnly": true,
+    "evidenceTransfer": "read-only host mount of separate MBR/FAT32 USB result image",
+    "normalShutdownConfirmed": true
+  },
+  "instrumentation": {
+    "entry": "separate tests/integration/electron-windows-fixture.cjs adapted from fixed tests/integration/electron.cjs",
+    "changes": [
+      "file-backed event and command transport for Windows GUI executable",
+      "Windows path normalization for loaded script digests",
+      "read configured BrowserWindow preload digest",
+      "no candidate product modules modified"
+    ],
+    "mainSourceProof": "Electron require.cache membership and file hash",
+    "rendererSourceProof": "Debugger.scriptParsed and Debugger.getScriptSource digests"
+  }
+}

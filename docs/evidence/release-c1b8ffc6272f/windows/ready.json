@@ -1,0 +1,12 @@
+{
+  "status": "READY",
+  "pid": 2680,
+  "desktopTopic": {
+    "itemId": "ns_e471456357feb40705ffecf7",
+    "itemType": "agent",
+    "topicId": "ns_9dcc66175e73ed919812aa9d",
+    "historyRevision": 7
+  },
+  "sharedTopicId": "shared_af1a1479659048af860909c03b268466",
+  "rows": 0
+}

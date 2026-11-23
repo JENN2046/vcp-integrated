@@ -1,0 +1,8 @@
+{
+  "event": "linux-exited",
+  "value": {
+    "pid": 1779328,
+    "code": 0,
+    "signal": null
+  }
+}

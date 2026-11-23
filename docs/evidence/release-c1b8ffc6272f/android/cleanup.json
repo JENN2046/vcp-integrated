@@ -1,0 +1,10 @@
+{
+  "currentAndroidUser": 0,
+  "isolatedFirefoxUser": 12,
+  "originalPwaPinPreserved": true,
+  "debugForwardTcp18446Removed": true,
+  "fixtureReverseTcp18443Removed": true,
+  "publicCertificateDownloadDeleted": true,
+  "fixtureCaRetainedInIsolatedUser": true,
+  "fixtureCaNotAfter": "Nov 26 13:25:40 2026 GMT"
+}

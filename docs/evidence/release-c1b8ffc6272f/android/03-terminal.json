@@ -1,0 +1,53 @@
+{
+  "pid": "32433",
+  "focus": "  mCurrentFocus=Window{ec8a324 u12 org.mozilla.firefox/org.mozilla.fenix.customtabs.ExternalAppBrowserActivity}",
+  "secure": true,
+  "visible": true,
+  "standalone": true,
+  "origin": "https://127.0.0.1:18443",
+  "connection": "已连接",
+  "bundle": "/mobile/assets/index-Cuf1bKRk.js",
+  "workerControlled": true,
+  "isPrivate": false,
+  "browsingContextID": 2,
+  "observed": {
+    "topicKey": "shared_af1a1479659048af860909c03b268466",
+    "topicLabel": "Sponsor target existing topic · 原来源 sourceC · 2 条",
+    "messages": [
+      {
+        "id": "msg_1795441148071_user_xvo56a3007",
+        "role": "user",
+        "name": "你",
+        "body": "Send-recovery compare 02: accept exactly once.",
+        "characters": 46,
+        "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+      },
+      {
+        "id": "reply_request_2699fc38ef4b4db6bce39676572afb8e",
+        "role": "assistant",
+        "name": "Synthetic lost receipt",
+        "body": "合成回复完成。",
+        "characters": 7,
+        "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+      }
+    ],
+    "executions": [
+      {
+        "id": "request_2699fc38ef4b4db6bce39676572afb8e",
+        "state": "completed",
+        "details": "回复已保存"
+      }
+    ],
+    "notice": [],
+    "previews": [],
+    "sendDisabled": true,
+    "composerDisabled": true
+  },
+  "readback": {
+    "status": 200,
+    "sharedPermissions": [
+      "shared:sharedAB:read"
+    ],
+    "sessionMarkerSha256": "2d7081919364127ee3b9fd3869567b242de0e6b0e32f4ad685d26c1e4f872acf"
+  }
+}

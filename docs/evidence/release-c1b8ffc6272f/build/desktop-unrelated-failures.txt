@@ -1,0 +1,24 @@
+tests/chat-send-acceptance.test.mjs:120:1 ✖ a mutation rejection never acknowledges an outgoing message
+tests/chat-send-acceptance.test.mjs:24:1 ✖ main send acknowledges only after the outgoing message save completes
+tests/chat-send-acceptance.test.mjs:37:1 ✖ a failed outgoing message save never acknowledges acceptance
+tests/chat-send-acceptance.test.mjs:43:1 ✖ an acceptance observer failure cannot turn a saved message into a retryable send
+tests/chat-send-deadline.test.mjs:32:1 ✖ a pet deadline expiring during automatic compaction prevents outgoing persistence
+tests/chat-send-deadline.test.mjs:35:1 ✖ an unexpired pet deadline retains ordinary context compaction and sending
+tests/main-chat-response-body.test.mjs:116:1 ✖ accepted interruption retains producer terminal delivery and its received content
+tests/main-chat-response-body.test.mjs:136:1 ✖ failed interruption from another IPC window cannot abort the original HTTP reader
+tests/main-chat-response-body.test.mjs:154:1 ✖ DONE before EOF cancels the actual response body and retains a single end event
+tests/main-chat-response-body.test.mjs:172:1 ✖ normal EOF preserves a final partial SSE line and does not cancel a completed body
+tests/main-chat-response-body.test.mjs:187:1 ✖ read failure remains the primary terminal error when cancellation also rejects
+tests/main-chat-response-body.test.mjs:199:1 ✖ rejected cancellation is reported without duplicating the successful terminal event
+tests/main-chat-response-body.test.mjs:212:1 ✖ pending old cancellation does not retain its reader or finish a reused message task
+tests/main-chat-response-body.test.mjs:244:1 ✖ a synchronous reader cancellation failure still releases ownership and the lock
+tests/main-chat-response-body.test.mjs:257:1 ✖ a non-Error cancellation rejection cannot throw from the cleanup reporter
+tests/main-chat-response-body.test.mjs:282:1 ✖ DONE closes a real local HTTP response which the server deliberately leaves open
+tests/main-chat-response-body.test.mjs:293:1 ✖ a real HTTP disconnect after a data chunk emits one read error and releases the task
+tests/main-chat-response-body.test.mjs:307:1 ✖ sender navigation aborts the real HTTP stream without delivering into the next document
+tests/main-chat-response-body.test.mjs:321:1 ✖ checkpoint text survives sanitizers and its private protection flag stays local
+tests/main-chat-response-body.test.mjs:344:1 ✖ the streamed request body does not ask the server for stream usage
+tests/main-chat-response-body.test.mjs:80:5 ✖ failed interruption (hung) releases the caller's HTTP reader without a duplicate terminal
+tests/main-chat-response-body.test.mjs:80:5 ✖ failed interruption (missing-settings) releases the caller's HTTP reader without a duplicate terminal
+tests/main-chat-response-body.test.mjs:80:5 ✖ failed interruption (rejected) releases the caller's HTTP reader without a duplicate terminal
+tests/main-chat-response-body.test.mjs:80:5 ✖ failed interruption (transport-error) releases the caller's HTTP reader without a duplicate terminal

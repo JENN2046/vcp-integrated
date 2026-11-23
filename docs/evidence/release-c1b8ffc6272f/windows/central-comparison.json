@@ -1,0 +1,34 @@
+{
+  "status": "PASS",
+  "candidate": "c1b8ffc6272f64626fc6465434372bcb632aabe4",
+  "workId": "request_2699fc38ef4b4db6bce39676572afb8e",
+  "sharedTopicId": "shared_af1a1479659048af860909c03b268466",
+  "journalSeqs": [
+    1,
+    2
+  ],
+  "oneAttemptOneDispatchOneProvider": true,
+  "messageRows": [
+    {
+      "id": "msg_1795441148071_user_xvo56a3007",
+      "role": "user",
+      "bytes": 46,
+      "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "id": "reply_request_2699fc38ef4b4db6bce39676572afb8e",
+      "role": "assistant",
+      "bytes": 21,
+      "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "loadedModulesVerifiedAgainstFixedGitTree": 15,
+  "screenshots": {
+    "before.png": "7a0cc47065511e6c611df3a8705df70c9e087617cd657f413ea72e713db65cb6",
+    "first.png": "3b55b1c84257a9a43493763262b541030883c113ce23b5b4e986b3055b41265c",
+    "reopened.png": "3b55b1c84257a9a43493763262b541030883c113ce23b5b4e986b3055b41265c"
+  },
+  "originalPid": 2680,
+  "capturePid": 9340,
+  "coldReopenPid": 6040
+}

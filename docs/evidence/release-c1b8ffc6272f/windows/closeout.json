@@ -1,0 +1,13 @@
+{
+  "status": "PASS",
+  "sameProfile": true,
+  "newElectronProcess": true,
+  "sameHistory": true,
+  "sameDom": true,
+  "sameWork": true,
+  "initialObservedPid": 2680,
+  "workId": "request_2699fc38ef4b4db6bce39676572afb8e",
+  "sharedTopicId": "shared_af1a1479659048af860909c03b268466",
+  "sendAttempts": 0,
+  "portableFiles": []
+}

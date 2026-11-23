@@ -1,0 +1,4 @@
+Current isolated user: 12
+Android release/API: 16/36
+    versionName=160.0.1
+ShortcutInfo {id=https://127.0.0.1:18443/mobile/, flags=0x28a [PinIc-fIc-aStr]

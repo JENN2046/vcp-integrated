@@ -1,0 +1,6 @@
+{
+  "status": "FAIL",
+  "progress": "first-hashes-and-picture",
+  "code": "ERR_ASSERTION",
+  "message": "The \"path\" argument must be of type string or an instance of Buffer or URL. Received undefined"
+}

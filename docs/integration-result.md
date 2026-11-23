@@ -138,3 +138,5 @@ TopicSponsor 的 River 引用对齐作者的最近消息窗口。两位成员同
 共享单聊收到 502 后，桌面在刷新同一笔待核对 Work 时保留已勾选的人工结清确认。目标、权限或连接状态改变会清除确认。真实 Electron 点击只提交一次，中央保留原生请求的未知状态，同话题可继续发送。[点击、结清回执与前后截图](evidence/abandon-confirmation/README.md)
 
 中央离线时冷开共享桌面，选中的群话题会在同地址中央恢复后原地读回 History。原故障话题的用户消息和三条成员回复均按原 ID 恢复，未发送草稿保留。[桌面及中央回执、原窗截图](evidence/desktop-topic-recovery/README.md)
+
+固定 `c1b8ffc6272f` 已完成共享单聊三端交付验证。Linux 实发一次，原 Windows 虚拟机及原手机隔离 Firefox PWA 观察同一 Work；三端换进程重开后读回原消息 ID 和正文，Provider 合计一次。手机两次执行的 JS 字节均匹配本轮干净构建。[三端对账、构建哈希与截图](evidence/release-c1b8ffc6272f/README.md)

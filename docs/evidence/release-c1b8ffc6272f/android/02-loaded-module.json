@@ -1,0 +1,31 @@
+{
+  "pid": "32433",
+  "secure": true,
+  "visible": true,
+  "standalone": true,
+  "origin": "https://127.0.0.1:18443",
+  "connection": "服务可达",
+  "bundle": "/mobile/assets/index-Cuf1bKRk.js",
+  "workerControlled": true,
+  "isPrivate": false,
+  "browsingContextID": 2,
+  "scriptURL": "https://127.0.0.1:18443/mobile/assets/index-Cuf1bKRk.js",
+  "sourceMethod": "Firefox Debugger SourceActor source encoded as UTF-8 and verified byte-for-byte against the HTTPS identity response",
+  "sourceActor": "server0.conn1.child2/source21",
+  "resource": [
+    {
+      "initiatorType": "script",
+      "responseStatus": 200,
+      "decodedBodySize": 0,
+      "encodedBodySize": 0,
+      "transferSize": 0,
+      "deliveryType": "",
+      "workerStart": 0
+    }
+  ],
+  "loadedBytes": 189721,
+  "loadedSha256": "163525d2fd59f47c752b13a0c52218abad4f6665340d2ee3784364a262937420",
+  "servedBytes": 189721,
+  "servedSha256": "163525d2fd59f47c752b13a0c52218abad4f6665340d2ee3784364a262937420",
+  "expectedBuildSha256": "163525d2fd59f47c752b13a0c52218abad4f6665340d2ee3784364a262937420"
+}

@@ -1,0 +1,46 @@
+{
+  "result": "PASS",
+  "fixed": "c1b8ffc6272f64626fc6465434372bcb632aabe4",
+  "tree": "81b3497e17deba0313b0edd7123067dafdb11cda",
+  "topic": "shared_af1a1479659048af860909c03b268466",
+  "work": "request_2699fc38ef4b4db6bce39676572afb8e",
+  "requestId": "msg_1795441148071_user_xvo56a3007",
+  "state": "completed",
+  "workCount": 1,
+  "attempts": 1,
+  "dispatched": 1,
+  "providerCalls": 1,
+  "journal": [
+    {
+      "seq": 1,
+      "id": "msg_1795441148071_user_xvo56a3007",
+      "action": "upsert",
+      "role": "user",
+      "body": "Send-recovery compare 02: accept exactly once.",
+      "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "seq": 2,
+      "id": "reply_request_2699fc38ef4b4db6bce39676572afb8e",
+      "action": "upsert",
+      "role": "assistant",
+      "body": "合成回复完成。",
+      "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "processes": {
+    "linux": [
+      1779328,
+      1785234
+    ],
+    "windows": [
+      9340,
+      6040
+    ],
+    "firefox": [
+      "32433",
+      "5416"
+    ]
+  },
+  "firefoxLoadedJS": "163525d2fd59f47c752b13a0c52218abad4f6665340d2ee3784364a262937420"
+}

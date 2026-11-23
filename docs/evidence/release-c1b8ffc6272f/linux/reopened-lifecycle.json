@@ -1,0 +1,19 @@
+[
+  {
+    "event": "linux-ready",
+    "value": {
+      "itemId": "ns_e471456357feb40705ffecf7",
+      "itemType": "agent",
+      "topicId": "ns_9dcc66175e73ed919812aa9d",
+      "historyRevision": 6
+    }
+  },
+  {
+    "event": "linux-exited",
+    "value": {
+      "pid": 1785234,
+      "code": 0,
+      "signal": null
+    }
+  }
+]

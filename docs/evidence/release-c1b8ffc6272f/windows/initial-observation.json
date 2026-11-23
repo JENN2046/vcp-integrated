@@ -1,0 +1,115 @@
+{
+  "status": "TERMINAL_OBSERVED_CAPTURE_RETRIED",
+  "candidate": "c1b8ffc6272f64626fc6465434372bcb632aabe4",
+  "ready": {
+    "status": "READY",
+    "pid": 2680,
+    "desktopTopic": {
+      "itemId": "ns_e471456357feb40705ffecf7",
+      "itemType": "agent",
+      "topicId": "ns_9dcc66175e73ed919812aa9d",
+      "historyRevision": 7
+    },
+    "sharedTopicId": "shared_af1a1479659048af860909c03b268466",
+    "rows": 0
+  },
+  "pid": 2680,
+  "sharedTopicId": "shared_af1a1479659048af860909c03b268466",
+  "desktopTopic": {
+    "itemId": "ns_e471456357feb40705ffecf7",
+    "itemType": "agent",
+    "topicId": "ns_9dcc66175e73ed919812aa9d",
+    "historyRevision": 13
+  },
+  "workId": "request_2699fc38ef4b4db6bce39676572afb8e",
+  "canonicalRows": [
+    {
+      "id": "msg_1795441148071_user_xvo56a3007",
+      "text": "Send-recovery compare 02: accept exactly once.",
+      "visible": true,
+      "sha256": "790294b03a412327aea069850dcf2c9b560ff5d8487c64d7d92aee2867c40480"
+    },
+    {
+      "id": "reply_request_2699fc38ef4b4db6bce39676572afb8e",
+      "text": "合成回复完成。",
+      "visible": true,
+      "sha256": "5b01818095c52b87032b8a2f910cae4b5b74f3733c60af97cca819de3782424d"
+    }
+  ],
+  "loaded": {
+    "main": [
+      {
+        "file": "apps\\desktop\\main.js",
+        "sha256": "7027975eacea21ba1d4259121b0c53960333c1ba1cd44e0c84bfca673a79a7db"
+      },
+      {
+        "file": "apps\\desktop\\modules\\ipc\\chatHandlers.js",
+        "sha256": "3f72379e438e2cadbb904bc7893175b0a3e69481795bfa59ab18e3e059e88ab7"
+      },
+      {
+        "file": "apps\\desktop\\modules\\services\\nativeSync\\queries.js",
+        "sha256": "4bbf33d8595e135af5f19058ad1194172af458ead4a2ff3a47b39619b4e14e4c"
+      },
+      {
+        "file": "apps\\desktop\\modules\\nativeSyncDesktopRuntime\\index.js",
+        "sha256": "f4dbd6b9714cc23e7941c506d1372d5def616cc60cb3dffb338763f1de3eb2ed"
+      },
+      {
+        "file": "apps\\desktop\\modules\\nativeSyncDesktopRuntime\\lifecycle.js",
+        "sha256": "6fa92a6cc818cd6a47d2a5275e11cdbd0074b005b730862328dd4c2487a0a0cd"
+      },
+      {
+        "file": "apps\\desktop\\modules\\services\\nativeSync\\runtime.js",
+        "sha256": "b0f9d90cf21880b88dfaf5ede6c8c80e97fab52aeb190ddff46efc250be35919"
+      },
+      {
+        "file": "apps\\desktop\\modules\\services\\nativeSync\\sharedRuntime.js",
+        "sha256": "4aac5e9c4c56dd374125308740950dc4db6de3fb728fa0d2a2f140ac49393717"
+      },
+      {
+        "file": "apps\\desktop\\modules\\services\\nativeSync\\sharedSessionClient.js",
+        "sha256": "aefae06d0bc48e601da231bd9a75140f75b860e08d1b909860a5a5f8a01fe879"
+      }
+    ],
+    "renderer": [
+      {
+        "file": "apps\\desktop\\renderer.js",
+        "bytes": 72622,
+        "sha256": "35530213e8d50b78965c7f420221edb66d918191bdd79b15eb902ebf66085682"
+      },
+      {
+        "file": "apps\\desktop\\modules\\chat\\nativeHistoryRefresh.js",
+        "bytes": 4622,
+        "sha256": "0445a65dc20506734d8844a41a450e2f6eedd5211b5180e49b48760bfef95b8c"
+      },
+      {
+        "file": "apps\\desktop\\modules\\renderer\\nativeExecutionStatus.js",
+        "bytes": 27254,
+        "sha256": "3cd6bd748e3026a9ee7d393cea924522193dede40c895d4d55f12bafe8fb19be"
+      },
+      {
+        "file": "apps\\desktop\\modules\\messageRenderer.js",
+        "bytes": 246953,
+        "sha256": "811a4945ad7b164911850effe410c88968754d5d950c7cf639054b043850b096"
+      },
+      {
+        "file": "apps\\desktop\\modules\\renderer\\mainChatSendOwner.js",
+        "bytes": 9043,
+        "sha256": "b1c8836bbeb62dc96db5e81439a01ee28d69c36382b441663e7707928ddea0ef"
+      },
+      {
+        "file": "apps\\desktop\\modules\\renderer\\topicRiverQuote.mjs",
+        "bytes": 3509,
+        "sha256": "a8430bb887e892be4cdb355123ed8c165be632f7d7e7f006342ee41d308a7b1c"
+      },
+      {
+        "file": "apps\\desktop\\modules\\chatManager.js",
+        "bytes": 180234,
+        "sha256": "d12da25e553266304bbedff4365ff8173f87539cdcf599b97975e37348e3b102"
+      }
+    ]
+  },
+  "exitObserved": true,
+  "sendAttempts": 0,
+  "collectorHalt": "first-hashes-and-picture"
+}
