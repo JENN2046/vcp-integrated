@@ -1,0 +1,26 @@
+{
+  "pass": true,
+  "stage": "ordinary",
+  "desktopContext": {
+    "itemId": "ns_673f7d28419ce6cb3ab96f84",
+    "itemType": "group",
+    "topicId": "ns_5172e9626f370da0a7be6179",
+    "historyRevision": 10
+  },
+  "sharedTopicId": "shared_4aaf370ed13b445cb436e0312dd7819f",
+  "journal": [
+    {
+      "seq": 1,
+      "msg_id": "mobile_job_9a93f378702ff9062b885e453b56b62a",
+      "action": "upsert",
+      "role": "user",
+      "content": "大家好，晚上开心吗\n",
+      "name": "用户"
+    }
+  ],
+  "providerCounts": {
+    "甲": 0,
+    "乙": 0
+  },
+  "historyAndDomMatched": true
+}

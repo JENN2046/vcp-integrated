@@ -1,0 +1,317 @@
+{
+  "revision": "c1b8ffc6272f64626fc6465434372bcb632aabe4",
+  "topicId": "shared_4aaf370ed13b445cb436e0312dd7819f",
+  "groupId": "shared_c6d7544ace0a40e5b4a83d5cf1b84b13",
+  "groupMode": "invite_only",
+  "members": {
+    "A": {
+      "name": "甲",
+      "id": "shared_050016c223f44ba89ab4e50d69417b42",
+      "localDesktopId": "ns_31ebdbb3120743eda0aae005"
+    },
+    "B": {
+      "name": "乙",
+      "id": "shared_3b3c2a3f6f674d79bbe9d713ae1f701d",
+      "localDesktopId": "ns_d05945a97abbb0619d82a201"
+    }
+  },
+  "pairScopes": [
+    "shared:sharedAB:read",
+    "shared:sharedAB:execute"
+  ],
+  "frozenAdmissions": [
+    {
+      "id": "request_b0503e9fc0d0433b95daf7b9422ed899",
+      "request_id": "88f7ff19-69b0-44ae-9c65-08a3fec72d4c",
+      "state": "completed",
+      "turn": {
+        "kind": "message",
+        "plan": [],
+        "userMessageId": "mobile_job_9a93f378702ff9062b885e453b56b62a"
+      },
+      "owner": {
+        "id": "shared_c6d7544ace0a40e5b4a83d5cf1b84b13",
+        "mode": "invite_only",
+        "memberIds": [
+          "shared_050016c223f44ba89ab4e50d69417b42",
+          "shared_3b3c2a3f6f674d79bbe9d713ae1f701d"
+        ]
+      },
+      "members": [
+        {
+          "id": "shared_050016c223f44ba89ab4e50d69417b42",
+          "name": "甲"
+        },
+        {
+          "id": "shared_3b3c2a3f6f674d79bbe9d713ae1f701d",
+          "name": "乙"
+        }
+      ]
+    },
+    {
+      "id": "request_8fcdbd68ddb14957b9c72dd06cef5a17",
+      "request_id": "0d2f73b9-98be-4838-8966-6f27a6f0b0b3",
+      "state": "completed",
+      "turn": {
+        "kind": "invite",
+        "plan": [
+          "shared_3b3c2a3f6f674d79bbe9d713ae1f701d"
+        ],
+        "userMessageId": "mobile_job_9a93f378702ff9062b885e453b56b62a"
+      },
+      "owner": {
+        "id": "shared_c6d7544ace0a40e5b4a83d5cf1b84b13",
+        "mode": "invite_only",
+        "memberIds": [
+          "shared_050016c223f44ba89ab4e50d69417b42",
+          "shared_3b3c2a3f6f674d79bbe9d713ae1f701d"
+        ]
+      },
+      "members": [
+        {
+          "id": "shared_050016c223f44ba89ab4e50d69417b42",
+          "name": "甲"
+        },
+        {
+          "id": "shared_3b3c2a3f6f674d79bbe9d713ae1f701d",
+          "name": "乙"
+        }
+      ]
+    }
+  ],
+  "executions": [
+    {
+      "id": "request_b0503e9fc0d0433b95daf7b9422ed899",
+      "request_id": "88f7ff19-69b0-44ae-9c65-08a3fec72d4c",
+      "kind": "group_message",
+      "state": "completed",
+      "attempts": 0,
+      "user_message_id": "mobile_job_9a93f378702ff9062b885e453b56b62a",
+      "user_seq": 1,
+      "reply_message_id": null,
+      "error_code": null,
+      "anchor_message_id": "mobile_job_9a93f378702ff9062b885e453b56b62a",
+      "plan": [],
+      "payload": {
+        "requestId": "88f7ff19-69b0-44ae-9c65-08a3fec72d4c",
+        "text": "大家好，晚上开心吗\n"
+      },
+      "config": {
+        "version": 1,
+        "hash": "652a763b864f8b48fba41ef3519e7415d0ce5bdf9e346cb7397da1f30b9fd3c5",
+        "sharedTemplateHash": "a211ffa45d8506e03f45451e8f1fef5d97d401a2da49fc999ebb068385efd477",
+        "mode": "invite_only",
+        "roster": [
+          "shared_050016c223f44ba89ab4e50d69417b42",
+          "shared_3b3c2a3f6f674d79bbe9d713ae1f701d"
+        ]
+      }
+    },
+    {
+      "id": "request_8fcdbd68ddb14957b9c72dd06cef5a17",
+      "request_id": "0d2f73b9-98be-4838-8966-6f27a6f0b0b3",
+      "kind": "group_invitation",
+      "state": "completed",
+      "attempts": 1,
+      "user_message_id": "invite_job_09f3e9be67757c07ba274231aadd522e",
+      "user_seq": 1,
+      "reply_message_id": "reply_gstep_80c1b0ccbb6632411d7cae70253196182b598674",
+      "error_code": null,
+      "anchor_message_id": "mobile_job_9a93f378702ff9062b885e453b56b62a",
+      "plan": [
+        "shared_3b3c2a3f6f674d79bbe9d713ae1f701d"
+      ],
+      "payload": {
+        "requestId": "0d2f73b9-98be-4838-8966-6f27a6f0b0b3",
+        "agentId": "shared_3b3c2a3f6f674d79bbe9d713ae1f701d"
+      },
+      "config": {
+        "version": 1,
+        "hash": "652a763b864f8b48fba41ef3519e7415d0ce5bdf9e346cb7397da1f30b9fd3c5",
+        "sharedTemplateHash": "a211ffa45d8506e03f45451e8f1fef5d97d401a2da49fc999ebb068385efd477",
+        "mode": "invite_only",
+        "roster": [
+          "shared_050016c223f44ba89ab4e50d69417b42",
+          "shared_3b3c2a3f6f674d79bbe9d713ae1f701d"
+        ]
+      }
+    }
+  ],
+  "native": {
+    "request_id": "gstep_80c1b0ccbb6632411d7cae70253196182b598674",
+    "admission_id": "request_8fcdbd68ddb14957b9c72dd06cef5a17",
+    "member_id": "shared_3b3c2a3f6f674d79bbe9d713ae1f701d",
+    "state": "model_terminal"
+  },
+  "handler": {
+    "userMessages": [
+      "[用户的发言]: 大家好，晚上开心吗\n",
+      "[系统邀请指令:] 现在轮到你 乙 发言了。"
+    ],
+    "member": "B",
+    "route": "/v1/chat/completions",
+    "requestId": "gstep_80c1b0ccbb6632411d7cae70253196182b598674",
+    "workId": "request_8fcdbd68ddb14957b9c72dd06cef5a17",
+    "model": "synthetic",
+    "stream": true,
+    "file": "modules/chatCompletionHandler.js",
+    "sha256": "80bd86a69dd41a1453650316345896164964066fc2aa0be4542b286918add593"
+  },
+  "provider": {
+    "userMessages": [
+      "[用户的发言]: 大家好，晚上开心吗\n",
+      "[系统邀请指令:] 现在轮到你 乙 发言了。"
+    ],
+    "member": "B",
+    "name": "乙",
+    "agentId": "shared_3b3c2a3f6f674d79bbe9d713ae1f701d",
+    "requestId": "gstep_80c1b0ccbb6632411d7cae70253196182b598674",
+    "at": 1795443559621,
+    "stream": true,
+    "model": "synthetic",
+    "reply": "乙：收到邀请。这是隔离测试回复。"
+  },
+  "ordinaryProviderCounts": {
+    "甲": 0,
+    "乙": 0
+  },
+  "invitationProviderCounts": {
+    "甲": 0,
+    "乙": 1
+  },
+  "journal": [
+    {
+      "seq": 1,
+      "msg_id": "mobile_job_9a93f378702ff9062b885e453b56b62a",
+      "action": "upsert",
+      "role": "user",
+      "content": "大家好，晚上开心吗\n",
+      "name": "用户"
+    },
+    {
+      "seq": 2,
+      "msg_id": "reply_gstep_80c1b0ccbb6632411d7cae70253196182b598674",
+      "action": "upsert",
+      "role": "assistant",
+      "content": "乙：收到邀请。这是隔离测试回复。",
+      "name": "乙",
+      "agentId": "shared_3b3c2a3f6f674d79bbe9d713ae1f701d"
+    }
+  ],
+  "inputComparison": {
+    "role": "user",
+    "matchingHandlerUserMessages": 1,
+    "matchingProviderUserMessages": 1,
+    "ordinaryInputSha256": "347802c257bb76e67944247586a1400812c755e636fb92cfa7b272d0c5b91adf"
+  },
+  "http": [
+    {
+      "route": "/mobile/api/conversations/shared_4aaf370ed13b445cb436e0312dd7819f/messages",
+      "method": "POST",
+      "at": 1795443545068,
+      "capabilities": "desktop-references-v1,source-data-v2,shared-space-v1",
+      "bodySha256": "ada8023244c5ff24e54c2cec6d89ca2de42a6636a7541f4fe7df2b2c2319a470",
+      "body": {
+        "requestId": "88f7ff19-69b0-44ae-9c65-08a3fec72d4c",
+        "text": "大家好，晚上开心吗\n",
+        "attachments": []
+      },
+      "status": 202,
+      "response": {
+        "id": "request_b0503e9fc0d0433b95daf7b9422ed899",
+        "topicKey": "shared_4aaf370ed13b445cb436e0312dd7819f",
+        "requestId": "88f7ff19-69b0-44ae-9c65-08a3fec72d4c",
+        "userMessageId": "mobile_job_9a93f378702ff9062b885e453b56b62a",
+        "state": "completed",
+        "attempts": 0,
+        "replyMessageId": null,
+        "errorCode": null,
+        "configVersion": 1,
+        "configHash": "652a763b864f8b48fba41ef3519e7415d0ce5bdf9e346cb7397da1f30b9fd3c5",
+        "createdAt": 1795443545073,
+        "updatedAt": 1795443545073,
+        "own": true,
+        "reviewResolved": false,
+        "nativeTasks": [],
+        "toolInvocations": [],
+        "kind": "group_message",
+        "remainingCancelled": false,
+        "canCancelRemaining": false,
+        "groupMode": "invite_only",
+        "stepCount": 0,
+        "position": 0,
+        "steps": [],
+        "recovery": {
+          "version": 1,
+          "sessionMarker": "f9e99c735ea14d76f7d4bc587ecc28d3a4b81dae4617401ccce60b59bda681e7",
+          "payloadHash": "00645443194f418397b5dd7285cf296a0cb602ffcc6e0932e4e1dda012ab5be9",
+          "kind": "message"
+        },
+        "submission": {
+          "requestId": "88f7ff19-69b0-44ae-9c65-08a3fec72d4c",
+          "text": "大家好，晚上开心吗\n"
+        },
+        "replayed": false
+      }
+    },
+    {
+      "route": "/mobile/api/conversations/shared_4aaf370ed13b445cb436e0312dd7819f/invitations",
+      "method": "POST",
+      "at": 1795443559556,
+      "capabilities": "desktop-references-v1,source-data-v2,shared-space-v1",
+      "bodySha256": "c3bc783ca1480d8f8b94bc28b364a58e2b32e1cc4302cac214dde83bcce43a9d",
+      "body": {
+        "requestId": "0d2f73b9-98be-4838-8966-6f27a6f0b0b3",
+        "agentId": "shared_3b3c2a3f6f674d79bbe9d713ae1f701d"
+      },
+      "status": 202,
+      "response": {
+        "id": "request_8fcdbd68ddb14957b9c72dd06cef5a17",
+        "topicKey": "shared_4aaf370ed13b445cb436e0312dd7819f",
+        "requestId": "0d2f73b9-98be-4838-8966-6f27a6f0b0b3",
+        "userMessageId": "invite_job_09f3e9be67757c07ba274231aadd522e",
+        "state": "queued",
+        "attempts": 0,
+        "replyMessageId": null,
+        "errorCode": null,
+        "configVersion": 1,
+        "configHash": "652a763b864f8b48fba41ef3519e7415d0ce5bdf9e346cb7397da1f30b9fd3c5",
+        "createdAt": 1795443559560,
+        "updatedAt": 1795443559560,
+        "own": true,
+        "reviewResolved": false,
+        "nativeTasks": [],
+        "toolInvocations": [],
+        "kind": "group_invitation",
+        "remainingCancelled": false,
+        "canCancelRemaining": true,
+        "groupMode": "invite_only",
+        "stepCount": 1,
+        "position": 0,
+        "steps": [
+          {
+            "id": "gstep_80c1b0ccbb6632411d7cae70253196182b598674",
+            "index": 0,
+            "agentId": "shared_3b3c2a3f6f674d79bbe9d713ae1f701d",
+            "name": "乙",
+            "state": "queued",
+            "attempts": 0,
+            "replyMessageId": null,
+            "errorCode": null
+          }
+        ],
+        "recovery": {
+          "version": 1,
+          "sessionMarker": "f9e99c735ea14d76f7d4bc587ecc28d3a4b81dae4617401ccce60b59bda681e7",
+          "payloadHash": "d81c004b5e75f24d23601e5de3f4ff4af7633de0611f5bd8f4693bd090a9823a",
+          "kind": "invitation"
+        },
+        "submission": {
+          "requestId": "0d2f73b9-98be-4838-8966-6f27a6f0b0b3",
+          "agentId": "shared_3b3c2a3f6f674d79bbe9d713ae1f701d"
+        },
+        "replayed": false
+      }
+    }
+  ]
+}

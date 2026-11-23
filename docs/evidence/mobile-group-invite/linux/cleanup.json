@@ -1,0 +1,10 @@
+{
+  "supervisorPid": 1802387,
+  "xvfbPid": 1801195,
+  "display": ":2",
+  "electronExit": 0,
+  "workerStopped": true,
+  "xDisplayReleased": true,
+  "supervisorStopped": true,
+  "supervisorTermination": "SIGKILL after Electron normal exit due held test control FIFO"
+}

@@ -1,0 +1,101 @@
+{
+  "timestamp": "2026-11-23T14:19:20.431Z",
+  "visible": true,
+  "actions": [
+    {
+      "what": "send",
+      "trusted": true,
+      "timestamp": "2026-11-23T14:19:05.372Z"
+    },
+    {
+      "what": "invite",
+      "trusted": true,
+      "member": "乙",
+      "timestamp": "2026-11-23T14:19:19.869Z"
+    }
+  ],
+  "connection": "已连接",
+  "agent": [
+    [
+      "[\"agent\",\"shared_050016c223f44ba89ab4e50d69417b42\"]",
+      "甲",
+      false
+    ],
+    [
+      "[\"agent\",\"shared_36a1246ff32b4518929d0cdff55c8b42\"]",
+      "Synthetic interrupted single",
+      false
+    ],
+    [
+      "[\"agent\",\"shared_3b3c2a3f6f674d79bbe9d713ae1f701d\"]",
+      "乙",
+      false
+    ],
+    [
+      "[\"agent\",\"shared_5fabe945b6a74baebf3d41e0a439cc4f\"]",
+      "Synthetic shared",
+      false
+    ],
+    [
+      "[\"agent\",\"shared_f6cbb24d70244d80a888edd472eb6e12\"]",
+      "Synthetic lost receipt",
+      false
+    ],
+    [
+      "[\"group\",\"shared_c6d7544ace0a40e5b4a83d5cf1b84b13\"]",
+      "群聊 · 邀请制实机测试",
+      true
+    ]
+  ],
+  "topics": [
+    [
+      "shared_4aaf370ed13b445cb436e0312dd7819f",
+      "仅邀请 · 甲乙 · 原来源 sourceC · 2 条",
+      true
+    ]
+  ],
+  "detail": "配置 v1 · shared_4aaf370ed13b445cb436e0312dd7819f · synthetic · 可继续对话",
+  "notice": "中央会话已更新",
+  "controls": {
+    "textareaDisabled": false,
+    "sendDisabled": true,
+    "inviteSelectorDisabled": false,
+    "inviteButtonDisabled": true,
+    "members": [
+      [
+        "",
+        "选择成员",
+        false,
+        true
+      ],
+      [
+        "shared_050016c223f44ba89ab4e50d69417b42",
+        "甲",
+        false,
+        false
+      ],
+      [
+        "shared_3b3c2a3f6f674d79bbe9d713ae1f701d",
+        "乙",
+        false,
+        false
+      ]
+    ]
+  },
+  "accepted": "0d2f73b9-98be-4838-8966-6f27a6f0b0b3",
+  "messages": [
+    {
+      "id": "mobile_job_9a93f378702ff9062b885e453b56b62a",
+      "role": "user",
+      "author": "你",
+      "text": "大家好，晚上开心吗\n"
+    },
+    {
+      "id": "reply_gstep_80c1b0ccbb6632411d7cae70253196182b598674",
+      "role": "assistant",
+      "author": "乙",
+      "text": "乙：收到邀请。这是隔离测试回复。"
+    }
+  ],
+  "live": []
+}

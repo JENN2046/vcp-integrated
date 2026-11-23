@@ -1,0 +1,10 @@
+{
+  "at": "2026-11-23T14:22:59Z",
+  "supervisorPid": 1802264,
+  "backendPid": 1802329,
+  "supervisorExited": true,
+  "backendExited": true,
+  "backendExitCode": 0,
+  "tlsListener18443Closed": true,
+  "isolatedDatabaseRetained": true
+}

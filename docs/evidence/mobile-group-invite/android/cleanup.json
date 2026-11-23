@@ -1,0 +1,9 @@
+{
+  "currentAndroidUser": 0,
+  "isolatedFirefoxUser": 12,
+  "pinnedPwaPreserved": true,
+  "testReverseRemoved": true,
+  "testDebugForwardRemoved": true,
+  "publicCertificateDownloadDeleted": true,
+  "installedFixtureCaRetainedInIsolatedUser": true
+}
