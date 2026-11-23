@@ -17,26 +17,26 @@ export function mountSharedEditor(root,{api,normalize,topic,context,storage=glob
   for(const [k,v]of Object.entries({min,max,step,rows}))if(v!==undefined)n.setAttribute(k,v);
   n.addEventListener(type==='checkbox'||options?'change':'input',()=>{holder[key]=type==='checkbox'?n.checked:type==='number'?(n.value===''?undefined:Number(n.value)):n.value;changed();});wrap.append(n);parent.append(wrap);return n;
  }
- function rules(){const section=el('details'),heading=el('summary','生效规则');section.append(heading);fields.append(section);draft.tavernRules||=[];
-  for(const [index,rule]of draft.tavernRules.entries()){
+ function rules(){const section=el('details'),heading=el('summary','生效规则');section.append(heading);fields.append(section);
+  for(const [index,rule]of (draft.tavernRules||[]).entries()){
    const box=el('div',null,{class:'rule'});section.append(box);field(box,'规则名称','name',{holder:rule});field(box,'启用','enabled',{holder:rule,type:'checkbox'});field(box,'类型','type',{holder:rule,options:[['system_suffix','系统后缀'],['user_suffix','用户后缀'],['context_inject','上下文注入']]}).addEventListener('change',()=>{if(rule.type==='context_inject'){rule.role||='user';rule.depth??=0;}persist();renderFields();});
    field(box,'范围','scope',{holder:rule,options:[['global','全局'],['agent','单聊'],['group','群聊']]});
    if(rule.type==='context_inject'){field(box,'角色','role',{holder:rule,options:[['user','用户'],['assistant','助手']]});field(box,'深度','depth',{holder:rule,type:'number',min:0,max:10000});}
    field(box,'内容','content',{holder:rule,type:'textarea',rows:4});const remove=el('button','移除此规则',{type:'button'});remove.onclick=()=>{draft.tavernRules.splice(index,1);changed();renderFields();};box.append(remove);
   }
-  const add=el('button','添加规则',{type:'button'});add.onclick=()=>{draft.tavernRules.push({id:crypto.randomUUID(),name:'新规则',enabled:true,type:'system_suffix',scope:'global',source:'user',content:''});changed();renderFields();};section.append(add);
+  const add=el('button','添加规则',{type:'button'});add.onclick=()=>{(draft.tavernRules??=[]).push({id:crypto.randomUUID(),name:'新规则',enabled:true,type:'system_suffix',scope:'global',source:'user',content:''});changed();renderFields();};section.append(add);
  }
- function regexes(){const section=el('details');section.append(el('summary','原生正则规则'));fields.append(section);draft.stripRegexes||=[];
-  for(const [index,rule]of draft.stripRegexes.entries()){
+ function regexes(){const section=el('details');section.append(el('summary','原生正则规则'));fields.append(section);
+  for(const [index,rule]of (draft.stripRegexes||[]).entries()){
    const box=el('div',null,{class:'rule'});section.append(box);for(const [k,label]of [['title','名称'],['findPattern','查找表达式'],['replaceWith','替换为']])field(box,label,k,{holder:rule});
    for(const [k,label]of [['enabled','启用'],['applyToFrontend','用于显示'],['applyToContext','用于执行上下文']])field(box,label,k,{holder:rule,type:'checkbox'});
    for(const role of ['user','assistant','system']){const check=el('input');check.type='checkbox';check.checked=(rule.applyToRoles||[]).includes(role);const label=el('label',role==='user'?'用户':role==='assistant'?'助手':'系统');label.append(check);box.append(label);check.onchange=()=>{rule.applyToRoles=check.checked?[...new Set([...(rule.applyToRoles||[]),role])]:(rule.applyToRoles||[]).filter(r=>r!==role);changed();};}
    field(box,'最小深度（-1 不限）','minDepth',{holder:rule,type:'number',min:-1,max:10000});field(box,'最大深度（-1 不限）','maxDepth',{holder:rule,type:'number',min:-1,max:10000});const remove=el('button','移除此正则',{type:'button'});remove.onclick=()=>{draft.stripRegexes.splice(index,1);changed();renderFields();};box.append(remove);
   }
-  const add=el('button','添加正则',{type:'button',id:'shared-config-add-regex'});add.onclick=()=>{draft.stripRegexes.push({id:crypto.randomUUID(),title:'新正则',findPattern:'',replaceWith:'',enabled:true,applyToRoles:['user','assistant'],applyToFrontend:true,applyToContext:false,minDepth:-1,maxDepth:-1});changed();renderFields();};section.append(add);
+  const add=el('button','添加正则',{type:'button',id:'shared-config-add-regex'});add.onclick=()=>{(draft.stripRegexes??=[]).push({id:crypto.randomUUID(),title:'新正则',findPattern:'',replaceWith:'',enabled:true,applyToRoles:['user','assistant'],applyToFrontend:true,applyToContext:false,minDepth:-1,maxDepth:-1});changed();renderFields();};section.append(add);
  }
- function overrides(){const section=el('details');section.append(el('summary','此会话的全局规则覆盖'));fields.append(section);draft.ruleOverrides||={};
-  for(const owner of choices.filter(o=>o.kind==='rules'))for(const rule of owner.config?.tavernRules||[]){const k=`${rule.source==='official'?'official':'user'}:${rule.id}`,wrap=el('label',rule.name||rule.id),input=el('select');for(const [v,label]of [['inherit','跟随全局'],['true','启用'],['false','停用']])input.append(el('option',label,{value:v}));input.value=Object.hasOwn(draft.ruleOverrides,k)?String(draft.ruleOverrides[k]):'inherit';input.onchange=()=>{if(input.value==='inherit')delete draft.ruleOverrides[k];else draft.ruleOverrides[k]=input.value==='true';changed();};wrap.append(input);section.append(wrap);}
+ function overrides(){const section=el('details');section.append(el('summary','此会话的全局规则覆盖'));fields.append(section);
+  for(const owner of choices.filter(o=>o.kind==='rules'))for(const rule of owner.config?.tavernRules||[]){const k=`${rule.source==='official'?'official':'user'}:${rule.id}`,wrap=el('label',rule.name||rule.id),input=el('select');for(const [v,label]of [['inherit','跟随全局'],['true','启用'],['false','停用']])input.append(el('option',label,{value:v}));input.value=Object.hasOwn(draft.ruleOverrides||{},k)?String(draft.ruleOverrides[k]):'inherit';input.onchange=()=>{if(input.value==='inherit')delete draft.ruleOverrides?.[k];else (draft.ruleOverrides??={})[k]=input.value==='true';changed();};wrap.append(input);section.append(wrap);}
  }
  async function avatar(file){if(!file)return;const turn=epoch,token=++avatarTurn;avatarBusy=true;status();try{if(file.size>20*1024*1024)throw Error('头像原件超过 20 MB');const bitmap=await createImageBitmap(file),canvas=doc.createElement('canvas');canvas.width=canvas.height=64;canvas.getContext('2d').drawImage(bitmap,0,0,64,64);bitmap.close();const value=canvas.toDataURL('image/png');if(value.length>24000)throw Error('头像缩略图过大，请换一张图片');if(turn!==epoch||disposed||token!==avatarTurn)return;draft.avatar=value;changed();renderFields();}catch(e){notice=e.message;status();}finally{if(token===avatarTurn){avatarBusy=false;status();}}}
  function renderFields(){if(!draft)return;title.textContent='共享配置 · 基础版本 '+base.version;fields.replaceChildren();field(fields,'名称','name',{id:'shared-config-name'});

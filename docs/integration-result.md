@@ -128,3 +128,5 @@ TopicSponsor 的 River 引用对齐作者的最近消息窗口。两位成员同
 普通桌面和桌面执行的共享单聊均在原生 renderer 生成 History 提示与附件标题。共享首轮已移除本机 History 投影路径；显式禁工具时，已内联正文的文本附件只带文件名，默认可调用工具时保留定位 URI。A 退出后的 B 续问仍只得到一份原文件正文。[本机与共享收包前后对照、文件工具实测](evidence/attachment-path-ownership/README.md)
 
 共享 A 首轮文件工具已验证跨端实取：在 ToolBox 看不见 A 附件缓存的独立挂载中，合成 Provider 以实际收到的完整 URI 发起一次摘要工具调用，A 经原生 WebSocket 返回 67 字节，工具回填与原文件 SHA-256 一致。只读内联正文无需取件；同工具只传显示文件名得到 ENOENT。[三组回执、源端字节及工具账本](evidence/file-uri-roundtrip/README.md)
+
+隔离移动 PWA 只修改共享 Agent 的系统提示词：A 在保存前接纳、保存后才派发，实际 handler/Provider 只收到旧提示词；B 同话题新 Work 只收到新提示词。保存丢回执重试只升一个版本，只读会话写入返回 403。修复共享编辑器打开时主动填充缺省规则集合的问题。[前后收包及保存回执](evidence/mobile-config-freeze/README.md)

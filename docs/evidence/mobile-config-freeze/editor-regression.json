@@ -1,0 +1,27 @@
+{
+  "browser": "Chrome/158.0.8127.36",
+  "baselineRevision": "f67c546c8a425ef2b31c198b329a3461c5111e7a",
+  "before": {
+    "editorSha256": "f481970d68740951dd50206e3d9f80134e07b277f207ff13169cbad5e3cd2b98",
+    "promptSave": {
+      "saves": 1,
+      "addedCollectionDefaults": [
+        "ruleOverrides",
+        "stripRegexes",
+        "tavernRules"
+      ]
+    }
+  },
+  "after": {
+    "editorSha256": "3a112c6f11403bae77e107b32eba092cfa2509922bc922a1c7b9bc0b70214641",
+    "promptSave": {
+      "saves": 1,
+      "addedCollectionDefaults": []
+    },
+    "rules": {
+      "explicitRulesSaved": true,
+      "existingRuleIdentitiesPreserved": true,
+      "saves": 3
+    }
+  }
+}

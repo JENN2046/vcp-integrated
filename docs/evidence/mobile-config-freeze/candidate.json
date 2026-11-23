@@ -1,0 +1,549 @@
+{
+  "result": "PASS",
+  "failedCriterion": null,
+  "platform": "linux x64",
+  "node": "v24.22.1",
+  "desktop": {
+    "electron": "44.9.3",
+    "sandbox": true,
+    "distinctProfiles": true,
+    "cdsBinarySha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+  },
+  "schedule": {
+    "nativeDelayMs": 10000,
+    "clockOverride": false
+  },
+  "source": {
+    "revision": "f67c546c8a425ef2b31c198b329a3461c5111e7a",
+    "checkoutRevision": "f67c546c8a425ef2b31c198b329a3461c5111e7a",
+    "candidate": true,
+    "editor": "apps/desktop/modules/nativeSyncSettings/sharedEditor.js",
+    "archivedBaseline": false,
+    "baselineBundleSha256": "ab00bcfbf1387c31dfcfaa39d98a2cb3dedf6fa46c9fe93c59cb0741169a2973",
+    "editorBaseSha256": "f481970d68740951dd50206e3d9f80134e07b277f207ff13169cbad5e3cd2b98",
+    "editorWorkingSha256": "3a112c6f11403bae77e107b32eba092cfa2509922bc922a1c7b9bc0b70214641",
+    "editorDiffSha256": "9f90f14876e014c161b9d2a5577d7965c8d2473a8845396180a28d0836476efb"
+  },
+  "sharedSpaceId": "sharedAB",
+  "sharedOwnerId": "shared_bd8b0fc2fd7144709cb7e2bb5a947a76",
+  "topicKey": "shared_0cf80efcbb48416f9547d1cea84856fd",
+  "held": [
+    {
+      "checkpoint": "A accepted before mobile save",
+      "at": 1795407224363,
+      "workId": "request_f17d3ff5ad814821b6e1d586f2992bed",
+      "requestId": "msg_1795407224301_user_f2c10x0tmi",
+      "workState": "queued",
+      "workAttempts": 0,
+      "rawRequestDispatched": null,
+      "requestDispatched": 0,
+      "admissionState": "accepted",
+      "admissionDispatched": 0,
+      "nativeTerminal": 0,
+      "nativeRequestRows": 0,
+      "handlerCount": 0,
+      "providerCount": 0,
+      "desktopHistoryCount": {
+        "A": 0,
+        "B": 0
+      },
+      "createdAt": 1795407224339,
+      "notBefore": 1795407234339,
+      "workConfigSha256": "d82f9d91b5e41e0c17bad528520231f9e14d5c46821b7ba48eb0f145f3b80557",
+      "admissionConfigSha256": "d32c99a2455d7aa93ba240ac0df6809426a1ee13035d22501556a5cd17499779"
+    },
+    {
+      "checkpoint": "after first PWA commit before receipt loss",
+      "at": 1795407225163,
+      "workId": "request_f17d3ff5ad814821b6e1d586f2992bed",
+      "requestId": "msg_1795407224301_user_f2c10x0tmi",
+      "workState": "queued",
+      "workAttempts": 0,
+      "rawRequestDispatched": null,
+      "requestDispatched": 0,
+      "admissionState": "accepted",
+      "admissionDispatched": 0,
+      "nativeTerminal": 0,
+      "nativeRequestRows": 0,
+      "handlerCount": 0,
+      "providerCount": 0,
+      "desktopHistoryCount": {
+        "A": 1,
+        "B": 1
+      },
+      "createdAt": 1795407224339,
+      "notBefore": 1795407234339,
+      "workConfigSha256": "d82f9d91b5e41e0c17bad528520231f9e14d5c46821b7ba48eb0f145f3b80557",
+      "admissionConfigSha256": "d32c99a2455d7aa93ba240ac0df6809426a1ee13035d22501556a5cd17499779"
+    },
+    {
+      "checkpoint": "after original PWA save replay",
+      "at": 1795407225258,
+      "workId": "request_f17d3ff5ad814821b6e1d586f2992bed",
+      "requestId": "msg_1795407224301_user_f2c10x0tmi",
+      "workState": "queued",
+      "workAttempts": 0,
+      "rawRequestDispatched": null,
+      "requestDispatched": 0,
+      "admissionState": "accepted",
+      "admissionDispatched": 0,
+      "nativeTerminal": 0,
+      "nativeRequestRows": 0,
+      "handlerCount": 0,
+      "providerCount": 0,
+      "desktopHistoryCount": {
+        "A": 1,
+        "B": 1
+      },
+      "createdAt": 1795407224339,
+      "notBefore": 1795407234339,
+      "workConfigSha256": "d82f9d91b5e41e0c17bad528520231f9e14d5c46821b7ba48eb0f145f3b80557",
+      "admissionConfigSha256": "d32c99a2455d7aa93ba240ac0df6809426a1ee13035d22501556a5cd17499779"
+    },
+    {
+      "checkpoint": "after read-only PWA permission and storage checks",
+      "at": 1795407225689,
+      "workId": "request_f17d3ff5ad814821b6e1d586f2992bed",
+      "requestId": "msg_1795407224301_user_f2c10x0tmi",
+      "workState": "queued",
+      "workAttempts": 0,
+      "rawRequestDispatched": null,
+      "requestDispatched": 0,
+      "admissionState": "accepted",
+      "admissionDispatched": 0,
+      "nativeTerminal": 0,
+      "nativeRequestRows": 0,
+      "handlerCount": 0,
+      "providerCount": 0,
+      "desktopHistoryCount": {
+        "A": 1,
+        "B": 1
+      },
+      "createdAt": 1795407224339,
+      "notBefore": 1795407234339,
+      "workConfigSha256": "d82f9d91b5e41e0c17bad528520231f9e14d5c46821b7ba48eb0f145f3b80557",
+      "admissionConfigSha256": "d32c99a2455d7aa93ba240ac0df6809426a1ee13035d22501556a5cd17499779"
+    },
+    {
+      "checkpoint": "after mobile checks before dispatch release",
+      "at": 1795407225762,
+      "workId": "request_f17d3ff5ad814821b6e1d586f2992bed",
+      "requestId": "msg_1795407224301_user_f2c10x0tmi",
+      "workState": "queued",
+      "workAttempts": 0,
+      "rawRequestDispatched": null,
+      "requestDispatched": 0,
+      "admissionState": "accepted",
+      "admissionDispatched": 0,
+      "nativeTerminal": 0,
+      "nativeRequestRows": 0,
+      "handlerCount": 0,
+      "providerCount": 0,
+      "desktopHistoryCount": {
+        "A": 1,
+        "B": 1
+      },
+      "createdAt": 1795407224339,
+      "notBefore": 1795407234339,
+      "workConfigSha256": "d82f9d91b5e41e0c17bad528520231f9e14d5c46821b7ba48eb0f145f3b80557",
+      "admissionConfigSha256": "d32c99a2455d7aa93ba240ac0df6809426a1ee13035d22501556a5cd17499779"
+    }
+  ],
+  "turns": [
+    {
+      "role": "A",
+      "requestId": "msg_1795407224301_user_f2c10x0tmi",
+      "workId": "request_f17d3ff5ad814821b6e1d586f2992bed",
+      "workState": "completed",
+      "workAttempts": 1,
+      "requestDispatched": 1,
+      "admissionState": "completed",
+      "admissionDispatched": 1,
+      "nativeTerminal": 1,
+      "sentThrough": "/api/v1/sync/shared/session-send",
+      "nativeRequestId": "request_f17d3ff5ad814821b6e1d586f2992bed",
+      "nativeRequestState": "model_terminal",
+      "userMessageId": "msg_1795407224301_user_f2c10x0tmi",
+      "replyMessageId": "reply_request_f17d3ff5ad814821b6e1d586f2992bed",
+      "workConfigSha256": "d82f9d91b5e41e0c17bad528520231f9e14d5c46821b7ba48eb0f145f3b80557",
+      "admissionConfigSha256": "d32c99a2455d7aa93ba240ac0df6809426a1ee13035d22501556a5cd17499779",
+      "workPrompt": "SYNTHETIC_FROZEN_PROMPT_OLD_727",
+      "ownerConfigVersion": 1,
+      "ownerConfigHash": "f86814d7632c6213d7956790e7672b2f6eaaa4bc7f940c0f820a796e62f0762d",
+      "executionConfig": {
+        "version": 2,
+        "hash": "8bec957cac5e3df1b2da32269eeab80fc40769bc8aa5e0cff04cf82de1b311dc",
+        "name": "Synthetic shared",
+        "systemPrompt": "SYNTHETIC_FROZEN_PROMPT_OLD_727",
+        "authority": {
+          "sharedSpaceId": "sharedAB",
+          "sharedId": "shared_0cf80efcbb48416f9547d1cea84856fd",
+          "sourceId": "sourceC",
+          "deviceId": "deviceC",
+          "spaceId": "e69bb868-d222-4e5b-8d0d-af0cf98412c0",
+          "ownerType": "agent",
+          "ownerId": "shared_bd8b0fc2fd7144709cb7e2bb5a947a76",
+          "topicId": "shared_0cf80efcbb48416f9547d1cea84856fd"
+        },
+        "model": "synthetic",
+        "executionPolicy": {
+          "userName": "用户",
+          "enableThoughtChainInjection": false,
+          "enableContextSanitizer": false,
+          "contextSanitizerDepth": 2,
+          "enableVcpToolInjection": false
+        },
+        "streamOutput": false,
+        "promptPolicy": "desktop",
+        "imageSupported": false,
+        "tavernRules": [],
+        "stripRegexes": [],
+        "temperature": 0.5,
+        "contextTokenLimit": 32000,
+        "maxOutputTokens": 128,
+        "sharedTemplateHash": "b2b8ebb89b2c16a2e10d9d7d861804ce5f844c742dcefc488b54c0f7827e412d"
+      },
+      "handler": {
+        "count": 1,
+        "route": "/v1/chat/completions",
+        "systemText": "SYNTHETIC_FROZEN_PROMPT_OLD_727",
+        "oppositeMarkerCount": 0
+      },
+      "provider": {
+        "count": 1,
+        "at": 1795407234393,
+        "systemText": "SYNTHETIC_FROZEN_PROMPT_OLD_727",
+        "oppositeMarkerCount": 0
+      }
+    },
+    {
+      "role": "B",
+      "requestId": "msg_1795407235115_user_8h5xi545yl",
+      "workId": "request_f0d1201e6f0c406eb3f5e3652bc6bc3e",
+      "workState": "completed",
+      "workAttempts": 1,
+      "requestDispatched": 1,
+      "admissionState": "completed",
+      "admissionDispatched": 1,
+      "nativeTerminal": 1,
+      "sentThrough": "/api/v1/sync/shared/session-send",
+      "nativeRequestId": "request_f0d1201e6f0c406eb3f5e3652bc6bc3e",
+      "nativeRequestState": "model_terminal",
+      "userMessageId": "msg_1795407235115_user_8h5xi545yl",
+      "replyMessageId": "reply_request_f0d1201e6f0c406eb3f5e3652bc6bc3e",
+      "workConfigSha256": "80dfc725d4834512aba5f4d111118c0b7368cc1aae92f87ab6cfbb740bf95b75",
+      "admissionConfigSha256": "382d33b78394d576dfca73c3686f6b282ce2cc4086488a84f29b792e7d37851b",
+      "workPrompt": "SYNTHETIC_FROZEN_PROMPT_NEW_839",
+      "ownerConfigVersion": 2,
+      "ownerConfigHash": "ebf89bcc23febc33bfd80715d46aba5855a653ca71cbf67372631fb868ded9d3",
+      "executionConfig": {
+        "version": 3,
+        "hash": "45431b6fe49a484524252dcdd511fd2cfb02f1882b606b28400717eaba891940",
+        "name": "Synthetic shared",
+        "systemPrompt": "SYNTHETIC_FROZEN_PROMPT_NEW_839",
+        "authority": {
+          "sharedSpaceId": "sharedAB",
+          "sharedId": "shared_0cf80efcbb48416f9547d1cea84856fd",
+          "sourceId": "sourceC",
+          "deviceId": "deviceC",
+          "spaceId": "e69bb868-d222-4e5b-8d0d-af0cf98412c0",
+          "ownerType": "agent",
+          "ownerId": "shared_bd8b0fc2fd7144709cb7e2bb5a947a76",
+          "topicId": "shared_0cf80efcbb48416f9547d1cea84856fd"
+        },
+        "model": "synthetic",
+        "executionPolicy": {
+          "userName": "用户",
+          "enableThoughtChainInjection": false,
+          "enableContextSanitizer": false,
+          "contextSanitizerDepth": 2,
+          "enableVcpToolInjection": false
+        },
+        "streamOutput": false,
+        "promptPolicy": "desktop",
+        "imageSupported": false,
+        "tavernRules": [],
+        "stripRegexes": [],
+        "temperature": 0.5,
+        "contextTokenLimit": 32000,
+        "maxOutputTokens": 128,
+        "sharedTemplateHash": "a8bdb6c0c5753e3d5900f0863ebe3431b3d6538860289872ada1562c361e0203"
+      },
+      "handler": {
+        "count": 1,
+        "route": "/v1/chat/completions",
+        "systemText": "SYNTHETIC_FROZEN_PROMPT_NEW_839",
+        "oppositeMarkerCount": 0
+      },
+      "provider": {
+        "count": 1,
+        "at": 1795407245187,
+        "systemText": "SYNTHETIC_FROZEN_PROMPT_NEW_839",
+        "oppositeMarkerCount": 0
+      }
+    }
+  ],
+  "loadedDesktopSources": {
+    "A": {
+      "main": [
+        {
+          "file": "apps/desktop/modules/ipc/chatHandlers.js",
+          "sha256": "3f72379e438e2cadbb904bc7893175b0a3e69481795bfa59ab18e3e059e88ab7"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedSessionClient.js",
+          "sha256": "aefae06d0bc48e601da231bd9a75140f75b860e08d1b909860a5a5f8a01fe879"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/modules/event-listeners.js",
+          "bytes": 72357,
+          "sha256": "b1b0d975beba491eec9193a17f63d71d232de15ae16f44ac9ac543603d43b6ea"
+        },
+        {
+          "file": "apps/desktop/modules/renderer/mainChatSendOwner.js",
+          "bytes": 9043,
+          "sha256": "b1c8836bbeb62dc96db5e81439a01ee28d69c36382b441663e7707928ddea0ef"
+        }
+      ]
+    },
+    "B": {
+      "main": [
+        {
+          "file": "apps/desktop/modules/ipc/chatHandlers.js",
+          "sha256": "3f72379e438e2cadbb904bc7893175b0a3e69481795bfa59ab18e3e059e88ab7"
+        },
+        {
+          "file": "apps/desktop/modules/services/nativeSync/sharedSessionClient.js",
+          "sha256": "aefae06d0bc48e601da231bd9a75140f75b860e08d1b909860a5a5f8a01fe879"
+        }
+      ],
+      "renderer": [
+        {
+          "file": "apps/desktop/modules/event-listeners.js",
+          "bytes": 72357,
+          "sha256": "b1b0d975beba491eec9193a17f63d71d232de15ae16f44ac9ac543603d43b6ea"
+        },
+        {
+          "file": "apps/desktop/modules/renderer/mainChatSendOwner.js",
+          "bytes": 9043,
+          "sha256": "b1c8836bbeb62dc96db5e81439a01ee28d69c36382b441663e7707928ddea0ef"
+        }
+      ]
+    }
+  },
+  "before": {
+    "object": {
+      "id": "shared_bd8b0fc2fd7144709cb7e2bb5a947a76",
+      "sharedSpaceId": "sharedAB",
+      "kind": "agent",
+      "parentId": null,
+      "deleted": false,
+      "originSource": "sourceC",
+      "version": 1,
+      "configHash": "f86814d7632c6213d7956790e7672b2f6eaaa4bc7f940c0f820a796e62f0762d",
+      "config": {
+        "name": "Synthetic shared",
+        "model": "synthetic",
+        "systemPrompt": "SYNTHETIC_FROZEN_PROMPT_OLD_727",
+        "temperature": 0.5,
+        "contextTokenLimit": 32000,
+        "maxOutputTokens": 128,
+        "streamOutput": false,
+        "stripRegexes": [],
+        "tavernRules": []
+      }
+    },
+    "configRows": 1,
+    "changeRows": 1
+  },
+  "mobile": {
+    "browser": "Chrome/158.0.8127.36",
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "isMobile": true,
+      "hasTouch": true
+    },
+    "bodyHash": "4fcae5c085cd0fc79cfe768519c9443a9a4ee93e39dd90073a9858fc889a810e",
+    "opId": "e4e247c3-9364-42c6-9e0e-678f0c084e40",
+    "initialVersion": 1,
+    "changedFields": [
+      "systemPrompt"
+    ],
+    "pendingOperationRetained": true,
+    "changedOtherFields": {},
+    "attempts": [
+      {
+        "opId": "e4e247c3-9364-42c6-9e0e-678f0c084e40",
+        "bodyHash": "4fcae5c085cd0fc79cfe768519c9443a9a4ee93e39dd90073a9858fc889a810e",
+        "responseStatusCode": 200,
+        "replayed": false,
+        "deliveredToBrowser": false
+      },
+      {
+        "opId": "e4e247c3-9364-42c6-9e0e-678f0c084e40",
+        "bodyHash": "4fcae5c085cd0fc79cfe768519c9443a9a4ee93e39dd90073a9858fc889a810e",
+        "responseStatusCode": 200,
+        "replayed": true,
+        "deliveredToBrowser": true
+      }
+    ],
+    "readOnly": {
+      "authenticated": true,
+      "permissions": [
+        "shared:sharedAB:read"
+      ],
+      "editorControls": 0,
+      "post": {
+        "status": 403,
+        "code": "SHARED_PERMISSION_REQUIRED"
+      },
+      "centralUnchanged": true
+    },
+    "loadedBundles": {
+      "readConfig": {
+        "path": "/mobile/assets/index-CFlZITE8.js",
+        "sha256": "bd2e8e83ed601467f1574773a9817b4aeb2076d9f3be7302957fd2bfa3194a92"
+      },
+      "readOnly": {
+        "path": "/mobile/assets/index-CFlZITE8.js",
+        "sha256": "bd2e8e83ed601467f1574773a9817b4aeb2076d9f3be7302957fd2bfa3194a92"
+      }
+    },
+    "finalVersion": 2,
+    "configHash": "ebf89bcc23febc33bfd80715d46aba5855a653ca71cbf67372631fb868ded9d3"
+  },
+  "after": {
+    "object": {
+      "id": "shared_bd8b0fc2fd7144709cb7e2bb5a947a76",
+      "sharedSpaceId": "sharedAB",
+      "kind": "agent",
+      "parentId": null,
+      "deleted": false,
+      "originSource": "sourceC",
+      "version": 2,
+      "configHash": "ebf89bcc23febc33bfd80715d46aba5855a653ca71cbf67372631fb868ded9d3",
+      "config": {
+        "name": "Synthetic shared",
+        "model": "synthetic",
+        "systemPrompt": "SYNTHETIC_FROZEN_PROMPT_NEW_839",
+        "temperature": 0.5,
+        "contextTokenLimit": 32000,
+        "maxOutputTokens": 128,
+        "streamOutput": false,
+        "stripRegexes": [],
+        "tavernRules": []
+      }
+    },
+    "configRows": 2,
+    "changeRows": 2,
+    "receipts": [
+      {
+        "request_hash": "4fcae5c085cd0fc79cfe768519c9443a9a4ee93e39dd90073a9858fc889a810e"
+      }
+    ]
+  },
+  "promptOnly": true,
+  "changedExecutionFields": [
+    "hash",
+    "sharedTemplateHash",
+    "systemPrompt",
+    "version"
+  ],
+  "finalHistory": {
+    "A": [
+      {
+        "id": "msg_1795407224301_user_f2c10x0tmi",
+        "role": "user",
+        "content": "SYNTHETIC CONFIG FREEZE A"
+      },
+      {
+        "id": "reply_request_f17d3ff5ad814821b6e1d586f2992bed",
+        "role": "assistant",
+        "content": "Synthetic response A"
+      },
+      {
+        "id": "msg_1795407235115_user_8h5xi545yl",
+        "role": "user",
+        "content": "SYNTHETIC CONFIG FREEZE B"
+      },
+      {
+        "id": "reply_request_f0d1201e6f0c406eb3f5e3652bc6bc3e",
+        "role": "assistant",
+        "content": "Synthetic response B"
+      }
+    ],
+    "B": [
+      {
+        "id": "msg_1795407224301_user_f2c10x0tmi",
+        "role": "user",
+        "content": "SYNTHETIC CONFIG FREEZE A"
+      },
+      {
+        "id": "reply_request_f17d3ff5ad814821b6e1d586f2992bed",
+        "role": "assistant",
+        "content": "Synthetic response A"
+      },
+      {
+        "id": "msg_1795407235115_user_8h5xi545yl",
+        "role": "user",
+        "content": "SYNTHETIC CONFIG FREEZE B"
+      },
+      {
+        "id": "reply_request_f0d1201e6f0c406eb3f5e3652bc6bc3e",
+        "role": "assistant",
+        "content": "Synthetic response B"
+      }
+    ]
+  },
+  "loadedToolBoxSources": [
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "e0965eb464dad61dfa0441c2a4bdb345208c8208ba2f80cb28b40adfe311f23e"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "80bd86a69dd41a1453650316345896164964066fc2aa0be4542b286918add593"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedNative.js",
+      "sha256": "2926a9738f9e9e03d8c3672adb8921a76d9df22b84070ec4780b16fecb84b353"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/sharedSingle.js",
+      "sha256": "8601d3070ba9c92ac5288560ed6d4890d2bc308633363a70e1e3046aca180672"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSession.js",
+      "sha256": "888eb0977494c7efcc6df66de50dc365e5b95f48159cfea3735a19bc8d3e294b"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "b9a1bfaeb407904aeb5ef1192ea0d8ad5930a4ceeb99267d86125a311aad0c3d"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/execution.js",
+      "sha256": "299fc48e0a1a0687a59f8c19adb91398ea61e40115f5a482a89caadf6d1d03a5"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/portal.js",
+      "sha256": "fd4ff20987a5410ee1ed65fa358226ef869e727238daf8cbb704cce09a7fa307"
+    }
+  ],
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  }
+}
