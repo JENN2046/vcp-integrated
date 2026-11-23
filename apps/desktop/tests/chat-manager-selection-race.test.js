@@ -108,6 +108,8 @@ function createFixture(options = {}) {
         setCurrentSelectedItem() {}, setCurrentTopicId() {}, setCurrentItemAvatar() {}, setCurrentItemAvatarColor() {},
         clearChat() { chatMessages.textContent = ''; },
         async renderMessage(message) {
+            const existing = message.id && chatMessages.querySelector(`.message-item[data-message-id="${message.id}"]`);
+            if (existing) return existing;
             const element = window.document.createElement('div');
             element.className = `message-item${message.isThinking ? ' streaming' : ''}`;
             element.dataset.messageId = message.id || `system-${Date.now()}`;
@@ -129,7 +131,7 @@ function createFixture(options = {}) {
         },
     };
     const electronAPI = {
-        getTopicExecutionAuthority: async () => ({ success: true, kind: 'local' }),
+        getTopicExecutionAuthority: options.getTopicExecutionAuthority || (async () => ({ success: true, kind: 'local' })),
         onCanvasContentUpdate(listener) {
             if (options.failCanvasRegistration) throw new Error('controlled canvas listener failure');
             canvasContentListener = listener;
@@ -1133,12 +1135,26 @@ test('a side conversation send leaves the main topic unread state and item list 
 });
 
 
-test('stream budget overflow invokes normal interrupt before terminal or interrupt acknowledgement', async () => {
-    const acknowledgement = deferred();
+test('stream budget overflow invokes normal interrupt before terminal or interrupt acknowledgement', { timeout: 15000 }, async () => {
+    const authorityRequested = deferred(), authorityResult = deferred();
+    const interruptIssued = deferred(), acknowledgement = deferred();
+    let ackReturned = false;
     const events = [];
     const fixture = createFixture({
         settings: { enableContextCompaction: true },
-        interruptHandler: { interrupt(id) { events.push(`interrupt:${id}`); return acknowledgement.promise; } },
+        getTopicExecutionAuthority(scope) {
+            authorityRequested.resolve(scope);
+            return authorityResult.promise;
+        },
+        interruptHandler: {
+            async interrupt(id) {
+                events.push(`interrupt:${id}`);
+                interruptIssued.resolve();
+                const result = await acknowledgement.promise;
+                ackReturned = true;
+                return result;
+            },
+        },
         flowlockManager: { suspendForContextCompaction() { events.push('suspend'); } },
     });
     fixture.configs['agent-a'].contextTokenLimit = 100;
@@ -1151,6 +1167,14 @@ test('stream budget overflow invokes normal interrupt before terminal or interru
     const checking = fixture.chatManager.checkStreamContextBudget({
         messageId: 'live', context, text: '结果'.repeat(100),
     });
+    const requested = await authorityRequested.promise;
+    assert.equal(requested.itemId, scope.itemId);
+    assert.equal(requested.itemType, scope.itemType);
+    assert.equal(requested.topicId, scope.topicId);
+    assert.equal(events.length, 0);
+    authorityResult.resolve({ success: true, kind: 'local' });
+    await interruptIssued.promise;
+    assert.equal(ackReturned, false);
     assert.deepEqual(events, ['suspend', 'interrupt:live']);
     assert.equal(fixture.chatManager.isContextCompacting(scope), true);
     await fixture.chatManager.checkStreamContextBudget({
@@ -1159,6 +1183,7 @@ test('stream budget overflow invokes normal interrupt before terminal or interru
     assert.equal(events.length, 2, 'only one interrupt per response');
     acknowledgement.resolve({ success: true });
     await checking;
+    assert.equal(ackReturned, true);
     fixture.chatManager.abandonStreamContextCompaction({
         messageId: 'live',
         event: { outcome: { persistence: { error: new Error('disk unavailable') } } },
