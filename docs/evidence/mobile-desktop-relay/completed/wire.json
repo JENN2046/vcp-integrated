@@ -1,0 +1,93 @@
+{
+  "permissions": [
+    "shared:sharedAB:read"
+  ],
+  "responses": {
+    "attention": {
+      "code": 200,
+      "version": 2,
+      "topicKey": "shared_14d89b041b7649cfbe8d86023a2bbfc7",
+      "mode": "attention",
+      "watermark": 0,
+      "observedAt": 1795448468241,
+      "executions": [],
+      "total": 0,
+      "hasMore": false,
+      "next": null,
+      "desktopRelays": []
+    },
+    "recent": {
+      "code": 200,
+      "version": 2,
+      "topicKey": "shared_14d89b041b7649cfbe8d86023a2bbfc7",
+      "mode": "recent",
+      "watermark": 0,
+      "observedAt": 1795448468247,
+      "executions": [],
+      "total": 0,
+      "hasMore": false,
+      "next": null,
+      "desktopRelays": [
+        {
+          "id": "request_3f478177daa64fd1b83567bab7787f4a",
+          "state": "completed",
+          "members": [
+            {
+              "ordinal": 0,
+              "memberId": "shared_2b92081751474076b9dee186164086dc",
+              "name": "A",
+              "replySeq": 5
+            },
+            {
+              "ordinal": 1,
+              "memberId": "shared_df92d2b62fe547f9bdf37f8315e632c8",
+              "name": "B",
+              "replySeq": 6
+            },
+            {
+              "ordinal": 2,
+              "memberId": "shared_761cc85b6677474e98f84659e0f3c06f",
+              "name": "C",
+              "replySeq": 7
+            }
+          ],
+          "memberCount": 3,
+          "confirmedCount": 3,
+          "nextOrdinal": null,
+          "unknownOrdinal": null,
+          "executor": null,
+          "userSeq": 4
+        }
+      ]
+    }
+  },
+  "stream": {
+    "code": 200,
+    "snapshot": {
+      "type": "snapshot",
+      "executionId": "request_3f478177daa64fd1b83567bab7787f4a",
+      "native": null,
+      "epoch": "6b424a5c-01e8-426a-b065-9ac4c045b9a0.323118cb-c073-4d19-8ea0-715c9d04b415",
+      "seq": 0,
+      "request": {
+        "id": "request_3f478177daa64fd1b83567bab7787f4a",
+        "state": "completed",
+        "userSeq": 4,
+        "replySeq": 7,
+        "groupHandoff": {
+          "state": "completed",
+          "executor": "desktop:deviceA",
+          "executorVersion": 2,
+          "nextOrdinal": null,
+          "nextRequestId": null,
+          "previousReplySeq": 7,
+          "confirmedReplies": [
+            5,
+            6,
+            7
+          ]
+        }
+      }
+    }
+  }
+}

@@ -148,7 +148,16 @@ class MobilePortal {
         this.router.get('/api/conversations/:key/baseline/:id',historyResponseCompression,(req,res,next)=>{
             try{const topic=this.authorize(req);if(!this.sourceCatalog)throw error('SOURCE_PROTOCOL_UNAVAILABLE',409);if(Object.keys(req.query).some(k=>!['after','limit','executions'].includes(k)))throw error('INVALID_CURSOR');res.json(requireReferenceReader(this.sourceCatalog.mobilePage(req.mobileSession.id,topic,req.params.id,Number(req.query.after||0),Number(req.query.limit||100)),req.headers['x-nativesync-capabilities']));}catch(e){next(e);}
         });
-        this.router.get('/api/conversations/:key/executions',(req,res,next)=>{try{const topic=this.authorize(req);res.json(this.engine.page(topic.key,req.mobileSession.id,req.query));}catch(e){next(e);}});
+        this.router.get('/api/conversations/:key/executions',(req,res,next)=>{
+            try {
+                const topic=this.authorize(req);
+                const page=this.engine.page(topic.key,req.mobileSession.id,req.query);
+                if (!req.query.cursor && topic.sharedSpaceId && topic.ownerType === 'group') {
+                    page.desktopRelays = require('./desktopRelays').desktopRelays(this.store.shared, req.mobileSession, topic, page.mode);
+                }
+                res.json(page);
+            } catch(e){next(e);}
+        });
         this.router.get('/api/conversations/:key/execution-request',(req,res,next)=>{try{const topic=this.authorize(req);if(Object.keys(req.query).some(k=>k!=='requestId'))throw error('INVALID_EXECUTION_QUERY');res.json(this.engine.request(topic.key,req.mobileSession.id,req.query.requestId));}catch(e){next(e);}});
         this.router.get('/api/conversations/:key/events',historyResponseCompression,(req,res,next)=>{
             try{const topic=this.authorize(req);if(Object.keys(req.query).some(k=>!['after','limit','executions'].includes(k)))throw error('INVALID_CURSOR');const result=this.store.pull(Number(req.query.after||0),Number(req.query.limit||100),[JSON.stringify([topic.ownerType,topic.ownerId,topic.topicId])],topic.sharedSpaceId?{spaceId:topic.sharedSpaceId}:undefined);requireReferenceReader(result,req.headers['x-nativesync-capabilities']);const state=this.catalog(req.mobileSession).find(t=>t.key===topic.key);res.json({...result,topic:{ownerType:topic.ownerType,ownerId:topic.ownerId,topicId:topic.topicId},...(req.query.executions==='paged'?{executionProtocol:2}:{executions:this.engine.list(topic.key,req.mobileSession.id)}),topicState:state});}catch(e){next(e);}

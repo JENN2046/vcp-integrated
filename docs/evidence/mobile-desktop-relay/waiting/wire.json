@@ -1,0 +1,107 @@
+{
+  "permissions": [
+    "shared:sharedAB:read"
+  ],
+  "responses": {
+    "attention": {
+      "code": 200,
+      "version": 2,
+      "topicKey": "shared_7f30a396be4a4bca9121236f124d3bdd",
+      "mode": "attention",
+      "watermark": 0,
+      "observedAt": 1795448468094,
+      "executions": [],
+      "total": 0,
+      "hasMore": false,
+      "next": null,
+      "desktopRelays": [
+        {
+          "id": "request_f0d6c35a86bf4a31b28f5f77ca34d5dc",
+          "state": "awaiting_continue",
+          "members": [
+            {
+              "ordinal": 0,
+              "memberId": "shared_addf01229cbf415ab0dcdb3f21e1bf91",
+              "name": "A",
+              "replySeq": 2
+            },
+            {
+              "ordinal": 1,
+              "memberId": "shared_344b5c83443c47f4bfe06d29762e0b0c",
+              "name": "B",
+              "replySeq": null
+            }
+          ],
+          "memberCount": 2,
+          "confirmedCount": 1,
+          "nextOrdinal": 1,
+          "unknownOrdinal": null,
+          "executor": "deviceB",
+          "userSeq": 1
+        }
+      ]
+    },
+    "recent": {
+      "code": 200,
+      "version": 2,
+      "topicKey": "shared_7f30a396be4a4bca9121236f124d3bdd",
+      "mode": "recent",
+      "watermark": 0,
+      "observedAt": 1795448468100,
+      "executions": [],
+      "total": 0,
+      "hasMore": false,
+      "next": null,
+      "desktopRelays": [
+        {
+          "id": "request_f0d6c35a86bf4a31b28f5f77ca34d5dc",
+          "state": "awaiting_continue",
+          "members": [
+            {
+              "ordinal": 0,
+              "memberId": "shared_addf01229cbf415ab0dcdb3f21e1bf91",
+              "name": "A",
+              "replySeq": 2
+            },
+            {
+              "ordinal": 1,
+              "memberId": "shared_344b5c83443c47f4bfe06d29762e0b0c",
+              "name": "B",
+              "replySeq": null
+            }
+          ],
+          "memberCount": 2,
+          "confirmedCount": 1,
+          "nextOrdinal": 1,
+          "unknownOrdinal": null,
+          "executor": "deviceB",
+          "userSeq": 1
+        }
+      ]
+    }
+  },
+  "stream": {
+    "code": 200,
+    "snapshot": {
+      "type": "snapshot",
+      "executionId": "request_f0d6c35a86bf4a31b28f5f77ca34d5dc",
+      "native": null,
+      "epoch": "80a37d56-02f0-45cb-83fa-85f8aab3db2e.6ad4eaf3-2745-4a59-bf1a-9670d0fdda19",
+      "seq": 0,
+      "request": {
+        "id": "request_f0d6c35a86bf4a31b28f5f77ca34d5dc",
+        "state": "dispatched",
+        "userSeq": 1,
+        "replySeq": 2,
+        "groupHandoff": {
+          "state": "awaiting_continue",
+          "executor": "desktop:deviceB",
+          "executorVersion": 1,
+          "nextOrdinal": 1,
+          "nextRequestId": "group_request_f0d6c35a86bf4a31b28f5f77ca34d5dc_1",
+          "firstReplySeq": 2
+        }
+      }
+    }
+  }
+}

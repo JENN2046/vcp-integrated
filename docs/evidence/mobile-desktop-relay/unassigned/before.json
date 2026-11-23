@@ -1,0 +1,125 @@
+{
+  "original": {
+    "a": {
+      "id": "request_96da1ec2f6e14f1bbb28f6a6afa292fb",
+      "topic_id": "shared_37bac68a9e004840905874277882307e",
+      "space_id": "sharedAB",
+      "state": "dispatched",
+      "user_seq": 1,
+      "reply_seq": 2
+    },
+    "topic": {
+      "id": "shared_37bac68a9e004840905874277882307e",
+      "parent_id": "shared_3568ec2d37b34b85b6f0e1d4ff4b0f89",
+      "topic_id": "shared_37bac68a9e004840905874277882307e"
+    },
+    "native": [
+      {
+        "id": "group_request_96da1ec2f6e14f1bbb28f6a6afa292fb_0",
+        "ordinal": 0,
+        "state": "model_terminal"
+      }
+    ],
+    "history": [
+      {
+        "seq": 1,
+        "msg_id": "controlled_bd016f0f3a5b4b818c967e14337385f5",
+        "body": "GROUP_HANDOFF_BASELINE_INPUT"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_group_request_96da1ec2f6e14f1bbb28f6a6afa292fb_0",
+        "body": "RELAY_A_FINAL"
+      }
+    ],
+    "closeoutReceipt": null,
+    "tables": {
+      "journal": {
+        "count": 2,
+        "sha256": "fbc4de3ada4a057522052335f53d53b3464a0d78e820081627bc5d5677d1143e"
+      },
+      "messages": {
+        "count": 2,
+        "sha256": "b9bb6721c754813c0979d89f26d65a6ebb53a0026eca86f8008a90fd78959993"
+      },
+      "shared_admissions": {
+        "count": 1,
+        "sha256": "c9dceb189236e2257ef6e318b4a97295cac826a4b16dd66fb5701f04908fd65f"
+      },
+      "shared_native_requests": {
+        "count": 1,
+        "sha256": "6f0924b58fca814506ce1de7874f42182a269b7a0d6244985b63404bb27bbfc7"
+      },
+      "shared_group_handoffs": {
+        "count": 1,
+        "sha256": "442f9d9cfeabd1f873484ad3137e5cbdbe0ade58a25c6ca5a68ea63c6f461e1a"
+      },
+      "shared_receipts": {
+        "count": 39,
+        "sha256": "dd9d897220a6effe3b1468be1faa141a9491ad4abc3eb1dd1a9e9eac7f46b607"
+      },
+      "mobile_executions": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "mobile_execution_steps": {
+        "count": 1,
+        "sha256": "3297971d130807ebbb85335788345a78e87ffe816acf976d394f7f8925245765"
+      },
+      "mobile_native_tasks": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "mobile_native_invocations": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    }
+  },
+  "source": "/tmp/vcp-integration-BKgqWh/ready/data/central.sqlite",
+  "sourceHash": "63f7db9561c667156fa4455cb95a38382a728414bd6c3f6d5d3b52521107c366",
+  "origin": "https://127.0.0.1:42029",
+  "browserPids": [
+    1880211,
+    1880342
+  ],
+  "outAssets": {
+    "htmlStatus": 200,
+    "bundleStatus": 200,
+    "connectionStatus": 200
+  },
+  "bundle": "/mobile/assets/index-BmAzvnoh.js",
+  "serverFiles": {
+    "portal.js": "fd4ff20987a5410ee1ed65fa358226ef869e727238daf8cbb704cce09a7fa307"
+  },
+  "servedBundleSha256": "1a18f6ef135a70f67fcf2957ecd33d63f8f9d2e51e35939685eea552d46d47c0",
+  "ui": {
+    "secure": true,
+    "workerControlled": true,
+    "work": null,
+    "pane": "任务状态\n返回聊天\n\n暂无任务记录\n\n本页 0 项 · 历史范围共 0 项 · 待处理／核对范围 0 项",
+    "history": [
+      {
+        "id": "controlled_bd016f0f3a5b4b818c967e14337385f5",
+        "text": "GROUP_HANDOFF_BASELINE_INPUT"
+      },
+      {
+        "id": "reply_group_request_96da1ec2f6e14f1bbb28f6a6afa292fb_0",
+        "text": "RELAY_A_FINAL"
+      }
+    ],
+    "buttons": [
+      "返回聊天"
+    ],
+    "noSend": true
+  },
+  "browserPosts": [
+    "/mobile/api/pair",
+    "/mobile/api/selection",
+    "/mobile/api/conversations/shared_37bac68a9e004840905874277882307e/baseline",
+    "/mobile/api/conversations/shared_37bac68a9e004840905874277882307e/baseline"
+  ],
+  "providerCalls": 0,
+  "toolCalls": 0,
+  "durableRowsUnchanged": true
+}

@@ -1,0 +1,238 @@
+{
+  "unassigned": {
+    "workId": "request_96da1ec2f6e14f1bbb28f6a6afa292fb",
+    "beforePane": "任务状态\n返回聊天\n\n暂无任务记录\n\n本页 0 项 · 历史范围共 0 项 · 待处理／核对范围 0 项",
+    "afterWork": "等待桌面接管\n\n请在另一台有权桌面接管，下一位是B。\n\n桌面群聊接力 · 1 / 2 位成员已确认\nA · 正式回复已确认\nB · 待接管",
+    "state": "awaiting_handoff",
+    "members": [
+      {
+        "ordinal": 0,
+        "memberId": "shared_024373252efd4eb4a1b3039034839826",
+        "name": "A",
+        "replySeq": 2
+      },
+      {
+        "ordinal": 1,
+        "memberId": "shared_5d9ab62dc0514d49b99cff961355ef0a",
+        "name": "B",
+        "replySeq": null
+      }
+    ],
+    "confirmedCount": 1,
+    "nextOrdinal": 1,
+    "unknownOrdinal": null,
+    "executor": null,
+    "hasDesktopCloseoutReceipt": false,
+    "sourceSha256": "63f7db9561c667156fa4455cb95a38382a728414bd6c3f6d5d3b52521107c366",
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "controlled_bd016f0f3a5b4b818c967e14337385f5",
+        "body": "GROUP_HANDOFF_BASELINE_INPUT"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_group_request_96da1ec2f6e14f1bbb28f6a6afa292fb_0",
+        "body": "RELAY_A_FINAL"
+      }
+    ],
+    "beforeScreenshot": "unassigned/before/work.png",
+    "afterScreenshot": "unassigned/after/work.png",
+    "providerCallsAcrossBothRuns": 0,
+    "toolCallsAcrossBothRuns": 0,
+    "sharedDurableRowsUnchanged": true,
+    "sharedSessionSseUnchanged": true
+  },
+  "waiting": {
+    "workId": "request_f0d6c35a86bf4a31b28f5f77ca34d5dc",
+    "beforePane": "任务状态\n返回聊天\n\n暂无任务记录\n\n本页 0 项 · 历史范围共 0 项 · 待处理／核对范围 0 项",
+    "afterWork": "等待桌面继续\n\n请在deviceB继续，下一位是B。\n\n桌面群聊接力 · 1 / 2 位成员已确认\nA · 正式回复已确认\nB · 待继续",
+    "state": "awaiting_continue",
+    "members": [
+      {
+        "ordinal": 0,
+        "memberId": "shared_addf01229cbf415ab0dcdb3f21e1bf91",
+        "name": "A",
+        "replySeq": 2
+      },
+      {
+        "ordinal": 1,
+        "memberId": "shared_344b5c83443c47f4bfe06d29762e0b0c",
+        "name": "B",
+        "replySeq": null
+      }
+    ],
+    "confirmedCount": 1,
+    "nextOrdinal": 1,
+    "unknownOrdinal": null,
+    "executor": "deviceB",
+    "hasDesktopCloseoutReceipt": false,
+    "sourceSha256": "6571dc5f2f9514305cd1657eec41788035f53f9ae209ad5504366c30c5ed9a68",
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "controlled_c51916a6f65341469a0151f86928e872",
+        "body": "GROUP_HANDOFF_BASELINE_INPUT"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_group_request_f0d6c35a86bf4a31b28f5f77ca34d5dc_0",
+        "body": "RELAY_A_FINAL"
+      }
+    ],
+    "beforeScreenshot": "waiting/before/work.png",
+    "afterScreenshot": "waiting/after/work.png",
+    "providerCallsAcrossBothRuns": 0,
+    "toolCallsAcrossBothRuns": 0,
+    "sharedDurableRowsUnchanged": true,
+    "sharedSessionSseUnchanged": true
+  },
+  "unknown": {
+    "workId": "request_9c83476f43f546a1a8f96d54254467fe",
+    "beforePane": "任务状态\n返回聊天\n\n暂无任务记录\n\n本页 0 项 · 历史范围共 0 项 · 待处理／核对范围 0 项",
+    "afterWork": "结果待核对，请回桌面处理\n桌面群聊接力 · 1 / 2 位成员已确认\nA · 正式回复已确认\nB · 已派发，结果待核对",
+    "state": "review_required",
+    "members": [
+      {
+        "ordinal": 0,
+        "memberId": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+        "name": "A",
+        "replySeq": 2
+      },
+      {
+        "ordinal": 1,
+        "memberId": "shared_91126376e0274108a9cf155f967873cf",
+        "name": "B",
+        "replySeq": null
+      }
+    ],
+    "confirmedCount": 1,
+    "nextOrdinal": null,
+    "unknownOrdinal": 1,
+    "executor": null,
+    "hasDesktopCloseoutReceipt": false,
+    "sourceSha256": "99db7df76016daf3624e66a220ef80891ac84be3bd151d1f3d877dc79bb27c44",
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+        "body": "GROUP_HANDOFF_BASELINE_INPUT"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+        "body": "RELAY_A_FINAL"
+      }
+    ],
+    "beforeScreenshot": "unknown/before/work.png",
+    "afterScreenshot": "unknown/after/work.png",
+    "providerCallsAcrossBothRuns": 0,
+    "toolCallsAcrossBothRuns": 0,
+    "sharedDurableRowsUnchanged": true,
+    "sharedSessionSseUnchanged": true
+  },
+  "ended": {
+    "workId": "request_9c83476f43f546a1a8f96d54254467fe",
+    "beforePane": "任务状态\n返回聊天\n\n暂无任务记录\n\n本页 0 项 · 历史范围共 0 项 · 待处理／核对范围 0 项",
+    "afterWork": "已人工结束，剩余接力已停止\n桌面群聊接力 · 1 / 2 位成员已确认\nA · 正式回复已确认\nB · 已派发，结果待核对",
+    "state": "abandoned",
+    "members": [
+      {
+        "ordinal": 0,
+        "memberId": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+        "name": "A",
+        "replySeq": 2
+      },
+      {
+        "ordinal": 1,
+        "memberId": "shared_91126376e0274108a9cf155f967873cf",
+        "name": "B",
+        "replySeq": null
+      }
+    ],
+    "confirmedCount": 1,
+    "nextOrdinal": null,
+    "unknownOrdinal": 1,
+    "executor": null,
+    "hasDesktopCloseoutReceipt": true,
+    "sourceSha256": "c14d1e4f6402cdc5d4ef5fc42ee03a4fbbe25b897682bb83913fbd3431f2038d",
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+        "body": "GROUP_HANDOFF_BASELINE_INPUT"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+        "body": "RELAY_A_FINAL"
+      }
+    ],
+    "beforeScreenshot": "ended/before/work.png",
+    "afterScreenshot": "ended/after/work.png",
+    "providerCallsAcrossBothRuns": 0,
+    "toolCallsAcrossBothRuns": 0,
+    "sharedDurableRowsUnchanged": true,
+    "sharedSessionSseUnchanged": true
+  },
+  "completed": {
+    "workId": "request_3f478177daa64fd1b83567bab7787f4a",
+    "beforePane": "任务状态\n返回聊天\n\n暂无任务记录\n\n本页 0 项 · 历史范围共 0 项 · 待处理／核对范围 0 项",
+    "afterWork": "接力已完成\n桌面群聊接力 · 3 / 3 位成员已确认\nA · 正式回复已确认\nB · 正式回复已确认\nC · 正式回复已确认",
+    "state": "completed",
+    "members": [
+      {
+        "ordinal": 0,
+        "memberId": "shared_2b92081751474076b9dee186164086dc",
+        "name": "A",
+        "replySeq": 5
+      },
+      {
+        "ordinal": 1,
+        "memberId": "shared_df92d2b62fe547f9bdf37f8315e632c8",
+        "name": "B",
+        "replySeq": 6
+      },
+      {
+        "ordinal": 2,
+        "memberId": "shared_761cc85b6677474e98f84659e0f3c06f",
+        "name": "C",
+        "replySeq": 7
+      }
+    ],
+    "confirmedCount": 3,
+    "nextOrdinal": null,
+    "unknownOrdinal": null,
+    "executor": null,
+    "hasDesktopCloseoutReceipt": false,
+    "sourceSha256": "ac62c2892794656892e9d523fe898717be192fe599768a0730a86eef4e4caae7",
+    "journal": [
+      {
+        "seq": 4,
+        "msg_id": "controlled_2606279cd5a14b3a800bcffd56559145",
+        "body": "GROUP_HANDOFF_BASELINE_INPUT"
+      },
+      {
+        "seq": 5,
+        "msg_id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+        "body": "RELAY_A_FINAL"
+      },
+      {
+        "seq": 6,
+        "msg_id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+        "body": "RELAY_B_FINAL"
+      },
+      {
+        "seq": 7,
+        "msg_id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2",
+        "body": "RELAY_C_FINAL"
+      }
+    ],
+    "beforeScreenshot": "completed/before/work.png",
+    "afterScreenshot": "completed/after/work.png",
+    "providerCallsAcrossBothRuns": 0,
+    "toolCallsAcrossBothRuns": 0,
+    "sharedDurableRowsUnchanged": true,
+    "sharedSessionSseUnchanged": true
+  }
+}

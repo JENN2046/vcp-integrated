@@ -42,7 +42,11 @@ async function init(t,count){
   const c=state().groupHandoff;
   return shared[name](actor,{...scope,opId:name+'-'+n,expectedExecutor:c.executor,expectedExecutorVersion:c.executorVersion,expectedNextOrdinal:c.nextOrdinal,expectedPreviousReplySeq:c.previousReplySeq,...overrides});
  };
- return {actors,store,state,native,publish,command,reopenBackend,shared,packet,group,members};
+ const phoneProjection=async()=>{
+  const phone=await f.phone({permissions:['read']});
+  return (await phone.call('/conversations/'+sharedId+'/executions')).desktopRelays[0];
+ };
+ return {actors,store,state,native,publish,command,reopenBackend,shared,packet,group,members,phoneProjection};
 }
 test('v2 completes one slot atomically',async t=>{
  const {actors:[a],state,native,publish}=await init(t,1);
@@ -53,7 +57,7 @@ test('v2 completes one slot atomically',async t=>{
  assert.equal(publish(a,0).replayed,true);
 });
 for(const count of [4,33])test('frozen sequential plan of '+count+' members settles each slot once',async t=>{
- const {actors,store,state,native,publish,command,reopenBackend}=await init(t,count);
+ const {actors,store,state,native,publish,command,reopenBackend,phoneProjection}=await init(t,count);
  const seqs=[];
  for(let n=0;n<count;n++){
   const actor=actors[n%2];
@@ -80,6 +84,11 @@ for(const count of [4,33])test('frozen sequential plan of '+count+' members sett
  }
  assert.equal(state().groupHandoff.state,'completed');
  assert.equal(state().groupHandoff.nextOrdinal,null);
+ const projection=await phoneProjection();
+ assert.equal(projection.state,'completed');
+ assert.equal(projection.memberCount,count);
+ assert.equal(projection.confirmedCount,count);
+ assert.deepEqual(projection.members.map(m=>m.replySeq),seqs);
  assert.equal(store.metrics().journalRows,count+1);
  assert.deepEqual(state().nativeRequests.map(row=>row.state),Array(count).fill('model_terminal'));
 });
@@ -143,4 +152,19 @@ test('editing membership after a boundary affects later admissions only',async t
  assert.deepEqual(state().turn.plan,members);
  assert.deepEqual(state().nativeRequests.map(row=>row.memberId),members);
  assert.equal(state().state,'completed');
+});
+
+
+test('mobile observes a bounded prefix of a large frozen plan',async t=>{
+ const {actors:[a],phoneProjection,shared,members}=await init(t,130);
+ const member=shared.get(a,sharedSpaceId,members[0]);
+ shared.saveConfig(a,{sharedSpaceId,sharedId:member.id,opId:'rename-first',
+  expectedVersion:member.version,config:{...member.config,name:'Renamed after admission'}});
+ const projection=await phoneProjection();
+ assert.equal(projection.memberCount,130);
+ assert.equal(projection.confirmedCount,0);
+ assert.equal(projection.members.length,128);
+ assert.equal(projection.members[0].name,'Synthetic shared');
+ assert.equal(projection.nextOrdinal,0);
+ assert.deepEqual(projection.members.map(m=>m.memberId),members.slice(0,128));
 });

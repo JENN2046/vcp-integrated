@@ -8,8 +8,8 @@ const {stable,sha256} = require(BOX+'/Plugin/NativeSync/sync/protocol');
 const sharedSpaceId = 'sharedAB';
 const mode = 'group-member-handoff-v1';
 
-async function groupFixture(t) {
- const f = await fixture(t), {shared} = f;
+async function groupFixture(t, options) {
+ const f = await fixture(t, options), {shared} = f;
  const actors = ['A','B'].map(x=>shared.desktop({sourceId:'source'+x,deviceId:'device'+x,spaceId:f.store.sourceCatalog.spaceId},'shared-space-v1,'+mode));
  const [a,b] = actors;
  const second = shared.create(a,{sharedSpaceId,opId:'handoff-member',kind:'agent',localId:'memberB',config:{name:'Member B',model:'synthetic',systemPrompt:'Second member'}}).object;
@@ -45,11 +45,20 @@ async function groupFixture(t) {
  });
  const transition = (actor,action,values)=>shared[action==='group-handoff'?'groupHandoff':'groupContinue'](actor,{sharedSpaceId,workId,opId:action,...values});
  const version = actor=>({expectedExecutor:actor.principal,expectedExecutorVersion:actor===a?0:1});
- return {f,shared,a,b,sharedId,workId,state,requestId,packet,prepare,enter,complete,transition,version};
+ return {f,shared,a,b,owner,sharedId,workId,state,requestId,packet,prepare,enter,complete,transition,version};
 }
 
 test('group handoff is fenced by the committed first reply, expected executor and explicit continuation',async t=>{
- const {f,shared,a,b,workId,state,packet,prepare,enter,complete,transition,version} = await groupFixture(t);
+ const {f,shared,a,b,sharedId,workId,state,packet,prepare,enter,complete,transition,version} = await groupFixture(t,{sourceLabels:{B:'Desktop B'}});
+ const phone=await f.phone({permissions:['read']});
+ const executions=mode=>phone.call('/conversations/'+sharedId+'/executions?mode='+mode);
+ const before=await executions('recent');
+ assert.deepEqual(before.executions,[]);
+ assert.equal(before.total,0);
+ assert.equal(before.desktopRelays[0].id,workId);
+ assert.equal(before.desktopRelays[0].state,'first_member');
+ assert.deepEqual(before.desktopRelays[0].members.map(m=>[m.name,m.replySeq]),[['Synthetic shared',null],['Member B',null]]);
+ assert.equal((await phone.call('/conversations/'+f.topic.id+'/executions')).desktopRelays,undefined);
  assert.equal(state().groupHandoff.state,'first_member');
  assert.equal(f.store.db.prepare('SELECT MAX(version) AS version FROM shared_schema').get().version,3);
  assert.throws(()=>transition(b,'group-handoff',version(a)));
@@ -70,8 +79,14 @@ test('group handoff is fenced by the committed first reply, expected executor an
  new SharedSpace(f.store);
  await f.reopenBackend();
  assert.equal(state(b).groupHandoff.state,'awaiting_handoff');
+ const awaitingHandoff=(await executions('attention')).desktopRelays[0];
+ assert.equal(awaitingHandoff.state,'awaiting_handoff');
+ assert.equal(awaitingHandoff.executor,null);
  assert.equal(transition(b,'group-handoff',version(a)).request.groupHandoff.state,'awaiting_continue');
  assert.equal(transition(b,'group-handoff',version(a)).replayed,true);
+ const awaitingContinue=(await executions('attention')).desktopRelays[0];
+ assert.equal(awaitingContinue.state,'awaiting_continue');
+ assert.equal(awaitingContinue.executor,'Desktop B');
  assert.throws(()=>prepare(b,1));
  assert.throws(()=>transition(a,'group-continue',version(b)));
  assert.equal(transition(b,'group-continue',version(b)).request.groupHandoff.state,'continuing');
@@ -89,18 +104,30 @@ test('group handoff is fenced by the committed first reply, expected executor an
  assert.throws(()=>native.bridge.onToolDispatch({pluginName:'Synthetic'}),rejects('CONTROLLED_TEXT_TOOLS_FORBIDDEN'));
  assert.throws(()=>enter(b,1,body));
  native.finish(true);
- complete(b,1);
+ const last=complete(b,1);
+ const awaitingFinish=(await executions('attention')).desktopRelays[0];
+ assert.equal(awaitingFinish.state,'continuing');
+ assert.equal(awaitingFinish.executor,'Desktop B');
+ assert.equal(awaitingFinish.nextOrdinal,null);
+ assert.deepEqual(awaitingFinish.members.map(m=>m.replySeq),[published.receipt.seq,last.receipt.seq]);
  assert.equal(shared.complete(b,{sharedSpaceId,admissionId:workId,opId:'handoff-finish',finish:true}).request.state,'completed');
  assert.deepEqual(state(b).nativeRequests.map(row=>row.state),['model_terminal','model_terminal']);
+ const finished=(await executions('recent')).desktopRelays[0];
+ assert.equal(finished.state,'completed');
+ assert.equal(finished.executor,null);
+ assert.deepEqual((await executions('attention')).desktopRelays,[]);
  assert.equal(f.store.metrics().journalRows,3);
 });
 
 test('already dispatched second member becomes unknown after restart and stays fenced',async t=>{
- const {f,a,b,state,prepare,enter,complete,transition,version} = await groupFixture(t);
+ const {f,shared,sharedId,workId,a,b,state,prepare,enter,complete,transition,version} = await groupFixture(t);
  prepare(a,0);
  enter(a,0).finish(true);
- complete(a,0);
+ const first=complete(a,0);
+ const phone=await f.phone({permissions:['read']});
+ const relays=async()=>(await phone.call('/conversations/'+sharedId+'/executions')).desktopRelays;
  transition(b,'group-handoff',version(a));
+ assert.equal((await relays())[0].executor,'deviceB');
  transition(b,'group-continue',version(b));
  prepare(b,1);
  enter(b,1);
@@ -110,6 +137,18 @@ test('already dispatched second member becomes unknown after restart and stays f
  assert.deepEqual(state(b).nativeRequests.map(row=>row.state),['model_terminal','unknown']);
  assert.throws(()=>prepare(b,1));
  assert.throws(()=>enter(b,1));
+ const changes=()=>f.store.db.prepare('SELECT total_changes() AS n').get().n;
+ const beforeReads=changes();
+ const review=(await relays())[0];
+ assert.equal(changes(),beforeReads);
+ assert.equal(review.state,'review_required');
+ assert.equal(review.unknownOrdinal,1);
+ assert.deepEqual(review.members.map(m=>m.replySeq),[first.receipt.seq,null]);
+ shared.abandon(b,{sharedSpaceId,admissionId:workId,opId:'resolved-review',confirm:true});
+ const abandoned=(await relays())[0];
+ assert.equal(abandoned.state,'abandoned');
+ assert.deepEqual(abandoned.members,review.members);
+ assert.equal(abandoned.unknownOrdinal,1);
  assert.equal(f.store.metrics().journalRows,2);
 });
 
@@ -169,4 +208,15 @@ test('the recipient continues the saved plan after the group changes its order',
  enter(b,1).finish(true);
  complete(b,1);
  assert.equal(shared.complete(b,{sharedSpaceId,admissionId:workId,opId:'finish-frozen-plan',finish:true}).request.state,'completed');
+});
+
+
+test('mobile relay reads stay within the paired space and selected group topic',async t=>{
+ const {f,shared,a,owner,sharedId}=await groupFixture(t,{attachments:true});
+ const other=shared.create(a,{sharedSpaceId,opId:'other-group-topic',kind:'topic',parentId:owner.id,
+  localParent:'handoffGroup',localId:'otherTopic',config:{name:'Other topic'}}).object;
+ const reader=await f.phone({permissions:['read']});
+ assert.deepEqual((await reader.call('/conversations/'+other.id+'/executions')).desktopRelays,[]);
+ const foreign=await f.phone({space:'foreignSpace',permissions:['read']});
+ assert.equal((await foreign.call('/conversations/'+sharedId+'/executions',undefined,403)).error.code,'SHARED_PERMISSION_REQUIRED');
 });

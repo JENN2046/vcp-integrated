@@ -140,3 +140,5 @@ TopicSponsor 的 River 引用对齐作者的最近消息窗口。两位成员同
 中央离线时冷开共享桌面，选中的群话题会在同地址中央恢复后原地读回 History。原故障话题的用户消息和三条成员回复均按原 ID 恢复，未发送草稿保留。[桌面及中央回执、原窗截图](evidence/desktop-topic-recovery/README.md)
 
 固定 `c1b8ffc6272f` 已完成共享单聊三端交付验证。Linux 实发一次，原 Windows 虚拟机及原手机隔离 Firefox PWA 观察同一 Work；三端换进程重开后读回原消息 ID 和正文，Provider 合计一次。手机两次执行的 JS 字节均匹配本轮干净构建。[三端对账、构建哈希与截图](evidence/release-c1b8ffc6272f/README.md)
+
+手机任务面板已能只读显示桌面发起的显式顺序群聊接力。五组存量 Work 的移动浏览器对照覆盖等待接管、等待指定桌面继续、原生成员结果未知、人工结束和全部确认；真实桌面接管消息也能在已打开的页面更新。[冷开与实时对照](evidence/mobile-desktop-relay/README.md)

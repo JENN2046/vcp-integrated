@@ -108,3 +108,6 @@
 }
 .topic-options { margin-top:16px; font-size:13px; color:#47645f; }
 .topic-options summary { padding-block:8px; }
+.desktop-relay > strong { display:block; color:#294340; font-size:15px; }
+.desktop-relay > p { margin:5px 0; font-size:14px; }
+.desktop-relay > small { color:#536e69; }

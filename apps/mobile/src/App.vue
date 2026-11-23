@@ -1,4 +1,5 @@
 <script setup>
+import DesktopRelayStatus from './DesktopRelayStatus.vue';
 import SharedAttachmentImage from './SharedAttachmentImage.vue';
 import {ref,computed,watch,onMounted,onUnmounted,nextTick} from 'vue';
 import TextPages from './TextPages.vue';
@@ -168,12 +169,16 @@ const displayJobs=computed(()=>jobs.value.map(job=>{try{if(job.topicKey!==select
 const keyAllowed=computed(()=>Boolean(isSecureContext&&server.value?.credentialExchangeAllowed));
 const pendingSubmission=computed(()=>recoveryRecords.value.find(record=>record.entryId===recoveryContext.value?.entryId&&record.topicKey===selected.value)||null);
 const recoveryBlocker=computed(()=>recoveryError.value||(!validSessionRecovery(recoveryContext.value)?'当前服务端未提供可靠提交恢复信息，暂不能发送。':''));
+const desktopRelays=computed(()=>jobsInfo.value?.desktopRelays || []);
 const workButtonText=computed(()=>{
  if(recoveryBlocker.value)return '提交受限';
  if(pendingSubmission.value)return '提交待确认';
  if(jobsError.value)return '任务状态待核对';
  if(displayJobs.value.some(j=>j.state==='waiting_approval'))return '等待审批';
- if(displayJobs.value.some(needsReview))return '任务待核对';
+ if(displayJobs.value.some(needsReview)||desktopRelays.value.some(r=>r.state==='review_required'))return '任务待核对';
+ if(desktopRelays.value.some(r=>r.state==='awaiting_handoff'))return '等待桌面接管';
+ if(desktopRelays.value.some(r=>r.state==='awaiting_continue'))return '等待桌面继续';
+ if(desktopRelays.value.some(r=>r.state==='first_member'||r.state==='continuing'))return '桌面接力中';
  if(displayJobs.value.some(j=>['running','dispatched','continuing','queued','accepted','publishing'].includes(j.state)))return '任务进行中';
  return '任务状态';
 });
@@ -312,7 +317,7 @@ async function refresh(){
    }while(result.hasMore);
   }else do{result=await readApi('conversations/'+encodeURIComponent(key)+'?after='+cursor+(currentTopic.value?.executionProtocol===2?'&executions=paged':''));if(!current())return;if(result.messages.length)changed=true;for(const row of result.messages){if(row.deleted)historyRows.delete(row.id);else historyRows.set(row.id,row.message);}cursor=result.next;}while(result.hasMore);
   if(changed)await displayHistory([...historyRows.values()],current);if(!current())return;historyProgress.value=null;historyContextReady.value=true;historyFromCache=false;jobs.value=result.executions||jobs.value;online.value=true;const topicRecord=topics.value.find(t=>t.key===key);if(topicRecord){topicRecord.messageCount=messages.value.length;if(result.topicState)Object.assign(topicRecord,result.topicState);}historyBinding=cacheBinding(key);
-  if(currentTopic.value?.executionProtocol===2){try{const page=await executionPager.refresh(readApi,key,current);if(!page||!current())return;result.executions=page.rows;jobs.value=page.rows;jobsInfo.value=page;jobsError.value='';}catch(e){jobsError.value='执行状态暂未更新，保留最近结果：'+e.message;}}
+  if(currentTopic.value?.executionProtocol===2){try{const page=await executionPager.refresh(readApi,key,current);if(!page||!current())return;result.executions=page.rows;jobs.value=page.rows;jobsInfo.value=page;jobsError.value='';}catch(e){if(!current())return;if(e.status===401||e.status===403)throw e;jobsError.value='执行状态暂未更新，保留最近结果：'+e.message;}}
   if(context&&loadRecovery()){const pending=submissionStore.current({entryId:context.recovery.entryId,topicKey:key});if(pending){const exact=currentTopic.value?.executionProtocol===2?await readApi('conversations/'+encodeURIComponent(key)+'/execution-request?'+new URLSearchParams({requestId:pending.requestId})):result;await reconcileSubmission(pending,exact.executions,context);}}
   if(selected.value!==key||epoch!==generation||sessionEpoch!==authEpoch)return;
   if(currentTopic.value?.attachmentsEnabled){const batch=attachmentPager.select(messages.value);attachmentStates.value=batch.retained;if(batch.ids.length){const status=await readApi('conversations/'+encodeURIComponent(key)+'/attachments/status',{messageIds:batch.ids});if(selected.value!==key||epoch!==generation||sessionEpoch!==authEpoch)return;attachmentStates.value=attachmentPager.merge(batch,status.attachments,messages.value);}}
@@ -591,11 +596,13 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
    </section>
    <section v-show="conversationPanel==='work'" id="conversation-work" aria-label="任务状态">
     <div class="panel-heading"><strong>任务状态</strong><button type="button" @click="closePanel">返回聊天</button></div>
-    <p v-if="!jobs.length && !jobsError && !pendingSubmission && !recoveryBlocker && !acceptedReceipt" class="empty">暂无任务记录</p>
+    <p v-if="!jobs.length && !desktopRelays.length && !jobsError && !pendingSubmission && !recoveryBlocker && !acceptedReceipt" class="empty">暂无任务记录</p>
    <section v-if="recoveryBlocker||pendingSubmission||acceptedReceipt||recoveryRecords.length" id="submission-recovery" class="submission-recovery" aria-label="提交确认状态" aria-live="polite"><p v-if="recoveryBlocker" role="alert">{{recoveryBlocker}}</p><div v-if="pendingSubmission" id="pending-submission" :data-request-id="pendingSubmission.requestId"><strong>本地已保存 · 云端接受尚待确认</strong><p>{{pendingSubmission.kind==='invitation'?'邀请成员：'+pendingSubmission.payload.agentId:pendingSubmission.payload.text.slice(0,120)||'附件消息'}}</p><small>提交 {{pendingSubmission.requestId}}<template v-if="pendingSubmission.payload.attachments?.length"> · {{pendingSubmission.payload.attachments.length}} 个附件</template></small><p id="submission-recovery-detail">{{recoveryDetail||'原提交已保留。刷新或重连只核对云端记录，不会自动发送。'}}</p></div><p v-else-if="acceptedReceipt" id="accepted-submission" :data-request-id="acceptedReceipt.requestId"><strong>云端已接受</strong> · 提交 {{acceptedReceipt.requestId}}</p><small v-if="recoveryRecords.length>(pendingSubmission?1:0)">此设备另有 {{recoveryRecords.length-(pendingSubmission?1:0)}} 条待确认提交，返回对应入口和话题可核对。</small></section>
    <section class="executions" aria-label="原生执行状态">
     <p v-if="jobsError" role="status">{{jobsError}}</p>
-    <div v-if="jobsInfo" class="execution-pages"><small>本页 {{jobs.length}} 项 · 历史范围共 {{jobsInfo.total}} 项 · 待处理／核对范围 {{jobsInfo.attentionTotal}} 项</small><button v-if="jobsInfo.moreAttention" @click="nextExecutions('attention')" :disabled="busy">下一页待处理／核对</button><button v-if="jobsInfo.moreRecent" @click="nextExecutions('recent')" :disabled="busy">更早任务</button><button v-if="jobsInfo.historyPage" @click="latestExecutions" :disabled="busy">返回最新任务</button></div>
+    <small v-if="desktopRelays.length && !online">最近已知的接力状态，联网后核对。</small>
+    <DesktopRelayStatus v-for="relay in desktopRelays" :key="relay.id" :relay="relay"/>
+    <div v-if="jobsInfo && (jobs.length || !desktopRelays.length)" class="execution-pages"><small>本页 {{jobs.length}} 项 · 历史范围共 {{jobsInfo.total}} 项 · 待处理／核对范围 {{jobsInfo.attentionTotal}} 项</small><button v-if="jobsInfo.moreAttention" @click="nextExecutions('attention')" :disabled="busy">下一页待处理／核对</button><button v-if="jobsInfo.moreRecent" @click="nextExecutions('recent')" :disabled="busy">更早任务</button><button v-if="jobsInfo.historyPage" @click="latestExecutions" :disabled="busy">返回最新任务</button></div>
     <small v-if="jobs.length">云端已接受 · {{online?'本次查询的原生执行状态':'最近已知状态，联网后重新核对'}}</small>
     <article v-for="j in displayJobs" :key="j.id" class="execution-job" :data-exec-id="j.id" :data-state="j.state">
      <div class="execution-row"><span>{{executionLabel(j)}}<template v-if="j.steps?.length"> · {{j.steps.filter(s=>s.state==='completed').length}} / {{j.stepCount}} 位成员</template></span><template v-if="j.own && j.steps && supportsCancelRemaining">

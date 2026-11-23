@@ -1,0 +1,110 @@
+{
+  "permissions": [
+    "shared:sharedAB:read"
+  ],
+  "responses": {
+    "attention": {
+      "code": 200,
+      "version": 2,
+      "topicKey": "shared_37bac68a9e004840905874277882307e",
+      "mode": "attention",
+      "watermark": 0,
+      "observedAt": 1795448468263,
+      "executions": [],
+      "total": 0,
+      "hasMore": false,
+      "next": null,
+      "desktopRelays": [
+        {
+          "id": "request_96da1ec2f6e14f1bbb28f6a6afa292fb",
+          "state": "awaiting_handoff",
+          "members": [
+            {
+              "ordinal": 0,
+              "memberId": "shared_024373252efd4eb4a1b3039034839826",
+              "name": "A",
+              "replySeq": 2
+            },
+            {
+              "ordinal": 1,
+              "memberId": "shared_5d9ab62dc0514d49b99cff961355ef0a",
+              "name": "B",
+              "replySeq": null
+            }
+          ],
+          "memberCount": 2,
+          "confirmedCount": 1,
+          "nextOrdinal": 1,
+          "unknownOrdinal": null,
+          "executor": null,
+          "userSeq": 1
+        }
+      ]
+    },
+    "recent": {
+      "code": 200,
+      "version": 2,
+      "topicKey": "shared_37bac68a9e004840905874277882307e",
+      "mode": "recent",
+      "watermark": 0,
+      "observedAt": 1795448468273,
+      "executions": [],
+      "total": 0,
+      "hasMore": false,
+      "next": null,
+      "desktopRelays": [
+        {
+          "id": "request_96da1ec2f6e14f1bbb28f6a6afa292fb",
+          "state": "awaiting_handoff",
+          "members": [
+            {
+              "ordinal": 0,
+              "memberId": "shared_024373252efd4eb4a1b3039034839826",
+              "name": "A",
+              "replySeq": 2
+            },
+            {
+              "ordinal": 1,
+              "memberId": "shared_5d9ab62dc0514d49b99cff961355ef0a",
+              "name": "B",
+              "replySeq": null
+            }
+          ],
+          "memberCount": 2,
+          "confirmedCount": 1,
+          "nextOrdinal": 1,
+          "unknownOrdinal": null,
+          "executor": null,
+          "userSeq": 1
+        }
+      ]
+    }
+  },
+  "stream": {
+    "code": 200,
+    "snapshot": {
+      "type": "snapshot",
+      "executionId": "request_96da1ec2f6e14f1bbb28f6a6afa292fb",
+      "native": null,
+      "epoch": "a91c6532-bc72-4e52-bf5e-d5fbe274f0f1.77b4947f-f5f7-43e8-9707-bdf669f829c9",
+      "seq": 0,
+      "request": {
+        "id": "request_96da1ec2f6e14f1bbb28f6a6afa292fb",
+        "state": "dispatched",
+        "userSeq": 1,
+        "replySeq": 2,
+        "groupHandoff": {
+          "state": "awaiting_handoff",
+          "executor": "desktop:deviceA",
+          "executorVersion": 0,
+          "nextOrdinal": 1,
+          "nextRequestId": "group_request_96da1ec2f6e14f1bbb28f6a6afa292fb_1",
+          "previousReplySeq": 2,
+          "confirmedReplies": [
+            2
+          ]
+        }
+      }
+    }
+  }
+}

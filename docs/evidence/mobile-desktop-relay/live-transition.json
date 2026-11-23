@@ -1,0 +1,99 @@
+{
+  "workId": "request_96da1ec2f6e14f1bbb28f6a6afa292fb",
+  "sourceHash": "63f7db9561c667156fa4455cb95a38382a728414bd6c3f6d5d3b52521107c366",
+  "origin": "https://127.0.0.1:40577",
+  "bundle": "/mobile/assets/index-BaXgBu8e.js",
+  "browserPids": [
+    1886263,
+    1886432
+  ],
+  "readOnlyPermissions": [
+    "shared:sharedAB:read"
+  ],
+  "start": {
+    "state": "awaiting_handoff",
+    "text": "等待桌面接管\n\n请在另一台有权桌面接管，下一位是B。\n\n桌面群聊接力 · 1 / 2 位成员已确认\nA · 正式回复已确认\nB · 待接管",
+    "timeOrigin": 1795448818970.9,
+    "pageUrl": "https://127.0.0.1:40577/mobile/"
+  },
+  "updates": [
+    {
+      "action": "handoff",
+      "receipt": {
+        "status": 200,
+        "id": "request_96da1ec2f6e14f1bbb28f6a6afa292fb",
+        "state": "awaiting_continue",
+        "executor": "desktop:deviceB",
+        "executorVersion": 1,
+        "nextOrdinal": 1,
+        "nextRequestId": "group_request_96da1ec2f6e14f1bbb28f6a6afa292fb_1",
+        "previousReplySeq": 2,
+        "confirmedReplies": [
+          2
+        ]
+      },
+      "shown": {
+        "state": "awaiting_continue",
+        "text": "等待桌面继续\n\n请在deviceB继续，下一位是B。\n\n桌面群聊接力 · 1 / 2 位成员已确认\nA · 正式回复已确认\nB · 待继续",
+        "timeOrigin": 1795448818970.9,
+        "pageUrl": "https://127.0.0.1:40577/mobile/"
+      },
+      "latencyMs": 83
+    },
+    {
+      "action": "continue",
+      "receipt": {
+        "status": 200,
+        "id": "request_96da1ec2f6e14f1bbb28f6a6afa292fb",
+        "state": "continuing",
+        "executor": "desktop:deviceB",
+        "executorVersion": 1,
+        "nextOrdinal": 1,
+        "nextRequestId": "group_request_96da1ec2f6e14f1bbb28f6a6afa292fb_1",
+        "previousReplySeq": 2,
+        "confirmedReplies": [
+          2
+        ]
+      },
+      "shown": {
+        "state": "continuing",
+        "text": "等待B的正式回复\n\n执行桌面：deviceB\n\n桌面群聊接力 · 1 / 2 位成员已确认\nA · 正式回复已确认\nB · 等待正式回复",
+        "timeOrigin": 1795448818970.9,
+        "pageUrl": "https://127.0.0.1:40577/mobile/"
+      },
+      "latencyMs": 86
+    }
+  ],
+  "desktopRoutes": [
+    "/api/v1/sync/shared/group-handoff",
+    "/api/v1/sync/shared/group-continue"
+  ],
+  "navigation": [],
+  "browserPostsAfterObservation": [],
+  "providerCalls": 0,
+  "toolCalls": 0,
+  "journal": [
+    {
+      "seq": 1,
+      "msg_id": "controlled_bd016f0f3a5b4b818c967e14337385f5",
+      "body": "GROUP_HANDOFF_BASELINE_INPUT"
+    },
+    {
+      "seq": 2,
+      "msg_id": "reply_group_request_96da1ec2f6e14f1bbb28f6a6afa292fb_0",
+      "body": "RELAY_A_FINAL"
+    }
+  ],
+  "native": [
+    {
+      "id": "group_request_96da1ec2f6e14f1bbb28f6a6afa292fb_0",
+      "ordinal": 0,
+      "state": "model_terminal"
+    }
+  ],
+  "receiptCount": {
+    "before": 39,
+    "after": 41
+  },
+  "durableWorkUnchanged": true
+}

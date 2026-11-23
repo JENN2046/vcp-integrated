@@ -14,7 +14,10 @@ export function createExecutionPager(){
   };
   const [attention,recent]=await Promise.all(['attention','recent'].map(request));if(!current()||owner!==key||revision!==epoch)return null;
   state={attention,recent};const rows=[...new Map([...attention.page.executions,...recent.page.executions].map(r=>[r.id,r])).values()];
-  return {rows,total:recent.page.total,attentionTotal:attention.page.total,moreRecent:recent.page.hasMore,moreAttention:attention.page.hasMore,historyPage:Boolean(recent.cursor||attention.cursor)};
+  // Relay observations have no submission identity or mobile action authority.
+  const desktopRelays=[...new Map([...(attention.page.desktopRelays||[]),...(recent.page.desktopRelays||[])]
+   .map(relay=>[relay.id,relay])).values()];
+  return {rows,desktopRelays,total:recent.page.total,attentionTotal:attention.page.total,moreRecent:recent.page.hasMore,moreAttention:attention.page.hasMore,historyPage:Boolean(recent.cursor||attention.cursor)};
  }
  function next(mode){if(!['recent','attention'].includes(mode)||!state[mode]?.page?.hasMore)return;state[mode]={cursor:state[mode].page.next,page:null};epoch++;}
  return {refresh,next,reset};

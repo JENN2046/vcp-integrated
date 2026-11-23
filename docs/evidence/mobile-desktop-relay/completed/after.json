@@ -1,0 +1,154 @@
+{
+  "original": {
+    "a": {
+      "id": "request_3f478177daa64fd1b83567bab7787f4a",
+      "topic_id": "shared_14d89b041b7649cfbe8d86023a2bbfc7",
+      "space_id": "sharedAB",
+      "state": "completed",
+      "user_seq": 4,
+      "reply_seq": 7
+    },
+    "topic": {
+      "id": "shared_14d89b041b7649cfbe8d86023a2bbfc7",
+      "parent_id": "shared_29c4f523979b4880b373a72c12b81d3d",
+      "topic_id": "shared_14d89b041b7649cfbe8d86023a2bbfc7"
+    },
+    "native": [
+      {
+        "id": "group_request_3f478177daa64fd1b83567bab7787f4a_0",
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "id": "group_request_3f478177daa64fd1b83567bab7787f4a_1",
+        "ordinal": 1,
+        "state": "model_terminal"
+      },
+      {
+        "id": "group_request_3f478177daa64fd1b83567bab7787f4a_2",
+        "ordinal": 2,
+        "state": "model_terminal"
+      }
+    ],
+    "history": [
+      {
+        "seq": 4,
+        "msg_id": "controlled_2606279cd5a14b3a800bcffd56559145",
+        "body": "GROUP_HANDOFF_BASELINE_INPUT"
+      },
+      {
+        "seq": 5,
+        "msg_id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+        "body": "RELAY_A_FINAL"
+      },
+      {
+        "seq": 6,
+        "msg_id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+        "body": "RELAY_B_FINAL"
+      },
+      {
+        "seq": 7,
+        "msg_id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2",
+        "body": "RELAY_C_FINAL"
+      }
+    ],
+    "closeoutReceipt": null,
+    "tables": {
+      "journal": {
+        "count": 11,
+        "sha256": "716de44c3f43e4d01e0ffbe6c484f7f567c598e18bce12f7db65e6377ba28714"
+      },
+      "messages": {
+        "count": 10,
+        "sha256": "d5003fb9a5501688e9619d5291b589bd3aa3cd8a505051f2330719e74e6271f3"
+      },
+      "shared_admissions": {
+        "count": 4,
+        "sha256": "6598da59c8f24af3201c8ef29c77ce113f6eebfe2652cbc314dd5b53ba4367cd"
+      },
+      "shared_native_requests": {
+        "count": 7,
+        "sha256": "7c7353cd352d8f6c0f530a6679c597b575230445b961dcb3a05a8b0718d8cb68"
+      },
+      "shared_group_handoffs": {
+        "count": 2,
+        "sha256": "04cb12325ee6ffa9a811712df8c2f55b9836dabac655e9f59ea4573cdd91b734"
+      },
+      "shared_receipts": {
+        "count": 61,
+        "sha256": "ba145f88a0f8dfc22ab31fed568b39e2905f3b105e40e77cfdc7c3a0e23d5dab"
+      },
+      "mobile_executions": {
+        "count": 2,
+        "sha256": "09f6c1e63dce70728c76d440f7bde843381b788a481eff2d2aa75cf384ecf2e3"
+      },
+      "mobile_execution_steps": {
+        "count": 7,
+        "sha256": "4db5cbef6b3d37b7ba40d23dc9555b503b9534b3d9bd851f35c9814d83e0db37"
+      },
+      "mobile_native_tasks": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "mobile_native_invocations": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    }
+  },
+  "source": "/tmp/ns-r4-central.gBb6t5/final-schema4-cold.sqlite",
+  "sourceHash": "ac62c2892794656892e9d523fe898717be192fe599768a0730a86eef4e4caae7",
+  "origin": "https://127.0.0.1:37007",
+  "browserPids": [
+    1882294,
+    1882906
+  ],
+  "outAssets": {
+    "htmlStatus": 200,
+    "bundleStatus": 200,
+    "connectionStatus": 200
+  },
+  "bundle": "/mobile/assets/index-BaXgBu8e.js",
+  "serverFiles": {
+    "portal.js": "a3ee1d71789783398e95f5af6119c637c5b249460e62f420afeb69e6ace77195",
+    "desktopRelays.js": "3e7c400069d040900c0de4c0148d88735fa0e4e3eba327a447d4672b6ae9c771"
+  },
+  "servedBundleSha256": "09a7a701e8658060d8283fdede9d7acd344debda84aacf35ac0f169943f8bc38",
+  "ui": {
+    "secure": true,
+    "workerControlled": true,
+    "work": "接力已完成\n桌面群聊接力 · 3 / 3 位成员已确认\nA · 正式回复已确认\nB · 正式回复已确认\nC · 正式回复已确认",
+    "pane": "任务状态\n返回聊天\n接力已完成\n桌面群聊接力 · 3 / 3 位成员已确认\nA · 正式回复已确认\nB · 正式回复已确认\nC · 正式回复已确认",
+    "history": [
+      {
+        "id": "controlled_2606279cd5a14b3a800bcffd56559145",
+        "text": "GROUP_HANDOFF_BASELINE_INPUT"
+      },
+      {
+        "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_0",
+        "text": "RELAY_A_FINAL"
+      },
+      {
+        "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_1",
+        "text": "RELAY_B_FINAL"
+      },
+      {
+        "id": "reply_group_request_3f478177daa64fd1b83567bab7787f4a_2",
+        "text": "RELAY_C_FINAL"
+      }
+    ],
+    "buttons": [
+      "返回聊天"
+    ],
+    "noSend": true
+  },
+  "browserPosts": [
+    "/mobile/api/pair",
+    "/mobile/api/selection",
+    "/mobile/api/conversations/shared_14d89b041b7649cfbe8d86023a2bbfc7/baseline",
+    "/mobile/api/conversations/shared_14d89b041b7649cfbe8d86023a2bbfc7/baseline"
+  ],
+  "providerCalls": 0,
+  "toolCalls": 0,
+  "durableRowsUnchanged": true
+}

@@ -1,0 +1,82 @@
+{
+  "permissions": [
+    "shared:sharedAB:read"
+  ],
+  "responses": {
+    "attention": {
+      "code": 200,
+      "version": 2,
+      "topicKey": "shared_846c39801b47445ca51fae9b0c64a85d",
+      "mode": "attention",
+      "watermark": 0,
+      "observedAt": 1795448468226,
+      "executions": [],
+      "total": 0,
+      "hasMore": false,
+      "next": null,
+      "desktopRelays": []
+    },
+    "recent": {
+      "code": 200,
+      "version": 2,
+      "topicKey": "shared_846c39801b47445ca51fae9b0c64a85d",
+      "mode": "recent",
+      "watermark": 0,
+      "observedAt": 1795448468231,
+      "executions": [],
+      "total": 0,
+      "hasMore": false,
+      "next": null,
+      "desktopRelays": [
+        {
+          "id": "request_9c83476f43f546a1a8f96d54254467fe",
+          "state": "abandoned",
+          "members": [
+            {
+              "ordinal": 0,
+              "memberId": "shared_63ffdefab78d4027baf7d6a43c6b1d0e",
+              "name": "A",
+              "replySeq": 2
+            },
+            {
+              "ordinal": 1,
+              "memberId": "shared_91126376e0274108a9cf155f967873cf",
+              "name": "B",
+              "replySeq": null
+            }
+          ],
+          "memberCount": 2,
+          "confirmedCount": 1,
+          "nextOrdinal": null,
+          "unknownOrdinal": 1,
+          "executor": null,
+          "userSeq": 1
+        }
+      ]
+    }
+  },
+  "stream": {
+    "code": 200,
+    "snapshot": {
+      "type": "snapshot",
+      "executionId": "request_9c83476f43f546a1a8f96d54254467fe",
+      "native": null,
+      "epoch": "6a6992e5-1f3a-46d4-96c7-7c64092eb5bd.b0951a6d-1503-4b01-a0eb-b607cc87ad60",
+      "seq": 0,
+      "request": {
+        "id": "request_9c83476f43f546a1a8f96d54254467fe",
+        "state": "abandoned",
+        "userSeq": 1,
+        "replySeq": 2,
+        "groupHandoff": {
+          "state": "abandoned",
+          "executor": "desktop:deviceB",
+          "executorVersion": 1,
+          "nextOrdinal": null,
+          "nextRequestId": null,
+          "firstReplySeq": 2
+        }
+      }
+    }
+  }
+}

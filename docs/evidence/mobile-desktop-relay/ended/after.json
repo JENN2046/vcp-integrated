@@ -1,0 +1,132 @@
+{
+  "original": {
+    "a": {
+      "id": "request_9c83476f43f546a1a8f96d54254467fe",
+      "topic_id": "shared_846c39801b47445ca51fae9b0c64a85d",
+      "space_id": "sharedAB",
+      "state": "abandoned",
+      "user_seq": 1,
+      "reply_seq": 2
+    },
+    "topic": {
+      "id": "shared_846c39801b47445ca51fae9b0c64a85d",
+      "parent_id": "shared_c5d0c176dd6e4306a647141f983e8f85",
+      "topic_id": "shared_846c39801b47445ca51fae9b0c64a85d"
+    },
+    "native": [
+      {
+        "id": "group_request_9c83476f43f546a1a8f96d54254467fe_0",
+        "ordinal": 0,
+        "state": "model_terminal"
+      },
+      {
+        "id": "group_request_9c83476f43f546a1a8f96d54254467fe_1",
+        "ordinal": 1,
+        "state": "unknown"
+      }
+    ],
+    "history": [
+      {
+        "seq": 1,
+        "msg_id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+        "body": "GROUP_HANDOFF_BASELINE_INPUT"
+      },
+      {
+        "seq": 2,
+        "msg_id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+        "body": "RELAY_A_FINAL"
+      }
+    ],
+    "closeoutReceipt": "desktop-abandon_request_9c83476f43f546a1a8f96d54254467fe",
+    "tables": {
+      "journal": {
+        "count": 2,
+        "sha256": "ecac27129f921e2cdfc90e5235fc65ba0c67e7b3f89eed13cfc44cba70c04ab8"
+      },
+      "messages": {
+        "count": 2,
+        "sha256": "e0bd7e679180d42dd61a3655fd8570448b2ba22ca7dfbb9359f9f56d6482df24"
+      },
+      "shared_admissions": {
+        "count": 1,
+        "sha256": "434bf9d2bcabb8d1092fb0fe3ca23c86d9150ebfdeddb39b9d2fecc943bf0dd5"
+      },
+      "shared_native_requests": {
+        "count": 2,
+        "sha256": "4950230c2f890230ecc2c3845031626458657a778da3a4ffbb8152e7e490a606"
+      },
+      "shared_group_handoffs": {
+        "count": 1,
+        "sha256": "cfb4a6a491be5979c3cceb1d77467e4f14742ad2cffa557a7780fb20898549e7"
+      },
+      "shared_receipts": {
+        "count": 42,
+        "sha256": "c1ba30e968aecea8f8728eef3d3449303e78f913c5d4fe2e79c5cadb8d1948d9"
+      },
+      "mobile_executions": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "mobile_execution_steps": {
+        "count": 2,
+        "sha256": "773d8da641c6f92eb9191f3be49b659ed608617770d61e2b4c0362370c1f5841"
+      },
+      "mobile_native_tasks": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "mobile_native_invocations": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    }
+  },
+  "source": "/tmp/vcp-integration-1NmGtR/ready/data/central.sqlite",
+  "sourceHash": "c14d1e4f6402cdc5d4ef5fc42ee03a4fbbe25b897682bb83913fbd3431f2038d",
+  "origin": "https://127.0.0.1:38397",
+  "browserPids": [
+    1882270,
+    1882901
+  ],
+  "outAssets": {
+    "htmlStatus": 200,
+    "bundleStatus": 200,
+    "connectionStatus": 200
+  },
+  "bundle": "/mobile/assets/index-BaXgBu8e.js",
+  "serverFiles": {
+    "portal.js": "a3ee1d71789783398e95f5af6119c637c5b249460e62f420afeb69e6ace77195",
+    "desktopRelays.js": "3e7c400069d040900c0de4c0148d88735fa0e4e3eba327a447d4672b6ae9c771"
+  },
+  "servedBundleSha256": "09a7a701e8658060d8283fdede9d7acd344debda84aacf35ac0f169943f8bc38",
+  "ui": {
+    "secure": true,
+    "workerControlled": true,
+    "work": "已人工结束，剩余接力已停止\n桌面群聊接力 · 1 / 2 位成员已确认\nA · 正式回复已确认\nB · 已派发，结果待核对",
+    "pane": "任务状态\n返回聊天\n已人工结束，剩余接力已停止\n桌面群聊接力 · 1 / 2 位成员已确认\nA · 正式回复已确认\nB · 已派发，结果待核对",
+    "history": [
+      {
+        "id": "controlled_88aead004a8a49d496526cfe58f3a75d",
+        "text": "GROUP_HANDOFF_BASELINE_INPUT"
+      },
+      {
+        "id": "reply_group_request_9c83476f43f546a1a8f96d54254467fe_0",
+        "text": "RELAY_A_FINAL"
+      }
+    ],
+    "buttons": [
+      "返回聊天"
+    ],
+    "noSend": true
+  },
+  "browserPosts": [
+    "/mobile/api/pair",
+    "/mobile/api/conversations/shared_a8cc121be1b844f4bc015436a5229a8a/baseline",
+    "/mobile/api/selection",
+    "/mobile/api/conversations/shared_846c39801b47445ca51fae9b0c64a85d/baseline",
+    "/mobile/api/conversations/shared_846c39801b47445ca51fae9b0c64a85d/baseline"
+  ],
+  "providerCalls": 0,
+  "toolCalls": 0,
+  "durableRowsUnchanged": true
+}
