@@ -1,0 +1,37 @@
+{
+  "coverage": "SQLite and native registration/publication boundaries; model completion supplied at native boundary",
+  "cases": [
+    {
+      "members": 1,
+      "workId": "request_160f60c2f0684803baf85795ade5491b",
+      "state": "completed",
+      "registeredRequests": 1,
+      "confirmedReplies": 1,
+      "journalRows": 2,
+      "executorVersion": 0
+    },
+    {
+      "members": 4,
+      "workId": "request_e71df5749eb34db781bd7a9a67c6bb10",
+      "state": "completed",
+      "registeredRequests": 4,
+      "confirmedReplies": 4,
+      "journalRows": 5,
+      "executorVersion": 3
+    },
+    {
+      "members": 33,
+      "workId": "request_71b3cc6e84b24a72ad0d16e7bfec6fc3",
+      "state": "completed",
+      "registeredRequests": 33,
+      "confirmedReplies": 33,
+      "journalRows": 34,
+      "executorVersion": 32
+    }
+  ],
+  "configurationOnlyTest": {
+    "members": 1001,
+    "sequentialOrder": "reversed",
+    "validated": true
+  }
+}

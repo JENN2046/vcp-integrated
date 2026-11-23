@@ -62,7 +62,7 @@ module.exports = async function reviewCloseout({
         assert.deepEqual(literals(text), [oldReply]);
         assert.deepEqual(history().map(row => row.content), [oldInput, oldReply]);
         const status = await groupStatus(client);
-        assert.match(status, /第二位成员 B的回复已派发，结果未知/);
+        assert.match(status, /第[二2]位成员 B的回复已派发，结果未知/);
         return { groupStatus: status, messages: text, history: history() };
     }
 

@@ -58,9 +58,10 @@ class ExecutionConfigs {
         if (topic.ownerType === 'group') {
             if (!input || Object.keys(input).some(k=>!['group','agents','tavernRules','executionPolicy'].includes(k))) throw fail('INVALID_GROUP_CONFIG',400);
             const group=input.group;
-            if (!group || Object.keys(group).some(k=>!groupFields.includes(k)) || typeof group.name!=='string' || !['sequential','naturerandom','invite_only','jev','game'].includes(group.mode) || !Array.isArray(group.members) || group.members.length>32 || new Set(group.members).size!==group.members.length || !Array.isArray(input.agents) || input.agents.length!==group.members.length || JSON.stringify(group).length>64000) throw fail('INVALID_GROUP_CONFIG',400);
+            const sharedSequential=authority?.sharedSpaceId && group?.mode==='sequential';
+            if (!group || Object.keys(group).some(k=>!groupFields.includes(k)) || typeof group.name!=='string' || !['sequential','naturerandom','invite_only','jev','game'].includes(group.mode) || !Array.isArray(group.members) || (!sharedSequential && group.members.length>32) || new Set(group.members).size!==group.members.length || !Array.isArray(input.agents) || input.agents.length!==group.members.length || JSON.stringify(group).length>64000) throw fail('INVALID_GROUP_CONFIG',400);
             if(group.members.some(id=>typeof id!=='string'||!id||id.length>200))throw fail('INVALID_GROUP_CONFIG',400);
-            for(const order of [group.modeSettings?.sequential?.speakerOrder,group.sequentialSpeakerOrder])if(order!==undefined&&(!Array.isArray(order)||order.length>1000||order.some(id=>typeof id!=='string')))throw fail('INVALID_GROUP_CONFIG',400);
+            for(const order of [group.modeSettings?.sequential?.speakerOrder,group.sequentialSpeakerOrder])if(order!==undefined&&(!Array.isArray(order)||(!sharedSequential&&order.length>1000)||order.some(id=>typeof id!=='string')))throw fail('INVALID_GROUP_CONFIG',400);
             const agents=await Promise.all(group.members.map(async id=>{
                 const value=input.agents.find(a=>a.id===id),alias=topic.memberAliases?.[id];
                 if(value?.unavailable===true&&Object.keys(value).every(k=>['id','unavailable'].includes(k)))return {id,unavailable:true};

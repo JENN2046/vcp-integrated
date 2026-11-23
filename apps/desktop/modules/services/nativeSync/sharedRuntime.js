@@ -844,9 +844,9 @@ class SharedRuntime {
    const access=this.accessController?.signal;
    value.groupHandoff=await handoff.observe(this.execution,mapping,{refresh:options.refresh!==false,connection:value.connection});
    if(this.backgroundDenied||access?.aborted)return unavailable();
-   value.groupHandoffAvailable=handoff.enabled(this)&&(Boolean(value.groupHandoff)||group?.config?.mode==='sequential'&&group.config.members?.length===2);
+   value.groupHandoffAvailable=handoff.enabled(this)&&(Boolean(value.groupHandoff)||Boolean(handoff.startMode(this,group?.config)));
    const groupWork=value.groupHandoff;
-   for(const job of value.executions.filter(job=>job.controlMode===handoff.capability)){
+   for(const job of value.executions.filter(job=>handoff.isMode(job.controlMode))){
     job.canResume=false;
     job.canAbandon=job.id===groupWork?.id&&groupWork.owned&&groupWork.fresh&&groupWork.state==='review_required';
     if(job.id===groupWork?.id)job.state=groupWork.state==='abandoned'?'cancelled':groupWork.state;

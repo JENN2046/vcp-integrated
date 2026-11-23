@@ -13,21 +13,23 @@ function create() {
     const frames = [];
     const requests = [];
     const fixture = createFixture();
+    const plan = mode.startsWith('plan');
     const closeout = mode === 'review-closeout';
     const isCandidate = mode.startsWith('handoff');
     let loseAck = isCandidate;
     let loseContinueAck = mode === 'handoff';
     let loseCloseoutAck = closeout;
     let secondFinal, secondCut;
-    if (isCandidate) fixture.finishFutureRounds();
+    let planContinueCount = 0;
+    if (isCandidate || plan) fixture.finishFutureRounds();
     function seed(f) {
-        const members = ['A', 'B'].map(name => f.shared.create(f.actor('C'), {
+        const members = (plan ? ['A', 'B', 'C'] : ['A', 'B']).map(name => f.shared.create(f.actor('C'), {
             sharedSpaceId: 'sharedAB', opId: 'handoff-agent-' + name, kind: 'agent', localId: 'handoff-agent-' + name,
             config: { ...f.owner.config, name, systemPrompt: 'GROUP_RELAY_MEMBER_' + name, streamOutput: true },
         }).object.id);
         const group = f.shared.create(f.actor('C'), {
             sharedSpaceId: 'sharedAB', opId: 'handoff-group', kind: 'group', localId: 'handoff-group',
-            config: { name: 'Relay fixture A B', mode: 'sequential', members, sequentialSpeakerOrder: members },
+            config: { name: plan ? 'Relay fixture A B C' : 'Relay fixture A B', mode: 'sequential', members, sequentialSpeakerOrder: members },
         }).object;
         const groupTopic = f.shared.create(f.actor('C'), {
             sharedSpaceId: 'sharedAB', opId: 'handoff-topic', kind: 'topic', localId: 'handoff-topic',
@@ -40,7 +42,7 @@ function create() {
         requests,
         seed,
         observed(out) {
-            if (!isCandidate) return undefined;
+            if (!isCandidate && mode !== 'plan') return undefined;
             return {
                 preload: path.join(__dirname, 'server-capture.cjs'),
                 handlerLog: path.join(out, 'group-handler.jsonl'), input: 'GROUP_HANDOFF_BASELINE_INPUT',
@@ -54,6 +56,7 @@ function create() {
             },
             dropResponse(row) {
                 if (row.status < 200 || row.status >= 300) return false;
+                if (mode === 'plan' && row.route.endsWith('/group-continue')) return ++planContinueCount === 2;
                 if (loseCloseoutAck && row.route.endsWith('/shared/abandon')) {
                     loseCloseoutAck = false;
                     return true;
@@ -93,7 +96,7 @@ function create() {
                 response.end(reply({ role: 'assistant', content: text }, null) + reply({}, 'stop') + 'data: [DONE]\n\n');
                 return true;
             }
-            if ((['a-partial', 'handoff-a-partial'].includes(mode) && member === 'A') || member === 'B') {
+            if ((['a-partial', 'handoff-a-partial'].includes(mode) && member === 'A') || !plan && member === 'B') {
                 response.writeHead(200, { 'content-type': 'text/event-stream' });
                 const text = `RELAY_${member}_PARTIAL`;
                 frames.push({ member, text });

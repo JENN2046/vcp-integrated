@@ -6,8 +6,8 @@ const labels = {
     running: '云端执行中', dispatched: '云端执行中', waiting_approval: '等待原生审批', publishing: '回复保存中',
     recovering: '结果恢复中', failed: '执行失败', cancelled: '已取消', cancelling: '正在取消',
     review_required: '需要核对', blocked_config: '等待配置确认',
-    first_member: '第一位成员的回复待确认', awaiting_handoff: '第一位成员已确认，等待接管',
-    awaiting_continue: '等待接管设备继续', continuing: '第二位成员的回复待确认',
+    first_member: '首位成员的回复待确认', awaiting_handoff: '上一位成员的回复已确认，等待接管',
+    awaiting_continue: '等待接管设备继续', continuing: '当前成员的回复待确认',
 };
 const taskLabels = { accepted: 'AA 已登记，启动待核对', running: 'AA 运行中', waiting: 'AA 等待下一步', cancelling: 'AA 正在取消', completed: 'AA 已完成', failed: 'AA 失败', cancelled: 'AA 已取消', stopped: 'AA 已停止（未成功完成）', unknown: 'AA 状态未知，待核对' };
 const toolLabels = { started: '工具已开始，结果待核对', returned: '工具调用已返回', error: '工具调用返回错误' };
@@ -208,7 +208,7 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
             if(job.shared&&job.canAbandon&&typeof api.abandonSharedSend==='function'){
                 const confirm=document.createElement('label'),check=document.createElement('input'),abandon=document.createElement('button');check.type='checkbox';confirm.append(check,document.createTextNode('我已核对可能的工具副作用，放弃此请求剩余工作'));abandon.type='button';abandon.textContent='确认放弃并解除暂停';abandon.disabled=true;
                 check.addEventListener('change',()=>{abandon.disabled=!check.checked;});
-                abandon.addEventListener('click',async()=>{if(!check.checked||!selection)return;abandon.disabled=true;const scope={...selection};const result=await api.abandonSharedSend({descriptor:{itemType:scope.ownerType,itemId:scope.ownerId,topicId:scope.topicId},requestId:job.requestId,...(job.controlMode==='group-member-handoff-v1'?{workId:job.id}:{}),confirmed:true});if(result?.success===false)observed.textContent='放弃尚未确认：'+result.error;else await query(true,scope);});
+                abandon.addEventListener('click',async()=>{if(!check.checked||!selection)return;abandon.disabled=true;const scope={...selection};const result=await api.abandonSharedSend({descriptor:{itemType:scope.ownerType,itemId:scope.ownerId,topicId:scope.topicId},requestId:job.requestId,...(['group-member-handoff-v1','group-member-handoff-v2'].includes(job.controlMode)?{workId:job.id}:{}),confirmed:true});if(result?.success===false)observed.textContent='放弃尚未确认：'+result.error;else await query(true,scope);});
                 row.append(confirm,abandon);
             }
             jobs.append(row);

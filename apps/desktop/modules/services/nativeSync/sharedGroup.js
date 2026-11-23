@@ -23,7 +23,7 @@ async function history(groupId,topicId,fallback){
  const s=current();if(!s)return fallback;
  const runtime=s.execution.runtime;
  const rows=await runtime.replica.queue.read(s.mapping.shared);
- if(s.ordinal===1)handoff.assertFirstReply(runtime,s.mapping,s.record.accepted,rows);
+ if(s.ordinal!==null)handoff.assertReplyPrefix(runtime,s.mapping,s.record.accepted,rows,s.ordinal);
  const index=s.record.accepted.turn.kind==='regenerate'?rows.findIndex(m=>m.id===s.record.accepted.turn.targetId):null;
  if(index!==null&&index<0)throw fail('SHARED_REGENERATION_TARGET_CHANGED');
  return (index===null?rows:rows.slice(0,index)).map(m=>({...m,...(m.agentId?{agentId:s.execution.runtime.localFor(m.agentId).localId}:{}),...(m.groupId?{groupId}:{}),...(m.topicId?{topicId}:{})}));
@@ -65,10 +65,8 @@ async function runPrepared(execution,descriptor,prepared,invoke,ordinal=null){
    const result=await invoke(s);
    if(ordinal===null){await execution.groupDone(record);return result;}
    const request=await execution.refresh(record);
-   if(ordinal===0){
-    if(!request?.groupHandoff?.firstReplySeq)throw fail('SHARED_GROUP_RESULT_UNCONFIRMED');
-   }else if(request?.state!=='completed'){
-    if(!(request?.replySeq>request?.groupHandoff?.firstReplySeq))throw fail('SHARED_GROUP_RESULT_UNCONFIRMED');
+   if(!request?.groupHandoff||handoff.confirmedReplies(request).length<=ordinal)throw fail('SHARED_GROUP_RESULT_UNCONFIRMED');
+   if(request.turn.controlMode===handoff.capability&&ordinal===request.turn.plan.length-1&&request.state!=='completed'){
     await execution.groupDone(record);
    }
    return {success:true,workId:record.accepted.id};

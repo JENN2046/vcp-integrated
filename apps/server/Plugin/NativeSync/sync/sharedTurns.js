@@ -70,7 +70,9 @@ function complete(shared,actor,body,row){
  if(!group)return false;
  if(!['accepted','dispatched','review_required'].includes(row.state))throw fail('SHARED_REQUEST_FENCED');
  const execution=shared.native?.engine.get?.(row.id),stop=execution?.group_stop_index;
+ const handoff=require('./sharedGroupHandoff');
  if(body.finish===true){
+  if(turn.controlMode===handoff.PLAN_MODE)throw fail('SHARED_GROUP_HANDOFF_FENCED');
   verifyGroupFinish(shared,topic,row);
   shared.db.prepare("UPDATE shared_admissions SET state='completed' WHERE id=?").run(row.id);
   return {request:shared.publicAdmission(shared.admission(actor,row.space_id,row.id))};
@@ -80,13 +82,14 @@ function complete(shared,actor,body,row){
  if(!message||message.role!=='assistant'||message.id!=='reply_'+step.id||message.agentId!==step.member_id)throw fail('INVALID_SHARED_REPLY',400);
  const native=shared.native?.engine.nativeTasks;
  if(!native||native.needsReview(row.id)||native.unsettledTools(row.id)||(stop!=null&&(native.uncertainTools(row.id)||shared.native.taskRequests.uncertain(row.id))))throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
- const handoff=require('./sharedGroupHandoff');
  const controlledGroup=handoff.matches(row);
  if(controlledGroup)handoff.assertReply(shared,actor,row,step,message);
  const receipt=writeReply(shared,actor,topic,row,message,'shared-step:'+step.id);
- if(controlledGroup&&step.ordinal===0)handoff.pause(shared,row,topic,receipt.seq);
+ const final=controlledGroup&&handoff.confirmReply(shared,row,topic,step.ordinal,receipt.seq);
+ if(final)verifyGroupFinish(shared,topic,row);
  if(turn.kind==='regenerate')replaceTarget(shared,actor,topic,row,turn);
- shared.db.prepare('UPDATE shared_admissions SET reply_seq=? WHERE id=?').run(receipt.seq,row.id);
+ if(final)shared.db.prepare("UPDATE shared_admissions SET reply_seq=?,state='completed' WHERE id=?").run(receipt.seq,row.id);
+ else shared.db.prepare('UPDATE shared_admissions SET reply_seq=? WHERE id=?').run(receipt.seq,row.id);
  return {request:shared.publicAdmission(shared.admission(actor,row.space_id,row.id)),receipt};
 }
 function writeReply(shared,actor,topic,row,message,opId){

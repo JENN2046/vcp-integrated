@@ -130,3 +130,5 @@ TopicSponsor 的 River 引用对齐作者的最近消息窗口。两位成员同
 共享 A 首轮文件工具已验证跨端实取：在 ToolBox 看不见 A 附件缓存的独立挂载中，合成 Provider 以实际收到的完整 URI 发起一次摘要工具调用，A 经原生 WebSocket 返回 67 字节，工具回填与原文件 SHA-256 一致。只读内联正文无需取件；同工具只传显示文件名得到 ENOENT。[三组回执、源端字节及工具账本](evidence/file-uri-roundtrip/README.md)
 
 隔离移动 PWA 只修改共享 Agent 的系统提示词：A 在保存前接纳、保存后才派发，实际 handler/Provider 只收到旧提示词；B 同话题新 Work 只收到新提示词。保存丢回执重试只升一个版本，只读会话写入返回 403。修复共享编辑器打开时主动填充缺省规则集合的问题。[前后收包及保存回执](evidence/mobile-config-freeze/README.md)
+
+显式共享纯文本顺序群接力按冻结计划的实际人数逐位推进。真实双桌面交替完成甲、乙、丙两次交接，第二次继续丢回执后，丙只派发一次并按原 ID 绑定甲、乙各一条正式回复；在线观察端与重开后的 History 一致。1、4、33 位成员另在服务端协议层逐位结清。首次 v2 Work 或超过旧上限的群配置使用共享 schema 4。[回执、兼容与截图](evidence/group-plan-handoff/README.md)

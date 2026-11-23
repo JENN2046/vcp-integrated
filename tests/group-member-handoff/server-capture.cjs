@@ -19,7 +19,7 @@ Module._load = function (request, parent, isMain) {
         const handle = loaded.prototype.handle;
         const execution = originalLoad.call(this, './modules/requestExecutionContext', parent, false);
         loaded.prototype.handle = function (req, res, forceShowVCP) {
-            const member = JSON.stringify(req.body?.messages?.[0]?.content || '').match(/GROUP_RELAY_MEMBER_([AB])/)?.[1];
+            const member = JSON.stringify(req.body?.messages?.[0]?.content || '').match(/GROUP_RELAY_MEMBER_([ABC])/)?.[1];
             if (member) {
                 const handoffFile = 'Plugin/NativeSync/sync/sharedGroupHandoff.js';
                 const fullPath = path.resolve(handoffFile);

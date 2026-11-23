@@ -7,7 +7,7 @@ const Module = require('node:module');
 const assert = require('node:assert/strict');
 
 const mode = process.argv[2];
-assert.ok(['a-partial', 'a-committed', 'b-unknown', 'handoff', 'handoff-unknown', 'handoff-a-partial', 'review-closeout'].includes(mode));
+assert.ok(['a-partial', 'a-committed', 'b-unknown', 'handoff', 'handoff-unknown', 'handoff-a-partial', 'review-closeout', 'plan-baseline', 'plan'].includes(mode));
 process.env.NS_GROUP_HANDOFF_CASE = mode;
 const runner = path.resolve(__dirname, '../integration/run.cjs');
 let source = fs.readFileSync(runner, 'utf8');
@@ -36,7 +36,7 @@ replace("(compaction || toolHandoff)?'/v1/chat/completions':'/v1/local-chat/comp
     "'/v1/chat/completions'");
 replace("if (mode === '--dev' || mode === 'ready') {",
     `if (mode === 'ready') {
-        await require('../group-member-handoff/${mode === 'review-closeout' ? 'review-closeout' : 'scenario'}.cjs')({
+        await require('../group-member-handoff/${mode === 'review-closeout' ? 'review-closeout' : mode.startsWith('plan') ? 'plan' : 'scenario'}.cjs')({
             clients, out, result, picture, click, evalJs, waitUntil, sha, service, stop, start, profiles, crash, groupRelay,
             ${mode === 'review-closeout' ? 'cert, closeoutSource,' : ''}
         });

@@ -1,0 +1,47 @@
+{
+  "previousRevision": "af17c99e784fd1afd5b127fcf8a467f06ef8423d",
+  "previousSharedSpaceSha256": "b9a1bfaeb407904aeb5ef1192ea0d8ad5930a4ceeb99267d86125a311aad0c3d",
+  "v1Backup": {
+    "schema": [
+      1,
+      3
+    ],
+    "opened": true,
+    "resumed": true,
+    "completed": true,
+    "finishReplayed": true,
+    "native": [
+      {
+        "ordinal": 0,
+        "principal": "desktop:deviceA",
+        "state": "model_terminal"
+      },
+      {
+        "ordinal": 1,
+        "principal": "desktop:deviceB",
+        "state": "model_terminal"
+      }
+    ],
+    "journalWriters": [
+      "desktop:deviceA",
+      "desktop:deviceA",
+      "desktop:deviceB"
+    ]
+  },
+  "v2Backup": {
+    "schema": [
+      1,
+      4
+    ],
+    "oldHostError": "SHARED_SCHEMA_UPGRADE_REQUIRED",
+    "confirmedOrdinals": [
+      0
+    ],
+    "storedFactsUnchanged": true
+  },
+  "v1ClientV2Work": {
+    "takeoverError": "SHARED_CLIENT_UPGRADE_REQUIRED",
+    "nativePrepareError": "SHARED_CLIENT_UPGRADE_REQUIRED",
+    "storedFactsUnchanged": true
+  }
+}

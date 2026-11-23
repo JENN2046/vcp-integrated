@@ -176,7 +176,8 @@ class SharedNative {
    if(group&&require('./sharedTurns').intent(admission).plan?.[ordinal]!==body.memberId)throw fail('SHARED_GROUP_PLAN_CHANGED');
    const stop=this.engine.get?.(admission.id)?.group_stop_index;
    if(stop!=null&&ordinal>=stop)throw fail('SHARED_REQUEST_FENCED');
-   if(ordinal>=1000)throw fail('SHARED_REQUEST_LIMIT');
+   // V2 has already fenced this exact ordinal against its frozen plan.
+   if(ordinal>=1000&&turn.controlMode!==handoff.PLAN_MODE)throw fail('SHARED_REQUEST_LIMIT');
    this.db.prepare("INSERT INTO shared_native_requests VALUES(?,?,?,?,?,'prepared',?)").run(body.requestId,admission.id,actor.principal,body.memberId||null,body.bodyHash,ordinal);
    this.db.prepare('UPDATE shared_admissions SET native_terminal=0 WHERE id=?').run(admission.id);
    // NativeTaskLinks already binds a child request through the existing step
@@ -292,7 +293,9 @@ class SharedNative {
   this.shared.atomic(()=>{
    if(groupControl){
     const fresh=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(admission.id);
-    handoff.assertSlot(this.shared,actor,fresh,row.ordinal,row.id);
+    const current=handoff.assertSlot(this.shared,actor,fresh,row.ordinal,row.id);
+    if(current.executor_version!==groupControl.executor_version)throw fail('SHARED_GROUP_HANDOFF_FENCED');
+    if(row.ordinal>0)handoff.verifyPrevious(this.shared,fresh,topic,current,row.ordinal);
    }
    if(!this.db.prepare("UPDATE shared_native_requests SET state='dispatched' WHERE id=? AND state='prepared'").run(row.id).changes)throw fail('SHARED_REQUEST_ALREADY_DISPATCHED');
    this.db.prepare("UPDATE shared_admissions SET state='dispatched',dispatched=1 WHERE id=?").run(admission.id);

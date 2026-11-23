@@ -1,4 +1,4 @@
-// Generated during release assembly; source SHA256 49aba60a4901d1ad6ccb8943437f659eb7f86ba84fc2e279924da9143098a3df
+// Generated during release assembly; source SHA256 8582d769bd7226640610b30d5f46f42df7af926aae84eb55b88226103e8c0d83
 // packages/sync-contracts/src/contracts.mjs
 function createProtocol({ canonicalizeMessage, BoundedWarnings, messageContentHash, stableStringify, sha256 }, metadata) {
 	function identity(value) {
@@ -538,6 +538,12 @@ function sharedConfig(kind, value) {
 		topic: ["name", "archived"]
 	};
 	if (!fields[kind] || !object(value) || Object.keys(value).some((k) => !fields[kind].includes(k)) || typeof value.name !== "string" || !value.name.trim() || value.name.length > 500) fail();
+	const sequential = kind === "group" && value.mode === "sequential";
+	const planLists = sequential ? [
+		value.members,
+		value.sequentialSpeakerOrder,
+		value.modeSettings?.sequential?.speakerOrder
+	] : [];
 	const walk = (v, depth = 0) => {
 		if (depth > 12) fail();
 		if (v === null || typeof v === "boolean" || typeof v === "number" && Number.isFinite(v)) return;
@@ -546,7 +552,7 @@ function sharedConfig(kind, value) {
 			return;
 		}
 		if (Array.isArray(v)) {
-			if (v.length > 1e3) fail();
+			if (v.length > 1e3 && !planLists.includes(v)) fail();
 			for (const x of v) walk(x, depth + 1);
 			return;
 		}
@@ -617,7 +623,7 @@ function sharedConfig(kind, value) {
 			"invite_only",
 			"jev",
 			"game"
-		].includes(value.mode) || !Array.isArray(value.members) || value.members.length > 32 || new Set(value.members).size !== value.members.length) fail();
+		].includes(value.mode) || !Array.isArray(value.members) || !sequential && value.members.length > 32 || new Set(value.members).size !== value.members.length) fail();
 		value.members.forEach(sharedIdentity);
 		for (const key of [
 			"groupPrompt",
@@ -627,7 +633,8 @@ function sharedConfig(kind, value) {
 		if (value.useUnifiedModel && !value.unifiedModel?.trim()) fail();
 		if (value.contextMessageWindowSize !== void 0 && (!Number.isSafeInteger(value.contextMessageWindowSize) || value.contextMessageWindowSize < 1 || value.contextMessageWindowSize > 1e4)) fail();
 		if (value.memberTags !== void 0 && (!object(value.memberTags) || Object.entries(value.memberTags).some(([k, v]) => !value.members.includes(k) || typeof v !== "string"))) fail();
-		for (const order of [value.sequentialSpeakerOrder, value.modeSettings?.sequential?.speakerOrder]) if (order !== void 0 && (!Array.isArray(order) || order.length > 1e3 || order.some((id) => !value.members.includes(id)))) fail();
+		const memberIds = new Set(value.members);
+		for (const order of [value.sequentialSpeakerOrder, value.modeSettings?.sequential?.speakerOrder]) if (order !== void 0 && (!Array.isArray(order) || !sequential && order.length > 1e3 || order.some((id) => !memberIds.has(id)))) fail();
 	}
 	if (value.tavernRules !== void 0) {
 		const allowed = [

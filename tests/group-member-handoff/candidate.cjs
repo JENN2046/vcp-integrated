@@ -39,6 +39,7 @@ module.exports = async function handoff({ clients, out, result, picture, click, 
         const journal = () => db.prepare('SELECT seq,msg_id,device_id,action,message_json FROM journal WHERE topic_id=? ORDER BY seq').all(topic.topic.topicId)
             .map(({ message_json, ...row }) => ({ ...row, message: JSON.parse(message_json) }));
         const counts = () => ['A', 'B'].map(member => groupRelay.requests.filter(row => row.member === member).length);
+        const hasReplySlots = Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE name='shared_group_handoff_replies'").get());
         function capture() {
             const rows = admissions();
             assert.equal(rows.length, 1);
@@ -46,6 +47,10 @@ module.exports = async function handoff({ clients, out, result, picture, click, 
             const handoff = db.prepare('SELECT executor,executor_version,state,first_reply_seq FROM shared_group_handoffs WHERE work_id=?')
                 .get(rows[0].id);
             assert.ok(handoff);
+            if (hasReplySlots && handoff.first_reply_seq === null) {
+                handoff.first_reply_seq = db.prepare('SELECT reply_seq FROM shared_group_handoff_replies WHERE work_id=? AND ordinal=0')
+                    .get(rows[0].id)?.reply_seq ?? null;
+            }
             return { admission: rows[0], handoff, native, journal: journal(), counts: counts() };
         }
         await select(A);
@@ -56,7 +61,11 @@ module.exports = async function handoff({ clients, out, result, picture, click, 
             composer.dispatchEvent(new Event('input', { bubbles: true }));
             return true;
         })()`);
-        await action(A, '开始两成员接力');
+        const startLabel = await waitUntil(async () => {
+            const available = await buttons(A);
+            return ['开始顺序接力', '开始两成员接力'].find(label => available[label]);
+        }, 'group relay start entry');
+        await action(A, startLabel);
         const desktopFiles = {
             main: ['apps/desktop/Groupmodules/groupchat.js', 'apps/desktop/modules/ipc/groupChatHandlers.js',
                 'apps/desktop/modules/services/nativeSync/sharedGroupHandoff.js',
@@ -82,7 +91,7 @@ module.exports = async function handoff({ clients, out, result, picture, click, 
                 'content-type': 'application/json', authorization: 'Bearer synthetic-only',
                 'x-nativesync-space': connection.spaceId, 'x-nativesync-source': connection.sourceId,
                 'x-nativesync-device': connection.deviceId,
-                'x-nativesync-capabilities': 'shared-space-v1,group-member-handoff-v1',
+                'x-nativesync-capabilities': 'shared-space-v1,group-member-handoff-v1,group-member-handoff-v2',
             };
         }
         function handlerEvidence() {
@@ -103,10 +112,14 @@ module.exports = async function handoff({ clients, out, result, picture, click, 
             assert.deepEqual(counts(), [1, 0]);
             evidence.observerButtons = await buttons(B);
             assert.equal(evidence.observerButtons['接管到本端'], false);
+            const admission = service.requests.find(row => row.route.endsWith('/shared/admit')
+                && row.body.requestId === evidence.partial.admission.request_id);
+            const plan = admission.body.controlMode === 'group-member-handoff-v2';
             const denied = await fetch(new URL('/api/v1/sync/shared/group-handoff', service.wsOrigin), {
                 method: 'POST', headers: secondDeviceHeaders(),
                 body: JSON.stringify({ sharedSpaceId: 'sharedAB', workId: evidence.partial.admission.id,
-                    opId: 'fixture-premature-takeover', expectedExecutor: 'desktop:deviceA', expectedExecutorVersion: 0 }),
+                    opId: 'fixture-premature-takeover', expectedExecutor: 'desktop:deviceA', expectedExecutorVersion: 0,
+                    ...(plan && { expectedNextOrdinal: 0 }) }),
             });
             evidence.rejectedHandoff = { status: denied.status, response: await denied.json() };
             assert.equal(denied.status, 409);

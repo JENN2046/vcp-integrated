@@ -114,7 +114,7 @@ export function createSharedSessionView(container, createObservedFrame, { api, s
                 if(parts.length>1||parts[0]?.nativeRequestId){const base=views.get(work.executionId);if(base){base.stopObserving?.();base.element.remove();views.delete(work.executionId);}}
                 for (const session of parts) {
                 if (!session.executionId || retired.has(session.viewId)) continue;
-                if (scope.ownerType === 'group' && session.request?.turn?.controlMode === 'group-member-handoff-v1' && session.nativeRequestId) {
+                if (scope.ownerType === 'group' && ['group-member-handoff-v1','group-member-handoff-v2'].includes(session.request?.turn?.controlMode) && session.nativeRequestId) {
                     const replyId = 'reply_' + session.nativeRequestId;
                     const committed = [...(historyMessages?.querySelectorAll('.message-item[data-message-id]') || [])]
                         .some(node => node.dataset.messageId === replyId && !node.classList.contains('streaming') && !node.classList.contains('thinking'));

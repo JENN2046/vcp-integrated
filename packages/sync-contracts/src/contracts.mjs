@@ -241,11 +241,14 @@ export function sharedConfig(kind,value) {
  const object=v=>v&&typeof v==='object'&&!Array.isArray(v);
  const fields={agent:['name','avatar','systemPrompt','model','temperature','contextTokenLimit','maxOutputTokens','streamOutput','stripRegexes','tavernRules','ruleOverrides'],group:['name','avatar','members','mode','memberTags','groupPrompt','invitePrompt','useUnifiedModel','unifiedModel','enableContextMessageWindow','contextMessageWindowSize','tagMatchMode','modeSettings','sequentialSpeakerOrder','tavernRules','ruleOverrides'],rules:['name','tavernRules','executionPolicy'],topic:['name','archived']};
  if(!fields[kind]||!object(value)||Object.keys(value).some(k=>!fields[kind].includes(k))||typeof value.name!=='string'||!value.name.trim()||value.name.length>500)fail();
+ // The frozen speaker list follows group membership. Other config arrays keep their usual budget.
+ const sequential=kind==='group'&&value.mode==='sequential';
+ const planLists=sequential?[value.members,value.sequentialSpeakerOrder,value.modeSettings?.sequential?.speakerOrder]:[];
  const walk=(v,depth=0)=>{
   if(depth>12)fail();
   if(v===null||typeof v==='boolean'||typeof v==='number'&&Number.isFinite(v))return;
   if(typeof v==='string'){if(v.length>128000)fail();return;}
-  if(Array.isArray(v)){if(v.length>1000)fail();for(const x of v)walk(x,depth+1);return;}
+  if(Array.isArray(v)){if(v.length>1000&&!planLists.includes(v))fail();for(const x of v)walk(x,depth+1);return;}
   if(!object(v)||Object.keys(v).length>200||Object.keys(v).some(k=>['__proto__','constructor','prototype'].includes(k)))fail();
   for(const x of Object.values(v))walk(x,depth+1);
  };
@@ -263,13 +266,14 @@ export function sharedConfig(kind,value) {
   }
  }
  if(kind==='group'){
-  if(!['sequential','naturerandom','invite_only','jev','game'].includes(value.mode)||!Array.isArray(value.members)||value.members.length>32||new Set(value.members).size!==value.members.length)fail();
+  if(!['sequential','naturerandom','invite_only','jev','game'].includes(value.mode)||!Array.isArray(value.members)||(!sequential&&value.members.length>32)||new Set(value.members).size!==value.members.length)fail();
   value.members.forEach(sharedIdentity);
   for(const key of ['groupPrompt','invitePrompt','unifiedModel'])if(value[key]!==undefined&&typeof value[key]!=='string')fail();
   if(value.useUnifiedModel&&!value.unifiedModel?.trim())fail();
   if(value.contextMessageWindowSize!==undefined&&(!Number.isSafeInteger(value.contextMessageWindowSize)||value.contextMessageWindowSize<1||value.contextMessageWindowSize>10000))fail();
   if(value.memberTags!==undefined&&(!object(value.memberTags)||Object.entries(value.memberTags).some(([k,v])=>!value.members.includes(k)||typeof v!=='string')))fail();
-  for(const order of [value.sequentialSpeakerOrder,value.modeSettings?.sequential?.speakerOrder])if(order!==undefined&&(!Array.isArray(order)||order.length>1000||order.some(id=>!value.members.includes(id))))fail();
+  const memberIds=new Set(value.members);
+  for(const order of [value.sequentialSpeakerOrder,value.modeSettings?.sequential?.speakerOrder])if(order!==undefined&&(!Array.isArray(order)||(!sequential&&order.length>1000)||order.some(id=>!memberIds.has(id))))fail();
  }
  if(value.tavernRules!==undefined){
   const allowed=['id','name','type','enabled','content','scope','builtinKey','isBuiltin','role','depth','wrap','order','source'];

@@ -9,11 +9,11 @@ export function createControlledWorkView({container,api,execute,refresh}){
  let value=null,scope=null,busy=false,closed=false,epoch=0,polling=false,creation=null;
  const groupStages={
   submission_unconfirmed:'原提交结果待核对',
-  first_member:'等待第一位成员的回复确认',
-  awaiting_handoff:'第一位成员回复已确认，可以关闭此设备并在另一设备接管',
+  first_member:'等待成员回复确认',
+  awaiting_handoff:'上一位成员回复已确认，可在另一设备接管',
   awaiting_continue:'已接管，等待本端继续',
-  continuing:'正在处理第二位成员的回复',
-  completed:'两位成员的回复均已保存',
+  continuing:'正在处理成员回复',
+  completed:'全部成员回复已保存',
   review_required:'原回复结果待核对',
   abandoned:'接力已结束',
  };
@@ -24,8 +24,8 @@ export function createControlledWorkView({container,api,execute,refresh}){
  const descriptor=()=>({itemType:scope.ownerType,itemId:scope.ownerId,topicId:scope.topicId});
  const work=()=>value?.executions?.find(job=>['text-only-v1','safe-tools-v1','agent-assistant-v1'].includes(job.controlMode)&&!['completed','cancelled','abandoned'].some(state=>job.phase===state||job.state===state));
  const key=s=>JSON.stringify([s?.ownerType,s?.ownerId,s?.topicId]);
- const errorText={SHARED_GROUP_HANDOFF_UNSUPPORTED:'两成员接力需要共享顺序群聊，并且只能使用纯文本。',SHARED_GROUP_RESULT_UNCONFIRMED:'原回复结果待核对。请先查看任务状态。',SHARED_GROUP_HANDOFF_STATE_CHANGED:'执行归属已变化，请核对最新任务。',CONTROLLED_MODE_IMMUTABLE:'当前话题已有请求，等待原请求结清后再提交。',WORK_SAFE_BOUNDARY_PENDING:'原请求尚未到安全边界，不能接管或继续。',WORK_HANDOFF_STATE_CHANGED:'执行归属已变化，请核对最新任务。',CONTROLLED_TEXT_PORTABLE_REQUIRED:'此会话含附件或本机资源，不能作为受控纯文本任务。',CONTROLLED_TEXT_TOOLS_FORBIDDEN:'受控纯文本模式已阻止工具执行。',SHARED_TOPIC_BUSY:'此话题仍有原请求，不能将它转换为受控任务。',WORK_EXECUTOR_HANDOFF_REQUIRED:'请先显式接管到本端。',STEERING_REVISION_CHANGED:'补充版本已变化，请核对后继续。'};
- async function run(action){if(closed||busy||!scope||panel.hidden)return;busy=true;const turn=epoch;buttons();try{const frozen={descriptor:descriptor(),work:work(),text:input.value,agentName:delegate.value.trim(),epoch:turn,current:()=>!closed&&turn===epoch&&!panel.hidden};const result=await action(frozen);if(result?.success===false)throw Object.assign(Error(result.error),{code:result.error});if(turn===epoch){status.textContent='操作已确认；任务归属和结果以最新记录为准。';await refresh();}}catch(error){if(turn===epoch){if(group())await refresh();if(turn===epoch)status.textContent=errorText[error.code]||`尚未完成：${error.code||error.message}，原任务和输入保持。`;}}finally{busy=false;buttons();}}
+ const errorText={SHARED_GROUP_HANDOFF_UNSUPPORTED:'顺序接力需要受支持的共享顺序群聊和纯文本输入。',SHARED_GROUP_RESULT_UNCONFIRMED:'原回复结果待核对。请先查看任务状态。',SHARED_GROUP_HANDOFF_STATE_CHANGED:'执行归属已变化，请核对最新任务。',CONTROLLED_MODE_IMMUTABLE:'当前话题已有请求，等待原请求结清后再提交。',WORK_SAFE_BOUNDARY_PENDING:'原请求尚未到安全边界，不能接管或继续。',WORK_HANDOFF_STATE_CHANGED:'执行归属已变化，请核对最新任务。',CONTROLLED_TEXT_PORTABLE_REQUIRED:'此会话含附件或本机资源，不能作为受控纯文本任务。',CONTROLLED_TEXT_TOOLS_FORBIDDEN:'受控纯文本模式已阻止工具执行。',SHARED_TOPIC_BUSY:'此话题仍有原请求，不能将它转换为受控任务。',WORK_EXECUTOR_HANDOFF_REQUIRED:'请先显式接管到本端。',STEERING_REVISION_CHANGED:'补充版本已变化，请核对后继续。'};
+ async function run(action){if(closed||busy||!scope||panel.hidden)return;busy=true;const turn=epoch;buttons();try{const frozen={descriptor:descriptor(),work:work(),groupWork:groupWork(),text:input.value,agentName:delegate.value.trim(),epoch:turn,current:()=>!closed&&turn===epoch&&!panel.hidden};const result=await action(frozen);if(result?.success===false)throw Object.assign(Error(result.error),{code:result.error});if(turn===epoch){status.textContent='操作已确认；任务归属和结果以最新记录为准。';await refresh();}}catch(error){if(turn===epoch){if(group())await refresh();if(turn===epoch)status.textContent=errorText[error.code]||`尚未完成：${error.code||error.message}，原任务和输入保持。`;}}finally{busy=false;buttons();}}
  async function createTask(frozen,mode){
   const text=frozen.text.trim();
   if(!text)throw Error('请输入任务文本');
@@ -44,16 +44,17 @@ export function createControlledWorkView({container,api,execute,refresh}){
  const toolTask=make('新建工具任务',frozen=>createTask(frozen,'safe-tools-v1'));
  const aaTask=make('新建 AA 委托',frozen=>createTask(frozen,'agent-assistant-v1'));
  const supplement=make('补充到此任务',async frozen=>{const current=frozen.work,text=frozen.text.trim();if(!current||!text)throw Error('请选择受控任务并填写补充文本');const result=await api.submitSharedSteering({descriptor:frozen.descriptor,observedWorkId:current.id,message:{id:'control_input_'+crypto.randomUUID().replaceAll('-',''),role:'user',content:text,timestamp:Date.now(),attachments:[]}});if(result?.success!==false&&frozen.current()&&input.value===frozen.text)input.value='';return result;});
- const groupStart=make('开始两成员接力',frozen=>createTask(frozen,'group-member-handoff-v1'));
+ const groupStart=make('开始顺序接力',frozen=>createTask(frozen,'group-relay'));
  const groupRecover=make('恢复原接力',async frozen=>{
-  const result=await api.groupMemberHandoff({descriptor:frozen.descriptor,action:'start',workId:groupWork()?.id});
+  const result=await api.groupMemberHandoff({descriptor:frozen.descriptor,action:'start',workId:frozen.groupWork?.id});
   if(result?.success===true&&frozen.current()&&input.value===frozen.text){input.value='';creation=null;}
   return result;
  });
  const groupAction=(frozen,action)=>{
-  const current=groupWork();
+  const current=frozen.groupWork;
   return api.groupMemberHandoff({descriptor:frozen.descriptor,action,workId:current.id,
-   expectedExecutor:current.executor,expectedExecutorVersion:current.executorVersion});
+   expectedExecutor:current.executor,expectedExecutorVersion:current.executorVersion,
+   ...(current.mode==='group-member-handoff-v2'&&{expectedNextOrdinal:current.nextOrdinal,expectedPreviousReplySeq:current.previousReplySeq})});
  };
  const handoff=make('接管到本端',frozen=>group()?groupAction(frozen,'handoff'):api.handoffSharedWork({descriptor:frozen.descriptor,workId:frozen.work.id}));
  const proceed=make('本端继续执行',async frozen=>{if(group())return groupAction(frozen,'continue');const current=frozen.work,prepared=await api.prepareSharedContinuation({descriptor:frozen.descriptor,workId:current.id,expectedRevision:current.steering?.revision});if(prepared?.success===false)return prepared;if(!frozen.current())throw Object.assign(Error('CONTROLLED_TOPIC_CHANGED'),{code:'CONTROLLED_TOPIC_CHANGED'});return execute({descriptor:frozen.descriptor,prepared});});
@@ -82,12 +83,14 @@ export function createControlledWorkView({container,api,execute,refresh}){
    :scope?.ownerType==='agent'&&(next?.controlledAAAvailable===true||next?.controlledToolsAvailable===true||next?.executions?.some(job=>job.controlMode==='text-only-v1'&&next?.controlledTextAvailable===true)));if(!panel.hidden&&!allowed)epoch++;value=allowed?next:null;panel.hidden=!allowed;
  if(group()){
   const current=groupWork();
-  description.textContent='按群聊顺序发言。第一位成员回复确认后，可在另一设备接管，再继续第二位成员。';
-  const state=current?.state==='continuing'&&current.canContinue?'已确认继续操作，等待本端开始第二位成员':groupStages[current?.state];
+  description.textContent='按提交时的群聊顺序逐位发言。每位成员的回复确认后，可在另一设备接管并继续。';
+  const state=current?.state==='continuing'&&current.canContinue?'已确认继续操作，等待本端执行':groupStages[current?.state];
   status.textContent=current?`${state||'正在核对原接力'}${current.executor?' · 执行端：'+(current.owned?'本端':'另一设备'):''}`:allowed?'当前没有进行中的接力。':'';
+  if(Number.isSafeInteger(current?.nextOrdinal))status.textContent+=` · 第${current.nextOrdinal+1}位，共${current.memberCount}位`;
+  else if(current?.memberCount)status.textContent+=` · 已保存 ${current.confirmedCount}/${current.memberCount} 份回复`;
   if(current?.unknownMember){
    const {ordinal,name}=current.unknownMember;
-   status.textContent+=` · 第${ordinal===0?'一':'二'}位成员${name?' '+name:''}的回复已派发，结果未知`;
+   status.textContent+=` · 第${ordinal+1}位成员${name?' '+name:''}的回复已派发，结果未知`;
   }
   if(current&&!current.fresh)status.textContent+=' · 最近已知';
   buttons();return;

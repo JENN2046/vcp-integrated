@@ -12,7 +12,7 @@ posts['steer-turn-complete']=['steerTurnComplete',['sharedSpaceId','workId','opI
 posts['compact-prepare']=['compactPrepare',['sharedSpaceId','sharedId','opId','expectedHead']];
 posts['compact-cancel']=['compactCancel',['sharedSpaceId','id','opId']];
 posts['compact-commit']=['compactCommit',['sharedSpaceId','id','opId','sourceHash','message']];
-const handoffFields=['sharedSpaceId','workId','opId','expectedExecutor','expectedExecutorVersion'];
+const handoffFields=['sharedSpaceId','workId','opId','expectedExecutor','expectedExecutorVersion','expectedNextOrdinal','expectedPreviousReplySeq'];
 posts['group-handoff']=['groupHandoff',handoffFields];
 posts['group-continue']=['groupContinue',handoffFields];
 posts['steer-handoff']=['steerHandoff',['sharedSpaceId','workId','opId','expectedRevision','expectedGeneration','expectedExecutor']];
@@ -52,7 +52,7 @@ function sharedInfo(shared,sourceId){
  if(!shared.configurationOnly)features.push(
   'shared-compaction-v1','shared-topic-history-v1','shared-desktop-message-edit-v1','shared-attachments-v1','shared-merge-v1','shared-context-v1',
   require('./sharedInline.cjs').CAP,
-  ...(handoff.available(shared)?[handoff.MODE]:[]),
+  ...(handoff.available(shared)?[handoff.MODE,handoff.PLAN_MODE]:[]),
   ...(shared.native?[require('./sharedNative').NATIVE_INLINE_CAPABILITY]:[]),
   ...(shared.native?.engine?[require('./sharedSession').CAPABILITY,'shared-execution-trace-v1','shared-session-cancel-v1',require('./sharedTopicSponsor').CAPABILITY]:[]),
   ...(shared.events&&!shared.events.closed?['shared-events-v1']:[]),
