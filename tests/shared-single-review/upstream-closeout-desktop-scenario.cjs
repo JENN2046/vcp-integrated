@@ -128,8 +128,15 @@ async function scenario({ A, profiles, service, cert, out, picture, click, evalJ
         }, 'original Work shows review status');
         assert.equal(await evalJs(A, `document.querySelector(${JSON.stringify(abandon)})?.disabled`), true);
         await picture(A, 'A-original-review-required');
-        await click(A, checkbox);
-        await click(A, abandon + ':not(:disabled)', '确认放弃并解除暂停');
+        if (process.env.NS_ABANDON_CONFIRMATION) {
+            const observeConfirmation = require('./abandon-confirmation-desktop.cjs');
+            if (!await observeConfirmation({
+                A, picture, click, evalJs, waitUntil, snapshot, service, evidence, panel, workRow, checkbox, abandon,
+            })) return evidence;
+        } else {
+            await click(A, checkbox);
+            await click(A, abandon + ':not(:disabled)', '确认放弃并解除暂停');
+        }
         const settled = evidence.settled = await waitUntil(() => {
             const state = snapshot();
             return state.admissions[0]?.state === 'abandoned' && state;

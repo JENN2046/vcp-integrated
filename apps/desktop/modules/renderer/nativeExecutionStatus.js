@@ -58,12 +58,52 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
         container, api, execute: executePreparedShared, refresh: () => query(true),
     });
     const stopRequests = new Set();
+    const pendingAbandons = new Set();
     const currentTopic = () => {
         const item = getSelection();
         return item?.id && getTopicId() && ['agent', 'group'].includes(item.type) ? { ownerType: item.type, ownerId: item.id, topicId: getTopicId() } : null;
     };
     function settleSharedFlowlock(value) {
         Promise.resolve(ownerWindow?.flowlockManager?.handleSharedSessionStatus?.(value)).catch(error=>console.error('[NativeExecutionStatus] shared Flowlock status failed',error?.code||error?.message));
+    }
+    function addAbandonControls(row, scope, job) {
+        const requestKey = JSON.stringify([key(scope), job.id, job.requestId]);
+        row.dataset.abandonRequest = requestKey;
+        const confirm = document.createElement('label'), check = document.createElement('input'), abandon = document.createElement('button');
+        check.type = 'checkbox';
+        confirm.append(check, document.createTextNode('我已核对可能的工具副作用，放弃此请求剩余工作'));
+        abandon.type = 'button'; abandon.textContent = '确认放弃并解除暂停';
+        const active = () => !disposed && row.isConnected && key(scope) === key(currentTopic());
+        const update = () => {
+            check.disabled = pendingAbandons.has(requestKey);
+            abandon.disabled = check.disabled || !check.checked;
+        };
+        check.addEventListener('change', update);
+        abandon.addEventListener('click', async () => {
+            if (!active() || !check.checked || pendingAbandons.has(requestKey)) return;
+            pendingAbandons.add(requestKey); update();
+            try {
+                const result = await api.abandonSharedSend({
+                    descriptor: {itemType: scope.ownerType, itemId: scope.ownerId, topicId: scope.topicId},
+                    requestId: job.requestId,
+                    ...(['group-member-handoff-v1','group-member-handoff-v2'].includes(job.controlMode) ? {workId: job.id} : {}),
+                    confirmed: true,
+                });
+                if (result?.success === false) throw Error(result.error);
+                if (active()) await query(true, scope);
+            } catch (error) {
+                if (active()) observed.textContent = '放弃尚未确认：' + error.message;
+            } finally {
+                pendingAbandons.delete(requestKey);
+                const current = [...jobs.children].find(item => item.dataset.abandonRequest === requestKey);
+                if (current) {
+                    const checkbox = current.querySelector('input[type="checkbox"]');
+                    checkbox.checked = false; checkbox.disabled = false;
+                    current.lastElementChild.disabled = true;
+                }
+            }
+        });
+        update(); row.append(confirm, abandon);
     }
     function render(value) {
         settleSharedFlowlock(value);
@@ -142,17 +182,25 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
             item.dataset.nativeSyncKey = identityKey; item.open = detailStates.get(identityKey) === true;
             heading.dataset.nativeSyncFocusKey = `${identityKey}:summary`;
         }
-        jobs.replaceChildren();
+        // Keep a live confirmation connected while the same actionable Work is refreshed.
+        const confirmations = new Map([...jobs.children].filter(item => item.dataset.confirmIdentity)
+            .map(item => [item.dataset.confirmIdentity, item]));
+        let position = 0;
         for (const job of displayed) {
-            const row = document.createElement('li'); row.dataset.workId = job.id;
+            const identity = job.shared && job.canAbandon && !value.readOnly && value.connection === 'online'
+                && typeof api.abandonSharedSend === 'function' && JSON.stringify([key(value.topic), job.id, job.requestId, job.state, job.controlMode]);
+            const previous = confirmations.get(identity);
+            const row = previous || document.createElement('li');
+            row.dataset.workId = job.id;
+            const content = document.createDocumentFragment();
             const completed = job.replyMessageId ? '回复已保存' : '主请求已结束';
             const state = job.state === 'completed' ? completed : labels[job.state] || `状态：${job.state}`;
-            row.textContent = `${state} · 请求 ${job.requestId}${job.errorCode ? `（${job.errorCode}）` : ''}`;
+            content.append(`${state} · 请求 ${job.requestId}${job.errorCode ? `（${job.errorCode}）` : ''}`);
             row.title = `执行 ${job.id}；执行尝试 ${job.attempts} 次`;
             if (job.errorCode?.endsWith('REVIEW_REQUIRED')) {
                 const review = document.createElement('p');
                 review.textContent = job.reviewResolved ? '已记录人工核对；这不表示已撤回工具副作用或取消 AA。' : '工具是否已经生效仍需核对；取消请求不表示已撤回副作用。';
-                row.append(review);
+                content.append(review);
             }
             if (job.toolInvocations?.length) {
                 const calls = document.createElement('details'), heading = document.createElement('summary');
@@ -160,7 +208,7 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
                 heading.textContent = `原生工具调用 ${job.toolInvocations.length} 项（返回不等于 AA 完成）`; calls.append(heading);
                 const list = document.createElement('ul');
                 for (const call of job.toolInvocations) { const item = document.createElement('li'); item.textContent = `${call.pluginName} · ${toolLabels[call.state] || call.state} · 调用 ${call.invocationId}`; list.append(item); }
-                calls.append(list); row.append(calls);
+                calls.append(list); content.append(calls);
             }
             for (const task of job.nativeTasks || []) {
                 const item = document.createElement('details'), heading = document.createElement('summary');
@@ -203,16 +251,20 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
                     read.dataset.nativeSyncFocusKey = `${item.dataset.nativeSyncKey}:report`;
                     read.addEventListener('click', () => { void showResult(job, task); }); item.append(read);
                 }
-                row.append(item);
+                content.append(item);
             }
-            if(job.shared&&job.canAbandon&&typeof api.abandonSharedSend==='function'){
-                const confirm=document.createElement('label'),check=document.createElement('input'),abandon=document.createElement('button');check.type='checkbox';confirm.append(check,document.createTextNode('我已核对可能的工具副作用，放弃此请求剩余工作'));abandon.type='button';abandon.textContent='确认放弃并解除暂停';abandon.disabled=true;
-                check.addEventListener('change',()=>{abandon.disabled=!check.checked;});
-                abandon.addEventListener('click',async()=>{if(!check.checked||!selection)return;abandon.disabled=true;const scope={...selection};const result=await api.abandonSharedSend({descriptor:{itemType:scope.ownerType,itemId:scope.ownerId,topicId:scope.topicId},requestId:job.requestId,...(['group-member-handoff-v1','group-member-handoff-v2'].includes(job.controlMode)?{workId:job.id}:{}),confirmed:true});if(result?.success===false)observed.textContent='放弃尚未确认：'+result.error;else await query(true,scope);});
-                row.append(confirm,abandon);
-            }
-            jobs.append(row);
+            if (previous) {
+                previous.firstElementChild.replaceChildren(content);
+            } else if (identity) {
+                row.dataset.confirmIdentity = identity;
+                const description = document.createElement('div');
+                description.append(content); row.append(description);
+                addAbandonControls(row, value.topic, job);
+            } else row.append(content);
+            const at = jobs.children[position++];
+            if (row !== at) jobs.insertBefore(row, at || null);
         }
+        while (jobs.children.length > position) jobs.lastElementChild.remove();
         if (!displayed.length) {
             const row = document.createElement('li'); row.textContent = value.freshness === 'unavailable' ? '尚无可核对的云端执行记录。' : '这次记录中没有云端执行任务。'; jobs.append(row);
         } else if (value.total > 5) {

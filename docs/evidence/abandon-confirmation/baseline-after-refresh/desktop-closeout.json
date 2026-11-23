@@ -1,0 +1,311 @@
+{
+  "before": {
+    "work": [
+      {
+        "id": "request_842bebe41397461cb8b191f60b2a85b6",
+        "request_id": "msg_1795411161378_user_f5h78ovoxp",
+        "state": "review_required",
+        "attempts": 1,
+        "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+        "user_message_id": "msg_1795411161378_user_f5h78ovoxp",
+        "reply_message_id": null,
+        "pending_operation": null,
+        "native_final_operation": null,
+        "review_resolved": 0
+      }
+    ],
+    "admissions": [
+      {
+        "id": "request_842bebe41397461cb8b191f60b2a85b6",
+        "principal": "desktop:deviceA",
+        "state": "review_required",
+        "dispatched": 1,
+        "native_terminal": 0,
+        "user_seq": 1,
+        "reply_seq": null
+      }
+    ],
+    "native": [
+      [
+        {
+          "id": "request_842bebe41397461cb8b191f60b2a85b6",
+          "state": "unknown"
+        }
+      ]
+    ],
+    "journal": [
+      {
+        "seq": 1,
+        "msg_id": "msg_1795411161378_user_f5h78ovoxp",
+        "action": "upsert",
+        "message": {
+          "id": "msg_1795411161378_user_f5h78ovoxp",
+          "role": "user",
+          "name": "用户",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT",
+          "timestamp": 1795411161385,
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "msg_1795411161378_user_f5h78ovoxp",
+            "executionId": "request_842bebe41397461cb8b191f60b2a85b6",
+            "dependsOnMessageIds": []
+          },
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "c429fe006cd0be179a88486f1b12bbe5eb692631ea564cb27fc4ad1f2200a686",
+            "fields": {
+              "continuity": {
+                "version": 1,
+                "known": true,
+                "requestId": "msg_1795411161378_user_f5h78ovoxp",
+                "executionId": "request_842bebe41397461cb8b191f60b2a85b6",
+                "dependsOnMessageIds": []
+              }
+            }
+          }
+        }
+      }
+    ],
+    "history": [
+      {
+        "id": "msg_1795411161378_user_f5h78ovoxp",
+        "role": "user",
+        "name": "用户",
+        "content": "SYNTHETIC_502_ORIGINAL_INPUT",
+        "timestamp": 1795411161385,
+        "continuity": {
+          "version": 1,
+          "known": true,
+          "requestId": "msg_1795411161378_user_f5h78ovoxp",
+          "executionId": "request_842bebe41397461cb8b191f60b2a85b6",
+          "dependsOnMessageIds": []
+        },
+        "_nativeSyncMetadata": {
+          "version": 1,
+          "hash": "c429fe006cd0be179a88486f1b12bbe5eb692631ea564cb27fc4ad1f2200a686",
+          "fields": {
+            "continuity": {
+              "version": 1,
+              "known": true,
+              "requestId": "msg_1795411161378_user_f5h78ovoxp",
+              "executionId": "request_842bebe41397461cb8b191f60b2a85b6",
+              "dependsOnMessageIds": []
+            }
+          }
+        }
+      }
+    ],
+    "provider": [
+      {
+        "id": "request_842bebe41397461cb8b191f60b2a85b6",
+        "input": "SYNTHETIC_502_ORIGINAL_INPUT",
+        "stream": true,
+        "httpStatus": 502
+      }
+    ]
+  },
+  "reviewUi": "需要核对 · 请求 msg_1795411161378_user_f5h78ovoxp我已核对可能的工具副作用，放弃此请求剩余工作确认放弃并解除暂停",
+  "abandonConfirmation": {
+    "mode": "refresh-before",
+    "renderer": {
+      "file": "apps/desktop/modules/renderer/nativeExecutionStatus.js",
+      "bytes": 24621,
+      "sha256": "026d01c78d9a883a84f06805750fe26211028b16eb60ff13fec25fe8ecffaf24"
+    },
+    "unchecked": {
+      "workId": "request_842bebe41397461cb8b191f60b2a85b6",
+      "checked": false,
+      "disabled": true,
+      "rowReplaced": false,
+      "controlReplaced": false,
+      "renders": 0,
+      "trusted": []
+    },
+    "checked": {
+      "workId": "request_842bebe41397461cb8b191f60b2a85b6",
+      "checked": true,
+      "disabled": false,
+      "rowReplaced": false,
+      "controlReplaced": false,
+      "renders": 0,
+      "trusted": [
+        {
+          "type": "pointerdown",
+          "tag": "INPUT",
+          "trusted": true
+        },
+        {
+          "type": "change",
+          "tag": "INPUT",
+          "trusted": true
+        }
+      ]
+    },
+    "refreshed": {
+      "workId": "request_842bebe41397461cb8b191f60b2a85b6",
+      "checked": false,
+      "disabled": true,
+      "rowReplaced": true,
+      "controlReplaced": true,
+      "renders": 1,
+      "trusted": [
+        {
+          "type": "pointerdown",
+          "tag": "INPUT",
+          "trusted": true
+        },
+        {
+          "type": "change",
+          "tag": "INPUT",
+          "trusted": true
+        }
+      ]
+    },
+    "refreshIpc": [
+      {
+        "t": 1795411162796,
+        "channel": "native-sync:executions",
+        "success": true
+      }
+    ],
+    "buttonPointer": {
+      "type": "pointerdown",
+      "tag": "BUTTON",
+      "trusted": true
+    },
+    "afterClick": {
+      "workId": "request_842bebe41397461cb8b191f60b2a85b6",
+      "checked": false,
+      "disabled": true,
+      "rowReplaced": true,
+      "controlReplaced": true,
+      "renders": 3,
+      "trusted": [
+        {
+          "type": "pointerdown",
+          "tag": "INPUT",
+          "trusted": true
+        },
+        {
+          "type": "change",
+          "tag": "INPUT",
+          "trusted": true
+        },
+        {
+          "type": "pointerdown",
+          "tag": "BUTTON",
+          "trusted": true
+        }
+      ]
+    },
+    "ipc": [],
+    "http": [],
+    "afterFailedClick": {
+      "work": [
+        {
+          "id": "request_842bebe41397461cb8b191f60b2a85b6",
+          "request_id": "msg_1795411161378_user_f5h78ovoxp",
+          "state": "review_required",
+          "attempts": 1,
+          "error_code": "EXECUTION_INTERRUPTED_REVIEW_REQUIRED",
+          "user_message_id": "msg_1795411161378_user_f5h78ovoxp",
+          "reply_message_id": null,
+          "pending_operation": null,
+          "native_final_operation": null,
+          "review_resolved": 0
+        }
+      ],
+      "admissions": [
+        {
+          "id": "request_842bebe41397461cb8b191f60b2a85b6",
+          "principal": "desktop:deviceA",
+          "state": "review_required",
+          "dispatched": 1,
+          "native_terminal": 0,
+          "user_seq": 1,
+          "reply_seq": null
+        }
+      ],
+      "native": [
+        [
+          {
+            "id": "request_842bebe41397461cb8b191f60b2a85b6",
+            "state": "unknown"
+          }
+        ]
+      ],
+      "journal": [
+        {
+          "seq": 1,
+          "msg_id": "msg_1795411161378_user_f5h78ovoxp",
+          "action": "upsert",
+          "message": {
+            "id": "msg_1795411161378_user_f5h78ovoxp",
+            "role": "user",
+            "name": "用户",
+            "content": "SYNTHETIC_502_ORIGINAL_INPUT",
+            "timestamp": 1795411161385,
+            "continuity": {
+              "version": 1,
+              "known": true,
+              "requestId": "msg_1795411161378_user_f5h78ovoxp",
+              "executionId": "request_842bebe41397461cb8b191f60b2a85b6",
+              "dependsOnMessageIds": []
+            },
+            "_nativeSyncMetadata": {
+              "version": 1,
+              "hash": "c429fe006cd0be179a88486f1b12bbe5eb692631ea564cb27fc4ad1f2200a686",
+              "fields": {
+                "continuity": {
+                  "version": 1,
+                  "known": true,
+                  "requestId": "msg_1795411161378_user_f5h78ovoxp",
+                  "executionId": "request_842bebe41397461cb8b191f60b2a85b6",
+                  "dependsOnMessageIds": []
+                }
+              }
+            }
+          }
+        }
+      ],
+      "history": [
+        {
+          "id": "msg_1795411161378_user_f5h78ovoxp",
+          "role": "user",
+          "name": "用户",
+          "content": "SYNTHETIC_502_ORIGINAL_INPUT",
+          "timestamp": 1795411161385,
+          "continuity": {
+            "version": 1,
+            "known": true,
+            "requestId": "msg_1795411161378_user_f5h78ovoxp",
+            "executionId": "request_842bebe41397461cb8b191f60b2a85b6",
+            "dependsOnMessageIds": []
+          },
+          "_nativeSyncMetadata": {
+            "version": 1,
+            "hash": "c429fe006cd0be179a88486f1b12bbe5eb692631ea564cb27fc4ad1f2200a686",
+            "fields": {
+              "continuity": {
+                "version": 1,
+                "known": true,
+                "requestId": "msg_1795411161378_user_f5h78ovoxp",
+                "executionId": "request_842bebe41397461cb8b191f60b2a85b6",
+                "dependsOnMessageIds": []
+              }
+            }
+          }
+        }
+      ],
+      "provider": [
+        {
+          "id": "request_842bebe41397461cb8b191f60b2a85b6",
+          "input": "SYNTHETIC_502_ORIGINAL_INPUT",
+          "stream": true,
+          "httpStatus": 502
+        }
+      ]
+    }
+  }
+}

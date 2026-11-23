@@ -134,3 +134,5 @@ TopicSponsor 的 River 引用对齐作者的最近消息窗口。两位成员同
 显式共享纯文本顺序群接力按冻结计划的实际人数逐位推进。真实双桌面交替完成甲、乙、丙两次交接，第二次继续丢回执后，丙只派发一次并按原 ID 绑定甲、乙各一条正式回复；在线观察端与重开后的 History 一致。1、4、33 位成员另在服务端协议层逐位结清。首次 v2 Work 或超过旧上限的群配置使用共享 schema 4。[回执、兼容与截图](evidence/group-plan-handoff/README.md)
 
 固定 `a2a13b53555c` 已完成带旧双人 Work 的干净重建及三端收口。Windows 原虚拟机在线收到丙，Linux 丢继续回执后恢复同一 Work；手机 Firefox PWA 只读冷开核对正式 History。单聊 502 结清、删除及续发通过，旧宿主从 schema 3 备份恢复到甲已确认处并继续。[升级、回退、三端回执与截图](evidence/release-a2a13b53555c/README.md)
+
+共享单聊收到 502 后，桌面在刷新同一笔待核对 Work 时保留已勾选的人工结清确认。目标、权限或连接状态改变会清除确认。真实 Electron 点击只提交一次，中央保留原生请求的未知状态，同话题可继续发送。[点击、结清回执与前后截图](evidence/abandon-confirmation/README.md)

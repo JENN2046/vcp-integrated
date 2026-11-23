@@ -1,0 +1,16 @@
+{
+  "electron": "44.9.3",
+  "sandbox": true,
+  "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce",
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "failures": []
+}
