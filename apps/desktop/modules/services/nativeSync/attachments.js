@@ -122,7 +122,11 @@ class DesktopAttachments{
  async mapping(){if(this.getMapping)return this.getMapping();const r=await this.send('/api/plugins/NativeSync/mobile/execution-configs');return r.topics;}
  find(rows,d){const id=wireTopic(d),t=rows.find(t=>t.ownerType===id.ownerType&&t.ownerId===id.ownerId&&t.topicId===id.topicId);if(!t)throw fail('TOPIC_NOT_ALLOWED');return t;}
  async uploadBytes(t,message,attachment,bytes,name,value,type,frameIndex){
-  const id=attachmentId(attachment),requestId='desktop_'+digest(JSON.stringify([t.key,message.id,id,value,frameIndex??null]));
+  const id=attachmentId(attachment);
+  // Old servers permanently marked GIF uploads rejected and discarded their bytes.
+  // A fresh upload identity lets an explicit retry keep the original message ID.
+  const prefix=frameIndex===undefined&&path.extname(name).toLowerCase()==='.gif'?'desktop_gif_':'desktop_';
+  const requestId=prefix+digest(JSON.stringify([t.key,message.id,id,value,frameIndex??null]));
   const route=this.routeBase+encodeURIComponent(t.key);
   const started=await this.send(route+'/uploads',{body:{requestId,name,size:bytes.length,expectedHash:value,messageId:message.id,attachmentId:id,...(type&&type!=='application/octet-stream'?{type}:{}),...(frameIndex!==undefined?{frameIndex}:{})}});
   if(started.state!=='ready')for(let offset=started.offset;offset<bytes.length;offset+=CHUNK)await this.send(route+'/uploads/'+started.uploadId+'/chunks',{body:{offset,data:bytes.subarray(offset,offset+CHUNK).toString('base64')}});

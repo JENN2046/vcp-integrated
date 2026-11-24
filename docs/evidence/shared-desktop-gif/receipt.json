@@ -1,0 +1,88 @@
+{
+  "baselineRevision": "d6e898af5a3c",
+  "environment": {
+    "clients": "Two isolated Linux Electron desktops",
+    "backend": "Disposable ToolBox on loopback",
+    "provider": "Synthetic local response endpoint",
+    "input": "Generated files only"
+  },
+  "baseline": {
+    "fixtureBytes": 2978105,
+    "fixtureSha256": "62ef69d93d3d8b597fad8cfdffa3a1ec40238855a362ba0a00dff196f2f6dc16",
+    "uploadFinishStatus": 415,
+    "errorCode": "ATTACHMENT_TYPE_REJECTED",
+    "localPhase": "preparing",
+    "admitStarted": false,
+    "admissions": 0,
+    "providerRequests": 0,
+    "journalEntries": 0
+  },
+  "candidate": {
+    "gif9Frames": {
+      "fixtureBytes": 2978105,
+      "fixtureSha256": "62ef69d93d3d8b597fad8cfdffa3a1ec40238855a362ba0a00dff196f2f6dc16",
+      "desktopASha256": "62ef69d93d3d8b597fad8cfdffa3a1ec40238855a362ba0a00dff196f2f6dc16",
+      "desktopBSha256": "62ef69d93d3d8b597fad8cfdffa3a1ec40238855a362ba0a00dff196f2f6dc16",
+      "centralAttachmentMime": "image/gif",
+      "providerRequests": 1,
+      "providerImageMime": "image/jpeg",
+      "providerImageCount": 9,
+      "distinctProviderImageCount": 9,
+      "admissionState": "completed",
+      "journalEntries": 2,
+      "desktopAHistoryEntries": 2,
+      "replyVisibleOnBothDesktops": true
+    },
+    "gif12Frames": {
+      "fixtureBytes": 2989184,
+      "fixtureSha256": "779b9661012e3ead0e19527e5d4d4ebfc2f8d0898c76c3a35caacc0d4dd30ace",
+      "desktopASha256": "779b9661012e3ead0e19527e5d4d4ebfc2f8d0898c76c3a35caacc0d4dd30ace",
+      "desktopBSha256": "779b9661012e3ead0e19527e5d4d4ebfc2f8d0898c76c3a35caacc0d4dd30ace",
+      "centralAttachmentMime": "image/gif",
+      "providerRequests": 1,
+      "providerImageMime": "image/jpeg",
+      "providerImageCount": 12,
+      "distinctProviderImageCount": 12,
+      "admissionState": "completed",
+      "journalEntries": 2,
+      "desktopAHistoryEntries": 2,
+      "replyVisibleOnBothDesktops": true
+    },
+    "pngControl": {
+      "fixtureBytes": 84339,
+      "fixtureSha256": "ddeb5d7cf439fcf00e9ae165c6b7f7c49baba1f8b94c057488c4b200d0d54847",
+      "desktopASha256": "ddeb5d7cf439fcf00e9ae165c6b7f7c49baba1f8b94c057488c4b200d0d54847",
+      "desktopBSha256": "ddeb5d7cf439fcf00e9ae165c6b7f7c49baba1f8b94c057488c4b200d0d54847",
+      "centralAttachmentMime": "image/png",
+      "providerRequests": 1,
+      "providerImageMime": "image/jpeg",
+      "providerImageCount": 1,
+      "distinctProviderImageCount": 1,
+      "admissionState": "completed",
+      "journalEntries": 2,
+      "desktopAHistoryEntries": 2,
+      "replyVisibleOnBothDesktops": true
+    },
+    "retryOriginalMessage": {
+      "action": "按原编号重试提交",
+      "originalMessageIdPreserved": true,
+      "previousRejectedUploadRetained": true,
+      "replacementUploadReady": true,
+      "admissions": 1,
+      "fixtureBytes": 2978105,
+      "fixtureSha256": "62ef69d93d3d8b597fad8cfdffa3a1ec40238855a362ba0a00dff196f2f6dc16",
+      "desktopASha256": "62ef69d93d3d8b597fad8cfdffa3a1ec40238855a362ba0a00dff196f2f6dc16",
+      "desktopBSha256": "62ef69d93d3d8b597fad8cfdffa3a1ec40238855a362ba0a00dff196f2f6dc16",
+      "centralAttachmentMime": "image/gif",
+      "providerRequests": 1,
+      "providerImageMime": "image/jpeg",
+      "providerImageCount": 9,
+      "distinctProviderImageCount": 9,
+      "admissionState": "completed",
+      "journalEntries": 2,
+      "desktopAHistoryEntries": 2,
+      "replyVisibleOnBothDesktops": true
+    }
+  },
+  "screenshot": "receiver-after-retry.png"
+}

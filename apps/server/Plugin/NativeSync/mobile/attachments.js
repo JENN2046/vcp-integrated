@@ -15,9 +15,10 @@ function detect(bytes,name){
  if(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))type='image/png';
  else if(bytes[0]===255&&bytes[1]===216&&bytes[2]===255)type='image/jpeg';
  else if(bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP')type='image/webp';
+ else if(['GIF87a','GIF89a'].includes(bytes.toString('latin1',0,6)))type='image/gif';
  else if(bytes.toString('ascii',0,5)==='%PDF-')type='application/pdf';
  else {try{new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{throw fail('ATTACHMENT_TYPE_REJECTED',415);}if(bytes.includes(0))throw fail('ATTACHMENT_TYPE_REJECTED',415);type='text/plain';}
- const extensions={'image/png':['.png'],'image/jpeg':['.jpg','.jpeg'],'image/webp':['.webp'],'application/pdf':['.pdf'],'text/plain':['.txt','.md','.csv','.json']};
+ const extensions={'image/png':['.png'],'image/jpeg':['.jpg','.jpeg'],'image/webp':['.webp'],'image/gif':['.gif'],'application/pdf':['.pdf'],'text/plain':['.txt','.md','.csv','.json']};
  if(!extensions[type].includes(path.extname(name).toLowerCase()))throw fail('ATTACHMENT_TYPE_REJECTED',415);
  return type;
 }

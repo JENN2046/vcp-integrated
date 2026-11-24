@@ -128,3 +128,35 @@ test('a late download cannot reintroduce a superseded attachment into History',a
     await a.work.run([topic]);assert.equal(mutations,1);assert.equal(reads,1);
     assert.equal(history[0].attachments[0]._fileManagerData.hash,hash(after));
 });
+
+test('GIF originals require valid image bytes, filename and MIME at upload completion', async t => {
+    const f = await fixture(t, { attachments: true });
+    const store = f.portal.attachments;
+    const topicKey = f.topic.id;
+    const principal = f.actor('A').principal;
+    const pixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64');
+
+    async function upload(bytes, name, type, requestId) {
+        const { uploadId } = store.begin(principal, topicKey, {
+            requestId, name, type, size: bytes.length, expectedHash: hash(bytes),
+        });
+        store.chunk(principal, topicKey, uploadId, { offset: 0, data: bytes.toString('base64') });
+        return store.finish(principal, topicKey, uploadId);
+    }
+
+    for (const version of ['GIF87a', 'GIF89a']) {
+        const bytes = Buffer.from(pixel);
+        bytes.write(version, 0, 'ascii');
+        const result = await upload(bytes, 'pixel.GIF', 'image/gif', 'version_' + version);
+        assert.equal(result.type, 'image/gif');
+        assert.deepEqual(store.readBlob(result.hash), bytes);
+    }
+    for (const [bytes, name, type, id] of [
+        [pixel, 'pixel.png', 'image/gif', 'bad_extension'],
+        [pixel, 'pixel.gif', 'image/jpeg', 'wrong_mime'],
+        [pixel.subarray(0, 6), 'truncated.gif', 'image/gif', 'header_only'],
+        [Buffer.from('plain text'), 'fake.gif', 'image/gif', 'fake_image'],
+    ]) {
+        await assert.rejects(upload(bytes, name, type, id), { code: 'ATTACHMENT_TYPE_REJECTED', status: 415 });
+    }
+});

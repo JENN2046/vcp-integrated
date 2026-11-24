@@ -13,6 +13,8 @@ const inputFailureText = new Map(Object.entries({
     SHARED_CONFIG_CONFLICT: '共享配置有冲突，请确认模型或配置后重试。',
     SHARED_CONFIG_PENDING: '共享配置仍在同步，请稍后重试。',
     SHARED_CONFIG_PENDING_CONFIRMATION: '模型保存尚未确认，请确认后重试。',
+    MODEL_IMAGE_UNSUPPORTED: '当前模型未在共享空间启用图片输入。请选择支持图片的模型后重试。',
+    ATTACHMENT_TYPE_REJECTED: '共享服务无法接收此附件格式，附件已保存在本机。',
     MODEL_SAVE_NOT_CURRENT: '此消息要求的模型尚未同步，请确认模型后重试。',
     MODEL_SAVE_REFERENCE_UNCONFIRMED: '模型保存尚未确认，请确认后重试。',
     SHARED_CONTEXT_CHANGED: '共享话题刚有更新，请同步后重试。',
@@ -138,7 +140,10 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
             const row = document.createElement('p'), text = document.createElement('span');
             text.textContent = `${saved.projectionPending ? '消息已接收，正在恢复本机记录。' : saved.accepted ? '消息已接收，等待原请求恢复。' : saved.submissionUnconfirmed ? '消息已保存，提交结果尚未确认。' : '待发消息已保存在本机。'} ${content.slice(0,80)}${content.length>80?'…':''} `;
             row.append(text);
-            const reason = saved.accepted || saved.submissionUnconfirmed ? null : inputFailureText.get(saved.errorCode);
+            const reason = saved.accepted || saved.submissionUnconfirmed ? null
+                : saved.errorCode === 'MODEL_IMAGE_UNSUPPORTED' && saved.modelSaveRef
+                    ? '此待发消息已绑定原模型。请选择支持图片的模型后重新发送。'
+                    : inputFailureText.get(saved.errorCode);
             const detail = document.createElement('span');
             if (reason) { detail.textContent = reason + ' '; row.append(detail); }
             if (saved.projectionPending && typeof api.getNativeHistorySnapshot === 'function') {
@@ -166,7 +171,7 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
                     if (disposed || key(scope) !== key(selection)) return;
                     retry.disabled = true;
                     try {
-                        await onRetryInput({descriptor:{itemType:scope.ownerType,itemId:scope.ownerId,topicId:scope.topicId},inputId,modelSaveRef:saved.modelSaveRef});
+                        await onRetryInput({descriptor:{itemType:scope.ownerType,itemId:scope.ownerId,topicId:scope.topicId},inputId,modelSaveRef:saved.modelSaveRef,errorCode:saved.errorCode});
                         await query(true, scope);
                     } catch (error) {
                         if (disposed || key(scope) !== key(selection)) return;
