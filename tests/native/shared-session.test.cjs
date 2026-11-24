@@ -354,3 +354,117 @@ test('HTTP owner review abandonment settles the original session atomically with
  f.control.holdHttp=false;const next=await httpSend(f,submission(f,'review-next-request'));assert.equal(next.status,200,JSON.stringify(next.value));await start(f);await completed(f,next.value.id);assert.equal(f.calls(),2);
  assert.equal(f.shared.db.prepare('SELECT state FROM shared_admissions WHERE id=?').get(id).state,'abandoned');
 });
+
+test('desktop retains the pre-admission reason and retries through the original session route after restart', async t => {
+ const f = await fixture(t);
+ let desktop = await f.desktop('A');
+ const {descriptor,runtime} = desktop;
+ const message = {id:'desktop-first-send',role:'user',content:'original synthetic input',timestamp:1,attachments:[]};
+ await runtime.prepareSharedSend({descriptor,message,localOnly:true});
+ const sessionClient = runtime.sessions;
+ sessionClient.context = async () => { throw Object.assign(Error('synthetic detail must stay private'),{code:'SHARED_CONFIG_PENDING'}); };
+ f.control.trace = [];
+ await assert.rejects(runtime.prepareSharedSend({descriptor,message,serverSession:true}), {code:'SHARED_CONFIG_PENDING'});
+ const view = (await runtime.getExecutionStatus(descriptor,{refresh:false})).localInputs[0];
+ assert.equal(view.errorCode,'SHARED_CONFIG_PENDING');
+ assert.equal(view.submissionUnconfirmed,false);
+ assert.equal(view.content,message.content);
+ assert.ok(!JSON.stringify(view).includes('synthetic detail'));
+ assert.equal(f.control.trace.filter(row => row.route.endsWith('/session-send')).length,0);
+ await desktop.close();
+ desktop = await f.desktop('A');
+ assert.equal(desktop.runtime.execution.localInputs(desktop.descriptor)[0].errorCode,'SHARED_CONFIG_PENDING');
+ assert.equal(f.control.trace.filter(row => row.route.endsWith('/session-send')).length,0);
+ const result = await desktop.runtime.retrySharedInput({descriptor:desktop.descriptor,inputId:message.id});
+ assert.ok(result.serverSession);
+ assert.equal(result.userMessage.id,message.id);
+ assert.equal(result.userMessage.content,message.content);
+ assert.equal(f.control.trace.filter(row => row.route.endsWith('/session-send')).length,1);
+ assert.equal(f.store.metrics().journalRows,1);
+ assert.equal(f.calls(),0);
+});
+
+test('desktop keeps a lost session acknowledgement unconfirmed without reporting a pre-admission reason', async t => {
+ const f = await fixture(t), {descriptor,runtime} = await f.desktop('A');
+ const message = {id:'lost-session-ack',role:'user',content:'synthetic input',timestamp:1,attachments:[]};
+ await runtime.prepareSharedSend({descriptor,message,localOnly:true});
+ const context = runtime.sessions.context;
+ runtime.sessions.context = async () => { throw Object.assign(Error('synthetic retryable failure'),{code:'SHARED_CONFIG_PENDING'}); };
+ await assert.rejects(runtime.prepareSharedSend({descriptor,message,serverSession:true}), {code:'SHARED_CONFIG_PENDING'});
+ runtime.sessions.context = context;
+ f.control.dropSessionAccept = 1;
+ await assert.rejects(runtime.retrySharedInput({descriptor,inputId:message.id}), {code:'NETWORK_UNAVAILABLE'});
+ const view = (await runtime.getExecutionStatus(descriptor,{refresh:false})).localInputs[0];
+ assert.equal(view.submissionUnconfirmed,true);
+ assert.equal(view.errorCode,null);
+ assert.equal(f.store.metrics().journalRows,1);
+ assert.equal(f.calls(),0);
+});
+
+test('desktop status still shows the saved input when the shared mapping is unavailable', async t => {
+ const f = await fixture(t), {descriptor,runtime} = await f.desktop('A');
+ const message = {id:'input-before-mapping',role:'user',content:'synthetic unmapped input',timestamp:1,attachments:[]};
+ await runtime.prepareSharedSend({descriptor,message,localOnly:true});
+ const mappingError = () => { throw Object.assign(Error('synthetic mapping detail'),{code:'SHARED_LOCAL_MAPPING_REQUIRED'}); };
+ runtime.executionMapping = mappingError;
+ runtime.execution.mapping = mappingError;
+ await assert.rejects(runtime.prepareSharedSend({descriptor,message,serverSession:true}), {code:'SHARED_LOCAL_MAPPING_REQUIRED'});
+ const value = await runtime.getExecutionStatus(descriptor,{refresh:false});
+ assert.equal(value.localInputs[0].errorCode,'SHARED_LOCAL_MAPPING_REQUIRED');
+ assert.equal(value.localInputs[0].inputId,message.id);
+ assert.equal(value.localInputs[0].content,message.content);
+ assert.ok(!JSON.stringify(value).includes('synthetic mapping detail'));
+ assert.equal(f.store.metrics().journalRows,0);
+});
+
+test('desktop status omits a staged input until its local save completes', async t => {
+ const f = await fixture(t), {descriptor,runtime} = await f.desktop('A');
+ const message = {id:'input-saving',role:'user',content:'synthetic saving input',timestamp:1,attachments:[]};
+ const {promise:started,resolve:markStarted} = Promise.withResolvers();
+ const {promise:gate,resolve:release} = Promise.withResolvers();
+ const updateInputs = runtime.execution.updateInputs.bind(runtime.execution);
+ runtime.execution.updateInputs = async change => { markStarted(); await gate; return updateInputs(change); };
+ const saving = runtime.prepareSharedSend({descriptor,message,localOnly:true});
+ try {
+  await started;
+  assert.deepEqual((await runtime.getExecutionStatus(descriptor,{refresh:false})).localInputs,[]);
+  assert.equal(f.store.metrics().journalRows,0);
+ } finally {
+  release();
+  await saving;
+ }
+ const view = (await runtime.getExecutionStatus(descriptor,{refresh:false})).localInputs[0];
+ assert.equal(view.inputId,message.id);
+ assert.equal(view.errorCode,null);
+ assert.equal(view.submissionUnconfirmed,false);
+});
+
+test('topic history carries its actual Journal head separately from baseline coverage', async t => {
+ const f=await fixture(t), after=1577;
+ const page=f.shared.topicHistory(f.actor('A'),{sharedSpaceId:'sharedAB',sharedId:f.topic.id,after});
+ assert.deepEqual({actual:page.topicHeadSeq,coverage:page.headSeq,next:page.nextSeq,more:page.hasMore,events:page.events},
+  {actual:0,coverage:after,next:after,more:false,events:[]});
+});
+
+test('session preflight rejects a genuine topic change, including when an older server only supplies the cursor', async t => {
+ const f=await fixture(t), {descriptor,runtime}=await f.desktop('A');
+ const read=runtime.refreshForExecution.bind(runtime,descriptor,{forceFresh:true,sharedSessionHistory:true});
+ const send=runtime.send.bind(runtime);
+ let legacy=false,contextReads=0,change=false;
+ runtime.send=async (route,...args)=>{
+  const reply=await send(route,...args);
+  if(!route.includes('/shared/context?'))return reply;
+  contextReads++;
+  return {...reply,head:change && contextReads===2 ? 1 : 0,desktopHistoryRequired:false};
+ };
+ runtime.syncExecutionTopic=async()=>legacy ? {head:1577} : {head:1577,topicHeadSeq:1};
+ await assert.rejects(read(),{code:'SHARED_CONTEXT_CHANGED'});
+ assert.equal(contextReads,1);
+ legacy=true;contextReads=0;
+ assert.equal((await read()).head,0);
+ assert.equal(contextReads,2);
+ change=true;contextReads=0;
+ await assert.rejects(read(),{code:'SHARED_CONTEXT_CHANGED'});
+ assert.equal(f.store.metrics().journalRows,0);
+ assert.equal(f.calls(),0);
+});

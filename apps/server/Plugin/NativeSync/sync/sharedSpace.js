@@ -303,11 +303,11 @@ class SharedSpace {
   if(!Number.isSafeInteger(after)||after<0||!Number.isSafeInteger(limit)||limit<1||limit>500)throw fail('INVALID_CURSOR',400);
   // A separate topic cursor. It conveys no progress over other Journal rows.
   return this.store.readSnapshot(()=>{
-   const headSeq=Math.max(after,this.head(topic));
+   const topicHeadSeq=this.head(topic),headSeq=Math.max(after,topicHeadSeq);
    const rows=this.db.prepare('SELECT seq FROM journal WHERE owner_type=? AND owner_id=? AND topic_id=? AND seq>? ORDER BY seq LIMIT ?').all(...tuple(topic),after,limit);
    const seqs=rows.map(v=>v.seq),records=this.store.readProjected(()=>seqs.length?this.store.readJournalSeqs.all(JSON.stringify(seqs)):[]);
    const events=records.map(({row,message})=>({seq:Number(row.seq),ownerType:row.owner_type,ownerId:row.owner_id,topicId:row.topic_id,msgId:row.msg_id,action:row.action,hash:row.hash,message,sourceDevice:row.device_id}));
-   const nextSeq=rows.at(-1)?.seq??after;return {sharedId:topic.id,events,headSeq,nextSeq,hasMore:nextSeq<headSeq};
+   const nextSeq=rows.at(-1)?.seq??after;return {sharedId:topic.id,events,topicHeadSeq,headSeq,nextSeq,hasMore:nextSeq<headSeq};
   });
  }
  spaceHistory(actor,{sharedSpaceId,after=0,limit=100}){

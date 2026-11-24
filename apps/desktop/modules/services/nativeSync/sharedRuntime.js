@@ -689,7 +689,18 @@ class SharedRuntime {
    if(require('./sharedExecution').blocksExecution(this,dependency.id))throw fail('SHARED_CONFIG_CONFLICT');
   }
   const projection=await this.syncExecutionTopic(mapping,{minSeq:context.head});
-  if(sharedSessionHistory&&context.desktopHistoryRequired!==undefined&&projection.head!==context.head)throw fail('SHARED_CONTEXT_CHANGED');
+  if(sharedSessionHistory&&context.desktopHistoryRequired!==undefined){
+   // A baseline can cover Journal entries from other topics. Its cursor may
+   // legitimately exceed the last mutation of this particular topic.
+   if(projection.topicHeadSeq!==undefined){
+    if(projection.topicHeadSeq!==context.head)throw fail('SHARED_CONTEXT_CHANGED');
+   }else if(projection.head!==context.head){
+    // Older servers report only the coverage cursor. Recheck the authority
+    // snapshot before using the context; admission still enforces its CAS.
+    const latest=await this.send(endpoint+'context?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,sharedId:mapping.sharedId}),{sharedSessionHistory:true});
+    if(latest.head!==context.head||latest.hash!==context.hash||latest.desktopHistoryRequired!==context.desktopHistoryRequired||latest.desktopConfigRequired!==context.desktopConfigRequired)throw fail('SHARED_CONTEXT_CHANGED');
+   }
+  }
   const executionHistory=await this.verifyHistory(mapping);return {...context,executionHistory};
  }
 
@@ -815,7 +826,8 @@ class SharedRuntime {
   if(input.targetFinished){const active=await this.execution.steering.active(descriptor);if(active)throw fail('STEERING_TARGET_CHANGED');input.previousParentInputId=input.parentLocalInputId;delete input.parentLocalInputId;await this.execution.save();return this.prepareSharedSend({descriptor,message:input.localMessage,...(input.body?.controlMode?{controlMode:input.body.controlMode, ...(input.body.delegation&&{delegation:input.body.delegation})}:{}),requireIdle:true,...(input.modelSaveRef?{modelSaveRef:input.modelSaveRef}:{}),...(input.modelSaveResolutionRef?{modelSaveResolutionRef:input.modelSaveResolutionRef}:{})});}
   if(input.parentLocalInputId)return this.submitSharedSteering({descriptor,message:input.localMessage,parentInputId:input.parentLocalInputId,modelSaveRef:input.modelSaveRef,deferReady:Boolean(input.modelSaveRef&&!input.dependencyReady)});
   if(input.rejected&&!input.accepted){input.phase='local_pending';if(!input.serverSession){delete input.sharedId;delete input.signature;}await this.execution.save();}
-  return this.prepareSharedSend({descriptor,message:input.localMessage,...(input.body?.controlMode?{controlMode:input.body.controlMode, ...(input.body.delegation&&{delegation:input.body.delegation})}:{}),...(input.modelSaveRef?{modelSaveRef:input.modelSaveRef}:{}),...(input.modelSaveResolutionRef?{modelSaveResolutionRef:input.modelSaveResolutionRef}:{})});
+  const serverSession=!input.admitStarted&&this.execution.state.localInputs[inputId]?.serverSessionPreferred===true;
+  return this.prepareSharedSend({descriptor,message:input.localMessage,serverSession,...(input.body?.controlMode?{controlMode:input.body.controlMode, ...(input.body.delegation&&{delegation:input.body.delegation})}:{}),...(input.modelSaveRef?{modelSaveRef:input.modelSaveRef}:{}),...(input.modelSaveResolutionRef?{modelSaveResolutionRef:input.modelSaveResolutionRef}:{})});
  }
  async readySharedInput({inputId,modelSaveRef}){this.assertSharedAccess();const input=this.execution.state.requests[inputId];if(!input)throw fail('SHARED_INPUT_NOT_FOUND');if(stable(input.modelSaveRef||input.steeringBody?.modelSaveRef||null)!==stable(modelSaveRef||null))throw fail('MODEL_SAVE_REFERENCE_CHANGED');input.dependencyReady=true;await this.execution.save();if(!input.isSteeringInput)return {success:true,pendingParent:true};return {success:true,...await this.execution.steering.finishInput(input)};}
 
@@ -826,18 +838,69 @@ class SharedRuntime {
   return this.execution.steering.prepare(descriptor,options);
  }
  async stageLocalSharedInput({descriptor,message,...options}){this.assertSharedAccess();if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.stageLocal(descriptor,message,options);}
- async prepareSharedSend({descriptor,message,localOnly=false,serverSession=false,...options}){this.assertSharedAccess();if(options.controlMode!==undefined){const tools=options.controlMode==='safe-tools-v1',aa=options.controlMode==='agent-assistant-v1';
+ async prepareSharedSend({descriptor,message,localOnly=false,serverSession=false,...options}){
+  this.assertSharedAccess();
+  if(options.controlMode!==undefined){
+   const tools=options.controlMode==='safe-tools-v1',aa=options.controlMode==='agent-assistant-v1';
    if(!tools&&!aa&&options.controlMode!=='text-only-v1')throw fail('CONTROLLED_MODE_UNSUPPORTED');
-   if(!this.capabilities.features?.includes(aa?'shared-controlled-aa-v1':tools?'shared-controlled-tools-v1':'shared-controlled-text-v1'))throw fail(aa?'CONTROLLED_AA_UNAVAILABLE':tools?'CONTROLLED_TOOLS_UNAVAILABLE':'CONTROLLED_TEXT_UNAVAILABLE');if(serverSession||this.execution.state.requests[message?.id]&&this.execution.state.requests[message.id].body?.controlMode!==options.controlMode)throw fail('CONTROLLED_MODE_IMMUTABLE');}if(localOnly)return this.execution.stageLocal(descriptor,message,options);if(this.readOnly)throw fail('SHARED_READ_ONLY');const mapping=await this.executionMapping(descriptor);this.matching.assert([mapping.sharedId,this.state.objects[mapping.sharedId].parentId]);if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');if(!options.controlMode&&(serverSession||this.execution.state.requests[message?.id]?.serverSession)&&this.sessions?.enabled()){const accepted=await this.sessions.prepare(descriptor,message,options);if(accepted)return accepted;}try{return await this.execution.prepare(descriptor,message,options);}catch(error){if(error.code!=='SHARED_CONTEXT_CHANGED'||error.status!==409||!error.knownAdmissionRejected)throw error;return this.execution.prepare(descriptor,message,options,{forceFresh:true});}}
+   if(!this.capabilities.features?.includes(aa?'shared-controlled-aa-v1':tools?'shared-controlled-tools-v1':'shared-controlled-text-v1'))throw fail(aa?'CONTROLLED_AA_UNAVAILABLE':tools?'CONTROLLED_TOOLS_UNAVAILABLE':'CONTROLLED_TEXT_UNAVAILABLE');
+   const existing=this.execution.state.requests[message?.id];
+   if(serverSession||existing&&existing.body?.controlMode!==options.controlMode)throw fail('CONTROLLED_MODE_IMMUTABLE');
+  }
+  if(localOnly)return this.execution.stageLocal(descriptor,message,options);
+  try{return await this.admitSharedSend(descriptor,message,serverSession,options);}
+  catch(error){
+   if(!this.readOnly&&message?.id&&this.execution.state.localInputs[message.id]){
+    // Diagnostic metadata must never mask the original admission outcome.
+    await this.execution.rememberInputFailure(descriptor,message,error?.code,serverSession).catch(()=>{});
+   }
+   throw error;
+  }
+ }
+ async admitSharedSend(descriptor,message,serverSession,options){
+  if(this.readOnly)throw fail('SHARED_READ_ONLY');
+  const mapping=await this.executionMapping(descriptor);
+  this.matching.assert([mapping.sharedId,this.state.objects[mapping.sharedId].parentId]);
+  if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');
+  if(!options.controlMode&&(serverSession||this.execution.state.requests[message?.id]?.serverSession)&&this.sessions?.enabled()){
+   const accepted=await this.sessions.prepare(descriptor,message,options);
+   if(accepted)return accepted;
+  }
+  try{return await this.execution.prepare(descriptor,message,options);}
+  catch(error){
+   if(error.code!=='SHARED_CONTEXT_CHANGED'||error.status!==409||!error.knownAdmissionRejected)throw error;
+   return this.execution.prepare(descriptor,message,options,{forceFresh:true});
+  }
+ }
  async abandonSharedSend(payload){this.assertSharedAccess();if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.abandon(payload);}
  async getExecutionStatus(d,options={}){
   const unavailable=()=>({enabled:true,readOnly:true,connection:'error',configurationError:permissionError().code,executions:[]});
   if(this.backgroundDenied)return unavailable();
   if(this.readOnly){this.nativeTaskViews?.clear();return {enabled:true,readOnly:true,configurationError:'SHARED_READ_ONLY',executions:[],connection:'online'};}if(!d?.itemId||!d?.topicId)return {enabled:true,readOnly:false};
-  if(this.capabilities.features?.includes('shared-controlled-text-v1')&&(d.itemType||'agent')==='agent'){await this.execution.steering.active(d);await this.execution.reconcile();}if(this.sessions?.enabled())await this.sessions.observe(d,{refresh:options.refresh!==false});const value=await this.execution.status(d,this.sessions?.enabled()?{...options,refresh:false}:options);if(this.sessions?.enabled()){
+  const sessionsEnabled=this.sessions?.enabled();
+  let observationError;
+  try{
+   if(this.capabilities.features?.includes('shared-controlled-text-v1')&&(d.itemType||'agent')==='agent'){
+    await this.execution.steering.active(d);await this.execution.reconcile();
+   }
+   if(sessionsEnabled)await this.sessions.observe(d,{refresh:options.refresh!==false});
+  }catch(error){
+   // Expose local recovery only for these transient reads, never on authorization failure.
+   if(!['SHARED_LOCAL_MAPPING_REQUIRED','NETWORK_UNAVAILABLE'].includes(error?.code))throw error;
+   observationError=error?.code==='NETWORK_UNAVAILABLE'?'NETWORK_UNAVAILABLE':'EXECUTION_STATUS_UNAVAILABLE';
+  }
+  const value=await this.execution.status(d,sessionsEnabled?{...options,refresh:false}:options);
+  if(observationError&&!value.error){
+   value.error={code:observationError};value.connection=observationError==='NETWORK_UNAVAILABLE'?'offline':'error';
+   value.freshness=value.observedAt?'last-known':'unavailable';
+  }
+  if(this.backgroundDenied)return unavailable();
+  let mapping;try{mapping=this.execution.mapping(d);}catch{this.dirty=true;return value;}
+  if(sessionsEnabled){
    value.serverSessions=this.sessions.values(d);
-   await this.refreshNativeTaskViews(value,d,options.refresh!==false);
-  }if(this.backgroundDenied)return unavailable();let mapping;try{mapping=this.execution.mapping(d);}catch{this.dirty=true;return value;}
+   if(!observationError)await this.refreshNativeTaskViews(value,d,options.refresh!==false);
+  }
+  if(this.backgroundDenied)return unavailable();
   if(this.matching.fenced(mapping.sharedId)||this.matching.fenced(this.state.objects[mapping.sharedId].parentId))return {...value,readOnly:true,configurationError:'SHARED_MATCH_PREPARING'};
   if(d.itemType==='group'){
    const handoff=require('./sharedGroupHandoff'),group=this.configs.state.objects[this.state.objects[mapping.sharedId].parentId];

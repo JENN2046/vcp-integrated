@@ -38,6 +38,15 @@ function executionConfig(config,member){
 }
 // Durable send/receipt intent around the existing native executor. No model
 // call is made here; restart queries accepted identities but never dispatches.
+const preAdmissionFailures = new Set([
+ 'SHARED_CONFIG_CONFLICT','SHARED_CONFIG_PENDING','SHARED_CONFIG_PENDING_CONFIRMATION',
+ 'MODEL_SAVE_NOT_CURRENT','MODEL_SAVE_REFERENCE_UNCONFIRMED','SHARED_CONTEXT_CHANGED',
+ 'SHARED_LOCAL_MAPPING_PENDING','SHARED_LOCAL_MAPPING_REQUIRED','SHARED_LOCAL_HISTORY_CONFLICT',
+ 'SHARED_MATCH_PREPARING','SHARED_TOPIC_BUSY','SHARED_RESULT_REQUIRES_REVIEW','DESKTOP_CONTEXT_REQUIRED',
+ 'SHARED_LOCAL_REMOVED','SHARED_LOCAL_TOPIC_NOT_FOUND','SHARED_UNREGISTERED_HISTORY',
+ 'SHARED_TOPIC_HISTORY_UPGRADE_REQUIRED','SHARED_CONTEXT_SERVER_UPGRADE_REQUIRED','NETWORK_UNAVAILABLE',
+]);
+
 class SharedExecution {
  static async open(runtime){
   const e=new SharedExecution(runtime),ledger=await ownedJson(runtime.root,e.file,{optional:true});
@@ -80,6 +89,18 @@ class SharedExecution {
    this.state.localInputs=next;
   });this.inputDisk=write;return write;
  }
+ async rememberInputFailure(descriptor,message,code,serverSession){
+  const failureCode=preAdmissionFailures.has(code)?code:undefined;
+  await this.updateInputs(inputs=>{
+   const input=inputs[message.id],record=this.state.requests[message.id];
+   if(!input||!record||record.accepted||(record.admitStarted&&(!failureCode||record.rejected!==failureCode))||
+      stable(input.descriptor)!==stable(descriptor)||stable(localShape(input.message))!==stable(localShape(message)))return false;
+   const serverSessionPreferred=Boolean(serverSession||input.serverSessionPreferred);
+   if(input.submissionErrorCode===failureCode&&Boolean(input.serverSessionPreferred)===serverSessionPreferred)return false;
+   inputs[message.id]={...input,submissionErrorCode:failureCode,serverSessionPreferred};
+  });
+ }
+
  async consumeInputs(ids){await this.updateInputs(inputs=>{let changed=false;for(const id of ids)if(Object.hasOwn(inputs,id)){delete inputs[id];changed=true;}return changed;});for(const id of ids)this.lightInputs.delete(id);}
  run(id,fn){const prior=this.tails.get(id)||Promise.resolve(),next=prior.catch(()=>{}).then(fn);this.tails.set(id,next);next.finally(()=>{if(this.tails.get(id)===next)this.tails.delete(id);}).catch(()=>{});return next;}
  mapping(d){const r=this.runtime,shared=r.replica.queue.shared(d);const m=r.mappings().find(m=>stable(m.shared)===stable({itemType:shared.itemType||'agent',itemId:shared.itemId,topicId:shared.topicId}));if(!m)throw fail('SHARED_LOCAL_MAPPING_REQUIRED');return m;}
@@ -379,7 +400,7 @@ class SharedExecution {
    await this.save();await this.refresh(record);return {success:true};
   });
  }
- localInputs(d){return Object.values(this.state.requests).filter(v=>v.descriptor&&stable(v.descriptor)===stable(d)&&v.localMessage&&v.phase!=='input_applied'&&!groupHandoff.isMode(v.body?.controlMode)&&((this.state.localInputs[v.localMessage.id]&&v.accepted)||(v.projection&&v.projection.state!=='saved')||(!v.accepted&&(!final.has(v.phase)||v.rejected))||v.isSteeringInput)).sort((a,b)=>(a.localInputSeq||0)-(b.localInputSeq||0)).map(v=>({inputId:v.localMessage.id,content:v.localMessage.content,attachments:(v.localMessage.attachments||[]).map(a=>({name:a.name,size:a.size,type:a.type})),phase:v.phase,accepted:Boolean(v.accepted),projectionPending:Boolean(v.serverProjectionPending||v.projection&&v.projection.state!=='saved'),received:Boolean(v.inputReceipt||v.accepted),errorCode:v.failureCode||v.rejected||null,modelSaveRef:v.modelSaveRef||v.steeringBody?.modelSaveRef||null,parentInputId:v.parentLocalInputId||null,targetFinished:v.targetFinished===true}));}
+ localInputs(d){return Object.values(this.state.requests).filter(v=>v.descriptor&&stable(v.descriptor)===stable(d)&&v.localMessage&&v.phase!=='input_applied'&&!groupHandoff.isMode(v.body?.controlMode)&&((this.state.localInputs[v.localMessage.id]&&v.accepted)||(v.projection&&v.projection.state!=='saved')||(!v.accepted&&(!final.has(v.phase)||v.rejected))||v.isSteeringInput)).sort((a,b)=>(a.localInputSeq||0)-(b.localInputSeq||0)).map(v=>({inputId:v.localMessage.id,content:v.localMessage.content,attachments:(v.localMessage.attachments||[]).map(a=>({name:a.name,size:a.size,type:a.type})),phase:v.phase,accepted:Boolean(v.accepted),projectionPending:Boolean(v.serverProjectionPending||v.projection&&v.projection.state!=='saved'),received:Boolean(v.inputReceipt||v.accepted),submissionUnconfirmed:Boolean(v.admitStarted&&!v.accepted&&!v.rejected),errorCode:v.failureCode||v.rejected||(!v.accepted&&!v.admitStarted&&this.state.localInputs[v.localMessage.id]?.submissionErrorCode)||null,modelSaveRef:v.modelSaveRef||v.steeringBody?.modelSaveRef||null,parentInputId:v.parentLocalInputId||null,targetFinished:v.targetFinished===true}));}
  async status(d,{refresh=true}={}){
   const r=this.runtime;let mapping,queryError=null,queried=false;
   try{mapping=this.mapping(d);}catch(error){queryError=error.code||'SHARED_LOCAL_MAPPING_PENDING';}

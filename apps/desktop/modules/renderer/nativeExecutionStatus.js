@@ -9,6 +9,27 @@ const labels = {
     first_member: '首位成员的回复待确认', awaiting_handoff: '上一位成员的回复已确认，等待接管',
     awaiting_continue: '等待接管设备继续', continuing: '当前成员的回复待确认',
 };
+const inputFailureText = new Map(Object.entries({
+    SHARED_CONFIG_CONFLICT: '共享配置有冲突，请确认模型或配置后重试。',
+    SHARED_CONFIG_PENDING: '共享配置仍在同步，请稍后重试。',
+    SHARED_CONFIG_PENDING_CONFIRMATION: '模型保存尚未确认，请确认后重试。',
+    MODEL_SAVE_NOT_CURRENT: '此消息要求的模型尚未同步，请确认模型后重试。',
+    MODEL_SAVE_REFERENCE_UNCONFIRMED: '模型保存尚未确认，请确认后重试。',
+    SHARED_CONTEXT_CHANGED: '共享话题刚有更新，请同步后重试。',
+    SHARED_LOCAL_MAPPING_PENDING: '此话题尚未接入共享空间，请等待同步后重试。',
+    SHARED_LOCAL_MAPPING_REQUIRED: '此话题的共享关联尚未就绪，请同步后重试。',
+    SHARED_LOCAL_HISTORY_CONFLICT: '本机与共享话题的历史不一致，请先核对话题状态。',
+    SHARED_MATCH_PREPARING: '共享话题正在匹配，请等待匹配完成后重试。',
+    SHARED_TOPIC_BUSY: '此话题已有请求在执行，请等它结束后重试。',
+    SHARED_RESULT_REQUIRES_REVIEW: '请先核对上一次请求的执行结果。',
+    DESKTOP_CONTEXT_REQUIRED: '此消息需要桌面上下文，请检查工作区后重试。',
+    SHARED_LOCAL_REMOVED: '此话题已移出共享空间，请核对话题状态。',
+    SHARED_LOCAL_TOPIC_NOT_FOUND: '本机找不到此话题，请核对话题状态。',
+    SHARED_UNREGISTERED_HISTORY: '此话题已有本机历史，请先完成接入。',
+    SHARED_TOPIC_HISTORY_UPGRADE_REQUIRED: '当前共享服务缺少话题历史支持，请核对版本。',
+    SHARED_CONTEXT_SERVER_UPGRADE_REQUIRED: '当前共享服务缺少上下文支持，请核对版本。',
+    NETWORK_UNAVAILABLE: '连接中断，请恢复连接后重试。',
+}));
 const taskLabels = { accepted: 'AA 已登记，启动待核对', running: 'AA 运行中', waiting: 'AA 等待下一步', cancelling: 'AA 正在取消', completed: 'AA 已完成', failed: 'AA 失败', cancelled: 'AA 已取消', stopped: 'AA 已停止（未成功完成）', unknown: 'AA 状态未知，待核对' };
 const toolLabels = { started: '工具已开始，结果待核对', returned: '工具调用已返回', error: '工具调用返回错误' };
 
@@ -117,6 +138,9 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
             const row = document.createElement('p'), text = document.createElement('span');
             text.textContent = `${saved.projectionPending ? '消息已接收，正在恢复本机记录。' : saved.accepted ? '消息已接收，等待原请求恢复。' : saved.submissionUnconfirmed ? '消息已保存，提交结果尚未确认。' : '待发消息已保存在本机。'} ${content.slice(0,80)}${content.length>80?'…':''} `;
             row.append(text);
+            const reason = saved.accepted || saved.submissionUnconfirmed ? null : inputFailureText.get(saved.errorCode);
+            const detail = document.createElement('span');
+            if (reason) { detail.textContent = reason + ' '; row.append(detail); }
             if (saved.projectionPending && typeof api.getNativeHistorySnapshot === 'function') {
                 const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = '重试恢复本机记录';
                 retry.addEventListener('click', async () => {
@@ -137,7 +161,23 @@ export function createNativeExecutionStatus({ container, api, getSelection, getT
                 row.append(retry);
             } else if (!saved.accepted && inputId && typeof onRetryInput === 'function') {
                 const retry=document.createElement('button');retry.type='button';retry.textContent='按原编号重试提交';
-                retry.addEventListener('click',async()=>{if(disposed||key(value.topic)!==key(selection))return;retry.disabled=true;try{await onRetryInput({descriptor:{itemType:value.topic.ownerType,itemId:value.topic.ownerId,topicId:value.topic.topicId},inputId,modelSaveRef:saved.modelSaveRef});await query(true,value.topic);}catch(error){text.textContent='原消息仍保留：'+(error.code||error.message);retry.disabled=false;}});row.append(retry);
+                retry.addEventListener('click', async () => {
+                    const scope = value.topic;
+                    if (disposed || key(scope) !== key(selection)) return;
+                    retry.disabled = true;
+                    try {
+                        await onRetryInput({descriptor:{itemType:scope.ownerType,itemId:scope.ownerId,topicId:scope.topicId},inputId,modelSaveRef:saved.modelSaveRef});
+                        await query(true, scope);
+                    } catch (error) {
+                        if (disposed || key(scope) !== key(selection)) return;
+                        detail.textContent = (error?.code === 'NETWORK_UNAVAILABLE'
+                            ? '连接中断，提交结果尚未确认。'
+                            : inputFailureText.get(error?.code) || '提交尚未完成，请核对状态后重试。') + ' ';
+                        if (!detail.isConnected) row.insertBefore(detail, retry);
+                        retry.disabled = false;
+                    }
+                });
+                row.append(retry);
             } else if (!saved.accepted && saved.message) {
                 const restore = document.createElement('button'); restore.type = 'button'; restore.textContent = '恢复到输入框';
                 restore.addEventListener('click', () => { if (key(value.topic)!==key(selection)) return; ownerWindow?.dispatchEvent(new ownerWindow.CustomEvent('native-sync:restore-local-input',{detail:saved})); });

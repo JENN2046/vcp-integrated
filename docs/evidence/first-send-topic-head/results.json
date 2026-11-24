@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "scope": "Independent local synthetic Electron/ToolBox runs",
+  "beforeCursorFix": {
+    "setup": {
+      "defaultTopicRestoredOnStartup": true,
+      "targetHistoryRows": 0,
+      "targetJournalRows": 0,
+      "otherTopicPriorJournalRows": 1,
+      "baselineWatermark": 1,
+      "topicCursor": 1
+    },
+    "originalInputId": "msg_1795488753631_user_2a88hy2228",
+    "localStageAndServerSubmissionUseSameId": true,
+    "localStageCount": 1,
+    "firstSendIpc": {
+      "accepted": false,
+      "error": "SHARED_CONTEXT_CHANGED"
+    },
+    "centralSessionPosts": 0,
+    "providerCalls": 0,
+    "applicationFailures": [],
+    "scopedContextHead": 0,
+    "coverageHeadUsedForComparison": 1,
+    "targetJournalRowsAfter": 0,
+    "targetWorkCountAfter": 0,
+    "targetHistoryRowsAfter": 0,
+    "savedInputId": "msg_1795488753631_user_2a88hy2228",
+    "originalInputRetainedAfterRestart": true,
+    "backendRevision": "7cdd195ee5ae16bf7ace17b1fc48066af53317c9",
+    "originalInputVisibleAfterRestart": true
+  },
+  "fixedSettledPhotoRun": {
+    "setup": {
+      "defaultTopicRestoredOnStartup": true,
+      "targetHistoryRows": 0,
+      "targetJournalRows": 0,
+      "otherTopicPriorJournalRows": 1,
+      "baselineWatermark": 1,
+      "topicCursor": 1
+    },
+    "originalInputId": "msg_1795488294684_user_msce525r52",
+    "localStageAndServerSubmissionUseSameId": true,
+    "localStageCount": 1,
+    "firstSendIpc": {
+      "accepted": true
+    },
+    "centralSessionPosts": 1,
+    "providerCalls": 1,
+    "applicationFailures": [],
+    "scopedContextHead": 0,
+    "targetJournalSeqs": [
+      2,
+      3
+    ],
+    "targetJournalMessageIds": [
+      "msg_1795488294684_user_msce525r52",
+      "reply_request_16b93df0033545d4a62d001e64905b1d"
+    ],
+    "desktopAHistoryIds": [
+      "msg_1795488294684_user_msce525r52",
+      "reply_request_16b93df0033545d4a62d001e64905b1d"
+    ],
+    "desktopBHistoryIds": [
+      "msg_1795488294684_user_msce525r52",
+      "reply_request_16b93df0033545d4a62d001e64905b1d"
+    ],
+    "centralWorkAttempts": [
+      1
+    ],
+    "sameHistoryAfterRestart": true,
+    "extraSessionPostsAfterRestart": 0,
+    "extraProviderCallsAfterRestart": 0,
+    "globalBaselineWatermarkAfterRestart": 1,
+    "unrelatedJournalRowUnchanged": true,
+    "timingsMs": {
+      "stageLocal": 8,
+      "localSavedToSessionEntry": 3,
+      "localSavedToProvider": 134
+    }
+  },
+  "fixedIndependentTimingRun": {
+    "timingsMs": {
+      "stageLocal": 10,
+      "localSavedToSessionEntry": 10,
+      "localSavedToProvider": 189
+    }
+  },
+  "legacyServer": {
+    "setup": {
+      "defaultTopicRestoredOnStartup": true,
+      "targetHistoryRows": 0,
+      "targetJournalRows": 0,
+      "otherTopicPriorJournalRows": 1,
+      "baselineWatermark": 1,
+      "topicCursor": 1
+    },
+    "originalInputId": "msg_1795488237306_user_amwe7tj5t3",
+    "localStageAndServerSubmissionUseSameId": true,
+    "localStageCount": 1,
+    "firstSendIpc": {
+      "accepted": true
+    },
+    "centralSessionPosts": 1,
+    "providerCalls": 1,
+    "applicationFailures": [],
+    "scopedContextHead": 0,
+    "targetJournalSeqs": [
+      2,
+      3
+    ],
+    "targetJournalMessageIds": [
+      "msg_1795488237306_user_amwe7tj5t3",
+      "reply_request_4dd355f1866e4e28b66b0cd2b6643103"
+    ],
+    "desktopAHistoryIds": [
+      "msg_1795488237306_user_amwe7tj5t3",
+      "reply_request_4dd355f1866e4e28b66b0cd2b6643103"
+    ],
+    "desktopBHistoryIds": [
+      "msg_1795488237306_user_amwe7tj5t3",
+      "reply_request_4dd355f1866e4e28b66b0cd2b6643103"
+    ],
+    "centralWorkAttempts": [
+      1
+    ],
+    "sameHistoryAfterRestart": true,
+    "extraSessionPostsAfterRestart": 0,
+    "extraProviderCallsAfterRestart": 0,
+    "globalBaselineWatermarkAfterRestart": 1,
+    "unrelatedJournalRowUnchanged": true,
+    "timingsMs": {
+      "stageLocal": 7,
+      "localSavedToSessionEntry": 2,
+      "localSavedToProvider": 124
+    },
+    "backendRevision": "7cdd195ee5ae16bf7ace17b1fc48066af53317c9"
+  },
+  "knownRejection": {
+    "fixture": "loopback HTTP 409 on the shared context lookup before admission",
+    "firstIpcError": "SHARED_CONFIG_CONFLICT",
+    "knownReason": "共享配置有冲突，请确认模型或配置后重试。",
+    "sameReasonVisibleAfterRestart": true,
+    "originalInputId": "msg_1795488153921_user_1v9ae825go",
+    "durableInputIdAfterRestart": "msg_1795488153921_user_1v9ae825go",
+    "beforeExplicitRetry": {
+      "targetJournalRows": 0,
+      "targetWorkCount": 0,
+      "targetHistoryRows": 0,
+      "sessionPosts": 0,
+      "providerCalls": 0
+    },
+    "afterExplicitRetry": {
+      "sessionPosts": 1,
+      "providerCalls": 1,
+      "requestId": "msg_1795488153921_user_1v9ae825go",
+      "centralWorkAttempts": 1
+    }
+  }
+}

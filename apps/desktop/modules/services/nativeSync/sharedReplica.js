@@ -49,6 +49,7 @@ async function openSharedReplica({queue,statePath,connection,mappings,send,notif
    for(let page=0;page<10000;page++){
     const value=await send('/api/v1/sync/shared/topic-history?'+query+'&'+new URLSearchParams({sharedId:id,after:String(cursor),limit:'100'}));
     if(value.sharedId!==id||!Array.isArray(value.events)||value.events.length>100||!Number.isSafeInteger(value.headSeq)||!Number.isSafeInteger(value.nextSeq)||value.nextSeq<cursor||value.nextSeq>value.headSeq||value.hasMore!==(value.nextSeq<value.headSeq)||value.hasMore&&value.nextSeq===cursor)throw fail('SHARED_TOPIC_HISTORY_INVALID');
+    if(value.topicHeadSeq!==undefined&&(!Number.isSafeInteger(value.topicHeadSeq)||value.topicHeadSeq<0||value.headSeq!==Math.max(cursor,value.topicHeadSeq)))throw fail('SHARED_TOPIC_HISTORY_INVALID');
     let last=cursor;const events=[];for(const raw of value.events){if(!Number.isSafeInteger(raw.seq)||raw.seq<=last||raw.seq>value.nextSeq||!adapter.sameTopic(raw,mapping.shared))throw fail('SHARED_TOPIC_HISTORY_INVALID');last=raw.seq;events.push(adapter.validateEvent(await adapter.pages.hydrate(raw)));}
     if(last!==value.nextSeq)throw fail('SHARED_TOPIC_HISTORY_INVALID');
     // An empty page adds no durable intent. Keep the cursor checkpoint below,
@@ -58,7 +59,7 @@ async function openSharedReplica({queue,statePath,connection,mappings,send,notif
 
     cursor=value.nextSeq;
     await adapter.transaction(state=>{state.topicCursors||={};state.topicCursors[id]=cursor;});
-    if(!value.hasMore){if(cursor<minSeq)throw fail('SHARED_TOPIC_VERSION_PENDING');adapter.retryNotifications();return {head:cursor};}
+    if(!value.hasMore){if(cursor<minSeq)throw fail('SHARED_TOPIC_VERSION_PENDING');adapter.retryNotifications();return {head:cursor,topicHeadSeq:value.topicHeadSeq};}
    }throw fail('PAGINATION_STALLED');
   });topicTails.set(id,next);next.finally(()=>{if(topicTails.get(id)===next)topicTails.delete(id);}).catch(()=>{});return next;
  };
