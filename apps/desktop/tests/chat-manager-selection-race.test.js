@@ -9,6 +9,7 @@ test.before(async () => {
         ...await import('../modules/chat/contextCompactionService.js'),
         ...await import('../modules/chat/contextCompactionState.js'),
         ...await import('../modules/chat/sharedHistoryOrder.mjs'),
+        ...await import('../modules/chat/historyMessageIntent.mjs'),
         ...await import('../modules/chat/composerDrafts.mjs'),
         ...await import('../modules/chat/recoverTopicAdmission.mjs'),
         ...await import('../modules/chat/nativeDirectoryActions.mjs'),
@@ -132,6 +133,8 @@ function createFixture(options = {}) {
     };
     const electronAPI = {
         getTopicExecutionAuthority: options.getTopicExecutionAuthority || (async () => ({ success: true, kind: 'local' })),
+        prepareSharedSend: options.prepareSharedSend,
+        noteSharedSendFailure: options.noteSharedSendFailure,
         onCanvasContentUpdate(listener) {
             if (options.failCanvasRegistration) throw new Error('controlled canvas listener failure');
             canvasContentListener = listener;
@@ -209,7 +212,7 @@ function createFixture(options = {}) {
                 nextVcpError = null;
                 throw error;
             }
-            return { streamingStarted: true };
+            return options.vcpResult?.() ?? { streamingStarted: true };
         },
         saveSettings: async settings => {
             const gate = nextSettingsSaveGate;
@@ -253,6 +256,7 @@ function createFixture(options = {}) {
     try {
         window.chatManager.init({
         singleChatRequestOrchestrator,
+        historyMutationAuthority: options.historyMutationAuthority,
         chatRepository: {
             getHistory: (itemId, _itemType, requestedTopicId) => electronAPI.getChatHistory(itemId, requestedTopicId),
             saveHistory: (itemId, _itemType, requestedTopicId, messages) => electronAPI.saveChatHistory(itemId, requestedTopicId, messages),
@@ -1294,4 +1298,64 @@ test('cancelling queued stream compaction prevents compression after partial rep
         await fixture.chatManager.dispose();
         fixture.dom.window.close();
     }
+});
+
+test('shared regenerate publishes only a confirmed terminal and keeps the original History in flight', async t => {
+    const question = { id: 'u1', role: 'user', content: 'question', timestamp: 1 };
+    const target = { id: 'r1', role: 'assistant', content: 'original', timestamp: 2 };
+    const later = { id: 'u2', role: 'user', content: 'later', timestamp: 3 };
+    const history = [question, target, later];
+    const scope = { itemId: 'agent-a', itemType: 'agent', topicId: 'topic-a' };
+    const admissions = [], publications = [], failures = [], interruptions = [];
+    let response = { choices: [{ message: { content: 'partial' }, finish_reason: 'length' }], nativeFailure: { code: 'RESPONSE_ABORTED' } };
+    const fixture = createFixture({
+        getTopicExecutionAuthority: async () => ({ success: true, kind: 'shared' }),
+        async prepareSharedSend(payload) {
+            admissions.push(payload);
+            return {
+                handled: true, replyId: 'native-regenerate', history, userMessage: question,
+                turn: { kind: 'regenerate', targetId: target.id }, config: { model: 'fixture-model' },
+            };
+        },
+        async noteSharedSendFailure(payload) { failures.push(payload); },
+        historyMutationAuthority: { async append(descriptor, reply) { publications.push({ descriptor, reply }); } },
+        interruptHandler: { async interrupt(id) { interruptions.push(id); return { success: true }; } },
+        vcpResult: () => ({ response }),
+    });
+    t.after(() => fixture.dom.window.close());
+    fixture.setPersistedHistory(scope.itemId, scope.topicId, history);
+    const selecting = fixture.chatManager.selectItem(scope.itemId, scope.itemType, 'Agent A', null, fixture.configs[scope.itemId]);
+    await new Promise(resolve => setImmediate(resolve));
+    fixture.topicRequests.get(scope.itemId).resolve(fixture.configs[scope.itemId].topics);
+    await selecting;
+
+    const gate = fixture.holdNextVcpRequest();
+    const regenerating = fixture.chatManager.regenerateSharedReply(scope, target);
+    await gate.started.promise;
+    assert.deepEqual(fixture.state().history.map(message => message.id), ['u1', 'r1', 'u2']);
+    assert.equal(fixture.historySaveCount(), 0);
+    assert.equal(publications.length, 0);
+    await assert.rejects(fixture.chatManager.regenerateSharedReply(scope, target), /SHARED_REGENERATION_IN_PROGRESS/);
+    assert.equal(admissions.length, 1);
+    assert.equal(admissions[0].targetMessage.content, 'original');
+    assert.deepEqual(Array.from(fixture.sentRequests[0][2], message => message.content), ['question']);
+    assert.equal(fixture.sentRequests[0][4], 'native-regenerate');
+    await fixture.chatManager.getSharedRegenerationInterruptTarget().interrupt();
+    assert.deepEqual(interruptions, ['native-regenerate']);
+    gate.release.resolve();
+    await assert.rejects(regenerating, /RESPONSE_ABORTED/);
+    assert.equal(publications.length, 0);
+    assert.equal(failures[0].requestId, 'native-regenerate');
+    assert.deepEqual(fixture.persistedHistory(scope.itemId, scope.topicId), history);
+
+    response = { choices: [{ message: { content: 'unconfirmed text' } }] };
+    await assert.rejects(fixture.chatManager.regenerateSharedReply(scope, target), /NO_TERMINAL/);
+    assert.equal(publications.length, 0);
+
+    response = { choices: [{ message: { content: 'final replacement' }, finish_reason: 'stop' }] };
+    await fixture.chatManager.regenerateSharedReply(scope, target);
+    assert.equal(publications.length, 1);
+    assert.equal(publications[0].descriptor.requestId, 'native-regenerate');
+    assert.equal(publications[0].reply.content, 'final replacement');
+    assert.equal(publications[0].reply.replyToMessageId, question.id);
 });

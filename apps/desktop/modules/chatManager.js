@@ -2,6 +2,7 @@ import { submitTopicAdmissionWithRecovery } from './chat/recoverTopicAdmission.m
 import {prepareNativeDeletion,nativeDeletionOptions} from './chat/nativeDirectoryActions.mjs';
 import {orderSharedHistory} from './chat/sharedHistoryOrder.mjs';
 import {createComposerDraftController} from './chat/composerDrafts.mjs';
+import {messagePreconditionValue} from './chat/historyMessageIntent.mjs';
 // modules/chatManager.js
 import {
     buildDefaultMessageContent,
@@ -1873,6 +1874,132 @@ export const chatManager = (() => {
         return result;
     }
 
+    const sharedRegenerations = new Map();
+    const regenerationKey = ({ itemType, itemId, topicId }) => JSON.stringify([itemType, itemId, topicId]);
+    function getSharedRegenerationInterruptTarget() {
+        return sharedRegenerations.get(regenerationKey(currentCompactionScope()))?.interruptTarget || null;
+    }
+
+    async function regenerateSharedReply(descriptor, original) {
+        const { itemId, itemType, topicId } = descriptor;
+        const targetMessage = structuredClone(original);
+        const itemGeneration = itemSelectionGeneration;
+        const topicGeneration = topicSelectionGeneration;
+        const selectedItem = currentSelectedItemRef.get();
+        const isCurrent = () => !disposed && itemSelectionGeneration === itemGeneration
+            && topicSelectionGeneration === topicGeneration
+            && currentSelectedItemRef.get()?.id === itemId && currentSelectedItemRef.get()?.type === itemType
+            && currentTopicIdRef.get() === topicId;
+        const failure = code => Object.assign(new Error(code), { code });
+        const key = regenerationKey(descriptor);
+        if (sharedRegenerations.has(key)) throw failure('SHARED_REGENERATION_IN_PROGRESS');
+        const operation = {};
+        sharedRegenerations.set(key, operation);
+        let replyId;
+        let publicationStarted = false;
+        try {
+            const authority = await executionAuthority(descriptor);
+            if (!isCurrent()) return { handled: true };
+            const visibleTarget = currentChatHistoryRef.get().find(message => message.id === targetMessage.id);
+            if (!visibleTarget || messagePreconditionValue(visibleTarget) !== messagePreconditionValue(targetMessage)) {
+                throw failure('SHARED_REGENERATION_TARGET_CHANGED');
+            }
+            if (authority.kind === 'local') return { handled: false };
+            if (visibleTarget.isThinking || visibleTarget.isPendingStream || visibleTarget.contextCompaction
+                || !effectiveContextHistory(currentChatHistoryRef.get()).includes(visibleTarget)) {
+                throw failure('SHARED_REGENERATION_TARGET_UNAVAILABLE');
+            }
+            if (isContextCompacting(descriptor)) throw failure('SHARED_REGENERATION_COMPACTING');
+            const settings = globalSettingsRef.get();
+            if (!settings.vcpServerUrl) throw failure('VCP_SERVER_URL_REQUIRED');
+            if (typeof electronAPI.prepareSharedSend !== 'function') throw failure('SHARED_SEND_UNAVAILABLE');
+            const modelSaveRef = window.ComposerModelSaveBarrier?.capture(itemId);
+            if (modelSaveRef) await window.ComposerModelSaveBarrier.wait(modelSaveRef);
+            if (!isCurrent()) return { handled: true };
+            const prepared = await electronAPI.prepareSharedSend({
+                descriptor, kind: 'regenerate', targetId: targetMessage.id, targetMessage,
+                message: { id: `regenerate_${crypto.randomUUID()}`, role: 'user', content: '' },
+                ...(modelSaveRef ? { modelSaveRef } : {}),
+            });
+            if (prepared?.success === false) throw failure(prepared.error || 'SHARED_SEND_UNAVAILABLE');
+            if (!prepared?.handled || prepared.turn?.kind !== 'regenerate' || prepared.turn.targetId !== targetMessage.id
+                || !prepared.replyId || !Array.isArray(prepared.history)) throw failure('SHARED_REGENERATION_RECEIPT_INVALID');
+            replyId = prepared.replyId;
+            if (isCurrent()) uiHelper.showToastNotification('共享回复正在重新生成', 'info');
+
+            const orderedHistory = orderSharedHistory(prepared.history);
+            const targetIndex = orderedHistory.findIndex(message => message.id === targetMessage.id);
+            if (targetIndex < 0) throw failure('SHARED_REGENERATION_TARGET_CHANGED');
+            const history = orderedHistory.slice(0, targetIndex);
+            const user = prepared.userMessage;
+            const agentConfig = { ...(selectedItem.config || selectedItem), ...prepared.config };
+            const context = {
+                agentId: itemId, itemType, topicId, isGroupMessage: false, sharedRegeneration: true,
+                agentName: selectedItem.name, avatarUrl: selectedItem.avatarUrl,
+                avatarColor: (selectedItem.config || selectedItem).avatarCalculatedColor,
+            };
+            const request = await singleChatRequestOrchestrator.buildRequest({
+                sharedTopic: true,
+                settings: { ...settings, ...prepared.executionPolicy },
+                tavernRules: prepared.tavernRules, agentConfig, history, messageId: replyId, context,
+                currentUserMessage: user,
+                ...createRequestTextOptions(agentConfig, history, user?.id),
+            });
+            if (typeof interruptCapability?.interrupt === 'function') {
+                operation.interruptTarget = {
+                    ...descriptor, id: replyId, role: 'assistant',
+                    interrupt(notify) {
+                        if (operation.interruptPending || !operation.interruptTarget) return false;
+                        operation.interruptPending = true;
+                        return Promise.resolve(interruptCapability.interrupt(replyId)).then(result => {
+                            notify?.(result?.success ? '已发送中止信号。' : '停止尚未确认，请查看任务状态。', result?.success ? 'info' : 'warning');
+                            return result?.success === true;
+                        }).finally(() => { operation.interruptPending = false; });
+                    },
+                };
+                notifySendStateChanged();
+            }
+            const result = await singleChatRequestOrchestrator.sendPrepared(request, settings);
+            operation.interruptTarget = null;
+            notifySendStateChanged();
+            const choice = result?.response?.choices?.[0];
+            if (!choice?.message || typeof choice.message.content !== 'string' || !choice.message.content.trim()
+                || result.response.nativeFailure || result.response.error
+                || !['stop', 'length', 'tool_calls', 'function_call'].includes(choice.finish_reason)) {
+                throw failure(result?.errorCode || result?.response?.nativeFailure?.code || 'SHARED_REGENERATION_NO_TERMINAL');
+            }
+            publicationStarted = true;
+            await historyMutationAuthority.append({
+                ...descriptor, category: 'regeneration-terminal', requestId: replyId,
+            }, {
+                role: 'assistant', id: replyId, content: choice.message.content,
+                name: request.context.agentName, avatarUrl: context.avatarUrl, avatarColor: context.avatarColor,
+                timestamp: Date.now(), finishReason: choice.finish_reason,
+                ...(user?.id ? { replyToMessageId: user.id } : {}),
+            });
+            if (isCurrent()) {
+                try { await syncHistoryFromFile(itemId, itemType, topicId, isCurrent); }
+                catch (error) { console.warn('[NativeSync] Regeneration history refresh failed', error); }
+            }
+            return { handled: true };
+        } catch (error) {
+            if (publicationStarted) {
+                throw Object.assign(new Error('SHARED_REGENERATION_PUBLICATION_UNCONFIRMED', { cause: error }), {
+                    code: error?.code || error?.message,
+                    publicationUnconfirmed: true,
+                });
+            }
+            if (replyId) {
+                await electronAPI.noteSharedSendFailure?.({ descriptor, requestId: replyId, code: error.code })
+                    .catch(failureError => console.warn('[NativeSync] Regeneration status could not be confirmed', failureError));
+            }
+            throw error;
+        } finally {
+            sharedRegenerations.delete(key);
+            notifySendStateChanged();
+        }
+    }
+
     async function handleSendMessage(request = null) {
         // 兼容渲染 Surface 的文本发送能力。AI 消息快捷按钮等调用方只提交
         // 一段独立文本；将其规范化为请求对象，避免错误回退到主输入框草稿，
@@ -3303,6 +3430,8 @@ export const chatManager = (() => {
         loadChatHistory,
         displayTopicTimestampBubble,
         handleSendMessage,
+        regenerateSharedReply,
+        getSharedRegenerationInterruptTarget,
         onSharedProjectionSettled,
         retryLocalInput,
         executePreparedShared,

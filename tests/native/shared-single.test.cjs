@@ -105,6 +105,88 @@ test('regeneration preserves the target until new acceptance, replaces only that
  assert.equal(f.store.db.prepare("SELECT count(*) n FROM journal WHERE msg_id=? AND action='delete'").get(original.replyId).n,1);
 });
 
+test('versioned desktop regeneration updates one logical slot and safely recovers lost admission and completion acknowledgements',async t=>{
+ const f=await fixture(t),b=await f.desktop('B');
+ let a=await f.desktop('A');
+ const prepare=message=>a.runtime.prepareSharedSend({descriptor:a.descriptor,message});
+ const original=await prepare(msg('regen-source','first question'));
+ const originalResult=await f.dispatch(a,original);
+ await a.runtime.execution.commit(a.descriptor,{requestId:original.replyId,operations:[{kind:'append',message:{
+  id:original.replyId,role:'assistant',content:originalResult.choices[0].message.content,timestamp:2,agentId:f.owner.id,name:'Synthetic shared',
+ }}]});
+ const later=await prepare(msg('regen-later','following question'));
+ await f.reply(a,later,await f.dispatch(a,later));
+ const snapshot=await a.queue.read(a.descriptor),target=snapshot[1];
+ const regenerate=(id,targetMessage=target)=>a.runtime.prepareSharedSend({
+  descriptor:a.descriptor,kind:'regenerate',targetId:targetMessage.id,targetMessage,message:{id,role:'user',content:''},
+ });
+ f.control.dropAccept=1;
+ await assert.rejects(regenerate('regen-intent'),rejects('NETWORK_UNAVAILABLE'));
+ assert.equal(f.calls(),2);
+ assert.deepEqual(await a.queue.read(a.descriptor),snapshot);
+ const active=f.shared.active(f.topic.id);
+ await a.close();
+ a=await f.desktop('A');
+ const regenerated=await regenerate('regen-intent');
+ assert.equal(regenerated.admissionId,active.id);
+ assert.equal(regenerated.userMessage.id,'regen-source');
+ assert.equal(regenerated.turn.targetId,target.id);
+ await assert.rejects(regenerate('overlapping-intent'),rejects('SHARED_TOPIC_BUSY'));
+ assert.deepEqual(await a.queue.read(a.descriptor),snapshot);
+ const publish=(actor,finishReason)=>f.shared.complete(actor,{
+  sharedSpaceId:'sharedAB',admissionId:regenerated.admissionId,opId:'premature-regen-publish',
+  message:{id:regenerated.replyId,role:'assistant',content:'incomplete',timestamp:10,finishReason},
+ });
+ assert.throws(()=>publish(f.actor('B'),'stop'),rejects('SHARED_REQUEST_OWNER_REQUIRED'));
+ assert.throws(()=>publish(f.actor('A'),'stop'),rejects('SHARED_NATIVE_TERMINAL_REQUIRED'));
+ const result=await f.dispatch(a,regenerated);
+ assert.throws(()=>publish(f.actor('A'),'interrupted'),rejects('INVALID_SHARED_REPLY'));
+ assert.deepEqual(await a.queue.read(a.descriptor),snapshot);
+ await assert.rejects(f.dispatch(a,regenerated),rejects('SHARED_RESULT_REQUIRES_REVIEW'));
+ f.control.dropComplete=1;
+ await assert.rejects(f.reply(a,regenerated,result),rejects('NETWORK_UNAVAILABLE'));
+ await a.close();
+ a=await f.desktop('A');
+ await b.runtime.tick();
+ const history=await a.queue.read(a.descriptor);
+ assert.deepEqual(await b.queue.read(b.descriptor),history);
+ assert.deepEqual(history.map(m=>m.id),snapshot.map(m=>m.id));
+ assert.deepEqual(history.slice(2),snapshot.slice(2));
+ assert.equal(history[1].timestamp,target.timestamp);
+ assert.equal(history[1].content,'SYNTHETIC_REPLY_3');
+ assert.equal(history[1].continuity.executionId,regenerated.admissionId);
+ assert.equal(f.store.db.prepare('SELECT count(*) n FROM journal WHERE msg_id=?').get(target.id).n,2);
+ assert.equal(f.store.db.prepare('SELECT count(*) n FROM journal WHERE msg_id=?').get(regenerated.replyId).n,0);
+ assert.equal(f.calls(),3);
+ assert.equal(f.shared.active(f.topic.id),undefined);
+ const next=await regenerate('next-regeneration',history[1]);
+ assert.equal(next.userMessage.id,'regen-source');
+ assert.ok(next.turn.targetSeq>regenerated.turn.targetSeq);
+});
+
+test('versioned regeneration refuses a centrally edited same-ID reply and read-only principals',async t=>{
+ const f=await fixture(t),a=await f.desktop('A'),b=await f.desktop('B');
+ const original=await a.runtime.prepareSharedSend({descriptor:a.descriptor,message:msg('stale-regen-source')});
+ await f.reply(a,original,await f.dispatch(a,original));
+ await b.runtime.tick();
+ const target=(await a.queue.read(a.descriptor))[1],seen=(await b.queue.read(b.descriptor))[1];
+ await b.runtime.execution.commit(b.descriptor,{version:1,source:'message-edit',operations:[
+  {kind:'edit',id:target.id,expected:seen,set:{content:'edited on B'},unset:[]},
+ ]});
+ await assert.rejects(a.runtime.prepareSharedSend({
+  descriptor:a.descriptor,kind:'regenerate',targetId:target.id,targetMessage:target,message:msg('stale-regen-intent',''),
+ }),rejects('SHARED_REGENERATION_TARGET_CHANGED'));
+ const context=f.shared.executionConfig(f.actor('A'),{sharedSpaceId:'sharedAB',sharedId:f.topic.id});
+ const row=f.store.findMessage.get(f.topic.topic.ownerType,f.topic.topic.ownerId,f.topic.topic.topicId,target.id);
+ const reader=f.shared.mobile({id:'readonly',scopes:['shared:sharedAB:read']},'sharedAB','read');
+ assert.throws(()=>f.shared.admit(reader,{sharedSpaceId:'sharedAB',sharedId:f.topic.id,kind:'regenerate',targetId:target.id,
+  targetHash:row.hash,targetSeq:row.last_seq,expectedHead:context.head,configHash:context.hash,requestId:'read-only-intent',
+ }),rejects('SHARED_PERMISSION_REQUIRED'));
+ assert.equal(f.shared.active(f.topic.id),undefined);
+ assert.equal(f.calls(),1);
+ assert.equal((await a.queue.read(a.descriptor))[1].content,'edited on B');
+});
+
 test('shared mobile invitation on an empty group reuses the native group runner and one frozen plan',async t=>{
  const f=await fixture(t),group=f.shared.create(f.actor('A'),{sharedSpaceId:'sharedAB',opId:'mobile-group-owner',kind:'group',localId:'mg',config:{name:'Mobile shared',mode:'invite_only',members:[f.owner.id]}}).object;
  const topic=f.shared.create(f.actor('A'),{sharedSpaceId:'sharedAB',opId:'mobile-group-topic',kind:'topic',parentId:group.id,localId:'mgt',localParent:'mg',config:{name:'Mobile shared topic'}}).object;

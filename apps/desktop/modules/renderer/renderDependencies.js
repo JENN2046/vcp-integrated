@@ -51,6 +51,7 @@ export function createRenderDependencies(input = {}) {
         removeAttachmentFromMessage: providedMessageCommands.removeAttachmentFromMessage || null,
         syncNextUiEmptyStateWithMessages: providedMessageCommands.syncNextUiEmptyStateWithMessages || null,
         handleSendMessage: providedMessageCommands.handleSendMessage || null,
+        regenerateSharedReply: providedMessageCommands.regenerateSharedReply || null,
         updateSendButtonState: providedMessageCommands.updateSendButtonState || null,
     });
     const ownerDocument = root.ownerDocument;

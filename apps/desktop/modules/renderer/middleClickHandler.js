@@ -728,6 +728,11 @@ async function handleMiddleClickQuickAction(event, messageItem, message, quickAc
         case 'regenerate':
             // 重新回复
             if (message.role === 'assistant') {
+                const sourceItem = mainRendererReferences.currentSelectedItemRef.get();
+                const sourceTopicId = mainRendererReferences.currentTopicIdRef.get();
+                const sourceMessage = !message.isGroupMessage && mainRendererReferences.messageCommands?.regenerateSharedReply
+                    ? structuredClone(message) : message;
+
                 // 获取全局设置来检查保险机制是否开启
                 const globalSettings = mainRendererReferences.globalSettingsRef.get();
                 const enableConfirmation = globalSettings.enableRegenerateConfirmation !== false;
@@ -782,8 +787,9 @@ async function handleMiddleClickQuickAction(event, messageItem, message, quickAc
                 } else {
                     // 非群聊重新回复逻辑（原有逻辑）
                     if (typeof callbacks.handleRegenerateResponse === 'function') {
-                        callbacks.handleRegenerateResponse(message);
-                        uiHelper.showToastNotification("已开始重新生成回复", "success");
+                        await callbacks.handleRegenerateResponse(sourceMessage, {
+                            itemId: sourceItem?.id, itemType: sourceItem?.type, topicId: sourceTopicId,
+                        });
                     } else {
                         uiHelper.showToastNotification("重新回复功能暂时不可用", "warning");
                     }

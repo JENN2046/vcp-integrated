@@ -404,6 +404,8 @@ class SharedSpace {
    this.assertNotPrepared([topic.id,topic.parent_id]);if(this.active(topic.id))throw fail('SHARED_TOPIC_BUSY');
    const config=this.freezeForExecution(actor,topic),head=this.head(topic);
    if(body.expectedHead!==head||body.configHash!==config.hash)throw fail('SHARED_CONTEXT_CHANGED');this.checkModelSave(actor,topic,body.modelSaveRef,config,body.modelSaveResolutionRef);
+   const versionedRegeneration=body.kind==='regenerate'&&(body.targetSeq!==undefined||body.targetHash!==undefined);
+   if(versionedRegeneration&&(session||actor.kind!=='desktop'||body.controlMode!==undefined))throw fail('INVALID_SHARED_SUBMISSION',400);
    const turn=require('./sharedTurns').prepare(this,topic,config,body,sponsored),message=body.message;
    if(handoff.isMode(body.controlMode))handoff.admit(this,actor,topic,config,body,turn);
    else if(require('./sharedControlledText').admit(this,actor,topic,config,body,turn)){
@@ -447,15 +449,17 @@ class SharedSpace {
    if(!session&&this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mobile_executions'").get()&&this.db.prepare("SELECT 1 FROM mobile_executions WHERE id=? AND kind='shared_session'").get(row.id))throw fail('SHARED_SESSION_COMPLETION_ONLY');
    if(handoff.matches(row))handoff.requireExecutor(this,actor,row);
    else if(row.principal!==actor.principal)throw fail('SHARED_REQUEST_OWNER_REQUIRED',403);
-   if(require('./sharedTurns').intent(row).controlMode===require('./sharedControlledText').AA_MODE)throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+   const turns=require('./sharedTurns'),turn=turns.intent(row);
+   if(turn.controlMode===require('./sharedControlledText').AA_MODE)throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
    if(this.db.prepare('SELECT 1 FROM shared_work_controls WHERE work_id=? AND (revision>0 OR generation>0)').get(row.id))throw fail('SHARED_CLIENT_UPGRADE_REQUIRED');
-   const groupResult=require('./sharedTurns').complete(this,actor,body,row);if(groupResult)return groupResult;
+   const groupResult=turns.complete(this,actor,body,row);if(groupResult)return groupResult;
    if(row.state!=='dispatched'||!row.native_terminal)throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
    const topic=this.topic(actor,row.space_id,row.topic_id,'execute'),message=body.message;
    if(!message||message.role!=='assistant'||message.id!=='reply_'+row.id)throw fail('INVALID_SHARED_REPLY',400);
-   const metadata=require('./metadata'),normalized={...message};delete normalized._nativeSyncMetadata;
-   const receipt=this.store.apply({ownerType:topic.owner_type,ownerId:topic.owner_id,topicId:topic.topic_id,msgId:message.id,deviceId:actor.principal,opId:'shared-reply:'+row.id,action:'upsert',baseHash:null,message:normalized,metadata:metadata.envelopeFor(message,1)},{sharedSpace:row.space_id,attachmentPrincipal:actor.principal,metadataPublisher:true});
-   require('./sharedTurns').replaceTarget(this,actor,topic,row);
+   const versionedRegeneration=turn.kind==='regenerate'&&turn.targetSeq!==undefined;
+   const receipt=versionedRegeneration?turns.updateTarget(this,actor,topic,row,message,turn):
+    turns.writeReply(this,actor,topic,row,message,'shared-reply:'+row.id);
+   if(!versionedRegeneration)turns.replaceTarget(this,actor,topic,row,turn);
    this.db.prepare("UPDATE shared_admissions SET reply_seq=?,state='completed' WHERE id=?").run(receipt.seq,row.id);
    return {request:this.publicAdmission(this.admission(actor,row.space_id,row.id)),receipt};
   });

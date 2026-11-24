@@ -1,0 +1,203 @@
+{
+  "baselineRevision": "4cfc2716bd8eaa051f8ff2d02d87fa56a5b598f3",
+  "runtime": {
+    "electron": "44.9.3",
+    "platform": "linux-x64",
+    "sandboxEnabled": true,
+    "cdsSha256": "ec8e0b0e0c037bc7e8b5a5c4cf9378b1b1fb0661ec9d51c66f16d940c73fc2ce"
+  },
+  "loadedCandidateBackend": [
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedHttp.js",
+      "sha256": "b3a356f7b3347240344c4b3bc51cc2eed39deda70a59dbaeef95038ddd6235af"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedSpace.js",
+      "sha256": "24f4a69f8458ced877d5509046d8a9629650b42ef8582804be6c03eb928a73e6"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/sync/sharedTurns.js",
+      "sha256": "ca41fa98b0b802fdd43c8ab0fb0159a733ec0277429f3bd654d5c7baf0a48816"
+    }
+  ],
+  "baseline": {
+    "stack": [
+      "VCP请求错误 (catch block): Error: SHARED_NATIVE_ADMISSION_REQUIRED",
+      "    at fail (apps/desktop/modules/services/nativeSync/contracts.generated.cjs:50:39)",
+      "    at apps/desktop/modules/services/nativeSync/sharedExecution.js:263:46 {"
+    ],
+    "historyUnchanged": true,
+    "journalUnchanged": true,
+    "providerCallsBeforeAndAfter": [
+      2,
+      2
+    ],
+    "originalAndLaterRepliesAbsentFromView": true
+  },
+  "candidate": {
+    "sse": {
+      "historyBefore": [
+        [
+          "user",
+          "SYNTHETIC_REGENERATE_ORIGINAL_INPUT"
+        ],
+        [
+          "assistant",
+          "SYNTHETIC_REGENERATE_ORIGINAL_REPLY"
+        ],
+        [
+          "user",
+          "SYNTHETIC_REGENERATE_LATER_INPUT"
+        ],
+        [
+          "assistant",
+          "SYNTHETIC_REGENERATE_LATER_REPLY"
+        ]
+      ],
+      "pendingHistoryUnchanged": true,
+      "pendingJournalUnchanged": true,
+      "duplicateClickUi": "此话题的回复正在重新生成",
+      "historyAfterSuccess": [
+        [
+          "user",
+          "SYNTHETIC_REGENERATE_ORIGINAL_INPUT"
+        ],
+        [
+          "assistant",
+          "SYNTHETIC_REGENERATE_NEW_REPLY"
+        ],
+        [
+          "user",
+          "SYNTHETIC_REGENERATE_LATER_INPUT"
+        ],
+        [
+          "assistant",
+          "SYNTHETIC_REGENERATE_LATER_REPLY"
+        ]
+      ],
+      "messageIdsAndOrderPreserved": true,
+      "unrelatedHistoryRowsIdentical": true,
+      "journalChangesAfterSuccess": [
+        {
+          "action": "upsert",
+          "sequence": 5,
+          "targetsOriginalReply": true
+        }
+      ],
+      "completionReplay": {
+        "status": 200,
+        "replayed": true,
+        "receiptSequence": 5,
+        "additionalProviderCalls": 0,
+        "additionalJournalRows": 0
+      },
+      "providerHttpStatuses": [
+        200,
+        200,
+        200,
+        200
+      ],
+      "lastProviderTransport": "partial SSE without terminal event",
+      "lastAdmissionState": "review_required",
+      "lastNativeRequestState": "unknown",
+      "lastAdmissionReplySequence": null,
+      "failedHistoryIdenticalToLastTerminal": true,
+      "failedJournalIdenticalToLastTerminal": true,
+      "failureUi": "结果需要核对"
+    },
+    "json": {
+      "historyBefore": [
+        [
+          "user",
+          "SYNTHETIC_REGENERATE_ORIGINAL_INPUT"
+        ],
+        [
+          "assistant",
+          "SYNTHETIC_REGENERATE_ORIGINAL_REPLY"
+        ],
+        [
+          "user",
+          "SYNTHETIC_REGENERATE_LATER_INPUT"
+        ],
+        [
+          "assistant",
+          "SYNTHETIC_REGENERATE_LATER_REPLY"
+        ]
+      ],
+      "pendingHistoryUnchanged": true,
+      "pendingJournalUnchanged": true,
+      "duplicateClickUi": "此话题的回复正在重新生成",
+      "historyAfterSuccess": [
+        [
+          "user",
+          "SYNTHETIC_REGENERATE_ORIGINAL_INPUT"
+        ],
+        [
+          "assistant",
+          "SYNTHETIC_REGENERATE_NEW_REPLY"
+        ],
+        [
+          "user",
+          "SYNTHETIC_REGENERATE_LATER_INPUT"
+        ],
+        [
+          "assistant",
+          "SYNTHETIC_REGENERATE_LATER_REPLY"
+        ]
+      ],
+      "messageIdsAndOrderPreserved": true,
+      "unrelatedHistoryRowsIdentical": true,
+      "journalChangesAfterSuccess": [
+        {
+          "action": "upsert",
+          "sequence": 5,
+          "targetsOriginalReply": true
+        }
+      ],
+      "completionReplay": {
+        "status": 200,
+        "replayed": true,
+        "receiptSequence": 5,
+        "additionalProviderCalls": 0,
+        "additionalJournalRows": 0
+      },
+      "providerHttpStatuses": [
+        200,
+        200,
+        200,
+        502
+      ],
+      "lastProviderTransport": "HTTP 502",
+      "lastAdmissionState": "review_required",
+      "lastNativeRequestState": "unknown",
+      "lastAdmissionReplySequence": null,
+      "failedHistoryIdenticalToLastTerminal": true,
+      "failedJournalIdenticalToLastTerminal": true,
+      "failureUi": "结果需要核对"
+    },
+    "local": {
+      "history": [
+        [
+          "user",
+          "SYNTHETIC_REGENERATE_ORIGINAL_INPUT"
+        ],
+        [
+          "assistant",
+          "SYNTHETIC_REGENERATE_NEW_REPLY"
+        ]
+      ],
+      "providerHttpStatuses": [
+        200,
+        200
+      ],
+      "sharedAdmissions": 0,
+      "sharedJournalRows": 0
+    }
+  },
+  "screenshotsSha256": {
+    "baseline-error.png": "e9e8a09e0b3c262709d0cda410e77b8ff022c1416b314a9f1a9ca80b0e4a471b",
+    "candidate-pending.png": "fbf4678e995376bf6a124b4c49f2d1ee94b25b6ee4e36c6f4c8d5d9733329f1b",
+    "candidate-completed.png": "8cd11550f311257088403def1fc5a287a2f164d1d737d7cb12b4a5ed5badd9b5",
+    "candidate-failed.png": "e1c999c0820ad9440861e0b83ac93766c805f696409c75af09d5daf7a613e959"
+  }
+}

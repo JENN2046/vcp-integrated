@@ -3,14 +3,32 @@ const fail=(code,status=409)=>Object.assign(Error(code),{code,status});
 const modes={sequential:require('../nativeRules/Groupmodules/modes/sequentialMode'),naturerandom:require('../nativeRules/Groupmodules/modes/natureRandomMode'),invite_only:require('../nativeRules/Groupmodules/modes/inviteOnlyMode')};
 const tuple=t=>[t.owner_type,t.owner_id,t.topic_id];
 function intent(row){return JSON.parse(row.user_op||'{}').sharedTurn||{kind:'message'};}
-function history(shared,topic){return shared.store.readProjected(()=>shared.db.prepare('SELECT * FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND deleted=0 ORDER BY last_seq').all(...tuple(topic))).map(r=>({...r.row,message:r.message}));}
+function history(shared,topic,{preservePositions=false}={}){
+ if(preservePositions){
+  const {readJournalHistory}=require('../mobile/effectiveContext');
+  return readJournalHistory(shared.store,tuple(topic),shared.head(topic))
+   .sort((a,b)=>a.row.first_seq-b.row.first_seq)
+   .map(({row,message})=>({...row,last_seq:row.seq,message}));
+ }
+ return shared.store.readProjected(()=>shared.db.prepare('SELECT * FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND deleted=0 ORDER BY last_seq').all(...tuple(topic))).map(r=>({...r.row,message:r.message}));
+}
 function prepare(shared,topic,config,body,sponsored=false){
  const kind=body.kind||'message';if(!['message','invite','regenerate'].includes(kind))throw fail('INVALID_SHARED_SUBMISSION',400);
- const records=history(shared,topic),index=kind==='regenerate'?records.findIndex(r=>r.msg_id===body.targetId):-1;
- if(kind==='regenerate'&&(index<0||records[index].message.role!=='assistant'))throw fail('SHARED_REGENERATION_TARGET_CHANGED');
+ const guarded=kind==='regenerate'&&(body.targetHash!==undefined||body.targetSeq!==undefined);
+ if(guarded&&topic.owner_type!=='agent')throw fail('INVALID_SHARED_SUBMISSION',400);
+ const records=history(shared,topic,{preservePositions:guarded}),index=kind==='regenerate'?records.findIndex(r=>r.msg_id===body.targetId):-1;
+ if(kind==='regenerate'){
+  const target=records[index];
+  if(!target||target.message.role!=='assistant'||target.message.isThinking||target.message.isPendingStream||target.message.contextCompaction||
+     guarded&&(body.targetHash!==target.hash||body.targetSeq!==target.last_seq))throw fail('SHARED_REGENERATION_TARGET_CHANGED');
+ }
  if(kind==='invite'&&config.owner.kind!=='group')throw fail('INVALID_SHARED_SUBMISSION',400);
  const selectedHistory=(kind==='regenerate'?records.slice(0,index):records).map(r=>r.message);
- const user=kind==='message'?body.message:[...selectedHistory].reverse().find(m=>m.role==='user');
+ const targetContinuity=guarded?records[index].message.continuity:null;
+ const priorUsers=kind==='message'?[]:[...selectedHistory].reverse().filter(m=>m.role==='user'&&(!guarded||!m.contextCompaction));
+ const user=kind==='message'?body.message:
+  (targetContinuity?.known&&priorUsers.find(m=>targetContinuity.dependsOnMessageIds.includes(m.id)))||priorUsers[0];
+ if(guarded&&!user)throw fail('SHARED_REGENERATION_TARGET_CHANGED');
  if(kind==='message'&&(!user||user.role!==(sponsored?'assistant':'user')||typeof user.id!=='string'||!user.id))throw fail('INVALID_SHARED_SUBMISSION',400);
  let plan=[];
  if(config.owner.kind==='group'){
@@ -27,7 +45,7 @@ function prepare(shared,topic,config,body,sponsored=false){
    plan=mode.determineSpeakers(members,[...selectedHistory,user],nativeGroup,user,{isAborted:()=>false}).map(m=>m.id);
   }
  }
- return {kind,plan,...(sponsored?{topicSponsor:true}:{}),userMessageId:user?.id||null,...(kind==='regenerate'?{targetId:body.targetId,targetHash:records[index].hash}:{} )};
+ return {kind,plan,...(sponsored?{topicSponsor:true}:{}),userMessageId:user?.id||null,...(kind==='regenerate'?{targetId:body.targetId,targetHash:records[index].hash,...(body.targetSeq!==undefined&&{targetSeq:body.targetSeq})}:{} )};
 }
 // Recheck durable facts even if an older release already issued the central
 // finish receipt but failed to settle the mobile ledger.
@@ -96,10 +114,27 @@ function writeReply(shared,actor,topic,row,message,opId){
  const normalized={...message};delete normalized._nativeSyncMetadata;
  return shared.store.apply({ownerType:topic.owner_type,ownerId:topic.owner_id,topicId:topic.topic_id,msgId:message.id,deviceId:actor.principal,opId,action:'upsert',baseHash:null,message:normalized,metadata:require('./metadata').envelopeFor(message,1)},{sharedSpace:row.space_id,attachmentPrincipal:actor.principal,metadataPublisher:true});
 }
+function updateTarget(shared,actor,topic,row,message,turn){
+ const target=shared.store.findMessage.get(...tuple(topic),turn.targetId);
+ if(!target||target.deleted||target.hash!==turn.targetHash||target.last_seq!==turn.targetSeq)throw fail('SHARED_REGENERATION_TARGET_CHANGED');
+ if(typeof message.content!=='string'||!message.content.trim()||message.isThinking||message.isPendingStream||
+    ['failed','error','interrupted','cancelled','content_filter'].includes(message.finishReason))throw fail('INVALID_SHARED_REPLY',400);
+ const original=shared.store.projectMessage(target),metadata=require('./metadata');
+ const replacement={...message,id:target.msg_id,timestamp:original.timestamp,
+  ...(original.agentId&&{agentId:original.agentId}),...(original.name&&{name:original.name}),continuity:{
+  version:1,known:true,executionId:row.id,requestId:row.request_id,dependsOnMessageIds:[turn.userMessageId],
+ }};
+ delete replacement._nativeSyncMetadata;
+ return shared.store.apply({
+  ownerType:topic.owner_type,ownerId:topic.owner_id,topicId:topic.topic_id,msgId:replacement.id,deviceId:actor.principal,
+  opId:'shared-reply:'+row.id,action:'upsert',baseHash:turn.targetHash,baseSeq:turn.targetSeq,
+  message:replacement,metadata:metadata.envelopeFor(replacement,(target.metadata_version||0)+1),
+ },{sharedSpace:row.space_id,attachmentPrincipal:actor.principal,metadataPublisher:true});
+}
 function replaceTarget(shared,actor,topic,row,turn=intent(row)){
  if(turn.kind!=='regenerate')return;
  const target=shared.store.readProjected(()=>shared.db.prepare('SELECT * FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND msg_id=?').all(...tuple(topic),turn.targetId))[0]?.row;
- if(!target||target.hash!==turn.targetHash||target.deleted)throw fail('SHARED_REGENERATION_TARGET_CHANGED');
+ if(!target||target.hash!==turn.targetHash||target.deleted||(turn.targetSeq!==undefined&&target.last_seq!==turn.targetSeq))throw fail('SHARED_REGENERATION_TARGET_CHANGED');
  shared.store.apply({ownerType:topic.owner_type,ownerId:topic.owner_id,topicId:topic.topic_id,msgId:turn.targetId,deviceId:actor.principal,opId:'shared-replaced:'+row.id,action:'delete',baseHash:turn.targetHash},{sharedSpace:row.space_id,metadataPublisher:true});
 }
-module.exports={verifyGroupFinish,intent,history,prepare,complete,writeReply,replaceTarget};
+module.exports={verifyGroupFinish,intent,history,prepare,complete,writeReply,replaceTarget,updateTarget};

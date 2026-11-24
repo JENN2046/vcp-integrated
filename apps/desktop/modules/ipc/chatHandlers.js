@@ -1038,6 +1038,8 @@ function initialize(mainWindow, context) {
 
         let streamTask = null;
         let streamTaskDetached = false;
+        let regeneration = false;
+        let regenerationTimeout;
         let readPausedMessage;
         // A dropped transport or a pause frame is only a hint. Confirm the
         // exact generation and its already-projected Journal row before showing it.
@@ -1074,6 +1076,7 @@ function initialize(mainWindow, context) {
                 hostHooks.emit('chat:stream-payload', aborted ? { ...payload, type: 'end', aborted: true } : payload);
             }
             if (aborted || event.sender.isDestroyed()) return false;
+            if ((regeneration || context?.sharedRegeneration === true) && payload.type !== 'ephemeral_presentation') return false;
             try {
                 event.sender.send(streamChannel, { ...payload, streamOperationId });
                 return true;
@@ -1354,6 +1357,16 @@ function initialize(mainWindow, context) {
 
             const sharedRequest=await require('../services/topicExecutionAuthority').prepareNativeRequest({authority:topicExecutionAuthority,queue:historyMutationQueue,context:buildRequestContext(context,messageId),body:requestBody});
             if(sharedRequest)serializedBody=JSON.stringify(sharedRequest.body);
+            regeneration = sharedRequest?.regeneration === true;
+            if (context?.sharedRegeneration === true && !regeneration) {
+                throw Object.assign(new Error('SHARED_REGENERATION_ADMISSION_REQUIRED'), { code: 'SHARED_REGENERATION_ADMISSION_REQUIRED' });
+            }
+            if (regeneration) {
+                streamTask ||= vcpStreamTasks.begin(event.sender, messageId, 'chat:regeneration', {
+                    cancelOnNavigation: true,
+                });
+                regenerationTimeout = setTimeout(() => streamTask?.controller.abort(), 900000);
+            }
             readPausedMessage = sharedRequest?.readPausedMessage;
             const requestBodyDeadline=Date.now()+900000;
             const responsePromise = fetch(finalVcpUrl, {
@@ -1438,7 +1451,7 @@ function initialize(mainWindow, context) {
                     sendStreamPayload(errorPayload);
                     // 为函数返回值构造统一的 errorDetail.message
                     const finalErrorMessageForReturn = `VCP请求失败: ${response.status} - ${errorMessage}`;
-                    return { streamError: true, error: `VCP请求失败 (${response.status})`, errorDetail: { message: finalErrorMessageForReturn, originalData: errorData } };
+                    return { streamError: true, ...(regeneration && { errorCode: errorData?.error?.code || 'UPSTREAM_HTTP_ERROR' }), error: `VCP请求失败 (${response.status})`, errorDetail: { message: finalErrorMessageForReturn, originalData: errorData } };
                 }
                 const err = new Error(errorMessageToPropagate);
                 err.details = errorData;
@@ -1457,8 +1470,12 @@ function initialize(mainWindow, context) {
 
                 async function processStream() {
                     let bodyReachedEOF = false;
+                    let regenerationText = '';
+                    let regenerationBytes = 0;
+                    let regenerationFinish;
                     try {
                         const { createSseDecoder } = await import('../chat/sseProtocol.mjs');
+                        const normalizeChunk = regeneration && (await import('../chat/contentRuntime.js')).normalizeStreamChunk;
                         const protocol = createSseDecoder({
                             onData(parsedChunk) {
                                 const presentation = takeResidentPresentationFromChunk(parsedChunk, residentPresentationChannel);
@@ -1467,10 +1484,12 @@ function initialize(mainWindow, context) {
                                     return;
                                 }
                                 trajectoryCall.chunk(parsedChunk);
+                                if (regeneration) regenerationText += normalizeChunk(parsedChunk);
                                 sendStreamPayload({ type: 'data', chunk: parsedChunk, messageId, context });
                             },
                             onDone(terminal) {
                                 const interrupted = terminal.finishReason === 'interrupted';
+                                regenerationFinish = terminal.finishReason;
                                 trajectoryCall.finish({ aborted: interrupted });
                                 sendStreamPayload({
                                     type: 'end', messageId, context, modelFinishReason: terminal.finishReason,
@@ -1480,14 +1499,31 @@ function initialize(mainWindow, context) {
                         });
                         while (true) {
                             const result = await reader.read(); bodyReachedEOF = result.done;
-                            if (result.value) protocol.push(result.value);
+                            if (result.value) {
+                                if (regeneration && (regenerationBytes += result.value.byteLength) > 32 * 1024 * 1024) {
+                                    throw Object.assign(new Error('RESPONSE_BODY_TOO_LARGE'), { code: 'RESPONSE_BODY_TOO_LARGE' });
+                                }
+                                protocol.push(result.value);
+                            }
                             if (result.done) { protocol.finish(); break; }
                             if (protocol.done) break;
+                        }
+                        // Regeneration publishes only a complete reply through the
+                        // shared terminal authority. Its transport is never a
+                        // normal visible stream or a separate History writer.
+                        if (regeneration) {
+                            const completion = { choices: [{
+                                message: { role: 'assistant', content: regenerationText },
+                                finish_reason: regenerationFinish,
+                            }] };
+                            (await import('../chat/boundedResponse.mjs')).validateCompletion(completion);
+                            return { response: completion, context };
                         }
                     } catch (streamError) {
                         if (readPausedMessage && await recoverToolPause()) return;
                         trajectoryCall.finish({ error: streamError, aborted: streamError?.name === 'AbortError' || streamTask?.controller.signal.aborted === true });
                         sendStreamPayload({ type: 'error', error: streamError.message, code: streamError.code || 'STREAM_READ_ERROR', messageId, context });
+                        if (regeneration) return { streamError: true, errorCode: streamError.code || 'STREAM_READ_ERROR', context };
                     } finally {
                         finishStreamTask();
                         const reportCancelFailure = error => {
@@ -1503,6 +1539,8 @@ function initialize(mainWindow, context) {
                         }
                     }
                 }
+
+                if (regeneration) return await processStream();
 
                 // IPC returns when streaming starts; the detached reader owns
                 // terminal delivery and response cleanup.
@@ -1558,6 +1596,7 @@ function initialize(mainWindow, context) {
             }
             return {error:`VCP请求错误: ${error.message}`,errorCode:error.code||'NETWORK_UNAVAILABLE',context};
         } finally {
+            clearTimeout(regenerationTimeout);
             if (!streamTaskDetached) finishStreamTask();
         }
     });

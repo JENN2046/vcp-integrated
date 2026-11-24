@@ -570,6 +570,7 @@ mainChatSettingsPresentationOwner.configureStartup({
                 removeAttachmentFromMessage: (...args) => chatManager.removeAttachmentFromMessage(...args),
                 syncNextUiEmptyStateWithMessages: (...args) => chatManager.syncNextUiEmptyStateWithMessages(...args),
                 handleSendMessage: (...args) => chatManager.handleSendMessage(...args),
+                regenerateSharedReply: (...args) => chatManager.regenerateSharedReply(...args),
                 updateSendButtonState: mainChatSendOwner.update,
             },
             summarizeTopicFromMessages: (messages, agentName) => {

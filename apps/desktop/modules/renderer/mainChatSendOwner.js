@@ -34,6 +34,8 @@ export function createMainChatSendOwner({
     };
     const getInterruptibleMessage = () => {
         if (interruptTarget && isTargetCurrent(interruptTarget)) return interruptTarget;
+        const regenerationTarget = getChatManager()?.getSharedRegenerationInterruptTarget?.();
+        if (regenerationTarget && isTargetCurrent(regenerationTarget)) return regenerationTarget;
         const history = historyRef.get();
         for (let index = history.length - 1; index >= 0; index--) {
             const message = history[index];
@@ -89,7 +91,7 @@ export function createMainChatSendOwner({
         if(['preparing','stopping'].includes(button.dataset.mode))button.disabled=false;
         const active = getInterruptibleMessage();
         const mode = active && !hasDraft() ? 'interrupt' : 'send';
-        displayedTarget = mode === 'interrupt' && active === interruptTarget ? active : null;
+        displayedTarget = mode === 'interrupt' && typeof active?.interrupt === 'function' ? active : null;
         button.dataset.mode = mode;
         button.classList.toggle('interrupt-mode', mode === 'interrupt');
         // The send control is the main-chat composer status surface. Keep its
@@ -106,7 +108,7 @@ export function createMainChatSendOwner({
     const interrupt = async () => {
         const activeMessage = getInterruptibleMessage();
         if (!activeMessage || disposed) return false;
-        if (activeMessage === interruptTarget) {
+        if (typeof activeMessage.interrupt === 'function') {
             return activeMessage.interrupt((text, type) => { if (!disposed && isTargetCurrent(activeMessage)) notify?.(text, type); });
         }
         const selected = selectedItemRef.get();

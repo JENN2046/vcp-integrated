@@ -467,11 +467,13 @@ function showContextMenu(event, messageItem, message) {
 
         // Regenerate option should be here to maintain order
         if (message.role === 'assistant' && !message.isGroupMessage && currentSelectedItemVal.type === 'agent') {
+            const regenerationScope = { itemId: currentSelectedItemVal.id, itemType: 'agent', topicId: currentTopicIdVal };
+            const regenerationTarget = mainRefs.messageCommands?.regenerateSharedReply ? structuredClone(message) : message;
             const regenerateOption = ownerDocument.createElement('div');
             regenerateOption.classList.add('context-menu-item', 'regenerate-text');
             regenerateOption.innerHTML = `<i class="fas fa-sync-alt"></i> 重新回复`;
             regenerateOption.onclick = () => {
-                handleRegenerateResponse(message);
+                void handleRegenerateResponse(regenerationTarget, regenerationScope);
                 closeContextMenu();
             };
             menu.appendChild(regenerateOption);
@@ -866,8 +868,30 @@ function describeLiveReferenceForContext(data) {
     return '笔记区实时文件，可直接修改';
 }
 
+function sharedRegenerationError(error) {
+    const code = error?.code || error?.message;
+    if (code === 'SHARED_REGENERATION_TARGET_CHANGED' || code === 'HISTORY_MESSAGE_CONFLICT') {
+        return '原回复已更新，请从当前消息重新操作。';
+    }
+    const statusCode = /^[A-Z][A-Z0-9_]{0,79}$/.test(code || '') ? `（${code}）` : '';
+    if (error?.publicationUnconfirmed) return `共享历史发布尚待确认，请查看任务状态。${statusCode}`;
+    const reason = {
+        SHARED_REGENERATION_IN_PROGRESS: '此话题的回复正在重新生成。',
+        SHARED_TOPIC_BUSY: '此话题还有执行正在处理，请查看任务状态。',
+        SHARED_READ_ONLY: '此共享话题当前为只读。',
+        SHARED_RESULT_REQUIRES_REVIEW: '原执行结果尚待核对，请查看任务状态。',
+        SHARED_REGENERATION_NO_TERMINAL: '未收到完整回复，请查看任务状态。',
+        SHARED_REGENERATION_TARGET_UNAVAILABLE: '只能重新生成当前上下文中已完成的回复。',
+        SHARED_REGENERATION_COMPACTING: '上下文正在压缩，请稍候。',
+        VCP_SERVER_URL_REQUIRED: '请先配置 VCP 服务器 URL。',
+        NETWORK_UNAVAILABLE: '连接中断，执行结果尚待确认，请查看任务状态。',
+        RESPONSE_ABORTED: '回复已中断，请查看任务状态。',
+        STREAM_INCOMPLETE: '回复连接中断，请查看任务状态。',
+    }[code];
+    return typeof reason === 'string' ? reason : `暂时无法确认重新回复，请查看任务状态。${statusCode}`;
+}
 
-async function handleRegenerateResponse(originalAssistantMessage) {
+async function handleRegenerateResponse(originalAssistantMessage, requestedScope = null) {
     const { electronAPI, uiHelper } = mainRefs;
     if (contextMenuDependencies.isContextCompacting?.()) {
         uiHelper.showToastNotification('上下文正在压缩，请稍候', 'warning');
@@ -884,6 +908,24 @@ async function handleRegenerateResponse(originalAssistantMessage) {
     if (!currentSelectedItemVal.id || currentSelectedItemVal.type !== 'agent' || !currentTopicIdVal || !originalAssistantMessage || originalAssistantMessage.role !== 'assistant') {
         uiHelper.showToastNotification("只能为 Agent 的回复进行重新生成。", "warning");
         return;
+    }
+
+    const descriptor = { itemId: currentSelectedItemVal.id, itemType: 'agent', topicId: currentTopicIdVal };
+    if (requestedScope && (requestedScope.itemId !== descriptor.itemId || requestedScope.topicId !== descriptor.topicId)) return;
+    const regenerateSharedReply = mainRefs.messageCommands?.regenerateSharedReply;
+    if (regenerateSharedReply) {
+        try {
+            const result = await regenerateSharedReply(descriptor, originalAssistantMessage);
+            if (result?.handled !== false) return;
+        } catch (error) {
+            uiHelper.showToastNotification(sharedRegenerationError(error), 'warning');
+            return;
+        }
+        // Local fallback still belongs to exactly the original selection and History.
+        if (mainRefs.currentSelectedItemRef.get()?.id !== descriptor.itemId
+            || mainRefs.currentSelectedItemRef.get()?.type !== descriptor.itemType
+            || mainRefs.currentTopicIdRef.get() !== descriptor.topicId
+            || mainRefs.currentChatHistoryRef.get() !== currentChatHistoryArray) return;
     }
 
     const originalMessageIndex = currentChatHistoryArray.findIndex(msg => msg.id === originalAssistantMessage.id);
