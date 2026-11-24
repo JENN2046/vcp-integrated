@@ -1,0 +1,179 @@
+{
+  "model": "synthetic",
+  "environment": "Isolated Linux Electron + VCPToolBox with a loopback provider",
+  "baseline": {
+    "release": "ecd9e89ae756",
+    "admissionError": "MODEL_IMAGE_UNSUPPORTED",
+    "modelCalls": 0
+  },
+  "scenarios": {
+    "png": {
+      "desktopImageModels": [],
+      "sourceImageModels": [],
+      "ordinaryDesktopImageParts": [
+        {
+          "type": "image_url",
+          "mime": "data:image/jpeg;base64",
+          "bytes": 9529,
+          "sha": "7cc6d235b43cb7c210cdc3db353781df5f801cb416eadb29450e496205d0b9c0"
+        }
+      ],
+      "sharedProviderCalls": [
+        {
+          "requestId": "reply_request_2a567bfc97434b7aa17eec8f75cebcae",
+          "imageHashes": [
+            "7cc6d235b43cb7c210cdc3db353781df5f801cb416eadb29450e496205d0b9c0"
+          ]
+        },
+        {
+          "requestId": "request_cef148af9adf4ef59a825493a02d7c1a",
+          "imageHashes": [
+            "7cc6d235b43cb7c210cdc3db353781df5f801cb416eadb29450e496205d0b9c0"
+          ]
+        }
+      ],
+      "followupInputAttachmentCount": 0,
+      "work": [
+        {
+          "id": "request_2a567bfc97434b7aa17eec8f75cebcae",
+          "principal": "desktop:deviceA",
+          "request_id": "msg_1795499556770_user_y4spgzo",
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "user_seq": 1,
+          "reply_seq": 2
+        },
+        {
+          "id": "request_cef148af9adf4ef59a825493a02d7c1a",
+          "principal": "desktop:deviceA",
+          "request_id": "msg_1795499557957_user_it08kblfgh",
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "user_seq": 3,
+          "reply_seq": 4
+        }
+      ],
+      "followupWorker": {
+        "id": "request_cef148af9adf4ef59a825493a02d7c1a",
+        "request_id": "msg_1795499557957_user_it08kblfgh",
+        "kind": "shared_session",
+        "state": "completed",
+        "attempts": 1,
+        "request_dispatched": 1,
+        "error_code": null
+      },
+      "journalMessages": [
+        "msg_1795499556770_user_y4spgzo",
+        "reply_request_2a567bfc97434b7aa17eec8f75cebcae",
+        "msg_1795499557957_user_it08kblfgh",
+        "reply_request_cef148af9adf4ef59a825493a02d7c1a"
+      ],
+      "historyMessageIdsMatch": true,
+      "resubmissions": [
+        {
+          "workId": "request_2a567bfc97434b7aa17eec8f75cebcae",
+          "http": 200,
+          "replayed": true
+        },
+        {
+          "workId": "request_cef148af9adf4ef59a825493a02d7c1a",
+          "http": 200,
+          "replayed": true
+        }
+      ]
+    },
+    "gif": {
+      "desktopImageModels": [],
+      "sourceImageModels": [],
+      "ordinaryDesktopImageParts": [
+        {
+          "type": "image_url",
+          "mime": "data:image/jpeg;base64",
+          "bytes": 1229,
+          "sha": "2bd7197a6f4a368afb0b484859763bc0eea0a9e897d651238d23e21ff9a6601d"
+        },
+        {
+          "type": "image_url",
+          "mime": "data:image/jpeg;base64",
+          "bytes": 1229,
+          "sha": "643fed381b57d09adf935810cae56400cd80e97717ddb8b0a4f4e2f04eaf5da3"
+        }
+      ],
+      "sharedProviderCalls": [
+        {
+          "requestId": "reply_request_95b5427f1cfa49d3ad9caee800e63881",
+          "imageHashes": [
+            "2bd7197a6f4a368afb0b484859763bc0eea0a9e897d651238d23e21ff9a6601d",
+            "643fed381b57d09adf935810cae56400cd80e97717ddb8b0a4f4e2f04eaf5da3"
+          ]
+        },
+        {
+          "requestId": "request_21cbba9768ab40e0843e9fe38dec00fa",
+          "imageHashes": [
+            "2bd7197a6f4a368afb0b484859763bc0eea0a9e897d651238d23e21ff9a6601d",
+            "643fed381b57d09adf935810cae56400cd80e97717ddb8b0a4f4e2f04eaf5da3"
+          ]
+        }
+      ],
+      "followupInputAttachmentCount": 0,
+      "work": [
+        {
+          "id": "request_95b5427f1cfa49d3ad9caee800e63881",
+          "principal": "desktop:deviceA",
+          "request_id": "msg_1795499566266_user_jm6kpo2",
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "user_seq": 1,
+          "reply_seq": 2
+        },
+        {
+          "id": "request_21cbba9768ab40e0843e9fe38dec00fa",
+          "principal": "desktop:deviceA",
+          "request_id": "msg_1795499567517_user_dm4d2qjre7",
+          "state": "completed",
+          "dispatched": 1,
+          "native_terminal": 1,
+          "user_seq": 3,
+          "reply_seq": 4
+        }
+      ],
+      "followupWorker": {
+        "id": "request_21cbba9768ab40e0843e9fe38dec00fa",
+        "request_id": "msg_1795499567517_user_dm4d2qjre7",
+        "kind": "shared_session",
+        "state": "completed",
+        "attempts": 1,
+        "request_dispatched": 1,
+        "error_code": null
+      },
+      "journalMessages": [
+        "msg_1795499566266_user_jm6kpo2",
+        "reply_request_95b5427f1cfa49d3ad9caee800e63881",
+        "msg_1795499567517_user_dm4d2qjre7",
+        "reply_request_21cbba9768ab40e0843e9fe38dec00fa"
+      ],
+      "historyMessageIdsMatch": true,
+      "resubmissions": [
+        {
+          "workId": "request_95b5427f1cfa49d3ad9caee800e63881",
+          "http": 200,
+          "replayed": true
+        },
+        {
+          "workId": "request_21cbba9768ab40e0843e9fe38dec00fa",
+          "http": 200,
+          "replayed": true
+        }
+      ]
+    }
+  },
+  "permissionAndRecoveryChecks": [
+    "read-only paired client denied upload creation (403)",
+    "different session denied use of original upload ID (404)",
+    "outside-space desktop and mobile denied attachment bytes and status (403)",
+    "lost mobile admission response recovered after backend restart with one dispatch per Work"
+  ]
+}

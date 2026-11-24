@@ -1,9 +1,11 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),{createHash,randomUUID}=require('node:crypto');
 const {identity,canonicalMessage}=require('../sync/protocol');
+const {attachmentImages}=require('@vcp/core-rules/attachment-images');
 const fail=(code,status=409)=>Object.assign(new Error(code),{code,status});
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const CHUNK=65536,MAX_FILE=20*1024*1024,MAX_STORAGE=512*1024*1024,TTL=24*3600000;
+const MAX_IMAGE_PIXELS=32000000,MAX_REQUEST_IMAGE_FRAMES=128;
 const byIdentity=t=>JSON.stringify([t.ownerType,t.ownerId,t.topicId]);
 function regular(file){const s=fs.lstatSync(file);if(!s.isFile()||s.isSymbolicLink()||s.nlink!==1)throw fail('ATTACHMENT_PATH_ALIAS');return s;}
 function directory(target){
@@ -92,7 +94,7 @@ class AttachmentStore{
   const temp=this.temporary(id);let bytes;if(fs.existsSync(temp)){regular(temp);bytes=fs.readFileSync(temp);}else if(r.state==='finalizing'&&r.hash)bytes=this.readBlob(r.hash);else throw fail('UPLOAD_BINARY_MISSING');const digest=hash(bytes);
   if(bytes.length!==r.size||(r.expected_hash&&digest!==r.expected_hash))throw fail('ATTACHMENT_HASH_MISMATCH');
   const type=detect(bytes,r.name);if(r.declared_type&&r.declared_type!==type&&!(type==='text/plain'&&['text/markdown','text/csv','application/json'].includes(r.declared_type)))throw fail('ATTACHMENT_TYPE_REJECTED',415);
-  if(type.startsWith('image/')){try{const info=await require('sharp')(bytes,{limitInputPixels:32000000}).metadata();if(!info.width||!info.height)throw Error();}catch{throw fail('ATTACHMENT_TYPE_REJECTED',415);}}
+  if(type.startsWith('image/')){try{const info=await require('sharp')(bytes,{limitInputPixels:MAX_IMAGE_PIXELS}).metadata();if(!info.width||!info.height)throw Error();}catch{throw fail('ATTACHMENT_TYPE_REJECTED',415);}}
   this.db.prepare("UPDATE attachment_uploads SET state='finalizing',hash=?,actual_type=? WHERE id=?").run(digest,type,id);
   const file=this.blobPath(digest);directory(path.dirname(file));
   this.db.prepare("INSERT INTO attachment_blobs(hash,size,type,state) VALUES(?,?,?,'staging') ON CONFLICT(hash) DO NOTHING").run(digest,bytes.length,type);
@@ -176,12 +178,36 @@ class AttachmentStore{
   }return result;
   });
  }
- async content(key,message,imageSupported,budget={bytes:0}){
+ async content(key,message,imageSupported,budget={bytes:0},{nativeImages=false}={}){
+  const imagePart=(type,base64)=>({type:'image_url',image_url:{url:`data:${type};base64,${base64}`}});
   const parts=[{type:'text',text:message.content||''}];
   for(const a of message.attachments||[]){
-   const metadata=this.locate(key,message.id,a.id,false);budget.bytes+=metadata.blob.size;if(budget.bytes>MAX_FILE)throw fail('ATTACHMENT_REQUEST_BUDGET',413);
-   const value=this.locate(key,message.id,a.id),type=value.blob.type;
-   if(type.startsWith('image/')){if(!imageSupported)throw fail('MODEL_IMAGE_UNSUPPORTED');parts.push({type:'image_url',image_url:{url:`data:${type};base64,${value.bytes.toString('base64')}`}});}
+   const metadata=this.locate(key,message.id,a.id,false);
+   // The shared worker selected this attachment from a frozen Journal window.
+   if(nativeImages&&(a.type?.startsWith('image/')||metadata.blob.type.startsWith('image/'))&&metadata.blob.hash!==(a.blobHash||a.hash))throw fail('ATTACHMENT_BLOB_MISSING',404);
+   budget.bytes+=metadata.blob.size;if(budget.bytes>MAX_FILE)throw fail('ATTACHMENT_REQUEST_BUDGET',413);
+   const type=metadata.blob.type,bytes=this.readBlob(metadata.blob.hash);
+   if(type.startsWith('image/')){
+    if(!imageSupported)throw fail('MODEL_IMAGE_UNSUPPORTED');
+    if(!nativeImages){
+     parts.push(imagePart(type,bytes.toString('base64')));
+     continue;
+    }
+    const {frames}=await attachmentImages(require('sharp'),bytes,{
+     gif:type==='image/gif',
+     limitInputPixels:MAX_IMAGE_PIXELS,
+     maxOutputBytes:MAX_FILE-(budget.imageBytes||0),
+     maxFrames:MAX_REQUEST_IMAGE_FRAMES-(budget.imageFrames||0),
+    }).catch(error=>{
+     if(error.code==='ATTACHMENT_REQUEST_BUDGET')throw error;
+     throw fail('ATTACHMENT_TYPE_REJECTED',415);
+    });
+    budget.imageFrames=(budget.imageFrames||0)+frames.length;
+    for(const frame of frames){
+     budget.imageBytes=(budget.imageBytes||0)+frame.length;
+     parts.push(imagePart('image/jpeg',frame.toString('base64')));
+    }
+   }
    else if(a.frameHashes?.length){if(!imageSupported)throw fail('MODEL_IMAGE_UNSUPPORTED');if(a.extractedText)parts[0].text+=`\n\n[附加文件: ${a.name}]\n${a.extractedText}`;for(let i=0;i<a.frameHashes.length;i++){const frame=this.frame(key,message.id,a.id,i);budget.bytes+=frame.bytes.length;if(budget.bytes>MAX_FILE)throw fail('ATTACHMENT_REQUEST_BUDGET',413);parts.push({type:'image_url',image_url:{url:`data:${frame.blob.type};base64,${frame.bytes.toString('base64')}`}});}}
    else if(a.imageFrames?.length){if(!imageSupported)throw fail('MODEL_IMAGE_UNSUPPORTED');for(const frame of a.imageFrames){const binary=Buffer.from(frame,'base64'),type=detect(binary,binary[0]===137?'frame.png':'frame.jpg');if(!type.startsWith('image/'))throw fail('ATTACHMENT_TYPE_REJECTED');budget.bytes+=binary.length;if(budget.bytes>MAX_FILE)throw fail('ATTACHMENT_REQUEST_BUDGET',413);parts.push({type:'image_url',image_url:{url:`data:${type};base64,${frame}`}});}}
    else if(typeof a.extractedText==='string'&&a.extractedText.trim())parts[0].text+=`\n\n[附加文件: ${a.name}]\n${a.extractedText}\n[/附加文件结束: ${a.name}]`;

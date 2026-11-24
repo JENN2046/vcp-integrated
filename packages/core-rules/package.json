@@ -10,6 +10,7 @@
     "./sanitizer": "./contextSanitizer.cjs",
     "./trajectory": "./modelTrajectory.cjs",
     "./request-envelope": "./requestEnvelope.cjs",
+    "./attachment-images": "./attachmentImages.cjs",
     "./renderer/*": "./renderer/*.js"
   }
 }

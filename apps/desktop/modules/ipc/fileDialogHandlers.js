@@ -6,7 +6,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const fileManager = require('../fileManager');
 const { PRELOAD_ROLES, resolveAppPreload } = require('../services/preloadPaths');
-// sharp is now lazy-loaded
+const { attachmentImages } = require('@vcp/core-rules/attachment-images');
 
 /**
  * Initializes file and dialog related IPC handlers.
@@ -115,97 +115,19 @@ function initialize(mainWindow, context) {
                 return { success: false, error: `File not found at path: ${cleanPath}` };
             }
     
-            let originalFileBuffer = await fs.readFile(cleanPath);
+            const originalFileBuffer = await fs.readFile(cleanPath);
             const fileExtension = path.extname(cleanPath).toLowerCase();
             const isImage = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tiff', '.svg'].includes(fileExtension);
     
             if (isImage) {
-                const MAX_DIMENSION = 800;
-                const JPEG_QUALITY = 70;
-    
-                // Special handling for GIFs
-                if (fileExtension === '.gif') {
-                    console.log('[Main Sharp] GIF detected. Starting frame extraction.');
-                    try {
-                        const sharp = require('sharp'); // Lazy load
-                        const image = sharp(originalFileBuffer, { animated: true });
-                        const metadata = await image.metadata();
-                        const frameDelays = metadata.delay || [];
-                        const totalFrames = metadata.pages || 1;
-                        
-                        console.log(`[Main Sharp] GIF Info: ${totalFrames} frames, delays available: ${frameDelays.length > 0}`);
-    
-                        const frameBase64s = [];
-                        let accumulatedDelay = 0;
-                        const targetInterval = 500; // 0.5 seconds in ms
-    
-                        for (let i = 0; i < totalFrames; i++) {
-                            if (i === 0 || accumulatedDelay >= targetInterval) {
-                                console.log(`[Main Sharp] Extracting frame ${i} (Accumulated delay: ${accumulatedDelay}ms)`);
-                                
-                                const sharp = require('sharp'); // Lazy load
-                                const frameBuffer = await sharp(originalFileBuffer, { page: i })
-                                    .resize({
-                                        width: MAX_DIMENSION,
-                                        height: MAX_DIMENSION,
-                                        fit: sharp.fit.inside,
-                                        withoutEnlargement: true
-                                    })
-                                    .jpeg({ quality: JPEG_QUALITY })
-                                    .toBuffer();
-                                
-                                frameBase64s.push(frameBuffer.toString('base64'));
-                                accumulatedDelay = 0; // Reset delay
-                            }
-                            
-                            if (frameDelays[i] !== undefined) {
-                                accumulatedDelay += (frameDelays[i] > 0 ? frameDelays[i] : 100);
-                            } else if (totalFrames > 1) {
-                                accumulatedDelay += 100; // Default delay
-                            }
-                        }
-                        
-                        if (frameBase64s.length === 0 && totalFrames > 0) {
-                             const sharp = require('sharp'); // Lazy load
-                             const frameBuffer = await sharp(originalFileBuffer, { page: 0 })
-                                .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: sharp.fit.inside, withoutEnlargement: true })
-                                .jpeg({ quality: JPEG_QUALITY })
-                                .toBuffer();
-                            frameBase64s.push(frameBuffer.toString('base64'));
-                        }
-    
-                        console.log(`[Main Sharp] Extracted ${frameBase64s.length} frames from GIF.`);
-                        console.log(`[Main - get-file-as-base64] ===== REQUEST END (SUCCESS - GIF) =====`);
-                        return { success: true, base64Frames: frameBase64s, isGif: true };
-    
-                    } catch (sharpError) {
-                        console.error(`[Main Sharp] Error processing animated GIF: ${sharpError.message}. Falling back to single frame.`, sharpError);
-                        const sharp = require('sharp'); // Lazy load
-                        const fallbackBuffer = await sharp(originalFileBuffer)
-                            .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: sharp.fit.inside, withoutEnlargement: true })
-                            .jpeg({ quality: JPEG_QUALITY }).toBuffer();
-                        return { success: true, base64Frames: [fallbackBuffer.toString('base64')], isGif: false };
-                    }
-                } else { // For other images (PNG, JPG, etc.)
-                    try {
-                        const sharp = require('sharp'); // Lazy load
-                        const processedBuffer = await sharp(originalFileBuffer)
-                            .resize({
-                                width: MAX_DIMENSION,
-                                height: MAX_DIMENSION,
-                                fit: sharp.fit.inside,
-                                withoutEnlargement: true
-                            })
-                            .jpeg({ quality: JPEG_QUALITY })
-                            .toBuffer();
-                        
-                        console.log(`[Main Sharp] Processed static image. Final buffer length: ${processedBuffer.length} bytes`);
-                        return { success: true, base64Frames: [processedBuffer.toString('base64')], isGif: false };
-    
-                    } catch (sharpError) {
-                        console.error(`[Main Sharp] Error processing static image: ${sharpError.message}. Using original buffer.`, sharpError);
-                        return { success: true, base64Frames: [originalFileBuffer.toString('base64')], isGif: false };
-                    }
+                const gif = fileExtension === '.gif';
+                try {
+                    const { frames, isGif } = await attachmentImages(require('sharp'), originalFileBuffer, { gif });
+                    return { success: true, base64Frames: frames.map(frame => frame.toString('base64')), isGif };
+                } catch (sharpError) {
+                    if (gif) throw sharpError;
+                    console.error(`[Main Sharp] Error processing static image: ${sharpError.message}. Using original buffer.`, sharpError);
+                    return { success: true, base64Frames: [originalFileBuffer.toString('base64')], isGif: false };
                 }
             } else { // Non-image file
                 console.log(`[Main - get-file-as-base64] Non-image file. Buffer length: ${originalFileBuffer.length}`);

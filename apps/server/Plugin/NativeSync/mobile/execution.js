@@ -206,7 +206,15 @@ class ConversationExecution {
             const journalHistory=topic.sharedSpaceId&&published
                 ? require('./effectiveContext').journalOrder(records)
                 : undefined;
-            const requestMessages=published?await require('./effectiveContext').effectiveRequest(ordered,published,row.user_message_id,async m=>m.attachments?.length?(this.attachments?this.attachments.content(row.topic_key,m,published.imageSupported,attachmentBudget):(()=>{throw error('ATTACHMENTS_NOT_ENABLED');})()):[{type:'text',text:m.content}],journalHistory):[{role:'system',content:prompt},...messages];
+            const nativeImages=Boolean(journalHistory&&topic.ownerType==='agent');
+            const buildContent=async message=>{
+                if(!message.attachments?.length)return [{type:'text',text:message.content}];
+                if(!this.attachments)throw error('ATTACHMENTS_NOT_ENABLED');
+                return this.attachments.content(row.topic_key,message,nativeImages||published.imageSupported,attachmentBudget,{nativeImages});
+            };
+            const requestMessages=published
+                ? await require('./effectiveContext').effectiveRequest(ordered,published,row.user_message_id,buildContent,journalHistory)
+                : [{role:'system',content:prompt},...messages];
             // Context budgeting remains in the existing ToolBox handler. The
             // complete central history is retained, including histories >200 rows.
             if(!topic.sharedSpaceId)releaseContext=require('../../../modules/requestExecutionContext').register(row.id,published,this.nativeTasks.hooks(row.id));

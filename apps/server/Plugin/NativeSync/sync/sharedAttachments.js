@@ -20,11 +20,9 @@ function validate(shared,actor,topic,message,config,turn){
   const grant=turn.accepted ? storage.locate(topic.id,message.id,a.id,false).blob : shared.db.prepare("SELECT * FROM attachment_uploads WHERE principal=? AND topic_key=? AND hash=? AND state='ready' AND expires>? LIMIT 1").get(actor.principal,topic.id,a.blobHash||a.hash,Date.now());
   if(!grant||grant.size!==a.size)throw fail('ATTACHMENT_NOT_ALLOWED',403);storage.readBlob(grant.hash);
  }
- if(files.some(a=>String(a.type).startsWith('image/'))){
+ if(config.owner.kind==='group'&&files.some(a=>String(a.type).startsWith('image/'))){
   const models=shared.catalog.grants.get(topic.origin_source)?.imageModels||[];
-  const required=config.owner.kind==='group'
-   ?(turn.plan||[]).map(id=>resolveEffectiveModel(config.owner.config,config.members.find(m=>m.id===id).config).effectiveModel)
-   :[config.owner.config.model];
+  const required=(turn.plan||[]).map(id=>resolveEffectiveModel(config.owner.config,config.members.find(m=>m.id===id).config).effectiveModel);
   if(required.some(model=>!models.includes(model)))throw fail('MODEL_IMAGE_UNSUPPORTED');
  }
 }
