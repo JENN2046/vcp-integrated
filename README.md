@@ -20,6 +20,14 @@ VCP Integrated 将 VCPChat 桌面客户端、VCPToolBox 服务端和移动端渐
 
 共享单聊按所选模型提交图片，无需另行登记图片模型名单。对已接纳的请求，使用相同身份重试会找回原 Work。工具副作用仍未确认时，工作保留为待核对状态。仓库中另有审批恢复、AgentAssistant 父子任务接续和手机参与邀请制群聊的验证记录。[审批恢复](docs/evidence/approval-restore/README.md) · [AgentAssistant 接续](docs/evidence/aa-handoff/README.md) · [手机群聊邀请](docs/evidence/mobile-group-invite/README.md)
 
+## 与 VCPMobileSync 的关系
+
+本仓的手机 PWA 通过 VCPToolBox 上的 NativeSync 接入共享会话。VCPMobileSync 是 VCPChat 桌面分布式服务中的同步插件，面向使用其 wire 协议的移动客户端。NativeSync 已复用插件的消息规范化、哈希和 Agent／群组数据转换代码。两者的客户端协议仍有各自的入口。[插件源码与协议说明](apps/desktop/VCPDistributedServer/Plugin/VCPMobileSync)
+
+当前集成版保留 **wire 1.5**。在已验证的桌面写入路径上，它可以更新普通本机话题；如果目标 History 已由 NativeSync 保护，宿主返回 `SYNC_WRITER_EXCLUDED`，并保留原文件内容。兼容测试还核对了上游提交 `68b43992` 的 **wire 1.6** 插件：该版本缺少宿主所需的 History 写入接口，加载时被拒绝注册。[兼容测试](tests/integration/mobile-wire.cjs) · [已保存回执](docs/evidence/linux-acceptance.json)
+
+未来若接入新版 VCPMobileSync，兼容的前提是每个话题在同一时刻有唯一的写入所有者。普通本机话题可以继续由原插件同步；共享话题的变更需要经过中央版本校验、Journal 提交和宿主 History 写入队列。新版协议是否纳入支持范围，应以具体版本的互操作、重复提交和重启恢复测试为准。
+
 ## 从源码运行隔离环境
 
 以下命令适用于 **Linux x64 GNU**。准备 Git、Node.js 24、npm、C/C++ 构建工具、Rust、OpenSSL、Xvfb 及 Electron 所需的系统库。桌面 Chat Data Service（CDS）使用 Rust release 构建，服务端 Vexus 使用 Rust 1.89.0 和仓库中的 Cargo.lock。Windows 桌面端单独构建。[Linux 构建记录](docs/evidence/release-c1b8ffc6272f/build/README.md) · [Windows 构建记录](docs/evidence/release-c1b8ffc6272f/windows/README.md)
@@ -43,7 +51,7 @@ npm run dev:isolated
 | `npm run test:native` | 原生宿主集成，包括共享准入、历史投影和执行恢复 |
 | `npm run test:integration` | 隔离桌面端到端流程，包括发送、回执丢失、流中断、配置保存和重开 |
 | `npm run test:collaboration` | 多端协作与浏览器测试，需要 Chrome 或 Chromium |
-| `npm run test:wire` | 移动端与服务端的协议验证 |
+| `npm run test:wire` | VCPMobileSync 的版本握手、本机写入和共享 History 写入保护 |
 
 可通过 `XVFB_BIN` 和 `CHROME_BIN` 指定可执行文件路径。针对单一故障复验，例如 `node tests/integration/run.cjs lost-only`，可缩短反馈时间。[验证记录索引](docs/evidence)
 
