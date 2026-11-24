@@ -9,6 +9,11 @@ const {sharedTaskList}=require('./sharedTaskList');
 const groupHandoff=require('./sharedGroupHandoff');
 const endpoint='/api/v1/sync/shared/';
 const final=new Set(['completed','abandoned']);
+function replyRecoveryHold(work){
+ if(work?.state==='abandoned')return 'abandoned';
+ if(work?.state==='review_required'||work?.state!=='completed'&&work?.nativeRequests?.some(v=>v.state==='unknown'))return 'review_required';
+ return null;
+}
 const localShape=m=>({id:m.id,role:m.role,content:m.content,attachments:(m.attachments||[]).map(a=>({type:a.type,name:a.name,size:a.size,src:a.src,hash:a.hash||a._fileManagerData?.hash||null}))});
 // A pending display title does not change execution. Keep its draft intact;
 // only this exact unsubmitted, non-conflicting current-version case is exempt.
@@ -334,17 +339,34 @@ class SharedExecution {
    return {handled:true,success:true,localState:'saved',history:await this.runtime.replica.queue.read(mapping.shared),sync:{state:'captured',delivery:'not_started',recoverable:true}};
   }return null;
  }
- async complete(record,message,mapping){
+ async complete(record,message,mapping,{recovering=false}={}){
   if(record.serverSession)throw fail('SHARED_SESSION_DISPATCH_ONLY');
   if(record.steeringV1)return this.steering.complete(record,message,mapping);
   return this.run(mapping.sharedId,async()=>{
-   const retained=await this.retainFailure(record,message,mapping);if(retained)return retained;
-   const r=this.runtime,value=r.adapter.canonical(message,mapping.shared.topicId);
-   if(record.reply&&stable(record.reply)!==stable(value))throw fail('SHARED_REPLY_INTENT_CHANGED');
-   delete record.localFailure;delete record.errorCode;delete record.failureDisposition;record.reply=value;record.replyProjectionPending=true;record.phase='publishing';await this.save();await this.waitProjection(mapping.local);await this.finish(record);
-   if(record.phase!=='completed')throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+   const known=recovering?await this.refresh(record):null;
+   if(recovering&&(!known||await this.holdReplyRecovery(record)))return;
+   const r=this.runtime;
+   if(known?.state!=='completed'){
+    const retained=await this.retainFailure(record,message,mapping);if(retained)return retained;
+    const value=r.adapter.canonical(message,mapping.shared.topicId);
+    if(record.reply&&stable(record.reply)!==stable(value))throw fail('SHARED_REPLY_INTENT_CHANGED');
+    delete record.localFailure;delete record.errorCode;delete record.failureDisposition;record.reply=value;record.replyProjectionPending=true;record.phase='publishing';await this.save();await this.waitProjection(mapping.local);
+    try{await this.finish(record);}catch(error){
+     if(recovering&&error.code==='SHARED_REQUEST_FENCED'&&await this.holdReplyRecovery(record))return;
+     throw error;
+    }
+    if(record.phase!=='completed'){
+     if(recovering){await this.holdReplyRecovery(record);return;}
+     throw fail('SHARED_NATIVE_TERMINAL_REQUIRED');
+    }
+   }
    if(record.committedReply){await this.applyInline(mapping,record.committedReply,{seq:record.accepted.replySeq,messageId:record.reply.id});await r.verifyHistory(mapping);delete record.committedReply;await this.rememberContext(mapping,record.accepted.replySeq,record.accepted.configHash);}else await r.syncExecutionTopic(mapping,{minSeq:record.accepted.replySeq||0});record.replyProjectionPending=false;await this.save();this.scheduleNativeBodyArchive(record);return {handled:true,success:true,localState:'saved',history:await r.replica.queue.read(mapping.shared),sync:{state:'captured',delivery:record.phase==='completed'?'accepted':'pending',recoverable:true}};
   });
+ }
+ async holdReplyRecovery(record){
+  const phase=replyRecoveryHold(record.accepted);
+  if(phase&&record.phase!==phase){record.phase=phase;await this.save();}
+  return Boolean(phase);
  }
  async finish(record){
   const fast=this.runtime.capabilities.features?.includes('shared-inline-receipts-v1')&&record.config?.owner.kind==='agent';
@@ -360,11 +382,12 @@ class SharedExecution {
   }
  }
  needsRecordReconcile(record){
+  if(!record.steeringV1&&record.reply&&record.phase==='abandoned'&&record.accepted?.state==='abandoned')return false;
   return (!final.has(record.phase)||record.replyProjectionPending||record.committedReply||this.steering.hasPendingFinalHistory(record))&&record.phase!=='local_pending'&&!record.isSteeringInput&&!record.serverSession&&(!record.projection||record.projection.state==='saved');
  }
  needsReconcile(){
   const records=Object.values(this.state.requests);
-  return records.some(record=>record.projection&&record.projection.state!=='saved'||this.needsRecordReconcile(record))||
+  return records.some(record=>record.projection&&record.projection.state!=='saved'||this.needsRecordReconcile(record)&&!(record.reply&&!record.steeringV1&&replyRecoveryHold(record.accepted)))||
    Object.values(this.state.compactions||{}).some(intent=>intent.phase==='publishing')||
    Object.values(this.state.compactionPrepareRequests||{}).some(intent=>intent.phase==='preparing'&&!this.runtime.activeCompactionPrepares?.has(intent.body.opId))||
    Object.entries(this.state.compactionPreparations||{}).some(([id,prepared])=>!prepared.cancelled&&!this.runtime.activeCompactions?.has(id)&&!this.state.compactions?.[id]?.body);
@@ -374,7 +397,7 @@ class SharedExecution {
   await this.runtime.recoverSharedCompactionPrepares?.();for(const intent of Object.values(this.state.compactions||{}))if(intent.phase==='publishing')await this.run('compaction:'+intent.body.id,()=>this.runtime.finishSharedCompaction(intent));for(const record of Object.values(this.state.requests))if(this.needsRecordReconcile(record)){
   if(record.remote&&!record.steeringV1){await this.steering.refresh(record);continue;}if(record.steeringV1){if(!record.accepted)await this.refresh(record);if(!record.accepted)continue;if(!record.config&&!record.remote){const value=await this.runtime.send(endpoint+'request-config?'+new URLSearchParams({sharedSpaceId:this.runtime.connection.sharedSpaceId,admissionId:record.accepted.id}));record.config=value.config;await this.save();}await this.steering.reconcile(record);continue;}
   if(record.config?.owner.kind==='group'){await this.run(record.sharedId,async()=>{await this.refresh(record);try{if(record.accepted?.groupHandoff){await this.reconcileGroupHandoff(record);return;}if(final.has(record.phase))return;for(const step of record.steps||[])if(step.reply&&!step.accepted&&!isInterruptedGroupReplyPendingReview(record,step))await this.finishStep(record,step);const allAccepted=record.steps?.length===record.accepted.turn.plan.length&&record.steps.every(s=>s.accepted);if(record.groupFinishing||allAccepted)await this.finishGroup(record);}catch(error){if(error.code!=='SHARED_NATIVE_TERMINAL_REQUIRED')throw error;}});}
-  else if(record.reply){const mapping=this.runtime.mappings().find(m=>m.sharedId===record.sharedId);if(mapping)await this.complete(record,record.reply,mapping);}else await this.run(record.sharedId,()=>this.refresh(record));
+  else if(record.reply){const mapping=this.runtime.mappings().find(m=>m.sharedId===record.sharedId);if(mapping)await this.complete(record,record.reply,mapping,{recovering:true});}else await this.run(record.sharedId,()=>this.refresh(record));
  }}
  async abandon({descriptor,requestId,workId,confirmed}){
   if(confirmed!==true)throw fail('SHARED_REVIEW_CONFIRMATION_REQUIRED');
@@ -391,12 +414,13 @@ class SharedExecution {
     if(known?.id!==workId||known.requestId!==requestId||known.sharedId!==mapping.sharedId)throw fail('SHARED_REQUEST_NOT_FOUND');
     if(known.groupHandoff?.executor!==groupHandoff.executor(r))throw fail('SHARED_REQUEST_OWNER_REQUIRED');
    }
-   await r.send(endpoint+'abandon',{body:{sharedSpaceId:r.connection.sharedSpaceId,admissionId:record.accepted.id,opId:'desktop-abandon_'+record.accepted.id,confirm:true}});
+   const abandoned=await r.send(endpoint+'abandon',{body:{sharedSpaceId:r.connection.sharedSpaceId,admissionId:record.accepted.id,opId:'desktop-abandon_'+record.accepted.id,confirm:true}});
    record.phase='abandoned';this.freshAdmissions.delete(record.accepted.id);
    if(record.serverSession){
     const known=await this.query(record);if(known.request)record.accepted=known.request;record.serverProjectionPending=true;
     await r.sessions.persist(record);await r.sessions.project(record,mapping);return {success:true};
    }
+   if(abandoned.request?.id===record.accepted.id)record.accepted={...record.accepted,...abandoned.request};
    await this.save();await this.refresh(record);return {success:true};
   });
  }
@@ -405,9 +429,9 @@ class SharedExecution {
   const r=this.runtime;let mapping,queryError=null,queried=false;
   try{mapping=this.mapping(d);}catch(error){queryError=error.code||'SHARED_LOCAL_MAPPING_PENDING';}
   if(refresh&&mapping){try{if(r.capabilities.features?.includes('shared-topic-history-v1')&&(d.itemType||'agent')==='agent'){await this.steering.active(d);queried=true;}await this.reconcile();this.lastStatus||=new Map();if(queried)this.lastStatus.set(stable(d),Date.now());}catch(error){queryError=error.code||'EXECUTION_STATUS_UNAVAILABLE';}}
-  const executions=Object.values(this.state.requests).filter(v=>(mapping?v.sharedId===mapping.sharedId:stable(v.descriptor)===stable(d))&&!v.isSteeringInput&&v.accepted).sort((a,b)=>(b.accepted?.userSeq??(final.has(b.phase)?0:Number.MAX_SAFE_INTEGER))-(a.accepted?.userSeq??(final.has(a.phase)?0:Number.MAX_SAFE_INTEGER))).map(v=>({id:v.accepted?.id,requestId:v.body.requestId,controlMode:v.accepted.turn?.controlMode,steering:v.control,outcome:v.generations?.find(g=>g.generation===(v.currentGeneration||0))?.replyIntent?.finishReason||v.reply?.finishReason,errorCode:v.generations?.find(g=>g.generation===(v.currentGeneration||0))?.errorCode||v.errorCode,model:v.generations?.find(g=>g.generation===(v.currentGeneration||0))?.config?.owner?.config?.model||v.config?.owner?.config?.model,canHandoff:Boolean(v.steeringV1&&v.control?.executor!=='desktop:'+r.connection.deviceId&&!final.has(v.phase)),replyMessageId:v.generations?.find(g=>g.generation===(v.currentGeneration||0)&&g.replyAccepted)?.requestId,state:v.phase==='review_required'?'review_required':v.phase==='background'?'background':v.control?.applicationState==='awaiting_native_task'?'running':v.phase==='steering'||v.control?.safeToolBoundary?'steering':v.phase==='completed'?'completed':v.phase==='abandoned'?'cancelled':v.serverSession&&v.accepted?.dispatched?'dispatched':v.accepted?.dispatched?((this.liveGroups.has(v.accepted.id)||v.accepted.nativeRequests?.some(n=>n.state==='dispatched'))?'running':'review_required'):v.accepted?'queued':'preparing',canResume:!v.remote&&!v.serverSession&&!final.has(v.phase)&&!v.accepted?.dispatched&&(v.accepted?.nativeRequests||[]).every(n=>n.state==='prepared'),interruptedGroupReplies:interruptedGroupReplies(v),retainedReplies:(v.generations||[v]).filter(s=>s.localFailure).map(s=>({requestId:s.requestId||'reply_'+v.accepted.id,message:s.localFailure,disposition:s.failureDisposition||'unknown'})),shared:true,executionHost:v.serverSession?'shared-backend':'native-desktop',timings:v.timings||{},nativePhases:(v.accepted?.nativeRequests||[]).map(n=>({requestId:n.id,phases:n.phases||{}})),phase:v.phase,canAbandon:!final.has(v.phase)&&Boolean(v.accepted)&&(v.serverSession?!v.remote&&(v.accepted.state==='review_required'||!v.accepted.dispatched):(!v.accepted.dispatched||v.accepted.nativeRequests?.every(n=>['unknown','model_terminal','prepared'].includes(n.state)))),nativeTasks:v.accepted?.nativeTasks||[],toolInvocations:v.accepted?.toolInvocations||[]})),localInputs=this.localInputs(d),observedAt=this.lastStatus?.get(stable(d))||Math.max(0,...Object.values(this.state.requests).filter(v=>stable(v.descriptor)===stable(d)).map(v=>v.observedAt||v.timings?.accepted||0))||null;
+  const executions=Object.values(this.state.requests).filter(v=>(mapping?v.sharedId===mapping.sharedId:stable(v.descriptor)===stable(d))&&!v.isSteeringInput&&v.accepted).sort((a,b)=>(b.accepted?.userSeq??(final.has(b.phase)?0:Number.MAX_SAFE_INTEGER))-(a.accepted?.userSeq??(final.has(a.phase)?0:Number.MAX_SAFE_INTEGER))).map(v=>({id:v.accepted?.id,requestId:v.body.requestId,controlMode:v.accepted.turn?.controlMode,steering:v.control,outcome:v.generations?.find(g=>g.generation===(v.currentGeneration||0))?.replyIntent?.finishReason||v.reply?.finishReason,errorCode:v.generations?.find(g=>g.generation===(v.currentGeneration||0))?.errorCode||v.errorCode,model:v.generations?.find(g=>g.generation===(v.currentGeneration||0))?.config?.owner?.config?.model||v.config?.owner?.config?.model,canHandoff:Boolean(v.steeringV1&&v.control?.executor!=='desktop:'+r.connection.deviceId&&!final.has(v.phase)),replyMessageId:v.generations?.find(g=>g.generation===(v.currentGeneration||0)&&g.replyAccepted)?.requestId,state:v.phase==='review_required'?'review_required':v.phase==='background'?'background':v.control?.applicationState==='awaiting_native_task'?'running':v.phase==='steering'||v.control?.safeToolBoundary?'steering':v.phase==='completed'?'completed':v.phase==='abandoned'?'cancelled':v.serverSession&&v.accepted?.dispatched?'dispatched':v.accepted?.dispatched?((this.liveGroups.has(v.accepted.id)||v.accepted.nativeRequests?.some(n=>n.state==='dispatched'))?'running':'review_required'):v.accepted?'queued':'preparing',canResume:!v.remote&&!v.serverSession&&!final.has(v.phase)&&!v.accepted?.dispatched&&(v.accepted?.nativeRequests||[]).every(n=>n.state==='prepared'),interruptedGroupReplies:interruptedGroupReplies(v),retainedReplies:(v.generations||[v]).filter(s=>s.localFailure).map(s=>({requestId:s.requestId||'reply_'+v.accepted.id,message:s.localFailure,disposition:s.failureDisposition||'unknown'})),shared:true,executionHost:v.serverSession?'shared-backend':'native-desktop',timings:v.timings||{},nativePhases:(v.accepted?.nativeRequests||[]).map(n=>({requestId:n.id,phases:n.phases||{}})),phase:v.phase,canAbandon:!final.has(v.phase)&&Boolean(v.accepted)&&(v.serverSession?!v.remote&&(v.accepted.state==='review_required'||!v.accepted.dispatched):(v.accepted.state==='review_required'||!v.accepted.dispatched||v.accepted.nativeRequests?.every(n=>['unknown','model_terminal','prepared'].includes(n.state)))),nativeTasks:v.accepted?.nativeTasks||[],toolInvocations:v.accepted?.toolInvocations||[]})),localInputs=this.localInputs(d),observedAt=this.lastStatus?.get(stable(d))||Math.max(0,...Object.values(this.state.requests).filter(v=>stable(v.descriptor)===stable(d)).map(v=>v.observedAt||v.timings?.accepted||0))||null;
   const reportJobs=r.sessions?.reportJobs?.(mapping?.sharedId)||[];
-  return {enabled:true,readOnly:false,localInputs,topic:{ownerType:d.itemType||'agent',ownerId:d.itemId,topicId:d.topicId},freshness:queried&&!queryError?'current':observedAt?'last-known':'unavailable',connection:queryError?(queryError==='NETWORK_UNAVAILABLE'?'offline':'error'):'online',observedAt,...(queryError?{error:{code:queryError}}:{}),local:{pendingInputs:localInputs.filter(v=>!v.received).length,pendingOperations:0,blockedOperations:0,pendingLocalCommit:Object.values(this.state.compactions||{}).some(v=>v.phase==='publishing'&&stable(v.descriptor)===stable(d))||Object.values(this.state.requests).some(v=>mapping&&v.sharedId===mapping.sharedId&&(v.phase==='publishing'||v.serverProjectionPending||v.replyProjectionPending||v.projection&&v.projection.state!=='saved'))},executions,total:executions.length,reportJobs,displayJobs:sharedTaskList(executions,reportJobs)};
+  return {enabled:true,readOnly:false,localInputs,topic:{ownerType:d.itemType||'agent',ownerId:d.itemId,topicId:d.topicId},freshness:queried&&!queryError?'current':observedAt?'last-known':'unavailable',connection:queryError?(queryError==='NETWORK_UNAVAILABLE'?'offline':'error'):'online',observedAt,...(queryError?{error:{code:queryError}}:{}),local:{pendingInputs:localInputs.filter(v=>!v.received).length,pendingOperations:0,blockedOperations:0,pendingLocalCommit:Object.values(this.state.compactions||{}).some(v=>v.phase==='publishing'&&stable(v.descriptor)===stable(d))||Object.values(this.state.requests).some(v=>mapping&&v.sharedId===mapping.sharedId&&(v.phase==='publishing'||v.serverProjectionPending||v.replyProjectionPending&&!replyRecoveryHold(v.accepted)||v.projection&&v.projection.state!=='saved'))},executions,total:executions.length,reportJobs,displayJobs:sharedTaskList(executions,reportJobs)};
  }
 
 

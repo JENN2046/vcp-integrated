@@ -417,3 +417,63 @@ test('desktop message IPC edits and deletes only the observed committed assistan
  assert.equal(f.store.metrics().journalRows,5);
  assert.equal(f.calls(),1);
 });
+
+test('startup retains an unknown desktop reply intent without publishing it and confirmed abandon survives restart', async t => {
+ const f = await fixture(t);
+ let a = await f.desktop('A');
+ const id = 'persisted-unknown-desktop-reply';
+ const accepted = await a.runtime.prepareSharedSend({descriptor:a.descriptor,message:msg(id)});
+ const packet = f.packet(a,accepted);
+ const prepared = await a.runtime.execution.prepareNative(packet.vcpchatExtensions.requestContext,packet);
+ f.control.holdHttp = true;
+ const pending = fetch(f.url+'/v1/chat/completions',{method:'POST',headers:{'content-type':'application/json',...prepared.headers},body:JSON.stringify(prepared.body)}).catch(()=>null);
+ await wait(()=>f.calls()===1,'synthetic native dispatch started');
+ f.heldResponse.destroy();
+ await pending;
+ await wait(()=>f.shared.db.prepare('SELECT state FROM shared_admissions WHERE id=?').get(accepted.admissionId).state==='review_required','server Work needs review');
+
+ const record = a.runtime.execution.state.requests[id];
+ const acceptedBeforeRefresh = structuredClone(record.accepted);
+ await assert.rejects(f.reply(a,accepted,{choices:[{message:{content:'retained unconfirmed reply'}}]}),{code:'SHARED_NATIVE_TERMINAL_REQUIRED'});
+ const replyIntent = structuredClone(record.reply);
+ assert.ok(record.replyProjectionPending);
+ assert.equal(record.phase,'publishing');
+ record.accepted = acceptedBeforeRefresh;
+ await a.runtime.execution.save();
+ await a.close();
+
+ f.control.trace = [];
+ a = await f.desktop('A');
+ assert.ok(a.runtime.ready);
+ let recovered = a.runtime.execution.state.requests[id];
+ assert.equal(recovered.phase,'review_required');
+ assert.equal(recovered.accepted.nativeRequests[0].state,'unknown');
+ assert.deepEqual(recovered.reply,replyIntent);
+ assert.equal(recovered.replyProjectionPending,true);
+ assert.equal(a.runtime.execution.needsReconcile(),false);
+ assert.ok(f.control.trace.some(row=>row.route.endsWith('/request')));
+ assert.ok(!f.control.trace.some(row=>row.route.endsWith('/complete')));
+ assert.deepEqual((await a.queue.read(a.descriptor)).map(message=>message.id),[id]);
+
+ const job = (await a.runtime.getExecutionStatus(a.descriptor,{refresh:false})).executions.find(job=>job.requestId===id);
+ assert.equal(job.state,'review_required');
+ assert.equal(job.canAbandon,true);
+ await assert.rejects(a.runtime.abandonSharedSend({descriptor:a.descriptor,requestId:id}),{code:'SHARED_REVIEW_CONFIRMATION_REQUIRED'});
+ await a.runtime.abandonSharedSend({descriptor:a.descriptor,requestId:id,confirmed:true});
+ await a.close();
+ a = await f.desktop('A');
+ recovered = a.runtime.execution.state.requests[id];
+ assert.equal(recovered.phase,'abandoned');
+ assert.deepEqual(recovered.reply,replyIntent);
+ assert.equal(recovered.replyProjectionPending,true);
+ assert.equal(a.runtime.execution.needsReconcile(),false);
+ assert.ok(!f.control.trace.some(row=>row.route.endsWith('/complete')));
+ assert.equal(f.store.metrics().journalRows,1);
+ assert.equal(f.calls(),1);
+
+ f.control.holdHttp = false;
+ const next = await a.runtime.prepareSharedSend({descriptor:a.descriptor,message:msg('healthy-after-unknown')});
+ await f.reply(a,next,await f.dispatch(a,next));
+ assert.equal(f.calls(),2);
+ assert.equal(f.store.metrics().journalRows,3);
+});
