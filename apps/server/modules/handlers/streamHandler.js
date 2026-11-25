@@ -1,3 +1,4 @@
+const HttpTurnSink = require('./httpTurnSink');
 // modules/handlers/streamHandler.js
 const { StringDecoder } = require('string_decoder');
 const vcpInfoHandler = require('../../vcpInfoHandler.js');
@@ -10,15 +11,14 @@ const {
   shouldConvertReasoningForModel
 } = require('../reasoningContentAdapter.js');
 const {
-  createPresentationChannel,
-  createStreamPresentationSink,
   frameResidentProposalTurn,
+  openResidentPresentation,
   hasResidentProposalSurface,
   isResidentProposalToolCall,
   residentProposalFailureCategory
 } = require('../vcpLoop/residentPresentation.js');
 
-async function streamUpstreamErrorAndEnd(res, nextAiAPIResponse, originalModel, label = 'Tool Loop') {
+async function streamUpstreamErrorAndEnd(sink, nextAiAPIResponse, originalModel, label = 'Tool Loop') {
   let errorBodyText = '';
   try {
     errorBodyText = await nextAiAPIResponse.text();
@@ -26,9 +26,10 @@ async function streamUpstreamErrorAndEnd(res, nextAiAPIResponse, originalModel, 
     errorBodyText = e.message || '';
   }
   const status = nextAiAPIResponse.status;
+  sink.onUpstreamError?.({ status, bodyText: errorBodyText, phase: label });
   console.error(`[StreamHandler Upstream Error] (${label}) Upstream returned status ${status}: ${errorBodyText}`);
 
-  if (!res.writableEnded && !res.destroyed) {
+  if (!sink.isClosed()) {
     let readableError = errorBodyText;
     try {
       const parsed = JSON.parse(errorBodyText);
@@ -41,17 +42,17 @@ async function streamUpstreamErrorAndEnd(res, nextAiAPIResponse, originalModel, 
 
     const errorContent = `\n\n> [!WARNING]\n> **上游API错误 (HTTP ${status})**: ${readableError || nextAiAPIResponse.statusText || '未知错误'}\n`;
     try {
-      res.write(`data: ${JSON.stringify({
+      sink.onProtocolFrame(`data: ${JSON.stringify({
         id: `chatcmpl-VCP-tool-upstream-error-${Date.now()}`,
         object: 'chat.completion.chunk',
         created: Math.floor(Date.now() / 1000),
         model: originalModel || 'unknown',
         choices: [{ index: 0, delta: { content: errorContent }, finish_reason: 'stop' }],
       })}\n\n`);
-      res.end('data: [DONE]\n\n');
+      sink.endStream('data: [DONE]\n\n');
     } catch (writeErr) {
       console.error('[StreamHandler Upstream Error] Failed to write error to stream:', writeErr.message);
-      try { res.end(); } catch (e) { }
+      try { sink.endStream(); } catch (e) { }
     }
   }
 }
@@ -62,7 +63,11 @@ class StreamHandler {
     this.config = context; // 兼容旧代码中的解构
   }
 
-  async handle(req, res, firstAiAPIResponse) {
+  handle(req, res, response) {
+    return this.execute(new HttpTurnSink(req, res), response);
+  }
+
+  async execute(sink, firstAiAPIResponse) {
     const {
       apiUrl,
       apiKey,
@@ -124,18 +129,13 @@ class StreamHandler {
     };
     const id = originalBody.requestId || originalBody.messageId;
     const residentProposalFramingActive = hasResidentProposalSurface(originalBody.messages);
-    const residentPresentationChannel = createPresentationChannel(res, residentProposalFramingActive);
-    const residentPresentationSink = residentProposalFramingActive
-      ? createStreamPresentationSink({
-        channelId: residentPresentationChannel,
-        model: originalBody.model,
-        res
-      })
-      : null;
+    const residentPresentationSink = openResidentPresentation(
+      sink, residentProposalFramingActive, true, originalBody.model
+    );
     let residentProposalExecuted = false;
     const failResidentProposalStream = (code) => {
-      res.__vcpDisableReplayCache?.();
-      if (!res.writableEnded && !res.destroyed) {
+      sink.disableReplay();
+      if (!sink.isClosed()) {
         const payload = {
           id: `chatcmpl-resident-fail-${Date.now()}`,
           object: 'chat.completion.chunk',
@@ -146,11 +146,11 @@ class StreamHandler {
 ` }, finish_reason: 'stop' }]
         };
         try {
-          res.write(`data: ${JSON.stringify(payload)}
+          sink.onProtocolFrame(`data: ${JSON.stringify(payload)}
 
 `);
-          res.write('data: [DONE]\n\n');
-          res.end();
+          sink.onProtocolFrame('data: [DONE]\n\n');
+          sink.endStream();
         } catch (_) {}
       }
     };
@@ -163,6 +163,7 @@ class StreamHandler {
     let oneRingAssistantTurnParts = [];
     let validUpstreamTurns = true;
     let completed = false;
+    let finalContent;
 
     const containsImageUrlPart = (content) => Array.isArray(content) &&
       content.some(part => part?.type === 'image_url' && part.image_url && typeof part.image_url.url === 'string');
@@ -229,22 +230,19 @@ class StreamHandler {
         let clientReasoningEndsWithNewline = false;
         let deferredClientWrites = [];
         const workerTurnStart = workerParts?.length;
-        const writeProviderClientChunk = (chunk, encodingOrCallback, maybeCallback) => {
+        const writeProviderClientChunk = (chunk, parsedData) => {
+          const frame = { rawLine: chunk, parsedData, displayDelta: parsedData?.choices?.[0]?.delta?.content };
           const keepalive = typeof chunk === 'string' && chunk.startsWith(': vcp-keepalive');
           if (!residentProposalFramingActive || keepalive) {
-            return res.write(chunk, encodingOrCallback, maybeCallback);
+            return sink.onDelta(frame);
           }
-          deferredClientWrites.push({ chunk, encodingOrCallback, maybeCallback });
-          const callback = typeof encodingOrCallback === 'function'
-            ? encodingOrCallback
-            : (typeof maybeCallback === 'function' ? maybeCallback : null);
-          if (callback) queueMicrotask(() => callback());
+          deferredClientWrites.push(frame);
           return true;
         };
         const flushDeferredClientWrites = () => {
           for (const item of deferredClientWrites) {
-            if (res.writableEnded || res.destroyed) break;
-            res.write(item.chunk);
+            if (sink.isClosed()) break;
+            sink.onDelta(item);
           }
           deferredClientWrites = [];
         };
@@ -260,14 +258,14 @@ class StreamHandler {
         });
         const incompleteStreamResult = () => {
           if (residentProposalFramingActive) {
-            res.__vcpDisableReplayCache?.();
+            sink.disableReplay();
             discardDeferredClientWrites();
             return { content: '', message, residentFrame: invalidResidentFrame, completed: false };
           }
           return { ...result(), completed: false };
         };
         const writeResidentClientPrefix = (content) => {
-          if (!content || res.writableEnded || res.destroyed) return;
+          if (!content || sink.isClosed()) return;
           const payload = {
             id: `chatcmpl-resident-client-${Date.now()}`,
             object: 'chat.completion.chunk',
@@ -276,9 +274,7 @@ class StreamHandler {
             choices: [{ index: 0, delta: { content }, finish_reason: null }]
           };
           workerParts?.push(content);
-          res.write(`data: ${JSON.stringify(payload)}
-
-`);
+          sink.onDelta({ rawLine: `data: ${JSON.stringify(payload)}\n\n`, parsedData: payload, displayDelta: content });
         };
 
         let finishReason = null;
@@ -303,7 +299,7 @@ class StreamHandler {
             collectedContentThisTurn += delta.content;
             message.content += delta.content;
             // Internal authenticated observer only; absent on legacy/unshared requests.
-            try { req.nativeSyncObserveAssistantText?.(delta.content); } catch (_) { /* Observation cannot change execution. */ }
+            try { sink.observeAssistantText?.(delta.content); } catch (_) { /* Observation cannot change execution. */ }
           }
 
           const reasoningText = extractReasoningText(delta);
@@ -363,7 +359,7 @@ class StreamHandler {
         };
 
         const writeClientReasoningCloseChunk = () => {
-          if (!reasoningToContentEnabled || !clientReasoningBlockOpen || res.writableEnded || res.destroyed) {
+          if (!reasoningToContentEnabled || !clientReasoningBlockOpen || sink.isClosed()) {
             return;
           }
 
@@ -383,14 +379,14 @@ class StreamHandler {
           };
           displayParts?.push(closePayload.choices[0].delta.content);
           appendWorkerDelta(closePayload);
-          writeProviderClientChunk(`data: ${JSON.stringify(closePayload)}\n\n`);
+          writeProviderClientChunk(`data: ${JSON.stringify(closePayload)}\n\n`, closePayload);
         };
         const writeClientLine = (line, parsedData, isDoneLine) => {
           if (isDoneLine) return writeClientReasoningCloseChunk();
           const nativeStop = publishFinalReply && parsedData?.choices?.[0]?.finish_reason === 'stop';
           if (!parsedData || (!reasoningToContentEnabled && !nativeStop)) {
             if (parsedData) appendWorkerDelta(parsedData);
-            return writeProviderClientChunk(line + '\n');
+            return writeProviderClientChunk(line + '\n', parsedData);
           }
           const packet = transformParsedDataForClient(parsedData);
           const choice = packet.choices?.[0];
@@ -398,11 +394,11 @@ class StreamHandler {
           if (displayParts && typeof choice?.delta?.content === 'string') displayParts.push(choice.delta.content);
           // ToolBox emits the formal stop below, after the native receipt is durable.
           if (nativeStop) choice.finish_reason = null;
-          writeProviderClientChunk(`data: ${JSON.stringify(packet)}\n`);
+          writeProviderClientChunk(`data: ${JSON.stringify(packet)}\n`, packet);
         };
         // 🌟 核心修复：注入 SSE 幽灵心跳保活，防止上游卡顿时浏览器假死
         keepAliveTimer = setInterval(() => {
-          if (!res.writableEnded && !res.destroyed) {
+          if (!sink.isClosed()) {
             try {
               writeProviderClientChunk(': vcp-keepalive\n\n');
             } catch (e) {
@@ -421,7 +417,7 @@ class StreamHandler {
             console.warn(`[Stream IdleTimeout] No upstream chunk received for ${CHUNK_IDLE_TIMEOUT / 1000}s. Assuming stream stalled. Forcing end.`);
             streamAborted = true;
             // 通知前端这次流异常结束
-            if (!res.writableEnded && !res.destroyed) {
+            if (!sink.isClosed()) {
               try {
                 const stallPayload = {
                   id: `chatcmpl-VCP-stall-${Date.now()}`,
@@ -499,7 +495,7 @@ class StreamHandler {
             }
 
             // 转发时才将 reasoning 字段改写成标签化正文；内部处理仍使用原始 parsedData。
-            if (!res.writableEnded && !res.destroyed) {
+            if (!sink.isClosed()) {
               try {
                 writeClientLine(line, parsedData, isDoneLine);
               } catch (writeError) {
@@ -536,7 +532,7 @@ class StreamHandler {
               }
             }
 
-            if (!res.writableEnded && !res.destroyed) {
+            if (!sink.isClosed()) {
               try {
                 writeClientLine(sseLineBuffer, parsedData, isDoneLine);
               } catch (e) { }
@@ -548,7 +544,7 @@ class StreamHandler {
           let residentFrame = null;
           let finalLoopContent = collectedContentThisTurn;
           if (residentProposalFramingActive) {
-            res.__vcpDisableReplayCache?.();
+            sink.disableReplay();
             residentFrame = frameResidentProposalTurn(collectedContentThisTurn, ToolCallParser);
             if (residentFrame.kind === 'NONE') {
               flushDeferredClientWrites();
@@ -574,10 +570,10 @@ class StreamHandler {
             return;
           }
           console.error('Error reading AI response stream:', streamError);
-          if (!res.writableEnded) {
+          if (!sink.hasEnded()) {
             try {
               writeProviderClientChunk(`data: ${JSON.stringify({ error: 'STREAM_READ_ERROR', message: streamError.message })}\n\n`);
-              res.end();
+              sink.endStream();
             } catch (e) { }
           }
           reject(streamError);
@@ -606,20 +602,20 @@ class StreamHandler {
       // A truncated/invalid provider turn is display data, never an execution
       // acceptance point. Do not dispatch even a syntactically complete prefix.
       if (!validUpstreamTurns) {
-        res.__vcpDisableReplayCache?.();
-        if (!res.writableEnded && !res.destroyed && !abortController?.signal.aborted) {
+        sink.disableReplay();
+        if (!sink.isClosed() && !abortController?.signal.aborted) {
           try {
-            res.write(`data: ${JSON.stringify({
+            sink.onProtocolFrame(`data: ${JSON.stringify({
               model: originalBody.model, object: 'chat.completion.chunk',
               choices: [{ index: 0, delta: { content: '\n[STREAM_INCOMPLETE: 工具执行已停止，上游响应不完整]\n' }, finish_reason: 'stop' }]
             })}\n\n`);
-            res.write('data: [DONE]\n\n');
-            res.end();
+            sink.onProtocolFrame('data: [DONE]\n\n');
+            sink.endStream();
           } catch (_) {}
         }
         break;
       }
-      if (res.writableEnded || res.destroyed) break;
+      if (sink.isClosed()) break;
       // 检查中止信号
       if (abortController && abortController.signal.aborted) {
         if (DEBUG_MODE) console.log('[VCP Stream Loop] Abort detected, exiting loop.');
@@ -653,7 +649,7 @@ class StreamHandler {
         if (publishFinalReply && !workerFrameInvalid && validUpstreamTurns && !abortController?.signal.aborted) {
           publishFinalReply({ content: workerParts ? workerParts.join('') : displayParts ? displayParts.join('') : currentAIContentForLoop, finishReason: 'stop' });
         }
-        if (!res.writableEnded) {
+        if (!sink.hasEnded()) {
           const finalChunkPayload = {
             id: `chatcmpl-VCP-final-stop-${Date.now()}`,
             object: 'chat.completion.chunk',
@@ -662,13 +658,14 @@ class StreamHandler {
             choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
           };
           try {
-            res.write(`data: ${JSON.stringify(finalChunkPayload)}\n\n`);
-            res.end('data: [DONE]\n\n');
+            sink.onProtocolFrame(`data: ${JSON.stringify(finalChunkPayload)}\n\n`);
+            sink.endStream('data: [DONE]\n\n');
           } catch (writeError) {
             console.error('[VCP Stream Loop] Failed to write final chunk:', writeError.message);
-            if (!res.writableEnded && !res.destroyed) try { res.end(); } catch (e) { }
+            if (!sink.isClosed()) try { sink.endStream(); } catch (e) { }
           }
         }
+        finalContent = currentAIContentForLoop;
         completed = validUpstreamTurns;
         break;
       }
@@ -678,11 +675,11 @@ class StreamHandler {
       const archeryStatusSummaryItems = [];
       const visibleToolResults = [];
       const emitToolBatch = () => {
-        if (res.writableEnded || res.destroyed || abortController?.signal.aborted) return;
+        if (sink.isClosed() || abortController?.signal.aborted) return;
         const content = formatToolResultBatch(visibleToolResults, enableRoleDivider);
         if (!content) return;
         workerParts?.push(content);
-        res.write(`data: ${JSON.stringify({
+        sink.onToolBatchDisplay(content, `data: ${JSON.stringify({
           id: `chatcmpl-vcp-batch-${Date.now()}`,
           object: 'chat.completion.chunk',
           created: Math.floor(Date.now() / 1000),
@@ -709,7 +706,7 @@ class StreamHandler {
           }
 
           const forceThisOne = !shouldShowVCP && toolCall.markHistory;
-          if ((shouldShowVCP || forceThisOne) && !res.writableEnded && (isError || forceThisOne)) {
+          if ((shouldShowVCP || forceThisOne) && !sink.hasEnded() && (isError || forceThisOne)) {
             const text = vcpInfoHandler.streamVcpInfo(null, originalBody.model, toolCall.name, result.success ? 'success' : 'error', result.raw || result.error, abortController);
             if (text) visibleToolResults.push(text);
           }
@@ -719,20 +716,20 @@ class StreamHandler {
           return { tool: toolCall, result: [{ type: 'text', text: String(e.message) }] };
         }
       }));
-      if (res.writableEnded || res.destroyed || abortController?.signal.aborted) break;
+      if (sink.isClosed() || abortController?.signal.aborted) break;
 
       // 处理纯 Archery 的错误或用户审核留言；成功留言不改变工具成功状态。
       if (normalCalls.length === 0 && archeryErrorContents.length > 0) {
         currentMessagesForLoop.push(buildToolPayloadMessage(archeryErrorContents));
 
-        if (!res.writableEnded && !res.destroyed) {
+        if (!sink.isClosed()) {
           try {
             if (archeryStatusSummaryItems.length > 0) {
               visibleToolResults.push(`\n[本轮工具调用摘要:]\n${archeryStatusSummaryItems.join('；')}。\n[本轮工具调用摘要结束]\n`);
             }
             emitToolBatch();
             workerParts?.push('\n');
-            res.write(`data: ${JSON.stringify({
+            sink.onProtocolFrame(`data: ${JSON.stringify({
               id: `chatcmpl-VCP-separator-${Date.now()}`,
               object: 'chat.completion.chunk',
               created: Math.floor(Date.now() / 1000),
@@ -742,7 +739,7 @@ class StreamHandler {
           } catch (e) { }
         }
 
-        if (res.writableEnded || res.destroyed || abortController?.signal.aborted) break;
+        if (sink.isClosed() || abortController?.signal.aborted) break;
         const nextAiAPIResponse = await fetchWithRetry(
           `${apiUrl}/v1/chat/completions`,
           {
@@ -781,7 +778,7 @@ class StreamHandler {
           continue;
         }
         if (!nextAiAPIResponse.ok) {
-          await streamUpstreamErrorAndEnd(res, nextAiAPIResponse, originalBody?.model, 'Async Tool Loop');
+          await streamUpstreamErrorAndEnd(sink, nextAiAPIResponse, originalBody?.model, 'Async Tool Loop');
           completed = false;
           break; // 异步工具错误后的上游失败，不得当作正常工具终结轮。
         }
@@ -790,17 +787,17 @@ class StreamHandler {
       if (normalCalls.length === 0) {
         emitToolBatch();
         completed = validUpstreamTurns && archeryErrorContents.length === 0;
-        if (!res.writableEnded && !res.destroyed) {
+        if (!sink.isClosed()) {
           if (workerParts && !workerFrameInvalid && completed && !abortController?.signal.aborted) {
             publishFinalReply({ content: workerParts.join(''), finishReason: 'stop' });
           }
           try {
-            res.write(`data: ${JSON.stringify({
+            sink.onProtocolFrame(`data: ${JSON.stringify({
               id: `chatcmpl-VCP-final-stop-${Date.now()}`,
               object: 'chat.completion.chunk',
               choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
             })}\n\n`);
-            res.end('data: [DONE]\n\n');
+            sink.endStream('data: [DONE]\n\n');
           } catch (e) { }
         }
         break;
@@ -815,7 +812,7 @@ class StreamHandler {
         { residentPresentationSink }
       );
       require('../requestExecutionContext').assertToolBoundary();
-      if (res.writableEnded || res.destroyed || abortController?.signal.aborted) break;
+      if (sink.isClosed() || abortController?.signal.aborted) break;
       if (residentProposalCalls.length === 1) {
         const proposalIndex = normalCalls.findIndex(isResidentProposalToolCall);
         const proposalFailure = proposalIndex >= 0
@@ -863,7 +860,7 @@ class StreamHandler {
         const statusText = isRejected ? '调用拒绝' : (isTimeout ? '调用超时' : (isError ? '调用失败' : '调用成功'));
         toolStatusSummaryItems.push(`${toolCall.name} ${statusText}${result?.recordId ? ` (记录ID: ${result.recordId})` : ''}`);
 
-        if ((shouldShowVCP || forceThisOne) && !res.writableEnded && !res.destroyed) {
+        if ((shouldShowVCP || forceThisOne) && !sink.isClosed()) {
           const text = vcpInfoHandler.streamVcpInfo(null, originalBody.model, toolCall.name, result.success ? 'success' : 'error', result.raw || result.error, abortController);
           if (text) visibleToolResults.push(text);
         }
@@ -872,7 +869,7 @@ class StreamHandler {
       if (toolStatusSummaryItems.length > 0) {
         visibleToolResults.push(`\n[本轮工具调用摘要:]\n${toolStatusSummaryItems.join('；')}。\n[本轮工具调用摘要结束]\n`);
       }
-      if (!res.writableEnded && !res.destroyed) {
+      if (!sink.isClosed()) {
         try { emitToolBatch(); } catch (e) {}
       }
 
@@ -895,10 +892,10 @@ class StreamHandler {
       toolPayload.content = await maybeTranslateToolPayloadMedia(toolPayload.content);
       currentMessagesForLoop.push(toolPayload);
 
-      if (!res.writableEnded && !res.destroyed) {
+      if (!sink.isClosed()) {
         try {
           workerParts?.push('\n');
-          res.write(`data: ${JSON.stringify({
+          sink.onProtocolFrame(`data: ${JSON.stringify({
             id: `chatcmpl-VCP-separator-${Date.now()}`,
             object: 'chat.completion.chunk',
             choices: [{ index: 0, delta: { content: '\n' }, finish_reason: null }],
@@ -906,7 +903,7 @@ class StreamHandler {
         } catch (e) { }
       }
 
-      if (res.writableEnded || res.destroyed || abortController?.signal.aborted) break;
+      if (sink.isClosed() || abortController?.signal.aborted) break;
       const nextAiAPIResponse = await fetchWithRetry(
         `${apiUrl}/v1/chat/completions`,
         {
@@ -923,7 +920,7 @@ class StreamHandler {
       );
 
       if (!nextAiAPIResponse.ok) {
-        await streamUpstreamErrorAndEnd(res, nextAiAPIResponse, originalBody?.model, 'Normal Tool Loop');
+        await streamUpstreamErrorAndEnd(sink, nextAiAPIResponse, originalBody?.model, 'Normal Tool Loop');
         completed = false;
         break;
       }
@@ -948,18 +945,19 @@ class StreamHandler {
     if (writeChatLog) writeChatLog(originalBody, chatLogs);
     // OneRing 由主流程在整轮完成且响应发送完成后提交。
 
-    if (recursionDepth >= maxRecursion && !res.writableEnded && !res.destroyed) {
+    if (recursionDepth >= maxRecursion && !sink.isClosed()) {
       try {
-        res.write(`data: ${JSON.stringify({
+        sink.onProtocolFrame(`data: ${JSON.stringify({
           id: `chatcmpl-VCP-final-length-${Date.now()}`,
           object: 'chat.completion.chunk',
           choices: [{ index: 0, delta: {}, finish_reason: 'length' }],
         })}\n\n`);
-        res.end('data: [DONE]\n\n');
+        sink.endStream('data: [DONE]\n\n');
       } catch (e) { }
     }
     return {
-      completed: completed && !abortController?.signal.aborted && !res.destroyed,
+      completed: completed && !abortController?.signal.aborted && !sink.isDestroyed(),
+      content: finalContent,
       aiText: oneRingAssistantTurnParts.join('\n')
     };
   }

@@ -1,3 +1,4 @@
+import { renderResidentEphemeralPresentation } from '../../renderer/residentEphemeralPresentation.mjs';
 import { createSharedStopTarget } from './sharedStopTarget.mjs';
 const scopeKey = value => JSON.stringify([value?.ownerType, value?.ownerId, value?.topicId]);
 const labels = {accepted:'已受理，等待执行',queued:'已受理，等待执行',preparing:'正在准备原生请求',dispatched:'原生执行中',running:'原生执行中',waiting_approval:'等待原生审批',publishing:'结果提交中',completed:'已完成',review_required:'结果需要核对',failed:'执行失败',cancelled:'已取消',abandoned:'已结清'};
@@ -17,6 +18,7 @@ export function createSharedSessionView(container, createObservedFrame, { api, s
             views.delete(key);
         }
     };
+    const cards = new Map();
     const historyMessages = container.querySelector('#chatMessages');
     const messages = createObservedFrame && historyMessages;
     function showOrdinaryBody(session) {
@@ -74,6 +76,8 @@ export function createSharedSessionView(container, createObservedFrame, { api, s
         select(next) {
             if (scopeKey(next) === scopeKey(scope)) return;
             stopTarget.select(next);
+            for (const { element, timer } of cards.values()) { clearTimeout(timer); element.remove(); }
+            cards.clear();
             scope = next;const key=scopeKey(scope);retired=retiredScopes.get(key)||new Set();retiredScopes.set(key,retired);for (const id of views.keys()) remove(id);
         },
         update(change) {
@@ -122,6 +126,15 @@ export function createSharedSessionView(container, createObservedFrame, { api, s
                 }
                 if (session.projectionSynced && views.get(session.executionId)?.setText && session.request?.state !== 'abandoned') continue;
                 if (session.projectionSynced || session.request?.state === 'abandoned') { retired.add(session.executionId);remove(session.executionId); continue; }
+                if (session.presentation && !cards.has(session.executionId)) {
+                    const card = renderResidentEphemeralPresentation({
+                        container: historyMessages, document, messageId: session.executionId, presentation: session.presentation
+                    });
+                    if (card) {
+                        const timer = setTimeout(() => card.element.remove(), card.expiresInMilliseconds);
+                        cards.set(session.executionId, { element: card.element, timer });
+                    }
+                }
                 if (showOrdinaryBody(session)) continue;
                 if (views.get(session.executionId)?.setText) {
                     if (!session.partialResult && !session.gap && !['failed','cancelled','review_required'].includes(session.native?.state)) continue;
@@ -155,6 +168,8 @@ export function createSharedSessionView(container, createObservedFrame, { api, s
                 }
             }
         },
-        dispose() { stopTarget.select(null); for (const id of views.keys()) remove(id); retiredScopes.clear();retired.clear(); scope=null; },
+        dispose() {
+            for (const { element, timer } of cards.values()) { clearTimeout(timer); element.remove(); }
+            cards.clear(); stopTarget.select(null); for (const id of views.keys()) remove(id); retiredScopes.clear();retired.clear(); scope=null; },
     };
 }

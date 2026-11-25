@@ -46,6 +46,24 @@ function approvalOwner() {
         catch { return false; }
     } };
 }
+function withTurnSignal(signal, execute) {
+    const scope = local.getStore();
+    if (scope?.signal) {
+        const combined = AbortSignal.any([scope.signal, signal]);
+        return local.run({ ...scope, signal: combined }, () => execute(combined));
+    }
+    return local.run({ ...scope, signal, toolRun: { waiting: 0 } }, () => execute(signal));
+}
+
+function runCoreTurn(scope, execute) {
+    return local.run({ ...scope, requestId: scope.workId, core: true, toolRun: { waiting: 0 } }, execute);
+}
+
+function notifyCoreApproval(type, details) {
+    const scope = local.getStore();
+    if (scope?.core) scope.observe(type, details);
+}
+
 function cancellation() {
     return Object.assign(new Error('NATIVE_EXECUTION_CANCELLED'), { code: 'NATIVE_EXECUTION_CANCELLED', name: 'AbortError' });
 }
@@ -155,6 +173,9 @@ function assertToolsAllowed(pluginName, args, { indirect = false, allowToolPassw
     assertToolOutcomeKnown();
     throwIfCancelled();
     const scope = local.getStore();
+    if (scope?.core && (['AgentAssistant', 'TopicSponsor'].includes(pluginName) || Object.hasOwn(args || {}, 'timely_contact'))) {
+        throw toolError('CORE_TOOL_NOT_MIGRATED');
+    }
     if (scope?.textOnly) throw Object.assign(Error('CONTROLLED_TEXT_TOOLS_FORBIDDEN'), { code: 'CONTROLLED_TEXT_TOOLS_FORBIDDEN' });
     if (scope?.safeTools && (!scope.safeTools.has(pluginName) || scope.invocation || indirect
         || Object.hasOwn(args || {}, 'timely_contact') || /file:\/\//i.test(JSON.stringify(args || {})))) {
@@ -189,6 +210,9 @@ function assertToolBatch(calls) {
     const scope = local.getStore();
     if (scope?.textOnly && scope.sharedAuthority?.kind === 'native-task' && calls.length) {
         throw toolError('CONTROLLED_TEXT_TOOLS_FORBIDDEN');
+    }
+    if (scope?.core && calls.some(call => call.archery || call.archeryNoReply)) {
+        throw toolError('CORE_ASYNC_TOOL_NOT_MIGRATED');
     }
     if (!controlledToolWork()) return;
     if (scope.delegation) {
@@ -292,7 +316,7 @@ async function trackToolInvocation({ pluginName, recordId = null }, process, isU
                     if (context.toolBatch?.names.length === 2 && value === undefined) throw toolError('NATIVE_TOOL_RESULT_UNCONFIRMED');
                     context.checkpoint?.result(invocation, value);
                 } else if (!began) context.checkpoint?.result(invocation, { nativeOutcome: 'not_executed', errorCode });
-                await confirmToolSettlement(context.bridge, { ...invocation, outcome, errorCode });
+                await confirmToolSettlement(context.bridge, { ...invocation, outcome, errorCode, ...(context.core && { value }) });
                 if (context.toolBatch && outcome === 'returned') context.toolBatch.settled = true;
             } catch (error) {
                 context.toolRun.unconfirmed = error;
@@ -405,7 +429,8 @@ function interruptWork(workId) {
 }
 
 module.exports = {
-    requireModelOutcome, recordModelOutcome,
+    requireModelOutcome, recordModelOutcome, withTurnSignal, runCoreTurn, notifyCoreApproval,
+    isCoreTurn: () => local.getStore()?.core === true,
     middleware, events, waitForApproval, throwIfCancelled, register, agentPrompt,setSharedBoundary,
     interruptWork, controlNativeTask,
     sharedTaskLink(pluginName, nativeTaskId) {

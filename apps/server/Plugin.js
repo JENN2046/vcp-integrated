@@ -1926,6 +1926,13 @@ class PluginManager extends EventEmitter {
         let approvalFeedback = '';
         // --- 人工审核逻辑 (新增) ---
         const approvalDecision = this.toolApprovalManager.getApprovalDecision(toolName, pluginSpecificArgs);
+        if (nativeExecution.isCoreTurn() && approvalDecision.requiresTrustedHumanAuthorization === true) {
+            // This host baseline has no production HumanClientAdmission binding.
+            // A generic tool approval response cannot stand in for that lease.
+            const code = 'CORE_TRUSTED_APPROVAL_UNAVAILABLE';
+            nativeExecution.notifyCoreApproval('tool', { pluginName: toolName, status: 'blocked', errorCode: code });
+            throw Object.assign(new Error(code), { code });
+        }
         if (approvalDecision.requiresApproval) {
             const requestId = `approve-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
             if (this.debugMode) {
@@ -1986,7 +1993,16 @@ class PluginManager extends EventEmitter {
             }
 
             try {
-                const approvalResult = await nativeExecution.waitForApproval(approvalPromise);
+                if (nativeExecution.isCoreTurn()) nativeExecution.notifyCoreApproval('approval_requested', {
+                    hostApprovalRequestId: requestId,
+                    toolName,
+                    command: typeof pluginSpecificArgs.command === 'string' ? pluginSpecificArgs.command.slice(0, 80) : null,
+                    argsPreview: Object.keys(pluginSpecificArgs).filter(key => key !== 'tool_password').slice(0, 16),
+                    targetDigest: require('node:crypto').createHash('sha256').update(JSON.stringify([toolName, pluginSpecificArgs])).digest('hex'),
+                    expiresAt,
+                    requiresTrustedHumanAuthorization: approvalDecision.requiresTrustedHumanAuthorization === true
+                });
+                const approvalResult = await nativeExecution.waitForApproval(approvalPromise, () => this._takePendingApproval(requestId));
                 if (approvalResult && approvalResult.silentRejected === true) {
                     // Silent rejection is a privacy boundary. A reason or a
                     // client-supplied feedback flag cannot override this rule.
@@ -2014,9 +2030,10 @@ class PluginManager extends EventEmitter {
                 throw error;
             } finally {
                 this._takePendingApproval(requestId);
+                nativeExecution.notifyCoreApproval('approval_settled', { hostApprovalRequestId: requestId });
             }
         }
-        // --- 人工审核逻辑结束 ---
+        nativeExecution.throwIfCancelled();
 
         // Manifest 驱动的工具生命周期 VCPInfo 由主进程统一发送。
         // 同步插件子进程退出、被杀或超时，都不会影响已发送的 WebSocket 通知。
@@ -2049,7 +2066,9 @@ class PluginManager extends EventEmitter {
                 getServiceModule: name => this.getServiceModule(name),
                 getDecryptedAuthCode: () => this._getDecryptedAuthCode(),
                 executeDirectWithTimeout: (...args) => invokeDirect(() => this._executeDirectToolCallWithTimeout(...args)),
-                executeStdio: (...args) => this.executePlugin(...args),
+                executeStdio: (...args) => nativeExecution.isCoreTurn()
+                    ? invokeDirect(() => this.executePlugin(...args))
+                    : this.executePlugin(...args),
                 triggerSleepDream: (...args) => this._tryTriggerDreamForVCPSleep(...args),
                 filterFuzzyDiff,
                 getTimestamp: getFormattedLocalTimestamp

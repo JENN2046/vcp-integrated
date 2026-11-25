@@ -1,12 +1,11 @@
+const HttpTurnSink = require('./httpTurnSink');
 // modules/handlers/nonStreamHandler.js
 const vcpInfoHandler = require('../../vcpInfoHandler.js');
 const roleDivider = require('../roleDivider.js');
 const { formatToolResultBatch, projectToolBatchForUpstream, buildToolPayloadMessage } = require('../toolResultBatch.js');
 const {
-  attachNonStreamPresentations,
-  createNonStreamPresentationSink,
-  createPresentationChannel,
   frameResidentProposalTurn,
+  openResidentPresentation,
   hasResidentProposalSurface,
   isResidentProposalToolCall,
   residentProposalFailureCategory
@@ -143,7 +142,11 @@ class NonStreamHandler {
     this.config = context;
   }
 
-  async handle(req, res, firstAiAPIResponse) {
+  handle(req, res, response) {
+    return this.execute(new HttpTurnSink(req, res), response);
+  }
+
+  async execute(sink, firstAiAPIResponse) {
     const {
       apiUrl,
       apiKey,
@@ -184,15 +187,9 @@ class NonStreamHandler {
 
     const shouldShowVCP = SHOW_VCP_OUTPUT || this.context.forceShowVCP;
     const residentProposalFramingActive = hasResidentProposalSurface(originalBody.messages);
-    const residentPresentations = [];
-    const residentPresentationChannel = createPresentationChannel(res, residentProposalFramingActive);
-    const residentPresentationSink = residentProposalFramingActive
-      ? createNonStreamPresentationSink({
-        channelId: residentPresentationChannel,
-        presentations: residentPresentations,
-        res
-      })
-      : null;
+    const residentPresentationSink = openResidentPresentation(
+      sink, residentProposalFramingActive, false, originalBody.model
+    );
     let residentProposalExecuted = false;
     const reasoningToContentEnabled = shouldConvertReasoningForModel(
       originalBody.model,
@@ -275,6 +272,7 @@ class NonStreamHandler {
     let chatLogs = [];
     let oneRingAssistantTurnParts = [];
     let validUpstreamTurns = isCompleteNonStreamResponse(firstReadResult);
+    if (!firstAiAPIResponse.ok) sink.onUpstreamError?.({ status: firstAiAPIResponse.status, bodyText: aiResponseText, phase: 'initial' });
     let completed = false;
 
     let fullContentFromAI = '';
@@ -319,12 +317,12 @@ class NonStreamHandler {
 
     do {
       if (!validUpstreamTurns) {
-        res.__vcpDisableReplayCache?.();
+        sink.disableReplay();
         conversationHistoryForClient.push(currentAIContentForClient,
           '\n[UPSTREAM_INCOMPLETE: 工具执行已停止，上游响应不完整]\n');
         break;
       }
-      if (res.writableEnded || res.destroyed) break;
+      if (sink.isClosed()) break;
       // 检查中止信号
       if (abortController && abortController.signal.aborted) {
         if (DEBUG_MODE) console.log('[VCP NonStream Loop] Abort detected, exiting loop.');
@@ -335,7 +333,7 @@ class NonStreamHandler {
       const residentFrame = residentProposalFramingActive
         ? frameResidentProposalTurn(currentAIContentForLoop, ToolCallParser)
         : { kind: 'NONE', clientContent: currentAIContentForClient, loopContent: currentAIContentForLoop };
-      if (residentFrame.kind !== 'NONE') res.__vcpDisableReplayCache?.();
+      if (residentFrame.kind !== 'NONE') sink.disableReplay();
       if (
         residentFrame.kind === 'INVALID'
         || (residentFrame.kind === 'RESIDENT_PROPOSAL' && residentProposalExecuted)
@@ -388,7 +386,7 @@ class NonStreamHandler {
             return { tool: toolCall, result: [{ type: 'text', text: String(e.message) }] };
           }
         }));
-        if (res.writableEnded || res.destroyed || abortController?.signal.aborted) break;
+        if (sink.isClosed() || abortController?.signal.aborted) break;
 
         // 处理纯 Archery 的错误或用户审核留言。
         if (normalCalls.length === 0 && archeryErrorContents.length > 0) {
@@ -412,7 +410,7 @@ class NonStreamHandler {
           conversationHistoryForClient.push(formatToolResultBatch(visibleToolResults, enableRoleDivider));
 
           const recursionBody = { ...originalBody, messages: currentMessagesForNonStreamLoop, stream: false };
-          if (res.writableEnded || res.destroyed || abortController?.signal.aborted) break;
+          if (sink.isClosed() || abortController?.signal.aborted) break;
           const recursionReadResult = await readNonStreamResponseWithSemanticRetry({
             fetchResponse: () => fetchNonStreamCompletion(recursionBody, `archery_error_depth_${recursionDepth}`),
             retries: apiRetries,
@@ -423,6 +421,9 @@ class NonStreamHandler {
           const recursionAiResponse = recursionReadResult.response;
 
           if (recursionAiResponse.ok) {
+            if (!recursionReadResult.response.ok) sink.onUpstreamError?.({
+              status: recursionReadResult.response.status, phase: 'tool_loop'
+            });
             validUpstreamTurns = validUpstreamTurns && isCompleteNonStreamResponse(recursionReadResult);
             const recursionText = recursionReadResult.text;
             const recursionParsedResponse = extractedResponse(recursionText);
@@ -477,7 +478,7 @@ class NonStreamHandler {
           { residentPresentationSink }
         );
         require('../requestExecutionContext').assertToolBoundary();
-        if (res.writableEnded || res.destroyed || abortController?.signal.aborted) break;
+        if (sink.isClosed() || abortController?.signal.aborted) break;
         if (residentProposalCalls.length === 1) {
           const proposalIndex = normalCalls.findIndex(isResidentProposalToolCall);
           const proposalFailure = proposalIndex >= 0
@@ -556,7 +557,7 @@ class NonStreamHandler {
         currentMessagesForNonStreamLoop.push(toolPayload);
 
         const recursionBody = { ...originalBody, messages: currentMessagesForNonStreamLoop, stream: false };
-        if (res.writableEnded || res.destroyed || abortController?.signal.aborted) break;
+        if (sink.isClosed() || abortController?.signal.aborted) break;
         const recursionReadResult = await readNonStreamResponseWithSemanticRetry({
           fetchResponse: () => fetchNonStreamCompletion(recursionBody, `tool_loop_depth_${recursionDepth}`),
           retries: apiRetries,
@@ -568,6 +569,9 @@ class NonStreamHandler {
 
         if (!recursionAiResponse.ok) break;
 
+        if (!recursionReadResult.response.ok) sink.onUpstreamError?.({
+          status: recursionReadResult.response.status, phase: 'tool_loop'
+        });
         validUpstreamTurns = validUpstreamTurns && isCompleteNonStreamResponse(recursionReadResult);
         const recursionText = recursionReadResult.text;
         const recursionParsedResponse = extractedResponse(recursionText);
@@ -619,7 +623,6 @@ class NonStreamHandler {
       };
     }
 
-    attachNonStreamPresentations(finalJsonResponse, residentPresentations);
     if (writeChatLog) writeChatLog(originalBody, chatLogs);
     // Seal the same client-facing text before the response can be lost in transport.
     const publishFinalReply = require('../requestExecutionContext').finalReplyPublisher();
@@ -628,11 +631,12 @@ class NonStreamHandler {
       publishFinalReply?.({ content: finalContentForClient, finishReason: 'stop' });
     }
     // OneRing 由主流程在整轮完成且响应发送完成后提交。
-    if (!res.writableEnded && !res.destroyed) {
-      res.send(Buffer.from(JSON.stringify(finalJsonResponse)));
+    if (!sink.isClosed()) {
+      sink.onNonStreamResponse(finalJsonResponse);
     }
     return {
-      completed: completed && !abortController?.signal.aborted && !res.destroyed,
+      completed: completed && !abortController?.signal.aborted && !sink.isDestroyed(),
+      content: currentAIContentForLoop,
       aiText: oneRingAssistantTurnParts.join('\n')
     };
   }

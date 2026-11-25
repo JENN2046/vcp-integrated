@@ -7,7 +7,6 @@ const { projectToolBatchForUpstream } = require('./toolResultBatch.js');
 const nativeContext = require('./requestExecutionContext');
 const fs = require('fs').promises;
 const path = require('path');
-const { createHash, randomBytes } = require('node:crypto');
 const http = require('http');
 const https = require('https');
 const finalContextStore = require('./finalContextStore.js');
@@ -41,340 +40,10 @@ const ToolCallParser = require('./vcpLoop/toolCallParser');
 const ToolExecutor = require('./vcpLoop/toolExecutor');
 const StreamHandler = require('./handlers/streamHandler');
 const NonStreamHandler = require('./handlers/nonStreamHandler');
-const { createInteractionCompletion } = require('./handlers/interactionCompletion');
+const HttpTurnSink = require('./handlers/httpTurnSink');
 
 const VCP_TOOL_USE_FORBIDDEN_PLACEHOLDER = '[[VCPToolUse=Forbidden]]';
-const RESIDENT_PRESENCE_BINDING_PROPERTY = '__agentsOsResidentPresence';
-
-const RESIDENT_PRESENCE_BINDING_SCHEMA =
-
-  'agents-os-resident.provider-presence-binding.v2';
-
-const RESIDENT_PRESENCE_CARRIER_HEADER =
-
-  '[AGENTSOSResident PresenceContext v1]\n';
-
-const RESIDENT_PROVIDER_ATTEMPT_DENIED =
-
-  'RESIDENT_PROVIDER_ATTEMPT_DENIED';
-
-const RESIDENT_PROVIDER_PATH_ID = 'VCP-CHAT-COMPLETIONS';
-
-const RESIDENT_PROVIDER_CREDENTIAL_SLOT =
-
-  'credential-slot:vcp-toolbox:primary';
-
-
-
-function residentProviderAttemptDenied() {
-
-  const error = new Error(RESIDENT_PROVIDER_ATTEMPT_DENIED);
-
-  error.code = RESIDENT_PROVIDER_ATTEMPT_DENIED;
-
-  return error;
-
-}
-
-
-
-function isPlainRecord(value) {
-
-  return value !== null
-
-    && typeof value === 'object'
-
-    && !Array.isArray(value)
-
-    && (Object.getPrototypeOf(value) === Object.prototype
-
-      || Object.getPrototypeOf(value) === null);
-
-}
-
-
-
-function hasExactRecordKeys(value, expected) {
-
-  if (!isPlainRecord(value)) return false;
-
-  const actual = Object.keys(value).sort();
-
-  const wanted = [...expected].sort();
-
-  return actual.length === wanted.length
-
-    && actual.every((key, index) => key === wanted[index]);
-
-}
-
-
-
-function sha256Text(value) {
-
-  return `sha256:${createHash('sha256').update(value, 'utf8').digest('hex')}`;
-
-}
-
-
-
-function readResidentPresenceBinding(messages) {
-
-  if (!Array.isArray(messages)) throw residentProviderAttemptDenied();
-
-  const descriptor = Object.getOwnPropertyDescriptor(
-
-    messages,
-
-    RESIDENT_PRESENCE_BINDING_PROPERTY
-
-  );
-
-  if (!descriptor) return null;
-
-  if (descriptor.enumerable !== false
-
-    || descriptor.configurable !== false
-
-    || descriptor.writable !== false
-
-    || Object.hasOwn(descriptor, 'get')
-
-    || Object.hasOwn(descriptor, 'set')) {
-
-    throw residentProviderAttemptDenied();
-
-  }
-
-  const binding = descriptor.value;
-
-  if (!Object.isFrozen(binding)
-
-    || !hasExactRecordKeys(binding, [
-
-      'attachmentGeneration',
-
-      'authorityGeneration',
-
-      'carrierContentSha256',
-
-      'contextId',
-
-      'freshPresenceId',
-
-      'projectionGeneration',
-
-      'schema'
-
-    ])
-
-    || binding.schema !== RESIDENT_PRESENCE_BINDING_SCHEMA
-
-    || !Number.isSafeInteger(binding.attachmentGeneration)
-
-    || binding.attachmentGeneration < 1
-
-    || !Number.isSafeInteger(binding.authorityGeneration)
-
-    || binding.authorityGeneration < 1
-
-    || !Number.isSafeInteger(binding.projectionGeneration)
-
-    || binding.projectionGeneration < 0
-
-    || !/^sha256:[0-9a-f]{64}$/u.test(binding.carrierContentSha256)
-
-    || !/^sha256:[0-9a-f]{64}$/u.test(binding.contextId)
-
-    || !/^fresh-presence:r1:[0-9a-f]{64}$/u.test(binding.freshPresenceId)) {
-
-    throw residentProviderAttemptDenied();
-
-  }
-
-  const carriers = messages.filter((message) =>
-
-    isPlainRecord(message)
-
-      && message.role === 'system'
-
-      && typeof message.content === 'string'
-
-      && message.content.startsWith(RESIDENT_PRESENCE_CARRIER_HEADER));
-
-  if (carriers.length !== 1
-
-    || sha256Text(carriers[0].content) !== binding.carrierContentSha256) {
-
-    throw residentProviderAttemptDenied();
-
-  }
-
-  return binding;
-
-}
-
-
-
-function validResidentProviderSeal(result, input, binding) {
-
-  const seal = result?.seal;
-
-  return hasExactRecordKeys(result, ['body', 'seal'])
-
-    && result.body === input.finalBodyText
-
-    && hasExactRecordKeys(seal, [
-
-      'accepted',
-
-      'attachmentGeneration',
-
-      'attemptId',
-
-      'authorityGeneration',
-
-      'contextId',
-
-      'credentialSlotDigest',
-
-      'ordinal',
-
-      'projectionGeneration',
-
-      'providerInvoked',
-
-      'resultCode',
-
-      'schema',
-
-      'sealId'
-
-    ])
-
-    && seal.accepted === true
-
-    && seal.attachmentGeneration === binding.attachmentGeneration
-
-    && seal.attemptId === input.attemptId
-
-    && seal.authorityGeneration === binding.authorityGeneration
-
-    && seal.contextId === binding.contextId
-
-    && seal.ordinal === input.ordinal
-
-    && seal.projectionGeneration === binding.projectionGeneration
-
-    && seal.providerInvoked === false
-
-    && seal.resultCode
-
-      === 'PRESENCE_PROVIDER_ATTEMPT_MATERIAL_SEALED_NOT_INVOKED'
-
-    && seal.schema === 'AGENTS_OS_PROVIDER_ATTEMPT_SEAL_V1'
-
-    && /^sha256:[0-9a-f]{64}$/u.test(seal.credentialSlotDigest)
-
-    && /^sha256:[0-9a-f]{64}$/u.test(seal.sealId);
-
-}
-
-
-
-function validResidentPresenceIntent(value) {
-
-  return hasExactRecordKeys(value, ['requested'])
-
-    && value.requested === true;
-
-}
-
-
-
-function validOneRingPresenceMeta(value) {
-
-  return isPlainRecord(value)
-
-    && typeof value.agentName === 'string'
-
-    && value.agentName.length > 0
-
-    && Buffer.byteLength(value.agentName, 'utf8') <= 200
-
-    && value.agentName.trim() === value.agentName
-
-    && !/[\u0000-\u001f\u007f]/u.test(value.agentName)
-
-    && (value.externalKeyDigest === null
-
-      || (typeof value.externalKeyDigest === 'string'
-
-        && /^[0-9a-f]{64}$/u.test(value.externalKeyDigest)))
-
-    && (value.frontendPlane === null
-
-      || (typeof value.frontendPlane === 'string'
-
-        && /^[A-Z][A-Z0-9_]{0,63}$/u.test(value.frontendPlane)))
-
-    && (value.frontendPrincipalDigest === null
-
-      || (typeof value.frontendPrincipalDigest === 'string'
-
-        && /^[0-9a-f]{64}$/u.test(value.frontendPrincipalDigest)))
-
-    && typeof value.frontendSource === 'string'
-
-    && value.frontendSource.length > 0
-
-    && Buffer.byteLength(value.frontendSource, 'utf8') <= 200
-
-    && value.frontendSource.trim() === value.frontendSource
-
-    && !/[\u0000-\u001f\u007f]/u.test(value.frontendSource)
-
-    && typeof value.requestHash === 'string'
-
-    && /^[0-9a-f]{64}$/u.test(value.requestHash)
-
-    && typeof value.turnId === 'string'
-
-    && value.turnId.length > 0
-
-    && Buffer.byteLength(value.turnId, 'utf8') <= 300
-
-    && value.turnId.trim() === value.turnId
-
-    && !/[\u0000-\u001f\u007f]/u.test(value.turnId);
-
-}
-
-
-
-function sameOneRingPresenceMeta(left, right) {
-
-  return validOneRingPresenceMeta(left)
-
-    && validOneRingPresenceMeta(right)
-
-    && left.agentName === right.agentName
-
-    && left.externalKeyDigest === right.externalKeyDigest
-
-    && left.frontendPlane === right.frontendPlane
-
-    && left.frontendPrincipalDigest === right.frontendPrincipalDigest
-
-    && left.frontendSource === right.frontendSource
-
-    && left.requestHash === right.requestHash
-
-    && left.turnId === right.turnId;
-
-}
-
-
+const residentPresence = require('./vcpLoop/residentPresence');
 
 function parseBooleanEnv(value, defaultValue = false) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -622,26 +291,13 @@ function copyArrayMetadata(source, target) {
     if (/^(?:length|\d+)$/.test(key)) continue;
     const descriptor = Object.getOwnPropertyDescriptor(source, key);
     if (!descriptor) continue;
-    try {
-      Object.defineProperty(target, key, descriptor);
-    } catch (e) {
-      if (key === RESIDENT_PRESENCE_BINDING_PROPERTY) {
-        throw residentProviderAttemptDenied();
-      }
-      // Other legacy metadata remains best-effort for compatibility.
-    }
-    if (key === RESIDENT_PRESENCE_BINDING_PROPERTY) {
-      const copied = Object.getOwnPropertyDescriptor(target, key);
-      if (!copied
-        || copied.value !== descriptor.value
-        || copied.enumerable !== descriptor.enumerable
-        || copied.configurable !== descriptor.configurable
-        || copied.writable !== descriptor.writable) {
-        throw residentProviderAttemptDenied();
-      }
+    try { Object.defineProperty(target, key, descriptor); }
+    catch {
+      // Legacy metadata remains best-effort.
     }
   }
 
+  residentPresence.verifyMetadataCopy(source, target);
   return target;
 }
 
@@ -783,9 +439,7 @@ async function fetchWithRetry(
     onRetry = null,
     connectionTimeout = 900000,
     modelFallbackCandidates = null,
-    beforeProviderAttempt = null,
-    nextProviderAttemptOrdinal = null,
-    providerAttemptNamespace = null
+    beforeProviderAttempt = null
   } = {},
 ) {
   const { default: fetch } = await import('node-fetch');
@@ -823,69 +477,12 @@ async function fetchWithRetry(
       i,
       debugMode
     );
-    if (beforeProviderAttempt !== null) {
-      let sealTimeoutId = null;
-      let removeSealAbortListener = null;
+    if (beforeProviderAttempt) {
       try {
-        if (typeof beforeProviderAttempt !== 'function'
-          || typeof nextProviderAttemptOrdinal !== 'function'
-          || !/^[0-9a-f]{64}$/u.test(providerAttemptNamespace)
-          || typeof url !== 'string'
-          || typeof attemptOptions?.body !== 'string'
-          || attemptOptions.body.length === 0
-          || attemptOptions.method !== 'POST') {
-          throw residentProviderAttemptDenied();
-        }
-        const ordinal = nextProviderAttemptOrdinal();
-        if (!Number.isSafeInteger(ordinal) || ordinal < 1) {
-          throw residentProviderAttemptDenied();
-        }
-        const attemptId = `attempt:vcp:r1:${createHash('sha256')
-          .update('vcp-toolbox.resident-provider-attempt.v1', 'utf8')
-          .update(Buffer.from([0]))
-          .update(providerAttemptNamespace, 'utf8')
-          .update(Buffer.from([0]))
-          .update(String(ordinal), 'utf8')
-          .digest('hex')}`;
-        const sealInput = Object.freeze({
-          attemptId,
-          credentialSlotRef: RESIDENT_PROVIDER_CREDENTIAL_SLOT,
-          finalBodyText: attemptOptions.body,
-          method: attemptOptions.method,
-          ordinal,
-          providerPathId: RESIDENT_PROVIDER_PATH_ID,
-          target: url
-        });
-        // Bound the local seal independently; provider connection time starts later.
-        const numericSealTimeout = typeof connectionTimeout === 'number'
-          || typeof connectionTimeout === 'string' ? Number(connectionTimeout) : NaN;
-        const sealTimeoutMs = Number.isFinite(numericSealTimeout) && numericSealTimeout > 0
-          ? Math.min(Math.max(Math.floor(numericSealTimeout), 1), 2147483647)
-          : 900000;
-        const sealed = await new Promise((resolve, reject) => {
-          const denyAbortedSeal = () => reject(residentProviderAttemptDenied());
-          attemptController.signal.addEventListener('abort', denyAbortedSeal, { once: true });
-          removeSealAbortListener = () => attemptController.signal.removeEventListener('abort', denyAbortedSeal);
-          if (attemptController.signal.aborted) {
-            denyAbortedSeal();
-            return;
-          }
-          sealTimeoutId = setTimeout(() => attemptController.abort(), sealTimeoutMs);
-          // Both settlement handlers remain attached if timeout/abort wins first.
-          Promise.resolve(beforeProviderAttempt(sealInput, {
-            signal: attemptController.signal
-          })).then(resolve, reject);
-        });
-        if (!hasExactRecordKeys(sealed, ['body', 'seal'])
-          || sealed.body !== attemptOptions.body) {
-          throw residentProviderAttemptDenied();
-        }
-      } catch {
+        await beforeProviderAttempt(url, attemptOptions, { controller: attemptController, connectionTimeout });
+      } catch (error) {
         cleanup();
-        throw residentProviderAttemptDenied();
-      } finally {
-        if (sealTimeoutId !== null) clearTimeout(sealTimeoutId);
-        if (removeSealAbortListener) removeSealAbortListener();
+        throw error;
       }
     }
     // Every model turn, including a tool follow-up, uses the original Work fence.
@@ -907,7 +504,7 @@ async function fetchWithRetry(
       const response = await fetch(url, {
         ...attemptOptions,
         agent: getFetchAgent, // 注入防御性长连接池
-        signal: attemptController.signal,
+        signal: externalSignal ? AbortSignal.any([attemptController.signal, externalSignal]) : attemptController.signal,
       });
       cleanup();
 
@@ -953,6 +550,9 @@ async function fetchWithRetry(
       return response;
     } catch (error) {
       cleanup();
+      if (nativeContext.isCoreTurn() && !externalSignal?.aborted) {
+        throw Object.assign(new Error('CORE_PROVIDER_OUTCOME_UNKNOWN', { cause: error }), { code: 'CORE_PROVIDER_OUTCOME_UNKNOWN' });
+      }
 
       // 区分超时中止和外部中止
       if (error.name === 'AbortError') {
@@ -1137,14 +737,56 @@ class ChatCompletionHandler {
   }
 
   async handle(req, res, forceShowVCP = false) {
+    const { activeRequests, DEBUG_MODE } = this.config;
+    const id = req.body.requestId || req.body.messageId;
+    const clientIp = normalizeClientIp(req.ip);
+    const resident = residentPresence.hasIntent(req.body);
+    const responseCacheKey = resident ? null : this.responseReplayCache.buildKey(clientIp, id);
     nativeContext.requireModelOutcome(res);
-    let nativeCompleted=false;
+    if (responseCacheKey && this.responseReplayCache.replay(responseCacheKey, req, res)) return;
+    const finalizeCache = responseCacheKey ? installResponseCacheRecorder(res, {
+      cache: this.responseReplayCache, cacheKey: responseCacheKey, id, clientIp,
+      streamMode: req.body.stream === true, debugMode: DEBUG_MODE
+    }) : () => {};
+    const abortController = new AbortController();
+    const requestData = { req, res, abortController, timestamp: Date.now(), aborted: false, abortReason: null };
+    const abort = reason => {
+      if (res.writableEnded || requestData.aborted) return;
+      requestData.aborted = true;
+      requestData.abortReason = reason;
+      abortController.abort();
+    };
+    const onAborted = () => abort('request_aborted');
+    const onRequestClose = () => { if (req.aborted) abort('request_close_after_abort'); };
+    const onResponseClose = () => abort('response_close_before_finish');
+    if (id) activeRequests.set(id, requestData);
+    req.on('aborted', onAborted);
+    req.on('close', onRequestClose);
+    res.on('close', onResponseClose);
+    let outcome;
+    try {
+      outcome = await nativeContext.withTurnSignal(abortController.signal, signal => this.executeTurn({
+        body: req.body, clientIp, userAgent: req.headers['user-agent'],
+        acceptHeader: req.headers.accept, forceShowVCP, signal
+      }, new HttpTurnSink(req, res)));
+      return outcome;
+    } finally {
+      nativeContext.recordModelOutcome(res, outcome?.completed === true);
+      req.off('aborted', onAborted);
+      req.off('close', onRequestClose);
+      res.off('close', onResponseClose);
+      if (res.destroyed && !res.writableEnded) abort('response_destroyed_in_finally');
+      if (res.destroyed || res.writableEnded) finalizeCache();
+      if (id) setImmediate(() => { if (activeRequests.get(id) === requestData) activeRequests.delete(id); });
+    }
+  }
+
+  async executeTurn({ body, clientIp, userAgent, acceptHeader, forceShowVCP = false, signal }, sink) {
     const {
       apiUrl,
       apiKey,
       modelRedirectHandler,
       pluginManager,
-      activeRequests,
       writeDebugLog,
       writeChatLog,
       webSocketServer,
@@ -1205,19 +847,9 @@ class ChatCompletionHandler {
       return body;
     };
 
-    let clientIp = normalizeClientIp(req.ip);
-
-    const id = req.body.requestId || req.body.messageId;
-    let originalBody = nativeContext.prepareContinuationBody(req.body);
-    const residentPresenceRequested = originalBody
-      && typeof originalBody === 'object'
-      && Object.hasOwn(originalBody, 'agentsOsResidentPresenceContext');
-    const residentPresenceContext = residentPresenceRequested
-      ? originalBody.agentsOsResidentPresenceContext
-      : undefined;
-    if (residentPresenceRequested) {
-      delete originalBody.agentsOsResidentPresenceContext;
-    }
+    const id = body.requestId || body.messageId;
+    let originalBody = nativeContext.prepareContinuationBody(body);
+    const presence = residentPresence.takeIntent(originalBody);
     const vcpchatExtensions = originalBody && typeof originalBody === 'object'
       ? originalBody.vcpchatExtensions
       : null;
@@ -1234,88 +866,9 @@ class ChatCompletionHandler {
     // 请求独享，PluginManager 浅拷贝配置时仍保留此对象引用。
     requestPreprocessorConfig.tavernInteraction = {};
     const isOriginalRequestStreaming = originalBody.stream === true;
-    const responseCacheKey = this.responseReplayCache.buildKey(clientIp, id);
-
-    if (!residentPresenceRequested
-      && responseCacheKey
-      && this.responseReplayCache.replay(responseCacheKey, req, res)) {
-      return;
-    }
-
-    const abortController = new AbortController();
-
-    let clientDisconnectedAbortReason = null;
-    let cleanupClientDisconnectListeners = () => {};
-    let finalizeResponseCacheRecorder = () => {};
-    let interactionCompletion = null;
+    const abortController = { signal };
+    let interactionCompletion;
     let interactionOutcomeAccepted = false;
-
-    if (responseCacheKey && !residentPresenceRequested) {
-      finalizeResponseCacheRecorder = installResponseCacheRecorder(res, {
-        cache: this.responseReplayCache,
-        cacheKey: responseCacheKey,
-        id,
-        clientIp,
-        streamMode: isOriginalRequestStreaming,
-        debugMode: DEBUG_MODE
-      });
-    }
-
-    if (id) {
-      activeRequests.set(id, {
-        req,
-        res,
-        abortController,
-        timestamp: Date.now(),
-        aborted: false, // 修复 Bug #4: 添加中止标志
-        abortReason: null
-      });
-
-      // 通用前端兼容：如果客户端没有显式调用 /v1/interrupt，
-      // 但 HTTP/SSE 连接已经断开，则把传输层断联转换为同一条级联中止链路。
-      // 注意：这里不能区分“用户点停止 / 刷新页面 / 网络断线 / 代理断开”，统一视为客户端不再等待响应。
-      const triggerClientDisconnectAbort = (reason) => {
-        const requestData = activeRequests.get(id);
-        if (!requestData) return;
-
-        // 正常完成的响应也会触发 close，此时不能误杀已经完成的请求。
-        if (res.writableEnded) return;
-
-        if (requestData.aborted) return;
-
-        requestData.aborted = true;
-        requestData.abortReason = reason;
-        clientDisconnectedAbortReason = reason;
-
-        if (!abortController.signal.aborted) {
-          abortController.abort();
-        }
-
-        console.log(`[ClientDisconnect] Request ${id} aborted due to ${reason}. Upstream cascade abort triggered.`);
-      };
-
-      const onReqAborted = () => triggerClientDisconnectAbort('request_aborted');
-      const onReqClose = () => {
-        if (req.aborted && !res.writableEnded) {
-          triggerClientDisconnectAbort('request_close_after_abort');
-        }
-      };
-      const onResClose = () => {
-        if (!res.writableEnded) {
-          triggerClientDisconnectAbort('response_close_before_finish');
-        }
-      };
-
-      req.on('aborted', onReqAborted);
-      req.on('close', onReqClose);
-      res.on('close', onResClose);
-
-      cleanupClientDisconnectListeners = () => {
-        req.off('aborted', onReqAborted);
-        req.off('close', onReqClose);
-        res.off('close', onResClose);
-      };
-    }
 
     // --- 上下文控制 (Context Control) ---
     // 1. 拦截 contextTokenLimit 参数
@@ -1340,10 +893,7 @@ class ChatCompletionHandler {
     }
 
     try {
-      if (residentPresenceRequested
-        && !validResidentPresenceIntent(residentPresenceContext)) {
-        throw residentProviderAttemptDenied();
-      }
+      presence?.validate();
       if (originalBody.model) {
         const originalModel = originalBody.model;
         const isSemanticRoutingModel = semanticModelRouter && typeof semanticModelRouter.isRoutingModel === 'function'
@@ -1560,7 +1110,7 @@ class ChatCompletionHandler {
 
       for (const name of orderedPipeline) {
         if (name === 'VCPTavern') continue;
-        if (residentPresenceRequested && name === 'AGENTSOSResident') continue;
+        if (presence?.handles(name)) continue;
 
         if (name === STATIC_PLACEHOLDER_INJECTION_STAGE) {
           if (DEBUG_MODE) console.log('[Server] Injecting static/hybrid/distributed plugin placeholders.');
@@ -1612,55 +1162,8 @@ class ChatCompletionHandler {
           console.error(`[Server] Error in preprocessor ${name}:`, pluginError);
         }
       }
-      let presenceOneRingMeta = null;
-      if (residentPresenceRequested) {
-        try {
-          const oneRingModule = pluginManager.messagePreprocessors
-            .get('OneRing');
-          const residentModule = pluginManager.messagePreprocessors
-            .get('AGENTSOSResident');
-          const extracted = oneRingModule
-            ?.extractMetaFromMessages?.(processedMessages);
-          if (!validOneRingPresenceMeta(extracted)
-            || !residentModule
-            || typeof residentModule.processMessages !== 'function') {
-            throw residentProviderAttemptDenied();
-          }
-          presenceOneRingMeta = Object.freeze({
-            agentName: extracted.agentName,
-            externalKeyDigest: extracted.externalKeyDigest,
-            frontendPlane: extracted.frontendPlane,
-            frontendPrincipalDigest: extracted.frontendPrincipalDigest,
-            frontendSource: extracted.frontendSource,
-            requestHash: extracted.requestHash,
-            turnId: extracted.turnId
-          });
-          const messagesBeforeResident = processedMessages;
-          processedMessages = copyArrayMetadata(
-            messagesBeforeResident,
-            await pluginManager.executeMessagePreprocessor(
-              'AGENTSOSResident',
-              processedMessages,
-              {
-                ...requestPreprocessorConfig,
-                agentsOsResidentPresenceContext: {
-                  oneRing: {
-                    externalKeyDigest:
-                      presenceOneRingMeta.externalKeyDigest,
-                    frontendPlane: presenceOneRingMeta.frontendPlane,
-                    frontendPrincipalDigest:
-                      presenceOneRingMeta.frontendPrincipalDigest,
-                    frontendSource: presenceOneRingMeta.frontendSource,
-                    requestHash: presenceOneRingMeta.requestHash,
-                    turnId: presenceOneRingMeta.turnId
-                  }
-                }
-              }
-            )
-          );
-        } catch {
-          throw residentProviderAttemptDenied();
-        }
+      if (presence) {
+        processedMessages = await presence.inject(processedMessages, pluginManager, requestPreprocessorConfig, copyArrayMetadata);
       }
       if (DEBUG_MODE) await writeDebugLog('LogAfterPreprocessors', processedMessages);
 
@@ -1729,36 +1232,7 @@ class ChatCompletionHandler {
         if (DEBUG_MODE) await writeDebugLog('LogAfterFinalRoleDivider', processedMessages);
       }
 
-      let residentPresenceBinding = null;
-      let residentPresenceModule = null;
-      if (residentPresenceRequested) {
-        try {
-          residentPresenceBinding = readResidentPresenceBinding(
-            processedMessages
-          );
-          residentPresenceModule = pluginManager.messagePreprocessors
-            .get('AGENTSOSResident');
-        } catch {
-          throw residentProviderAttemptDenied();
-        }
-        const sealDescriptor = residentPresenceModule
-          ? Object.getOwnPropertyDescriptor(
-            residentPresenceModule,
-            'sealProviderAttempt'
-          )
-          : null;
-        if (!residentPresenceBinding
-          || !residentPresenceModule
-          || !sealDescriptor
-          || sealDescriptor.enumerable !== false
-          || sealDescriptor.configurable !== false
-          || sealDescriptor.writable !== false
-          || Object.hasOwn(sealDescriptor, 'get')
-          || Object.hasOwn(sealDescriptor, 'set')
-          || typeof sealDescriptor.value !== 'function') {
-          throw residentProviderAttemptDenied();
-        }
-      }
+      presence?.bind(processedMessages, pluginManager);
 
       // Keep internal speaker names for native consumers; project display names at the Provider boundary.
       originalBody.messages = processedMessages;
@@ -1775,16 +1249,9 @@ class ChatCompletionHandler {
       } catch (oneRingMetaError) {
         console.warn('[OneRing] Failed to freeze response meta before upstream fetch:', oneRingMetaError.message);
       }
-      if (residentPresenceRequested
-        && !sameOneRingPresenceMeta(
-          presenceOneRingMeta,
-          oneRingResponseMeta
-        )) {
-        throw residentProviderAttemptDenied();
-      }
+      presence?.confirmOneRing(oneRingResponseMeta);
 
-      interactionCompletion = createInteractionCompletion({
-        res,
+      interactionCompletion = sink.beginInteraction({
         signal: abortController.signal,
         oneRingModule: pluginManager?.messagePreprocessors?.get?.('OneRing'),
         oneRingMeta: oneRingResponseMeta,
@@ -1796,8 +1263,8 @@ class ChatCompletionHandler {
       const finalUpstreamBody = projectToolBatchForUpstream({ ...originalBody, stream: willStreamResponse });
 
       finalContextStore.setLastFinalContext(finalUpstreamBody, {
-        requestId: req.body.requestId || null,
-        messageId: req.body.messageId || null,
+        requestId: body.requestId || null,
+        messageId: body.messageId || null,
         clientIp,
         forceShowVCP,
         capturedStage: 'before_upstream_fetch'
@@ -1805,50 +1272,7 @@ class ChatCompletionHandler {
 
       await writeDebugLog('LogOutputAfterProcessing', finalUpstreamBody);
 
-      let providerAttemptOrdinal = 0;
-      const providerAttemptNamespace = residentPresenceBinding
-        ? randomBytes(32).toString('hex')
-        : null;
-      const requestFetchWithRetry = residentPresenceBinding
-        ? (url, options, retryOptions = {}) => fetchWithRetry(
-          url,
-          options,
-          {
-            ...retryOptions,
-            providerAttemptNamespace,
-            nextProviderAttemptOrdinal: () => {
-              providerAttemptOrdinal += 1;
-              return providerAttemptOrdinal;
-            },
-            beforeProviderAttempt: async (input, { signal } = {}) => {
-              if (signal?.aborted === true) {
-                throw residentProviderAttemptDenied();
-              }
-              let result;
-              const boundInput = Object.freeze({
-                ...input,
-                binding: residentPresenceBinding
-              });
-              try {
-                result = await residentPresenceModule.sealProviderAttempt(
-                  boundInput
-                );
-              } catch {
-                throw residentProviderAttemptDenied();
-              }
-              if (signal?.aborted === true
-                || !validResidentProviderSeal(
-                  result,
-                  boundInput,
-                  residentPresenceBinding
-                )) {
-                throw residentProviderAttemptDenied();
-              }
-              return result;
-            }
-          }
-        )
-        : fetchWithRetry;
+      const requestFetchWithRetry = presence?.wrapFetch(fetchWithRetry) || fetchWithRetry;
 
       let firstAiAPIResponse = await requestFetchWithRetry(
         `${apiUrl}/v1/chat/completions`,
@@ -1857,8 +1281,8 @@ class ChatCompletionHandler {
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${apiKey}`,
-            ...(req.headers['user-agent'] && { 'User-Agent': req.headers['user-agent'] }),
-            Accept: willStreamResponse ? 'text/event-stream' : req.headers['accept'] || 'application/json',
+            ...(userAgent && { 'User-Agent': userAgent }),
+            Accept: willStreamResponse ? 'text/event-stream' : acceptHeader || 'application/json',
           },
           body: JSON.stringify(finalUpstreamBody),
           signal: abortController.signal,
@@ -1869,106 +1293,16 @@ class ChatCompletionHandler {
           debugMode: DEBUG_MODE,
           connectionTimeout: apiConnectionTimeoutMs,
           modelFallbackCandidates: semanticModelFallbackCandidates,
-          onRetry: async (attempt, errorInfo) => {
-            if (!res.headersSent && isOriginalRequestStreaming) {
-              if (DEBUG_MODE)
-                console.log(`[VCP Retry] First retry attempt (#${attempt}). Sending 200 OK to client to establish stream.`);
-              res.status(200);
-              res.setHeader('Content-Type', 'text/event-stream');
-              res.setHeader('Cache-Control', 'no-cache');
-              res.setHeader('Connection', 'keep-alive');
-            }
-          },
+          onRetry: attempt => sink.onUpstreamRetry?.({ stream: isOriginalRequestStreaming, debug: DEBUG_MODE, attempt }),
         },
       );
 
       const isUpstreamStreaming =
         willStreamResponse && firstAiAPIResponse.headers.get('content-type')?.includes('text/event-stream');
 
-      if (!res.headersSent) {
-        const upstreamStatus = firstAiAPIResponse.status;
-
-        if (isOriginalRequestStreaming && upstreamStatus !== 200) {
-          // If streaming was requested, but upstream returned a non-200 status (e.g., 400, 401, 502, 504),
-          // we must return 200 OK and stream the error as an SSE chunk to prevent client listener termination.
-          res.status(200);
-          res.setHeader('Content-Type', 'text/event-stream');
-          res.setHeader('Cache-Control', 'no-cache');
-          res.setHeader('Connection', 'keep-alive');
-
-          // The text frame remains display-compatible. Side requests use the actual status.
-          res.setHeader('X-VCP-Upstream-Status', String(upstreamStatus));
-          const exposed = res.getHeader('Access-Control-Expose-Headers');
-          res.setHeader('Access-Control-Expose-Headers', [exposed, 'X-VCP-Upstream-Status'].filter(Boolean).join(', '));
-
-          // Read the error body from the upstream response
-          const errorBodyText = await firstAiAPIResponse.text();
-          abortController.signal.throwIfAborted();
-
-          // Log the error
-          console.error(`[Upstream Error Stream Proxy] Upstream API returned status ${upstreamStatus}. Streaming error to client: ${errorBodyText}`);
-
-          // Construct the error message for the client
-          const errorContent = `[UPSTREAM_ERROR] 上游API返回状态码 ${upstreamStatus}，错误信息: ${errorBodyText}`;
-
-          // Send an error chunk
-          const errorPayload = {
-            id: `chatcmpl-VCP-upstream-error-${Date.now()}`,
-            object: 'chat.completion.chunk',
-            created: Math.floor(Date.now() / 1000),
-            model: originalBody.model || 'unknown',
-            choices: [
-              {
-                index: 0,
-                delta: {
-                  content: errorContent,
-                },
-                finish_reason: 'stop',
-              },
-            ],
-          };
-          try {
-            res.write(`data: ${JSON.stringify(errorPayload)}\n\n`);
-            res.end('data: [DONE]\n\n');
-          } catch (writeError) {
-            console.error('[Upstream Error] Failed to write error to stream:', writeError.message);
-            if (!res.writableEnded) {
-              try {
-                res.end();
-              } catch (endError) {
-                console.error('[Upstream Error] Failed to end response:', endError.message);
-              }
-            }
-          }
-
-          if (writeChatLog) {
-            writeChatLog(originalBody,
-              [ {
-                request: originalBody,
-                response: { error: true, status: upstreamStatus, body: errorBodyText }
-              } ]);
-          }
-          // We are done with this request. Return early.
-          return;
-        }
-
-        // Normal header setting for non-streaming or successful streaming responses
-        res.status(upstreamStatus);
-        firstAiAPIResponse.headers.forEach((value, name) => {
-          if (
-            !['content-encoding', 'transfer-encoding', 'connection', 'content-length', 'keep-alive', 'x-vcp-upstream-status'].includes(
-              name.toLowerCase(),
-            )
-          ) {
-            res.setHeader(name, value);
-          }
-        });
-        if (isOriginalRequestStreaming && !res.getHeader('Content-Type')?.includes('text/event-stream')) {
-          res.setHeader('Content-Type', 'text/event-stream');
-          if (!res.getHeader('Cache-Control')) res.setHeader('Cache-Control', 'no-cache');
-          if (!res.getHeader('Connection')) res.setHeader('Connection', 'keep-alive');
-        }
-      }
+      if (!await sink.beginUpstream(firstAiAPIResponse, {
+        originalBody, isOriginalRequestStreaming, signal, writeChatLog
+      })) return { completed: false };
 
       const context = {
         ...this.config,
@@ -1993,155 +1327,22 @@ class ChatCompletionHandler {
       };
 
       const outcome = isUpstreamStreaming
-        ? await new StreamHandler(context).handle(req, res, firstAiAPIResponse)
-        : await new NonStreamHandler(context).handle(req, res, firstAiAPIResponse);
-      nativeCompleted=outcome?.completed===true;
-      interactionOutcomeAccepted = true;
+        ? await new StreamHandler(context).execute(sink, firstAiAPIResponse)
+        : await new NonStreamHandler(context).execute(sink, firstAiAPIResponse);
+      if (outcome?.completed && !signal.aborted) sink.onModelFinal?.(outcome);
       interactionCompletion.accept(outcome);
+      interactionOutcomeAccepted = true;
+      return outcome;
     } catch (error) {
-      if (error.name === 'AbortError') {
-        // 显式 /v1/interrupt 或客户端断联都会走到这里。
-        // 如果是客户端断联，响应通道通常已经不可写；如果是显式 interrupt，则由 interrupt 路由负责关闭响应流。
-        // 这里仅停止后续处理，避免与中止链路竞态写入。
-        const abortReason = clientDisconnectedAbortReason || activeRequests.get(id)?.abortReason || 'explicit_interrupt_or_abort';
-        console.log(`[Abort] Caught AbortError for request ${id}. Execution halted. reason=${abortReason}`);
-        return; // Stop processing and allow the 'finally' block to clean up.
+      if (error.name === 'AbortError' || signal.aborted) {
+        return { completed: false, errorCode: 'TURN_CANCELLED' };
       }
       const toolBoundary = error.code === 'WORK_SAFE_TOOL_BOUNDARY' && nativeContext.settleToolPause();
-      if (toolBoundary) {
-        res.__vcpDisableReplayCache?.();
-        const state = toolBoundary === 'awaiting_native_task' ? toolBoundary : 'paused';
-        const payload = { nativeSync: { state, code: error.code, requestId: originalBody.requestId } };
-        if (!res.writableEnded && !res.destroyed) {
-          if (res.headersSent) {
-            res.end(`event: nativesync_work_paused\ndata: ${JSON.stringify(payload)}\n\ndata: [DONE]\n\n`);
-          } else {
-            res.status(409).json(payload);
-          }
-        }
-        return;
-      }
-      // Only log full stack trace for non-abort errors
       console.error('处理请求或转发时出错:', error.message, error.stack);
-
-      if (!res.headersSent) {
-        if (isOriginalRequestStreaming) {
-          // If streaming was requested but failed before headers were sent (e.g., fetchWithRetry failed),
-          // send a 200 status and communicate the error via SSE chunks to prevent the client from stopping listening.
-          res.status(200);
-          res.setHeader('Content-Type', 'text/event-stream');
-          res.setHeader('Cache-Control', 'no-cache');
-          res.setHeader('Connection', 'keep-alive');
-
-          const errorContent = `[ERROR] 代理服务器在连接上游API时失败，可能已达到重试上限或网络错误: ${error.message}`;
-
-          // Send an error chunk
-          const errorPayload = {
-            id: `chatcmpl-VCP-error-${Date.now()}`,
-            object: 'chat.completion.chunk',
-            created: Math.floor(Date.now() / 1000),
-            model: originalBody.model || 'unknown',
-            choices: [
-              {
-                index: 0,
-                delta: {
-                  content: errorContent,
-                },
-                finish_reason: 'stop',
-              },
-            ],
-          };
-          try {
-            res.write(`data: ${JSON.stringify(errorPayload)}\n\n`);
-            res.end('data: [DONE]\n\n');
-          } catch (writeError) {
-            console.error('[Error Handler Stream] Failed to write error:', writeError.message);
-            if (!res.writableEnded && !res.destroyed) {
-              try {
-                res.end();
-              } catch (endError) {
-                console.error('[Error Handler Stream] Failed to end response:', endError.message);
-              }
-            }
-          }
-        } else {
-          // Non-streaming failure
-          res.status(500).json({ error: 'Internal Server Error', details: error.message });
-        }
-        if (writeChatLog) {
-          writeChatLog(originalBody,
-            [ {
-              request: originalBody,
-              response: { error: true, message: error.message }
-            } ]);
-        }
-      } else if (!res.writableEnded && !res.destroyed) {
-        // Headers already sent (error during streaming loop)
-        console.error(
-          '[STREAM ERROR] Headers already sent. Streaming error chunk to client before ending stream:',
-          error.message,
-        );
-        const errorContent = `\n\n> [!WARNING]\n> **流式响应中断 (上游连接异常)**: ${error.message}\n`;
-        try {
-          res.write(`data: ${JSON.stringify({
-            id: `chatcmpl-VCP-stream-error-${Date.now()}`,
-            object: 'chat.completion.chunk',
-            created: Math.floor(Date.now() / 1000),
-            model: originalBody?.model || 'unknown',
-            choices: [{ index: 0, delta: { content: errorContent }, finish_reason: 'stop' }],
-          })}\n\n`);
-        } catch (writeErr) {
-          console.error('[Stream Error Chunk Failed]:', writeErr.message);
-        }
-        // Send [DONE] marker before ending the stream for graceful termination
-        try {
-          res.end('data: [DONE]\n\n');
-        } catch (writeError) {
-          console.error('[Error Handler Stream Cleanup] Failed to write [DONE]:', writeError.message);
-          if (!res.writableEnded && !res.destroyed) {
-            try {
-              res.end();
-            } catch (endError) {
-              console.error('[Error Handler Stream Cleanup] Failed to end response:', endError.message);
-            }
-          }
-        }
-      }
+      sink.onExecutionError(error, { originalBody, isOriginalRequestStreaming, writeChatLog, toolBoundary });
+      return { completed: false, errorCode: error.code || 'TURN_FAILED' };
     } finally {
-      nativeContext.recordModelOutcome(res,nativeCompleted);
       if (!interactionOutcomeAccepted) interactionCompletion?.fail();
-      cleanupClientDisconnectListeners();
-
-      if (!res.writableEnded && !res.destroyed) {
-        // 仍未结束的异常路径不应写入缓存；正常 finish 会自动 finalize。
-      } else {
-        finalizeResponseCacheRecorder();
-      }
-
-      if (id) {
-        const requestData = activeRequests.get(id);
-        if (requestData) {
-          // 修复 Bug #4: 只有在未被 interrupt 路由中止时才执行清理
-          // 优化清理逻辑：只有在请求未正常结束且未被中止时才调用 abort
-          // 🟢 修复：不再在 finally 块中盲目 abort
-          // 只有在客户端连接已断开（res.destroyed）且请求未正常结束时才中止上游
-          // 这防止了在模型输出异常（如潜空间坍缩）导致处理逻辑快速结束时，服务器误杀上游连接
-          if (!requestData.aborted && requestData.abortController && !requestData.abortController.signal.aborted) {
-            if (res.destroyed && !res.writableEnded) {
-              requestData.aborted = true;
-              requestData.abortReason = 'response_destroyed_in_finally';
-              requestData.abortController.abort();
-            }
-          }
-
-          // 无论如何都要删除 Map 条目以释放内存
-          // 但使用 setImmediate 延迟删除，确保 interrupt 路由完成操作
-          setImmediate(() => {
-            activeRequests.delete(id);
-            if (DEBUG_MODE) console.log(`[ChatHandler Cleanup] Removed request ${id} from activeRequests.`);
-          });
-        }
-      }
     }
   }
 }

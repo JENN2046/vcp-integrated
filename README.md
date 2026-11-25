@@ -42,6 +42,8 @@ npm run dev:isolated
 
 首次安装会按三个应用各自的锁文件下载依赖和 Electron。构建脚本生成同步契约、桌面 preload、原生组件及 PWA 资源。`dev:isolated` 使用两个独立的测试 Profile 和本地合成 Provider，终端会打印回环 HTTPS 地址和运行目录。默认在 Xvfb 中启动桌面窗口。若要在本机 X11 桌面查看这两个窗口，可使用 `VCP_DEV_DISPLAY="$DISPLAY" npm run dev:isolated`。按 Ctrl+C 结束会话。
 
+Core 隔离开发和验证入口见 [VCP Core M1](docs/core-v1-development.md)。
+
 ## 运行测试
 
 完成依赖安装和构建后，在仓库根目录运行所需套件。

@@ -1407,6 +1407,17 @@ async function initialize() {
     pluginManager.setWebSocketServer(webSocketServer);
 
     await pluginManager.initializeServices(app, adminPanelRoutes, __dirname);
+    if (process.env.VCP_CORE_DATA_DIR || process.env.VCP_CORE_WORKSPACE) {
+        const nativeSync = pluginManager.getServiceModule('NativeSync');
+        if (!nativeSync?.enableCore || !process.env.VCP_CORE_DATA_DIR || !process.env.VCP_CORE_WORKSPACE) {
+            throw new Error('CORE_DEVELOPMENT_CONFIGURATION_REQUIRED');
+        }
+        nativeSync.enableCore({
+            directory: process.env.VCP_CORE_DATA_DIR,
+            workspace: process.env.VCP_CORE_WORKSPACE,
+            chat: chatCompletionHandler
+        });
+    }
     // 在所有服务插件都注册完路由后，再将 adminApiRouter 挂载到主 app 上
     app.use('/admin_api', adminPanelRoutes);
     // 挂载 VCP 论坛 API 路由

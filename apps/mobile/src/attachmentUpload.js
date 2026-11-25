@@ -1,10 +1,9 @@
 const hex=bytes=>[...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,'0')).join('');
 function base64(bytes){let text='';for(let i=0;i<bytes.length;i+=8192)text+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(text);}
-export async function uploadAttachment(api,topicKey,file,progress=()=>{}){
+export async function uploadAttachment(api,topicKey,file,progress=()=>{},route='conversations/'+encodeURIComponent(topicKey)+'/attachments'){
  if(file.size<1||file.size>20*1024*1024)throw Object.assign(Error('单个附件需在 20 MB 以内'),{code:'ATTACHMENT_FILE_TOO_LARGE'});
  const bytes=new Uint8Array(await file.arrayBuffer()),hash=hex(await crypto.subtle.digest('SHA-256',bytes));
  const requestId='file_'+hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([topicKey,file.name,file.size,hash]))));
- const route='conversations/'+encodeURIComponent(topicKey)+'/attachments';
  const input={requestId,name:file.name,size:bytes.length,expectedHash:hash,...(file.type?{type:file.type}:{})};
  let upload;try{upload=await api(route+'/uploads',input);}catch(e){if(e.code!=='UPLOAD_EXPIRED')throw e;upload=await api(route+'/uploads',{...input,requestId:requestId+'_'+Date.now()});}
  if(upload.state!=='ready')for(let offset=upload.offset;offset<bytes.length;){

@@ -16,7 +16,7 @@ function approvedAlias(configs,shared,object){
  if(aliases.length>1)throw fail('CONFIG_PROMPT_AUTHORITY_CONFLICT');
  return aliases[0];
 }
-async function prepareSharedConfiguration(configs,topic,{desktopContext=false}={}){
+async function prepareSharedConfiguration(configs,topic,{desktopContext=false,persist=true}={}){
  const shared=configs.sourceCatalog?.store?.shared;
  if(!shared||!topic.sharedSpaceId)return null;
  if(shared.readOnly)throw fail('SHARED_READ_ONLY');
@@ -32,7 +32,9 @@ async function prepareSharedConfiguration(configs,topic,{desktopContext=false}={
  const nativeTopic={...topic,...(owner.kind==='agent'?{agentAlias:approvedAlias(configs,shared,owner)}:{memberAliases:Object.fromEntries(frozen.members.map(m=>[m.id,approvedAlias(configs,shared,m)]))})};
  const value=await configs.normalize(nativeTopic,input,{desktopContext});
  if(shared.freeze(row).hash!==frozen.hash)throw fail('SHARED_CONFIG_PENDING');
- value.sharedTemplateHash=frozen.hash;const hash=sha256(stable(value));
+ value.sharedTemplateHash=frozen.hash;
+ if(!persist)return value;
+ const hash=sha256(stable(value));
  shared.atomic(()=>{
   const latest=configs.latest(topic.key);
   if(latest?.hash!==hash)configs.db.prepare('INSERT INTO owner_execution_configs(topic_key,version,hash,config_json,created_at) VALUES(?,?,?,?,?)').run(topic.key,(latest?.version||0)+1,hash,JSON.stringify(value),Date.now());

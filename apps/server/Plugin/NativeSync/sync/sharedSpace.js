@@ -14,6 +14,8 @@ class SharedSpace {
  constructor(store,config={}, {configurationOnly=false}={}) {
   this.store=store;this.db=store.db;this.catalog=store.sourceCatalog;
   this.configurationOnly=configurationOnly;
+  const coreBinding=this.catalog?this.db.prepare("SELECT value FROM native_sync_metadata WHERE key='core-single-workspace-v1'").get():null;
+  if(coreBinding){const binding=JSON.parse(coreBinding.value);this.coreWorkspace=binding.workspace;this.coreStorageId=binding.storageId;}
   const controlled=require('./sharedControlledText');
   this.safeTools=controlled.allowedTools(config.NativeSyncSharedSafeTools);
   this.delegationAgents=controlled.allowedAgents(config.NativeSyncSharedAgentAssistantAgents);
@@ -251,6 +253,7 @@ class SharedSpace {
    return {removed:'all',sharedId:row.id};
   });
  }
+ requiresCore(row){return row?.owner_type==='agent'&&row.space_id===(this.coreWorkspace||this.core?.workspace);}
  topicFor(tupleValue){return this.db.prepare("SELECT * FROM shared_objects WHERE owner_type=? AND owner_id=? AND topic_id=? AND kind='topic'").get(...tupleValue);}
  legacyGuard(topic){if(this.topicFor([topic.ownerType,topic.ownerId,topic.topicId]))throw fail('SHARED_CLIENT_UPGRADE_REQUIRED');}
  adopt(actor,body){
@@ -295,11 +298,11 @@ class SharedSpace {
   this.row(space,row.parent_id);if(permission==='execute'&&actor.kind==='desktop'&&this.db.prepare('SELECT 1 FROM shared_local_bindings b WHERE b.source_id=? AND b.hidden=1 AND b.object_id IN (?,?) AND NOT EXISTS(SELECT 1 FROM shared_local_bindings a WHERE a.source_id=b.source_id AND a.object_id=b.object_id AND a.hidden=0) LIMIT 1').get(actor.sourceId,row.id,row.parent_id))throw fail('SHARED_LOCAL_REMOVED');return row;
  }
  history(actor,{sharedSpaceId,sharedId,after=0,limit=100}){
-  const topic=this.topic(actor,sharedSpaceId,sharedId);if(topic.id!==sharedId&&after>0)throw fail('SHARED_TOPIC_MERGED');
+  const topic=this.topic(actor,sharedSpaceId,sharedId);if(this.requiresCore(topic))throw fail('CORE_ROUTE_REQUIRED');if(topic.id!==sharedId&&after>0)throw fail('SHARED_TOPIC_MERGED');
   return this.store.pull(after,limit,[JSON.stringify(tuple(topic))],{spaceId:sharedSpaceId});
  }
  topicHistory(actor,{sharedSpaceId,sharedId,after=0,limit=100}){
-  const topic=this.topic(actor,sharedSpaceId,sharedId);if(topic.id!==sharedId)throw fail('SHARED_TOPIC_MERGED');
+  const topic=this.topic(actor,sharedSpaceId,sharedId);if(this.requiresCore(topic))throw fail('CORE_ROUTE_REQUIRED');if(topic.id!==sharedId)throw fail('SHARED_TOPIC_MERGED');
   if(!Number.isSafeInteger(after)||after<0||!Number.isSafeInteger(limit)||limit<1||limit>500)throw fail('INVALID_CURSOR',400);
   // A separate topic cursor. It conveys no progress over other Journal rows.
   return this.store.readSnapshot(()=>{
@@ -395,6 +398,7 @@ class SharedSpace {
   const sponsored=sponsor===require('./sharedTopicSponsor').dispatchKey&&session;
   if(this.readOnly)throw fail('SHARED_READ_ONLY');
   const topic=this.topic(actor,body.sharedSpaceId,body.sharedId,'execute');id(body.requestId);
+  if(this.requiresCore(topic))throw fail('CORE_ROUTE_REQUIRED');
   if((body.kind||'message')==='message'&&body.message?.role!==(sponsored?'assistant':'user'))throw fail('INVALID_SHARED_SUBMISSION',400);
   if(body.sponsorRouteHash!==undefined&&(actor.kind!=='desktop'||topic.owner_type!=='agent'||(body.kind||'message')!=='message'||typeof body.sponsorRouteHash!=='string'||!/^[a-f0-9]{64}$/.test(body.sponsorRouteHash)))throw fail('INVALID_TOPIC_SPONSOR_ROUTE',400);
   const requestHash=sha256(stable(body));

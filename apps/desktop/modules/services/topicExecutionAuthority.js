@@ -64,6 +64,10 @@ function createTopicExecutionAuthority({ appDataRoot, getQueue, getRuntime = () 
             const topicId = topicRows[0][0], topic = runtime.state.objects[topicId];
             if (!topic || topic.deleted || topic.parentId !== ownerId || !runtime.isLocalVisible(topicId)) throw failure('SHARED_LOCAL_MAPPING_PENDING');
             runtime.matching.assert([ownerId, topicId]);
+            if (runtime.coreSingle?.owns(normalized)) {
+                if (runtime.coreSingle.mapping(normalized).sharedId !== topicId) throw failure('SHARED_LOCAL_MAPPING_PENDING');
+                return { success: true, kind: 'shared', core: true, sharedId: topicId };
+            }
             const mapping = runtime.execution.mapping(normalized);
             if (mapping.sharedId !== topicId) throw failure('SHARED_LOCAL_MAPPING_PENDING');
             // Only a fully validated shared binding may use Queue's guarded
@@ -96,6 +100,7 @@ async function prepareNativeRequest({authority,queue,context,body}) {
     const owner=await authority.classifyNativeRequest(context);
     if(!owner?.success || !['local','shared'].includes(owner.kind)) throw failure(owner?.code||'TOPIC_AUTHORITY_UNAVAILABLE');
     if(owner.kind==='local') return null;
+    if(owner.core)throw failure('CORE_ROUTE_REQUIRED');
     if(!queue?.syncPolicy?.sharedExecution) throw failure('SHARED_AUTHORITY_UNAVAILABLE');
     return queue.syncPolicy.sharedExecution.prepareNative(context,body);
 }

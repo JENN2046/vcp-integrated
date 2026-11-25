@@ -129,6 +129,10 @@ class SharedRuntime {
   if(this.readOnly&&!loaded)throw fail('SHARED_READ_ONLY_EXISTING_REPLICA_REQUIRED');
   this.state=loaded||{version:1,binding:this.binding(),legacyHash:sha256(stable(previous)),locals:{},objects:{},baselines:{},adopted:false,pending:null};
   if(this.state.version!==1||stable(this.state.binding)!==stable(this.binding())||this.state.legacyHash!==sha256(stable(previous)))throw fail('SHARED_BINDING_CHANGED');
+  this.coreSingle = new (require('./coreSingleClient').CoreSingleClient)(this);
+  const coreAdvertised = this.coreSingle.owns({ itemType: 'agent' });
+  if (this.state.coreSingle && !coreAdvertised) throw fail('CORE_AUTHORITY_UNAVAILABLE');
+  if (coreAdvertised && !this.state.coreSingle) { this.state.coreSingle=true; await this.save(); }
   if(this.readOnly)return require('./sharedReadonly').open(this);
   this.matching=await require('./sharedMatching').SharedMatching.open(this);
   if(this.isStopping())throw fail('APPLICATION_SHUTTING_DOWN');
@@ -142,7 +146,7 @@ class SharedRuntime {
   await this.pollDirectory();await this.directoryState.bindings();
   await this.ensureRules();
   await this.materialize();
-  const mappings=this.mappings();
+  const mappings=this.legacyMappings();
   this.replica=await openSharedReplica({queue:this.queue,statePath:path.join(this.dir,'messages.json'),connection:this.connection,mappings,send:this.send,notify:this.notify,historyAuthority:authorityControl.authorityFor(this)});
   // Origin histories already have verified per-message bases. Retain them so
   // baseline reconciliation never mistakes a current v2 for an empty v1 base.
@@ -160,8 +164,8 @@ class SharedRuntime {
   await this.matching.poll();await this.directoryState.tombstones();
   await this.backfill({verifyExisting:true});await this.replica.sync();
   if(this.connection.syncAttachments&&this.capabilities.features?.includes('shared-attachments-v1')){
-   const connection={...this.connection,topics:this.mappings().filter(m=>this.isLocalVisible(m.sharedId)&&!this.matching?.fenced(m.sharedId)).map(m=>m.local)};
-   this.attachments=new (require('./attachments').DesktopAttachments)({queue:{readSnapshot:d=>this.queue.readSnapshot(d),mutate:(...args)=>this.mutateAttachment(...args)},appDataRoot:this.root,connection,send:this.send,download:this.download,storeAttachment:this.storeAttachment,routeBase:'/api/plugins/NativeSync/shared-attachments/',localOnly:true,getMapping:()=>this.mappings().map(m=>({key:m.sharedId,ownerType:m.local.itemType,ownerId:m.local.itemId,topicId:m.local.topicId})),onMaterialized:(d,result)=>this.notify({agentId:d.itemId,ownerId:d.itemId,ownerType:d.itemType,topicId:d.topicId,revision:result.revision,source:'native-sync'})});
+   const connection={...this.connection,topics:this.legacyMappings().filter(m=>this.isLocalVisible(m.sharedId)&&!this.matching?.fenced(m.sharedId)).map(m=>m.local)};
+   this.attachments=new (require('./attachments').DesktopAttachments)({queue:{readSnapshot:d=>this.queue.readSnapshot(d),mutate:(...args)=>this.mutateAttachment(...args)},appDataRoot:this.root,connection,send:this.send,download:this.download,storeAttachment:this.storeAttachment,routeBase:'/api/plugins/NativeSync/shared-attachments/',localOnly:true,getMapping:()=>this.legacyMappings().map(m=>({key:m.sharedId,ownerType:m.local.itemType,ownerId:m.local.itemId,topicId:m.local.topicId})),onMaterialized:(d,result)=>this.notify({agentId:d.itemId,ownerId:d.itemId,ownerType:d.itemType,topicId:d.topicId,revision:result.revision,source:'native-sync'})});
    adapter.attachmentRecovery = this.attachments;
   }
   this.execution=await require('./sharedExecution').SharedExecution.open(this);adapter.sharedExecution=this.execution;await this.execution.reconcile();this.sessions=new (require('./sharedSessionClient').SharedSessionClient)(this,{openEvents:this.openEvents});
@@ -184,11 +188,12 @@ class SharedRuntime {
    if(!this.isLocalVisible(mapping.sharedId))throw fail('SHARED_LOCAL_REMOVED');
    if(this.state.pending)throw fail('SHARED_PENDING_REGISTRATION');
    this.matching.assert([mapping.sharedId,this.state.objects[mapping.sharedId].parentId]);
+   if(this.coreSingle?.owns(d))return;
    adapter.assertInitializationReady(d);
    await beforeMutation(d);await beforeWrite(d);
   };
-  adapter.beforeMutation=async d=>{if(!['remote','attachment-materialization'].includes(d.syncSource))throw fail('SHARED_EXECUTION_NOT_READY');return beforeMutation(d);};
-  adapter.beforeWrite=async d=>{if(!['remote','attachment-materialization'].includes(d.syncSource))throw fail('SHARED_EXECUTION_NOT_READY');return beforeWrite(d);};
+  adapter.beforeMutation=async d=>{if(this.coreSingle?.owns(d))throw fail('CORE_ROUTE_REQUIRED');if(!['remote','attachment-materialization'].includes(d.syncSource))throw fail('SHARED_EXECUTION_NOT_READY');return beforeMutation(d);};
+  adapter.beforeWrite=async d=>{if(this.coreSingle?.owns(d))throw fail('CORE_ROUTE_REQUIRED');if(!['remote','attachment-materialization'].includes(d.syncSource))throw fail('SHARED_EXECUTION_NOT_READY');return beforeWrite(d);};
  }
  async recordCommand(p,result){
   if(authorityControl.authorityFor(this))return authorityControl.withAuthority(authorityControl.authorityFor(this),'shared-recordCommand',()=>this.recordCommandPrepared(p,result));
@@ -321,6 +326,7 @@ class SharedRuntime {
   }
  }
  mappings(){return Object.entries(this.state.locals).filter(([id,l])=>l.kind==='topic'&&!l.aliasOf&&this.state.objects[id]?.topic).map(([id,l])=>{const t=this.state.objects[id].topic;return {sharedId:id,adopted:l.adopted,local:{itemType:t.ownerType,itemId:l.localParent,topicId:l.localId},shared:{itemType:t.ownerType,itemId:t.ownerId,topicId:t.topicId}};});}
+ legacyMappings(){return this.mappings().filter(mapping=>!this.coreSingle?.owns(mapping.shared));}
  async verifyHistory(mapping){
   const a=this.replica.adapter,rows=await a.queue.read(mapping.shared),seen=new Set();
   for(const raw of rows){const m=a.canonical(raw,mapping.shared.topicId),key=messageKey({...this.state.objects[mapping.sharedId].topic,msgId:m.id}),ack=a.state.acked[key];if(!ack||ack.deleted||ack.hash!==messageHash(m)||ack.metadataHash!==sha256(stable(fieldsFrom(m)))||raw.isPendingStream||raw.isThinking)throw fail('SHARED_LOCAL_HISTORY_CONFLICT');seen.add(key);}
@@ -329,7 +335,7 @@ class SharedRuntime {
  }
  async backfill({verifyExisting=false,only=null}={}){
   const a=this.replica.adapter;
-  for(const mapping of this.mappings()){
+  for(const mapping of this.legacyMappings()){
    if(only&&mapping.sharedId!==only)continue;
    if(!this.isLocalVisible(mapping.sharedId))continue;
    let plan=this.state.baselines[mapping.sharedId];if(plan?.complete){if(verifyExisting)await this.verifyHistory(mapping);continue;}
@@ -344,7 +350,7 @@ class SharedRuntime {
    await this.verifyHistory(mapping);
   }
   if (a.state.cursor) return;
-  const mappings = this.mappings();
+  const mappings = this.legacyMappings();
   if (!mappings.length || !mappings.every(m => this.state.baselines[m.sharedId]?.complete)) return;
   const watermark = mappings.reduce((min, m) => Math.min(min, this.state.baselines[m.sharedId].remote.watermark), Number.MAX_SAFE_INTEGER);
   // An empty baseline at cursor zero is already durable. Repeated background
@@ -405,7 +411,7 @@ class SharedRuntime {
  recoverableDirectory(){
   return !this.readOnly&&(this.state.pending||this.capabilities.features?.includes('shared-merge-v1')&&this.matching?.needsPoll()||
    Object.values(this.state.localRemovals||{}).some(operation=>['pending','accepted','restoring'].includes(operation.stage))||
-   this.mappings().some(mapping=>this.isLocalVisible(mapping.sharedId)&&!this.state.baselines[mapping.sharedId]?.complete));
+   this.legacyMappings().some(mapping=>this.isLocalVisible(mapping.sharedId)&&!this.state.baselines[mapping.sharedId]?.complete));
  }
  recoverableExecution(){
   return !this.readOnly&&(this.execution?.needsReconcile()||this.sessions?.needsReconcile());
@@ -473,6 +479,9 @@ class SharedRuntime {
  }
  async refreshCapabilities(){
   const next=await inspectShared(this.connection,this.legacy,this.send,{allowReadOnly:true});
+  if(Boolean(this.state.coreSingle)!==next.spaces.some(space=>space.id===this.connection.sharedSpaceId&&space.coreSingle===true)){
+   throw fail('CORE_AUTHORITY_CHANGED_RESTART_REQUIRED');
+  }
   this.lastCapabilityCheck=Date.now();
   if(next.readOnly&&!this.readOnly){
    this.readOnly=true;
@@ -499,7 +508,7 @@ class SharedRuntime {
     scannedTopics.set(JSON.stringify([kind,ownerId,topic.id]),localTopicConfig(topic));
    });
   }
-  for(const mapping of this.mappings())if(!this.replica.adapter.isEnabled(mapping.shared))await this.replica.add(mapping);
+  for(const mapping of this.legacyMappings())if(!this.replica.adapter.isEnabled(mapping.shared))await this.replica.add(mapping);
   await this.backfill();
   for(const [id,known]of Object.entries(this.configs.state.objects)){
    if(this.configs.state.drafts[id])continue;
@@ -558,6 +567,7 @@ class SharedRuntime {
   return {records:unique.slice(-Math.min(200,Math.max(1,limit))),total:unique.length,truncated:budgetLimited||held.length>100||unique.length>limit,missingHistoricalTraces:missing.length,initiatorOnly:true};
  }
  async cancelNativeSession({descriptor,executionId,operationId}){this.assertSharedAccess();
+  if(this.coreSingle?.owns(descriptor))return this.coreSingle.control(descriptor,executionId,'cancel',operationId);
   require('./contracts.generated.cjs').sharedIdentity(executionId);
   if(!this.capabilities.features?.includes('shared-session-cancel-v1'))throw fail('SHARED_SESSION_CONTROL_UPGRADE_REQUIRED');
   if(this.readOnly)throw fail('SHARED_READ_ONLY');
@@ -711,10 +721,15 @@ class SharedRuntime {
   if(!this.host.readTopic)throw fail('SHARED_NATIVE_TOPIC_AUTHORITY_REQUIRED');const config=await this.host.readTopic(kind,d.itemId,d.topicId);if(!config)throw fail('SHARED_LOCAL_TOPIC_NOT_FOUND');
   await require('./sourceDirectory').assertHistoryPath(this.root,this.queue.getHistoryPath(d.itemId,d.topicId));const rows=await this.queue.read(d);if(rows.length)throw fail('SHARED_UNREGISTERED_HISTORY');
   const object=await this.register('objects',{opId:this.op('topic:'+kind+':'+d.itemId+':'+d.topicId),kind:'topic',localId:d.topicId,localParent:d.itemId,parentId:owner.id,config});await this.adoptRegisteredConfig(object);
-  const mapping=this.mappings().find(m=>m.sharedId===object.id);if(!mapping)throw fail('SHARED_LOCAL_MAPPING_REQUIRED');await this.replica.add(mapping);await this.backfill({only:object.id});return this.execution.mapping(d);
+  const mapping=this.mappings().find(m=>m.sharedId===object.id);if(!mapping)throw fail('SHARED_LOCAL_MAPPING_REQUIRED');if(!this.coreSingle?.owns(d)){await this.replica.add(mapping);await this.backfill({only:object.id});}return this.execution.mapping(d);
  }
 
- async submitSharedSteering({descriptor,message,observedWorkId,...options}){this.assertSharedAccess();if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');let record;
+ async submitSharedSteering({descriptor,message,observedWorkId,...options}){this.assertSharedAccess();
+ if(this.coreSingle?.owns(descriptor)){
+  if(!observedWorkId||message?.attachments?.length)throw fail('CORE_STEERING_TEXT_REQUIRED');
+  return {...await this.coreSingle.steer(descriptor,observedWorkId,message.content,message.id),handled:true,success:true,inputAccepted:true};
+ }
+if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');let record;
  if(options.parentInputId){const input=this.execution.state.requests[message.id],parent=this.execution.state.requests[options.parentInputId];if(!input||input.parentLocalInputId!==options.parentInputId||stable(input.descriptor)!==stable(descriptor))throw fail('SHARED_LOCAL_INTENT_CHANGED');
   if(!parent?.accepted){input.phase='waiting_parent';await this.execution.save();return {handled:true,success:true,pendingParent:true,inputId:message.id,localState:'saved'};}record=parent;
  }else record=await this.execution.steering.active(descriptor,observedWorkId);if(!record)throw fail('STEERING_NO_ACTIVE_WORK');if(!record.steeringV1)throw fail('SHARED_STEERING_TARGET_UNSUPPORTED');return this.execution.steering.submit(record,descriptor,message,options);}
@@ -734,7 +749,7 @@ class SharedRuntime {
   }
   for(const [id,prepared]of Object.entries(this.execution.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.activeCompactions.has(id)&&!this.execution.state.compactions?.[id]?.body)await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:this.closed});
  }
- async prepareSharedCompaction({descriptor,retryId}){this.assertSharedAccess();
+ async prepareSharedCompaction({descriptor,retryId}){this.assertSharedAccess();if(this.coreSingle?.owns(descriptor))throw fail('CORE_COMPACTION_NOT_MIGRATED');
   if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(descriptor);if(!this.capabilities.features?.includes('shared-compaction-v1'))throw fail('SHARED_COMPACTION_UPGRADE_REQUIRED');const context=await this.refreshForExecution(descriptor,{forceFresh:true});if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');
   const publications=this.execution.state.compactions||{};
   if(retryId!==undefined){
@@ -831,15 +846,20 @@ class SharedRuntime {
  }
  async readySharedInput({inputId,modelSaveRef}){this.assertSharedAccess();const input=this.execution.state.requests[inputId];if(!input)throw fail('SHARED_INPUT_NOT_FOUND');if(stable(input.modelSaveRef||input.steeringBody?.modelSaveRef||null)!==stable(modelSaveRef||null))throw fail('MODEL_SAVE_REFERENCE_CHANGED');input.dependencyReady=true;await this.execution.save();if(!input.isSteeringInput)return {success:true,pendingParent:true};return {success:true,...await this.execution.steering.finishInput(input)};}
 
- async prepareSharedContinuation({descriptor,...options}){this.assertSharedAccess();if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');
+ async prepareSharedContinuation({descriptor,...options}){this.assertSharedAccess();if(this.coreSingle?.owns(descriptor))throw fail('CORE_CONTINUATION_NOT_MIGRATED');if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');
   const record=Object.values(this.execution.state.requests).find(value=>value.accepted?.id===options.workId&&!value.isSteeringInput),control=record&&await this.execution.steering.query(record);
   const mode=record?.accepted?.turn?.controlMode;
   if(['text-only-v1','safe-tools-v1','agent-assistant-v1'].includes(mode)&&control?.generation===0&&control.revision===0&&control.executor==='desktop:'+this.connection.deviceId&&control.generations?.[0]?.state==='prepared'&&record.localMessage)return this.execution.prepare(descriptor,record.localMessage,{controlMode:mode,...(record.body.delegation&&{delegation:record.body.delegation})});
   return this.execution.steering.prepare(descriptor,options);
  }
- async stageLocalSharedInput({descriptor,message,...options}){this.assertSharedAccess();if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.stageLocal(descriptor,message,options);}
+ async stageLocalSharedInput({descriptor,message,...options}){this.assertSharedAccess();if(this.coreSingle?.owns(descriptor))throw fail('CORE_STEERING_NOT_MIGRATED');if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.stageLocal(descriptor,message,options);}
  async prepareSharedSend({descriptor,message,localOnly=false,serverSession=false,...options}){
   this.assertSharedAccess();
+  if(this.coreSingle?.owns(descriptor)){
+   if(localOnly)return {handled:false};
+   if(!serverSession||options.controlMode||message.desktopReferences?.length)throw fail('CORE_COMMAND_NOT_MIGRATED');
+   return this.coreSingle.send(descriptor,message);
+  }
   if(options.controlMode!==undefined){
    const tools=options.controlMode==='safe-tools-v1',aa=options.controlMode==='agent-assistant-v1';
    if(!tools&&!aa&&options.controlMode!=='text-only-v1')throw fail('CONTROLLED_MODE_UNSUPPORTED');
@@ -872,11 +892,12 @@ class SharedRuntime {
    return this.execution.prepare(descriptor,message,options,{forceFresh:true});
   }
  }
- async abandonSharedSend(payload){this.assertSharedAccess();if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.abandon(payload);}
+ async abandonSharedSend(payload){this.assertSharedAccess();if(this.coreSingle?.owns(payload.descriptor)){if(payload.confirmed!==true)throw fail('WORK_REVIEW_CONFIRMATION_REQUIRED');return this.coreSingle.control(payload.descriptor,payload.requestId,'release');}if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');return this.execution.abandon(payload);}
  async getExecutionStatus(d,options={}){
   const unavailable=()=>({enabled:true,readOnly:true,connection:'error',configurationError:permissionError().code,executions:[]});
   if(this.backgroundDenied)return unavailable();
   if(this.readOnly){this.nativeTaskViews?.clear();return {enabled:true,readOnly:true,configurationError:'SHARED_READ_ONLY',executions:[],connection:'online'};}if(!d?.itemId||!d?.topicId)return {enabled:true,readOnly:false};
+  if(this.coreSingle?.owns(d))return this.coreSingle.status(d);
   const sessionsEnabled=this.sessions?.enabled();
   let observationError;
   try{
@@ -963,6 +984,6 @@ class SharedRuntime {
   return {success: true};
  }
  async getNativeTaskResult(d,workId,nativeTaskId){this.assertSharedAccess();if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(d);const known=await this.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId}));if(known.request?.sharedId!==mapping.sharedId)throw fail('NATIVE_TASK_RESULT_MISMATCH');const value=await this.send(endpoint+'task-result?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId,nativeTaskId}));return {...value,topic:{ownerType:d.itemType||'agent',ownerId:d.itemId,topicId:d.topicId}};}
- async close(){if(this.closed)return;this.closed=true;this.nativeTaskViews?.clear();const watchClosed=this.waitClient.close();clearTimeout(this.timer);await this.sessions?.close();try{await this.recoverSharedCompactionPrepares();}catch{}for(const [id,prepared]of Object.entries(this.execution?.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.execution.state.compactions?.[id]?.body)try{await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:true});}catch{}clearTimeout(this.timer);if(this.changed)this.agentConfigEvents?.off?.('agent-config-updated',this.changed);await Promise.allSettled([watchClosed,this.running,this.refreshing,this.attachments?.work?.running,this.coreTail,this.registrationTail,this.registryDisk,this.topicSponsorRecovery]);await this.execution?.close();await this.replica?.close();this.releaseHost?.();}
+ async close(){if(this.closed)return;this.closed=true;this.nativeTaskViews?.clear();const watchClosed=this.waitClient.close();clearTimeout(this.timer);await this.coreSingle?.close();await this.sessions?.close();try{await this.recoverSharedCompactionPrepares();}catch{}for(const [id,prepared]of Object.entries(this.execution?.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.execution.state.compactions?.[id]?.body)try{await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:true});}catch{}clearTimeout(this.timer);if(this.changed)this.agentConfigEvents?.off?.('agent-config-updated',this.changed);await Promise.allSettled([watchClosed,this.running,this.refreshing,this.attachments?.work?.running,this.coreTail,this.registrationTail,this.registryDisk,this.topicSponsorRecovery]);await this.execution?.close();await this.replica?.close();this.releaseHost?.();}
 }
 module.exports={SharedRuntime,startupFence};

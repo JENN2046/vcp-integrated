@@ -116,6 +116,9 @@ class CentralStore {
   apply(raw, authority = {}) {
     let id;
     try { id = identity(raw); } catch { throw new SyncError('INVALID_IDENTITY','Invalid message identity'); }
+    if ((this.shared?.core || this.shared?.coreWorkspace) && this.shared.requiresCore(this.shared.topicFor([id.ownerType, id.ownerId, id.topicId]))) {
+      throw new SyncError('CORE_ROUTE_REQUIRED', 'Conversation owned by Core', 409);
+    }
     if (this.shared && !authority.sharedSpace) this.shared.legacyGuard(id);
     if (!raw || typeof raw.deviceId !== 'string' || !raw.deviceId ||
         typeof raw.opId !== 'string' || !raw.opId ||

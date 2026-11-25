@@ -2365,7 +2365,7 @@ export const chatManager = (() => {
         let locallySaved = false;
         // An immutable text intent is fsynced locally before releasing this input.
         // Attachments and native business operations retain their existing path.
-        if (sendAuthority.kind === 'shared' && !request && !nativeResult?.handled && !uiAttachments.length && typeof electronAPI.prepareSharedSend === 'function') {
+        if (sendAuthority.kind === 'shared' && !sendAuthority.core && !request && !nativeResult?.handled && !uiAttachments.length && typeof electronAPI.prepareSharedSend === 'function') {
             try {
                 const saved = await electronAPI.prepareSharedSend({localOnly:true,descriptor:{itemId:sendContext.agentId,itemType:sendContext.itemType||'agent',topicId:sendContext.topicId},message:userMessage,...(modelSaveRef?{modelSaveRef}:{})});
                 if (saved?.success === false) throw new Error(saved.error || 'LOCAL_SAVE_FAILED');
@@ -2395,7 +2395,7 @@ export const chatManager = (() => {
                 const result = await electronAPI.prepareSharedSend({serverSession:true,descriptor:{itemId:sendContext.agentId,itemType:sendContext.itemType||'agent',topicId:sendContext.topicId},message:userMessage,...(modelSaveRef?{modelSaveRef}:{})});
                 if (result?.success === false) throw Object.assign(new Error(result.error),{code:result.error});
                 if (!result?.handled) throw Object.assign(new Error('共享受理能力不可用'), {code:'SHARED_SEND_UNAVAILABLE'});
-                if (result?.handled) { sharedSubmission={...result,history:orderSharedHistory(result.history)};userMessage=result.userMessage;if(result.projectionPending){sharedPendingUserIds.add(userMessage.id);historySyncGeneration++;} }
+                if (result?.handled) { sharedSubmission={...result,history:result.core?result.history:orderSharedHistory(result.history)};userMessage=result.userMessage;if(result.projectionPending){sharedPendingUserIds.add(userMessage.id);historySyncGeneration++;} }
                 if (projectionLease) {
                     if (result?.handled && result.projectionPending === true) observeSharedProjection(projectionLease);
                     else settleSharedProjection(projectionLease, true);
@@ -2533,7 +2533,7 @@ export const chatManager = (() => {
             return nativeResult;
         }
         if (sharedSubmission?.serverSession) {
-            const bound=window.flowlockManager?.bindSharedExecution?.(sharedFlowlock,{
+            const bound=!sharedSubmission.core && window.flowlockManager?.bindSharedExecution?.(sharedFlowlock,{
                 executionId:sharedSubmission.serverSession.executionId,requestId:userMessage.id,messageId:sharedSubmission.replyId,
             });
             if(bound&&typeof electronAPI.getNativeExecutionStatus==='function'){

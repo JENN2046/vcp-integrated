@@ -783,7 +783,7 @@ class ToolExecutor {
   }
 
   _broadcast(toolName, status, content) {
-    this.webSocketServer.broadcast({
+    this.webSocketServer?.broadcast?.({
       type: 'vcp_log',
       data: { tool_name: toolName, status, content }
     }, 'VCPLog');

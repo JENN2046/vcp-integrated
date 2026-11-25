@@ -191,6 +191,12 @@ function validateHostPresentation(value) {
   });
 }
 
+function openResidentPresentation(sink, enabled, stream, model) {
+  return enabled ? sink.createPresentationSink({
+    type: 'resident_presentation', validate: validateHostPresentation, stream, model
+  }) : null;
+}
+
 function createPresentationChannel(res, enabled) {
   if (!enabled) return null;
   const channelId = randomBytes(16).toString('hex');
@@ -281,5 +287,6 @@ module.exports = Object.freeze({
   hasResidentProposalSurface,
   isResidentProposalToolCall,
   residentProposalFailureCategory,
+  openResidentPresentation,
   validateHostPresentation
 });
