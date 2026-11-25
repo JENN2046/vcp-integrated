@@ -1,0 +1,10 @@
+{
+  "build": "sha256:7a40ab457a22313dfcad43f13f230ba21201cad336b08d3e95c5d42a19d6461d",
+  "nativeCompanion": true,
+  "providerAttempts": 2,
+  "presenceCarrier": false,
+  "ephemeralCards": 1,
+  "challengeInProviderBody": false,
+  "formalFinal": 1,
+  "consentSubmitted": false
+}

@@ -1,0 +1,82 @@
+{
+  "model": "SmolVLM-500M-Instruct-Q8_0",
+  "engine": "llama.cpp b12728",
+  "source": "c3777d083c59d041de9a452a6471da101069570d",
+  "android": "USB physical WebView",
+  "desktop": "Electron 44 GUI",
+  "desktopStoppedDuringWork": true,
+  "androidObservedUncommittedLiveReply": true,
+  "provider": [
+    {
+      "imageHash": "d2b4669acbbccac985634a61fefe46db4f00b87d14f5df6e34792e9dbe7e2d4b",
+      "roles": [
+        "system",
+        "user"
+      ],
+      "status": 200
+    },
+    {
+      "imageHash": "d2b4669acbbccac985634a61fefe46db4f00b87d14f5df6e34792e9dbe7e2d4b",
+      "roles": [
+        "system",
+        "user",
+        "assistant",
+        "user"
+      ],
+      "status": 200
+    }
+  ],
+  "transcript": [
+    {
+      "id": "05fe2fcd-13c9-494d-8c32-d33d656893d8",
+      "role": "user",
+      "content": "What color is the image? Answer in one short sentence.",
+      "timestamp": 1795628478021,
+      "ordinal": 1024,
+      "revision": 1,
+      "attachments": [
+        {
+          "id": "attachment_01f4236cd231e3935c2f3780c2288f532da550eda7333454b05402fde0d0102b",
+          "name": "red.png",
+          "type": "image/png",
+          "size": 1188,
+          "hash": "01f4236cd231e3935c2f3780c2288f532da550eda7333454b05402fde0d0102b",
+          "blobHash": "01f4236cd231e3935c2f3780c2288f532da550eda7333454b05402fde0d0102b"
+        }
+      ]
+    },
+    {
+      "id": "reply_2dd84230-9f37-4ec5-86bf-7998207b3cf0",
+      "role": "assistant",
+      "content": " The image is a red background.",
+      "timestamp": 1795628480164,
+      "ordinal": 2047,
+      "sourceWorkId": "2dd84230-9f37-4ec5-86bf-7998207b3cf0",
+      "revision": 1,
+      "attachments": []
+    },
+    {
+      "id": "fb4384cb-8386-4673-93ea-5f646789d659",
+      "role": "user",
+      "content": "What did you just see in the image? Answer in one short sentence.",
+      "timestamp": 1795628482337,
+      "ordinal": 3072,
+      "revision": 1,
+      "attachments": []
+    },
+    {
+      "id": "reply_87c4bc7e-2558-4e44-871e-c820dfaf143e",
+      "role": "assistant",
+      "content": " Red background.",
+      "timestamp": 1795628482645,
+      "ordinal": 4095,
+      "sourceWorkId": "87c4bc7e-2558-4e44-871e-c820dfaf143e",
+      "revision": 1,
+      "attachments": []
+    }
+  ],
+  "legacyJournalRows": 0,
+  "modelRevision": "72e986006ef53e37cdd3f6d4241c90b0f01df376",
+  "modelSha256": "9d4612de6a42214499e301494a3ecc2be0abdd9de44e663bda63f1152fad1bf4",
+  "projectorSha256": "d1eb8b6b23979205fdf63703ed10f788131a3f812c7b1f72e0119d5d81295150"
+}
