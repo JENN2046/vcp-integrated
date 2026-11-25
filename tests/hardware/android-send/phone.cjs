@@ -93,7 +93,10 @@ async function withPage(job) {
       assert(!result.exceptionDetails, 'Evaluation failed inside the isolated PWA');
       return result.result.value;
     };
-    await waitFor(() => evaluate(() => isSecureContext && document.querySelector('header strong')?.textContent === 'VCP Mobile'),
+    await waitFor(() => evaluate(() => isSecureContext && (
+      document.querySelector('header strong')?.textContent === 'VCP Mobile' ||
+      Boolean(document.querySelector('#agent-select'))
+    )),
       'Secure fixture PWA failed to load');
     await job(evaluate, call);
   } finally {
@@ -131,6 +134,7 @@ function snapshot() {
     accepted: read('#accepted-submission')?.dataset.requestId ?? null,
     jobs: [...document.querySelectorAll('[data-exec-id]')].map((entry) => ({id: entry.dataset.execId, state: entry.dataset.state})),
     messages,
+    liveReplies: [...document.querySelectorAll('[aria-label="正在生成的共享回复"] .bubble')].map(node => node.innerText),
   };
 }
 

@@ -153,9 +153,11 @@ test('Core uses the native approval queue and cancels before tool dispatch', asy
     const plugin = { name, pluginType: 'hybridservice', communication: { protocol: 'direct' } };
     pluginManager.plugins.set(name, plugin);
     pluginManager.serviceModules.set(name, { module: {
-        processToolCall: async () => { toolRuns++; return { status: 'success', result: 'fixture tool returned' }; }
+        processToolCall: async () => { toolRuns++; return Object.freeze({ status: 'success', result: 'fixture tool returned' }); }
     } });
-    pluginManager.toolApprovalManager.config = { ...pluginManager.toolApprovalManager.config, enabled: true, approveAll: true };
+    const previousApprovalConfig = pluginManager.toolApprovalManager.config;
+    pluginManager.toolApprovalManager.config = { ...previousApprovalConfig, enabled: true, approveAll: true };
+    t.after(() => { pluginManager.toolApprovalManager.config = previousApprovalConfig; });
     pluginManager.webSocketServer = { broadcast() {}, cancelVcpLogApprovalCache() {} };
     const { core, route } = await mountCore(f, chat);
     const completion = content => JSON.stringify({ choices: [{ message: { role: 'assistant', content }, finish_reason: 'stop' }] });
@@ -241,5 +243,54 @@ test('Core leaves a lost provider outcome for review without repeating the call'
     } finally {
         await core.close();
         await fs.rm(f.root + '-core', { recursive: true, force: true });
+    }
+});
+
+test('Core commits the streaming follow-up after one ephemeral Resident proposal', async t => {
+    const provider = await localProvider(t);
+    const { chat, pluginManager } = host(provider);
+    const { CoreTurnSink } = require(BOX + '/core/turnSink');
+    const name = 'AGENTSOSResident';
+    const presentation = Object.freeze({
+        schema: 'agents-os-resident.host-presentation.v1',
+        kind: 'OWNER_CONSENT_CHALLENGE',
+        title: 'AGENTSOSResident · Owner Consent',
+        mutationType: 'CREATE_GOAL_BUNDLE',
+        expiresInSeconds: 30,
+        challenge: '确认创建，测试甲、测试乙、测试丙'
+    });
+    pluginManager.plugins.set(name, { name, pluginType: 'hybridservice', communication: { protocol: 'direct' } });
+    pluginManager.serviceModules.set(name, { module: {
+        async processToolCall(_args, context) {
+            await context.emitEphemeralPresentation(presentation);
+            return Object.freeze({ data: { content: [{ type: 'text', text: 'Proposal prepared' }] } });
+        }
+    } });
+    const request = [
+        '<<<[TOOL_REQUEST]>>>', 'tool_name:「始」AGENTSOSResident「末」,',
+        'operation:「始」PROPOSE_GOAL_MUTATION「末」', '<<<[END_TOOL_REQUEST]>>>'
+    ].join('\n');
+    provider.setReply((_body, response) => {
+        response.setHeader('Content-Type', 'text/event-stream');
+        const content = provider.calls.length === 1 ? request : 'Ready for review.';
+        response.end('data: ' + JSON.stringify({ choices: [{ delta: { content }, finish_reason: 'stop' }] }) + '\n\ndata: [DONE]\n\n');
+    });
+    const { signal } = new AbortController();
+    const transient = [], messages = [];
+    const sink = new CoreTurnSink({ signal, observe: () => {},
+        present: (event, card) => transient.push({ event, card }), commit: content => messages.push(content) });
+    try {
+        const outcome = await chat.executeTurn({ signal, clientIp: null, body: {
+            model: 'synthetic', requestId: 'core-resident-proposal', stream: true,
+            messages: [{ role: 'system', content: 'AGENTSOSResident is available.' }, { role: 'user', content: 'Prepare a proposal.' }]
+        } }, sink);
+        assert.equal(outcome.completed, true);
+        assert.equal(provider.calls.length, 2);
+        assert.deepEqual(transient, [{ event: 'resident_presentation', card: presentation }]);
+        assert.deepEqual(messages, ['Ready for review.']);
+        assert.doesNotMatch(JSON.stringify(provider.calls), /测试甲/);
+    } finally {
+        pluginManager.plugins.delete(name);
+        pluginManager.serviceModules.delete(name);
     }
 });

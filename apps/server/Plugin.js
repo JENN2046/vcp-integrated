@@ -2176,6 +2176,9 @@ class PluginManager extends EventEmitter {
                 ? { content: resultFromPlugin }
                 : ((typeof resultFromPlugin === 'object' && resultFromPlugin !== null) ? resultFromPlugin : { original_plugin_output: resultFromPlugin });
 
+            // Host metadata belongs to a writable result envelope.
+            if (Object.isFrozen(finalResultObject)) finalResultObject = { ...finalResultObject };
+
             if (maidNameFromArgs) {
                 finalResultObject.MaidName = maidNameFromArgs;
             }

@@ -925,7 +925,12 @@ class StreamHandler {
         break;
       }
 
-      let nextAIResponseData = await processAIResponseStreamHelper(nextAiAPIResponse, false);
+      const nextAIResponseData = await processAIResponseStreamHelper(nextAiAPIResponse, false);
+      currentResidentFrame = nextAIResponseData.residentFrame || null;
+      if (currentResidentFrame?.kind === 'INVALID') {
+        failResidentProposalStream('PROPOSAL_SEQUENCE_REJECTED');
+        return;
+      }
       validUpstreamTurns = validUpstreamTurns && nextAIResponseData.completed;
       currentAIContentForLoop = nextAIResponseData.content;
       if (currentAIContentForLoop && currentAIContentForLoop.trim()) {
