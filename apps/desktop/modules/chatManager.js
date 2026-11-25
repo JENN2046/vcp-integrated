@@ -2405,6 +2405,8 @@ export const chatManager = (() => {
                 const attachmentFailure = ({
                     MODEL_IMAGE_UNSUPPORTED: '当前模型未在共享空间启用图片输入。',
                     ATTACHMENT_TYPE_REJECTED: '共享服务无法接收此附件格式。',
+                    ATTACHMENT_TEXT_UNAVAILABLE: '附件中没有可供会话读取的文本。',
+                    ATTACHMENT_TEXT_TOO_LARGE: '附件提取的文本超出长度限制。',
                 })[error.code];
                 if (locallySaved || attachmentFailure) window.dispatchEvent(new Event('native-sync:local-input-changed'));
                 const reason = ({SHARED_CONFIG_CONFLICT:'当前模型或共享配置尚未确认。',SHARED_CONFIG_PENDING_CONFIRMATION:'模型保存回执尚未确认。',SHARED_RESULT_REQUIRES_REVIEW:'原请求的执行结果需要核对。',SHARED_TOPIC_BUSY:'上一条请求尚未结束。',NETWORK_UNAVAILABLE:'连接中断，提交结果尚未确认。'})[error.code] || '本次提交尚未完成。';

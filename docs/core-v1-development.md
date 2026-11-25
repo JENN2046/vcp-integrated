@@ -29,5 +29,5 @@ npm run test:collaboration -- --test-name-pattern='Core single chat PWA'
 
 - 基线缺少生产 `HumanClientAdmission` 和 `ApprovalReceiptAuthority` 接线。普通审批沿用 ToolBox；要求可信人类凭据的 Core 工具调用返回 `CORE_TRUSTED_APPROVAL_UNAVAILABLE`。
 - AGENTS OS Resident 保持可选。Presence 校验与 Provider Seal 放在 Resident 扩展模块。Core 接收由扩展验证的瞬态展示。M1-R1 用已安装的 Resident 验证了提案和临时卡。正向 Provider Seal 仍需有效的 OneRing 绑定。
-- 群聊、AA、异步工具、压缩、桌面专用上下文和真实历史导入未迁移。Core 单聊不走这些能力的旧执行入口。
+- 群聊、AA、异步工具、桌面专用上下文和真实历史导入仍采用各自的既有能力边界。M2 在 Core 单聊接入了空闲话题的手动压缩。[M2 已验范围](core-v1-m2.md)
 - M1-R1 在 Linux Electron GUI、实体 Android 与本机真实视觉模型上通过了隔离三端验证。Windows 打包与生产可信审批仍需独立验收。[验收回执](evidence/core-m1-r1/README.md)

@@ -27,7 +27,7 @@ class CoreStore {
                 created_seq INTEGER NOT NULL UNIQUE, ordinal INTEGER NOT NULL,
                 role TEXT NOT NULL CHECK (role IN ('user','assistant')),
                 content TEXT NOT NULL, attachments_json TEXT NOT NULL DEFAULT '[]',
-                rev INTEGER NOT NULL DEFAULT 1, deleted INTEGER NOT NULL DEFAULT 0, source_work_id TEXT,
+                rev INTEGER NOT NULL DEFAULT 1, deleted INTEGER NOT NULL DEFAULT 0, source_work_id TEXT, checkpoint_json TEXT,
                 last_change_seq INTEGER NOT NULL, created_at INTEGER NOT NULL,
                 UNIQUE(conversation_id, ordinal)
             );
@@ -58,6 +58,9 @@ class CoreStore {
                 result_json TEXT NOT NULL, PRIMARY KEY(principal, op_id)
             );
         `);
+        if (!this.db.prepare('PRAGMA table_info(messages)').all().some(column => column.name === 'checkpoint_json')) {
+            this.db.exec('ALTER TABLE messages ADD COLUMN checkpoint_json TEXT');
+        }
         this.db.prepare("INSERT OR IGNORE INTO core_metadata VALUES('storage_id',?)").run(randomUUID());
         this.storageId = this.db.prepare("SELECT value FROM core_metadata WHERE key='storage_id'").get().value;
     }
@@ -105,11 +108,12 @@ class CoreStore {
             .run(key, id, action, rev).lastInsertRowid;
     }
 
-    insertMessage({ id, key, role, content, attachments = [], after, sourceWorkId = null }) {
+    insertMessage({ id, key, role, content, attachments = [], after, sourceWorkId = null, checkpoint = null }) {
         const seq = this.appendChange(key, id, 'upsert', 1);
         this.db.prepare(`INSERT INTO messages
-            (id,conversation_id,created_seq,ordinal,role,content,attachments_json,last_change_seq,created_at,source_work_id)
-            VALUES(?,?,?,?,?,?,?,?,?,?)`).run(id, key, seq, after ?? seq * 1024, role, content, json(attachments), seq, Date.now(), sourceWorkId);
+            (id,conversation_id,created_seq,ordinal,role,content,attachments_json,last_change_seq,created_at,source_work_id,checkpoint_json)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(id, key, seq, after ?? seq * 1024, role, content, json(attachments), seq, Date.now(),
+            sourceWorkId, checkpoint ? json(checkpoint) : null);
         return seq;
     }
 
@@ -142,7 +146,7 @@ class CoreStore {
             for (const attachment of attachments) delete attachment.extractedText;
         }
         return { id: row.id, role: row.role, content: row.content, timestamp: row.created_at,
-            ordinal: row.ordinal, ...(row.source_work_id && { sourceWorkId: row.source_work_id }), revision: row.rev, attachments };
+            ordinal: row.ordinal, ...(row.checkpoint_json && { contextCompaction: parse(row.checkpoint_json) }), ...(row.source_work_id && { sourceWorkId: row.source_work_id }), revision: row.rev, attachments };
     }
 
     history(work) {
@@ -151,6 +155,18 @@ class CoreStore {
                 SELECT id FROM works WHERE conversation_id=? AND admitted_seq<=?
             )) ORDER BY ordinal`).all(work.conversation_id, work.admitted_seq, work.conversation_id, work.admitted_seq)
             .map(row => this.message(row, true));
+    }
+
+    requireIdleCompaction(key) {
+        if (this.db.prepare(`SELECT 1 FROM works WHERE conversation_id=?
+            AND status IN ('queued','running','waiting_approval','cancelling','review_required')`).get(key)) {
+            throw failure('WORK_SAFE_BOUNDARY_PENDING');
+        }
+    }
+
+    compactionHistory(key) {
+        return this.db.prepare('SELECT * FROM messages WHERE conversation_id=? AND deleted=0 ORDER BY ordinal')
+            .all(key).map(row => this.message(row, true));
     }
 
     snapshot(key, before, limit) {
@@ -177,6 +193,7 @@ class CoreStore {
             const row = this.db.prepare('SELECT * FROM messages WHERE id=? AND conversation_id=? AND deleted=0').get(id, key);
             if (!row) throw failure('MESSAGE_NOT_FOUND', 404);
             if (row.rev !== input.revision) throw failure('MESSAGE_REVISION_CONFLICT');
+            if (row.checkpoint_json) throw failure('CORE_CHECKPOINT_IMMUTABLE');
             if (this.db.prepare(`SELECT 1 FROM works
                 WHERE (user_message_id=? OR id=?) AND status IN ('queued','running','waiting_approval','cancelling')`).get(id, row.source_work_id || '')) {
                 throw failure('MESSAGE_IN_ACTIVE_WORK');

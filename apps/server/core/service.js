@@ -2,9 +2,12 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { createHash, randomUUID } = require('node:crypto');
 const express = require('express');
 const { CoreStore, failure } = require('./store');
 const { CoreRunner } = require('./runner');
+const { effectiveContextHistory, isContextCheckpoint, checkpointFailure } = require('@vcp/native-history-window');
+const { fieldsFrom } = require('../Plugin/NativeSync/sync/metadata');
 const { AttachmentStore } = require('../Plugin/NativeSync/mobile/attachments');
 const { attachmentRoutes } = require('../Plugin/NativeSync/mobile/attachmentRoutes');
 const { prepareSharedConfiguration } = require('../Plugin/NativeSync/mobile/sharedConfiguration');
@@ -118,7 +121,7 @@ class CoreService {
                     content: previousTurn.content, timestamp: Date.now() });
             }
         }
-        assertPortableHistory(history);
+        assertPortableHistory(effectiveContextHistory(history));
         const latest = history.filter(message => message.sourceWorkId === work.id).at(-1)?.id || work.user_message_id;
         const budget = { bytes: 0 };
         const messages = await effectiveRequest(history, config, latest, message => {
@@ -183,6 +186,12 @@ class CoreService {
         return { ...result, id: work.id, topicKey: topic.key, requestId, state: work.status, message, ...(recovery && { recovery }) };
     }
 
+    compactionSource(topic, principal, id) {
+        const head = this.store.head(topic.key);
+        const { hash } = this.shared.freeze(this.shared.row(topic.workspace, topic.key));
+        return createHash('sha256').update(JSON.stringify([principal, topic.workspace, topic.key, id, head, hash])).digest('hex');
+    }
+
     router(resolveActor) {
         const router = express.Router({ mergeParams: true });
         const scope = (req, permission) => {
@@ -196,6 +205,49 @@ class CoreService {
             const directory = this.shared.directory(actor, { sharedSpaceId: workspace, after: req.query.after, limit: 128 });
             res.json({ ...directory, objects: directory.objects.filter(object => object.kind === 'agent' || object.topic?.ownerType === 'agent')
                 .map(({ id, kind, parentId, deleted, config, name }) => ({ id, kind, parentId, deleted, name: name ?? config?.name })) });
+        }));
+        const compactionScope = req => {
+            const value = scope(req, 'execute');
+            if (value.actor.kind !== 'desktop') throw failure('CORE_COMPACTION_DESKTOP_REQUIRED', 403);
+            this.shared.authorize(value.actor, value.topic.workspace, 'config');
+            return value;
+        };
+        router.get('/:workspace/:key/compact', route((req, res) => {
+            const { actor, topic } = compactionScope(req);
+            this.store.requireIdleCompaction(topic.key);
+            const history = effectiveContextHistory(this.store.compactionHistory(topic.key));
+            if (!history.length) throw failure('CORE_COMPACTION_EMPTY');
+            const id = randomUUID();
+            res.json({ id, messageId: 'checkpoint_' + id, sourceHash: this.compactionSource(topic, actor.principal, id), history });
+        }));
+        router.post('/:workspace/:key/compact', route((req, res) => {
+            const { actor, topic } = compactionScope(req);
+            const { id, sourceHash, message } = req.body || {};
+            if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/.test(id) || typeof sourceHash !== 'string' ||
+                !/^[0-9a-f]{64}$/.test(sourceHash) || message?.id !== 'checkpoint_' + id ||
+                !isContextCheckpoint(message) || message.isThinking || message.attachments?.length ||
+                typeof message.content !== 'string' || !message.content.trim() ||
+                Buffer.byteLength(message.content) > 512000 || checkpointFailure(message.contextCompaction.checkpoint)) {
+                throw failure('INVALID_CHECKPOINT_METADATA', 400);
+            }
+            let metadata;
+            try { metadata = fieldsFrom(message).contextCompaction; }
+            catch { throw failure('INVALID_CHECKPOINT_METADATA', 400); }
+            if (!metadata) throw failure('INVALID_CHECKPOINT_METADATA', 400);
+            const result = this.store.command(actor.principal, 'compact_' + id, {
+                key: topic.key, sourceHash, content: message.content, metadata
+            }, () => {
+                this.store.requireIdleCompaction(topic.key);
+                if (this.compactionSource(topic, actor.principal, id) !== sourceHash) {
+                    throw failure('SHARED_COMPACTION_SOURCE_CHANGED');
+                }
+                const seq = this.store.insertMessage({
+                    id: message.id, key: topic.key, role: 'user', content: message.content, checkpoint: metadata
+                });
+                return { success: true, messageId: message.id, seq };
+            });
+            this.runner.publish(topic.key, 'change_seq', { seq: result.seq });
+            res.json(result);
         }));
         router.get('/:workspace/:key/messages', route((req, res) => {
             const { topic } = scope(req, 'read');

@@ -7,6 +7,7 @@ function authorize(shared,storage,req){
  const original=shared.db.prepare('SELECT space_id FROM shared_objects WHERE id=?').get(req.params.key);
  if(!original)throw fail('SHARED_OBJECT_NOT_FOUND',404);
  shared.authorize(actor,original.space_id);const row=shared.canonical(original.space_id,req.params.key);shared.topic(actor,original.space_id,row.id);
+ if(shared.requiresCore(row))throw fail('CORE_ROUTE_REQUIRED');
  if(req.method!=='GET'&&req.path!=='/status'){
   if(shared.readOnly)throw fail('SHARED_READ_ONLY');shared.assertNotPrepared?.([row.id,row.parent_id]);
  }

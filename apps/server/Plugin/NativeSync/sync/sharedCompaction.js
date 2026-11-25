@@ -15,7 +15,7 @@ class SharedCompaction{
  active(workId){return this.db.prepare("SELECT id,principal FROM shared_compaction_intents WHERE work_id=? AND state='prepared' ORDER BY rowid DESC LIMIT 1").get(workId)||null;}
  invalidate(workId){this.db.prepare("UPDATE shared_compaction_intents SET state='superseded' WHERE work_id=? AND state='prepared'").run(workId);}
 
- topic(actor,space,id){if(actor.kind!=='desktop')throw fail('SHARED_STEERING_DEVICE_REQUIRED');this.shared.authorize(actor,space,'config');if(this.shared.readOnly)throw fail('SHARED_READ_ONLY');const topic=this.shared.topic(actor,space,id,'execute');if(topic.owner_type!=='agent')throw fail('SHARED_COMPACTION_SINGLE_CHAT_ONLY');return topic;}
+ topic(actor,space,id){if(actor.kind!=='desktop')throw fail('SHARED_STEERING_DEVICE_REQUIRED');this.shared.authorize(actor,space,'config');if(this.shared.readOnly)throw fail('SHARED_READ_ONLY');const topic=this.shared.topic(actor,space,id,'execute');if(topic.owner_type!=='agent')throw fail('SHARED_COMPACTION_SINGLE_CHAT_ONLY');if(this.shared.requiresCore(topic))throw fail('CORE_ROUTE_REQUIRED');return topic;}
  snapshot(actor,topic){
   const s=this.shared,work=s.active(topic.id);let control=null,frozenHash=null;
   if(work){

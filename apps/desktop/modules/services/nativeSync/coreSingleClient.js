@@ -7,6 +7,7 @@ const { fail, stable } = require('./protocol');
 const { syncHeaders } = require('./syncRequest');
 const { sourceRoute } = require('./connection');
 const { ownedJson } = require('./sharedLocal');
+const { fieldsFrom } = require('./metadata');
 const { durableJson } = require('./durableJson');
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -211,6 +212,73 @@ class CoreSingleClient {
             revision: target.revision, remove: !edit, ...(edit && { text: op.set.content })
         } });
         return { ...await this.history(descriptor), handled: true, success: true };
+    }
+
+    async prepareCompaction(descriptor, retryId) {
+        const mapping = this.mapping(descriptor);
+        const r = this.runtime;
+        if (r.readOnly) throw fail('SHARED_READ_ONLY');
+        return r.execution.run('compact:' + mapping.sharedId, async () => {
+            const file = this.file(mapping, 'compaction');
+            const pending = await ownedJson(r.root, file, { optional: true });
+            if (pending?.id) {
+                if (retryId && retryId !== pending.id) throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
+                return { ...await this.publishCompaction(descriptor, mapping, file, pending), recovered: true };
+            }
+            const prepared = await r.send(this.route(mapping, 'compact'));
+            if (!prepared.id || prepared.messageId !== 'checkpoint_' + prepared.id ||
+                !prepared.sourceHash || !Array.isArray(prepared.history)) throw fail('SHARED_COMPACTION_RESPONSE_INVALID');
+            return { ...prepared, handled: true, success: true };
+        });
+    }
+
+    async commitCompaction(descriptor, body) {
+        const mapping = this.mapping(descriptor);
+        const r = this.runtime;
+        if (r.readOnly) throw fail('SHARED_READ_ONLY');
+        return r.execution.run('compact:' + mapping.sharedId, async () => {
+            const file = this.file(mapping, 'compaction');
+            const pending = await ownedJson(r.root, file, { optional: true });
+            if (pending?.id && stable(pending) !== stable(body)) throw fail('SHARED_CHECKPOINT_INTENT_CHANGED');
+            if (!pending?.id) await durableJson(file, body);
+            return this.publishCompaction(descriptor, mapping, file, body);
+        });
+    }
+
+    async cancelCompaction(descriptor, id) {
+        const mapping = this.mapping(descriptor);
+        const r = this.runtime;
+        if (r.readOnly) throw fail('SHARED_READ_ONLY');
+        return r.execution.run('compact:' + mapping.sharedId, async () => {
+            const file = this.file(mapping, 'compaction');
+            const pending = await ownedJson(r.root, file, { optional: true });
+            if (pending?.id !== id) return { success: true, cancelled: true };
+            await this.publishCompaction(descriptor, mapping, file, pending, { acknowledge: false });
+            return { success: true, alreadyCommitted: true };
+        });
+    }
+
+    async publishCompaction(descriptor, mapping, file, body, { acknowledge = true } = {}) {
+        let receipt;
+        try {
+            receipt = await this.runtime.send(this.route(mapping, 'compact'), { body });
+        } catch (error) {
+            if (['WORK_SAFE_BOUNDARY_PENDING', 'SHARED_COMPACTION_SOURCE_CHANGED', 'INVALID_CHECKPOINT_METADATA'].includes(error.code)) {
+                await durableJson(file, {});
+            }
+            throw error;
+        }
+        if (receipt?.success !== true || receipt.messageId !== body.message.id || !Number.isSafeInteger(receipt.seq)) {
+            throw fail('SHARED_COMPACTION_RESPONSE_INVALID');
+        }
+        const snapshot = await this.history(descriptor);
+        const message = snapshot.history.find(row => row.id === receipt.messageId);
+        if (snapshot.seq < receipt.seq || message?.content !== body.message.content ||
+            stable(message?.contextCompaction) !== stable(fieldsFrom(body.message).contextCompaction)) {
+            throw fail('SHARED_CHECKPOINT_PROJECTION_CONFLICT');
+        }
+        if (acknowledge) await durableJson(file, {});
+        return { handled: true, success: true, id: body.id, messageId: message.id, message, history: snapshot.history };
     }
 
     async control(descriptor, executionId, action, requestId = randomUUID()) {

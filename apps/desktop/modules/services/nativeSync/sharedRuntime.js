@@ -749,7 +749,7 @@ if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');let record;
   }
   for(const [id,prepared]of Object.entries(this.execution.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.activeCompactions.has(id)&&!this.execution.state.compactions?.[id]?.body)await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:this.closed});
  }
- async prepareSharedCompaction({descriptor,retryId}){this.assertSharedAccess();if(this.coreSingle?.owns(descriptor))throw fail('CORE_COMPACTION_NOT_MIGRATED');
+ async prepareSharedCompaction({descriptor,retryId}){this.assertSharedAccess();if(this.coreSingle?.owns(descriptor))return this.coreSingle.prepareCompaction(descriptor,retryId);
   if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(descriptor);if(!this.capabilities.features?.includes('shared-compaction-v1'))throw fail('SHARED_COMPACTION_UPGRADE_REQUIRED');const context=await this.refreshForExecution(descriptor,{forceFresh:true});if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');
   const publications=this.execution.state.compactions||{};
   if(retryId!==undefined){
@@ -776,7 +776,7 @@ if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');let record;
   }catch(error){if(intent.receipt)this.activeCompactions.delete(intent.receipt.id);throw error;}finally{this.activeCompactionPrepares.delete(opId);}
  }
 
- async cancelSharedCompaction({descriptor,id,closing=false}){this.assertSharedAccess();if(this.closed&&!closing)throw fail('APPLICATION_SHUTTING_DOWN');
+ async cancelSharedCompaction({descriptor,id,closing=false}){this.assertSharedAccess();if(this.coreSingle?.owns(descriptor))return this.coreSingle.cancelCompaction(descriptor,id);if(this.closed&&!closing)throw fail('APPLICATION_SHUTTING_DOWN');
   const prepared=this.execution.state.compactionPreparations?.[id];if(!prepared||stable(prepared.descriptor)!==stable(descriptor))throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
   const intent=this.execution.state.compactions?.[id];if(intent&&['publishing','completed'].includes(intent.phase)){await this.execution.run('compaction:'+id,()=>this.finishSharedCompaction(intent));return {success:true,alreadyCommitted:true};}
   const result=await this.send(endpoint+'compact-cancel',{body:{sharedSpaceId:this.connection.sharedSpaceId,id,opId:'compact_cancel_'+id}});prepared.cancelled=true;this.activeCompactions.delete(id);await this.execution.save();if(result.alreadyCommitted)await this.syncExecutionTopic(this.execution.mapping(descriptor),{minSeq:result.seq});return result;
@@ -805,7 +805,7 @@ if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');let record;
    return {handled:true,success:true,recovered,id:body.id,messageId:message.id,message,history};
   });
  }
- async commitSharedCompaction({descriptor,id,sourceHash,message}){this.assertSharedAccess();
+ async commitSharedCompaction({descriptor,id,sourceHash,message}){this.assertSharedAccess();if(this.coreSingle?.owns(descriptor))return this.coreSingle.commitCompaction(descriptor,{id,sourceHash,message});
   if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(descriptor),body={sharedSpaceId:this.connection.sharedSpaceId,id,sourceHash,opId:'compact_commit_'+id,message:this.adapter.canonical(message,mapping.shared.topicId)};
   const preparation=this.execution.state.compactionPreparations?.[id];if(!preparation||stable(preparation.descriptor)!==stable(descriptor)||preparation.sharedId!==mapping.sharedId||preparation.sourceHash!==sourceHash||preparation.messageId!==message.id)throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
   this.execution.state.compactions||={};let intent=this.execution.state.compactions[id];if(intent&&(stable(intent.body)!==stable(body)||stable(intent.descriptor)!==stable(descriptor)))throw fail('SHARED_CHECKPOINT_INTENT_CHANGED');

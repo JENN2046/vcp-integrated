@@ -324,6 +324,9 @@ test('Core single chat sends existing text and PDF attachments through one nativ
     try {
         const desktop = await f.desktop('A');
         const phone = await f.phone();
+        await assert.rejects(desktop.runtime.send('/api/plugins/NativeSync/shared-attachments/' + f.topic.id + '/uploads', {
+            body: { requestId: 'legacy-core-upload', name: 'legacy.txt', size: 1, type: 'text/plain' }
+        }), { code: 'CORE_ROUTE_REQUIRED' });
         const foreign = await f.phone({ space: 'foreignSpace' });
         const directory = path.join(desktop.data, 'UserData', 'attachments');
         await fs.mkdir(directory, { recursive: true });
@@ -380,6 +383,98 @@ test('Core single chat sends existing text and PDF attachments through one nativ
         assert.equal(rejected.error.code, 'ATTACHMENT_TEXT_UNAVAILABLE');
         assert.equal((await phone.call(route + '/messages')).messages.length, 4);
         assert.equal(provider.calls.length, 2);
+    } finally {
+        await core.close();
+        await fs.rm(f.root + '-core', { recursive: true, force: true });
+    }
+});
+
+test('Core single chat publishes a native checkpoint once and resumes from its canonical context window', async t => {
+    const f = await fixture(t);
+    const provider = await localProvider(t);
+    const { chat } = host(provider);
+    const { core, route } = await mountCore(f, chat);
+    f.control.nativeResponder = (req, res) => ctx.runNativeHandler(() => chat.handle(req, res));
+    provider.setReply((body, response) => {
+        if (body.stream) {
+            response.setHeader('Content-Type', 'text/event-stream');
+            const frame = { choices: [{ delta: { content: '<context_checkpoint>CORE_CHECKPOINT_FIXTURE</context_checkpoint>' }, finish_reason: 'stop' }] };
+            response.end('data: ' + JSON.stringify(frame) + '\n\ndata: [DONE]\n\n');
+            return;
+        }
+        response.end(JSON.stringify({ choices: [{ message: { content: 'core reply' }, finish_reason: 'stop' }] }));
+    });
+    try {
+        const desktop = await f.desktop('A');
+        const phone = await f.phone();
+        const { descriptor, runtime } = desktop;
+        assert.throws(() => f.shared.compaction.prepare(f.actor('A'), {
+            sharedSpaceId: 'sharedAB', sharedId: f.topic.id, opId: 'legacy-core-compaction', expectedHead: 0
+        }), { code: 'CORE_ROUTE_REQUIRED' });
+        const oldInput = await phone.call(route + '/send', { requestId: 'checkpoint-source', text: 'ORIGINAL_FIXTURE_BODY' }, 202);
+        await wait(() => core.store.work(oldInput.id)?.status === 'completed', 'checkpoint source Work');
+
+        const { createContextCompactionService, requestContextCompaction } = await import(CHAT + '/modules/chat/contextCompactionService.js');
+        const { prepareCompactionState } = await import(CHAT + '/modules/chat/contextCompactionState.js');
+        const { createCheckpointMessage } = await import(CHAT + '/modules/chat/contextCompactionPrompts.js');
+        const settings = {
+            enableContextCompaction: true, contextCompactionModel: 'synthetic',
+            vcpServerUrl: f.url + '/v1/chat/completions'
+        };
+        const original = await runtime.prepareSharedCompaction({ descriptor });
+        const stale = createCheckpointMessage(prepareCompactionState(original.history), 'STALE_CHECKPOINT', settings, { id: original.messageId });
+        await phone.call(route + '/messages/' + oldInput.messageId, { requestId: 'checkpoint-source-edit', revision: 1, text: 'EDITED_FIXTURE_BODY' });
+        await assert.rejects(runtime.commitSharedCompaction({
+            descriptor, id: original.id, sourceHash: original.sourceHash, message: stale
+        }), { code: 'SHARED_COMPACTION_SOURCE_CHANGED' });
+        await phone.call(route + '/compact', undefined, 403);
+
+        let summaries = 0, dropReceipt = true;
+        const request = runtime.send;
+        runtime.send = async (url, options) => {
+            const response = await request(url, options);
+            if (dropReceipt && url.endsWith('/compact') && options?.body) {
+                dropReceipt = false;
+                throw Object.assign(new Error('Receipt lost'), { code: 'NETWORK_UNAVAILABLE' });
+            }
+            return response;
+        };
+        const compaction = createContextCompactionService({
+            historyMutationAuthority: { mutate() { assert.fail('Core checkpoint entered desktop History writer'); } },
+            getExecutionAuthority: () => ({ success: true, kind: 'shared', core: true }),
+            sharedCompaction: runtime,
+            async request(input) {
+                const { state } = input;
+                summaries++;
+                assert.match(JSON.stringify(state.messages), /EDITED_FIXTURE_BODY/);
+                assert.doesNotMatch(JSON.stringify(state.messages), /ORIGINAL_FIXTURE_BODY/);
+                return requestContextCompaction(input);
+            }
+        });
+        const current = await runtime.coreSingle.history(descriptor);
+        await assert.rejects(compaction.compact({ scope: descriptor, history: current.history, settings }), { code: 'NETWORK_UNAVAILABLE' });
+        await desktop.close();
+
+        const reopened = await f.desktop('A');
+        const recovered = await reopened.runtime.prepareSharedCompaction({ descriptor: reopened.descriptor });
+        assert.equal(recovered.recovered, true);
+        assert.equal(summaries, 1);
+        assert.equal(recovered.history.filter(message => message.contextCompaction).length, 1);
+        assert.equal(recovered.history[0].content, 'EDITED_FIXTURE_BODY');
+        const checkpoint = recovered.message;
+        await phone.call(route + '/messages/' + checkpoint.id, { requestId: 'checkpoint-delete-try', revision: 1, remove: true }, 409);
+
+        const followup = await phone.call(route + '/send', { requestId: 'checkpoint-follow-up', text: 'Use this checkpoint.' }, 202);
+        await wait(() => core.store.work(followup.id)?.status === 'completed', 'follow-up through native window');
+        assert.equal(provider.calls.length, 3);
+        assert.equal(f.calls(), 1);
+        assert.match(JSON.stringify(provider.calls[2].messages), /CORE_CHECKPOINT_FIXTURE/);
+        assert.doesNotMatch(JSON.stringify(provider.calls[2].messages), /EDITED_FIXTURE_BODY|ORIGINAL_FIXTURE_BODY/);
+        const snapshot = await phone.call(route + '/messages');
+        assert.equal(snapshot.messages.length, 5);
+        assert.equal(snapshot.messages[2].id, checkpoint.id);
+        assert.equal(f.store.db.prepare('SELECT count(*) AS count FROM journal').get().count, 0);
+        compaction.dispose();
     } finally {
         await core.close();
         await fs.rm(f.root + '-core', { recursive: true, force: true });
