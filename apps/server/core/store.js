@@ -136,9 +136,13 @@ class CoreStore {
 
     work(id) { return this.db.prepare('SELECT * FROM works WHERE id=?').get(id); }
 
-    message(row) {
+    message(row, includeAttachmentText = false) {
+        const attachments = parse(row.attachments_json);
+        if (!includeAttachmentText) {
+            for (const attachment of attachments) delete attachment.extractedText;
+        }
         return { id: row.id, role: row.role, content: row.content, timestamp: row.created_at,
-            ordinal: row.ordinal, ...(row.source_work_id && { sourceWorkId: row.source_work_id }), revision: row.rev, attachments: parse(row.attachments_json) };
+            ordinal: row.ordinal, ...(row.source_work_id && { sourceWorkId: row.source_work_id }), revision: row.rev, attachments };
     }
 
     history(work) {
@@ -146,7 +150,7 @@ class CoreStore {
             created_seq<=? OR source_work_id IN (
                 SELECT id FROM works WHERE conversation_id=? AND admitted_seq<=?
             )) ORDER BY ordinal`).all(work.conversation_id, work.admitted_seq, work.conversation_id, work.admitted_seq)
-            .map(row => this.message(row));
+            .map(row => this.message(row, true));
     }
 
     snapshot(key, before, limit) {

@@ -294,3 +294,94 @@ test('Core commits the streaming follow-up after one ephemeral Resident proposal
         pluginManager.serviceModules.delete(name);
     }
 });
+
+function textPdf(text) {
+    const commands = 'BT /F1 16 Tf 20 50 Td (' + text + ') Tj ET';
+    const objects = [
+        '<< /Type /Catalog /Pages 2 0 R >>',
+        '<< /Type /Pages /Count 1 /Kids [3 0 R] >>',
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 250 90] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+        '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+        '<< /Length ' + commands.length + ' >>\nstream\n' + commands + '\nendstream'
+    ];
+    let pdf = '%PDF-1.4\n';
+    const offsets = objects.map((value, index) => {
+        const offset = pdf.length;
+        pdf += (index + 1) + ' 0 obj\n' + value + '\nendobj\n';
+        return offset;
+    });
+    const xref = pdf.length;
+    pdf += 'xref\n0 6\n0000000000 65535 f \n' + offsets.map(offset => String(offset).padStart(10, '0') + ' 00000 n \n').join('');
+    return Buffer.from(pdf + 'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n');
+}
+
+test('Core single chat sends existing text and PDF attachments through one native history context', async t => {
+    const f = await fixture(t, { attachments: true, imageModels: [] });
+    const provider = await localProvider(t);
+    const { core, route } = await mountCore(f, host(provider).chat);
+    const text = Buffer.from('CORE_TEXT_FIXTURE');
+    const pdf = textPdf('CORE_PDF_FIXTURE');
+    try {
+        const desktop = await f.desktop('A');
+        const phone = await f.phone();
+        const foreign = await f.phone({ space: 'foreignSpace' });
+        const directory = path.join(desktop.data, 'UserData', 'attachments');
+        await fs.mkdir(directory, { recursive: true });
+        const attachments = await Promise.all([['notes.txt', text, 'text/plain'], ['source.pdf', pdf, 'application/pdf']]
+            .map(async ([name, data, type]) => {
+                const internalPath = path.join(directory, name);
+                await fs.writeFile(internalPath, data);
+                return { name, type, internalPath, size: data.length };
+            }));
+        const accepted = await desktop.runtime.prepareSharedSend({
+            descriptor: desktop.descriptor, serverSession: true,
+            message: { id: 'core-documents', role: 'user', content: 'Read the supplied files.', attachments }
+        });
+        await desktop.close();
+        await wait(() => core.store.work(accepted.serverSession.executionId)?.status === 'completed', 'document turn completion');
+
+        const { messages } = await phone.call(route + '/messages');
+        const [attachedText, attachedPdf] = messages[0].attachments;
+        assert.deepEqual(messages[0].attachments.map(file => file.name), ['notes.txt', 'source.pdf']);
+        assert.equal(Object.hasOwn(attachedPdf, 'extractedText'), false);
+        assert.deepEqual(await phone.download(route + '/blob/' + attachedText.hash), text);
+        assert.deepEqual(await phone.download(route + '/blob/' + attachedPdf.hash), pdf);
+        await foreign.call(route + '/blob/' + attachedPdf.hash, undefined, 403);
+
+        // The original message and blob link outlive the temporary upload proof.
+        core.store.db.prepare('UPDATE attachment_uploads SET expires=0').run();
+        core.attachments.expire();
+        assert.equal(core.store.db.prepare('SELECT count(*) AS count FROM attachment_uploads').get().count, 0);
+        const body = { requestId: 'core-document-followup', text: 'Use both attachments again.' };
+        const next = await phone.call(route + '/send', body, 202);
+        assert.equal((await phone.call(route + '/send', body, 202)).id, next.id);
+        await wait(() => core.store.work(next.id)?.status === 'completed', 'document follow-up completion');
+        assert.equal(provider.calls.length, 2);
+        for (const call of provider.calls) {
+            const user = call.messages.filter(message => message.role === 'user');
+            const content = JSON.stringify(user[0].content);
+            assert.equal(content.match(/CORE_TEXT_FIXTURE/g)?.length, 1);
+            assert.equal(content.match(/CORE_PDF_FIXTURE/g)?.length, 1);
+            assert.doesNotMatch(JSON.stringify(call.messages), /image_url|file:\/\//);
+        }
+        assert.equal(f.store.db.prepare('SELECT count(*) AS count FROM journal').get().count, 0);
+        assert.equal(f.calls(), 0);
+
+        const empty = Buffer.from('  \n');
+        const upload = await phone.call(route + '/attachments/uploads', {
+            requestId: 'core-empty-text-upload', name: 'empty.txt', size: empty.length, type: 'text/plain'
+        }, 201);
+        const uploadRoute = route + '/attachments/uploads/' + upload.uploadId;
+        await phone.call(uploadRoute + '/chunks', { offset: 0, data: empty.toString('base64') });
+        await phone.call(uploadRoute + '/finish', {});
+        const rejected = await phone.call(route + '/send', {
+            requestId: 'core-empty-text-message', text: '', attachments: [upload.uploadId]
+        }, 422);
+        assert.equal(rejected.error.code, 'ATTACHMENT_TEXT_UNAVAILABLE');
+        assert.equal((await phone.call(route + '/messages')).messages.length, 4);
+        assert.equal(provider.calls.length, 2);
+    } finally {
+        await core.close();
+        await fs.rm(f.root + '-core', { recursive: true, force: true });
+    }
+});

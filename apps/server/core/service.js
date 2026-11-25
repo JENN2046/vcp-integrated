@@ -12,7 +12,6 @@ const { effectiveRequest, assertPortableHistory } = require('../Plugin/NativeSyn
 const { sanitize, assertPortableContext } = require('../Plugin/NativeSync/mobile/groupRequest');
 const { payloadHash, sessionMarker } = require('../Plugin/NativeSync/mobile/submissionRecovery');
 const { nativePacket } = require('../Plugin/NativeSync/mobile/nativePacket');
-const { stripHiddenToolResults } = require('../Plugin/NativeSync/nativeRules/modules/renderer/toolResultRegions');
 
 const capability = 'core-single-v1';
 const route = fn => (req, res, next) => Promise.resolve().then(() => fn(req, res)).catch(next);
@@ -123,7 +122,7 @@ class CoreService {
         const latest = history.filter(message => message.sourceWorkId === work.id).at(-1)?.id || work.user_message_id;
         const budget = { bytes: 0 };
         const messages = await effectiveRequest(history, config, latest, message => {
-            if (!message.attachments?.length) return [{ type: 'text', text: stripHiddenToolResults(message.content) }];
+            if (!message.attachments?.length) return [{ type: 'text', text: message.content }];
             return this.attachments.content(topic.key, message, config.imageSupported, budget, { nativeImages: true });
         });
         const prepared = sanitize(messages, config.executionPolicy, true);
@@ -152,8 +151,13 @@ class CoreService {
         reauthorize();
         const result = this.store.admit(topic, principal, requestId, input, () => {
             const files = this.attachments.claim(principal, topic.key, attachments);
-            if (files.some(file => !file.type.startsWith('image/'))) throw failure('CORE_ATTACHMENT_NOT_MIGRATED', 415);
-            if (files.length && !config.imageSupported) throw failure('MODEL_IMAGE_UNSUPPORTED');
+            for (const file of files) {
+                if (file.type.startsWith('image/')) {
+                    if (!config.imageSupported) throw failure('MODEL_IMAGE_UNSUPPORTED');
+                } else if (!file.extractedText?.trim()) {
+                    throw failure('ATTACHMENT_TEXT_UNAVAILABLE', 422);
+                }
+            }
             return {
                 config, attachments: files,
                 ...(principal.startsWith('mobile:') && { recovery: {
@@ -297,7 +301,10 @@ class CoreService {
                 WHERE m.conversation_id=? AND m.deleted=0 AND json_extract(a.value,'$.hash')=b.hash)`).get(hash, topic.key);
             if (!item) throw failure('ATTACHMENT_NOT_FOUND', 404);
             this.attachments.spend(actor.principal, item.size);
-            res.set({ 'Content-Type': item.type, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' }).end(this.attachments.readBlob(hash));
+            res.set({
+                'Content-Type': item.type, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store',
+                ...(!item.type.startsWith('image/') && { 'Content-Disposition': 'attachment' })
+            }).end(this.attachments.readBlob(hash));
         }));
         router.use((error, _req, res, next) => {
             if (res.headersSent) return next(error);

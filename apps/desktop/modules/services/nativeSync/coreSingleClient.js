@@ -134,7 +134,7 @@ class CoreSingleClient {
 
     async upload(mapping, messageId, item) {
         const r = this.runtime;
-        if (!r.attachments || !item.type?.startsWith('image/')) throw fail('CORE_ATTACHMENT_NOT_MIGRATED');
+        if (!r.attachments) throw fail('ATTACHMENTS_NOT_ENABLED');
         const { file } = await r.attachments.localFile(item);
         const bytes = await fs.readFile(file);
         const hash = digest(bytes);
@@ -142,7 +142,8 @@ class CoreSingleClient {
         const prefix = this.route(mapping, 'attachments/uploads');
         const response = await r.send(prefix, { body: {
             requestId: 'file_' + digest(JSON.stringify([messageId, hash, name])),
-            name, size: bytes.length, expectedHash: hash, type: item.type
+            name, size: bytes.length, expectedHash: hash,
+            ...(item.type && item.type !== 'application/octet-stream' && { type: item.type })
         } });
         const upload = prefix + '/' + response.uploadId;
         for (let offset = response.offset; response.state !== 'ready' && offset < bytes.length; offset += response.chunkSize) {
@@ -150,6 +151,7 @@ class CoreSingleClient {
         }
         const finished = await r.send(upload + '/finish', { body: {} });
         if (finished.hash !== hash) throw fail('ATTACHMENT_HASH_MISMATCH');
+        if (finished.parseError) throw fail(finished.parseError);
         return response.uploadId;
     }
 

@@ -4,12 +4,17 @@ export async function uploadAttachment(api,topicKey,file,progress=()=>{},route='
  if(file.size<1||file.size>20*1024*1024)throw Object.assign(Error('单个附件需在 20 MB 以内'),{code:'ATTACHMENT_FILE_TOO_LARGE'});
  const bytes=new Uint8Array(await file.arrayBuffer()),hash=hex(await crypto.subtle.digest('SHA-256',bytes));
  const requestId='file_'+hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([topicKey,file.name,file.size,hash]))));
- const input={requestId,name:file.name,size:bytes.length,expectedHash:hash,...(file.type?{type:file.type}:{})};
+ const input={requestId,name:file.name,size:bytes.length,expectedHash:hash,...(file.type&&file.type!=='application/octet-stream'?{type:file.type}:{})};
  let upload;try{upload=await api(route+'/uploads',input);}catch(e){if(e.code!=='UPLOAD_EXPIRED')throw e;upload=await api(route+'/uploads',{...input,requestId:requestId+'_'+Date.now()});}
  if(upload.state!=='ready')for(let offset=upload.offset;offset<bytes.length;){
   const chunk=bytes.subarray(offset,Math.min(bytes.length,offset+Math.min(upload.chunkSize,65536)));
   const result=await api(route+'/uploads/'+upload.uploadId+'/chunks',{offset,data:base64(chunk)});
   if(result.offset!==offset+chunk.length)throw Error('附件续传位置不一致，请重试');offset=result.offset;progress(Math.round(offset/bytes.length*100));
  }
- const complete=await api(route+'/uploads/'+upload.uploadId+'/finish',{});if(complete.hash!==hash)throw Error('附件完整性校验失败');progress(100);return complete.uploadId;
+ const complete=await api(route+'/uploads/'+upload.uploadId+'/finish',{});
+ if(complete.hash!==hash)throw Error('附件完整性校验失败');
+ if(route.startsWith('core/')&&complete.parseError)throw Object.assign(Error(
+  complete.parseError==='ATTACHMENT_TEXT_TOO_LARGE'?'附件提取的文字超出长度限制':'附件没有可读取的文字'
+ ),{code:complete.parseError});
+ progress(100);return complete.uploadId;
 }
