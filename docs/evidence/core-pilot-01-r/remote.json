@@ -1,0 +1,82 @@
+{
+  "baseline": "1b20a0dcd5ab8feffd6bbf93742c6c48fcf4f741",
+  "provider": "SmolVLM-500M-Instruct-Q8_0 / llama.cpp b12728",
+  "physicalAndroid": true,
+  "browserPwa": false,
+  "desktopExitedDuringWork": true,
+  "mobileContinuation": true,
+  "mobileSseTerminal": true,
+  "deviceRevocation": true,
+  "attachmentHash": "01f4236cd231e3935c2f3780c2288f532da550eda7333454b05402fde0d0102b",
+  "formalMessages": 4,
+  "authenticatedDesktopColdReadback": true,
+  "historyAndAttachmentUnchangedAfterRestart": true,
+  "unauthenticatedRejected": true,
+  "readOnlyMutationRejected": true,
+  "definitionTombstoneAndReplay": true,
+  "restart": {
+    "code": 0,
+    "signal": null
+  },
+  "webBundle": {
+    "htmlStatus": 200,
+    "bundleStatus": 200,
+    "connectionStatus": 200
+  },
+  "nativeSyncLoaded": false,
+  "desktop": "Two isolated Electron GUI profiles on Linux",
+  "mobile": "Physical Android Firefox, USB via Windows test bridge",
+  "physicalFirefoxPairAccepted": true,
+  "syntheticTranscript": [
+    {
+      "id": "f643d8bb-7f39-4ce0-abb3-e3cff0ea94d7",
+      "role": "user",
+      "content": "What color is the attached image? Answer in one short sentence.",
+      "workId": null
+    },
+    {
+      "id": "reply_59f3f180-2e83-4f56-8973-621310ecc193",
+      "role": "assistant",
+      "content": " Answer: red",
+      "workId": "59f3f180-2e83-4f56-8973-621310ecc193"
+    },
+    {
+      "id": "321942b1-2c46-4c3f-b608-0163305a710e",
+      "role": "user",
+      "content": "what color was the image?",
+      "workId": null
+    },
+    {
+      "id": "reply_dca6a6f4-e27b-46c7-8acc-b7f50b0e405b",
+      "role": "assistant",
+      "content": " Red.",
+      "workId": "dca6a6f4-e27b-46c7-8acc-b7f50b0e405b"
+    }
+  ],
+  "providerCalls": [
+    {
+      "imageParts": 1,
+      "status": 200,
+      "stream": true
+    },
+    {
+      "imageParts": 1,
+      "status": 200,
+      "stream": true
+    }
+  ],
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  }
+}

@@ -284,7 +284,7 @@ function invalidateSession(){conversationPanel.value='';clearSharedObservers();s
 function captureContext(){if(!paired.value||!selected.value||!validSessionRecovery(recoveryContext.value))throw Object.assign(Error(recoveryMessages.SUBMISSION_RECOVERY_UNAVAILABLE),{code:'SUBMISSION_RECOVERY_UNAVAILABLE'});return {topicKey:selected.value,recovery:{...recoveryContext.value},generation,authEpoch,draftScope:draftScope()};}
 function sameView(context){return context.topicKey===selected.value&&context.generation===generation&&context.authEpoch===authEpoch&&context.recovery?.entryId===recoveryContext.value?.entryId&&context.recovery?.sessionMarker===recoveryContext.value?.sessionMarker;}
 function newSubmissionContext(){if(!loadRecovery())throw Error(recoveryError.value);const context=captureContext();if(!historyContextReady.value)throw Object.assign(Error('正在载入历史并核对上下文'),{code:'HISTORY_CONTEXT_LOADING'});if(!currentTopic.value)throw Object.assign(Error(recoveryMessages.SUBMISSION_TOPIC_UNAVAILABLE),{code:'SUBMISSION_TOPIC_UNAVAILABLE'});if(submissionStore.current({entryId:context.recovery.entryId,topicKey:context.topicKey}))throw Object.assign(Error(recoveryMessages.SUBMISSION_PENDING),{code:'SUBMISSION_PENDING'});return context;}
-const errors={SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保留；完成后请显式重试',SHARED_GROUP_EXECUTION_NOT_READY:'共享群聊暂为只读，发送接线尚未完成',SHARED_CONFIG_PENDING:'共享配置正在核对，请稍后显式发送',SHARED_CONFIG_CONFLICT:'共享配置存在冲突，请先选择采用的版本',SHARED_EXECUTION_PERMISSION_REQUIRED:'本会话尚未授予共享执行权限',ATTACHMENTS_NOT_ENABLED:'当前服务器尚未启用附件传输，已选择的文件和消息草稿仍保留',SHARED_ATTACHMENTS_NOT_READY:'共享附件发送尚未接通，原文件保留',HISTORY_CONTEXT_LOADING:'正在载入历史并核对上下文',DESKTOP_REFERENCE_CLIENT_UPGRADE_REQUIRED:'此历史包含桌面引用，请更新应用后重开',GROUP_MODE_REQUIRES_DESKTOP:'此群聊模式请在桌面执行',GROUP_MEMBER_UNAVAILABLE:'此成员配置暂不可用',DEPENDENCY_REVIEW_REQUIRED:'同一话题有待核对的执行，请先处理暂停任务',DESKTOP_CONTEXT_REQUIRED:'本轮上下文需要桌面专用内容，请在桌面继续',CONFIG_SNAPSHOT_CORRUPT:'执行配置校验失败，请在桌面重新发布',GROUP_CONTEXT_UNAVAILABLE:'有效上下文暂不可用',ATTACHMENT_BLOB_MISSING:'附件暂未同步，请等待电脑补齐',ATTACHMENT_BLOB_CORRUPT:'附件完整性校验失败，请重新同步',ATTACHMENT_TEXT_UNAVAILABLE:'此文件的文本尚不可用',ATTACHMENT_TYPE_REJECTED:'支持 PNG、JPEG、WebP、PDF 和 UTF-8 文本文件',ATTACHMENT_STORAGE_BUDGET:'附件空间已达到上限',ATTACHMENT_REQUEST_BUDGET:'附件请求过多，请稍后重试',MODEL_IMAGE_UNSUPPORTED:'当前模型不支持图片，请在电脑端选择支持图片的模型并发布配置',EXECUTION_CONFIG_REQUIRED:'请先在电脑端发布有效 Agent 配置',PAIR_REQUIRED:'输入你的 Key 连接会话',HTTPS_REQUIRED:'当前入口尚未启用 HTTPS，不能提交 Key',SERVER_NOT_APPROVED:'此地址尚未由服务端批准，请使用已获授权的服务器',PROTECTED_HOST_NOT_READY:'安全链路或服务端接入尚未就绪，暂不接收访问凭据',AUTH_FAILED:'访问凭据不正确',AUTH_RATE_LIMIT:'尝试过于频繁，请稍后重试',AGENT_NOT_EXECUTABLE:'此 Agent 尚未配置服务端执行能力',EXECUTION_INTERRUPTED_REVIEW_REQUIRED:'执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑'};
+const errors={SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保留；完成后请显式重试',SHARED_GROUP_EXECUTION_NOT_READY:'共享群聊暂为只读，发送接线尚未完成',SHARED_CONFIG_PENDING:'共享配置正在核对，请稍后显式发送',SHARED_CONFIG_CONFLICT:'共享配置存在冲突，请先选择采用的版本',SHARED_EXECUTION_PERMISSION_REQUIRED:'本会话尚未授予共享执行权限',ATTACHMENTS_NOT_ENABLED:'当前服务器尚未启用附件传输，已选择的文件和消息草稿仍保留',SHARED_ATTACHMENTS_NOT_READY:'共享附件发送尚未接通，原文件保留',HISTORY_CONTEXT_LOADING:'正在载入历史并核对上下文',DESKTOP_REFERENCE_CLIENT_UPGRADE_REQUIRED:'此历史包含桌面引用，请更新应用后重开',GROUP_MODE_REQUIRES_DESKTOP:'此群聊模式请在桌面执行',GROUP_MEMBER_UNAVAILABLE:'此成员配置暂不可用',DEPENDENCY_REVIEW_REQUIRED:'同一话题有待核对的执行，请先处理暂停任务',DESKTOP_CONTEXT_REQUIRED:'本轮上下文需要桌面专用内容，请在桌面继续',CONFIG_SNAPSHOT_CORRUPT:'执行配置校验失败，请在桌面重新发布',GROUP_CONTEXT_UNAVAILABLE:'有效上下文暂不可用',ATTACHMENT_BLOB_MISSING:'附件暂未同步，请等待电脑补齐',ATTACHMENT_BLOB_CORRUPT:'附件完整性校验失败，请重新同步',ATTACHMENT_TEXT_UNAVAILABLE:'此文件的文本尚不可用',ATTACHMENT_TYPE_REJECTED:'支持 PNG、JPEG、WebP、PDF 和 UTF-8 文本文件',ATTACHMENT_STORAGE_BUDGET:'附件空间已达到上限',ATTACHMENT_REQUEST_BUDGET:'附件请求过多，请稍后重试',MODEL_IMAGE_UNSUPPORTED:'当前模型不支持图片，请在电脑端选择支持图片的模型并发布配置',EXECUTION_CONFIG_REQUIRED:'请先在电脑端发布有效 Agent 配置',PAIR_REQUIRED:'请使用本入口的配对方式连接会话',HTTPS_REQUIRED:'当前入口尚未启用 HTTPS，不能提交 Key',SERVER_NOT_APPROVED:'此地址尚未由服务端批准，请使用已获授权的服务器',PROTECTED_HOST_NOT_READY:'安全链路或服务端接入尚未就绪，暂不接收访问凭据',AUTH_FAILED:'访问凭据不正确',AUTH_RATE_LIMIT:'尝试过于频繁，请稍后重试',AGENT_NOT_EXECUTABLE:'此 Agent 尚未配置服务端执行能力',EXECUTION_INTERRUPTED_REVIEW_REQUIRED:'执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑'};
 async function api(route,body,requestHeaders={},signal,suppressPairRequired=false){
  const requestEpoch=authEpoch;
  const r=await fetch('/mobile/api/'+route,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'X-NativeSync-Capabilities':'desktop-references-v1,source-data-v2,shared-space-v1',...(body?{'Content-Type':'application/json'}:{}),...requestHeaders},body:body?JSON.stringify(body):undefined,signal});
@@ -313,9 +313,14 @@ async function setDirectory(result,{initial=false,selectedTopic=null,adjustSelec
  }
 }
 async function refreshDirectory(force=false,{adjustSelection=true}={}){
- if(!paired.value||!directoryPaged||directoryLoading)return;
+ if(!paired.value||(!directoryPaged&&server.value?.mode!=='core')||directoryLoading)return;
  directoryLoading=true;const request=++directoryRequest,epoch=authEpoch;const current=()=>request===directoryRequest&&epoch===authEpoch&&paired.value;
  try{
+  if(server.value?.mode==='core'){
+   const snapshot=await api('session');if(!current())return;
+   if(snapshot.recovery?.sessionMarker!==recoveryContext.value?.sessionMarker){await session();return;}
+   await setDirectory({topics:snapshot.topics,agents:snapshot.agents});return;
+  }
   const marker=await api('directory?kind=revision');if(!current())return;
   sourceProgress.value=marker.sourceProgress||[];
   if(!force&&marker.revision===directoryRevision){directoryFetchError.value='';return;}
@@ -702,7 +707,7 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
   </header>
   <main v-if="settingsOpen||!paired" class="pairing settings">
    <div class="intro">连接你的会话</div><p v-if="server?.credentialExchangeAllowed===false">此入口使用电脑生成的一次性配对码，无需输入后端 Key。</p><p v-else>输入 VCPToolBox API Key。服务器和连接参数已自动配置。</p>
-   <form @submit.prevent="connect">
+   <form v-if="server?.mode!=='core'" @submit.prevent="connect">
     <details :open="settingsOpen"><summary>连接设置</summary><label for="server-address">后端地址</label><input id="server-address" v-model="serverUrl" type="url" required @input="tested=false;accessKey=''" :disabled="busy">
     <button id="test-connection" type="button" @click="testConnection" :disabled="busy">测试连接</button>
     <p v-if="server" id="server-info">{{server.service}} · {{server.plugin}}<br>{{server.serverUrl||'尚未配置正式后端'}}</p></details>
@@ -711,7 +716,7 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
     <button id="save-connection" :disabled="busy||!tested||!keyAllowed||!accessKey">{{paired?'重新认证并保存连接':'保存服务器连接'}}</button>
    </form>
    <div v-if="paired" class="device-actions"><button id="disconnect" @click="disconnect" :disabled="busy">断开连接</button><button id="clear-session" @click="disconnect" :disabled="busy">清除设备会话</button><button id="close-settings" @click="settingsOpen=false">返回会话</button></div>
-   <details v-if="!paired" :open="pairingLinkOpen"><summary>使用一次性配对码</summary><form @submit.prevent="pair"><label for="pair-code">一次性配对码</label><input id="pair-code" v-model="pairCode" type="password" autocomplete="off" required><button id="pair-submit" :disabled="busy">连接会话</button></form></details>
+   <details v-if="!paired" :open="pairingLinkOpen||server?.mode==='core'"><summary>使用一次性配对码</summary><form @submit.prevent="pair"><label for="pair-code">一次性配对码</label><input id="pair-code" v-model="pairCode" type="password" autocomplete="off" required><button id="pair-submit" :disabled="busy">连接会话</button></form></details>
    <p v-if="recoveryRecords.length" id="saved-submissions">此设备保留 {{recoveryRecords.length}} 条待确认提交。重新连接后会核对原记录，不会自动重发。</p><p v-if="recoveryError" role="alert">{{recoveryError}}</p><p v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</p><p role="status">{{notice}}</p>
   </main>
   <template v-else>

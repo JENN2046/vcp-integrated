@@ -1,5 +1,6 @@
 'use strict';
-const {app, ipcMain, BrowserWindow} = require('electron');
+const {app, ipcMain, BrowserWindow, dialog} = require('electron');
+if (process.env.NS_CORE_TEST_IMAGE) dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [process.env.NS_CORE_TEST_IMAGE] });
 const hooks = require('./electron-fixture-hooks.cjs').get();
 const { isLoopback, restrictNodeNetwork } = require('./restrict-network.cjs');
 restrictNodeNetwork();

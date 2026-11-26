@@ -231,7 +231,13 @@ function initialize(mainWindow, context) {
 
     ipcMain.handle('create-new-topic-for-group', async (event, groupId, topicName) => {
         historyMutationQueue?.syncPolicy?.sharedExecution?.runtime?.assertNativeMutation('group',groupId,undefined);
-        return await groupChat.createNewTopicForGroup(groupId, topicName);
+        const core = historyMutationQueue?.coreClient;
+        try {
+            core?.assertCanConfigure();
+            const result = await groupChat.createNewTopicForGroup(groupId, topicName);
+            if (result.success) await core?.defineTopic({ itemType: 'group', itemId: groupId, topicId: result.topicId });
+            return result;
+        } catch (error) { return { success: false, error: error.code || error.message }; }
     });
 
     ipcMain.handle('delete-group-topic', async (event, groupId, topicId, options) => {
@@ -249,7 +255,13 @@ function initialize(mainWindow, context) {
         const shared=historyMutationQueue?.syncPolicy?.sharedExecution?.runtime;
         shared?.assertNativeMutation('group',groupId,topicId);
         if(shared?.nativeObject('group',groupId)){try{return await shared.renameNativeTopic({itemType:'group',itemId:groupId,topicId},newTitle,options);}catch(e){return {success:false,error:e.code||'SHARED_CONFIG_CONFLICT'};}}
-        return await groupChat.saveGroupTopicTitle(groupId, topicId, newTitle);
+        const core = historyMutationQueue?.coreClient;
+        try {
+            core?.assertCanConfigure();
+            const result = await groupChat.saveGroupTopicTitle(groupId, topicId, newTitle);
+            if (result.success) await core?.defineTopic({ itemType: 'group', itemId: groupId, topicId });
+            return result;
+        } catch (error) { return { success: false, error: error.code || error.message }; }
     });
 
     ipcMain.handle('regenerate-group-topic-title', async (event, groupId, topicId) => {

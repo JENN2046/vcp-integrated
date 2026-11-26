@@ -62,10 +62,11 @@ const ordinaryFixture = ordinaryMode || approvalRestore ? {
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', 'core-rc', 'core-local', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', compactionRetryMode, ...compactionFallbackModes, 'local-stream-interrupt', 'desktop-stream-close'].includes(requested) || process.argv.length > 3) {
+if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', 'core-rc', 'core-local', 'core-remote', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', compactionRetryMode, ...compactionFallbackModes, 'local-stream-interrupt', 'desktop-stream-close'].includes(requested) || process.argv.length > 3) {
     throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|' + duoModes.join('|') + '|' + [compactionAckMode, ...compactionFallbackModes].join('|') + '|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|tool-final-receipt-lost|tool-final-receipt-unknown|tool-final-publication-ack|' + [...readbackModes, legacyReadbackMode].join('|') + '|local-stream-interrupt|desktop-stream-close]');
 }
-let out, cert, fingerprint, display;
+let out, cert, fingerprint, display, remoteFixture;
+const coreRemote = requested === 'core-remote' && require('./core-remote.cjs');
 const desktopRequire = createRequire(path.join(host, 'package.json'));
 const executable = process.env.ELECTRON_BIN || desktopRequire('electron');
 // An interactive developer can opt into a local X11 display while both
@@ -105,6 +106,8 @@ function launch(profile, role, mode) {
         ...((compactionFallbackMode || mode === compactionAckMode) && { NS_COMPACTION_FALLBACK_FIXTURE:'1' }),
         ...(mode === 'idle' && process.env.NS_IDLE_METER !== 'off' ? { NS_METER_PREFIX: path.join(out, role) } : {}),
         ...(mode === 'core-local' ? { VCPCHAT_LOCAL_CORE_WORKSPACE: 'personal' } : {}),
+        ...(coreRemote && { VCPCHAT_CORE_REMOTE_ORIGIN: remoteFixture.origin, VCPCHAT_CORE_DEVICE_TOKEN: remoteFixture.tokens[role],
+            NS_CORE_TEST_IMAGE: remoteFixture.image }),
         ...(mode === 'shutdown-only' ? { NS_CHECK_QUIT_ADMISSION: '1' } : {}),
         ...(desktopStreamClose ? { NS_DESKTOP_STREAM_CLOSE: '1' } : {}) };
     const args = ['--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1', '--disable-background-networking', '--ozone-platform=x11', '--disable-gpu', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', path.join(here, './electron.cjs')];
@@ -209,14 +212,16 @@ async function runCase(root, mode) {
         execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1',
             '-subj', '/CN=NativeSync isolated fixture', '-addext', 'subjectAltName=IP:127.0.0.1',
             '-keyout', key, '-out', cert], { env: { PATH: '/usr/bin:/bin' }, stdio: 'ignore' });
+        if (coreRemote) remoteFixture = await coreRemote.create(out, cert);
         try {
             service = await (desktopStreamClose || require('./service.cjs')).start({
-                out, candidate, cert, key, trace, waitUntil, mode, ordinaryTools: ordinaryFixture, serverRevision, groupRelay, toolHandoff,
+                out, candidate, cert, key, trace, waitUntil, mode, ...remoteFixture?.serviceOptions, ordinaryTools: ordinaryFixture, serverRevision, groupRelay, toolHandoff,
                 observedContext: toolHandoff?.observed || compactionFallback?.observe(out) || compaction?.observe(out, crossDeviceCompaction), streamInterrupt: streamInterrupt?.observe(out),
             });
         } finally { fs.rmSync(key, { force: true }); }
     }
     fingerprint = new X509Certificate(fs.readFileSync(cert)).fingerprint256;
+    if (coreRemote) await remoteFixture.pairDesktops(service);
     const clients = {};
     const profiles = {};
     const result = { candidate, mode, ...(serverRevision && {serverRevision}), origin: service.origin, exits:{}, failures:[] };
@@ -296,7 +301,7 @@ async function runCase(root, mode) {
         }
         result.exits[role] = value;
         delete clients[role];
-        if(!desktopStreamClose && mode !== 'core-local' && !(mode === 'idle' && result.disabledBeforeMeasurement) && (mode!=='local-only'||role==='B')) assert(client.events.some(event=>event.event==='runtime-close-end'),'NativeSync normal close');
+        if(!desktopStreamClose && !['core-local', 'core-remote'].includes(mode) && !(mode === 'idle' && result.disabledBeforeMeasurement) && (mode!=='local-only'||role==='B')) assert(client.events.some(event=>event.event==='runtime-close-end'),'NativeSync normal close');
         assert(client.events.some(event=>event.event==='electron-quit'),'Electron normal quit hook');
         if (result[role]?.cds) assert.equal(fs.existsSync(path.join('/proc',String(result[role].cds.pid))),false,'C1 CDS child exited');
         assert.deepEqual(result.exits[role],{code:0,signal:null});
@@ -311,11 +316,11 @@ async function runCase(root, mode) {
         const roles = desktopStreamClose ? ['A', 'B', 'C'] : approvalRestore || aaDesktop || nativeQueue || (compaction && !crossDeviceCompaction) || streamInterrupt ? ['A'] : ['A', 'B'];
         for(const role of roles){
             const profile=profiles[role]=path.join(out,'profile-'+role);
-            if (desktopStreamClose || mode==='core-local' || mode==='local-only' && role==='A') {
+            if (desktopStreamClose || ['core-local', 'core-remote'].includes(mode) || mode==='local-only' && role==='A') {
                 const write=(rel,obj)=>{const file=path.join(profile,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,json(obj));};
                 write('settings.json',{vcpApiKey:'synthetic-only',disableAsana:true,disableUpdateCheck:true});
-                write('Agents/local-agent/config.json',{id:'local-agent',name:'Synthetic local',model:'synthetic',systemPrompt:'Synthetic test',streamOutput:Boolean(desktopStreamClose),...streamInterrupt?.agent,topics:[{id:'local-topic',name:'Local topic',createdAt:1}],current_topic_id:'local-topic'});
-                write('UserData/local-agent/topics/local-topic/history.json',[]);
+                if (!coreRemote || role === 'A') write('Agents/local-agent/config.json',{id:'local-agent',name:'Synthetic local',model:remoteFixture?.model || 'synthetic',systemPrompt:coreRemote ? 'Reply in one short sentence.' : 'Synthetic test',streamOutput:Boolean(desktopStreamClose || coreRemote),...streamInterrupt?.agent,topics:[{id:'local-topic',name:'Local topic',createdAt:1}],current_topic_id:'local-topic'});
+                if (!coreRemote || role === 'A') write('UserData/local-agent/topics/local-topic/history.json',[]);
                 for (const speaker of nativeQueue?.agents || []) {
                     const id = 'local-group-' + speaker.toLowerCase();
                     write('Agents/' + id + '/config.json', {
@@ -333,7 +338,7 @@ async function runCase(root, mode) {
                 ...compaction?.settings,...compactionFallback?.settings,...toolHandoffFixture?.settings,...streamInterrupt?.settings,...(desktopStreamClose && { enableVcpToolInjection:false, enableContextCompaction:false }),userName:'用户',voiceMode:'local',voiceLocalSettings:{sovitsUrl:service.origin},enableDistributedServer:false,vcpLogUrl:service.wsOrigin,vcpLogKey:'synthetic-sponsor-ws'}));
         }
         const [A,B] = await Promise.all(roles.map(role => start(role)));
-        if (mode!=='core-local' && !approvalRestore && !compaction && !streamInterrupt && !toolHandoff && !desktopStreamClose) {
+        if (!['core-local', 'core-remote'].includes(mode) && !approvalRestore && !compaction && !streamInterrupt && !toolHandoff && !desktopStreamClose) {
             result.mobile = await service.checkMobile();
             if (mode !== 'idle') result.mobile.chromium = await A.command('mobile', service.origin + '/mobile/');
         }
@@ -353,7 +358,7 @@ async function runCase(root, mode) {
                 start, stop, click, evalJs, waitUntil, sha,
             });
         } else if (mode !== 'ready') {
-            const runScenario = ['core-rc','core-local'].includes(mode) ? require('./core-rc.cjs') : desktopStreamClose ? require('../desktop-stream-close/scenario.cjs') : toolHandoff ? require('../tool-work-handoff/scenario.cjs')
+            const runScenario = coreRemote ? remoteFixture.run : ['core-rc','core-local'].includes(mode) ? require('./core-rc.cjs') : desktopStreamClose ? require('../desktop-stream-close/scenario.cjs') : toolHandoff ? require('../tool-work-handoff/scenario.cjs')
                 : compaction ? require('../compact-e2e/scenario.cjs')
                 : streamInterrupt ? require('../local-stream-interrupt/scenario.cjs')
                 : aaDesktop ? require('../aa-desktop/scenario.cjs')
@@ -392,10 +397,10 @@ async function runCase(root, mode) {
                     assert.equal(row.sha256, expectedSha, row.file);
                 }
                 assert.ok(loaded.length >= 9, 'required loaded backend source files');
-                if (mode === 'core-local') {
+                if (['core-local', 'core-remote'].includes(mode)) {
                     assert.ok(loaded.some(row => row.file === 'apps/server/core/localWorkspace.js'));
                     assert.ok(!loaded.some(row => row.file === 'apps/server/Plugin/NativeSync/native-sync.js'));
-                    result.core.nativeSyncLoaded = false;
+                    (result.core ||= {}).nativeSyncLoaded = false;
                 }
                 result.backendSources=loaded;
             } catch(error) { result.failures.push(error.stack); }

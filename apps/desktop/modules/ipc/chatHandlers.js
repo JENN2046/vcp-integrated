@@ -445,6 +445,8 @@ function initialize(mainWindow, context) {
         if(shared?.nativeObject('agent',agentId)){try{return await shared.renameNativeTopic({itemType:'agent',itemId:agentId,topicId},newTitle,options);}catch(e){return {success:false,error:e.code||'SHARED_CONFIG_CONFLICT'};}}
         if (!topicId || !newTitle) return { error: "保存话题标题失败: topicId 或 newTitle 未提供。" };
         try {
+            const core = historyMutationQueue?.coreClient;
+            core?.assertCanConfigure();
             if (agentConfigManager) {
                 await agentConfigManager.updateAgentConfig(agentId, existingConfig => {
                     if (!existingConfig.topics || !Array.isArray(existingConfig.topics)) {
@@ -458,6 +460,7 @@ function initialize(mainWindow, context) {
                     return updatedConfig;
                 });
                 const updatedConfig = await agentConfigManager.readAgentConfig(agentId);
+                await core?.defineTopic({ itemType: 'agent', itemId: agentId, topicId });
                 return { success: true, topics: updatedConfig.topics };
             } else {
                 console.error(`AgentConfigManager not available, cannot safely save topic title for agent ${agentId}`);
@@ -628,6 +631,8 @@ function initialize(mainWindow, context) {
         const shared = historyMutationQueue?.syncPolicy?.sharedExecution?.runtime;
         try {
             shared?.assertNativeMutation('agent',agentId,undefined);
+            const core = historyMutationQueue?.coreClient;
+            core?.assertCanConfigure();
             const newTopicId = `topic_${Date.now()}_${crypto.randomUUID()}`;
             const timestamp = Date.now();
 
@@ -667,6 +672,7 @@ function initialize(mainWindow, context) {
                 }
                 const updatedConfig = await agentConfigManager.readAgentConfig(agentId);
 
+                await core?.defineTopic({ itemId: agentId, itemType: 'agent', topicId: newTopicId });
                 await historyMutationQueue.initializeIfMissing({ itemId: agentId, itemType: 'agent', topicId: newTopicId });
 
                 return { success: true, topicId: newTopicId, topicName: newTopic.name, topics: updatedConfig.topics };

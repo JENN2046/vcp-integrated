@@ -34,7 +34,7 @@ const integer = (value, defaultValue, min, max) => {
 };
 
 class CoreService {
-    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, agentManager, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
+    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, agentManager, remoteConfig, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
         if (shared && (!shared.grants.has(workspace) || shared.readOnly || !mobile || shared.coreWorkspace && shared.coreWorkspace !== workspace)) throw failure('CORE_WORKSPACE_UNAVAILABLE');
         if (!path.isAbsolute(directory) || directory === path.parse(directory).root) throw failure('CORE_DATA_DIRECTORY_REQUIRED');
         fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -51,10 +51,18 @@ class CoreService {
         }
         this.workspace = workspace;
         this.gameEnabled = gameEnabled;
+        this.observers = new Set();
         this.mobile = mobile;
         this.store = new CoreStore(filename);
         try {
             this.local = shared ? null : new (require('./localWorkspace').LocalWorkspace)(this.store, workspace, agentManager);
+            if (remoteConfig) {
+                const bound = this.store.db.prepare("SELECT value FROM core_metadata WHERE key='remote_origin'").get();
+                if (bound && bound.value !== remoteConfig.origin) throw failure('CORE_REMOTE_ORIGIN_CHANGED');
+                this.remote = new (require('./remoteAccess').RemoteAccess)(this, remoteConfig);
+                this.local.remote = this.remote;
+                this.store.db.prepare("INSERT OR IGNORE INTO core_metadata VALUES('remote_origin',?)").run(remoteConfig.origin);
+            }
         } catch (error) {
             this.store.db.close();
             throw error;
@@ -175,6 +183,7 @@ class CoreService {
     liveActor(principal) {
         if (this.local) {
             if (principal === this.local.actor.principal) return this.local.actor;
+            if (this.remote) return this.remote.live(principal, 'execute');
             throw failure('WORK_AUTHORITY_REVOKED', 403);
         }
         const [kind, id] = principal.split(':');
@@ -465,10 +474,51 @@ class CoreService {
             this.desktopContext.announce(actor, req.body?.routeHash);
             res.json({ success: true });
         }));
-        if (this.local) router.put('/:workspace/:key/definition', route(async (req, res) => {
-            this.local.authorize(resolveActor(req, req.params.workspace, 'config'), req.params.workspace);
-            res.json(await this.local.define(req.params.key, req.body, config => this.supportsGroup(config)));
-        }));
+        if (this.local) {
+            const mutationActor = req => {
+                if (this.runner.draining) throw failure('HOST_DRAINING', 503);
+                const actor = resolveActor(req, req.params.workspace, 'config');
+                this.local.authorize(actor, req.params.workspace, 'config');
+                return actor;
+            };
+            router.put('/:workspace/:key/definition', route(async (req, res) => {
+                const actor = mutationActor(req);
+                res.json(await this.local.define(req.params.key, req.body, config => this.supportsGroup(config), actor, () => mutationActor(req)));
+            }));
+            router.put('/:workspace/agents/:id', route(async (req, res) => {
+                mutationActor(req);
+                res.json(await this.local.defineAgent(req.params.id, req.body, () => mutationActor(req)));
+            }));
+            router.post('/:workspace/remove-definition', route((req, res) => {
+                const actor = mutationActor(req);
+                const { kind, id, topicId, requestId } = req.body || {};
+                if (topicId !== undefined && (typeof topicId !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(topicId))) throw failure('INVALID_CORE_TOPIC', 400);
+                const key = topicId === undefined ? null : require('./localWorkspace').localTopicKey(kind, id, topicId);
+                const result = this.local.remove(kind, id, key, actor, requestId, topicKey => {
+                    const work = this.store.db.prepare(`SELECT 1 FROM works WHERE conversation_id=? AND
+                        status IN ('queued','running','waiting_approval','cancelling','review_required') LIMIT 1`).get(topicKey);
+                    if (work || this.compaction.running.has(topicKey)) throw failure('CORE_TOPIC_BUSY');
+                });
+                for (const topic of result.removed) {
+                    this.runner.publish(topic.id, 'change_seq', { seq: this.store.head(topic.id) });
+                    this.attachments.topics.delete(topic.id);
+                }
+                this.runner.flowlock.schedule();
+                res.json(result);
+            }));
+            router.get('/:workspace/desktop-directory', route((req, res) => {
+                const actor = resolveActor(req, req.params.workspace, 'read');
+                this.local.authorize(actor, req.params.workspace, 'read');
+                if (actor.kind !== 'desktop') throw failure('CORE_DESKTOP_REQUIRED', 403);
+                let canConfigure = true;
+                try { this.local.authorize(actor, req.params.workspace, 'config'); }
+                catch (error) {
+                    if (error.status !== 403) throw error;
+                    canConfigure = false;
+                }
+                res.json(this.local.desktopDirectory(this.historyDeleted, canConfigure));
+            }));
+        }
         router.get('/:workspace/directory', route((req, res) => {
             const { workspace } = req.params;
             if (workspace !== this.workspace) throw failure('CORE_WORKSPACE_NOT_ENABLED', 404);
@@ -571,6 +621,8 @@ class CoreService {
         }));
         router.get('/:workspace/:key/observe', route((req, res) => {
             const { topic } = scope(req, 'read');
+            if (this.runner.draining) throw failure('HOST_DRAINING', 503);
+            this.observers.add(res);
             res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
             res.flushHeaders();
             const write = (name, value) => {
@@ -583,7 +635,7 @@ class CoreService {
             const timer = setInterval(() => {
                 try { write('change_seq', { seq: this.store.head(topic.key) }); } catch { res.end(); }
             }, 10000);
-            res.once('close', () => { stop(); clearInterval(timer); });
+            res.once('close', () => { this.observers.delete(res); stop(); clearInterval(timer); });
             write('change_seq', { seq: this.store.head(topic.key) });
         }));
         router.get('/:workspace/:key/receipt', route((req, res) => {
@@ -596,7 +648,7 @@ class CoreService {
             const { actor, topic } = scope(req, 'execute');
             // Configuration resolution may await native prompt templates. Recheck
             // before admitting if the session or its binding changed meanwhile.
-            if (actor.kind === 'mobile') this.mobile.requireSubmissionContext(req);
+            if (actor.kind === 'mobile') (this.mobile || this.remote).requireSubmissionContext(req);
             await this.send(topic, actor.principal, req.body || {}, () => scope(req, 'execute'), actor);
             res.status(202).json(this.receipt(topic, actor.principal, req.body.requestId));
         }));
@@ -619,7 +671,7 @@ class CoreService {
         }));
         router.post('/:workspace/:key/invitations', route(async (req, res) => {
             const { actor, topic } = scope(req, 'execute');
-            if (actor.kind === 'mobile') this.mobile.requireSubmissionContext(req);
+            if (actor.kind === 'mobile') (this.mobile || this.remote).requireSubmissionContext(req);
             await this.invite(topic, actor, req.body || {}, () => scope(req, 'execute'));
             res.status(202).json(this.receipt(topic, actor.principal, req.body.requestId));
         }));
@@ -697,8 +749,14 @@ class CoreService {
         return router;
     }
 
-    beginDrain() { this.compaction.beginDrain(); this.runner.beginDrain(); }
+    beginDrain() {
+        this.compaction.beginDrain();
+        this.runner.beginDrain();
+        for (const observer of this.observers) observer.end();
+        this.observers.clear();
+    }
     async close() {
+        this.beginDrain();
         await this.compaction.close();
         const jev = this.jev?.close();
         await this.runner.close();

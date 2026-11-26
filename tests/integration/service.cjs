@@ -23,7 +23,8 @@ async function jsonBody(req) {
     for await (const chunk of req) chunks.push(chunk);
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision, mobileBuild, groupRelay, serverDependencies, restoreSyntheticState, expectedStartupError, streamInterrupt, toolHandoff}) {
+async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, hardwareStream, observedContext, ordinaryTools, delegation, serverRevision, mobileBuild, groupRelay, serverDependencies, restoreSyntheticState, expectedStartupError, streamInterrupt, toolHandoff, coreRemote}) {
+    const independentCore = ['core-local', 'core-remote'].includes(mode);
     const sourceApp = path.join(candidate, 'apps/server');
     const box = path.join(out, 'runtime-box');
     fs.mkdirSync(box);
@@ -38,7 +39,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     const excluded = /(?:^|\/)(?:node_modules|DebugLog|logs|TVDaily|dailynote|file|image|Agent|VectorStore|\.file_cache)(?:\/|$)|(?:^|\/)(?:config\.env|\.env(?:\..*)?)(?:$|\/)|\.(?:pem|key|p12|pfx)$/i;
     for (const entry of tracked.toString().split('\0').filter(Boolean)) {
         const rel = entry.slice('apps/server/'.length);
-        if (excluded.test(rel) || (mode === 'core-local' && rel === 'Plugin/NativeSync/plugin-manifest.json')) continue;
+        if (excluded.test(rel) || (independentCore && rel === 'Plugin/NativeSync/plugin-manifest.json')) continue;
         if (rel.startsWith('Plugin/') && !rel.startsWith('Plugin/NativeSync/') &&
             !/^Plugin\/(?:VCPSleep|AgentAssistant)\/(?!plugin-manifest)/.test(rel) &&
             !(delegation && rel === 'Plugin/AgentAssistant/plugin-manifest.json.example')) continue;
@@ -84,7 +85,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     const descriptors = {};
     const missingCase = mode === 'idle' && process.env.NS_IDLE_SCENARIOS === 'attachment';
     const idleScale = mode === 'idle' && process.env.NS_IDLE_SCALE === 'large';
-    if (mode === 'core-local') {
+    if (independentCore) {
         const descriptor = { itemType: 'agent', itemId: 'local-agent', topicId: 'local-topic' };
         const { mapTopic } = require('../../apps/desktop/modules/services/localCoreRuntime');
         source = { id: mapTopic(descriptor).sharedId };
@@ -128,19 +129,23 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     const data = path.join(out, 'data');
     fs.mkdirSync(data, {recursive:Boolean(observedContext)});
     if (restoreSyntheticState) await restoreSyntheticState({ box, data });
-    else if (mode !== 'core-local') fs.copyFileSync(path.join(seed,'central.sqlite'), path.join(data,'central.sqlite'));
+    else if (!independentCore) fs.copyFileSync(path.join(seed,'central.sqlite'), path.join(data,'central.sqlite'));
     const calls=[], requests=[];
     const gates={partialClosed:false};
     let releaseLost,activePartial;
     const lostGate=new Promise(r=>{releaseLost=r;});
     const provider=http.createServer(async(req,res)=>{
         try {
+            if(req.url==='/v1/models' && coreRemote?.provider) {
+                const response = await fetch(coreRemote.provider + req.url);
+                return res.writeHead(response.status).end(await response.text());
+            }
             if(req.url==='/v1/models')return res.end(JSON.stringify({data:[{id:'synthetic'}]}));
             if(req.method!=='POST'||req.url!=='/v1/chat/completions')throw Error('Unexpected fixture provider route '+req.url);
             const body=await jsonBody(req);
             const last=body.messages.findLast(row=>row.role==='user')?.content;
             const input=Array.isArray(last)?last.filter(x=>x.type==='text').map(x=>x.text).join(''):last;
-            const which=input===coreInput&&(mode==='core-rc'||mode==='core-local')?'coreRC':Object.entries(contract.cases).find(([,content])=>input===content)?.[0];
+            const which=input===(coreRemote?.input || coreInput)&&(mode==='core-rc'||independentCore)?'coreRC':Object.entries(contract.cases).find(([,content])=>input===content)?.[0];
             const row={case:which,id:body.requestId,stream:Boolean(body.stream),at:Date.now()};
             const ordinaryReply = ordinaryTools?.reply(body, row, calls);
             if (delegation?.classify(body, row)) {
@@ -154,6 +159,19 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             if (await observedContext?.respond?.(body, row, res)) return;
             observedContext?.recordProvider?.(req.url, body);
             if(which==='lostAck'||which==='coreRC')await lostGate;
+            if (coreRemote?.provider) {
+                row.imageParts = body.messages.flatMap(message => Array.isArray(message.content) ? message.content : [])
+                    .filter(item => item.type === 'image_url').length;
+                const response = await fetch(coreRemote.provider + req.url, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body), signal: AbortSignal.timeout(80000)
+                });
+                row.status = response.status;
+                res.writeHead(response.status, { 'Content-Type': response.headers.get('content-type') });
+                const { Readable } = require('node:stream');
+                await require('node:stream/promises').pipeline(Readable.fromWeb(response.body), res);
+                return;
+            }
             if(which==='interrupted'){
                 if(!body.stream)throw Error('Partial fixture expected streaming provider input');
                 if (hardwareStream) { hardwareStream.provider.accept(res); return; }
@@ -314,6 +332,11 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 if (!res.destroyed) res.writeHead(response.statusCode, response.headers).end(Buffer.concat(chunks));
                 return;
             }
+            if (coreRemote && route === '/mobile/api/pair') trace('mobile-pair-http', {
+                status: response.statusCode, sameOrigin: req.headers.origin === 'https://' + req.headers.host,
+                originPresent: Boolean(req.headers.origin), nullOrigin: req.headers.origin === 'null',
+                firefox: /Firefox/.test(req.headers['user-agent'] || '')
+            });
             res.writeHead(response.statusCode,response.headers);
             response.pipe(res);
         });
@@ -339,6 +362,8 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             cwd:box,stdio:['ignore',log,log],env:{
                 ...(process.env.NS_FIXTURE_POLL_WATCHERS === '1' && { CHOKIDAR_USEPOLLING:'true', NS_FIXTURE_POLL_WATCHERS:'1' }),
                 ...(mode==='core-local'&&{ VCP_CORE_DATA_DIR:path.join(out,'core'), VCP_CORE_MODE:'local' }),
+                ...(coreRemote&&{ VCP_CORE_DATA_DIR:path.join(out,'core'), VCP_CORE_MODE:'remote',
+                    VCP_CORE_REMOTE_ORIGIN:'https://127.0.0.1:'+proxyPort, VCP_CORE_IMAGE_MODELS:JSON.stringify([coreRemote.model]) }),
                 ...(mode==='core-rc'&&{ VCP_CORE_DATA_DIR:path.join(out,'core'), VCP_CORE_WORKSPACE:'sharedAB', VCP_CORE_MODE:'shared' }),
                 PATH:'/usr/bin:/bin',HOME:out,LANG:'C.UTF-8',TZ:'UTC',NS_LOADED_REPORT:path.join(out,'backend-loaded.json'),
                 ...(mode === 'idle' && process.env.NS_IDLE_METER !== 'off' ? { NS_METER_BACKEND:'1', NS_METER_PREFIX:path.join(out,'backend') } : {}),
@@ -347,7 +372,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 API_URL:'http://127.0.0.1:'+providerPort,...(mode==='transport-only'?{}:{ApiRetries:'1'}),MaxVCPLoopNonStream:'4',MaxVCPLoopStream:'4',
                 KNOWLEDGEBASE_ROOT_PATH:path.join(out,'empty-diaries'),KNOWLEDGEBASE_STORE_PATH:path.join(data,'vectors'),
                 KNOWLEDGEBASE_FULL_SCAN_ON_STARTUP:'false',TDB_KNOWLEDGE_ENABLED:'false',
-                NativeSyncEnabled:mode==='core-local'?'false':'true',NativeSyncDataDir:data,NativeMobileEnabled:mode==='core-local'?'false':'true',
+                NativeSyncEnabled:independentCore?'false':'true',NativeSyncDataDir:data,NativeMobileEnabled:independentCore?'false':'true',
                 NativeMobileOrigin:'https://127.0.0.1:'+proxyPort,NativeMobileStartDelayMs:'0',
                 ...(delegation ? { AdminUsername:'synthetic-admin', AdminPassword:'synthetic-admin-only' } : {}),
                 ...(mode === 'idle' ? { NativeMobileConfigSync:'true', NativeMobileAttachments:'true' } : {}),
@@ -438,7 +463,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         return { htmlStatus: page.status, bundleStatus: bundle.status, connectionStatus: connection.status };
     }
     return { checkMobile, startupError, get backendPid(){return backend.pid;},
-        ...((mode==='core-rc' || mode==='core-local' || ordinaryTools || delegation || groupRelay || toolHandoff?.finalReceipt || toolHandoff?.duo) && { async restartAfterCrash() {
+        ...((mode==='core-rc' || independentCore || ordinaryTools || delegation || groupRelay || toolHandoff?.finalReceipt || toolHandoff?.duo) && { async restartAfterCrash() {
             const crashed = await stopBackend('SIGKILL');
             assert.deepEqual(crashed, {code:null,signal:'SIGKILL'});
             await startBackend();

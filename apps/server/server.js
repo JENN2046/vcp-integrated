@@ -557,8 +557,13 @@ else console.log('未加载任何全局上下文转换规则。');
 const app = express();
 app.set('trust proxy', 'loopback');
 app.set('trust proxy', true); // 新增：信任代理，以便正确解析 X-Forwarded-For 头，解决本地IP识别为127.0.0.1的问题
-// Mobile requests use scoped sessions; the plugin enforces HTTPS and Origin.
-app.use('/mobile', (req, res) => {
+// These entry points resolve their own scoped device credentials before the host Bearer gate.
+app.use('/core/api', (req, res, next) => {
+    if (!coreHost?.remoteDesktopRouter) return res.status(404).json({ error: { code: 'CORE_DISABLED' } });
+    return coreHost.remoteDesktopRouter(req, res, next);
+});
+app.use('/mobile', (req, res, next) => {
+    if (coreHost?.remoteMobileRouter) return coreHost.remoteMobileRouter(req, res, next);
     const mobile = pluginManager.getServiceModule('NativeSync');
     if (!mobile?.handleMobile) return res.status(503).json({ error: { code: 'MOBILE_DISABLED' } });
     return mobile.handleMobile(req, res);

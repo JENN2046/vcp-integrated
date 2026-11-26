@@ -1725,8 +1725,34 @@ if (!gotTheLock) {
         // ⚠️ agentHandlers 必须在 assistantHandlers 之前初始化
         // 因为 assistantHandlers 依赖 getAgentConfigById 函数，该函数需要 AGENT_DIR_CACHE 已被初始化
         const { saveNativeOwnerConfig, saveNativeOwnerAvatar } = require('./modules/services/nativeSync/nativeConfigSave');
-        const beforeOwnerDelete = require('./modules/services/nativeSync/nativeOwnerDeletion').createOwnerDeletion({ root: APP_DATA_ROOT_IN_PROJECT });
-        const saveOwnerConfig = request => saveNativeOwnerConfig({ root: APP_DATA_ROOT_IN_PROJECT, ...request });
+        const legacyOwnerDelete = require('./modules/services/nativeSync/nativeOwnerDeletion').createOwnerDeletion({ root: APP_DATA_ROOT_IN_PROJECT });
+        const coreOwnerRuntime = async () => {
+            const core = nativeSyncLifecycle?.getRuntime();
+            if (core?.removeDefinition) return core;
+            const profile = await require('./modules/services/nativeSync/sharedLocal').ownedJson(APP_DATA_ROOT_IN_PROJECT,
+                path.join(APP_DATA_ROOT_IN_PROJECT, '.vcp-core/profile.json'), { optional: true });
+            if (profile || process.env.VCPCHAT_LOCAL_CORE_WORKSPACE || process.env.VCPCHAT_CORE_REMOTE_ORIGIN) {
+                throw Object.assign(Error('CORE_STARTUP_PENDING'), { code: 'CORE_STARTUP_PENDING' });
+            }
+        };
+        const beforeOwnerDelete = async (scope, options, createDefaultTopic) => {
+            try {
+                const core = await coreOwnerRuntime();
+                if (!core) return legacyOwnerDelete(scope, options, createDefaultTopic);
+                if (options != null) return { success: false, error: 'CORE_DELETE_SCOPE_CHANGED' };
+                return await core.removeDefinition(scope);
+            } catch (error) {
+                return { success: false, error: error.code || 'CORE_DELETE_FAILED' };
+            }
+        };
+        const saveOwnerConfig = async request => {
+            try {
+                const core = await coreOwnerRuntime();
+                return core ? await core.saveOwnerConfig(request) : await saveNativeOwnerConfig({ root: APP_DATA_ROOT_IN_PROJECT, ...request });
+            } catch (error) {
+                return { success: false, error: error.code || 'CORE_CONFIG_SAVE_FAILED' };
+            }
+        };
         const saveOwnerAvatar = request => saveNativeOwnerAvatar({ root: APP_DATA_ROOT_IN_PROJECT, ...request });
         agentHandlers.initialize({
             beforeOwnerDelete,

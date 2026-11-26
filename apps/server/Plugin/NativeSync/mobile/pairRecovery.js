@@ -1,7 +1,7 @@
 'use strict';
 
 const { createPublicKey, randomBytes, verify } = require('node:crypto');
-const { error } = require('./execution');
+const error = (code, status = 400) => Object.assign(Error(code), { code, status });
 
 const challengeLifetimeMs = 60_000;
 const proofContext = 'vcp-mobile-pair-recovery-v1';

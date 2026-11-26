@@ -9,7 +9,7 @@ const entryId = (origin, serverUrl) => sha256('native-sync-mobile-entry-v1\0' + 
 
 function normalizeSubmission({ topicKey, kind, payload }) {
     const invalid = () => { throw Object.assign(new Error('INVALID_RECOVERY_SUBMISSION'), { code: 'INVALID_RECOVERY_SUBMISSION' }); };
-    if (typeof topicKey !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(topicKey) || !payload || typeof payload !== 'object' || Array.isArray(payload)) invalid();
+    if (typeof topicKey !== 'string' || !/^(?:[a-zA-Z0-9_-]{1,64}|local_[a-f0-9]{64})$/.test(topicKey) || !payload || typeof payload !== 'object' || Array.isArray(payload)) invalid();
     if (typeof payload.requestId !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(payload.requestId)) invalid();
     if (kind === 'message') {
         if (Object.keys(payload).some(k => !['requestId', 'text', 'attachments'].includes(k)) || typeof payload.text !== 'string' || payload.text.length > 12000) invalid();

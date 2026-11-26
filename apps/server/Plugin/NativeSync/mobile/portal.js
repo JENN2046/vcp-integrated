@@ -8,10 +8,7 @@ const { MobileConnection } = require('./connection');
 const { historyResponseCompression } = require('./historyResponse');
 const {requireReferenceReader}=require('../sync/capabilities');
 const { entryId, sessionMarker } = require('./submissionRecovery');
-const { PairRecovery, recoveryPublicKey } = require('./pairRecovery');
-const cookieName = '__Secure-vcp_mobile';
-const mobileCookies = req => String(req.headers.cookie || '').split(';').map(value => value.trim()).filter(value => value.startsWith(cookieName + '='));
-const protectedHttps = req => Boolean(req.socket?.encrypted) || (req.secure === true && ['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket?.remoteAddress));
+const { PairedSessions, cookieName, protectedHttps } = require('./pairedSessions');
 class MobilePortal {
     constructor({ store, config, agentManager }) {
         this.store = store; this.db = store.db;
@@ -42,10 +39,8 @@ class MobilePortal {
         }
         const hours=Number(config.NativeMobileSessionHours ?? 8);
         if(!Number.isFinite(hours)||hours<1||hours>720)throw error('INVALID_MOBILE_SESSION_DURATION');
-        this.db.exec(`CREATE TABLE IF NOT EXISTS mobile_pairings(hash TEXT PRIMARY KEY,expires INTEGER NOT NULL,scopes TEXT NOT NULL,used INTEGER NOT NULL DEFAULT 0);
-            CREATE TABLE IF NOT EXISTS mobile_sessions(hash TEXT PRIMARY KEY,id TEXT NOT NULL UNIQUE,expires INTEGER NOT NULL,scopes TEXT NOT NULL);`);
-        if(!this.db.prepare('PRAGMA table_info(mobile_sessions)').all().some(c=>c.name==='last_topic_key'))this.db.exec('ALTER TABLE mobile_sessions ADD COLUMN last_topic_key TEXT');
-        this.pairRecovery = new PairRecovery(this.db, this.origin);
+        this.sessions = new PairedSessions(this.db, this.origin, hours);
+        this.pairRecovery = this.sessions.pairRecovery;
         if(config.NativeMobileAttachments===true&&config.NativeMobileConfigSync!==true)throw error('ATTACHMENTS_REQUIRE_VERSIONED_CONFIG');
         this.attachments=config.NativeMobileAttachments===true?new (require('./attachments').AttachmentStore)({store,root:config.NativeSyncDataDir,topics:this.topics}):null;
         this.engine = new ConversationExecution({ store, topics: this.topics, agentManager, configRequired: config.NativeMobileConfigSync === true, startDelayMs: Math.max(0, Math.min(Number(config.NativeMobileStartDelayMs) || 0, 10000)), maxConcurrency: config.NativeMobileMaxConcurrency === undefined ? 4 : Number(config.NativeMobileMaxConcurrency), executionTimeoutMs: config.NativeMobileExecutionTimeoutMs === undefined ? 120000 : Number(config.NativeMobileExecutionTimeoutMs),groupIdleTimeoutMs:config.NativeMobileGroupIdleTimeoutMs===undefined?62000:Number(config.NativeMobileGroupIdleTimeoutMs) });
@@ -83,17 +78,12 @@ class MobilePortal {
         this.router.post('/api/pair', (req, res, next) => { try { this.pair(req, res); } catch (e) { next(e); } });
         this.router.post('/api/pair/challenge', (req, res, next) => {
             try {
-                this.requireMissingSession(req);
-                res.json({ challenge: this.pairRecovery.challenge(req.body) });
+                res.json(this.sessions.challenge(req));
             } catch (e) { next(e); }
         });
         this.router.post('/api/pair/recover', (req, res, next) => {
             try {
-                this.requireMissingSession(req);
-                const token = randomBytes(32).toString('base64url');
-                const expires = this.pairRecovery.recover(req.body, digest(token));
-                this.setSessionCookie(res, token, Math.max(1, Math.ceil((expires - Date.now()) / 1000)));
-                res.json({ authenticated: true });
+                this.sessions.recover(req, res);
             } catch (e) { next(e); }
         });
         this.router.use('/api', (req, _res, next) => {
@@ -350,17 +340,9 @@ class MobilePortal {
         this.db.exec('BEGIN IMMEDIATE');try{const put=this.db.prepare('INSERT INTO mobile_catalog(topic_key,metadata) VALUES(?,?) ON CONFLICT(topic_key) DO UPDATE SET metadata=excluded.metadata');for(const row of rows)put.run(...row);this.db.exec('COMMIT');}catch(e){this.db.exec('ROLLBACK');throw e;}
         return {published:rows.length};
     }
-    currentSession(req) {
-        const values=mobileCookies(req);if(values.length!==1)return null;
-        const token=values[0].slice(cookieName.length+1);if(!/^[a-zA-Z0-9_-]{43}$/.test(token))return null;
-        const row=this.db.prepare('SELECT id,expires,scopes,last_topic_key FROM mobile_sessions WHERE hash=?').get(digest(token));return row&&row.expires>Date.now()?row:null;
-    }
-    requireMissingSession(req) {
-        if (mobileCookies(req).length > 1 || this.currentSession(req)) throw error('MOBILE_SESSION_ALREADY_AUTHENTICATED', 409);
-    }
-    setSessionCookie(res, token, maxAge = this.sessionSeconds) {
-        res.setHeader('Set-Cookie',`${cookieName}=${token}; Path=/mobile; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}`);
-    }
+    currentSession(req) { return this.sessions.currentSession(req); }
+    requireMissingSession(req) { return this.sessions.requireMissingSession(req); }
+    setSessionCookie(res, token, maxAge) { return this.sessions.setSessionCookie(res, token, maxAge); }
     issueSession(res,scopes,existingId) {
         const token=randomBytes(32).toString('base64url'),id=existingId||randomUUID();
         const selected=existingId?this.db.prepare('SELECT last_topic_key FROM mobile_sessions WHERE id=?').get(existingId)?.last_topic_key:null;
@@ -386,9 +368,7 @@ class MobilePortal {
             if(requestScope.source)shared.authorize(shared.desktop(requestScope.source,'shared-space-v1'),options.sharedSpaceId,'config');
             else if(requestScope.topics!==undefined)throw error('SHARED_PERMISSION_REQUIRED',403);
             if(!shared.grants.has(options.sharedSpaceId))throw error('SHARED_SPACE_NOT_APPROVED',403);
-            const code=randomBytes(24).toString('base64url'),expiresAt=Date.now()+180000;
-            this.db.prepare('INSERT INTO mobile_pairings(hash,expires,scopes) VALUES(?,?,?)').run(digest(code),expiresAt,JSON.stringify(permissions.map(p=>'shared:'+options.sharedSpaceId+':'+p)));
-            return {pairingCode:code,expiresAt};
+            return this.sessions.createCode(permissions.map(p=>'shared:'+options.sharedSpaceId+':'+p));
         }
         if(options.sharedSpaceId!==undefined||options.permissions!==undefined)throw error('INVALID_PAIRING_SCOPE');
         if(options.snapshot!==undefined&&(typeof options.snapshot!=='boolean'||options.scopeMode!=='source'))throw error('INVALID_PAIRING_SCOPE');
@@ -410,27 +390,7 @@ class MobilePortal {
         this.db.prepare('INSERT INTO mobile_pairings(hash,expires,scopes) VALUES(?,?,?)').run(digest(code),expiresAt,JSON.stringify(scopes));
         return {pairingCode:code,expiresAt};
     }
-    pair(req,res) {
-        const code=req.body?.code;
-        if(typeof code!=='string'||!/^[a-zA-Z0-9_-]{32}$/.test(code))throw error('INVALID_PAIRING',401);
-        const hash=digest(code),now=Date.now();const grant=this.db.prepare('SELECT * FROM mobile_pairings WHERE hash=?').get(hash);
-        if(!grant||grant.used||grant.expires<=now)throw error('INVALID_PAIRING',401);
-        const key = req.body.recoveryPublicKey;
-        if (key !== undefined && !recoveryPublicKey(key)) throw error('INVALID_PAIR_RECOVERY_KEY', 400);
-        const token=randomBytes(32).toString('base64url'),id=randomUUID();
-        this.db.exec('BEGIN IMMEDIATE');
-        try {
-            if(!this.db.prepare('UPDATE mobile_pairings SET used=1 WHERE hash=? AND used=0 AND expires>?').run(hash,now).changes)throw error('INVALID_PAIRING',401);
-            if (key !== undefined && this.pairRecovery.hasKey(key)) throw error('PAIR_RECOVERY_KEY_ALREADY_BOUND', 409);
-            const previous = this.currentSession(req);
-            if (previous) this.pairRecovery.clear(previous.id);
-            const scopes = this.db.prepare('SELECT scopes FROM mobile_pairings WHERE hash=?').get(hash).scopes;
-            this.db.prepare('INSERT INTO mobile_sessions(hash,id,expires,scopes,recovery_public_key) VALUES(?,?,?,?,?)').run(digest(token),id,now+this.sessionSeconds*1000,scopes,key ?? null);
-            this.db.exec('COMMIT');
-        } catch(e){this.db.exec('ROLLBACK');throw e;}
-        this.setSessionCookie(res, token);
-        res.json({ authenticated: true, ...(key !== undefined ? { recoveryEnrolled: true } : {}) });
-    }
+    pair(req, res) { return this.sessions.pair(req, res); }
     beginDrain(){for(const stream of this.eventStreams||[])stream.close();this.eventStreams?.clear();this.engine.beginDrain();if(this.attachments)this.attachments.closing=true;}
     async close(){for(const stream of this.eventStreams||[])stream.close();this.eventStreams?.clear();await this.engine.close();await this.attachments?.close();}
     snapshot(){return {executions:this.engine.snapshot(),sessionCount:this.db.prepare('SELECT count(*) AS n FROM mobile_sessions').get().n};}

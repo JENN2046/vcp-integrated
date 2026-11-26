@@ -31,11 +31,20 @@ function registerIntegrated({ historyQueue, appDataRoot, readSettings, mainWindo
         start: async startup => {
             const { ownedJson } = require('../services/nativeSync/sharedLocal');
             const marker = await ownedJson(appDataRoot, require('node:path').join(appDataRoot, '.vcp-core/profile.json'), { optional: true });
-            const localWorkspace = process.env.VCPCHAT_LOCAL_CORE_WORKSPACE || marker?.workspace;
+            const remoteOrigin = process.env.VCPCHAT_CORE_REMOTE_ORIGIN || (marker?.remote && marker.origin) || undefined;
+            const localWorkspace = process.env.VCPCHAT_LOCAL_CORE_WORKSPACE || marker?.workspace || (remoteOrigin && 'personal');
             if (localWorkspace) {
                 if (!isolated) throw Object.assign(new Error('CORE_LOCAL_REQUIRES_SEPARATE_PROFILE'), { code: 'CORE_LOCAL_REQUIRES_SEPARATE_PROFILE' });
                 return require('../services/localCoreRuntime').openLocalCore({
                     queue: historyQueue(), appDataRoot, workspace: localWorkspace, readSettings, ipcMain, getMainWindow,
+                    remoteOrigin, remoteToken: process.env.VCPCHAT_CORE_DEVICE_TOKEN, remotePairCode: process.env.VCPCHAT_CORE_PAIR_CODE,
+                    writeOwner: (kind, id, value, exists) => kind === 'agent'
+                        ? exists ? agentConfigManager.updateAgentConfig(id, () => value) : agentConfigManager.writeAgentConfig(id, value)
+                        : exists ? groupChat.mutateGroupConfig(id, () => value) : groupChat.initializeAgentGroupConfig(id, value),
+                    notifyDirectory: () => {
+                        invalidateAgentCaches();
+                        broadcast('native-sync:directory-changed', { core: true });
+                    },
                     readAgent: id => agentConfigManager.readAgentConfig(id),
                     readGroup: id => groupChat.getAgentGroupConfig(id),
                     readRules: async ({ itemType, itemId }) => (await require('../services/conversationContext')

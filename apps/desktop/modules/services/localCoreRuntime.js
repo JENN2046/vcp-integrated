@@ -35,12 +35,12 @@ class LocalCoreClient extends CoreSingleClient {
 
     mapping(descriptor) { return mapTopic(descriptor); }
     route(mapping, resource) {
-        return '/api/core/' + encodeURIComponent(this.runtime.workspace) + '/' + mapping.sharedId + '/' + resource;
+        return this.runtime.base + '/' + encodeURIComponent(this.runtime.workspace) + '/' + mapping.sharedId + '/' + resource;
     }
 
     async announceResources() {
         const { nativeSyncRouteId } = require('./nativeSync/sharedTopicSponsor');
-        await this.runtime.send('/api/core/' + encodeURIComponent(this.runtime.workspace) + '/resource-node', {
+        await this.runtime.send(this.runtime.base + '/' + encodeURIComponent(this.runtime.workspace) + '/resource-node', {
             body: { routeHash: createHash('sha256').update(nativeSyncRouteId).digest('hex') }
         });
     }
@@ -58,6 +58,8 @@ class LocalCoreClient extends CoreSingleClient {
         return super.send(descriptor, message);
     }
 
+    async defineTopic(descriptor) { await this.runtime.define(descriptor); }
+    assertCanConfigure() { this.runtime.assertCanConfigure(); }
     groupMode(descriptor) { return this.runtime.groupModes.get(this.mapping(descriptor).sharedId); }
     async invite(descriptor, member, redo) { await this.runtime.define(descriptor); return super.invite(descriptor, member, redo); }
     async jev(descriptor, action, member) { await this.runtime.define(descriptor); return super.jev(descriptor, action, member); }
@@ -66,18 +68,23 @@ class LocalCoreClient extends CoreSingleClient {
 }
 
 async function openLocalCore({ queue, appDataRoot, workspace, readSettings, readAgent, readGroup, readRules,
-    ipcMain, getMainWindow, notify, notifyExecutionStatus, notifyGroupEvent, storeAttachment }) {
+    ipcMain, getMainWindow, notify, notifyExecutionStatus, notifyGroupEvent, storeAttachment, writeOwner, notifyDirectory,
+    remoteOrigin, remoteToken, remotePairCode }) {
     const settings = await readSettings();
-    const endpoint = new URL(settings.vcpServerUrl);
-    if (!['http:', 'https:'].includes(endpoint.protocol) || !['127.0.0.1', '[::1]'].includes(endpoint.hostname) ||
-        endpoint.username || endpoint.password || typeof settings.vcpApiKey !== 'string' || !settings.vcpApiKey.trim()) {
-        throw fail('CORE_LOCAL_REQUIRES_AUTHENTICATED_LOOPBACK');
+    const remote = Boolean(remoteOrigin);
+    const endpoint = new URL(remoteOrigin || settings.vcpServerUrl);
+    let credential = remote ? remoteToken : settings.vcpApiKey;
+    if (endpoint.username || endpoint.password || (remote
+        ? endpoint.protocol !== 'https:' || endpoint.origin !== remoteOrigin
+        : !['http:', 'https:'].includes(endpoint.protocol) || !['127.0.0.1', '[::1]'].includes(endpoint.hostname) ||
+            typeof credential !== 'string' || !credential.trim())) {
+        throw fail(remote ? 'CORE_REMOTE_HTTPS_ORIGIN_REQUIRED' : 'CORE_LOCAL_REQUIRES_AUTHENTICATED_LOOPBACK');
     }
     const root = path.resolve(appDataRoot);
     const dir = path.join(root, '.vcp-core');
     const marker = path.join(dir, 'profile.json');
     const previous = await ownedJson(root, marker, { optional: true });
-    if (previous && (previous.workspace !== workspace || previous.origin !== endpoint.origin)) {
+    if (previous && (previous.workspace !== workspace || previous.origin !== endpoint.origin || Boolean(previous.remote) !== remote)) {
         throw fail('CORE_LOCAL_PROFILE_CHANGED');
     }
     if (queue.syncPolicy?.isRecoveryFence || queue.syncPolicy?.sharedSpaceId ||
@@ -85,12 +92,13 @@ async function openLocalCore({ queue, appDataRoot, workspace, readSettings, read
         throw fail('CORE_LOCAL_REQUIRES_SEPARATE_PROFILE');
     }
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
-    if (!previous) await durableJson(marker, { workspace, origin: endpoint.origin });
+    if (!previous) await durableJson(marker, { workspace, origin: endpoint.origin, ...(remote && { remote: true }) });
     const request = async (route, options = {}) => {
         try {
             const response = await fetch(endpoint.origin + route, {
                 method: options.method || (options.body ? 'POST' : 'GET'),
-                headers: { Authorization: 'Bearer ' + settings.vcpApiKey, ...(options.body && { 'Content-Type': 'application/json' }) },
+                headers: { ...(credential && { Authorization: 'Bearer ' + credential }),
+                    ...(options.body && { 'Content-Type': 'application/json' }) },
                 ...(options.body && { body: JSON.stringify(options.body) }),
                 redirect: 'error', cache: 'no-store', signal: options.signal || AbortSignal.timeout(15000)
             });
@@ -104,9 +112,83 @@ async function openLocalCore({ queue, appDataRoot, workspace, readSettings, read
             throw fail('NETWORK_UNAVAILABLE');
         }
     };
+    const base = remote ? '/core/api' : '/api/core';
+    const workspaceRoute = base + '/' + encodeURIComponent(workspace);
+    let permissions;
+    if (remote) {
+        const storage = require('electron').safeStorage;
+        const secretFile = path.join(dir, 'device.json');
+        const stored = await ownedJson(root, secretFile, { optional: true });
+        const safe = storage?.isEncryptionAvailable() && storage.getSelectedStorageBackend?.() !== 'basic_text';
+        if (!credential && remotePairCode) {
+            if (!safe) throw fail('CORE_REMOTE_KEYRING_REQUIRED');
+            const enrollment = await (await request(base + '/pair', { body: { code: remotePairCode } })).json();
+            if (enrollment.workspace !== workspace || !/^[A-Za-z0-9_-]{43}$/.test(enrollment.token)) throw fail('CORE_REMOTE_DEVICE_INVALID');
+            credential = enrollment.token;
+            await durableJson(secretFile, { encrypted: storage.encryptString(credential).toString('base64') });
+        } else if (!credential && stored && safe) {
+            credential = storage.decryptString(Buffer.from(stored.encrypted, 'base64'));
+        }
+        if (!/^[A-Za-z0-9_-]{43}$/.test(credential || '')) throw fail('CORE_REMOTE_PAIR_REQUIRED');
+        const session = await (await request(base + '/session')).json();
+        if (session.workspace !== workspace || !session.permissions?.includes('read')) throw fail('CORE_REMOTE_DEVICE_INVALID');
+        permissions = new Set(session.permissions);
+    }
     const pending = new Map(), written = new Map(), commands = new Map();
+    const versions = new Map(), ownerVersions = new Map();
+    const nativeFile = (kind, id) => path.join(root, kind === 'agent' ? 'Agents' : 'AgentGroups', id, 'config.json');
+    const coreProjection = (kind, config) => kind === 'agent'
+        ? agentConfiguration(config)
+        : { ...extractGroupDTO(config), ...(config.modeSettings && { modeSettings: config.modeSettings }),
+            ...(config.sequentialSpeakerOrder && { sequentialSpeakerOrder: config.sequentialSpeakerOrder }) };
+    const ownerFingerprint = (kind, owner, topic) => JSON.stringify([coreProjection(kind, owner), topic?.name]);
+    const baseline = new Map();
+    const remoteProjection = path.join(dir, 'catalog.json');
+    async function loadRemoteDirectory() {
+        const snapshot = await (await request(workspaceRoute + '/desktop-directory')).json();
+        const owners = new Map();
+        for (const item of snapshot.agents) {
+            owners.set('agent:' + item.id, { kind: 'agent', id: item.id, config: item.config, topics: [] });
+            ownerVersions.set(item.id, item.version);
+        }
+        for (const row of snapshot.topics) {
+            const { local, sharedId } = mapTopic({ itemType: row.ownerType, itemId: row.ownerId, topicId: row.topicId });
+            if (row.key !== sharedId) throw fail('CORE_DIRECTORY_INVALID');
+            const identity = row.ownerType + ':' + row.ownerId;
+            let owner = owners.get(identity);
+            if (!owner) owners.set(identity, owner = { kind: row.ownerType, id: row.ownerId, topics: [], config: row.config.group || row.config });
+            owner.topics.push({ id: row.topicId, name: row.name, createdAt: 1 });
+            versions.set(sharedId, row.version);
+            runtime.localTopics.set(sharedId, { local, sharedId });
+            if (row.config.group) runtime.groupModes.set(sharedId, row.config.group.mode);
+        }
+        const last = await ownedJson(root, remoteProjection, { optional: true });
+        for (const [identity, owner] of owners) {
+            const { kind, id, config, topics } = owner;
+            const current = await ownedJson(root, nativeFile(kind, id), { optional: true });
+            const managedTopics = new Set(last?.[identity] || []);
+            const kept = (current?.topics || []).filter(topic => !managedTopics.has(topic.id) && !topics.some(row => row.id === topic.id));
+            const projected = {
+                ...current, ...coreProjection(kind, config), id, _historyDeleting: false, topics: [...topics, ...kept],
+                current_topic_id: topics.some(row => row.id === current?.current_topic_id) ? current.current_topic_id : topics[0]?.id || kept[0]?.id
+            };
+            await writeOwner(kind, id, projected, Boolean(current));
+            for (const topic of topics) baseline.set(mapTopic({ itemType: kind, itemId: id, topicId: topic.id }).sharedId, ownerFingerprint(kind, projected, topic));
+        }
+        for (const [identity, topics] of Object.entries(last || {})) {
+            if (owners.has(identity)) continue;
+            const [kind, id] = identity.split(':');
+            if (!['agent', 'group'].includes(kind) || !/^[A-Za-z0-9_-]{1,200}$/.test(id)) throw fail('CORE_DIRECTORY_INVALID');
+            const current = await ownedJson(root, nativeFile(kind, id), { optional: true });
+            if (!current) continue;
+            const remaining = current.topics.filter(topic => !topics.includes(topic.id));
+            await writeOwner(kind, id, { ...current, topics: remaining, _historyDeleting: !remaining.length }, true);
+        }
+        await durableJson(remoteProjection, Object.fromEntries([...owners].map(([key, row]) => [key, row.topics.map(topic => topic.id)])));
+        notifyDirectory?.();
+    }
     const runtime = {
-        enabled: true, root, dir, workspace, queue, notify, notifyExecutionStatus, notifyGroupEvent, storeAttachment, readOnly: false,
+        enabled: true, root, dir, workspace, base, queue, notify, notifyExecutionStatus, notifyGroupEvent, storeAttachment, readOnly: false,
         groupModes: new Map(), localTopics: new Map(),
         attachments: { localFile: DesktopAttachments.prototype.localFile.bind({ root }) },
         execution: { async run(key, fn) {
@@ -117,6 +199,10 @@ async function openLocalCore({ queue, appDataRoot, workspace, readSettings, read
         } },
         close: null,
         assertSharedAccess() { if (runtime.closed) throw fail('HOST_DRAINING'); },
+        assertCanConfigure() {
+            runtime.assertSharedAccess();
+            if (remote && !permissions.has('config')) throw fail('CORE_WORKSPACE_FORBIDDEN');
+        },
         send: async (route, options) => (await request(route, options)).json(),
         download: async route => Buffer.from(await (await request(route)).arrayBuffer()),
         observeRequest: (route, signal) => request(route, { signal }),
@@ -130,7 +216,10 @@ async function openLocalCore({ queue, appDataRoot, workspace, readSettings, read
             const operation = prior.catch(() => {}).then(async () => {
                 const owner = await (itemType === 'group' ? readGroup(itemId) : readAgent(itemId));
                 const topic = owner?.topics?.find(value => value.id === topicId);
-                if (!topic || owner.error) throw fail('CORE_TOPIC_NOT_FOUND');
+                if (!topic || owner.error || owner._historyDeleting) throw fail('CORE_TOPIC_NOT_FOUND');
+                if (remote && versions.has(sharedId) && (!permissions.has('config') ||
+                    baseline.get(sharedId) === ownerFingerprint(itemType, owner, topic))) return;
+                if (remote && !permissions.has('config')) throw fail('CORE_WORKSPACE_FORBIDDEN');
                 const native = await queue.inspect(mapping.local);
                 if (native.history?.length) throw fail('CORE_OFFLINE_HISTORY_IMPORT_REQUIRED');
                 const ruleSet = await readRules(mapping.local);
@@ -158,7 +247,10 @@ async function openLocalCore({ queue, appDataRoot, workspace, readSettings, read
                 const body = { ownerType: itemType, ownerId: itemId, topicId, name: topic.name || topicId, config };
                 const signature = JSON.stringify(body);
                 if (written.get(sharedId) !== signature) {
-                    await runtime.send(runtime.coreSingle.route(mapping, 'definition'), { method: 'PUT', body });
+                    const result = await runtime.send(runtime.coreSingle.route(mapping, 'definition'), { method: 'PUT',
+                        body: { ...body, ...(remote && { version: versions.get(sharedId) ?? 0 }) } });
+                    versions.set(sharedId, result.version);
+                    baseline.set(sharedId, ownerFingerprint(itemType, owner, topic));
                     written.set(sharedId, signature);
                     runtime.localTopics.set(sharedId, mapping);
                 }
@@ -170,6 +262,40 @@ async function openLocalCore({ queue, appDataRoot, workspace, readSettings, read
         async prepareSharedSend({ descriptor, message, localOnly }) {
             if (localOnly) return { handled: false };
             return runtime.coreSingle.send(descriptor, message);
+        },
+        async saveOwnerConfig(request) {
+            runtime.assertSharedAccess();
+            if (remote && !permissions.has('config')) throw fail('CORE_WORKSPACE_FORBIDDEN');
+            if (request.kind !== 'agent') {
+                const result = await request.saveLocal?.();
+                if (result?.success !== false) {
+                    const owner = await readGroup(request.localId);
+                    for (const topic of owner?.topics || []) await runtime.define({ itemType: 'group', itemId: request.localId, topicId: topic.id });
+                }
+                return result;
+            }
+            const owner = await readAgent(request.localId);
+            const result = await runtime.send(workspaceRoute + '/agents/' + encodeURIComponent(request.localId), {
+                method: 'PUT', body: { config: agentConfiguration({ ...owner, ...request.config }), version: ownerVersions.get(request.localId) ?? 0 }
+            });
+            ownerVersions.set(request.localId, result.version);
+            return request.saveLocal?.();
+        },
+        async removeDefinition({ itemType, itemId, topicId }) {
+            runtime.assertSharedAccess();
+            if (remote && !permissions.has('config')) throw fail('CORE_WORKSPACE_FORBIDDEN');
+            const current = await ownedJson(root, nativeFile(itemType, itemId), { optional: true });
+            if (!current) throw fail('CORE_TOPIC_NOT_FOUND');
+            const requestId = 'remove_' + createHash('sha256').update(JSON.stringify([itemType,itemId,topicId])).digest('hex');
+            if (topicId) await runtime.define({ itemType, itemId, topicId }).catch(error => {
+                if (error.status !== 404) throw error;
+            });
+            await runtime.send(workspaceRoute + '/remove-definition', { body: { kind: itemType, id: itemId, topicId, requestId } });
+            const remaining = topicId ? current.topics.filter(topic => topic.id !== topicId) : [];
+            await writeOwner(itemType, itemId, { ...current, topics: remaining, ...(!topicId && { _historyDeleting: true }),
+                current_topic_id: remaining.find(topic => topic.id === current.current_topic_id)?.id || remaining[0]?.id || null }, true);
+            notifyDirectory?.();
+            return { success: true, remainingTopics: remaining, newTopicId: remaining[0]?.id || null };
         },
         nativeDeletionContext(scope) { return { success: true, kind: 'shared', core: true, ...(scope?.topicId && { sharedId: mapTopic(scope).sharedId }) }; },
         async getExecutionStatus(descriptor) {
@@ -190,6 +316,7 @@ async function openLocalCore({ queue, appDataRoot, workspace, readSettings, read
         }
     };
     runtime.coreSingle = new LocalCoreClient(runtime);
+    if (remote) await loadRemoteDirectory();
     const previousPolicy = queue.syncPolicy;
     const reject = () => { throw fail('CORE_ROUTE_REQUIRED'); };
     const beforeHistoryWrite = async d => {
