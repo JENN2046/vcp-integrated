@@ -37,10 +37,11 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
     const origin = 'https://127.0.0.1:' + server.address().port;
     const directory = path.join(root, 'core');
     const core = new CoreService({ directory, workspace:'personal', chat, modelCatalog, remoteConfig:{origin, hours:1} });
-    const posts = [], pairCalls = [];
+    const posts = [], pairCalls = [], attachmentPosts = [];
     let truncateSend = false, holdReceipt = false, proxyRateLimited = false, htmlGateway = false, holdImageRejection;
     app.use((req, res, next) => {
         if (req.method === "POST" && req.path.startsWith("/mobile/api/pair")) pairCalls.push(req.path);
+        if (req.method === 'POST' && req.path.includes('/attachments/')) attachmentPosts.push(req.path);
         if (req.method === 'GET' && req.path.endsWith('/receipt') && holdReceipt) {
             return res.status(503).json({ error:{code:'FIXTURE_RECEIPT_UNAVAILABLE'} });
         }
@@ -92,6 +93,8 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         const topic = await define('main'), other = await define('other');
         const imageTopic = await define('image-rejection'), probeTopic = await define('image-failed-probe');
         const gatewayTopic = await define('html-gateway');
+        const draftTopic = await define('draft-restore');
+        const modelTopic = await define('draft-model-retired');
         core.store.ensureConversation({ workspace:'personal', key:topic, ownerId:'fixture' });
         core.store.transaction(() => {
             for (let i = 0; i < 18; i++) core.store.insertMessage({ id:'seed-'+i, key:topic,
@@ -137,7 +140,8 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
             input.dispatchEvent(new Event('change', { bubbles:true }));
         }, entries);
         const removeFiles = async () => {
-            while (await page.$('.pending-file button')) await page.$eval('.pending-file button', button=>button.click());
+            const remove = '.pending-file [aria-label="移除附件"]';
+            while (await page.$(remove)) await page.$eval(remove, button=>button.click());
         };
         await selectFiles(Array.from({length:9}, (_v, i)=>['file-'+(i+1)+'.txt', 'x']));
         assert.equal(await page.$$eval('.pending-file', rows => rows.length),8);
@@ -145,6 +149,16 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await removeFiles();
         await selectFiles([['same.txt','A'],['same.txt','B']]);
         results.sameMetadataBothAdded = await page.$$eval('.pending-file', rows => rows.length===2);
+        await removeFiles();
+
+        await selectFiles([['preview.txt','<b>local preview</b>'],['other.bin','opaque']]);
+        assert.match(await page.$eval('.pending-files', element=>element.textContent), /不支持预览/);
+        await page.click('[aria-label="预览 preview.txt"]');
+        await page.waitForFunction(()=>document.querySelector('#attachment-viewer[open] .attachment-viewer-content')
+            ?.innerText.includes('<b>local preview</b>'));
+        assert.equal(await page.$('#attachment-save'),null);
+        assert.equal(attachmentPosts.length,0);
+        await page.click('#attachment-close');
         await removeFiles();
 
         await fill('本机话题草稿');
@@ -351,6 +365,8 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await sendText('目录移除后保留这个草稿');
         await page.waitForFunction(() => document.querySelector('#send-state')?.textContent.includes('不在 Core 允许的目录'));
         assert.equal(await value(),'目录移除后保留这个草稿');
+        assert.match(await readModelLabel(),/下一条.*model-b/);
+        await page.waitForSelector('#composer-model-unavailable',{visible:true});
         assert.equal(workFor('目录移除后保留这个草稿'),undefined);
         assert.equal(provider.calls.length,firstModelCall+4);
         assert.equal(posts.length,8,'receipt recovery does not resubmit B; removed model reaches no provider');
@@ -378,19 +394,25 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         assert.notEqual(await page.evaluate(key=>localStorage.getItem(key),storageKeys[topic]),null);
         await page.click('#steering-remove-local');
         await page.click('#steering-confirm-remove');
-        await page.waitForSelector('#send:not([disabled])');
+        await page.waitForFunction(key=>localStorage.getItem(key.replace('steering.v1:','steering-dismissed.v1:'))==='{truncated',{},storageKeys[topic]);
+        await page.waitForSelector('#steering-confirm-remove',{hidden:true});
+        assert.equal(await page.$eval('#send', button=>button.disabled),true,'removing the corrupt record does not default the model');
         assert.equal(await value(),'目录移除后保留这个草稿');
         await page.reload({waitUntil:'domcontentloaded'});
-        await page.waitForSelector('#send:not([disabled])');
+        await page.waitForSelector('#composer-model-unavailable',{visible:true});
         assert.equal(await page.$('#steering-remove-local'),null);
         assert.notEqual(await page.evaluate(key=>localStorage.getItem(key),storageKeys[other]),null);
         await chooseTopic(other);
         await page.waitForSelector('#steering-remove-local',{visible:true});
         await chooseTopic(topic);
         assert.equal(await value(),'目录移除后保留这个草稿');
+        await page.$eval('.message-composer', form=>form.requestSubmit());
         assert.equal(posts.length,8);
+        await page.click('#composer-model-current');
+        await page.click('#composer-model-options button:not([aria-pressed])');
         await sendText('代理限流任务');
         await wait(()=>activeStreams.length===5,'work held for the proxy 429');
+        assert.equal(provider.calls.at(-1).model,baseModel,'the explicit return to default is used');
         await page.waitForSelector('#quote-task',{visible:true});
         await page.click('#quote-task');
         proxyRateLimited=true;
@@ -446,6 +468,28 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         const responseFor = (key,status) => page.waitForResponse(response=>
             new URL(response.url()).pathname===imageSend(key) && response.request().method()==='POST' && response.status()===status);
 
+        await chooseTopic(draftTopic);
+        const beforeDraftPosts=posts.length, beforeDraftUploads=attachmentPosts.length;
+        await fill('拍摄草稿');
+        await chooseModel(visionModel);
+        await attachImage();
+        await page.reload({waitUntil:'domcontentloaded'});
+        await chooseTopic(draftTopic);
+        assert.equal(await value(),'拍摄草稿');
+        assert.match(await readModelLabel(),/下一条.*fixture-vision/);
+        assert.match(await page.$eval('#attachment-reselection-notice', el=>el.textContent),/1 个草稿附件未恢复，请重新选择/);
+        assert.equal(await page.$('.pending-file'),null);
+        await chooseTopic(imageTopic);
+        assert.equal(await value(),'');
+        assert.match(await readModelLabel(),/当前模型.*synthetic/);
+        assert.equal(await page.$('.pending-file'),null);
+        assert.equal(await page.$('#attachment-reselection-notice'),null);
+        await chooseTopic(draftTopic);
+        await attachImage();
+        assert.equal(await page.$('#attachment-reselection-notice'),null);
+        assert.equal(posts.length,beforeDraftPosts);
+        assert.equal(attachmentPosts.length,beforeDraftUploads);
+
         await chooseTopic(imageTopic);
         await chooseModel(nextModel);
         await attachImage();
@@ -479,6 +523,23 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         assert.equal(provider.calls.length,beforeCalls);
         assert.equal(posts.filter(route=>route===imageSend(imageTopic)).length,1);
 
+        const uploadsAfterRejection=attachmentPosts.length;
+        await page.reload({waitUntil:'domcontentloaded'});
+        await chooseTopic(imageTopic);
+        await page.waitForSelector('.pending-file');
+        assert.equal(await value(),'要保留的图片消息，后来编辑');
+        assert.equal(await page.$('#attachment-reselection-notice'),null,'the rejected upload is already recoverable');
+        await selectFiles([['local-only.txt','not uploaded']]);
+        await page.reload({waitUntil:'domcontentloaded'});
+        await chooseTopic(imageTopic);
+        await page.waitForSelector('.pending-file');
+        assert.equal(await page.$$eval('.pending-file',files=>files.length),1,'only the reusable upload is restored');
+        assert.match(await page.$eval('#attachment-reselection-notice', el=>el.textContent),/1 个草稿附件未恢复，请重新选择/);
+        await selectFiles([['local-only.txt','not uploaded']]);
+        await page.click('.pending-file:last-child [aria-label="移除附件"]');
+        assert.equal(await page.$('#attachment-reselection-notice'),null);
+        assert.equal(attachmentPosts.length,uploadsAfterRejection);
+
         await chooseModel(visionModel);
         truncateSend=true;
         holdReceipt=true;
@@ -487,6 +548,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await page.$eval('#send',button=>button.click());
         const visionRequest=JSON.parse((await acceptedImage).request().postData());
         assert.deepEqual(visionRequest.attachments,deniedBody.attachments,'reuse the original upload IDs');
+        assert.equal(attachmentPosts.length,uploadsAfterRejection,'sending the recovered upload does not upload it again');
         assert.notEqual(visionRequest.requestId,deniedBody.requestId);
         await wait(()=>workFor('要保留的图片消息，后来编辑')?.status==='completed','vision Work settled');
         await page.waitForSelector('#pending-submission');
@@ -497,10 +559,13 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
             message.content.some(part=>part.type==='image_url')));
         await page.reload({waitUntil:'domcontentloaded'});
         await page.waitForSelector('#pending-submission');
+        assert.equal(await page.$('#attachment-reselection-notice'),null,'prepared attachments are owned by the pending submission');
+        assert.match(await readModelLabel(),/待确认.*fixture-vision/);
         assert.equal(posts.filter(route=>route===imageSend(imageTopic)).length,2);
         holdReceipt=false;
         await page.waitForFunction(()=>!document.querySelector('#pending-submission') &&
             document.querySelector('#message-text')?.value==='');
+        assert.match(await readModelLabel(),/当前模型.*synthetic/);
         assert.equal(posts.filter(route=>route===imageSend(imageTopic)).length,2);
         assert.equal(counts()[0],beforeImage[0]+1);
         t.diagnostic('Verified image rejection kept the edited draft and upload; manual vision send committed once despite a lost 202.');
@@ -624,6 +689,33 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await page.reload({waitUntil:'domcontentloaded'});
         await page.waitForSelector('#pair-code',{visible:true});
         assert.equal(await page.$('#topic-select'),null);
+        await enter(pair());
+        await page.waitForSelector('#topic-select');
+        const replacementIdentity=await readIdentity();
+        assert.notEqual(replacementIdentity.sessionMarker,identity.sessionMarker);
+        await chooseTopic(draftTopic);
+        assert.equal(await value(),'');
+        assert.match(await readModelLabel(),/当前模型.*synthetic/);
+        assert.equal(await page.$('.pending-file'),null);
+        assert.equal(await page.$('#attachment-reselection-notice'),null);
+        assert.equal(posts.filter(route=>route===imageSend(draftTopic)).length,0);
+        t.diagnostic('A new paired identity saw neither the previous draft, model override, nor attachment hint.');
+
+        await chooseTopic(modelTopic);
+        const beforeRetired=counts(), providerBeforeRetired=provider.calls.length, postsBeforeRetired=posts.length;
+        await chooseModel(visionModel);
+        await fill('刷新时目录已移除临时模型');
+        provider.setModels([{id:baseModel}]);
+        await page.reload({waitUntil:'domcontentloaded'});
+        await chooseTopic(modelTopic);
+        await page.waitForSelector('#composer-model-unavailable',{visible:true});
+        assert.equal(await value(),'刷新时目录已移除临时模型');
+        assert.match(await readModelLabel(),/下一条.*fixture-vision/);
+        assert.equal(await page.$eval('#send',button=>button.disabled),true);
+        assert.equal(posts.length,postsBeforeRetired);
+        assert.deepEqual(counts(),beforeRetired);
+        assert.equal(provider.calls.length,providerBeforeRetired);
+        t.diagnostic('A retired model after restore was shown as unavailable without a send; a last-moment retirement required explicit reselection.');
         assert.deepEqual(errors, []);
         assert.deepEqual(Object.entries(results).filter(([,passed])=>!passed).map(([name])=>name), [], JSON.stringify(results));
     } finally {

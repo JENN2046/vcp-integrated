@@ -3,6 +3,7 @@ import MobileIcon from './MobileIcon.vue';
 import AgentAvatar from './AgentAvatar.vue';
 import DesktopRelayStatus from './DesktopRelayStatus.vue';
 import SharedAttachmentImage from './SharedAttachmentImage.vue';
+import DraftImageThumbnail from './DraftImageThumbnail.vue';
 import {ref,computed,watch,onMounted,onUnmounted,nextTick} from 'vue';
 import TextPages from './TextPages.vue';
 import SharedConfigEditor from './SharedConfigEditor.vue';
@@ -65,7 +66,8 @@ function closePanel(){
  nextTick(()=>toggle?.focus());
 }
 const attachmentPreview=ref(null),attachmentDialog=ref(null);let attachmentReadRequest=0,attachmentReadController=null;
-// Persist composer text and its quote by paired identity and topic. Selected local files
+const attachmentTextPreviewLimit=256*1024;
+// Persist composer intent by paired identity and topic. Selected local files
 // stay in the page; verified rejections use the existing recovery store.
 const drafts=new Map(),composerDraft=ref({text:'',files:[],revision:0});let composerScope='';
 const steeringStoragePrefix='vcp.mobile.steering.v1:', steeringStorageError=ref('');
@@ -75,6 +77,10 @@ const steeringRecordCorrupt=ref(false), steeringRemovalPrompt=ref(false);
 const text=computed({get:()=>composerDraft.value.text,set:value=>{composerDraft.value.text=value;composerDraft.value.revision++;saveDraftEdit(composerDraft.value);}});
 watch(text,resizeComposer,{flush:'post'});
 const pendingFiles=computed({get:()=>composerDraft.value.files,set:value=>{composerDraft.value.files=value;}});
+watch(()=>pendingFiles.value.map(item=>item.file),files=>{
+ const file=attachmentPreview.value?.localFile;
+ if(file&&!files.includes(file))closeAttachment();
+});
 const nativeResult=ref(null),nativeResultPanel=ref(null);let nativeResultRequest=0;
 let incomingPairing=consumePairingLink({location:window.location,history:window.history,secureContext:window.isSecureContext});
 let connectionInitialized=false;
@@ -275,7 +281,7 @@ const currentTopic=computed(()=>{const topic=topics.value.find(t=>t.key===select
 function draftScope(){const topic=currentTopic.value;return paired.value&&validSessionRecovery(recoveryContext.value)&&topic?JSON.stringify([recoveryContext.value.entryId,recoveryContext.value.sessionMarker,ownerKey(topic),topic.topicId,topic.key]):'';}
 function switchDraft(next=draftScope()){
  if(next===composerScope)return;
- if(composerScope&&!text.value&&!pendingFiles.value.length&&!composerDraft.value.submitted&&!composerDraft.value.coreSteering&&!composerDraft.value.nextModel)drafts.delete(composerScope);
+ if(composerScope&&!text.value&&!pendingFiles.value.length&&!composerDraft.value.submitted&&!composerDraft.value.coreSteering&&!composerDraft.value.nextModel&&!composerDraft.value.missingAttachments)drafts.delete(composerScope);
  composerScope=next;composerDraft.value=drafts.get(next)||{text:'',files:[],revision:0};
  steeringStorageError.value='';
  steeringRecordCorrupt.value=false;
@@ -283,9 +289,16 @@ function switchDraft(next=draftScope()){
  if(next){
   const draft=composerDraft.value;
   drafts.set(next,draft);
-  if(!draft.revision&&!draft.text&&!draft.coreSteering){
+  if(!draft.revision&&!draft.ordinaryEditId&&!draft.coreSteering){
    const saved=readOrdinaryText(next);
-   if(saved?.quote){draft.text=saved.text;draft.taskQuote=saved.quote;draft.ordinaryEditId=saved.editId;}
+   if(saved?.quote&&!draft.text){draft.text=saved.text;draft.taskQuote=saved.quote;draft.ordinaryEditId=saved.editId;}
+   if(typeof saved?.nextModel==='string'){
+    draft.nextModel=saved.nextModel;
+    draft.restoredModel=true;
+    draft.modelUnavailable=saved.modelUnavailable===true;
+   }
+   if(Number.isInteger(saved?.localAttachments)&&saved.localAttachments>0&&saved.localAttachments<=8)
+    draft.missingAttachments=saved.localAttachments;
   }
   syncSteeringDraft();
   syncRejectedDraft();
@@ -306,7 +319,7 @@ function syncRejectedDraft(){
 const composerText=computed({get:()=>text.value,set:value=>{
  text.value=value;
  const draft=composerDraft.value;
- if(draft.taskQuote||!draft.rejected)rememberOrdinaryText(draft,composerScope);
+ if(draft.taskQuote||!draft.rejected||draft.nextModel||draftLocalAttachmentCount(draft))rememberOrdinaryText(draft,composerScope);
  else delete draft.ordinaryEditId;
 }});
 const ordinaryDraftPrefix='vcp.mobile.draft.v1:';
@@ -334,14 +347,25 @@ function restoreOrdinaryText(draft,scope){
  const saved=readOrdinaryText(scope);
  if(saved){draft.text=saved.text;draft.ordinaryEditId=saved.editId;}
 }
+function draftLocalAttachmentCount(draft){
+ const prepared=draft.submitted?.prepared?draft.submitted.files:[];
+ const rejected=draft.rejected;
+ const localOnly=(draft.files||[]).filter(item=>{
+  const recoverable=rejected&&item.uploadSessionMarker===rejected.sessionMarker&&rejected.attachments.includes(item.uploadId);
+  return item.file&&!prepared.includes(item)&&!recoverable;
+ });
+ return (draft.missingAttachments||0)+localOnly.length;
+}
 function rememberOrdinaryText(draft,scope){
  if(!scope)return false;
  try{
   const previous=storedOrdinaryText(scope);
-  if(draft.text||draft.taskQuote){
+  const localAttachments=draftLocalAttachmentCount(draft);
+  if(draft.text||draft.taskQuote||draft.nextModel||localAttachments){
    const editId=crypto.randomUUID();
    localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({text:draft.text,editId,
-    ...(draft.taskQuote&&{quote:draft.taskQuote})}));
+    ...(draft.taskQuote&&{quote:draft.taskQuote}),...(draft.nextModel&&{nextModel:draft.nextModel}),
+    ...(draft.nextModel&&draft.modelUnavailable&&{modelUnavailable:true}),...(localAttachments&&{localAttachments})}));
    draft.ordinaryEditId=editId;
   }else{
    localStorage.removeItem(ordinaryDraftPrefix+scope);
@@ -358,7 +382,12 @@ function rememberOrdinaryText(draft,scope){
 function markOrdinarySubmission(draft,scope,requestId){
  const saved=readOrdinaryText(scope);
  if(!saved||saved.editId!==draft.ordinaryEditId)return;
- try{localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({...saved,requestId}));}
+ // The durable submission owns its model and upload references from here.
+ // Later edits keep their own draft ID and must survive this request's receipt.
+ try{localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({...saved,
+  requestId:draft.revision===draft.submitted.revision?requestId:undefined,
+  nextModel:draft.nextModel,modelUnavailable:draft.nextModel&&draft.modelUnavailable||undefined,
+  localAttachments:draftLocalAttachmentCount(draft)||undefined}));}
  catch{ordinaryDraftError.value='草稿暂无法保存在此浏览器，刷新前请检查存储。';}
 }
 function forgetOrdinarySubmission(record,scope){
@@ -369,7 +398,7 @@ function forgetOrdinarySubmission(record,scope){
 }
 function confirmOrdinaryText(draft,record,scope){
  const saved=forgetOrdinarySubmission(record,scope);
- if(saved&&draft.ordinaryEditId===saved.editId){draft.text='';delete draft.ordinaryEditId;}
+ if(saved&&draft.ordinaryEditId===saved.editId){draft.text='';delete draft.ordinaryEditId;delete draft.missingAttachments;}
 }
 watch(composerDraft,draft=>{
  ordinaryDraftError.value='';
@@ -394,7 +423,9 @@ function saveDraftEdit(draft){
  });
 }
 function removeDraftFile(index){
- const draft=composerDraft.value;draft.files.splice(index,1);draft.revision++;saveDraftEdit(draft);
+ const draft=composerDraft.value,[removed]=draft.files.splice(index,1);
+ draft.revision++;saveDraftEdit(draft);
+ if(removed?.file)rememberOrdinaryText(draft,composerScope);
 }
 function confirmDraft(record,context){
  const draft=drafts.get(context.draftScope),sent=draft?.submitted;
@@ -709,7 +740,9 @@ async function postPrepared(record,context){
     draft.text=saved.text;draft.files=rejectedDraftFiles(saved);
    }
    draft.rejected=saved;
-   if(imageRejected&&record.payload.model&&!draft.nextModel)draft.nextModel=record.payload.model;
+   if((imageRejected||modelRejected)&&record.payload.model&&!draft.nextModel)draft.nextModel=record.payload.model;
+   if(modelRejected&&draft.nextModel===record.payload.model)draft.modelUnavailable=true;
+   if(draft.nextModel||draftLocalAttachmentCount(draft))rememberOrdinaryText(draft,context.draftScope);
    if(!loadRecovery())throw Error(recoveryError.value);
    if(sameView(context)){
     submissionNoticeHeld=true;
@@ -732,9 +765,17 @@ async function submit(submission,kind='message',context=newSubmissionContext()){
  try{
   if(!sameView(context))return;
   const record=await submissionStore.prepare({entryId:context.recovery.entryId,sessionMarker:context.recovery.sessionMarker,topicKey:context.topicKey,kind,payload:submission,rejected:context.rejected});
-  if(!loadRecovery())throw Error(recoveryError.value);
   const draft=drafts.get(context.draftScope);
-  if(submission.model&&draft?.nextModel===submission.model)delete draft.nextModel;
+  if(submission.model&&draft?.nextModel===submission.model){
+   delete draft.nextModel;
+   delete draft.restoredModel;
+   delete draft.modelUnavailable;
+  }
+  if(draft?.submitted?.requestId===record.requestId){
+   draft.submitted.prepared=true;
+   markOrdinarySubmission(draft,context.draftScope,record.requestId);
+  }
+  if(!loadRecovery())throw Error(recoveryError.value);
   if(sameView(context)){recoveryDetail.value='本地已保存，尚未收到可核验的云端接受回执。';acceptedReceipt.value=null;}
   await postPrepared(record,context);
  }catch(error){loadRecovery();if(sameView(context)){submissionNoticeHeld=true;notice.value='尚未完成提交确认：'+(noteConnectionFailure(error)?(error.status===502?'网关暂时不可用':'暂未连上服务端')+'，原提交仍待核对。':recoveryMessage(error));}}
@@ -742,19 +783,49 @@ async function submit(submission,kind='message',context=newSubmissionContext()){
 }
 function selectFiles(event){
  const draft=composerDraft.value,rejected=[];
+ const originalCount=draft.files.length;
  for(const file of event.target.files||[]){
   const reason=file.size>20*1024*1024?'单个附件超过 20 MB':draft.files.length>=8?'最多添加 8 个附件':'';
   if(reason)rejected.push({name:file.name,reason});
   else draft.files.push({file,progress:0,error:'',uploadId:null});
  }
  draft.fileRejections=rejected;
+ const added=draft.files.length-originalCount;
+ if(added){
+  if(draft.missingAttachments)draft.missingAttachments=Math.max(0,draft.missingAttachments-added);
+  rememberOrdinaryText(draft,composerScope);
+ }
  event.target.value='';
 }
 function attachmentUrl(message,attachment){if(currentTopic.value?.coreSingle)return '/mobile/api/'+corePath(currentTopic.value)+'/blob/'+encodeURIComponent(attachment.hash);return '/mobile/api/conversations/'+encodeURIComponent(selected.value)+'/attachments/messages/'+encodeURIComponent(message.id)+'/'+encodeURIComponent(attachment.id);}
+function draftPreviewKind(file){
+ if(file?.type.startsWith('image/'))return 'image';
+ if(/\.txt$/i.test(file?.name||''))return 'text';
+}
 function closeAttachment(){
  attachmentReadRequest++;attachmentReadController?.abort();attachmentReadController=null;
  if(attachmentPreview.value?.url)URL.revokeObjectURL(attachmentPreview.value.url);
  attachmentPreview.value=null;if(attachmentDialog.value?.open)attachmentDialog.value.close();
+}
+async function openDraftAttachment(file){
+ const kind=draftPreviewKind(file);
+ if(!kind)return;
+ closeAttachment();
+ const request=attachmentReadRequest;
+ const current=()=>request===attachmentReadRequest;
+ attachmentPreview.value={name:file.name,localFile:file,loading:true};
+ await nextTick();
+ if(!current())return;
+ attachmentDialog.value?.showModal();
+ try{
+  const isImage=kind==='image';
+  const text=isImage?null:await file.slice(0,attachmentTextPreviewLimit).text();
+  if(!current())return;
+  attachmentPreview.value={name:file.name,localFile:file,isImage,text,
+   url:isImage?URL.createObjectURL(file):null,truncated:!isImage&&file.size>attachmentTextPreviewLimit};
+ }catch{
+  if(current())attachmentPreview.value={name:file.name,localFile:file,error:'无法预览此文件。'};
+ }
 }
 async function openAttachment(message,attachment){
  closeAttachment();const request=attachmentReadRequest,epoch=authEpoch,view=generation,url=attachmentUrl(message,attachment);
@@ -764,10 +835,14 @@ async function openAttachment(message,attachment){
  await nextTick();if(!current())return;attachmentDialog.value?.showModal();
  try{
   const blob=await readAttachment(url,{signal}),isImage=blob.type.startsWith('image/');
-  const limit=256*1024,previewText=isImage?null:/^(text\/|application\/json(?:;|$))/.test(blob.type)?await blob.slice(0,limit).text():attachment.extractedText?.slice(0,limit)||null;
+  const limit=attachmentTextPreviewLimit,previewText=isImage?null:/^(text\/|application\/json(?:;|$))/.test(blob.type)?await blob.slice(0,limit).text():attachment.extractedText?.slice(0,limit)||null;
   if(!current())return;
   attachmentPreview.value={name:attachment.name||'附件',loading:false,error:'',blob,url:isImage?URL.createObjectURL(blob):null,isImage,text:previewText,truncated:!isImage&&blob.size>limit};
  }catch(error){if(current())attachmentPreview.value={name:attachment.name||'附件',loading:false,error:error.status?error.message:'附件暂时无法读取，请检查连接',url:null};}
+}
+function draftImageError(event){
+ const preview=attachmentPreview.value;
+ if(preview?.localFile&&event.target.src===preview.url)preview.error='无法预览此图片。';
 }
 function downloadAttachment(){const item=attachmentPreview.value;if(item?.blob)saveAttachment(item.blob,item.name);}
 const steerableStates=['running','waiting_approval'];
@@ -781,6 +856,21 @@ const supportsModelSelection=computed(()=>server.value?.mode==='core'&&server.va
 const shownModel=computed(()=>taskQuote.value?quotedWork.value?.model:
  composerDraft.value.nextModel||pendingSubmission.value?.payload.model||currentTopic.value?.model);
 watch([composerDraft,taskQuote],()=>{modelPicker.value=null;});
+async function readComposerModels(topic){
+ const {models,purpose}=await api(corePath(topic)+'/models');
+ if(!Array.isArray(models))throw Error('Invalid model catalog');
+ return purpose==='chat'?models:filterChatModels(models);
+}
+watch([composerDraft,supportsModelSelection,historyContextReady],async ([draft,supported,ready])=>{
+ const model=draft.nextModel;
+ if(!supported||!ready||!model||!draft.restoredModel||draft.modelUnavailable)return;
+ try{
+  const context=captureContext();
+  const models=await readComposerModels(currentTopic.value);
+  if(sameView(context)&&draft===composerDraft.value&&draft.restoredModel&&draft.nextModel===model&&!models.includes(model))
+   draft.modelUnavailable=true;
+ }catch{/* A failed catalog read cannot establish that the model is unavailable. Core still validates sends. */}
+});
 async function toggleModelPicker(){
  if(modelPicker.value){modelPicker.value=null;return;}
  if(!supportsModelSelection.value||!currentTopic.value?.executable||taskQuote.value)return;
@@ -788,10 +878,11 @@ async function toggleModelPicker(){
  modelPicker.value={loading:true,models:[],error:''};
  const picker=modelPicker.value;
  try{
-  const {models,purpose}=await api(corePath(topic)+'/models');
+  const models=await readComposerModels(topic);
   if(!sameView(context)||modelPicker.value!==picker)return;
-  if(!Array.isArray(models))throw Error('Invalid model catalog');
-  picker.models=purpose==='chat'?models:filterChatModels(models);
+  picker.models=models;
+  const draft=composerDraft.value;
+  if(draft.nextModel&&!models.includes(draft.nextModel))draft.modelUnavailable=true;
  }catch(error){
   if(sameView(context)&&modelPicker.value===picker)picker.error=errors[error.code]||'暂时无法读取 Core 模型目录';
  }finally{picker.loading=false;}
@@ -799,8 +890,12 @@ async function toggleModelPicker(){
 function pickNextModel(model){
  if(busy.value||taskQuote.value||!modelPicker.value)return;
  if(model&&!modelPicker.value.models.includes(model))return;
- if(model)composerDraft.value.nextModel=model;
- else delete composerDraft.value.nextModel;
+ const draft=composerDraft.value;
+ if(model)draft.nextModel=model;
+ else delete draft.nextModel;
+ delete draft.restoredModel;
+ delete draft.modelUnavailable;
+ rememberOrdinaryText(draft,composerScope);
  modelPicker.value=null;
 }
 const quoteClosed=computed(()=>{
@@ -836,7 +931,7 @@ async function submitComposer(){
   await sendCoreSteering(taskQuote.value);
   return;
  }
- await send();
+ if(!composerDraft.value.modelUnavailable)await send();
 }
 const validSteeringId=value=>typeof value==='string'&&/^[a-zA-Z0-9_-]{8,100}$/.test(value);
 const validTaskQuote=quote=>validSteeringId(quote?.id)&&typeof quote.name==='string'&&typeof quote.label==='string';
@@ -1032,7 +1127,29 @@ async function sendCoreSteering(quote){
 async function send(){
  if((!text.value.trim()&&!pendingFiles.value.length)||busy.value||currentTopic.value?.executable===false)return;
  let context;busy.value=true;submissionNoticeHeld=false;
- try{context=newSubmissionContext();const draft=composerDraft.value;await draftWrites.get(draft);if(!sameView(context))return;context.rejected=draft.rejected;const snapshot={text:draft.text,revision:draft.revision,files:[...draft.files],model:draft.nextModel},ids=[];for(const item of snapshot.files){item.error='';try{if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;if(!item.uploadId&&!item.file)throw Error('请移除已上传附件并重新选择原文件');item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n,currentTopic.value?.coreSingle?corePath(currentTopic.value)+'/attachments':undefined);item.uploadSessionMarker=context.recovery.sessionMarker;ids.push(item.uploadId);}catch(e){item.error=e.message;throw e;}}if(!sameView(context))return;const requestId=crypto.randomUUID();draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};if(draft.revision===snapshot.revision)markOrdinarySubmission(draft,context.draftScope,requestId);await submit({requestId,text:snapshot.text,attachments:ids,...(snapshot.model&&{model:snapshot.model})},'message',context);}
+ try{
+  context=newSubmissionContext();
+  const draft=composerDraft.value;
+  await draftWrites.get(draft);
+  if(!sameView(context))return;
+  context.rejected=draft.rejected;
+  const snapshot={text:draft.text,revision:draft.revision,files:[...draft.files],model:draft.nextModel},ids=[];
+  for(const item of snapshot.files){
+   item.error='';
+   try{
+    if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;
+    if(!item.uploadId&&!item.file)throw Error('请移除已上传附件并重新选择原文件');
+    item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n,
+     currentTopic.value?.coreSingle?corePath(currentTopic.value)+'/attachments':undefined);
+    item.uploadSessionMarker=context.recovery.sessionMarker;
+    ids.push(item.uploadId);
+   }catch(error){item.error=error.message;throw error;}
+  }
+  if(!sameView(context))return;
+  const requestId=crypto.randomUUID();
+  draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};
+  await submit({requestId,text:snapshot.text,attachments:ids,...(snapshot.model&&{model:snapshot.model})},'message',context);
+ }
  catch(error){if(!context||sameView(context)){submissionNoticeHeld=true;notice.value=recoveryMessage(error);}}finally{busy.value=false;}
 }
 async function refreshRetrySession(context){
@@ -1182,7 +1299,15 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
 <dialog v-if="attachmentPreview" ref="attachmentDialog" id="attachment-viewer" class="attachment-viewer" aria-labelledby="attachment-title" @cancel.prevent="closeAttachment">
    <div class="attachment-viewer-heading"><strong id="attachment-title">{{attachmentPreview.name}}</strong><button id="attachment-close" @click="closeAttachment" autofocus>关闭</button></div>
    <p v-if="attachmentPreview.loading" role="status">正在读取附件…</p><p v-else-if="attachmentPreview.error" role="alert">{{attachmentPreview.error}}</p>
-   <template v-else><div class="attachment-viewer-content"><img v-if="attachmentPreview.isImage" :src="attachmentPreview.url" :alt="attachmentPreview.name"><TextPages v-else-if="attachmentPreview.text!==null" :text="attachmentPreview.text" :complete="!attachmentPreview.truncated"/><p v-else>此文件暂无页内预览，可以保存后打开。</p><small v-if="attachmentPreview.truncated">预览已截取，保存文件可查看完整内容。</small></div><button id="attachment-save" @click="downloadAttachment">保存文件</button></template>
+   <template v-else>
+    <div class="attachment-viewer-content">
+     <img v-if="attachmentPreview.isImage" :src="attachmentPreview.url" :alt="attachmentPreview.name" @error="draftImageError">
+     <TextPages v-else-if="attachmentPreview.text!==null" :text="attachmentPreview.text" :complete="!attachmentPreview.truncated"/>
+     <p v-else>此文件暂无页内预览，可以保存后打开。</p>
+     <small v-if="attachmentPreview.truncated">{{attachmentPreview.localFile?'仅显示文件开头。':'预览已截取，保存文件可查看完整内容。'}}</small>
+    </div>
+    <button v-if="!attachmentPreview.localFile" id="attachment-save" @click="downloadAttachment">保存文件</button>
+   </template>
   </dialog>
   <header :class="{'chat-header': paired && !settingsOpen}">
    <template v-if="paired && !settingsOpen">
@@ -1354,10 +1479,31 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
        :aria-expanded="conversationPanel==='work'" :data-tone="workTone" @click="togglePanel('work')"><MobileIcon name="work"/><span>{{workButtonText}}</span></button>
     </div>
     <div v-show="conversationPanel!=='work'" class="composer-body">
-    <div v-if="pendingFiles.length" class="pending-files"><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><MobileIcon name="file"/><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||(item.progress===100?'已上传':item.progress>0?item.progress+'%':'待发送')}}</span><button type="button" @click="removeDraftFile(i)" :disabled="busy" aria-label="移除附件"><MobileIcon name="close"/></button></div></div>
+    <p v-if="!taskQuote&&composerDraft.modelUnavailable" id="composer-model-unavailable" class="attachment-selection-notice" role="status">
+     模型「{{composerDraft.nextModel}}」已不在 Core 允许的目录中，请重新选择。
+    </p>
+    <div v-if="pendingFiles.length" class="pending-files">
+     <div v-for="(item,i) in pendingFiles" :key="i" class="pending-file">
+      <button v-if="draftPreviewKind(item.file)==='image'" type="button" class="pending-image"
+       :aria-label="'预览 '+item.file.name" @click="openDraftAttachment(item.file)">
+       <DraftImageThumbnail :file="item.file"/>
+      </button>
+      <MobileIcon v-else name="file"/>
+      <div class="pending-file-label">
+       <span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||(item.progress===100?'已上传':item.progress>0?item.progress+'%':'待发送')}}</span>
+       <small v-if="!draftPreviewKind(item.file)">{{item.file?'不支持预览':'本机无原文件，无法预览'}}</small>
+      </div>
+      <button v-if="draftPreviewKind(item.file)==='text'" type="button" class="pending-preview"
+       :aria-label="'预览 '+item.file.name" @click="openDraftAttachment(item.file)">预览</button>
+      <button type="button" @click="removeDraftFile(i)" :disabled="busy" aria-label="移除附件"><MobileIcon name="close"/></button>
+     </div>
+    </div>
     <ul v-if="composerDraft.fileRejections?.length" id="attachment-selection-notice" class="attachment-selection-notice" aria-label="未添加的附件" role="status">
      <li v-for="(item,index) in composerDraft.fileRejections" :key="index">{{item.name}} · 未添加（{{item.reason}}）</li>
     </ul>
+    <p v-if="composerDraft.missingAttachments&&!pendingSubmission" id="attachment-reselection-notice" class="attachment-selection-notice" role="status">
+     {{composerDraft.missingAttachments}} 个草稿附件未恢复，请重新选择。
+    </p>
     <p v-if="ordinaryDraftError" class="pair-error" role="status">{{ordinaryDraftError}}</p>
     <div v-if="taskQuote" id="task-quote" class="task-quote" :data-closed="Boolean(quoteClosed)">
      <MobileIcon name="reply"/>
@@ -1386,7 +1532,7 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
      </label>
      <label class="sr-only" for="message-text">消息</label>
      <textarea ref="composer" id="message-text" v-model="composerText" :aria-describedby="taskQuote?'task-quote':undefined" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):taskQuote?'补充给当前任务…':'输入消息…'" rows="1" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea>
-     <button id="send" type="submit" :aria-label="taskQuote?'发送追加指令':'发送新消息'" :title="taskQuote?'发送追加指令':'发送新消息'" :disabled="!currentTopic||busy||newSubmissionBlocked||currentTopic?.executable===false||(taskQuote?quoteSendBlocked:(!text.trim()&&!pendingFiles.length))"><MobileIcon name="send"/></button>
+     <button id="send" type="submit" :aria-label="taskQuote?'发送追加指令':'发送新消息'" :title="taskQuote?'发送追加指令':'发送新消息'" :disabled="!currentTopic||busy||newSubmissionBlocked||currentTopic?.executable===false||(taskQuote?quoteSendBlocked:composerDraft.modelUnavailable||(!text.trim()&&!pendingFiles.length))"><MobileIcon name="send"/></button>
     </form>
     <div v-show="visibleNotice||pairRecoveryNotice||pendingSubmission" class="send-state"><span v-if="visibleNotice" id="send-state" role="status">{{visibleNotice}}</span><span v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</span><button id="retry-last" v-show="pendingSubmission" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div>
     </div>
