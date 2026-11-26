@@ -54,6 +54,7 @@ function initialize(mainWindow, context) {
         historyMutationQueue = new HistoryMutationQueue({ userDataDir: USER_DATA_DIR, fileWatcher }),
         jevService = null,
         gameService = null,
+        getModelCatalog = null,
         topicAdmission = null
     } = context;
 
@@ -116,28 +117,16 @@ function initialize(mainWindow, context) {
                 const now = Date.now();
                 if (forceRefresh || !modelCache.ids.length || now - modelCache.fetchedAt > 30000) {
                     try {
-                        const settingsPath = path.join(path.dirname(USER_DATA_DIR), 'settings.json');
-                        const settings = await fs.pathExists(settingsPath) ? await fs.readJson(settingsPath) : {};
-                        if (settings?.vcpServerUrl) {
-                            const parsed = new URL(settings.vcpServerUrl);
-                            const modelsUrl = new URL('/v1/models', `${parsed.protocol}//${parsed.host}`).toString();
-                            const headers = settings.vcpApiKey
-                                ? { Authorization: `Bearer ${settings.vcpApiKey}` }
-                                : {};
-                            const response = await fetch(modelsUrl, {
-                                headers,
-                                signal: AbortSignal.timeout(4000),
+                        const models = getModelCatalog ? await getModelCatalog() : await (async () => {
+                            const root = path.dirname(USER_DATA_DIR);
+                            const settingsPath = path.join(root, 'settings.json');
+                            const settings = await fs.pathExists(settingsPath) ? await fs.readJson(settingsPath) : {};
+                            return require('../services/modelCatalog').fetchDesktopModelCatalog({
+                                root, settings, getCoreClient: async () => historyMutationQueue.coreClient
                             });
-                            if (response.ok) {
-                                const payload = await response.json();
-                                const remoteIds = (Array.isArray(payload?.data) ? payload.data : [])
-                                    .map(item => (typeof item?.id === 'string' ? item.id.trim() : ''))
-                                    .filter(Boolean);
-                                if (remoteIds.length) {
-                                    modelCache = { fetchedAt: now, ids: remoteIds };
-                                }
-                            }
-                        }
+                        })();
+                        const remoteIds = models.map(item => typeof item?.id === 'string' ? item.id.trim() : '').filter(Boolean);
+                        if (remoteIds.length) modelCache = { fetchedAt: now, ids: remoteIds };
                     } catch {
                         // Fall back to cached / local agent models without blocking table setup.
                     }

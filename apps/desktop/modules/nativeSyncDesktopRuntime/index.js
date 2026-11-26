@@ -40,6 +40,8 @@ function registerIntegrated({ historyQueue, appDataRoot, readSettings, mainWindo
             const localWorkspace = process.env.VCPCHAT_LOCAL_CORE_WORKSPACE || marker?.workspace || (remoteOrigin && 'personal');
             if (localWorkspace) {
                 if (!isolated) throw Object.assign(new Error('CORE_LOCAL_REQUIRES_SEPARATE_PROFILE'), { code: 'CORE_LOCAL_REQUIRES_SEPARATE_PROFILE' });
+                // Remote directory projection writes through native History authority.
+                await startup.waitForHistoryAuthority();
                 return require('../services/localCoreRuntime').openLocalCore({
                     queue: historyQueue(), appDataRoot, workspace: localWorkspace, readSettings, ipcMain, getMainWindow,
                     remoteOrigin, remoteToken: process.env.VCPCHAT_CORE_DEVICE_TOKEN, remotePairCode: process.env.VCPCHAT_CORE_PAIR_CODE,

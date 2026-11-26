@@ -1400,35 +1400,20 @@ if (!gotTheLock) {
             console.log('[Main] fetchAndCacheModels called');
             try {
                 const settings = await appSettingsManager.readSettings();
-                const vcpServerUrl = settings.vcpServerUrl;
-                const vcpApiKey = settings.vcpApiKey; // Get the API key
-
-                if (!vcpServerUrl) {
-                    console.warn('[Main] VCP Server URL is not configured. Cannot fetch models.');
-                    cachedModels = []; // Clear cache if URL is not set
-                    return;
-                }
-                // Correctly construct the base URL by removing known API paths.
-                const urlObject = new URL(vcpServerUrl);
-                const baseUrl = `${urlObject.protocol}//${urlObject.host}`;
-                const modelsUrl = new URL('/v1/models', baseUrl).toString();
-
-                console.log(`[Main] Fetching models from: ${modelsUrl}`);
-                const response = await fetch(modelsUrl, {
-                    headers: {
-                        'Authorization': `Bearer ${vcpApiKey}` // Add the Authorization header
+                const { fetchDesktopModelCatalog } = require('./modules/services/modelCatalog');
+                cachedModels = await fetchDesktopModelCatalog({
+                    root: APP_DATA_ROOT_IN_PROJECT, settings,
+                    getCoreClient: async () => {
+                        if (!historyMutationQueue.coreClient && nativeSyncLifecycle) await nativeSyncLifecycle.ready;
+                        return historyMutationQueue.coreClient;
                     }
                 });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                cachedModels = data.data || []; // Assuming the response has a 'data' field containing the models array
                 console.log('[Main] Models fetched and cached successfully:', cachedModels.map(m => m.id));
             } catch (error) {
                 console.error('[Main] Failed to fetch and cache models:', error);
                 cachedModels = []; // Clear cache on error
             }
+            return cachedModels;
         }
 
         // Create the native window first, but load the renderer only after IPC registration.
@@ -1561,20 +1546,6 @@ if (!gotTheLock) {
         ];
         const menu = Menu.buildFromTemplate(menuTemplate);
         Menu.setApplicationMenu(menu);
-
-        // Fetch models in the background and notify the renderer when done.
-        console.log('[Main] Fetching models in the background...');
-        fetchAndCacheModels().then(() => {
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                console.log('[Main] Background model fetch complete. Notifying renderer.');
-                mainWindow.webContents.send('models-updated', cachedModels);
-            }
-        }).catch(error => {
-            console.error('[Main] Background model fetch failed:', error);
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.webContents.send('models-update-failed', error.message);
-            }
-        });
 
         // IPC handler to provide cached models to the renderer process
         ipcMain.handle('get-cached-models', () => {
@@ -1797,6 +1768,7 @@ if (!gotTheLock) {
             historyMutationQueue,
             topicAdmission: topicAdmissionHost.service,
             jevService: globalJevService,
+            getModelCatalog: fetchAndCacheModels,
             gameService
         });
         regexHandlers.initialize({ AGENT_DIR });
@@ -2100,6 +2072,20 @@ if (!gotTheLock) {
             agentOps: () => pluginAgentOperationService,
         }, new Map([[runtimeEntry, runtimeServices]]));
         nativeSyncLifecycle = appFeatures.getHandle('NativeSyncDesktopRuntime');
+
+        // Fetch models in the background and notify the renderer when done.
+        console.log('[Main] Fetching models in the background...');
+        fetchAndCacheModels().then(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                console.log('[Main] Background model fetch complete. Notifying renderer.');
+                mainWindow.webContents.send('models-updated', cachedModels);
+            }
+        }).catch(error => {
+            console.error('[Main] Background model fetch failed:', error);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('models-update-failed', error.message);
+            }
+        });
 
         ipcMain.on('minimize-to-tray', () => {
             if (mainWindow) {

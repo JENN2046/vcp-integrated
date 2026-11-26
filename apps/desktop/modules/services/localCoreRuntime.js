@@ -38,6 +38,13 @@ class LocalCoreClient extends CoreSingleClient {
         return this.runtime.base + '/' + encodeURIComponent(this.runtime.workspace) + '/' + mapping.sharedId + '/' + resource;
     }
 
+    async listModels() {
+        this.runtime.assertSharedAccess();
+        const data = await this.runtime.send(this.runtime.base + '/' + encodeURIComponent(this.runtime.workspace) + '/models');
+        if (!Array.isArray(data?.data)) throw fail('CORE_MODEL_CATALOG_UNAVAILABLE');
+        return data.data;
+    }
+
     async announceResources() {
         const { nativeSyncRouteId } = require('./nativeSync/sharedTopicSponsor');
         await this.runtime.send(this.runtime.base + '/' + encodeURIComponent(this.runtime.workspace) + '/resource-node', {
