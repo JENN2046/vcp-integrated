@@ -292,7 +292,11 @@ function switchDraft(next=draftScope()){
   if(!draft.revision&&!draft.ordinaryEditId&&!draft.coreSteering){
    const saved=readOrdinaryText(next);
    if(saved?.quote&&!draft.text){draft.text=saved.text;draft.taskQuote=saved.quote;draft.ordinaryEditId=saved.editId;}
-   if(typeof saved?.nextModel==='string')draft.nextModel=saved.nextModel;
+   if(typeof saved?.nextModel==='string'){
+    draft.nextModel=saved.nextModel;
+    draft.restoredModel=true;
+    draft.modelUnavailable=saved.modelUnavailable===true;
+   }
    if(Number.isInteger(saved?.localAttachments)&&saved.localAttachments>0&&saved.localAttachments<=8)
     draft.missingAttachments=saved.localAttachments;
   }
@@ -356,7 +360,7 @@ function rememberOrdinaryText(draft,scope){
    const editId=crypto.randomUUID();
    localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({text:draft.text,editId,
     ...(draft.taskQuote&&{quote:draft.taskQuote}),...(draft.nextModel&&{nextModel:draft.nextModel}),
-    ...(localAttachments&&{localAttachments})}));
+    ...(draft.nextModel&&draft.modelUnavailable&&{modelUnavailable:true}),...(localAttachments&&{localAttachments})}));
    draft.ordinaryEditId=editId;
   }else{
    localStorage.removeItem(ordinaryDraftPrefix+scope);
@@ -377,7 +381,8 @@ function markOrdinarySubmission(draft,scope,requestId){
  // Later edits keep their own draft ID and must survive this request's receipt.
  try{localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({...saved,
   requestId:draft.revision===draft.submitted.revision?requestId:undefined,
-  nextModel:draft.nextModel,localAttachments:draftLocalAttachmentCount(draft)||undefined}));}
+  nextModel:draft.nextModel,modelUnavailable:draft.nextModel&&draft.modelUnavailable||undefined,
+  localAttachments:draftLocalAttachmentCount(draft)||undefined}));}
  catch{ordinaryDraftError.value='草稿暂无法保存在此浏览器，刷新前请检查存储。';}
 }
 function forgetOrdinarySubmission(record,scope){
@@ -730,7 +735,8 @@ async function postPrepared(record,context){
     draft.text=saved.text;draft.files=rejectedDraftFiles(saved);
    }
    draft.rejected=saved;
-   if(imageRejected&&record.payload.model&&!draft.nextModel)draft.nextModel=record.payload.model;
+   if((imageRejected||modelRejected)&&record.payload.model&&!draft.nextModel)draft.nextModel=record.payload.model;
+   if(modelRejected&&draft.nextModel===record.payload.model)draft.modelUnavailable=true;
    if(draft.nextModel||draftLocalAttachmentCount(draft))rememberOrdinaryText(draft,context.draftScope);
    if(!loadRecovery())throw Error(recoveryError.value);
    if(sameView(context)){
@@ -755,7 +761,11 @@ async function submit(submission,kind='message',context=newSubmissionContext()){
   if(!sameView(context))return;
   const record=await submissionStore.prepare({entryId:context.recovery.entryId,sessionMarker:context.recovery.sessionMarker,topicKey:context.topicKey,kind,payload:submission,rejected:context.rejected});
   const draft=drafts.get(context.draftScope);
-  if(submission.model&&draft?.nextModel===submission.model)delete draft.nextModel;
+  if(submission.model&&draft?.nextModel===submission.model){
+   delete draft.nextModel;
+   delete draft.restoredModel;
+   delete draft.modelUnavailable;
+  }
   if(draft?.submitted?.requestId===record.requestId){
    draft.submitted.prepared=true;
    markOrdinarySubmission(draft,context.draftScope,record.requestId);
@@ -841,6 +851,21 @@ const supportsModelSelection=computed(()=>server.value?.mode==='core'&&server.va
 const shownModel=computed(()=>taskQuote.value?quotedWork.value?.model:
  composerDraft.value.nextModel||pendingSubmission.value?.payload.model||currentTopic.value?.model);
 watch([composerDraft,taskQuote],()=>{modelPicker.value=null;});
+async function readComposerModels(topic){
+ const {models,purpose}=await api(corePath(topic)+'/models');
+ if(!Array.isArray(models))throw Error('Invalid model catalog');
+ return purpose==='chat'?models:filterChatModels(models);
+}
+watch([composerDraft,supportsModelSelection,historyContextReady],async ([draft,supported,ready])=>{
+ const model=draft.nextModel;
+ if(!supported||!ready||!model||!draft.restoredModel||draft.modelUnavailable)return;
+ try{
+  const context=captureContext();
+  const models=await readComposerModels(currentTopic.value);
+  if(sameView(context)&&draft===composerDraft.value&&draft.restoredModel&&draft.nextModel===model&&!models.includes(model))
+   draft.modelUnavailable=true;
+ }catch{/* A failed catalog read cannot establish that the model is unavailable. Core still validates sends. */}
+});
 async function toggleModelPicker(){
  if(modelPicker.value){modelPicker.value=null;return;}
  if(!supportsModelSelection.value||!currentTopic.value?.executable||taskQuote.value)return;
@@ -848,10 +873,11 @@ async function toggleModelPicker(){
  modelPicker.value={loading:true,models:[],error:''};
  const picker=modelPicker.value;
  try{
-  const {models,purpose}=await api(corePath(topic)+'/models');
+  const models=await readComposerModels(topic);
   if(!sameView(context)||modelPicker.value!==picker)return;
-  if(!Array.isArray(models))throw Error('Invalid model catalog');
-  picker.models=purpose==='chat'?models:filterChatModels(models);
+  picker.models=models;
+  const draft=composerDraft.value;
+  if(draft.nextModel&&!models.includes(draft.nextModel))draft.modelUnavailable=true;
  }catch(error){
   if(sameView(context)&&modelPicker.value===picker)picker.error=errors[error.code]||'暂时无法读取 Core 模型目录';
  }finally{picker.loading=false;}
@@ -859,9 +885,12 @@ async function toggleModelPicker(){
 function pickNextModel(model){
  if(busy.value||taskQuote.value||!modelPicker.value)return;
  if(model&&!modelPicker.value.models.includes(model))return;
- if(model)composerDraft.value.nextModel=model;
- else delete composerDraft.value.nextModel;
- rememberOrdinaryText(composerDraft.value,composerScope);
+ const draft=composerDraft.value;
+ if(model)draft.nextModel=model;
+ else delete draft.nextModel;
+ delete draft.restoredModel;
+ delete draft.modelUnavailable;
+ rememberOrdinaryText(draft,composerScope);
  modelPicker.value=null;
 }
 const quoteClosed=computed(()=>{
@@ -897,7 +926,7 @@ async function submitComposer(){
   await sendCoreSteering(taskQuote.value);
   return;
  }
- await send();
+ if(!composerDraft.value.modelUnavailable)await send();
 }
 const validSteeringId=value=>typeof value==='string'&&/^[a-zA-Z0-9_-]{8,100}$/.test(value);
 const validTaskQuote=quote=>validSteeringId(quote?.id)&&typeof quote.name==='string'&&typeof quote.label==='string';
@@ -1445,6 +1474,9 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
        :aria-expanded="conversationPanel==='work'" :data-tone="workTone" @click="togglePanel('work')"><MobileIcon name="work"/><span>{{workButtonText}}</span></button>
     </div>
     <div v-show="conversationPanel!=='work'" class="composer-body">
+    <p v-if="!taskQuote&&composerDraft.modelUnavailable" id="composer-model-unavailable" class="attachment-selection-notice" role="status">
+     模型「{{composerDraft.nextModel}}」已不在 Core 允许的目录中，请重新选择。
+    </p>
     <div v-if="pendingFiles.length" class="pending-files">
      <div v-for="(item,i) in pendingFiles" :key="i" class="pending-file">
       <button v-if="draftPreviewKind(item.file)==='image'" type="button" class="pending-image"
@@ -1495,7 +1527,7 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
      </label>
      <label class="sr-only" for="message-text">消息</label>
      <textarea ref="composer" id="message-text" v-model="composerText" :aria-describedby="taskQuote?'task-quote':undefined" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):taskQuote?'补充给当前任务…':'输入消息…'" rows="1" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea>
-     <button id="send" type="submit" :aria-label="taskQuote?'发送追加指令':'发送新消息'" :title="taskQuote?'发送追加指令':'发送新消息'" :disabled="!currentTopic||busy||newSubmissionBlocked||currentTopic?.executable===false||(taskQuote?quoteSendBlocked:(!text.trim()&&!pendingFiles.length))"><MobileIcon name="send"/></button>
+     <button id="send" type="submit" :aria-label="taskQuote?'发送追加指令':'发送新消息'" :title="taskQuote?'发送追加指令':'发送新消息'" :disabled="!currentTopic||busy||newSubmissionBlocked||currentTopic?.executable===false||(taskQuote?quoteSendBlocked:composerDraft.modelUnavailable||(!text.trim()&&!pendingFiles.length))"><MobileIcon name="send"/></button>
     </form>
     <div v-show="visibleNotice||pairRecoveryNotice||pendingSubmission" class="send-state"><span v-if="visibleNotice" id="send-state" role="status">{{visibleNotice}}</span><span v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</span><button id="retry-last" v-show="pendingSubmission" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div>
     </div>
