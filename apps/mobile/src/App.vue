@@ -80,7 +80,7 @@ function observeCore(topic) {
      if(!data.workId)return;
      const prior=corePreviews.value.find(work=>work.id===data.workId);
      const next={...prior,id:data.workId};
-     if(type==='work_preview')next.text=data.text;
+     if(type==='work_preview'){next.text=data.text;next.speakerName=data.speakerName;}
      if(type==='delta')next.text=((next.text||'')+data.text).slice(-256*1024);
      if(type==='approval_requested')next.approval=data.toolName;
      if(type==='approval_settled')delete next.approval;
@@ -446,7 +446,7 @@ async function postPrepared(record,context){
   const conversation='conversations/'+encodeURIComponent(record.topicKey);
   let accepted;
   try{
-   const target=currentTopic.value?.coreSingle ? corePath(currentTopic.value)+'/send' : conversation+(record.kind==='invitation'?'/invitations':'/messages');
+   const target=currentTopic.value?.coreSingle ? corePath(currentTopic.value)+(record.kind==='invitation'?'/invitations':'/send') : conversation+(record.kind==='invitation'?'/invitations':'/messages');
    accepted=await api(target,record.payload,{'X-NativeSync-Entry-Id':record.entryId,'X-NativeSync-Session-Marker':record.sessionMarker});
   }catch(error){
    const topic=currentTopic.value;
@@ -513,7 +513,7 @@ async function openAttachment(message,attachment){
  }catch(error){if(current())attachmentPreview.value={name:attachment.name||'附件',loading:false,error:error.status?error.message:'附件暂时无法读取，请检查连接',url:null};}
 }
 function downloadAttachment(){const item=attachmentPreview.value;if(item?.blob)saveAttachment(item.blob,item.name);}
-const coreSteeringWork=computed(()=>currentTopic.value?.coreSingle &&
+const coreSteeringWork=computed(()=>currentTopic.value?.coreSingle && currentTopic.value.ownerType==='agent' &&
  jobs.value.find(work=>['running','waiting_approval'].includes(work.state)));
 async function sendCoreSteering() {
  const work=coreSteeringWork.value, topic=currentTopic.value, original=text.value;
@@ -719,6 +719,7 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
     <article v-for="work in corePreviews" :key="work.id" class="message assistant">
      <small v-if="work.approval">等待桌面审批 · {{work.approval}}</small>
      <small v-else-if="work.tool">工具 · {{work.tool}}</small>
+     <small v-else-if="work.speakerName">{{work.speakerName}}</small>
      <div v-if="work.text" class="bubble">{{work.text}}</div>
      <div v-if="work.presentation" class="bubble"><strong>{{work.presentation.title}}</strong><p>{{work.presentation.challenge}}</p></div>
     </article>

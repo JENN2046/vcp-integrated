@@ -252,8 +252,26 @@ function initialize(mainWindow, context) {
         return await groupChat.regenerateGroupTopicTitle(groupId, topicId);
     });
 
+    const coreGroup = (groupId, topicId) => {
+        const descriptor = { itemType: 'group', itemId: groupId, topicId };
+        const client = historyMutationQueue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
+        return { descriptor, client: client?.owns(descriptor) ? client : null };
+    };
+
     ipcMain.handle('get-group-chat-history', async (event, groupId, topicId) => {
-        return await groupChat.getGroupChatHistory(groupId, topicId);
+        const { client, descriptor } = coreGroup(groupId, topicId);
+        if (client) {
+            try {
+                const result = await client.history(descriptor);
+                client.observe(client.mapping(descriptor));
+                return result.history;
+            } catch (error) { return { error: error.code || error.message }; }
+        }
+        const { CoreSingleClient } = require('../services/nativeSync/coreSingleClient');
+        try {
+            const cached = await CoreSingleClient.offlineHistory(historyMutationQueue, descriptor);
+            return cached?.history || await groupChat.getGroupChatHistory(groupId, topicId);
+        } catch (error) { return { error: error.code || error.message }; }
     });
 
     ipcMain.handle('save-group-chat-history', async (event, groupId, topicId, history, options) => {
@@ -295,6 +313,11 @@ function initialize(mainWindow, context) {
                 || typeof userMessage.content?.text !== 'string') {
                 throw new TypeError('群聊用户消息参数无效');
             }
+            const { client, descriptor } = coreGroup(groupId, topicId);
+            if (client) {
+                return await client.send(descriptor, { id: userMessage.id, role: 'user', attachments: userMessage.attachments || [],
+                    content: userMessage.originalUserText ?? userMessage.content.text });
+            }
             const execution = historyMutationQueue.syncPolicy?.sharedExecution;
             if (execution?.runtime.nativeObject('group', groupId)) {
                 // The native group runner resumes the shared admission using the original message ID.
@@ -320,9 +343,12 @@ function initialize(mainWindow, context) {
     });
 
     ipcMain.handle('inviteAgentToSpeak', async (event, groupId, topicId, invitedAgentId) => {
+        if (event.sender !== mainWindow?.webContents) return { success: false, error: 'FORBIDDEN' };
         console.log(`[Main IPC] Received inviteAgentToSpeak for Group: ${groupId}, Topic: ${topicId}, Agent: ${invitedAgentId}`);
         try {
             const sendStreamChunkToRenderer = createStreamSender();
+            const { client, descriptor } = coreGroup(groupId, topicId);
+            if (client) return await client.invite(descriptor, invitedAgentId);
             const groupConfig = await groupChat.getAgentGroupConfig(groupId);
             if (groupConfig?.mode === 'jev') {
                 return await groupChat.enqueueJevGroupAgent(
@@ -388,6 +414,13 @@ function initialize(mainWindow, context) {
     ipcMain.handle('interrupt-group-chat-queue', async (event, groupId, topicId) => {
         console.log(`[Main IPC] Received interrupt-group-chat-queue for Group: ${groupId}, Topic: ${topicId}`);
         try {
+            const { client, descriptor } = coreGroup(groupId, topicId);
+            if (client) {
+                if (event.sender !== mainWindow?.webContents) return { success: false, error: 'FORBIDDEN' };
+                const status = await client.status(descriptor);
+                const work = status.executions.find(entry => entry.canCancel);
+                return work ? await client.control(descriptor, work.id, 'cancel') : { success: false, error: 'WORK_NOT_CANCELLABLE' };
+            }
             return await groupChat.interruptGroupChatQueue(groupId, topicId);
         } catch (error) {
             console.error(`[Main IPC] Error interrupting group queue for ${groupId}/${topicId}:`, error);
@@ -404,6 +437,7 @@ function initialize(mainWindow, context) {
                 }
             };
 
+            if (coreGroup(groupId, topicId).client) return { success: false, error: 'CORE_GROUP_REDO_NOT_MIGRATED' };
             // This new function will be created in groupchat.js
             await groupChat.redoGroupChatMessage(groupId, topicId, messageId, agentId, sendStreamChunkToRenderer, getAgentConfigById);
 

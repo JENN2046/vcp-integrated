@@ -221,8 +221,9 @@ test('main group send resumes the accepted message and completes an invite-only 
  t.after(()=>context.initialize(null));
  const src=await fs.readFile(CHAT+'/modules/ipc/groupChatHandlers.js','utf8');
  const i=src.indexOf("    ipcMain.handle('send-group-chat-message'"),j=src.indexOf("    ipcMain.handle('inviteAgentToSpeak'",i);
+ const prelude=src.slice(src.indexOf('    const coreGroup = '),src.indexOf("    ipcMain.handle('get-group-chat-history'"));
  let handler;const sender={};
- require('node:vm').runInNewContext(src.slice(i,j),{ipcMain:{handle:(n,fn)=>{handler=fn;}},mainWindow:{webContents:sender},historyMutationQueue:queue,
+ require('node:vm').runInNewContext(prelude+src.slice(i,j),{ipcMain:{handle:(n,fn)=>{handler=fn;}},mainWindow:{webContents:sender},historyMutationQueue:queue,
   groupChat,topicAdmission:{submit(){throw Error('unexpected local submission');}},createStreamSender:()=>()=>{},getAgentConfigById:()=>{}});
  const result=await handler({sender},d.itemId,d.topicId,{...message,content:{text:message.content},originalUserText:message.content});
  assert.equal(result.success,true,result.error);assert.equal(first.record.phase,'completed');

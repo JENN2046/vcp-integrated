@@ -111,8 +111,7 @@ class MobilePortal {
         });
         this.router.use('/api/conversations/:key', (req, _res, next) => {
             const target = this.topics.find(topic => topic.key === req.params.key);
-            const coreWorkspace = this.store.shared?.coreWorkspace || this.store.shared?.core?.workspace;
-            if (coreWorkspace && target?.ownerType === 'agent' && coreWorkspace === target.sharedSpaceId) {
+            if (this.usesCore(target)) {
                 return next(error('CORE_ROUTE_REQUIRED', 409));
             }
             next();
@@ -250,20 +249,37 @@ class MobilePortal {
         // authorization; these non-credential hashes cannot confer authority.
         if (typeof entry !== 'string' || !/^[a-f0-9]{64}$/.test(entry) || typeof marker !== 'string' || !/^[a-f0-9]{64}$/.test(marker) || entry !== current.entryId || marker !== current.sessionMarker) throw error('SUBMISSION_CONTEXT_CHANGED',409);
     }
+    usesCore(topic) {
+        return Boolean(topic?.sharedSpaceId && this.store.shared.requiresCore(
+            this.store.shared.topicFor([topic.ownerType, topic.ownerId, topic.topicId])));
+    }
+
     catalog(session) {
         return this.topics.filter(t=>this.topicAllowed(t,session)).map(t=>{
             const legacyMetadata=JSON.parse(this.db.prepare('SELECT metadata FROM mobile_catalog WHERE topic_key=?').get(t.key)?.metadata || '{}');
             const owner=t.sourceId?this.sourceCatalog.entity(t.sourceId,t.ownerType,t.ownerId,''):null;
             const row=t.sourceId?this.sourceCatalog.entity(t.sourceId,t.ownerType,t.ownerId,t.topicId):null;
             const metadata=owner&&row?{agentName:JSON.parse(owner.metadata).name,topicName:JSON.parse(row.metadata).name,avatar:JSON.parse(owner.metadata).avatar,updatedAt:null}:legacyMetadata;
-            const ready=historyReady(this.db,t),published=this.engine.configs.public(t.key);let available=false,reason='SERVER_AGENT_NOT_CONFIGURED';
+            const migrated=this.usesCore(t),ready=migrated||historyReady(this.db,t),published=this.engine.configs.public(t.key);let available=false,reason='SERVER_AGENT_NOT_CONFIGURED';
             try{if(t.ownerType==='group'){const snapshot=this.engine.configs.snapshot(t);if(!snapshot)reason='EXECUTION_CONFIG_REQUIRED';else if(!['sequential','naturerandom','invite_only'].includes(snapshot.group.mode))reason='GROUP_MODE_REQUIRES_DESKTOP';else available=true;}
             else {const snapshot=this.engine.configs.snapshot(t);this.engine.configs.assertRunnable(t,snapshot);available=Boolean((published.model||t.model)&&(!this.engine.configs.required||snapshot));reason=this.engine.configs.required&&!published.configVersion?'EXECUTION_CONFIG_REQUIRED':'SERVER_AGENT_NOT_CONFIGURED';}}catch(e){reason=e.code||'CONFIG_SNAPSHOT_CORRUPT';}
-            if(t.ownerType==='agent'&&t.sharedSpaceId&&(this.store.shared?.coreWorkspace||this.store.shared?.core?.workspace)===t.sharedSpaceId){available=Boolean(this.coreRouter);reason=available?null:'CORE_DISABLED';}
+            if(migrated){
+                available=Boolean(this.coreRouter);reason=available?null:'CORE_DISABLED';
+                if(t.ownerType==='group'){
+                    try{
+                        const shared=this.store.shared;
+                        const {owner: group,members}=shared.freeze(shared.row(t.sharedSpaceId,t.key));
+                        published.groupMode=group.config.mode;
+                        published.members=members.map(member=>({id:member.id,name:member.config.name||member.id,
+                            unavailable:member.deleted||!member.config.model}));
+                    }catch(error){available=false;reason=error.code||'CORE_CONFIG_PENDING';}
+                }
+                if(this.store.shared.core?.historyDeleted?.get(t.key)){available=false;reason='CORE_CONVERSATION_DELETED';}
+            }
             if(t.sharedSpaceId&&!session.scopes.includes('shared:'+t.sharedSpaceId+':execute')){available=false;reason='SHARED_EXECUTION_PERMISSION_REQUIRED';}
             if(t.sharedSpaceId&&this.store.shared.readOnly){available=false;reason='SHARED_READ_ONLY';}
             if(!ready){available=false;reason='HISTORY_IMPORT_PENDING';}
-            return {key:t.key,ownerId:t.ownerId,ownerType:t.ownerType,topicId:t.topicId,historyProtocol:this.sourceCatalog?2:1,executionProtocol:2,...(t.sharedSpaceId?{sharedSpaceId:t.sharedSpaceId,...(t.ownerType==='agent'&&(this.store.shared?.coreWorkspace||this.store.shared?.core?.workspace)===t.sharedSpaceId?{coreSingle:true,historyReady:true}:{}),sharedOwnerId:t.sharedOwnerId,originSource:t.originSource,originLabel:this.sourceCatalog.grants.get(t.originSource)?.label||t.originSource,configurationEditable:!this.store.shared.readOnly&&session.scopes.includes('shared:'+t.sharedSpaceId+':config')}:{}),...(t.sourceId?{sourceId:t.sourceId,sourceLabel:this.sourceLabel(t.sourceId),archived:Boolean(t.archived),sourceState:t.sourceState||'available'}:{}),agentName:metadata.agentName||t.agentName||t.ownerId,topicName:metadata.topicName||t.topicName||t.topicId,avatar:t.sharedSpaceId?t.avatar||null:metadata.avatar||null,updatedAt:metadata.updatedAt||null,model:t.model||null,historyReady:ready,executable:available,unavailableReason:available?null:reason,attachmentsEnabled:Boolean(this.attachments),...published,syncStatus:ready?(t.sourceId?'history-ready':'central'):'initial-import-pending',...this.db.prepare('SELECT count(*) AS messageCount,coalesce(max(last_seq),0) AS seq FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND deleted=0').get(t.ownerType,t.ownerId,t.topicId)};
+            return {key:t.key,ownerId:t.ownerId,ownerType:t.ownerType,topicId:t.topicId,historyProtocol:this.sourceCatalog?2:1,executionProtocol:2,...(t.sharedSpaceId?{sharedSpaceId:t.sharedSpaceId,...(migrated?{coreSingle:true}:{}),sharedOwnerId:t.sharedOwnerId,originSource:t.originSource,originLabel:this.sourceCatalog.grants.get(t.originSource)?.label||t.originSource,configurationEditable:!this.store.shared.readOnly&&session.scopes.includes('shared:'+t.sharedSpaceId+':config')}:{}),...(t.sourceId?{sourceId:t.sourceId,sourceLabel:this.sourceLabel(t.sourceId),archived:Boolean(t.archived),sourceState:t.sourceState||'available'}:{}),agentName:metadata.agentName||t.agentName||t.ownerId,topicName:metadata.topicName||t.topicName||t.topicId,avatar:t.sharedSpaceId?t.avatar||null:metadata.avatar||null,updatedAt:metadata.updatedAt||null,model:t.model||null,historyReady:ready,executable:available,unavailableReason:available?null:reason,attachmentsEnabled:Boolean(this.attachments),...published,syncStatus:ready?(t.sourceId?'history-ready':'central'):'initial-import-pending',...this.db.prepare('SELECT count(*) AS messageCount,coalesce(max(last_seq),0) AS seq FROM messages WHERE owner_type=? AND owner_id=? AND topic_id=? AND deleted=0').get(t.ownerType,t.ownerId,t.topicId)};
         });
     }
     agents(session) {

@@ -67,6 +67,19 @@ class CoreStore {
         if (!this.db.prepare('PRAGMA table_info(messages)').all().some(column => column.name === 'sender_name')) {
             this.db.exec('ALTER TABLE messages ADD COLUMN sender_name TEXT');
         }
+        if (!this.db.prepare('PRAGMA table_info(messages)').all().some(column => column.name === 'history_metadata_json')) {
+            this.db.exec('ALTER TABLE messages ADD COLUMN history_metadata_json TEXT');
+        }
+        const workColumns = this.db.prepare('PRAGMA table_info(works)').all();
+        if (!workColumns.some(column => column.name === 'group_step')) {
+            this.db.exec('ALTER TABLE works ADD COLUMN group_step INTEGER NOT NULL DEFAULT 0');
+        }
+        if (!workColumns.some(column => column.name === 'group_plan_json')) {
+            this.db.exec('ALTER TABLE works ADD COLUMN group_plan_json TEXT');
+        }
+        if (!workColumns.some(column => column.name === 'group_ordinal')) {
+            this.db.exec('ALTER TABLE works ADD COLUMN group_ordinal INTEGER');
+        }
         this.db.prepare("INSERT OR IGNORE INTO core_metadata VALUES('storage_id',?)").run(randomUUID());
         this.storageId = this.db.prepare("SELECT value FROM core_metadata WHERE key='storage_id'").get().value;
     }
@@ -114,12 +127,15 @@ class CoreStore {
             .run(key, id, action, rev).lastInsertRowid;
     }
 
-    insertMessage({ id, key, role, content, attachments = [], after, sourceWorkId = null, checkpoint = null, desktopReferences = null, senderName = null }) {
-        const seq = this.appendChange(key, id, 'upsert', 1);
+    insertMessage({ id, key, role, content, attachments = [], after, sourceWorkId = null, checkpoint = null,
+        desktopReferences = null, senderName = null, createdAt = Date.now(), deleted = false, historyMetadata = null }) {
+        const seq = this.appendChange(key, id, deleted ? 'delete' : 'upsert', 1);
         this.db.prepare(`INSERT INTO messages
-            (id,conversation_id,created_seq,ordinal,role,content,attachments_json,last_change_seq,created_at,source_work_id,checkpoint_json,desktop_refs_json,sender_name)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, key, seq, after ?? seq * 1024, role, content, json(attachments), seq, Date.now(),
-            sourceWorkId, checkpoint ? json(checkpoint) : null, desktopReferences?.length ? json(desktopReferences) : null, senderName);
+            (id,conversation_id,created_seq,ordinal,role,content,attachments_json,last_change_seq,created_at,source_work_id,
+                checkpoint_json,desktop_refs_json,sender_name,deleted,history_metadata_json)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, key, seq, after ?? seq * 1024, role, content, json(attachments), seq, createdAt,
+            sourceWorkId, checkpoint ? json(checkpoint) : null, desktopReferences?.length ? json(desktopReferences) : null, senderName,
+            Number(deleted), historyMetadata ? json(historyMetadata) : null);
         return seq;
     }
 
@@ -133,13 +149,25 @@ class CoreStore {
                 throw failure('SUBMISSION_RATE_LIMIT', 429);
             }
             const { attachments, config, link, recovery, desktopReferences, senderName, senderRole } = prepare();
-            const userId = randomUUID();
+            const group = topic.ownerType === 'group';
+            const ordinal = group ? this.db.prepare(`SELECT max(
+                coalesce((SELECT max(ordinal) FROM messages WHERE conversation_id=?),0),
+                coalesce((SELECT max(group_ordinal)+1023 FROM works WHERE conversation_id=?),0)
+            ) AS value`).get(topic.key, topic.key).value + 1024 : null;
+            const anchor = input.inviteAgentId && this.db.prepare(`SELECT id FROM messages
+                WHERE conversation_id=? AND deleted=0 ORDER BY role='user' DESC,ordinal DESC LIMIT 1`).get(topic.key);
+            if (input.inviteAgentId && !anchor) throw failure('GROUP_INVITATION_HISTORY_REQUIRED');
+            const userId = anchor?.id || randomUUID();
             const workId = randomUUID();
-            const seq = this.insertMessage({ id: userId, key: topic.key, role: senderRole || 'user', content: input.text, attachments, desktopReferences, senderName });
-            link?.(userId);
+            const seq = anchor ? this.head(topic.key) : this.insertMessage({
+                id: userId, key: topic.key, role: senderRole || 'user', content: input.text,
+                attachments, desktopReferences, senderName, after: ordinal,
+                historyMetadata: group ? { groupId: topic.ownerId, topicId: topic.topicId, isGroupMessage: true } : null
+            });
+            if (!anchor) link?.(userId);
             this.db.prepare(`INSERT INTO works
-                (id,conversation_id,principal,request_id,status,admitted_seq,user_message_id,frozen_config_json,created_at)
-                VALUES(?,?,?,?,'queued',?,?,?,?)`).run(workId, topic.key, principal, requestId, seq, userId, json(config), Date.now());
+                (id,conversation_id,principal,request_id,status,admitted_seq,user_message_id,frozen_config_json,created_at,group_ordinal)
+                VALUES(?,?,?,?,'queued',?,?,?,?,?)`).run(workId, topic.key, principal, requestId, seq, userId, json(config), Date.now(), ordinal);
             return { workId, messageId: userId, seq, ...(recovery && { recovery }) };
         });
     }
@@ -152,8 +180,10 @@ class CoreStore {
             for (const attachment of attachments) delete attachment.extractedText;
         }
         const refs = row.desktop_refs_json && parse(row.desktop_refs_json);
+        const metadata = row.history_metadata_json && parse(row.history_metadata_json);
+        const { agentId, groupId, topicId, isGroupMessage, finishReason } = metadata || {};
         const desktopReferences = includeAttachmentText ? refs : refs?.map(({ sourceId, ...reference }) => reference);
-        return { id: row.id, role: row.role, content: row.content, timestamp: row.created_at,
+        return { agentId, groupId, topicId, isGroupMessage, finishReason, id: row.id, role: row.role, content: row.content, timestamp: row.created_at,
             ordinal: row.ordinal, ...(row.sender_name && { name: row.sender_name }), ...(desktopReferences && { desktopReferences }), ...(row.checkpoint_json && { contextCompaction: parse(row.checkpoint_json) }), ...(row.source_work_id && { sourceWorkId: row.source_work_id }), revision: row.rev, attachments };
     }
 
@@ -260,10 +290,10 @@ class CoreStore {
 
     saveFinal(work, content) {
         const result = this.db.prepare(`UPDATE works SET pending_final_json=? WHERE id=? AND status='running' AND dispatched=1
-            AND pending_final_json IS NULL`).run(json({
+            AND pending_final_json IS NULL AND group_step=?`).run(json({
                 id: work.id, principal: work.principal, key: work.conversation_id, requestId: work.request_id,
-                userId: work.user_message_id, content
-            }), work.id);
+                userId: work.user_message_id, content, ...(work.group_ordinal !== null && { step: work.group_step })
+            }), work.id, work.group_step ?? 0);
         if (result.changes !== 1) throw failure('WORK_FINAL_FENCED');
     }
 
@@ -279,6 +309,23 @@ class CoreStore {
         const user = this.db.prepare("SELECT ordinal FROM messages WHERE id=? AND conversation_id=? AND deleted=0")
             .get(work.user_message_id, work.conversation_id);
         if (!user) throw failure('WORK_FINAL_UNSETTLED');
+        if (work.group_ordinal !== null) {
+            const plan = work.group_plan_json && parse(work.group_plan_json);
+            const config = parse(work.frozen_config_json);
+            const member = config.agents?.find(agent => agent.id === plan?.[work.group_step]);
+            if (!member || final.step !== work.group_step) throw failure('WORK_FINAL_UNSETTLED');
+            const replyId = 'reply_' + id + '_' + work.group_step;
+            const seq = this.insertMessage({ id: replyId, key: work.conversation_id, role: 'assistant',
+                content: final.content, after: work.group_ordinal + work.group_step + 1, sourceWorkId: id,
+                senderName: member.name || member.id, historyMetadata: {
+                    agentId: member.id, groupId: config.groupId, topicId: config.topicId, isGroupMessage: true
+                }
+            });
+            const status = work.group_step + 1 === plan.length ? 'completed' : 'running';
+            this.db.prepare(`UPDATE works SET status=?,reply_message_id=?,pending_final_json=NULL,error_code=NULL,
+                group_step=group_step+1,dispatched=0 WHERE id=?`).run(status, replyId, id);
+            return { workId: id, replyId, seq, status, step: work.group_step, speaker: member.id };
+        }
         const replyId = 'reply_' + id;
         const seq = this.insertMessage({ id: replyId, key: work.conversation_id, role: 'assistant',
             content: final.content, after: user.ordinal + 1023, sourceWorkId: id });
@@ -289,12 +336,13 @@ class CoreStore {
 
     recover(isValid, onFinal) {
         this.transaction(() => {
-            for (const work of this.db.prepare("SELECT * FROM works WHERE status IN ('queued','running','waiting_approval','cancelling') ORDER BY admitted_seq").all()) {
+            for (const work of this.db.prepare("SELECT * FROM works WHERE status IN ('queued','running','waiting_approval','cancelling') ORDER BY admitted_seq,rowid").all()) {
                 const valid = isValid(work);
                 if (valid && work.status === 'running' && work.pending_final_json) {
                     try {
-                        this.finish(work.id);
-                        onFinal?.(work, parse(work.pending_final_json).content);
+                        const result = this.finish(work.id);
+                        if (result.status === 'running') this.setState(work.id, 'queued');
+                        else if (work.group_ordinal === null) onFinal?.(work, parse(work.pending_final_json).content);
                         continue;
                     }
                     catch (error) { if (error.code !== 'WORK_FINAL_UNSETTLED') throw error; }

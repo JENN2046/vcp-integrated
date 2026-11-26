@@ -8,6 +8,7 @@ const sharedGroup = require('../modules/services/nativeSync/sharedGroup');
 const source = fs.readFileSync(path.join(__dirname, '../modules/ipc/groupChatHandlers.js'), 'utf8');
 const start = source.indexOf("    ipcMain.handle('send-group-chat-message'");
 const end = source.indexOf("    ipcMain.handle('inviteAgentToSpeak'", start);
+const prelude = source.slice(source.indexOf('    const coreGroup = '), source.indexOf("    ipcMain.handle('get-group-chat-history'"));
 assert.ok(start > 0 && end > start);
 
 function fixture({ shared = true, admission = true, admissionError, runnerError, runnerResult } = {}) {
@@ -52,7 +53,7 @@ function fixture({ shared = true, admission = true, admissionError, runnerError,
         createStreamSender: () => emit,
         getAgentConfigById: lookup,
     };
-    vm.runInNewContext(source.slice(start, end), context);
+    vm.runInNewContext(prelude + source.slice(start, end), context);
     return { calls, emit, execution, handler, record, sender };
 }
 

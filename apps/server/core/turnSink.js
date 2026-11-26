@@ -16,9 +16,9 @@ class CoreTurnSink {
     endStream() {}
     onNonStreamResponse() {}
 
-    onDelta({ textDelta, displayDelta }) {
+    onDelta({ textDelta, reasoningDelta, displayDelta }) {
         if (typeof displayDelta === 'string' && displayDelta && !this.signal.aborted) {
-            this.observe('delta', { text: displayDelta, textDelta, displayDelta });
+            this.observe('delta', { text: displayDelta, textDelta, reasoningDelta, displayDelta });
         }
     }
 

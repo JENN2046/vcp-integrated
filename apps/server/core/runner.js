@@ -3,11 +3,13 @@
 const native = require('../modules/requestExecutionContext');
 const { CoreTurnSink } = require('./turnSink');
 const { failure } = require('./store');
+const { planGroup, buildGroupPacket } = require('./group');
 
 class CoreRunner {
-    constructor({ store, chat, resolveAcceptedTopic, buildPacket, allowedAgents, sponsor, send, automaticCompaction, isCompacting }) {
+    constructor({ store, chat, resolveAcceptedTopic, buildPacket, allowedAgents, sponsor, send, automaticCompaction, isCompacting, attachments }) {
         this.store = store;
         this.chat = chat;
+        this.attachments = attachments;
         this.resolveAcceptedTopic = resolveAcceptedTopic;
         this.buildPacket = buildPacket;
         this.sponsor = sponsor;
@@ -40,7 +42,7 @@ class CoreRunner {
         observers.add(listener);
         const current = this.running.get(key);
         if (current) {
-            listener('work_preview', { workId: current.id, text: current.text });
+            listener('work_preview', { workId: current.id, text: current.text, ...current.speaker });
             for (const approval of current.approvals.values()) listener('approval_requested', approval);
             for (const [type, presentation] of current.presentations) listener(type, presentation);
         }
@@ -61,7 +63,7 @@ class CoreRunner {
                 const queue = this.store.db.prepare(`SELECT q.* FROM works q WHERE q.status='queued'
                     AND NOT EXISTS(SELECT 1 FROM works b WHERE b.conversation_id=q.conversation_id
                         AND b.status IN ('running','waiting_approval','cancelling','review_required'))
-                    ORDER BY admitted_seq`).all();
+                    ORDER BY admitted_seq,q.rowid`).all();
                 for (const work of queue) {
                     if (this.running.has(work.conversation_id)) continue;
                     const claimed = this.store.db.prepare("UPDATE works SET status='running' WHERE id=? AND status='queued' AND dispatched=0").run(work.id);
@@ -111,6 +113,8 @@ class CoreRunner {
         let continuation;
         let previousTurn;
         let includedCount;
+        let step = work;
+        const group = work.group_ordinal !== null;
         const sink = new CoreTurnSink({
             signal, observe,
             present: (type, presentation) => {
@@ -125,11 +129,11 @@ class CoreRunner {
                     continuation = { content, includedCount };
                     return false;
                 }
-                this.store.saveFinal(work, content);
+                this.store.saveFinal(step, content);
                 let flowlockChanged;
                 const result = this.store.transaction(() => {
                     const receipt = this.store.finish(id);
-                    flowlockChanged = this.flowlock.afterFinal(work, content);
+                    if (!group) flowlockChanged = this.flowlock.afterFinal(work, content);
                     return receipt;
                 });
                 if (flowlockChanged) this.publish(key, 'flowlock_state', {});
@@ -142,16 +146,16 @@ class CoreRunner {
             const topic = this.resolveAcceptedTopic(work);
             if (!topic) throw failure('WORK_AUTHORITY_REVOKED');
             const config = JSON.parse(work.frozen_config_json);
-            await this.automaticCompaction(topic, work, config, signal, fence);
-            await native.runCoreTurn({
+            if (!group) await this.automaticCompaction(topic, work, config, signal, fence);
+            const execute = (agent, turn) => native.runCoreTurn({
                 workId: id, signal, fence, observe,
-                ...(topic.actor?.kind === 'desktop' && !config.sponsoredByWorkId && { coreSponsor: (invocation, args) => this.sponsor(work, invocation, args) }),
+                ...(!group && topic.actor?.kind === 'desktop' && !config.sponsoredByWorkId && { coreSponsor: (invocation, args) => this.sponsor(work, invocation, args) }),
                 coreAA: {
                     assertAllowed: (args, indirect) => this.agentAssistant.assertAllowed(work, args, indirect),
                     link: (plugin, taskId) => this.agentAssistant.link(work, plugin, taskId),
                     accept: identity => this.agentAssistant.accept(work, identity)
                 },
-                agentAlias: config.agentAlias, agentPrompt: config.systemPrompt,
+                agentAlias: agent.agentAlias, agentPrompt: agent.systemPrompt,
                 phase: () => this.store.db.prepare('UPDATE works SET dispatched=1 WHERE id=? AND dispatched=0').run(id),
                 bridge: {
                     onToolDispatch: ({ invocationId, pluginName, recordId }) => {
@@ -167,7 +171,32 @@ class CoreRunner {
                         observe('tool', { invocationId, pluginName, status: outcome });
                     }
                 }
-            }, async () => {
+            }, turn);
+            if (group) {
+                let plan = step.group_plan_json && JSON.parse(step.group_plan_json);
+                if (!plan) {
+                    plan = planGroup(config, this.store.history(work), work.user_message_id, signal);
+                    fence();
+                    this.store.db.prepare('UPDATE works SET group_plan_json=? WHERE id=?').run(JSON.stringify(plan), id);
+                }
+                if (!plan.length) {
+                    observe('work_state', this.store.setState(id, 'completed'));
+                    return;
+                }
+                for (const memberId of plan.slice(step.group_step)) {
+                    step = this.store.work(id);
+                    const member = config.agents.find(agent => agent.id === memberId);
+                    includedCount = step.steering_count;
+                    runtime.text = '';
+                    fence();
+                    runtime.speaker = { step: step.group_step, speaker: memberId, speakerName: member.name || member.id };
+                    observe('work_preview', { text: '', ...runtime.speaker });
+                    const packet = await buildGroupPacket(topic, step, config, member, this.store.history(work), this.attachments);
+                    fence();
+                    await execute(member, () => this.chat.executeTurn({ body: packet.body, signal, clientIp: null }, sink));
+                    if (this.store.work(id).group_step === step.group_step) break;
+                }
+            } else await execute(config, async () => {
                 do {
                     continuation = null;
                     includedCount = this.store.work(id).steering_count;
@@ -191,7 +220,7 @@ class CoreRunner {
             return;
         }
         const result = this.store.transaction(() => {
-            this.flowlock.endWork(work);
+            if (!group) this.flowlock.endWork(work);
             if (this.store.unresolved(id)) return this.store.review(id, 'TOOL_EXECUTION_UNCONFIRMED');
             if (['CORE_PROVIDER_OUTCOME_UNKNOWN', 'CORE_COMPACTION_OUTCOME_UNKNOWN'].includes(sink.errorCode)) return this.store.review(id, sink.errorCode);
             if (state.status === 'cancelling' || signal.aborted) return this.store.setState(id, 'cancelled');

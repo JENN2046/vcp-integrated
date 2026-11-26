@@ -1,5 +1,6 @@
 'use strict';
 const handoff=require('./sharedGroupHandoff');
+const {isCoreGroupMode}=require('../../../core/group');
 const {randomUUID} = require('node:crypto');
 const {stable,sha256,identity} = require('./protocol');
 const {sharedIdentity:id,sharedConfig,SHARED_SPACE_CAPABILITY} = require('./contracts.generated.cjs');
@@ -36,6 +37,7 @@ class SharedSpace {
     CREATE TABLE IF NOT EXISTS shared_objects(id TEXT PRIMARY KEY,space_id TEXT NOT NULL,kind TEXT NOT NULL,parent_id TEXT,owner_type TEXT,owner_id TEXT,topic_id TEXT,version INTEGER NOT NULL,deleted INTEGER NOT NULL DEFAULT 0,origin_source TEXT NOT NULL,UNIQUE(owner_type,owner_id,topic_id));
     CREATE INDEX IF NOT EXISTS idx_shared_objects_space ON shared_objects(space_id,id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_shared_single_rules ON shared_objects(space_id) WHERE kind='rules' AND deleted=0;
+    CREATE TABLE IF NOT EXISTS shared_core_group_topics(topic_id TEXT PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS shared_configs(object_id TEXT NOT NULL,version INTEGER NOT NULL,hash TEXT NOT NULL,config_json TEXT NOT NULL CHECK(json_valid(config_json)),PRIMARY KEY(object_id,version));
     CREATE TABLE IF NOT EXISTS shared_local_bindings(space_id TEXT NOT NULL,source_id TEXT NOT NULL,kind TEXT NOT NULL,local_parent TEXT NOT NULL DEFAULT '',local_id TEXT NOT NULL,object_id TEXT NOT NULL,hidden INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(space_id,source_id,kind,local_parent,local_id));
     CREATE INDEX IF NOT EXISTS idx_shared_bindings_object ON shared_local_bindings(object_id,source_id);
@@ -159,7 +161,7 @@ class SharedSpace {
  object(row){
   const config=this.db.prepare('SELECT hash,config_json FROM shared_configs WHERE object_id=? AND version=?').get(row.id,row.version);
   if(!config||sha256(stable(JSON.parse(config.config_json)))!==config.hash)throw fail('SYNC_STORAGE_CORRUPT',500);
-  return {id:row.id,sharedSpaceId:row.space_id,kind:row.kind,parentId:row.parent_id,version:row.version,configHash:config.hash,config:JSON.parse(config.config_json),deleted:Boolean(row.deleted),originSource:row.origin_source,...(row.owner_type?{topic:{ownerType:row.owner_type,ownerId:row.owner_id,topicId:row.topic_id}}:{})};
+  return {id:row.id,sharedSpaceId:row.space_id,kind:row.kind,parentId:row.parent_id,version:row.version,configHash:config.hash,config:JSON.parse(config.config_json),deleted:Boolean(row.deleted),originSource:row.origin_source,...(row.owner_type==='group'&&this.requiresCore(row)&&{coreGroup:true}),...(row.owner_type?{topic:{ownerType:row.owner_type,ownerId:row.owner_id,topicId:row.topic_id}}:{})};
  }
  get(actor,space,objectId){this.authorize(actor,space,'config');return this.object(this.row(space,objectId,true));}
  directory(actor,{sharedSpaceId,after='',limit=128}){
@@ -206,6 +208,9 @@ class SharedSpace {
    this.db.prepare('INSERT INTO shared_objects VALUES(?,?,?,?,?,?,?,?,0,?)').run(sharedId,space,body.kind,parent?.id||null,topic?.ownerType||null,topic?.ownerId||null,topic?.topicId||null,1,actor.sourceId);
    this.db.prepare('INSERT INTO shared_configs VALUES(?,?,?,?)').run(sharedId,1,sha256(stable(config)),JSON.stringify(config));
    this.db.prepare('INSERT INTO shared_local_bindings(space_id,source_id,kind,local_parent,local_id,object_id) VALUES(?,?,?,?,?,?)').run(space,actor.sourceId,body.kind,body.localParent||'',body.localId,sharedId);
+   if(topic?.ownerType==='group'&&this.core?.workspace===space&&isCoreGroupMode(this.object(parent).config.mode)){
+    this.db.prepare('INSERT INTO shared_core_group_topics VALUES(?)').run(sharedId);
+   }
    const row=this.row(space,sharedId);this.changed(row,'created');return {object:this.object(row)};
   });
  }
@@ -228,6 +233,10 @@ class SharedSpace {
    const row=this.row(body.sharedSpaceId,body.sharedId),config=sharedConfig(row.kind,body.config);this.assertNotPrepared([row.id,row.parent_id]);
    if(!Number.isSafeInteger(body.expectedVersion)||body.expectedVersion!==row.version)throw fail('SHARED_CONFIG_CONFLICT');
    this.validateRelations(body.sharedSpaceId,row.kind,config);
+   if(row.kind==='group'&&!isCoreGroupMode(config.mode)&&this.db.prepare(`SELECT 1 FROM shared_core_group_topics c
+       JOIN shared_objects t ON t.id=c.topic_id WHERE t.parent_id=? AND t.deleted=0 LIMIT 1`).get(row.id)){
+    throw fail('CORE_GROUP_MODE_CHANGE_REQUIRES_NEW_GROUP');
+   }
    if(stable(config)===stable(this.object(row).config)){this.modelSaveReceipt(actor,body.opId,this.object(row));return {object:this.object(row)};}
    const version=row.version+1;this.db.prepare('INSERT INTO shared_configs VALUES(?,?,?,?)').run(row.id,version,sha256(stable(config)),JSON.stringify(config));
    this.db.prepare('UPDATE shared_objects SET version=? WHERE id=?').run(version,row.id);row.version=version;this.changed(row,'config');this.modelSaveReceipt(actor,body.opId,this.object(row));
@@ -253,7 +262,11 @@ class SharedSpace {
    return {removed:'all',sharedId:row.id};
   });
  }
- requiresCore(row){return row?.owner_type==='agent'&&row.space_id===(this.coreWorkspace||this.core?.workspace);}
+ requiresCore(row){
+  if(!row||row.space_id!==(this.coreWorkspace||this.core?.workspace))return false;
+  return row.owner_type==='agent'||(row.owner_type==='group'&&Boolean(this.db.prepare(
+   'SELECT 1 FROM shared_core_group_topics WHERE topic_id=?').get(row.id)));
+ }
  topicFor(tupleValue){return this.db.prepare("SELECT * FROM shared_objects WHERE owner_type=? AND owner_id=? AND topic_id=? AND kind='topic'").get(...tupleValue);}
  legacyGuard(topic){if(this.topicFor([topic.ownerType,topic.ownerId,topic.topicId]))throw fail('SHARED_CLIENT_UPGRADE_REQUIRED');}
  adopt(actor,body){
@@ -290,8 +303,8 @@ class SharedSpace {
  nativeJob(admissionId){const row=this.db.prepare('SELECT * FROM shared_admissions WHERE id=?').get(admissionId);return row?{...row,topic_key:row.topic_id}:null;}
  sourceManaged(sourceId){return Boolean(this.db.prepare('SELECT 1 FROM shared_members WHERE source_id=? LIMIT 1').get(sourceId));}
  prepareNative(actor,body){if(!this.native)throw fail('SHARED_NATIVE_UNAVAILABLE',503);return this.native.prepare(actor,body);}
- beginSharedBaseline(actor,body){const row=this.topic(actor,body.sharedSpaceId,body.sharedId);return this.catalog.beginMobile(actor.principal,{key:row.id,ownerType:row.owner_type,ownerId:row.owner_id,topicId:row.topic_id},body.planId);}
- sharedBaseline(actor,body){const row=this.topic(actor,body.sharedSpaceId,body.sharedId);return this.catalog.mobilePage(actor.principal,{key:row.id,ownerType:row.owner_type,ownerId:row.owner_id,topicId:row.topic_id},body.baselineId,body.after??0,body.limit??100);}
+ beginSharedBaseline(actor,body){const row=this.topic(actor,body.sharedSpaceId,body.sharedId);if(this.requiresCore(row))throw fail('CORE_ROUTE_REQUIRED');return this.catalog.beginMobile(actor.principal,{key:row.id,ownerType:row.owner_type,ownerId:row.owner_id,topicId:row.topic_id},body.planId);}
+ sharedBaseline(actor,body){const row=this.topic(actor,body.sharedSpaceId,body.sharedId);if(this.requiresCore(row))throw fail('CORE_ROUTE_REQUIRED');return this.catalog.mobilePage(actor.principal,{key:row.id,ownerType:row.owner_type,ownerId:row.owner_id,topicId:row.topic_id},body.baselineId,body.after??0,body.limit??100);}
  topic(actor,space,topicId,permission='read'){
   this.authorize(actor,space,permission);const row=this.canonical(space,topicId);
   if(row.kind!=='topic')throw fail('SHARED_TOPIC_REQUIRED',400);
@@ -316,7 +329,7 @@ class SharedSpace {
  spaceHistory(actor,{sharedSpaceId,after=0,limit=100}){
   this.authorize(actor,sharedSpaceId);
   const topics=this.db.prepare("SELECT t.* FROM shared_objects t JOIN shared_objects o ON o.id=t.parent_id WHERE t.space_id=? AND t.kind='topic' AND t.deleted=0 AND o.deleted=0 AND NOT EXISTS(SELECT 1 FROM shared_local_bindings b WHERE b.source_id=? AND b.hidden=1 AND b.object_id IN (t.id,o.id) AND NOT EXISTS(SELECT 1 FROM shared_local_bindings a WHERE a.source_id=b.source_id AND a.object_id=b.object_id AND a.hidden=0))").all(sharedSpaceId,actor.kind==='desktop'?actor.sourceId:'');
-  return this.store.pull(after,limit,topics.map(row=>JSON.stringify(tuple(row))),{spaceId:sharedSpaceId});
+  return this.store.pull(after,limit,topics.filter(row=>!this.requiresCore(row)).map(row=>JSON.stringify(tuple(row))),{spaceId:sharedSpaceId});
  }
  bindings(actor,{sharedSpaceId}){
   this.authorize(actor,sharedSpaceId);if(actor.kind!=='desktop')throw fail('SHARED_DEVICE_REQUIRED',403);

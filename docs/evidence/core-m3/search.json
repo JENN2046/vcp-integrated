@@ -1,0 +1,172 @@
+{
+  "documents": 3006,
+  "cds": {
+    "startMs": 70.52331799999999,
+    "rebuildMs": 203.01149800000002,
+    "hits": [
+      {
+        "query": "南京市",
+        "expected": [
+          0
+        ],
+        "ids": [
+          "relevant_0"
+        ],
+        "ms": 4.56249600000001
+      },
+      {
+        "query": "长江大桥",
+        "expected": [
+          0,
+          1
+        ],
+        "ids": [
+          "relevant_1",
+          "relevant_0"
+        ],
+        "ms": 2.855169999999987
+      },
+      {
+        "query": "红外光谱",
+        "expected": [
+          2
+        ],
+        "ids": [
+          "relevant_2"
+        ],
+        "ms": 3.2133079999999836
+      },
+      {
+        "query": "青铜器",
+        "expected": [
+          3
+        ],
+        "ids": [
+          "relevant_3"
+        ],
+        "ms": 3.01103999999998
+      },
+      {
+        "query": "自然语言处理",
+        "expected": [
+          4
+        ],
+        "ids": [
+          "relevant_4"
+        ],
+        "ms": 3.950033000000019
+      },
+      {
+        "query": "研究生",
+        "expected": [
+          2
+        ],
+        "ids": [
+          "relevant_2"
+        ],
+        "ms": 2.935188000000039
+      },
+      {
+        "query": "生命起源",
+        "expected": [
+          5
+        ],
+        "ids": [
+          "relevant_5"
+        ],
+        "ms": 2.1676560000000222
+      }
+    ],
+    "legacyQuery": "{长江大桥|红外光谱:2},[晚霞]",
+    "legacyIds": [
+      "relevant_2",
+      "relevant_0"
+    ],
+    "windowCount": 1,
+    "windowSize": 3,
+    "rssKiB": 79144,
+    "indexBytes": 95718
+  },
+  "sqlite": {
+    "sqliteVersion": "3.46.1",
+    "jiebaVersion": "0.42.1",
+    "startMs": 516.1703340127133,
+    "rebuildMs": 164.04431199771352,
+    "hits": [
+      {
+        "query": "南京市",
+        "expected": [
+          0
+        ],
+        "ids": [
+          "relevant_0"
+        ],
+        "ms": 0.16949600831139833
+      },
+      {
+        "query": "长江大桥",
+        "expected": [
+          0,
+          1
+        ],
+        "ids": [
+          "relevant_1",
+          "relevant_0"
+        ],
+        "ms": 0.06872799713164568
+      },
+      {
+        "query": "红外光谱",
+        "expected": [
+          2
+        ],
+        "ids": [
+          "relevant_2"
+        ],
+        "ms": 0.06098300218582153
+      },
+      {
+        "query": "青铜器",
+        "expected": [
+          3
+        ],
+        "ids": [
+          "relevant_3"
+        ],
+        "ms": 0.04826999793294817
+      },
+      {
+        "query": "自然语言处理",
+        "expected": [
+          4
+        ],
+        "ids": [
+          "relevant_4"
+        ],
+        "ms": 0.0648909917799756
+      },
+      {
+        "query": "研究生",
+        "expected": [
+          2
+        ],
+        "ids": [
+          "relevant_2"
+        ],
+        "ms": 0.04656700184568763
+      },
+      {
+        "query": "生命起源",
+        "expected": [
+          5
+        ],
+        "ids": [
+          "relevant_5"
+        ],
+        "ms": 0.05154700193088502
+      }
+    ],
+    "peakRssKiB": 88156,
+    "databaseBytes": 462848
+  }
+}

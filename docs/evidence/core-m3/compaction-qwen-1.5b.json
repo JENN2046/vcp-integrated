@@ -1,0 +1,51 @@
+{
+  "model": "Qwen2.5-1.5B-Instruct Q4_K_M",
+  "engine": "llama.cpp b12728",
+  "providerRequests": 2,
+  "equivalentModelInput": true,
+  "desktopNative": {
+    "checkpoint": "</context_checkpoint>\n待压缩历史已作为本条消息之前的 3 条独立消息提供，请逐条读取其角色与正文；不是空历史，不要等待另行提供。\n\n</context_checkpoint>",
+    "fidelity": {
+      "total": 3,
+      "preserved": 0,
+      "missing": {
+        "path": [
+          "src/probes/health.js"
+        ],
+        "hash": [
+          "9ac5e43"
+        ],
+        "url": [
+          "https://example.invalid/qa"
+        ]
+      },
+      "capped": [],
+      "note": "宿主本地子串核对；缺失是审计信号而非拒收依据，也不证明语义无损。"
+    },
+    "kept": [],
+    "pendingDecision": false
+  },
+  "core": {
+    "checkpoint": "</context_checkpoint>\n待压缩历史已作为本条消息之前的 3 条独立消息提供，请逐条读取其角色与正文；不是空历史，不要等待另行提供。\n\n</context_checkpoint>",
+    "fidelity": {
+      "total": 3,
+      "preserved": 0,
+      "missing": {
+        "path": [
+          "src/probes/health.js"
+        ],
+        "hash": [
+          "9ac5e43"
+        ],
+        "url": [
+          "https://example.invalid/qa"
+        ]
+      },
+      "capped": [],
+      "note": "宿主本地子串核对；缺失是审计信号而非拒收依据，也不证明语义无损。"
+    },
+    "kept": [],
+    "pendingDecision": false
+  },
+  "equalOutput": true
+}

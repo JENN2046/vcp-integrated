@@ -17,7 +17,7 @@ const active = new Set(['queued', 'running', 'waiting_approval', 'cancelling']);
 class CoreSingleClient {
     static async offlineHistory(queue, descriptor) {
         const policy = queue.syncPolicy;
-        if (descriptor.itemType !== 'agent' || !policy?.isRecoveryFence ||
+        if (!['group','agent'].includes(descriptor.itemType) || !policy?.isRecoveryFence ||
             policy.diagnostics?.().degraded !== 'NETWORK_UNAVAILABLE' ||
             !/^[a-zA-Z0-9_-]{1,96}$/.test(policy.sharedSpaceId || '')) return null;
         const root = path.dirname(queue.userDataDir);
@@ -25,13 +25,14 @@ class CoreSingleClient {
         const state = await ownedJson(root, path.join(directory, 'registry.json'), { optional: true });
         if (!state?.coreSingle) return null;
         const owner = Object.entries(state.locals).find(([id, binding]) =>
-            binding.kind === 'agent' && binding.localId === descriptor.itemId && !binding.hidden &&
+            binding.kind === descriptor.itemType && binding.localId === descriptor.itemId && !binding.hidden &&
             !binding.aliasOf && state.objects[id] && !state.objects[id].deleted);
         const topic = owner && Object.entries(state.locals).find(([id, binding]) =>
             binding.kind === 'topic' && binding.localParent === descriptor.itemId && binding.localId === descriptor.topicId &&
             !binding.hidden && !binding.aliasOf && !state.objects[id]?.deleted && state.objects[id]?.parentId === owner[0]);
-        if (!topic) return null;
+        if (!topic || descriptor.itemType === 'group' && !state.objects[topic[0]].coreGroup) return null;
         const cached = await ownedJson(root, projectionFile(directory, topic[0]), { optional: true });
+        if (!cached && descriptor.itemType === 'group') throw fail('CORE_HISTORY_OFFLINE_UNAVAILABLE');
         return cached && { ...cached, syncEnabled: true, core: true, offline: true, revision: queue.revision(cached.history) };
     }
 
@@ -43,8 +44,12 @@ class CoreSingleClient {
 
     owns(descriptor) {
         const r = this.runtime;
-        return (descriptor?.itemType || 'agent') === 'agent' &&
-            r.capabilities?.spaces?.some(workspace => workspace.id === r.connection.sharedSpaceId && workspace.coreSingle === true);
+        if (!r.capabilities?.spaces?.some(workspace => workspace.id === r.connection.sharedSpaceId && workspace.coreSingle === true)) return false;
+        if ((descriptor?.itemType || 'agent') === 'agent') return true;
+        if (descriptor.itemType !== 'group') return false;
+        const mapping = r.mappings().find(({ local, shared }) => [local, shared].some(scope =>
+            scope.itemType === 'group' && scope.itemId === descriptor.itemId && scope.topicId === descriptor.topicId));
+        return Boolean(mapping && r.state.objects[mapping.sharedId]?.coreGroup);
     }
 
     mapping(descriptor) {
@@ -167,6 +172,7 @@ class CoreSingleClient {
     }
 
     async send(descriptor, message) {
+        if (this.runtime.readOnly) throw fail('SHARED_READ_ONLY');
         const projected = projectDesktopReferences(message);
         const references = projected.desktopReferences || [];
         if (references.some(ref => ref.kind !== 'workspace')) throw fail('CORE_RESOURCE_REFERENCE_NOT_SUPPORTED');
@@ -206,6 +212,36 @@ class CoreSingleClient {
             this.observe(mapping);
             return { handled: true, success: true, history, userMessage, replyId: 'reply_' + accepted.id,
                 serverSession: { executionId: accepted.id }, core: true };
+        });
+    }
+
+    async invite(descriptor, localAgentId) {
+        if (this.runtime.readOnly) throw fail('SHARED_READ_ONLY');
+        const mapping = this.mapping(descriptor);
+        const member = this.runtime.nativeObject('agent', localAgentId);
+        if (!member) throw fail('GROUP_MEMBER_UNAVAILABLE');
+        const r = this.runtime;
+        return r.execution.run(mapping.sharedId, async () => {
+            const file = this.file(mapping, 'draft');
+            const signature = stable({ inviteAgentId: member.id });
+            let draft = await ownedJson(r.root, file, { optional: true });
+            if (draft?.signature && draft.signature !== signature) throw fail('CORE_PREVIOUS_SUBMISSION_UNCONFIRMED');
+            if (!draft?.requestId) {
+                draft = { requestId: randomUUID(), signature };
+                await durableJson(file, draft);
+            }
+            let accepted;
+            try {
+                accepted = await r.send(this.route(mapping, 'invitations'), {
+                    body: { agentId: member.id, requestId: draft.requestId }
+                });
+            } catch (error) {
+                if (error.status >= 400 && error.status < 500 && error.code !== 'REQUEST_ID_REUSED') await durableJson(file, {});
+                throw error;
+            }
+            await durableJson(file, {});
+            this.observe(mapping);
+            return { ...accepted, success: true, core: true };
         });
     }
 
@@ -337,7 +373,7 @@ class CoreSingleClient {
 
     topic(mapping) {
         const local = mapping.local;
-        return { ownerType: 'agent', ownerId: local.itemId, topicId: local.topicId };
+        return { ownerType: local.itemType, ownerId: local.itemId, topicId: local.topicId };
     }
 
     observe(mapping) {
@@ -378,7 +414,7 @@ class CoreSingleClient {
             if (data.seq !== this.lastSeq || this.lastKey !== mapping.sharedId) {
                 this.lastKey = mapping.sharedId;
                 this.lastSeq = data.seq;
-                r.notify({ ...topic, agentId: local.itemId, revision: 'core:' + data.seq, source: 'native-sync' });
+                r.notify({ ...topic, ...(local.itemType === 'group' ? { groupId: local.itemId } : { agentId: local.itemId }), revision: 'core:' + data.seq, source: 'native-sync' });
             }
             return;
         }
@@ -386,7 +422,10 @@ class CoreSingleClient {
         const id = data.workId;
         const preview = this.previews.get(id) || { executionId: id, sharedId: mapping.sharedId, text: '',
             connection: 'online', native: { kind: 'shared_session', state: 'running' } };
-        if (type === 'work_preview') preview.text = data.text;
+        if (type === 'work_preview') {
+            preview.text = data.text;
+            if (data.speaker) preview.speaker = data.speaker;
+        }
         if (type === 'delta') preview.text = (preview.text + data.text).slice(-256 * 1024);
         if (type === 'work_state') {
             preview.native.state = data.status;

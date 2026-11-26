@@ -6,6 +6,7 @@ const { createHash } = require('node:crypto');
 const express = require('express');
 const { CoreStore, failure } = require('./store');
 const { CoreRunner } = require('./runner');
+const { isCoreGroupMode } = require('./group');
 const { DesktopContext } = require('./desktopContext');
 const { CoreCompaction } = require('./compaction');
 const { fieldsFrom } = require('../Plugin/NativeSync/sync/metadata');
@@ -43,13 +44,6 @@ class CoreService {
         if (fs.existsSync(filename) && (fs.lstatSync(filename).isSymbolicLink() || fs.statSync(filename).nlink !== 1)) {
             throw failure('CORE_DATA_FILE_ALIAS');
         }
-        // Activation is for an empty development conversation domain. There is
-        // no migration of existing message or execution authority in M1.
-        if (shared.db.prepare(`SELECT 1 FROM shared_objects t WHERE t.space_id=? AND t.owner_type='agent' AND (
-            EXISTS (SELECT 1 FROM journal j WHERE j.owner_type=t.owner_type AND j.owner_id=t.owner_id AND j.topic_id=t.topic_id)
-            OR EXISTS (SELECT 1 FROM shared_admissions a WHERE a.topic_id=t.id)) LIMIT 1`).get(workspace)) {
-            throw failure('CORE_DEVELOPMENT_WORKSPACE_NOT_EMPTY');
-        }
         this.workspace = workspace;
         this.shared = shared;
         this.mobile = mobile;
@@ -63,14 +57,14 @@ class CoreService {
         const attachmentsStore = {
             db,
             findMessage: db.prepare(`SELECT m.* FROM messages m JOIN conversations c ON c.id=m.conversation_id
-                WHERE ?='agent' AND c.owner_id=? AND c.id=? AND m.id=?`),
+                WHERE ? IN ('agent','group') AND c.owner_id=? AND c.id=? AND m.id=?`),
             readSnapshot: fn => fn(),
             readProjected: fn => fn(db).map(row => ({ row, message: this.store.message(row) })),
             projectMessage: row => this.store.message(row)
         };
         this.attachments = new AttachmentStore({ store: attachmentsStore, root: directory, topics: [] });
         this.runner = new CoreRunner({
-            store: this.store, chat, allowedAgents: shared.delegationAgents,
+            store: this.store, chat, attachments: this.attachments, allowedAgents: shared.delegationAgents,
             resolveAcceptedTopic: work => this.resolveAcceptedTopic(work),
             buildPacket: (...args) => this.buildPacket(...args),
             sponsor: (...args) => this.deliverSponsoredMessage(...args),
@@ -81,6 +75,7 @@ class CoreService {
         for (const row of db.prepare('SELECT * FROM conversations').all()) {
             if (row.workspace !== workspace) throw failure('CORE_DATABASE_WORKSPACE_MISMATCH');
         }
+        this.activateHistory();
         this.compaction = new CoreCompaction({ store: this.store, chat,
             sourceHash: (...args) => this.compactionSource(...args),
             publish: (key, type, event) => this.runner.publish(key, type, event),
@@ -88,14 +83,54 @@ class CoreService {
         this.runner.recover();
     }
 
-    manages(row) { return row?.owner_type === 'agent' && row.space_id === this.workspace; }
+    activateHistory() {
+        const { db } = this.store;
+        const { shared } = this;
+        const imported = db.prepare("SELECT 1 FROM sqlite_master WHERE name='history_import_topics' AND type='table'").get();
+        const proofs = imported ? db.prepare('SELECT * FROM history_import_topics').all() : [];
+        const byId = new Map(proofs.map(proof => [proof.conversation_id, proof]));
+        const topics = shared.db.prepare("SELECT * FROM shared_objects WHERE space_id=? AND kind='topic' AND deleted=0").all(this.workspace);
+        const newGroups = [];
+        for (const row of topics) {
+            const proof = byId.get(row.id);
+            if (!this.manages(row) && !proof) continue;
+            const head = shared.head(row);
+            if (proof && (proof.owner_type !== row.owner_type || proof.owner_id !== row.owner_id ||
+                proof.topic_id !== row.topic_id || proof.central_head !== head)) {
+                throw failure('CORE_HISTORY_SOURCE_CHANGED');
+            }
+            if (!proof && (head || shared.active(row.id))) throw failure('CORE_DEVELOPMENT_WORKSPACE_NOT_EMPTY');
+            if (!proof) continue;
+            const legacyJob = shared.db.prepare(`SELECT 1 FROM mobile_executions WHERE topic_key=?
+                AND state NOT IN ('completed','failed','cancelled','review_released') LIMIT 1`).get(row.id);
+            if (shared.active(row.id) || legacyJob) throw failure('CORE_HISTORY_LEGACY_WORK_UNSETTLED');
+            shared.assertNotPrepared([row.id, row.parent_id]);
+            if (row.owner_type === 'group' && !this.manages(row)) {
+                if (!isCoreGroupMode(shared.object(shared.row(this.workspace, row.parent_id)).config.mode)) {
+                    throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
+                }
+                newGroups.push(row);
+            }
+        }
+        if (newGroups.length) shared.atomic(() => {
+            for (const row of newGroups) {
+                shared.db.prepare('INSERT OR IGNORE INTO shared_core_group_topics VALUES(?)').run(row.id);
+                shared.changed(row, 'config');
+            }
+        });
+        if (imported) this.historyDeleted = db.prepare(`SELECT 1 FROM history_import_deletions
+            WHERE conversation_id=? AND kind IN ('owner','topic') LIMIT 1`);
+    }
+
+    manages(row) { return row?.space_id === this.workspace && (row.owner_type === 'agent' || this.shared.requiresCore(row)); }
 
     topic(actor, workspace, key, permission) {
         if (workspace !== this.workspace) throw failure('CORE_WORKSPACE_NOT_ENABLED', 404);
         const row = this.shared.topic(actor, workspace, key, permission);
         if (!this.manages(row)) throw failure('CORE_CONVERSATION_NOT_MIGRATED', 409);
         if (row.id !== key) throw failure('CORE_CONVERSATION_MOVED');
-        const topic = { key, workspace, sharedSpaceId: workspace, ownerType: 'agent', ownerId: row.owner_id, topicId: row.topic_id, originSource: row.origin_source };
+        if (this.historyDeleted?.get(key)) throw failure('CORE_CONVERSATION_DELETED', 404);
+        const topic = { key, workspace, sharedSpaceId: workspace, ownerType: row.owner_type, ownerId: row.owner_id, topicId: row.topic_id, originSource: row.origin_source };
         this.attachments.topics.set(key, topic);
         return topic;
     }
@@ -164,24 +199,29 @@ class CoreService {
             desktopReferences.some(ref => ref?.kind !== 'workspace') || desktopReferences.length && actor?.kind !== 'desktop') {
             throw failure('INVALID_DESKTOP_REFERENCE', 400);
         }
+        if (topic.ownerType === 'group' && desktopReferences.length) throw failure('CORE_GROUP_DESKTOP_REFERENCE_NOT_MIGRATED');
         const refs = desktopReferences.length ? fieldsFrom({ desktopReferences }).desktopReferences : [];
         const input = { text, attachments, ...(options.flowlock && { flowlock: true }), ...(refs.length && { desktopReferences: refs }) };
         const prior = this.store.replay(principal, requestId, { key: topic.key, op: 'send', input });
         if (prior) return prior;
         const config = await prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false, desktopContext: true });
         if (!config) throw failure('CORE_CONFIG_PENDING', 503);
+        if (topic.ownerType === 'group') {
+            if (!isCoreGroupMode(config.group?.mode)) throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
+            Object.assign(config, { groupId: topic.ownerId, topicId: topic.topicId });
+        }
         reauthorize();
         const result = this.store.admit(topic, principal, requestId, input, () => {
             const files = this.attachments.claim(principal, topic.key, attachments);
             for (const file of files) {
                 if (file.type.startsWith('image/')) {
-                    if (!config.imageSupported) throw failure('MODEL_IMAGE_UNSUPPORTED');
+                    if (!(config.group ? config.imageModels?.length : config.imageSupported)) throw failure('MODEL_IMAGE_UNSUPPORTED');
                 } else if (!file.extractedText?.trim()) {
                     throw failure('ATTACHMENT_TEXT_UNAVAILABLE', 422);
                 }
             }
             return {
-                config, attachments: files, ...(options.flowlock && { senderName: 'Flowlock' }), desktopReferences: refs.map(ref => ({ ...ref, sourceId: actor.sourceId })),
+                config, attachments: files, ...(config.group && { senderName: config.executionPolicy?.userName || '用户' }), ...(options.flowlock && { senderName: 'Flowlock' }), desktopReferences: refs.map(ref => ({ ...ref, sourceId: actor.sourceId })),
                 ...(principal.startsWith('mobile:') && { recovery: {
                     version: 1, kind: 'message', sessionMarker: sessionMarker(principal.slice(7)),
                     payloadHash: payloadHash({ topicKey: topic.key, kind: 'message', payload: { requestId, text, attachments } })
@@ -190,6 +230,30 @@ class CoreService {
             };
         });
         this.runner.publish(topic.key, 'change_seq', { seq: result.seq });
+        this.runner.wake();
+        return result;
+    }
+
+    async invite(topic, actor, body, reauthorize) {
+        if (this.runner.draining) throw failure('HOST_DRAINING', 503);
+        if (topic.ownerType !== 'group' || typeof body.agentId !== 'string' ||
+            Object.keys(body).some(key => !['requestId', 'agentId'].includes(key))) throw failure('INVALID_GROUP_INVITATION', 400);
+        const input = { inviteAgentId: body.agentId };
+        const prior = this.store.replay(actor.principal, body.requestId, { key: topic.key, op: 'send', input });
+        if (prior) return prior;
+        const config = await prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false, desktopContext: true });
+        if (!isCoreGroupMode(config?.group?.mode)) throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
+        if (!config.group.members.includes(body.agentId) || !config.agents.some(agent => agent.id === body.agentId && !agent.unavailable)) {
+            throw failure('GROUP_MEMBER_UNAVAILABLE', 403);
+        }
+        reauthorize();
+        const result = this.store.admit(topic, actor.principal, body.requestId, input, () => ({
+            config: { ...config, inviteAgentId: body.agentId, groupId: topic.ownerId, topicId: topic.topicId },
+            ...(actor.kind === 'mobile' && { recovery: {
+                version: 1, kind: 'invitation', sessionMarker: sessionMarker(actor.principal.slice(7)),
+                payloadHash: payloadHash({ topicKey: topic.key, kind: 'invitation', payload: body })
+            } })
+        }));
         this.runner.wake();
         return result;
     }
@@ -235,8 +299,8 @@ class CoreService {
         const { result_json } = this.store.db.prepare('SELECT result_json FROM idempotency_receipts WHERE principal=? AND op_id=?')
             .get(principal, requestId);
         const { recovery, ...result } = JSON.parse(result_json);
-        const message = this.store.message(this.store.db.prepare('SELECT * FROM messages WHERE id=?').get(work.user_message_id));
-        return { ...result, id: work.id, topicKey: topic.key, requestId, state: work.status, message, ...(recovery && { recovery }) };
+        const message = JSON.parse(work.frozen_config_json).inviteAgentId ? undefined : this.store.message(this.store.db.prepare('SELECT * FROM messages WHERE id=?').get(work.user_message_id));
+        return { ...result, id: work.id, topicKey: topic.key, requestId, state: work.status, ...(message && { message }), ...(recovery && { recovery }) };
     }
 
     compactionSource(topic, principal, id) {
@@ -262,11 +326,13 @@ class CoreService {
             if (workspace !== this.workspace) throw failure('CORE_WORKSPACE_NOT_ENABLED', 404);
             const actor = resolveActor(req, workspace, 'read');
             const directory = this.shared.directory(actor, { sharedSpaceId: workspace, after: req.query.after, limit: 128 });
-            res.json({ ...directory, objects: directory.objects.filter(object => object.kind === 'agent' || object.topic?.ownerType === 'agent')
+            res.json({ ...directory, objects: directory.objects.filter(object => !this.historyDeleted?.get(object.id) &&
+                (object.kind === 'agent' || object.topic?.ownerType === 'agent' || object.coreGroup))
                 .map(({ id, kind, parentId, deleted, config, name }) => ({ id, kind, parentId, deleted, name: name ?? config?.name })) });
         }));
         const compactionScope = req => {
             const value = scope(req, 'execute');
+            if (value.topic.ownerType !== 'agent') throw failure('CORE_GROUP_COMPACTION_NOT_MIGRATED');
             if (value.actor.kind !== 'desktop') throw failure('CORE_COMPACTION_DESKTOP_REQUIRED', 403);
             this.shared.authorize(value.actor, value.topic.workspace, 'config');
             return value;
@@ -325,7 +391,7 @@ class CoreService {
             const { actor, topic } = scope(req, 'read');
             const works = this.store.db.prepare(`SELECT id, principal, status, user_message_id AS messageId,
                 reply_message_id AS replyId, error_code AS errorCode, created_at AS createdAt
-                FROM works WHERE conversation_id=? ORDER BY admitted_seq DESC LIMIT 100`).all(topic.key)
+                FROM works WHERE conversation_id=? ORDER BY admitted_seq DESC,rowid DESC LIMIT 100`).all(topic.key)
                 .map(({ principal, ...work }) => ({ ...work, owner: principal === actor.principal,
                     tools: this.store.db.prepare('SELECT id, plugin_name AS name, status, error_code AS errorCode FROM work_invocations WHERE work_id=?').all(work.id),
  }));
@@ -336,6 +402,7 @@ class CoreService {
         }));
         router.post('/:workspace/:key/flowlock', route((req, res) => {
             const { topic, actor } = scope(req, 'execute');
+            if (topic.ownerType !== 'agent') throw failure('CORE_GROUP_FLOWLOCK_NOT_MIGRATED');
             if (this.runner.draining) throw failure('HOST_DRAINING', 503);
             res.json(this.runner.flowlock.control(topic, actor.principal, req.body || {}));
         }));
@@ -370,6 +437,12 @@ class CoreService {
             await this.send(topic, actor.principal, req.body || {}, () => scope(req, 'execute'), actor);
             res.status(202).json(this.receipt(topic, actor.principal, req.body.requestId));
         }));
+        router.post('/:workspace/:key/invitations', route(async (req, res) => {
+            const { actor, topic } = scope(req, 'execute');
+            if (actor.kind === 'mobile') this.mobile.requireSubmissionContext(req);
+            await this.invite(topic, actor, req.body || {}, () => scope(req, 'execute'));
+            res.status(202).json(this.receipt(topic, actor.principal, req.body.requestId));
+        }));
         router.post('/:workspace/:key/messages/:id', route((req, res) => {
             const { actor, topic } = scope(req, 'execute');
             const { requestId, revision, text, remove = false } = req.body || {};
@@ -384,6 +457,7 @@ class CoreService {
             const { actor, topic } = scope(req, 'execute');
             const { id, action } = req.params;
             if (action === 'steer') {
+                if (topic.ownerType !== 'agent') throw failure('CORE_GROUP_STEERING_NOT_MIGRATED');
                 if (this.runner.draining) throw failure('HOST_DRAINING', 503);
                 const text = requireText(req.body?.text);
                 if (!text.trim()) throw failure('INVALID_MESSAGE_TEXT', 400);

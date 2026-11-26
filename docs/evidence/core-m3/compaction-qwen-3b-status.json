@@ -1,0 +1,52 @@
+{
+  "model": "Qwen2.5-3B-Instruct Q4_K_M",
+  "case": "zh-status",
+  "engine": "llama.cpp b12728",
+  "providerRequests": 2,
+  "equivalentModelInput": true,
+  "desktopNative": {
+    "checkpoint": "<context_checkpoint>\n代号: Azure Kite\n脚本路径: src/probes/health.js\n冻结提交: 9ac5e43\n报告网址: https://example.invalid/qa\n待审时间: 14:30\n部署当前是否已批准: 未批准\n下一步决定: 等待 14:30 审查完成再决定是否发布\n</context_checkpoint>",
+    "fidelity": {
+      "total": 3,
+      "preserved": 3,
+      "missing": {
+        "path": [],
+        "hash": [],
+        "url": []
+      },
+      "capped": [],
+      "note": "宿主本地子串核对；缺失是审计信号而非拒收依据，也不证明语义无损。"
+    },
+    "kept": [
+      "Azure Kite",
+      "src/probes/health.js",
+      "9ac5e43",
+      "https://example.invalid/qa",
+      "14:30"
+    ],
+    "pendingDecision": true
+  },
+  "core": {
+    "checkpoint": "<context_checkpoint>\n代号: Azure Kite\n脚本路径: src/probes/health.js\n冻结提交: 9ac5e43\n报告网址: https://example.invalid/qa\n待审时间: 14:30\n</context_checkpoint>",
+    "fidelity": {
+      "total": 3,
+      "preserved": 3,
+      "missing": {
+        "path": [],
+        "hash": [],
+        "url": []
+      },
+      "capped": [],
+      "note": "宿主本地子串核对；缺失是审计信号而非拒收依据，也不证明语义无损。"
+    },
+    "kept": [
+      "Azure Kite",
+      "src/probes/health.js",
+      "9ac5e43",
+      "https://example.invalid/qa",
+      "14:30"
+    ],
+    "pendingDecision": false
+  },
+  "equalOutput": false
+}
