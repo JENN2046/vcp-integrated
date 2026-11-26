@@ -132,7 +132,7 @@ footer>* {max-width:var(--content); margin-inline:auto}
 #work-toggle[aria-expanded="true"] {background:var(--surface)}
 .group-invitation {display:flex; flex:1; align-items:center; gap:4px; min-width:0}
 .group-invitation select {width:auto; min-width:0; max-width:15em; flex:1; padding:4px 5px; font-size:.84rem}
-.group-invitation button,.steering button {white-space:nowrap; color:var(--accent); background:var(--accent-soft); padding:5px 8px; font-size:.83rem}
+.group-invitation button {white-space:nowrap; color:var(--accent); background:var(--accent-soft); padding:5px 8px; font-size:.83rem}
 .message-composer {display:flex; align-items:flex-end; min-width:0; gap:4px; padding:3px; border:1px solid var(--edge); border-radius:24px; background:var(--surface)}
 .message-composer:focus-within {border-color:var(--focus)}
 .message-composer textarea {min-height:44px; max-height:min(112px,24dvh); width:100%; flex:1; padding:10px 8px; border:0; background:transparent; outline:none; font-size:1rem; line-height:1.5}
@@ -148,8 +148,8 @@ footer>* {max-width:var(--content); margin-inline:auto}
 .pending-file span {flex:1; min-width:0; overflow-wrap:anywhere}
 .pending-file svg {flex:none; width:16px; height:16px}
 .pending-file button {padding:0; width:44px; display:grid; place-items:center; color:var(--ink); background:transparent}
-.steering,.send-state {display:flex; align-items:center; gap:6px; justify-content:space-between; margin-top:3px; line-height:1.4}
-.steering small,.send-state {color:var(--muted); font-size:.8rem}
+.send-state {display:flex; align-items:center; gap:6px; justify-content:space-between; margin-top:3px; line-height:1.4}
+.send-state {color:var(--muted); font-size:.8rem}
 .send-state {flex-wrap:wrap}
 .send-state button {color:var(--accent); background:var(--accent-soft); font-size:.82rem}
 .settings {min-height:0; overflow:auto; overscroll-behavior:contain; padding:25px max(20px,env(safe-area-inset-right)) 18px max(20px,env(safe-area-inset-left))}
@@ -185,3 +185,16 @@ footer>* {max-width:var(--content); margin-inline:auto}
 .submission-recovery.is-receipt p {padding-bottom:10px}
 .native-tools ul {padding-inline-start:20px}
 .native-tools li small {display:block}
+
+.quote-task {display:flex; align-items:center; gap:7px; min-height:44px; padding:4px 0; background:transparent; color:var(--accent); text-align:start; font-size:.83rem; font-weight:600}
+.quote-task svg,.task-quote>svg {width:17px; height:17px; flex:none}
+.quote-task-action {color:var(--muted); border-inline-start:1px solid var(--line); padding-inline-start:7px; white-space:nowrap}
+.quote-task:active {color:var(--ink)}
+.task-quote {display:flex; align-items:center; gap:8px; padding:2px 0 2px 9px; margin-bottom:4px; border-inline-start:2px solid var(--accent); border-radius:4px 12px 12px 4px; background:var(--accent-soft); color:var(--accent)}
+.task-quote[data-closed="true"] {border-color:var(--warning); background:var(--warning-soft); color:var(--warning)}
+.task-quote-copy {min-width:0; flex:1; font-size:.78rem; line-height:1.4}
+.task-quote-copy strong,.task-quote-copy span {display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.task-quote-copy span {color:var(--muted)}
+.task-quote .icon-button,.quote-exit {background:transparent; color:inherit}
+.quote-exit {padding:4px 8px; white-space:nowrap; font-size:.81rem; font-weight:650}
+@media(max-height:480px) {.task-quote {margin-bottom:2px}}

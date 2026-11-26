@@ -42,6 +42,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
     const finish = (res, content) => res.end('data: ' + JSON.stringify({
         choices: [{ delta: { content }, finish_reason: 'stop' }]
     }) + '\n\ndata: [DONE]\n\n');
+    const composerPosts = [];
     let proxy, browser;
     try {
         const grant = f.portal.createPairing({ scopeMode: 'shared', sharedSpaceId: 'sharedAB', permissions: ['read','execute'] });
@@ -51,6 +52,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         const certificate = await fs.readFile(cert);
         const spki = createHash('sha256').update(new X509Certificate(certificate).publicKey.export({ type: 'spki', format: 'der' })).digest('base64');
         proxy = https.createServer({ cert: certificate, key: await fs.readFile(key) }, (req, res) => {
+            if(req.method==='POST' && /\/(?:send|steer)$/.test(req.url))composerPosts.push(req.url);
             const forward = http.request(f.url + req.url, { method: req.method, headers: {
                 ...req.headers, 'x-forwarded-proto': 'https', origin: 'https://synthetic-shared.invalid'
             } }, response => { res.writeHead(response.statusCode, response.headers); response.pipe(res); });
@@ -85,17 +87,44 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
             message: { id: 'from-desktop', role: 'user', content: '把明天的拍摄安排整理一下：先拍产品主图，再拍细节，最后试一组上身图。', attachments: [] } });
         await desktop.close();
         await page.waitForFunction(() => document.querySelector('.live-message .bubble')?.textContent.includes('共用布光'));
+        await page.waitForSelector('#quote-task',{visible:true});
+        assert.equal(await page.$eval('#send', button=>button.getAttribute('aria-label')),'发送新消息');
+        await shot(page, '02a-quote-entry');
+        await page.click('#quote-task');
+        assert.equal(await page.$eval('#send', button=>button.getAttribute('aria-label')),'发送追加指令');
+        assert.equal(await page.$eval('.message-composer', form=>form.querySelectorAll('button[type="submit"]').length),1);
         await page.type('#message-text', '请把白底主图放在第一组。');
-        const steering = await page.waitForSelector('.steering button:not([disabled])');
-        await shot(page, '02-core-live-steering');
-        await steering.click();
+        await shot(page, '02b-quoted-composer');
+        await page.click('#quote-clear');
+        assert.equal(await page.$eval('#message-text', el=>el.value),'请把白底主图放在第一组。');
+        assert.equal(await page.$eval('#send', button=>button.getAttribute('aria-label')),'发送新消息');
+        assert.deepEqual(composerPosts,[]);
+        await page.click('#quote-task');
+        await page.click('#send');
         await page.waitForFunction(() => !document.querySelector('#message-text').value);
         finish(upstream[0], '按原计划整理。');
         await wait(() => upstream.length === 2, 'steering reached provider for same work');
         assert.match(JSON.stringify(provider.calls[1].messages), /请把白底主图放在第一组/);
+        assert.equal(composerPosts.length,1);
+        assert.ok(composerPosts[0].endsWith('/works/'+first.serverSession.executionId+'/steer'));
+        await page.waitForSelector('#quote-task',{visible:true});
+        await page.click('#quote-task');
+        const preservedDraft = '附上现场灯光记录。';
+        await page.type('#message-text', preservedDraft);
         const finalText = '\n\n第一组｜白底产品主图\n先固定机位、白平衡和产品朝向，再补正面与侧面。\n\n第二组｜细节与功能\n保留原布光，拉近拍材质与缝线。两组都拍完后，再切换到上身布景。';
         finish(upstream[1], finalText);
         await page.waitForFunction(id => Boolean(document.querySelector('[data-message-id="' + id + '"] .bubble')?.textContent.includes('第二组')), {}, first.replyId);
+        await page.waitForSelector('#task-quote[data-closed="true"]');
+        assert.equal(await page.$eval('#message-text', el=>el.value),preservedDraft);
+        assert.equal(await page.$eval('#send', button=>button.disabled),true);
+        await shot(page, '02c-completed-keeps-draft');
+        await page.$eval('.message-composer', form=>form.requestSubmit());
+        await page.evaluate(() => new Promise(requestAnimationFrame));
+        assert.equal(composerPosts.length,1,'a stale quote never falls through to a new message');
+        await page.click('#quote-new-message');
+        assert.equal(await page.$eval('#message-text', el=>el.value),preservedDraft);
+        assert.equal(await page.$eval('#send', button=>button.getAttribute('aria-label')),'发送新消息');
+        assert.equal(composerPosts.length,1,'conversion changes only the draft, not the server');
         await shot(page, '01-core-light-chat');
         await page.click('#topic-toggle');
         await page.waitForSelector('.topic-list button[aria-current="true"]',{visible:true});
@@ -107,7 +136,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.click('#close-settings');
         await page.waitForFunction(()=>document.querySelector('[data-message-id]'));
         await shot(page,'04-core-dark-chat');
-        await page.type('#message-text', '附上现场灯光记录。');
+        assert.equal(await page.$eval('#message-text', el=>el.value),preservedDraft);
         const notes = path.join(f.root, '灯光记录.txt');
         await fs.writeFile(notes, '现场灯光记录：主灯柔光箱，左侧 45 度。');
         const fileInput = await page.waitForSelector('.attachment-picker input');
@@ -141,6 +170,8 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => [...document.querySelectorAll('[data-message-id] .bubble')].some(node => node.textContent.includes('拍摄安排已更新')));
         assert.equal(await page.$eval('html',el=>el.dataset.theme),'dark');
+        assert.equal(composerPosts.length,2);
+        assert.ok(composerPosts[1].endsWith('/send'));
         assert.equal(upstream.length,4,'reconnect and reload must not create another execution');
         assert.deepEqual(errors, []);
     } finally {

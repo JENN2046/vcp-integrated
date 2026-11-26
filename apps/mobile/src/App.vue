@@ -92,7 +92,7 @@ watch(history, (area, previous, onCleanup) => {
  onCleanup(()=>{area.removeEventListener('scroll',onScroll);observer.disconnect();});
 });
 const sharedSpaces=ref([]),sharedFeatures=ref([]),sharedStreams=ref([]);
-const corePreviews=ref([]);
+const corePreviews=ref([]), lastClosedSteeringId=ref('');
 let coreObserver, coreRefreshTimer;
 const coreStorageKey = 'vcp.core.storage-id';
 const coreStorageHeaders = () => {
@@ -134,6 +134,9 @@ function observeCore(topic) {
      if(type==='work_state'){
       scheduleRefresh();
       if(['completed','failed','cancelled','review_required','review_released'].includes(data.status)){
+       lastClosedSteeringId.value=data.workId;
+       const quote=composerDraft.value.taskQuote;
+       if(quote?.id===data.workId)quote.closed=data.status;
        corePreviews.value=corePreviews.value.filter(work=>work.id!==data.workId);
        return;
       }
@@ -611,22 +614,62 @@ async function openAttachment(message,attachment){
  }catch(error){if(current())attachmentPreview.value={name:attachment.name||'附件',loading:false,error:error.status?error.message:'附件暂时无法读取，请检查连接',url:null};}
 }
 function downloadAttachment(){const item=attachmentPreview.value;if(item?.blob)saveAttachment(item.blob,item.name);}
-const coreSteeringWork=computed(()=>currentTopic.value?.coreSingle && currentTopic.value.ownerType==='agent' &&
- jobs.value.find(work=>['running','waiting_approval'].includes(work.state)));
-async function sendCoreSteering() {
- const work=coreSteeringWork.value, topic=currentTopic.value, original=text.value;
- if(!work||!original.trim()||busy.value||pendingFiles.value.length)return;
- const epoch=generation;
- const draft=composerDraft.value,previous=draft.coreSteering;
- const intent=previous?.workId===work.id&&previous.text===original?previous:{workId:work.id,text:original,requestId:crypto.randomUUID()};
+const steerableStates=['running','waiting_approval'];
+const coreSteeringWork=computed(()=>currentTopic.value?.coreSingle && currentTopic.value.ownerType==='agent'
+ ? jobs.value.find(work=>work.id!==lastClosedSteeringId.value&&steerableStates.includes(work.state)) : null);
+const taskQuote=computed(()=>composerDraft.value.taskQuote||null);
+const quotedWork=computed(()=>jobs.value.find(work=>work.id===taskQuote.value?.id));
+const quoteClosed=computed(()=>{
+ const quote=taskQuote.value, state=quotedWork.value?.state;
+ return quote?.closed || (state&&!steerableStates.includes(state)?state:'');
+});
+const quoteUnavailable=computed(()=>!browserOnline.value||!online.value||!coreSteeringWork.value||
+ coreSteeringWork.value.id!==taskQuote.value?.id);
+const canQuoteTask=computed(()=>Boolean(coreSteeringWork.value&&currentTopic.value?.executable&&
+ !busy.value&&!newSubmissionBlocked.value&&browserOnline.value&&online.value&&!pendingFiles.value.length&&!taskQuote.value));
+const quoteSendBlocked=computed(()=>quoteUnavailable.value||Boolean(quoteClosed.value)||!text.value.trim()||pendingFiles.value.length>0);
+const quoteStatus=computed(()=>quoteClosed.value
+ ? quoteClosed.value==='completed'?'任务已完成':'此任务已停止接收追加'
+ : quoteUnavailable.value?'暂时无法核对任务状态':pendingFiles.value.length?'附件只能作为新消息发送。':'');
+function quoteTask(){
+ if(!canQuoteTask.value)return;
+ const work=coreSteeringWork.value;
+ composerDraft.value.taskQuote={id:work.id,name:currentTopic.value.agentName||'Agent',
+  label:workMessageNames.value.get(work.messageId)||currentTopic.value.topicName||'当前任务'};
+ composer.value?.focus();
+}
+function clearTaskQuote(){
+ if(busy.value)return;
+ delete composerDraft.value.taskQuote;
+ composer.value?.focus();
+}
+async function submitComposer(){
+ if(taskQuote.value){
+  if(busy.value||newSubmissionBlocked.value||!currentTopic.value?.executable||quoteSendBlocked.value)return;
+  await sendCoreSteering(taskQuote.value);
+  return;
+ }
+ await send();
+}
+async function sendCoreSteering(quote) {
+ const topic=currentTopic.value,original=text.value,epoch=generation;
+ const draft=composerDraft.value,previous=draft.coreSteering,revision=draft.revision;
+ const intent=previous?.workId===quote.id&&previous.text===original?previous:{workId:quote.id,text:original,requestId:crypto.randomUUID()};
  draft.coreSteering=intent;busy.value=true;
  try{
-  await api(corePath(topic)+'/works/'+encodeURIComponent(work.id)+'/steer',{requestId:intent.requestId,text:original});
-  if(generation===epoch&&text.value===original)text.value='';
+  await api(corePath(topic)+'/works/'+encodeURIComponent(quote.id)+'/steer',{requestId:intent.requestId,text:original});
+  if(generation===epoch&&draft===composerDraft.value&&draft.taskQuote===quote&&draft.revision===revision){
+   text.value='';
+   delete draft.taskQuote;
+  }
   if(draft.coreSteering===intent)delete draft.coreSteering;
   await refresh();
- }catch(error){if(generation===epoch)notice.value=recoveryMessage(error);}
- finally{busy.value=false;}
+ }catch(error){
+  if(draft.taskQuote===quote&&['WORK_STEERING_WINDOW_CLOSED','WORK_NOT_FOUND'].includes(error.code)){
+   quote.closed='closed';
+   await refresh();
+  }else if(generation===epoch)notice.value=recoveryMessage(error);
+ }finally{busy.value=false;}
 }
 async function send(){
  if((!text.value.trim()&&!pendingFiles.value.length)||busy.value||currentTopic.value?.executable===false)return;
@@ -861,11 +904,17 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
    <section v-if="currentTopic?.coreSingle && corePreviews.length" aria-label="正在生成的共享回复">
     <article v-for="work in corePreviews" :key="work.id" class="message assistant live-message">
      <div class="message-author"><AgentAvatar :src="currentTopic?.avatar||activeAgent?.avatar" :name="work.speakerName||currentTopic?.agentName"/><small>{{work.speakerName||currentTopic?.agentName||'Agent'}}</small></div>
-     <div class="work-inline" :data-tone="work.approval?'attention':'active'"><MobileIcon :name="work.approval||work.tool?'tool':'work'"/><span>{{work.approval?'等待桌面审批 · '+work.approval:coreFeed!=='live'||!browserOnline?'最近收到的预览':work.tool?work.tool+' · '+(displayedToolStatus[work.toolStatus]||'工具状态待核对'):'正在生成回复'}}</span></div>
+     <button v-if="coreSteeringWork?.id===work.id && canQuoteTask" class="quote-task" id="quote-task" type="button" @click="quoteTask">
+      <MobileIcon name="reply"/><span>{{work.approval?'等待桌面审批 · '+work.approval:'任务进行中'}}</span><span class="quote-task-action">追加指令</span>
+     </button>
+     <div v-if="coreSteeringWork?.id!==work.id||!canQuoteTask||work.tool" class="work-inline" :data-tone="work.approval?'attention':'active'"><MobileIcon :name="work.approval||work.tool?'tool':'work'"/><span>{{work.approval?'等待桌面审批 · '+work.approval:coreFeed!=='live'||!browserOnline?'最近收到的预览':work.tool?work.tool+' · '+(displayedToolStatus[work.toolStatus]||'工具状态待核对'):'正在生成回复'}}</span></div>
      <div v-if="work.text" class="bubble">{{work.text}}</div>
      <div v-if="work.presentation" class="bubble"><strong>{{work.presentation.title}}</strong><p>{{work.presentation.challenge}}</p></div>
     </article>
    </section>
+   <button v-if="canQuoteTask&&!corePreviews.some(work=>work.id===coreSteeringWork.id)" class="quote-task" id="quote-task" type="button" @click="quoteTask">
+    <MobileIcon name="reply"/><span>{{currentTopic.agentName}} 正在工作</span><span class="quote-task-action">追加指令</span>
+   </button>
    <section v-if="visibleSharedStreams.length" id="shared-live-replies" aria-label="正在生成的共享回复">
     <article v-for="stream in visibleSharedStreams" :key="stream.previewId" class="message assistant live-message" :data-live-execution="stream.executionId" :data-native-request="stream.nativeRequestId"><small>{{stream.memberName||currentTopic?.agentName||'Agent'}}<template v-if="stream.kind==='controlled-text'"> · 第 {{stream.nativeGeneration+1}} 代</template> · {{stream.settled?'正在核对最终记录':stream.activity?sharedActivityLabels[stream.activity.state]||'正在核对原生任务':labels[stream.state]||'正在核对原生任务'}} · {{stream.connection==='online'?'实时观察':stream.connection==='disconnected'?'实时连接已暂停':'正在恢复连接'}}</small><div v-if="stream.text" class="bubble">{{stream.text}}</div><small v-if="stream.gap">仅显示目前可核对的临时片段，完整内容以保存后的会话为准。</small><small v-if="stream.settled&&stream.request?.state!=='completed'">{{labels[stream.request?.state]||'执行已暂停，请核对原生状态'}} · 已收到的片段暂存于此页。</small></article>
    </section>
@@ -914,19 +963,24 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
     </div>
     <div v-show="conversationPanel!=='work'" class="composer-body">
     <div v-if="pendingFiles.length" class="pending-files"><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><MobileIcon name="file"/><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||(item.progress===100?'已上传':item.progress>0?item.progress+'%':'待发送')}}</span><button type="button" @click="removeDraftFile(i)" :disabled="busy" aria-label="移除附件"><MobileIcon name="close"/></button></div></div>
-    <form class="message-composer" @submit.prevent="send">
-     <label v-if="currentTopic?.attachmentsEnabled" class="attachment-picker" title="添加附件">
+    <div v-if="taskQuote" id="task-quote" class="task-quote" :data-closed="Boolean(quoteClosed)">
+     <MobileIcon name="reply"/>
+     <div class="task-quote-copy" role="status">
+      <strong>{{quoteStatus||'追加给 '+taskQuote.name}}</strong>
+      <span :title="taskQuote.label">{{taskQuote.label}}</span>
+     </div>
+     <button v-if="quoteClosed" id="quote-new-message" class="quote-exit" type="button" :disabled="busy" @click="clearTaskQuote">改发新消息</button>
+     <button v-else id="quote-clear" class="icon-button" type="button" :disabled="busy" aria-label="取消引用，保留草稿" @click="clearTaskQuote"><MobileIcon name="close"/></button>
+    </div>
+    <form class="message-composer" @submit.prevent="submitComposer">
+     <label v-if="currentTopic?.attachmentsEnabled&&!taskQuote" class="attachment-picker" title="添加附件">
       <MobileIcon name="plus"/><span class="sr-only">添加图片或文件</span>
       <input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false">
      </label>
      <label class="sr-only" for="message-text">消息</label>
-     <textarea ref="composer" id="message-text" v-model="text" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):'输入消息…'" rows="1" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea>
-     <button id="send" type="submit" aria-label="发送新消息" title="发送新消息" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false"><MobileIcon name="send"/></button>
+     <textarea ref="composer" id="message-text" v-model="text" :aria-describedby="taskQuote?'task-quote':undefined" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):taskQuote?'补充给当前任务…':'输入消息…'" rows="1" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea>
+     <button id="send" type="submit" :aria-label="taskQuote?'发送追加指令':'发送新消息'" :title="taskQuote?'发送追加指令':'发送新消息'" :disabled="!currentTopic||busy||newSubmissionBlocked||currentTopic?.executable===false||(taskQuote?quoteSendBlocked:(!text.trim()&&!pendingFiles.length))"><MobileIcon name="send"/></button>
     </form>
-    <div v-if="corePreviews.length && coreSteeringWork && currentTopic?.executable" class="steering">
-     <small>{{pendingFiles.length?'附件只能作为新消息发送。':'发送是新消息；追加会交给当前工作。'}}</small>
-     <button type="button" :disabled="busy || !text.trim() || pendingFiles.length > 0" @click="sendCoreSteering">追加到当前工作</button>
-    </div>
     <div v-show="visibleNotice||pairRecoveryNotice||pendingSubmission" class="send-state"><span v-if="visibleNotice" id="send-state" role="status">{{visibleNotice}}</span><span v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</span><button id="retry-last" v-show="pendingSubmission" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div>
     </div>
    </footer>
