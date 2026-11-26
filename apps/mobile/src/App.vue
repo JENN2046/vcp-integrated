@@ -572,7 +572,23 @@ async function retry(){
  }catch(error){loadRecovery();if(!context||sameView(context)){submissionNoticeHeld=true;notice.value='原提交仍待核对：'+recoveryMessage(error);}}
  finally{busy.value=false;}
 }
-async function invite(){if(!invitedAgent.value||busy.value||currentTopic.value?.executable===false)return;submissionNoticeHeld=false;try{const context=newSubmissionContext();await submit({requestId:crypto.randomUUID(),agentId:invitedAgent.value},'invitation',context);}catch(error){submissionNoticeHeld=true;notice.value=recoveryMessage(error);}}
+async function invite(){
+ if(!invitedAgent.value||busy.value||currentTopic.value?.executable===false)return;
+ submissionNoticeHeld=false;
+ try{
+  const topic=currentTopic.value;
+  if(topic?.coreSingle&&topic.groupMode==='jev'){
+   const agentId=invitedAgent.value;
+   const result=await api(corePath(topic)+'/jev',{action:'invite',agentId});
+   if(!result.success)throw Error(result.error||'JEV 未接受邀请');
+   if(currentTopic.value?.key===topic.key&&invitedAgent.value===agentId)invitedAgent.value='';
+   await refresh();
+   return;
+  }
+  const context=newSubmissionContext();
+  await submit({requestId:crypto.randomUUID(),agentId:invitedAgent.value},'invitation',context);
+ }catch(error){submissionNoticeHeld=true;notice.value=recoveryMessage(error);}
+}
 function waitingForGroupTasks(job){
  return job.state==='recovering' && !job.remainingCancelled && job.steps?.length &&
   job.steps.every(step=>step.state==='completed') && job.nativeTasks.some(task=>['accepted','running','waiting','cancelling'].includes(task.state));

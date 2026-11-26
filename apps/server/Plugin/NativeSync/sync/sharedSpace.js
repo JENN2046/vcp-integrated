@@ -1,6 +1,5 @@
 'use strict';
 const handoff=require('./sharedGroupHandoff');
-const {isCoreGroupMode}=require('../../../core/group');
 const {randomUUID} = require('node:crypto');
 const {stable,sha256,identity} = require('./protocol');
 const {sharedIdentity:id,sharedConfig,SHARED_SPACE_CAPABILITY} = require('./contracts.generated.cjs');
@@ -208,7 +207,7 @@ class SharedSpace {
    this.db.prepare('INSERT INTO shared_objects VALUES(?,?,?,?,?,?,?,?,0,?)').run(sharedId,space,body.kind,parent?.id||null,topic?.ownerType||null,topic?.ownerId||null,topic?.topicId||null,1,actor.sourceId);
    this.db.prepare('INSERT INTO shared_configs VALUES(?,?,?,?)').run(sharedId,1,sha256(stable(config)),JSON.stringify(config));
    this.db.prepare('INSERT INTO shared_local_bindings(space_id,source_id,kind,local_parent,local_id,object_id) VALUES(?,?,?,?,?,?)').run(space,actor.sourceId,body.kind,body.localParent||'',body.localId,sharedId);
-   if(topic?.ownerType==='group'&&this.core?.workspace===space&&isCoreGroupMode(this.object(parent).config.mode)){
+   if(topic?.ownerType==='group'&&this.core?.workspace===space&&this.core.supportsGroup(this.object(parent).config)){
     this.db.prepare('INSERT INTO shared_core_group_topics VALUES(?)').run(sharedId);
    }
    const row=this.row(space,sharedId);this.changed(row,'created');return {object:this.object(row)};
@@ -233,7 +232,8 @@ class SharedSpace {
    const row=this.row(body.sharedSpaceId,body.sharedId),config=sharedConfig(row.kind,body.config);this.assertNotPrepared([row.id,row.parent_id]);
    if(!Number.isSafeInteger(body.expectedVersion)||body.expectedVersion!==row.version)throw fail('SHARED_CONFIG_CONFLICT');
    this.validateRelations(body.sharedSpaceId,row.kind,config);
-   if(row.kind==='group'&&!isCoreGroupMode(config.mode)&&this.db.prepare(`SELECT 1 FROM shared_core_group_topics c
+   if(row.kind==='group'&&(this.object(row).config.mode!==config.mode||
+       this.object(row).config.modeSettings?.game?.gameTypeId!==config.modeSettings?.game?.gameTypeId)&&!this.core?.supportsGroup(config)&&this.db.prepare(`SELECT 1 FROM shared_core_group_topics c
        JOIN shared_objects t ON t.id=c.topic_id WHERE t.parent_id=? AND t.deleted=0 LIMIT 1`).get(row.id)){
     throw fail('CORE_GROUP_MODE_CHANGE_REQUIRES_NEW_GROUP');
    }

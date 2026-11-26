@@ -41,7 +41,7 @@ class CoreStore {
             CREATE TABLE IF NOT EXISTS works (
                 id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL REFERENCES conversations(id),
                 principal TEXT NOT NULL, request_id TEXT NOT NULL, status TEXT NOT NULL,
-                admitted_seq INTEGER NOT NULL, user_message_id TEXT NOT NULL REFERENCES messages(id),
+                admitted_seq INTEGER NOT NULL, user_message_id TEXT REFERENCES messages(id),
                 reply_message_id TEXT REFERENCES messages(id), frozen_config_json TEXT NOT NULL,
                 dispatched INTEGER NOT NULL DEFAULT 0, steering_count INTEGER NOT NULL DEFAULT 0, pending_final_json TEXT, error_code TEXT,
                 created_at INTEGER NOT NULL, UNIQUE(principal, request_id)
@@ -80,8 +80,36 @@ class CoreStore {
         if (!workColumns.some(column => column.name === 'group_ordinal')) {
             this.db.exec('ALTER TABLE works ADD COLUMN group_ordinal INTEGER');
         }
+        if (workColumns.find(column => column.name === 'user_message_id').notnull) this.allowWorkWithoutUserMessage();
         this.db.prepare("INSERT OR IGNORE INTO core_metadata VALUES('storage_id',?)").run(randomUUID());
         this.storageId = this.db.prepare("SELECT value FROM core_metadata WHERE key='storage_id'").get().value;
+    }
+
+    allowWorkWithoutUserMessage() {
+        const { sql } = this.db.prepare("SELECT sql FROM sqlite_master WHERE name='works' AND type='table'").get();
+        const definition = sql.replace('CREATE TABLE works', 'CREATE TABLE works_next')
+            .replace(/user_message_id TEXT NOT NULL(\s+REFERENCES messages\(id\))/, 'user_message_id TEXT$1');
+        if (!definition.startsWith('CREATE TABLE works_next') || !definition.includes('user_message_id TEXT REFERENCES messages(id)')) {
+            throw failure('CORE_WORK_SCHEMA_MISMATCH');
+        }
+        this.db.exec('PRAGMA foreign_keys=OFF');
+        try {
+            this.transaction(() => {
+                this.db.exec(`${definition};
+                    INSERT INTO works_next(rowid, id, conversation_id, principal, request_id, status, admitted_seq, user_message_id,
+                        reply_message_id, frozen_config_json, dispatched, steering_count, pending_final_json, error_code, created_at,
+                        group_step, group_plan_json, group_ordinal)
+                    SELECT rowid, id, conversation_id, principal, request_id, status, admitted_seq, user_message_id, reply_message_id,
+                        frozen_config_json, dispatched, steering_count, pending_final_json, error_code, created_at,
+                        group_step, group_plan_json, group_ordinal FROM works;
+                    DROP TABLE works;
+                    ALTER TABLE works_next RENAME TO works;
+                    CREATE INDEX core_works_conversation ON works(conversation_id, admitted_seq)`);
+                if (this.db.prepare('PRAGMA foreign_key_check').get()) throw failure('CORE_WORK_SCHEMA_MISMATCH');
+            });
+        } finally {
+            this.db.exec('PRAGMA foreign_keys=ON');
+        }
     }
 
     transaction(fn) {
@@ -139,6 +167,13 @@ class CoreStore {
         return seq;
     }
 
+    nextGroupOrdinal(key) {
+        return this.db.prepare(`SELECT max(
+            coalesce((SELECT max(ordinal) FROM messages WHERE conversation_id=?),0),
+            coalesce((SELECT max(group_ordinal)+1023 FROM works WHERE conversation_id=?),0)
+        ) AS value`).get(key, key).value + 1024;
+    }
+
     admit(topic, principal, requestId, input, prepare) {
         return this.command(principal, requestId, { key: topic.key, op: 'send', input }, () => {
             this.ensureConversation(topic);
@@ -150,21 +185,25 @@ class CoreStore {
             }
             const { attachments, config, link, recovery, desktopReferences, senderName, senderRole } = prepare();
             const group = topic.ownerType === 'group';
-            const ordinal = group ? this.db.prepare(`SELECT max(
-                coalesce((SELECT max(ordinal) FROM messages WHERE conversation_id=?),0),
-                coalesce((SELECT max(group_ordinal)+1023 FROM works WHERE conversation_id=?),0)
-            ) AS value`).get(topic.key, topic.key).value + 1024 : null;
-            const anchor = input.inviteAgentId && this.db.prepare(`SELECT id FROM messages
+            const ordinal = group ? this.nextGroupOrdinal(topic.key) : null;
+            if (input.redo) {
+                const { id, revision } = input.redo;
+                const target = this.db.prepare('SELECT * FROM messages WHERE id=? AND conversation_id=? AND deleted=0').get(id, topic.key);
+                if (!target) throw failure('MESSAGE_NOT_FOUND', 404);
+                if (target.role !== 'assistant' || this.message(target).agentId !== input.inviteAgentId) throw failure('GROUP_REDO_SPEAKER_MISMATCH');
+                this.applyMessageMutation(topic.key, id, { revision, delete: true });
+            }
+            const invitation = Boolean(input.inviteAgentId);
+            const anchor = invitation && this.db.prepare(`SELECT id FROM messages
                 WHERE conversation_id=? AND deleted=0 ORDER BY role='user' DESC,ordinal DESC LIMIT 1`).get(topic.key);
-            if (input.inviteAgentId && !anchor) throw failure('GROUP_INVITATION_HISTORY_REQUIRED');
-            const userId = anchor?.id || randomUUID();
+            const userId = invitation ? anchor?.id ?? null : randomUUID();
             const workId = randomUUID();
-            const seq = anchor ? this.head(topic.key) : this.insertMessage({
+            const seq = invitation ? this.head(topic.key) : this.insertMessage({
                 id: userId, key: topic.key, role: senderRole || 'user', content: input.text,
                 attachments, desktopReferences, senderName, after: ordinal,
                 historyMetadata: group ? { groupId: topic.ownerId, topicId: topic.topicId, isGroupMessage: true } : null
             });
-            if (!anchor) link?.(userId);
+            if (!invitation) link?.(userId);
             this.db.prepare(`INSERT INTO works
                 (id,conversation_id,principal,request_id,status,admitted_seq,user_message_id,frozen_config_json,created_at,group_ordinal)
                 VALUES(?,?,?,?,'queued',?,?,?,?,?)`).run(workId, topic.key, principal, requestId, seq, userId, json(config), Date.now(), ordinal);
@@ -181,9 +220,9 @@ class CoreStore {
         }
         const refs = row.desktop_refs_json && parse(row.desktop_refs_json);
         const metadata = row.history_metadata_json && parse(row.history_metadata_json);
-        const { agentId, groupId, topicId, isGroupMessage, finishReason } = metadata || {};
+        const { agentId, groupId, topicId, isGroupMessage, finishReason, gameEvent, gameEventId } = metadata || {};
         const desktopReferences = includeAttachmentText ? refs : refs?.map(({ sourceId, ...reference }) => reference);
-        return { agentId, groupId, topicId, isGroupMessage, finishReason, id: row.id, role: row.role, content: row.content, timestamp: row.created_at,
+        return { agentId, groupId, topicId, isGroupMessage, finishReason, ...(gameEvent && { gameEvent, gameEventId }), id: row.id, role: row.role, content: row.content, timestamp: row.created_at,
             ordinal: row.ordinal, ...(row.sender_name && { name: row.sender_name }), ...(desktopReferences && { desktopReferences }), ...(row.checkpoint_json && { contextCompaction: parse(row.checkpoint_json) }), ...(row.source_work_id && { sourceWorkId: row.source_work_id }), revision: row.rev, attachments };
     }
 
@@ -227,21 +266,24 @@ class CoreStore {
     }
 
     mutateMessage(key, principal, requestId, id, input) {
-        return this.command(principal, requestId, { key, id, op: 'message', input }, () => {
-            const row = this.db.prepare('SELECT * FROM messages WHERE id=? AND conversation_id=? AND deleted=0').get(id, key);
-            if (!row) throw failure('MESSAGE_NOT_FOUND', 404);
-            if (row.rev !== input.revision) throw failure('MESSAGE_REVISION_CONFLICT');
-            if (row.checkpoint_json) throw failure('CORE_CHECKPOINT_IMMUTABLE');
-            if (this.db.prepare(`SELECT 1 FROM works
-                WHERE (user_message_id=? OR id=?) AND status IN ('queued','running','waiting_approval','cancelling')`).get(id, row.source_work_id || '')) {
-                throw failure('MESSAGE_IN_ACTIVE_WORK');
-            }
-            const rev = row.rev + 1;
-            const seq = this.appendChange(key, id, input.delete ? 'delete' : 'upsert', rev);
-            this.db.prepare('UPDATE messages SET content=?, deleted=?, rev=?, last_change_seq=? WHERE id=?')
-                .run(input.delete ? row.content : input.text, Number(input.delete), rev, seq, id);
-            return { id, revision: rev, seq };
-        });
+        return this.command(principal, requestId, { key, id, op: 'message', input },
+            () => this.applyMessageMutation(key, id, input));
+    }
+
+    applyMessageMutation(key, id, input) {
+        const row = this.db.prepare('SELECT * FROM messages WHERE id=? AND conversation_id=? AND deleted=0').get(id, key);
+        if (!row) throw failure('MESSAGE_NOT_FOUND', 404);
+        if (row.rev !== input.revision) throw failure('MESSAGE_REVISION_CONFLICT');
+        if (row.checkpoint_json) throw failure('CORE_CHECKPOINT_IMMUTABLE');
+        if (this.db.prepare(`SELECT 1 FROM works
+            WHERE (user_message_id=? OR id=?) AND status IN ('queued','running','waiting_approval','cancelling')`).get(id, row.source_work_id || '')) {
+            throw failure('MESSAGE_IN_ACTIVE_WORK');
+        }
+        const rev = row.rev + 1;
+        const seq = this.appendChange(key, id, input.delete ? 'delete' : 'upsert', rev);
+        this.db.prepare('UPDATE messages SET content=?, deleted=?, rev=?, last_change_seq=? WHERE id=?')
+            .run(input.delete ? row.content : input.text, Number(input.delete), rev, seq, id);
+        return { id, revision: rev, seq };
     }
 
     control(key, principal, requestId, id, action) {
@@ -300,20 +342,29 @@ class CoreStore {
     finish(id) {
         const work = this.work(id);
         const final = work?.pending_final_json && parse(work.pending_final_json);
+        const config = work && parse(work.frozen_config_json);
         if (!final || work.status !== 'running' || !work.dispatched || this.unresolved(id) ||
             final.id !== id || final.principal !== work.principal || final.key !== work.conversation_id ||
             final.requestId !== work.request_id || final.userId !== work.user_message_id ||
-            typeof final.content !== 'string' || !final.content.trim()) {
+            (config.game ? final.content !== null : typeof final.content !== 'string' || !final.content.trim())) {
             throw failure('WORK_FINAL_UNSETTLED');
         }
         const user = this.db.prepare("SELECT ordinal FROM messages WHERE id=? AND conversation_id=? AND deleted=0")
             .get(work.user_message_id, work.conversation_id);
-        if (!user) throw failure('WORK_FINAL_UNSETTLED');
+        if (!user && !(work.user_message_id === null && work.group_ordinal !== null && config.inviteAgentId)) {
+            throw failure('WORK_FINAL_UNSETTLED');
+        }
         if (work.group_ordinal !== null) {
             const plan = work.group_plan_json && parse(work.group_plan_json);
-            const config = parse(work.frozen_config_json);
             const member = config.agents?.find(agent => agent.id === plan?.[work.group_step]);
             if (!member || final.step !== work.group_step) throw failure('WORK_FINAL_UNSETTLED');
+            if (config.game) {
+                const { game, ...settledConfig } = config;
+                this.db.prepare(`UPDATE works SET status='completed',pending_final_json=NULL,
+                    frozen_config_json=?,group_step=group_step+1,dispatched=0 WHERE id=?`)
+                    .run(json({ ...settledConfig, game: { matchId: game.matchId, decisionId: game.decisionId, revision: game.revision } }), id);
+                return { workId: id, seq: this.head(work.conversation_id), status: 'completed' };
+            }
             const replyId = 'reply_' + id + '_' + work.group_step;
             const seq = this.insertMessage({ id: replyId, key: work.conversation_id, role: 'assistant',
                 content: final.content, after: work.group_ordinal + work.group_step + 1, sourceWorkId: id,

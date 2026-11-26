@@ -15,14 +15,14 @@ async function readCoreContext(input, { workspace, selection, canvas }) {
         // Active Canvas belongs to the desktop surface currently showing the
         // requested topic. Never fall back to the most recent Canvas file.
         const current = await selection();
-        if (current?.itemType !== 'agent' || !Array.isArray(topics) || topics.length > 8 ||
-            !topics.some(topic => topic.itemId === current.itemId && topic.topicId === current.topicId)) {
+        if (!['agent','group'].includes(current?.itemType) || !Array.isArray(topics) || topics.length > 8 ||
+            !topics.some(topic => (topic.itemType || 'agent') === current.itemType && topic.itemId === current.itemId && topic.topicId === current.topicId)) {
             throw unavailable();
         }
         const active = await canvas();
         const after = await selection();
         if (active?.error || typeof active?.content !== 'string' || after?.itemId !== current.itemId ||
-            after?.topicId !== current.topicId) throw unavailable();
+            after?.topicId !== current.topicId || after?.itemType !== current.itemType) throw unavailable();
         result.canvas = active.content;
     }
     for (const selector of workspaces) {

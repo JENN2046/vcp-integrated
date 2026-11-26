@@ -88,7 +88,7 @@ class GameSessionOrchestrator {
                 matchId, groupId: record.groupId, topicId: record.topicId,
                 agentId: seatConfig.agentId, seat,
                 ...(seatConfig.model ? { model: seatConfig.model } : {}),
-                observation, reminder: attempts > 0,
+                observation, attempt: attempts, reminder: attempts > 0,
             });
             attempts++;
         }

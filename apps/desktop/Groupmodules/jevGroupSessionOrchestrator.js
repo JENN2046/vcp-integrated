@@ -251,7 +251,7 @@ class JevGroupSessionOrchestrator {
             return { success: false, error: '群聊正在进行中。', state: this._snapshot(session) };
         }
 
-        const groupConfig = await this.loadGroupConfig(groupId);
+        const groupConfig = await this.loadGroupConfig(groupId, topicId);
         const memberIds = Array.isArray(groupConfig?.members) ? groupConfig.members : [];
         const settings = normalizeJevModeSettings(groupConfig?.modeSettings?.jev, memberIds);
         const now = Date.now();
@@ -329,7 +329,7 @@ class JevGroupSessionOrchestrator {
     }
 
     async _runLoop(session, options) {
-        const groupConfig = await this.loadGroupConfig(session.groupId);
+        const groupConfig = await this.loadGroupConfig(session.groupId, session.topicId);
         const activeMembers = await this.loadActiveMembers(groupConfig);
         const memberMap = new Map(activeMembers.map(member => [member.id, member]));
         const settings = normalizeJevModeSettings(

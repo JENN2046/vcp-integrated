@@ -76,6 +76,7 @@ function registerIntegrated({ historyQueue, appDataRoot, readSettings, mainWindo
                     }
                 },
                 notify: change => broadcast('history-file-updated', change),
+                notifyGroupEvent: event => broadcast('vcp-stream-event', event),
             });
         },
     });

@@ -1,0 +1,9 @@
+{
+  "target": "x86_64-pc-windows-gnu",
+  "buildCommand": "cargo build --locked --target x86_64-pc-windows-gnu",
+  "profile": "dev",
+  "format": "PE32+ console executable, x86-64",
+  "sha256": "e05e9fce20cd1630d73935d7cf331b4cabf501fb23441fc16e7548a13fafab79",
+  "guestExecutionVerified": false,
+  "installerVerified": false
+}

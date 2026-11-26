@@ -45,6 +45,24 @@ function readTombstones(cds, topic) {
     return results;
 }
 
+function historyContent(value) {
+    if (typeof value === 'string') return value;
+    if (typeof value?.text === 'string' && Object.keys(value).every(key => key === 'text')) return value.text;
+    if (Array.isArray(value) && value.every(part => part?.type === 'text' && typeof part.text === 'string')) {
+        return value.map(part => part.text).join('\n');
+    }
+    throw new Error('Unsupported non-text historical message content');
+}
+
+function historyTimestamp(value) {
+    if (Number.isSafeInteger(value) && value >= 0) return value;
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+        const timestamp = Date.parse(value);
+        if (Number.isSafeInteger(timestamp) && timestamp >= 0) return timestamp;
+    }
+    throw new Error('Unsupported historical message timestamp');
+}
+
 function collect(root, central, cds, topic) {
     const snapshot = topic.history && readJson(under(root, path.resolve(root, topic.history)));
     const native = snapshot ? (Array.isArray(snapshot) ? snapshot : snapshot.messages) : [];
@@ -53,7 +71,8 @@ function collect(root, central, cds, topic) {
     for (const message of native) {
         identity({ ...topic, msgId: message.id });
         if (entries.has(message.id)) throw new Error('Duplicate native message in History');
-        entries.set(message.id, { id: message.id, message, deleted: false });
+        entries.set(message.id, { id: message.id, message,
+            deleted: message.status === 'removed' || message.deletedAt != null });
     }
     const beforeNative = new Map();
     let centralTail = [];
@@ -73,7 +92,7 @@ function collect(root, central, cds, topic) {
             } else centralTail.push(row.msg_id);
             // The native array supplies order and native-only extensions. A
             // validated central edit supplies the shared message projection.
-            entries.set(row.msg_id, { id: row.msg_id, deleted: !!row.deleted,
+            entries.set(row.msg_id, { id: row.msg_id, deleted: !!row.deleted || !!entries.get(row.msg_id)?.deleted,
                 message: message ? { ...prior, ...message, attachments: message.attachments ?? [] } : prior,
                 nativeMessage: prior, centralSeq: row.last_seq });
         }
@@ -217,14 +236,16 @@ function importHistory(root, destination) {
                     for (const entry of entries) {
                         const { id, role = 'user', content = '', timestamp, name, attachments: refs = [],
                             contextCompaction, ...extension } = entry.message || {};
-                        if (!entry.deleted && (!['assistant', 'user'].includes(role) || typeof content !== 'string' || !Number.isSafeInteger(timestamp))) {
-                            throw new Error('Unsupported historical message role, content or timestamp');
-                        }
+                        if (!entry.deleted && !['assistant', 'user'].includes(role)) throw new Error('Unsupported historical message role');
+                        const text = entry.deleted ? '' : historyContent(content);
+                        const time = entry.deleted ? entry.deletedAt ?? 0 : historyTimestamp(timestamp);
                         const portable = entry.deleted ? [] : refs.map((ref, index) => importAttachment(attachments, topic, entry, ref, entry.files[index]));
                         store.insertMessage({ id: entry.id, key: topic.key, role: entry.deleted ? 'user' : role,
-                            content: entry.deleted ? '' : content, createdAt: timestamp ?? entry.deletedAt ?? 0,
+                            content: text, createdAt: time,
                             deleted: entry.deleted, senderName: name, attachments: portable, checkpoint: contextCompaction,
-                            historyMetadata: { ...extension, originalAttachments: refs, nativeMessage: entry.nativeMessage, centralSeq: entry.centralSeq } });
+                            historyMetadata: { ...extension, originalAttachments: refs, nativeMessage: entry.nativeMessage,
+                                ...(typeof content !== 'string' && { originalContent: content }),
+                                ...(typeof timestamp === 'string' && { originalTimestamp: timestamp }), centralSeq: entry.centralSeq } });
                         if (entry.deleted) deleted++; else messages++;
                         files += portable.length;
                     }

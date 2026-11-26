@@ -121,3 +121,33 @@ test('Core settles a recovered group final and runs only the next undispatched m
     assert.match(JSON.stringify(provider.calls[0].messages), /saved member final/);
     assert.deepEqual(reopened.store.snapshot(created.id, Number.MAX_SAFE_INTEGER, 100).slice(1).map(m => m.agentId), members);
 });
+
+test('an empty-topic invitation and redo use Core without placeholder messages', async t => {
+    const f = await fixture(t);
+    const provider = await localProvider(t);
+    const { chat } = host(provider);
+    const { core } = await mountCore(f, chat);
+    t.after(() => core.close());
+    const actor = f.actor('A');
+    const group = f.shared.create(actor, { sharedSpaceId: 'sharedAB', opId: 'empty-invite-owner',
+        kind: 'group', localId: 'emptyInvite', config: { name: 'Empty', mode: 'invite_only', members: [f.owner.id] } }).object;
+    const topic = f.shared.create(actor, { sharedSpaceId: 'sharedAB', opId: 'empty-invite-topic',
+        kind: 'topic', parentId: group.id, localParent: 'emptyInvite', localId: 'emptyTopic', config: { name: 'Empty' } }).object;
+    const desktop = await f.desktop('A');
+    const binding = desktop.runtime.localFor(topic.id);
+    const descriptor = { itemType: 'group', itemId: binding.localParent, topicId: binding.localId };
+    const memberId = desktop.runtime.localFor(f.owner.id).localId;
+    const invite = await desktop.runtime.coreSingle.invite(descriptor, memberId);
+    await wait(() => core.store.work(invite.id)?.status === 'completed', 'empty invitation');
+    assert.equal(core.store.work(invite.id).user_message_id, null);
+    let { history } = await desktop.runtime.coreSingle.history(descriptor);
+    assert.deepEqual(history.map(message => message.role), ['assistant']);
+    const original = history[0].id;
+    const redo = await desktop.runtime.coreSingle.invite(descriptor, memberId, { id: original });
+    await wait(() => core.store.work(redo.id)?.status === 'completed', 'redo');
+    ({ history } = await desktop.runtime.coreSingle.history(descriptor));
+    assert.equal(history.length, 1);
+    assert.notEqual(history[0].id, original);
+    assert.equal(provider.calls.length, 2);
+    assert.equal(core.store.changes(topic.id, 0, 10).filter(event => event.action === 'delete')[0].messageId, original);
+});

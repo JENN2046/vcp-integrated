@@ -528,6 +528,7 @@ function startDistributedServerAfterRenderer() {
                 gameService,
                 // 工作区只读门面：direct 插件据此动态获取写入白名单
                 workspaceService: workspaceHandlers.workspaceService,
+                coreMemory: require('./modules/services/nativeSync/coreMemory').createCoreMemory(APP_DATA_ROOT_IN_PROJECT),
                 readCoreContext: input => require('./modules/services/nativeSync/coreContextNode').readCoreContext(input, {
                     workspace: workspaceHandlers.workspaceService,
                     selection: () => mainWindow?.webContents.executeJavaScript(

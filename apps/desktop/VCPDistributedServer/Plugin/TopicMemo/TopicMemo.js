@@ -3,84 +3,27 @@ const path = require('path');
 const cheerio = require('cheerio');
 const { projectMemoryProtocols } = require('../../shared/memoryProtocolProjection');
 
-// --- 主逻辑 ---
-async function main() {
-    try {
-        const input = await readStdin();
-        const args = parseToolArgs(input);
+let coreMemory = null;
+const defaultRoot = path.join(__dirname, '..', '..', '..', 'AppData');
+let dataRoot = defaultRoot;
 
-        // 1. 获取 AppData 路径
-        const VchatDataURL = path.join(__dirname, '..', '..', '..', 'AppData');
-
-        // 2. 获取 maid 参数
-        const maidName = args.maid;
-        if (!maidName) {
-            throw new Error("请求中缺少 'maid' 参数。");
-        }
-
-        // 3. 查找 Agent 信息
-        const agentInfo = await findAgentInfo(VchatDataURL, maidName);
-        if (!agentInfo) {
-            throw new Error(`未找到名为 "${maidName}" 的Agent。`);
-        }
-
-        // 4. 获取用户名
-        const userName = await findUserName(VchatDataURL);
-
-        // 5. 根据 command 执行不同操作
-        const command = args.command || 'ListTopics';
-        let result;
-
-        if (command === 'ListTopics') {
-            result = await listTopics(agentInfo);
-        } else if (command === 'GetTopicContent') {
-            const topicId = args.topic_id;
-            if (!topicId) {
-                throw new Error("请求中缺少 'topic_id' 参数。");
-            }
-            result = await getTopicContent(VchatDataURL, agentInfo, topicId, userName);
-        } else {
-            throw new Error(`未知的指令: ${command}，支持的指令: ListTopics, GetTopicContent`);
-        }
-
-        console.log(JSON.stringify({ status: "success", result: result }));
-
-    } catch (error) {
-        console.error(JSON.stringify({ status: "error", error: `[TopicMemo] ${error.message}` }));
-        process.exit(1);
-    }
+function initialize(options = {}) {
+    coreMemory = options.services?.coreMemory || null;
+    dataRoot = coreMemory?.root || defaultRoot;
 }
 
-// --- 辅助函数 ---
-
-function readStdin() {
-    return new Promise((resolve) => {
-        let data = '';
-        process.stdin.on('data', chunk => data += chunk);
-        process.stdin.on('end', () => resolve(data));
-    });
-}
-
-function parseToolArgs(input) {
-    let args;
-    try {
-        args = JSON.parse(input);
-    } catch (e) {
-        console.error(JSON.stringify({ status: "error", error: `[TopicMemo] 无效的输入格式，无法解析JSON: ${input}` }));
-        process.exit(1);
-    }
-
-    // 兼容 topic_id 的不同写法
-    if (args.topicId) {
-        args.topic_id = args.topicId;
-        delete args.topicId;
-    }
-    if (args.TopicId) {
-        args.topic_id = args.TopicId;
-        delete args.TopicId;
-    }
-
-    return args;
+async function processToolCall(args, scope, core) {
+    const maidName = args.maid;
+    if (!maidName) throw new Error("请求中缺少 'maid' 参数。");
+    const agentInfo = core ? await core.findAgent(maidName) : await findAgentInfo(dataRoot, maidName);
+    if (!agentInfo) throw new Error(`未找到名为 "${maidName}" 的Agent。`);
+    const command = args.command || 'ListTopics';
+    if (command === 'ListTopics') return listTopics(agentInfo);
+    if (command !== 'GetTopicContent') throw new Error(`未知的指令: ${command}，支持的指令: ListTopics, GetTopicContent`);
+    const topicId = args.topicId || args.TopicId || args.topic_id;
+    if (!topicId) throw new Error("请求中缺少 'topic_id' 参数。");
+    const userName = core ? core.userName : await findUserName(dataRoot);
+    return getTopicContent(dataRoot, agentInfo, topicId, userName, core?.history || coreMemory?.history);
 }
 
 async function findAgentInfo(vchatPath, maidName) {
@@ -149,7 +92,7 @@ async function listTopics(agentInfo) {
 }
 
 // --- 指令2: 获取话题完整内容 ---
-async function getTopicContent(vchatPath, agentInfo, topicId, userName) {
+async function getTopicContent(vchatPath, agentInfo, topicId, userName, readCoreHistory) {
     // 查找话题信息
     const topicInfo = agentInfo.topics.find(t => t.id === topicId);
     if (!topicInfo) {
@@ -159,8 +102,8 @@ async function getTopicContent(vchatPath, agentInfo, topicId, userName) {
     // 读取 history.json
     const historyPath = path.join(vchatPath, 'UserData', agentInfo.uuid, 'topics', topicId, 'history.json');
 
-    let history;
-    try {
+    let history = await readCoreHistory?.({ agentId: agentInfo.uuid, topicId });
+    if (!history) try {
         const content = await fs.readFile(historyPath, 'utf-8');
         const rawData = JSON.parse(content);
 
@@ -262,5 +205,4 @@ function cleanHtmlContent(htmlContent) {
     }
 }
 
-if (require.main === module) main();
-module.exports = { cleanHtmlContent, getTopicContent };
+module.exports = { initialize, processToolCall, cleanHtmlContent, getTopicContent };

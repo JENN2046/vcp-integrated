@@ -53,11 +53,11 @@ function host(provider) {
     return { chat, events, pluginManager };
 }
 
-async function mountCore(f, chat) {
+async function mountCore(f, chat, extensions = {}) {
     const directory = f.root + '-core';
     await fs.mkdir(f.root + '/files', { recursive: true });
     const { CoreService } = require(BOX + '/core/service');
-    const options = { directory, legacyDirectory: f.root, workspace: 'sharedAB', shared: f.shared, mobile: f.portal, chat };
+    const options = { directory, legacyDirectory: f.root, workspace: 'sharedAB', shared: f.shared, mobile: f.portal, chat, ...extensions };
     const core = new CoreService(options);
     f.shared.core = core;
     f.app.use(['/api/plugins/NativeSync/source/core', '/api/plugins/NativeSync/core'], core.router(req => f.shared.desktop({

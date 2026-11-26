@@ -27,7 +27,10 @@ test('offline migration reconciles native order, central commits and both CDS de
     fs.writeFileSync(path.join(source, 'history.json'), JSON.stringify([
         msg('original', '原始正文', { timestamp: 200, customExtension: { score: 1 },
             attachments: [{ id: 'file', name: 'note.txt', internalPath: 'note.txt' }] }),
-        msg('edited'), msg('central_deleted'), msg('cds_deleted')
+        msg('edited'), msg('central_deleted'), msg('cds_deleted'),
+        msg('older_parts', [{ type: 'text', text: '分段' }, { type: 'text', text: '内容' }], { timestamp: '2024-01-02T00:00:00Z' }),
+        msg('older_object', { text: '旧对象' }),
+        msg('native_removed', '本地已删', { status: 'removed' })
     ]));
     fs.writeFileSync(path.join(source, 'second.json'), JSON.stringify([msg('hidden_by_topic')]));
     fs.writeFileSync(path.join(source, 'note.txt'), bytes);
@@ -58,7 +61,7 @@ test('offline migration reconciles native order, central commits and both CDS de
     assert.equal(first.status, 0, first.stderr);
     const receipt = JSON.parse(first.stdout);
     assert.deepEqual({ ...receipt, fingerprint: undefined }, {
-        fingerprint: undefined, conversations: 2, messages: 4, deleted: 4, attachments: 1
+        fingerprint: undefined, conversations: 2, messages: 6, deleted: 5, attachments: 1
     });
     const again = command();
     assert.equal(again.status, 0, again.stderr);
@@ -68,10 +71,10 @@ test('offline migration reconciles native order, central commits and both CDS de
     t.after(() => store.db.close());
     const messages = store.snapshot(topic.key, Number.MAX_SAFE_INTEGER, 100);
     assert.deepEqual(messages.map(({ id, content, timestamp }) => [id, content, timestamp]), [
-        ['original', '原始正文', 200], ['central_prefix', '先于匹配锚点', 100], ['edited', '中央修订', 100], ['central_only', '中央独有', 100]
+        ['original', '原始正文', 200], ['central_prefix', '先于匹配锚点', 100], ['edited', '中央修订', 100], ['older_parts', '分段\n内容', 1704153600000], ['older_object', '旧对象', 100], ['central_only', '中央独有', 100]
     ]);
     assert.deepEqual(store.changes(topic.key, 0, 100).filter(e => e.action === 'delete').map(e => e.messageId),
-        ['central_deleted', 'cds_deleted', 'v1_deleted']);
+        ['central_deleted', 'cds_deleted', 'native_removed', 'v1_deleted']);
     assert.deepEqual(store.snapshot(second.key, Number.MAX_SAFE_INTEGER, 100), []);
     const metadata = store.db.prepare('SELECT history_metadata_json FROM messages WHERE id=?').get('original');
     assert.deepEqual(JSON.parse(metadata.history_metadata_json).customExtension, { score: 1 });

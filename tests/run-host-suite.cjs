@@ -13,6 +13,9 @@ function runSuite(suite, args) {
     const run = fs.mkdtempSync(path.join(os.tmpdir(), 'vcp-'+suite+'-'));
     const server = path.join(run, 'server');
     const browser = process.env.CHROME_BIN || '/opt/google/chrome/chrome';
+    const cds = path.join(root, 'apps/desktop/modules/services/chatDataService/bin', process.platform + '-' + process.arch,
+        'vcp_chat_data_service' + (process.platform === 'win32' ? '.exe' : ''));
+
 
     try {
         if (process.versions.node.split('.')[0] !== '24') throw Error('Use Node 24 for host validation');
@@ -50,6 +53,7 @@ function runSuite(suite, args) {
                 LANG: 'C.UTF-8',
                 TMPDIR: run,
                 FIX03_FIXTURE_ROOT: run,
+                ...(fs.existsSync(cds) && { VCP_CORE_CDS_BINARY: cds }),
                 VCP_TEST_SERVER: server,
                 VCP_COLLABORATION_SERVER: server,
             },

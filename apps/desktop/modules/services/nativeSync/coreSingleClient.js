@@ -215,7 +215,7 @@ class CoreSingleClient {
         });
     }
 
-    async invite(descriptor, localAgentId) {
+    async invite(descriptor, localAgentId, redo) {
         if (this.runtime.readOnly) throw fail('SHARED_READ_ONLY');
         const mapping = this.mapping(descriptor);
         const member = this.runtime.nativeObject('agent', localAgentId);
@@ -223,17 +223,19 @@ class CoreSingleClient {
         const r = this.runtime;
         return r.execution.run(mapping.sharedId, async () => {
             const file = this.file(mapping, 'draft');
-            const signature = stable({ inviteAgentId: member.id });
+            const signature = stable({ inviteAgentId: member.id, ...(redo && { redo: redo.id }) });
             let draft = await ownedJson(r.root, file, { optional: true });
             if (draft?.signature && draft.signature !== signature) throw fail('CORE_PREVIOUS_SUBMISSION_UNCONFIRMED');
             if (!draft?.requestId) {
-                draft = { requestId: randomUUID(), signature };
+                const target = redo && (await this.history(descriptor)).history.find(message => message.id === redo.id);
+                if (redo && !target) throw fail('MESSAGE_NOT_FOUND');
+                draft = { requestId: randomUUID(), signature, ...(target && { revision: target.revision }) };
                 await durableJson(file, draft);
             }
             let accepted;
             try {
-                accepted = await r.send(this.route(mapping, 'invitations'), {
-                    body: { agentId: member.id, requestId: draft.requestId }
+                accepted = await r.send(this.route(mapping, redo ? 'messages/' + encodeURIComponent(redo.id) + '/redo' : 'invitations'), {
+                    body: { agentId: member.id, requestId: draft.requestId, ...(redo && { revision: draft.revision }) }
                 });
             } catch (error) {
                 if (error.status >= 400 && error.status < 500 && error.code !== 'REQUEST_ID_REUSED') await durableJson(file, {});
@@ -243,6 +245,60 @@ class CoreSingleClient {
             this.observe(mapping);
             return { ...accepted, success: true, core: true };
         });
+    }
+
+    async gameEvent(descriptor, { messageId, event, seats }) {
+        const mapping = this.mapping(descriptor);
+        return this.runtime.send(this.route(mapping, 'game-event'), { body: { id: messageId, event,
+            seats: seats.map(({ name }) => ({ name })) } });
+    }
+
+    async gameTurn(descriptor, { agentId, observation, attempt = 0, reminder, model }) {
+        if (this.runtime.readOnly) throw fail('SHARED_READ_ONLY');
+        const mapping = this.mapping(descriptor);
+        const r = this.runtime;
+        const member = r.nativeObject('agent', agentId);
+        if (!member) throw fail('GROUP_MEMBER_UNAVAILABLE');
+        await this.announceResources();
+        const requestId = 'game_' + digest(JSON.stringify([mapping.sharedId, observation.decisionId, attempt]));
+        const accepted = await r.send(this.route(mapping, 'game-turn'), {
+            body: { agentId: member.id, requestId, observation, reminder, ...(model && { model }) }
+        });
+        this.observe(mapping);
+        const { setTimeout } = require('node:timers/promises');
+        while (!r.closed) {
+            const { works } = await r.send(this.route(mapping, 'works'));
+            const work = works.find(item => item.id === accepted.id);
+            if (!work) throw fail('GAME_WORK_UNAVAILABLE');
+            if (work.status === 'completed') return work;
+            if (!active.has(work.status)) throw fail(work.errorCode || 'GAME_WORK_UNSETTLED');
+            await setTimeout(250);
+        }
+        throw fail('HOST_DRAINING');
+    }
+
+    groupMode(descriptor) {
+        const mapping = this.mapping(descriptor);
+        const parentId = this.runtime.state.objects[mapping.sharedId].parentId;
+        return this.runtime.configs.state.objects[parentId]?.config?.mode;
+    }
+
+    presentJev(mapping, state) {
+        if (!state) return state;
+        const local = id => id ? this.runtime.localFor(id)?.localId || id : null;
+        return { ...state, groupId: mapping.local.itemId, topicId: mapping.local.topicId,
+            currentAgentId: local(state.currentAgentId), queue: state.queue.map(local), manualQueue: state.manualQueue.map(local) };
+    }
+
+    async jev(descriptor, action, localAgentId) {
+        const mapping = this.mapping(descriptor);
+        const r = this.runtime;
+        const agentId = localAgentId && r.nativeObject('agent', localAgentId)?.id;
+        if (localAgentId && !agentId) throw fail('GROUP_MEMBER_UNAVAILABLE');
+        this.observe(mapping);
+        const result = await r.send(this.route(mapping, 'jev'),
+            action ? { body: { action, ...(agentId && { agentId }) } } : undefined);
+        return action ? { ...result, state: this.presentJev(mapping, result.state) } : this.presentJev(mapping, result);
     }
 
     async mutate(descriptor, intent) {
@@ -408,6 +464,11 @@ class CoreSingleClient {
     onEvent(mapping, data, type) {
         const r = this.runtime;
         const topic = this.topic(mapping);
+        if (type === 'jev_session') {
+            r.notifyGroupEvent?.({ ...data, session: this.presentJev(mapping, data.session),
+                context: { ...data.context, groupId: topic.ownerId, topicId: topic.topicId } });
+            return;
+        }
         if (type === 'native_task' || type === 'flowlock_state') { r.notifyExecutionStatus({ topic }); return; }
         if (type === 'change_seq') {
             const local = mapping.local;

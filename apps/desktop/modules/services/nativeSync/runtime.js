@@ -25,7 +25,7 @@ function createSyncDownload(connection){
         catch(error){if(error.code==='ATTACHMENT_FILE_TOO_LARGE')throw error;throw fail('NETWORK_UNAVAILABLE');}
     });
 }
-async function createNativeSyncRuntime({ queue, appDataRoot, args = [], isolated = false, notify, notifyExecutionStatus, intervalMs = 250, executionIntervalMs = 5000, readSettings, readAgentConfig, readGroupConfig, readTavernRules, readEffectiveTavernRules, readExecutionPolicy, thumbnail, request, requestBinary, requestEvents, requestWatch, storeAttachment, ipcMain, getMainWindow, sourceFault, agentConfigEvents, sharedHost, historyAuthority = authorityControl.authorityForQueue(queue), localHistoryAuthority, waitForHistoryAuthority, isStopping = () => false, publishRecoveredRuntime }) {
+async function createNativeSyncRuntime({ queue, appDataRoot, args = [], isolated = false, notify, notifyExecutionStatus, notifyGroupEvent, intervalMs = 250, executionIntervalMs = 5000, readSettings, readAgentConfig, readGroupConfig, readTavernRules, readEffectiveTavernRules, readExecutionPolicy, thumbnail, request, requestBinary, requestEvents, requestWatch, storeAttachment, ipcMain, getMainWindow, sourceFault, agentConfigEvents, sharedHost, historyAuthority = authorityControl.authorityForQueue(queue), localHistoryAuthority, waitForHistoryAuthority, isStopping = () => false, publishRecoveredRuntime }) {
     const poc = args.includes('--native-sync-poc');
     if (poc && !isolated) throw fail('ISOLATED_APP_DATA_REQUIRED');
     if (!poc && !appDataRoot) return null;
@@ -54,7 +54,7 @@ async function createNativeSyncRuntime({ queue, appDataRoot, args = [], isolated
             send: request || createSyncRequest(connection),
             openEvents: requestEvents || (!request ? require('./sharedSessionClient').createSharedEventRequest(connection) : null),
             openWatch: requestWatch || (!request ? require('./sharedWaitClient').createSharedWatchRequest(connection) : null),
-            notify, notifyExecutionStatus, intervalMs, agentConfigEvents,
+            notify, notifyExecutionStatus, notifyGroupEvent, intervalMs, agentConfigEvents,
             download: requestBinary || createSyncDownload(connection), storeAttachment,
         });
         const close = () => {

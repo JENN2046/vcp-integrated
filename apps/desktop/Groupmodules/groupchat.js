@@ -309,7 +309,10 @@ function requireGroupHistoryQueue() {
 }
 
 async function initializeGroupHistory(groupId, topicId) {
-    return requireGroupHistoryQueue().initializeIfMissing(getGroupHistoryDescriptor(groupId, topicId), []);
+    const queue = requireGroupHistoryQueue();
+    const descriptor = getGroupHistoryDescriptor(groupId, topicId);
+    if (queue.syncPolicy?.sharedExecution?.runtime?.coreSingle?.owns(descriptor)) return { success: true };
+    return queue.initializeIfMissing(descriptor, []);
 }
 
 async function appendGroupHistoryMessage(groupId, topicId, message) {

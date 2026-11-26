@@ -1,0 +1,12 @@
+{
+  "platform": "linux",
+  "architecture": "x64",
+  "electron": "44.9.3",
+  "renderer": {
+    "ready": "complete",
+    "title": "",
+    "preload": "object"
+  },
+  "nativeCds": "vcp_chat_data_service",
+  "isolatedProfile": true
+}

@@ -1733,7 +1733,8 @@ class PluginManager extends EventEmitter {
     // }
 
     getPlugin(name) {
-        return this.plugins.get(name) || (name === 'TopicSponsor' && nativeExecution.currentCoreSponsor()
+        const coreMemory = ['DeepMemo', 'TopicMemo'].includes(name) && nativeExecution.currentCoreMemory();
+        return this.plugins.get(name) || ((name === 'TopicSponsor' && nativeExecution.currentCoreSponsor() || coreMemory)
             ? { name, pluginType: 'hybridservice', isDistributed: true, communication: { protocol: 'direct' } }
             : undefined);
     }
@@ -2069,6 +2070,13 @@ class PluginManager extends EventEmitter {
                 pluginName: toolName,
                 executionOptions,
                 webSocketServer: this.webSocketServer,
+                ...(['DeepMemo', 'TopicMemo'].includes(toolName) && nativeExecution.currentCoreMemory() && {
+                    executeCoreMemory: args => invokeDirect(() => nativeExecution.currentCoreMemory()(
+                        toolName, args, this._getPluginConfig(plugin)))
+                }),
+                ...(toolName === 'GameController' && nativeExecution.currentCoreGame() && {
+                    executeCoreGame: args => invokeDirect(() => nativeExecution.currentCoreGame()(args))
+                }),
                 ...(toolName === 'TopicSponsor' && nativeExecution.currentCoreSponsor() && {
                     deliverCoreTopic: args => invokeDirect(invocation => nativeExecution.currentCoreSponsor()(invocation, args))
                 }),

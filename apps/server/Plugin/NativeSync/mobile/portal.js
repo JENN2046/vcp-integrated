@@ -270,6 +270,7 @@ class MobilePortal {
                         const shared=this.store.shared;
                         const {owner: group,members}=shared.freeze(shared.row(t.sharedSpaceId,t.key));
                         published.groupMode=group.config.mode;
+                        if(group.config.mode==='game'){available=false;reason='CORE_GAME_ORIGIN_REQUIRED';}
                         published.members=members.map(member=>({id:member.id,name:member.config.name||member.id,
                             unavailable:member.deleted||!member.config.model}));
                     }catch(error){available=false;reason=error.code||'CORE_CONFIG_PENDING';}

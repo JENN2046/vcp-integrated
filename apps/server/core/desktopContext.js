@@ -46,6 +46,27 @@ class DesktopContext {
         return result;
     }
 
+    gameTool(topic, game, agentName, args) {
+        const signatures = [args?.maid, args?.valet].filter(value => typeof value === 'string' && value.trim());
+        if (!agentName || !signatures.length || signatures.some(value => value.trim().toLowerCase() !== agentName.trim().toLowerCase())) {
+            throw failure('CORE_GAME_SEAT_MISMATCH', 403);
+        }
+        if (args?.matchId !== game.matchId || args?.decisionId !== game.decisionId ||
+            !['string','number'].includes(typeof args.revision) || String(args.revision).trim() === '' || Number(args.revision) !== game.revision) {
+            throw failure('CORE_GAME_DECISION_MISMATCH', 403);
+        }
+        return this.gameNode(topic)(args, 30000);
+    }
+
+    gameNode(topic) {
+        const route = this.routes.get(topic.originSource);
+        if (!route) throw failure('CORE_RESOURCE_NODE_OFFLINE', 503);
+        this.shared.authorize(route.actor, this.workspace, 'execute');
+        const send = this.toolHost?.bindDistributedTool?.('GameController', route.routeHash);
+        if (!send) throw failure('CORE_RESOURCE_NODE_OFFLINE', 503);
+        return send;
+    }
+
     async prompt(topic, messages) {
         for (const message of messages) {
             // Expansion of named resources is opted into through the owner's
@@ -56,12 +77,12 @@ class DesktopContext {
             if (!workspaces.length && !canvases) continue;
             const binding = this.shared.db.prepare(`SELECT t.local_id AS topicId, t.local_parent AS itemId
                 FROM shared_local_bindings t JOIN shared_local_bindings a
-                  ON a.source_id=t.source_id AND a.space_id=t.space_id AND a.kind='agent'
+                  ON a.source_id=t.source_id AND a.space_id=t.space_id AND a.kind=?
                   AND a.local_id=t.local_parent AND a.object_id=?
                 WHERE t.space_id=? AND t.source_id=? AND t.object_id=? AND t.kind='topic'
-                  AND t.hidden=0 AND a.hidden=0`).all(topic.ownerId, this.workspace, topic.originSource, topic.key);
+                  AND t.hidden=0 AND a.hidden=0`).all(topic.ownerType, topic.ownerId, this.workspace, topic.originSource, topic.key);
             if (!binding.length || binding.length > 8) throw failure('CORE_RESOURCE_UNAVAILABLE', 409);
-            const result = await this.read(topic.originSource, { canvases, workspaces, references: [], topics: binding });
+            const result = await this.read(topic.originSource, { canvases, workspaces, references: [], topics: topic.ownerType === 'group' ? binding.map(item => ({ ...item, itemType: 'group' })) : binding });
             const values = new Map(workspaces.map((name, index) => [name, result.workspaces[index]]));
             message.content = message.content.replace(/\{\{VCPChat(?:Canvas|WorkSpace(?::[^{}\r\n]{1,200})?)\}\}/g,
                 name => name === canvasPlaceholder ? result.canvas : values.get(name));

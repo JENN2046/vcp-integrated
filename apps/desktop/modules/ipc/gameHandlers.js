@@ -115,7 +115,7 @@ async function openGame(gameId) {
     }
 }
 
-function configureRuntime({ gameService, groupChat, loadAgent, listAgents, listModels }) {
+function configureRuntime({ gameService, groupChat, loadAgent, listAgents, listModels, getCoreGame }) {
     listGameAgents = listAgents;
     if (typeof listModels === 'function') listGameModels = listModels;
     if (gameRuntime) {
@@ -139,12 +139,22 @@ function configureRuntime({ gameService, groupChat, loadAgent, listAgents, listM
     };
     gameRuntime = new GameRuntime({
         gameService, groupChat, loadAgent,
+        commitCoreEvent: async payload => {
+            const core = getCoreGame?.(payload);
+            if (!core) return false;
+            await core.client.gameEvent(core.descriptor, payload);
+            return true;
+        },
         toolInstructions: async () => '',
         // Seat overrides and the turn budget belong only to the Dou Dizhu runtime.
-        runAgent: decision => runAgent(decision, async id => {
-            const cfg = await loadAgent(id);
-            return id === decision.agentId ? clampGameAgentConfig(cfg, decision.model) : cfg;
-        }),
+        runAgent: decision => {
+            const core = getCoreGame?.(decision);
+            if (core) return core.client.gameTurn(core.descriptor, decision);
+            return runAgent(decision, async id => {
+                const cfg = await loadAgent(id);
+                            return id === decision.agentId ? clampGameAgentConfig(cfg, decision.model) : cfg;
+            });
+        },
     });
     const { VTradeOrchestrator } = require('../game/vtrade/orchestrator');
     vtradeFeature().orchestrator = new VTradeOrchestrator({

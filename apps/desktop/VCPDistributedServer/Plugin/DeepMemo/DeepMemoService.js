@@ -24,6 +24,7 @@ const DEFAULTS = Object.freeze({
 
 let runtime = {
     chatDataService: null,
+    coreMemory: null,
     config: { ...DEFAULTS },
     logger: console
 };
@@ -31,45 +32,48 @@ let runtime = {
 function initialize(options = {}) {
     runtime = {
         chatDataService: options.services?.chatDataService || options.chatDataService || null,
+        coreMemory: options.services?.coreMemory || null,
         config: normalizeConfig(options.config || {}),
         logger: options.logger || console
     };
 }
 
-async function processToolCall(rawArgs = {}, executionContext = {}) {
+async function processToolCall(rawArgs = {}, executionContext = {}, core) {
+    const config = core ? normalizeConfig(core.config || {}) : runtime.config;
     const args = normalizeArgs(rawArgs);
-    const query = combineQuery(args.keyword, runtime.config.queryPreset);
+    const query = combineQuery(args.keyword, config.queryPreset);
     if (!query) {
         throw new Error('[DeepMemo] 请求中缺少 keyword 参数。');
     }
 
-    const finalResultLimit = args.resultLimit || runtime.config.resultLimit;
-    const finalMaxChars = args.maxChars || runtime.config.maxMemoChars;
-    const rerankRequested = args.rerank ?? runtime.config.rerankSearch;
-    const rerankEnabled = rerankRequested && Boolean(runtime.config.rerankUrl);
-    const request = buildCentralRequest(args, executionContext, query, runtime.config);
+    const finalResultLimit = args.resultLimit || config.resultLimit;
+    const finalMaxChars = args.maxChars || config.maxMemoChars;
+    const rerankRequested = args.rerank ?? config.rerankSearch;
+    const rerankEnabled = rerankRequested && Boolean(config.rerankUrl);
+    const request = buildCentralRequest(args, executionContext, query, config);
     if (rerankEnabled) {
         request.resultLimit = Math.min(
             100,
-            finalResultLimit * runtime.config.rerankCandidateMultiplier
+            finalResultLimit * config.rerankCandidateMultiplier
         );
         request.maxChars = Math.min(
             1_000_000,
-            finalMaxChars * runtime.config.rerankCandidateMultiplier
+            finalMaxChars * config.rerankCandidateMultiplier
         );
     }
 
     try {
-        const client = runtime.chatDataService?.client;
-        if (!client) {
-            const error = new Error('VCP-CDS is unavailable.');
-            error.code = 'UNAVAILABLE';
-            throw error;
+        let response = core ? await core.search(request) : normalizeExecutionContext(executionContext).topicId
+            ? await runtime.coreMemory?.search(request) : null;
+        if (!response && !core) {
+            const client = runtime.chatDataService?.client;
+            if (!client) {
+                const error = new Error('VCP-CDS is unavailable.');
+                error.code = 'UNAVAILABLE';
+                throw error;
+            }
+            response = await client.searchMemories(request, { timeoutMs: config.timeoutMs });
         }
-
-        const response = await client.searchMemories(request, {
-            timeoutMs: runtime.config.timeoutMs
-        });
         if (!response || !Array.isArray(response.windows)) {
             const error = new Error('VCP-CDS returned an invalid memory search response.');
             error.code = 'INVALID_RESPONSE';
@@ -81,7 +85,7 @@ async function processToolCall(rawArgs = {}, executionContext = {}) {
                 const reranked = await rerankWindows(
                     response.windows,
                     query,
-                    runtime.config
+                    config
                 );
                 const selected = selectWindowsWithinBudget(
                     reranked,
@@ -562,6 +566,7 @@ function toBoolean(value, fallback) {
 function resetForTests() {
     runtime = {
         chatDataService: null,
+        coreMemory: null,
         config: { ...DEFAULTS },
         logger: console
     };

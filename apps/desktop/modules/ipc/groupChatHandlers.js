@@ -91,6 +91,11 @@ function initialize(mainWindow, context) {
         };
         require('./gameHandlers').configureRuntime({
             gameService, groupChat, loadAgent: getAgentConfigById,
+            getCoreGame: ({ groupId, topicId }) => {
+                const descriptor = { itemType: 'group', itemId: groupId, topicId };
+                const client = historyMutationQueue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
+                return client?.owns(descriptor) ? { client, descriptor } : null;
+            },
             listAgents: async () => {
                 const configs = await readAllAgentConfigs();
                 return configs.filter(config => config.model)
@@ -348,7 +353,9 @@ function initialize(mainWindow, context) {
         try {
             const sendStreamChunkToRenderer = createStreamSender();
             const { client, descriptor } = coreGroup(groupId, topicId);
-            if (client) return await client.invite(descriptor, invitedAgentId);
+            if (client) return client.groupMode(descriptor) === 'jev'
+                ? await client.jev(descriptor, 'invite', invitedAgentId)
+                : await client.invite(descriptor, invitedAgentId);
             const groupConfig = await groupChat.getAgentGroupConfig(groupId);
             if (groupConfig?.mode === 'jev') {
                 return await groupChat.enqueueJevGroupAgent(
@@ -369,6 +376,11 @@ function initialize(mainWindow, context) {
 
     ipcMain.handle('start-jev-group-chat', async (event, groupId, topicId) => {
         try {
+            const { client, descriptor } = coreGroup(groupId, topicId);
+            if (client) {
+                if (event.sender !== mainWindow?.webContents) return { success: false, error: 'FORBIDDEN' };
+                return await client.jev(descriptor, 'start');
+            }
             return await groupChat.startJevGroupChat(
                 groupId,
                 topicId,
@@ -382,6 +394,11 @@ function initialize(mainWindow, context) {
 
     ipcMain.handle('continue-jev-group-chat', async (event, groupId, topicId) => {
         try {
+            const { client, descriptor } = coreGroup(groupId, topicId);
+            if (client) {
+                if (event.sender !== mainWindow?.webContents) return { success: false, error: 'FORBIDDEN' };
+                return await client.jev(descriptor, 'continue');
+            }
             return await groupChat.continueJevGroupChat(
                 groupId,
                 topicId,
@@ -395,6 +412,11 @@ function initialize(mainWindow, context) {
 
     ipcMain.handle('enqueue-jev-group-agent', async (event, groupId, topicId, agentId) => {
         try {
+            const { client, descriptor } = coreGroup(groupId, topicId);
+            if (client) {
+                if (event.sender !== mainWindow?.webContents) return { success: false, error: 'FORBIDDEN' };
+                return await client.jev(descriptor, 'invite', agentId);
+            }
             return await groupChat.enqueueJevGroupAgent(
                 groupId,
                 topicId,
@@ -408,6 +430,11 @@ function initialize(mainWindow, context) {
     });
 
     ipcMain.handle('get-jev-group-chat-state', async (event, groupId, topicId) => {
+        const { client, descriptor } = coreGroup(groupId, topicId);
+        if (client) {
+            if (event.sender !== mainWindow?.webContents) return { success: false, error: 'FORBIDDEN' };
+            return client.jev(descriptor);
+        }
         return groupChat.getJevGroupChatState(groupId, topicId);
     });
 
@@ -417,6 +444,7 @@ function initialize(mainWindow, context) {
             const { client, descriptor } = coreGroup(groupId, topicId);
             if (client) {
                 if (event.sender !== mainWindow?.webContents) return { success: false, error: 'FORBIDDEN' };
+                if (client.groupMode(descriptor) === 'jev') return await client.jev(descriptor, 'stop');
                 const status = await client.status(descriptor);
                 const work = status.executions.find(entry => entry.canCancel);
                 return work ? await client.control(descriptor, work.id, 'cancel') : { success: false, error: 'WORK_NOT_CANCELLABLE' };
@@ -437,7 +465,11 @@ function initialize(mainWindow, context) {
                 }
             };
 
-            if (coreGroup(groupId, topicId).client) return { success: false, error: 'CORE_GROUP_REDO_NOT_MIGRATED' };
+            const { client, descriptor } = coreGroup(groupId, topicId);
+            if (client) {
+                if (event.sender !== mainWindow?.webContents) return { success: false, error: 'FORBIDDEN' };
+                return await client.invite(descriptor, agentId, { id: messageId });
+            }
             // This new function will be created in groupchat.js
             await groupChat.redoGroupChatMessage(groupId, topicId, messageId, agentId, sendStreamChunkToRenderer, getAgentConfigById);
 

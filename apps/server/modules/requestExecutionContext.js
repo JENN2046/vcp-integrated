@@ -460,6 +460,8 @@ module.exports = {
     assertToolsAllowed, controlledToolWork, assertToolBatch, assertToolBoundary, executeControlledToolBatch, trackToolInvocation,
     settleToolPause: () => local.getStore()?.settleToolPause?.(),
     currentTopicSponsorCall, approvalOwner,
+    currentCoreMemory: () => local.getStore()?.coreMemory,
+    currentCoreGame: () => local.getStore()?.coreGame,
     currentCoreSponsor: () => local.getStore()?.coreSponsor,
     controlledDelegation, assertDelegationDispatch, assertDelegationInvocation,
     runToolInvocation, acceptNativeTask, registerNativeTaskProvider, queryNativeTask, hasNativeTaskProvider, verifyNativeTaskArchive,

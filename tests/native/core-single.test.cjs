@@ -518,6 +518,7 @@ test('Core reads Canvas, Workspace, and live files through the enrolled native r
     try {
         const desktop = await f.desktop('A');
         const phone = await f.phone();
+        let selected = desktop.descriptor;
         const current = f.shared.get(f.actor('A'), 'sharedAB', f.owner.id);
         f.shared.saveConfig(f.actor('A'), { sharedSpaceId: 'sharedAB', sharedId: f.owner.id, opId: 'core-context-agent',
             expectedVersion: current.version, config: { ...current.config, systemPrompt: '{{VCPChatCanvas}} {{VCPChatWorkSpace:fixture}}' } });
@@ -542,7 +543,7 @@ test('Core reads Canvas, Workspace, and live files through the enrolled native r
                         expandPlaceholders: async () => '[VCPChat 工作区: fixture]\nnotes.txt',
                         list: () => [{ id: 'fixture-workspace', enabled: true, path: resources }]
                     },
-                    selection: async () => desktop.descriptor,
+                    selection: async () => selected,
                     canvas: async () => ({ content: 'active CANVAS FIXTURE' })
                 });
                 node.send(JSON.stringify({ type: 'tool_result', data: { requestId, status: 'success', result } }));
@@ -580,12 +581,34 @@ test('Core reads Canvas, Workspace, and live files through the enrolled native r
         assert.equal(messages[0].desktopReferences[0].sourceId, undefined);
         assert.doesNotMatch(JSON.stringify(messages), /actual workspace revision/);
 
+        const actor = f.actor('A');
+        const owner = f.shared.create(actor, { sharedSpaceId: 'sharedAB', opId: 'resource-group', kind: 'group',
+            localId: 'resourceGroup', config: { name: 'Resource group', mode: 'sequential', members: [f.owner.id] } }).object;
+        const group = f.shared.create(actor, { sharedSpaceId: 'sharedAB', opId: 'resource-group-topic', kind: 'topic',
+            parentId: owner.id, localId: 'resourceTopic', localParent: 'resourceGroup', config: { name: 'Resources' } }).object;
+        await desktop.runtime.pollDirectory();
+        const binding = desktop.runtime.localFor(group.id);
+        selected = { itemType: 'group', itemId: binding.localParent, topicId: binding.localId };
+        const groupWork = await desktop.runtime.coreSingle.send(selected, { id: 'group-node-resources', role: 'user',
+            content: 'Use the group room resources.', attachments: [{
+                id: 'group-node-file', name: 'notes.txt', type: 'text/plain',
+                _fileManagerData: { isLiveReference: true, workspaceRef: { workspaceId: 'fixture-workspace', alias: 'fixture', relPath: 'notes.txt' } }
+            }] });
+        await wait(() => {
+            const work = core.store.work(groupWork.serverSession.executionId);
+            if (work?.error_code) throw Error('Core group resources: ' + work.error_code);
+            return work?.status === 'completed';
+        }, 'group resource turn');
+        assert.match(JSON.stringify(provider.calls[2].messages), /active CANVAS FIXTURE/);
+        assert.match(JSON.stringify(provider.calls[2].messages), /VCPChat 工作区: fixture/);
+        assert.match(JSON.stringify(provider.calls[2].messages), /actual workspace revision two/);
+
         node.terminate();
         await wait(() => !webSockets.bindDistributedTool('internal_core_context', routeHash), 'node offline');
         const offline = await phone.call(route + '/send', { requestId: 'resource-offline', text: 'Read after disconnect.' }, 202);
         await wait(() => core.store.work(offline.id)?.status === 'failed', 'resource offline result');
         assert.equal(core.store.work(offline.id).error_code, 'CORE_RESOURCE_NODE_OFFLINE');
-        assert.equal(provider.calls.length, 2);
+        assert.equal(provider.calls.length, 3);
         assert.equal(f.calls(), 0);
     } finally {
         node?.terminate();

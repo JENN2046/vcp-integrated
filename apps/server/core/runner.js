@@ -6,10 +6,12 @@ const { failure } = require('./store');
 const { planGroup, buildGroupPacket } = require('./group');
 
 class CoreRunner {
-    constructor({ store, chat, resolveAcceptedTopic, buildPacket, allowedAgents, sponsor, send, automaticCompaction, isCompacting, attachments }) {
+    constructor({ store, chat, resolveAcceptedTopic, buildPacket, allowedAgents, sponsor, send, automaticCompaction, isCompacting, attachments, desktopContext, memoryTool }) {
         this.store = store;
         this.chat = chat;
         this.attachments = attachments;
+        this.desktopContext = desktopContext;
+        this.memoryTool = memoryTool;
         this.resolveAcceptedTopic = resolveAcceptedTopic;
         this.buildPacket = buildPacket;
         this.sponsor = sponsor;
@@ -93,7 +95,9 @@ class CoreRunner {
     async run(work, runtime) {
         const { id, conversation_id: key } = work;
         const { signal } = runtime.controller;
+        const config = JSON.parse(work.frozen_config_json);
         const observe = (type, data) => {
+            if (config.game && ['delta','tool_display'].includes(type)) return;
             const payload = { ...data, workId: id };
             if (type === 'delta') runtime.text = (runtime.text + data.text).slice(-256 * 1024);
             if (type === 'approval_requested') {
@@ -118,18 +122,19 @@ class CoreRunner {
         const sink = new CoreTurnSink({
             signal, observe,
             present: (type, presentation) => {
+                if (config.game) return;
                 const payload = { ...presentation, workId: id };
                 runtime.presentations.set(type, payload);
                 this.publish(key, type, payload);
             },
             commit: content => {
                 fence();
-                if (typeof content !== 'string' || !content.trim() || this.store.unresolved(id)) throw failure('WORK_FINAL_UNSETTLED');
+                if ((!config.game && (typeof content !== 'string' || !content.trim())) || this.store.unresolved(id)) throw failure('WORK_FINAL_UNSETTLED');
                 if (this.store.work(id).steering_count > includedCount) {
                     continuation = { content, includedCount };
                     return false;
                 }
-                this.store.saveFinal(step, content);
+                this.store.saveFinal(step, config.game ? null : content);
                 let flowlockChanged;
                 const result = this.store.transaction(() => {
                     const receipt = this.store.finish(id);
@@ -145,11 +150,13 @@ class CoreRunner {
         try {
             const topic = this.resolveAcceptedTopic(work);
             if (!topic) throw failure('WORK_AUTHORITY_REVOKED');
-            const config = JSON.parse(work.frozen_config_json);
+            if (config.game) this.desktopContext.gameNode(topic);
             if (!group) await this.automaticCompaction(topic, work, config, signal, fence);
             const execute = (agent, turn) => native.runCoreTurn({
                 workId: id, signal, fence, observe,
                 ...(!group && topic.actor?.kind === 'desktop' && !config.sponsoredByWorkId && { coreSponsor: (invocation, args) => this.sponsor(work, invocation, args) }),
+                coreMemory: (name, args, pluginConfig) => this.memoryTool(topic, name, args, pluginConfig),
+                ...(config.game && { coreGame: args => this.desktopContext.gameTool(topic, config.game, agent.name, args) }),
                 coreAA: {
                     assertAllowed: (args, indirect) => this.agentAssistant.assertAllowed(work, args, indirect),
                     link: (plugin, taskId) => this.agentAssistant.link(work, plugin, taskId),
@@ -191,7 +198,7 @@ class CoreRunner {
                     fence();
                     runtime.speaker = { step: step.group_step, speaker: memberId, speakerName: member.name || member.id };
                     observe('work_preview', { text: '', ...runtime.speaker });
-                    const packet = await buildGroupPacket(topic, step, config, member, this.store.history(work), this.attachments);
+                    const packet = await buildGroupPacket(topic, step, config, member, this.store.history(work), this.attachments, this.desktopContext);
                     fence();
                     await execute(member, () => this.chat.executeTurn({ body: packet.body, signal, clientIp: null }, sink));
                     if (this.store.work(id).group_step === step.group_step) break;

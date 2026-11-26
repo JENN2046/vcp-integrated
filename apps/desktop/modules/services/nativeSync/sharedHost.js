@@ -25,7 +25,10 @@ function groupProjection(raw){
  const {createdAt,...dto}=extractGroupDTO(raw),members=dto.members||[];
  const order=raw.modeSettings?.sequential?.speakerOrder||raw.sequentialSpeakerOrder||members;
  if(dto.memberTags)dto.memberTags=Object.fromEntries(Object.entries(dto.memberTags).filter(([id])=>members.includes(id)));
- return {...dto,avatar:raw.avatar||null,tavernRules:raw.nativeSyncSharedRules||raw.tavernRules||[],ruleOverrides:raw.conversationOverrides?.rules||raw.ruleOverrides||{},sequentialSpeakerOrder:[...order],modeSettings:{sequential:{speakerOrder:[...order]}}};
+ return {...dto,avatar:raw.avatar||null,tavernRules:raw.nativeSyncSharedRules||raw.tavernRules||[],ruleOverrides:raw.conversationOverrides?.rules||raw.ruleOverrides||{},sequentialSpeakerOrder:[...order],modeSettings:{sequential:{speakerOrder:[...order]},
+   ...(raw.mode==='jev'&&{jev:require('../../../Groupmodules/modes/jevDecisionMode').normalizeJevModeSettings(
+   raw.modeSettings?.jev, members)}),
+  ...(raw.mode==='game'&&raw.modeSettings?.game?.gameTypeId&&{game:{gameTypeId:raw.modeSettings.game.gameTypeId}})}};
 }
 function projectNativeConfig(runtime,kind,raw,base){
  const value=runtime.host.projectOwner(kind,{

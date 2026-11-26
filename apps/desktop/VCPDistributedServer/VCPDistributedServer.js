@@ -182,6 +182,7 @@ class DistributedServer {
         this.chartService = config.chartService || null;
         this.gameService = config.gameService || null;
         this.readCoreContext = config.readCoreContext;
+        this.coreMemory = config.coreMemory;
         this.workspaceService = config.workspaceService || null; // 工作区只读门面（白名单来源）
         this.crownEvidenceService = createCrownEvidenceService();
         this.onToolResult = typeof config.onToolResult === 'function' ? config.onToolResult : null; // 工具调用成功后的旁路通知，不影响返回结果
@@ -297,6 +298,7 @@ class DistributedServer {
         // 初始化服务类插件，并将主进程持有的共享服务依赖注入 direct 模块。
         await pluginManager.initializeServices(this.app, null, basePath, {
             chatDataService: this.chatDataService,
+            coreMemory: this.coreMemory,
             loomManager: this.loomManager,
             scriptoriumAgentControl: this.scriptoriumAgentControl,
             pluginAgentOperationService: this.pluginAgentOperationService,

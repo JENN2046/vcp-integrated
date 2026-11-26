@@ -41,8 +41,8 @@ class SharedRuntime {
   }
   return runtime;
  }
- constructor({queue,appDataRoot,connection,sharedHost,send,openEvents,openWatch,notify=()=>{},notifyExecutionStatus=()=>{},intervalMs=1000,agentConfigEvents,download,storeAttachment,isStopping=()=>false,historyAuthority=authorityControl.authorityForQueue(queue)}){
-  Object.assign(this,{queue,root:path.resolve(appDataRoot),connection,host:sharedHost,notify,notifyExecutionStatus,intervalMs,storeAttachment,isStopping});
+ constructor({queue,appDataRoot,connection,sharedHost,send,openEvents,openWatch,notify=()=>{},notifyExecutionStatus=()=>{},notifyGroupEvent,intervalMs=1000,agentConfigEvents,download,storeAttachment,isStopping=()=>false,historyAuthority=authorityControl.authorityForQueue(queue)}){
+  Object.assign(this,{queue,root:path.resolve(appDataRoot),connection,host:sharedHost,notify,notifyExecutionStatus,notifyGroupEvent,intervalMs,storeAttachment,isStopping});
   this.accessController=new AbortController();
   this.download=download&&((route,options)=>this.withSharedAccess(download,route,options));
   this.openEvents=openEvents&&((query,options)=>this.withSharedAccess(openEvents,query,options));
@@ -231,8 +231,8 @@ class SharedRuntime {
  }
  localFor(id){const local=this.state.locals[id];if(!local)throw fail('SHARED_LOCAL_MAPPING_REQUIRED');return local;}
  sharedMember(localId){const found=Object.entries(this.state.locals).find(([id,l])=>l.kind==='agent'&&!l.aliasOf&&l.localId===localId);if(!found){const alias=this.state.retiredOwners?.['agent:'+localId];if(alias)return alias;throw fail('SHARED_MEMBER_NOT_REGISTERED');}return found[0];}
- groupToShared(config){const value=structuredClone(config),convert=id=>this.sharedMember(id);value.members=value.members.map(convert);if(value.memberTags)value.memberTags=Object.fromEntries(Object.entries(value.memberTags).map(([id,v])=>[convert(id),v]));for(const order of [value.sequentialSpeakerOrder,value.modeSettings?.sequential?.speakerOrder])if(order)for(let i=0;i<order.length;i++)order[i]=convert(order[i]);return value;}
- groupToLocal(config){const value=structuredClone(config),convert=id=>this.localFor(id).localId;value.members=value.members.map(convert);if(value.memberTags)value.memberTags=Object.fromEntries(Object.entries(value.memberTags).map(([id,v])=>[convert(id),v]));for(const order of [value.sequentialSpeakerOrder,value.modeSettings?.sequential?.speakerOrder])if(order)for(let i=0;i<order.length;i++)order[i]=convert(order[i]);return value;}
+ groupToShared(config){const value=structuredClone(config),convert=id=>this.sharedMember(id);value.members=value.members.map(convert);if(value.memberTags)value.memberTags=Object.fromEntries(Object.entries(value.memberTags).map(([id,v])=>[convert(id),v]));const jev=value.modeSettings?.jev;if(jev?.memberStyles)jev.memberStyles=Object.fromEntries(Object.entries(jev.memberStyles).map(([id,v])=>[convert(id),v]));for(const order of [value.sequentialSpeakerOrder,value.modeSettings?.sequential?.speakerOrder])if(order)for(let i=0;i<order.length;i++)order[i]=convert(order[i]);return value;}
+ groupToLocal(config){const value=structuredClone(config),convert=id=>this.localFor(id).localId;value.members=value.members.map(convert);if(value.memberTags)value.memberTags=Object.fromEntries(Object.entries(value.memberTags).map(([id,v])=>[convert(id),v]));const jev=value.modeSettings?.jev;if(jev?.memberStyles)jev.memberStyles=Object.fromEntries(Object.entries(jev.memberStyles).map(([id,v])=>[convert(id),v]));for(const order of [value.sequentialSpeakerOrder,value.modeSettings?.sequential?.speakerOrder])if(order)for(let i=0;i<order.length;i++)order[i]=convert(order[i]);return value;}
  target(object){if(object.kind==='topic')return {name:object.config.name,archived:object.config.archived===true};if(['agent','group'].includes(object.kind))return this.host.projectOwner(object.kind,object.config);if(object.kind==='rules')return {name:object.config.name,tavernRules:this.host.projectRuleStore(object.config.tavernRules||[]),executionPolicy:this.host.projectPolicy(object.config.executionPolicy||{})};return object.config;}
  async readLocal(object){
   object={...this.state.objects[object.id],...object};

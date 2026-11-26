@@ -5,6 +5,9 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const express = require('express');
 const { CoreStore, failure } = require('./store');
+const { nativeGamePrompts, isCoreGame, gameDecision } = require('./game');
+const { CoreJev, configuredJev } = require('./jev');
+const { CoreCdsIndex } = require('./cdsIndex');
 const { CoreRunner } = require('./runner');
 const { isCoreGroupMode } = require('./group');
 const { DesktopContext } = require('./desktopContext');
@@ -31,7 +34,7 @@ const integer = (value, defaultValue, min, max) => {
 };
 
 class CoreService {
-    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat }) {
+    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
         if (!shared?.grants.has(workspace) || shared.readOnly || !mobile || shared.coreWorkspace && shared.coreWorkspace !== workspace) throw failure('CORE_WORKSPACE_UNAVAILABLE');
         if (!path.isAbsolute(directory) || directory === path.parse(directory).root) throw failure('CORE_DATA_DIRECTORY_REQUIRED');
         fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -45,10 +48,12 @@ class CoreService {
             throw failure('CORE_DATA_FILE_ALIAS');
         }
         this.workspace = workspace;
+        this.gameEnabled = gameEnabled;
         this.shared = shared;
         this.mobile = mobile;
         this.desktopContext = new DesktopContext(shared, workspace, chat.config?.webSocketServer);
         this.store = new CoreStore(filename);
+        this.cds = new CoreCdsIndex(directory, cdsBinary);
         const { db } = this.store;
         if (shared.coreStorageId && shared.coreStorageId !== this.store.storageId) {
             db.close();
@@ -64,7 +69,7 @@ class CoreService {
         };
         this.attachments = new AttachmentStore({ store: attachmentsStore, root: directory, topics: [] });
         this.runner = new CoreRunner({
-            store: this.store, chat, attachments: this.attachments, allowedAgents: shared.delegationAgents,
+            store: this.store, chat, memoryTool: (...args) => this.memoryTool(...args), attachments: this.attachments, desktopContext: this.desktopContext, allowedAgents: shared.delegationAgents,
             resolveAcceptedTopic: work => this.resolveAcceptedTopic(work),
             buildPacket: (...args) => this.buildPacket(...args),
             sponsor: (...args) => this.deliverSponsoredMessage(...args),
@@ -75,6 +80,8 @@ class CoreService {
         for (const row of db.prepare('SELECT * FROM conversations').all()) {
             if (row.workspace !== workspace) throw failure('CORE_DATABASE_WORKSPACE_MISMATCH');
         }
+        this.jev = jevService && new CoreJev(this, jevService, topic =>
+            prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false, desktopContext: true }));
         this.activateHistory();
         this.compaction = new CoreCompaction({ store: this.store, chat,
             sourceHash: (...args) => this.compactionSource(...args),
@@ -106,7 +113,7 @@ class CoreService {
             if (shared.active(row.id) || legacyJob) throw failure('CORE_HISTORY_LEGACY_WORK_UNSETTLED');
             shared.assertNotPrepared([row.id, row.parent_id]);
             if (row.owner_type === 'group' && !this.manages(row)) {
-                if (!isCoreGroupMode(shared.object(shared.row(this.workspace, row.parent_id)).config.mode)) {
+                if (!this.supportsGroup(shared.object(shared.row(this.workspace, row.parent_id)).config)) {
                     throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
                 }
                 newGroups.push(row);
@@ -122,6 +129,11 @@ class CoreService {
             WHERE conversation_id=? AND kind IN ('owner','topic') LIMIT 1`);
     }
 
+    supportsGroup(config) {
+        const mode = config?.mode;
+        return isCoreGroupMode(mode) || mode === 'jev' && Boolean(this.jev) || this.gameEnabled && isCoreGame(config);
+    }
+
     manages(row) { return row?.space_id === this.workspace && (row.owner_type === 'agent' || this.shared.requiresCore(row)); }
 
     topic(actor, workspace, key, permission) {
@@ -129,26 +141,32 @@ class CoreService {
         const row = this.shared.topic(actor, workspace, key, permission);
         if (!this.manages(row)) throw failure('CORE_CONVERSATION_NOT_MIGRATED', 409);
         if (row.id !== key) throw failure('CORE_CONVERSATION_MOVED');
+        const topicGame = row.owner_type === 'group' && this.shared.object(this.shared.row(workspace, row.parent_id)).config.mode === 'game';
+        if (topicGame && (actor.kind !== 'desktop' || actor.sourceId !== row.origin_source)) {
+            throw failure('CORE_GAME_ORIGIN_REQUIRED', 403);
+        }
         if (this.historyDeleted?.get(key)) throw failure('CORE_CONVERSATION_DELETED', 404);
-        const topic = { key, workspace, sharedSpaceId: workspace, ownerType: row.owner_type, ownerId: row.owner_id, topicId: row.topic_id, originSource: row.origin_source };
+        const topic = { key, workspace, sharedSpaceId: workspace, ownerType: row.owner_type, ownerId: row.owner_id, topicId: row.topic_id, originSource: row.origin_source, ...(topicGame && { game: true }) };
         this.attachments.topics.set(key, topic);
         return topic;
     }
 
+    liveActor(principal) {
+        const [kind, id] = principal.split(':');
+        if (kind === 'desktop') {
+            const member = this.shared.db.prepare('SELECT source_id FROM shared_members WHERE space_id=? AND device_id=?')
+                .get(this.workspace, id);
+            if (member) return { kind, principal, deviceId: id, sourceId: member.source_id };
+        } else if (kind === 'mobile') {
+            const session = this.shared.db.prepare('SELECT * FROM mobile_sessions WHERE id=? AND expires>?').get(id, Date.now());
+            if (session) return this.shared.mobile({ id, scopes: JSON.parse(session.scopes) }, this.workspace, 'execute');
+        }
+        throw failure('WORK_AUTHORITY_REVOKED', 403);
+    }
+
     resolveAcceptedTopic(work) {
         try {
-            const [kind, id] = work.principal.split(':');
-            let actor;
-            if (kind === 'desktop') {
-                const member = this.shared.db.prepare('SELECT source_id FROM shared_members WHERE space_id=? AND device_id=?')
-                    .get(this.workspace, id);
-                if (!member) return null;
-                actor = { kind, principal: work.principal, deviceId: id, sourceId: member.source_id };
-            } else if (kind === 'mobile') {
-                const session = this.shared.db.prepare('SELECT * FROM mobile_sessions WHERE id=? AND expires>?').get(id, Date.now());
-                if (!session) return null;
-                actor = this.shared.mobile({ id, scopes: JSON.parse(session.scopes) }, this.workspace, 'execute');
-            } else return null;
+            const actor = this.liveActor(work.principal);
             return { ...this.topic(actor, this.workspace, work.conversation_id, 'execute'), actor };
         } catch (error) {
             if (error.status >= 400 && error.status < 500) return null;
@@ -199,7 +217,6 @@ class CoreService {
             desktopReferences.some(ref => ref?.kind !== 'workspace') || desktopReferences.length && actor?.kind !== 'desktop') {
             throw failure('INVALID_DESKTOP_REFERENCE', 400);
         }
-        if (topic.ownerType === 'group' && desktopReferences.length) throw failure('CORE_GROUP_DESKTOP_REFERENCE_NOT_MIGRATED');
         const refs = desktopReferences.length ? fieldsFrom({ desktopReferences }).desktopReferences : [];
         const input = { text, attachments, ...(options.flowlock && { flowlock: true }), ...(refs.length && { desktopReferences: refs }) };
         const prior = this.store.replay(principal, requestId, { key: topic.key, op: 'send', input });
@@ -207,11 +224,13 @@ class CoreService {
         const config = await prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false, desktopContext: true });
         if (!config) throw failure('CORE_CONFIG_PENDING', 503);
         if (topic.ownerType === 'group') {
-            if (!isCoreGroupMode(config.group?.mode)) throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
+            if (!this.supportsGroup(config.group) || topic.game) throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
             Object.assign(config, { groupId: topic.ownerId, topicId: topic.topicId });
         }
         reauthorize();
+        let admitted = false;
         const result = this.store.admit(topic, principal, requestId, input, () => {
+            admitted = true;
             const files = this.attachments.claim(principal, topic.key, attachments);
             for (const file of files) {
                 if (file.type.startsWith('image/')) {
@@ -230,32 +249,67 @@ class CoreService {
             };
         });
         this.runner.publish(topic.key, 'change_seq', { seq: result.seq });
+        if (admitted && config.group?.mode === 'jev') this.jev.input(topic, actor, config, { id: result.messageId, content: text });
         this.runner.wake();
         return result;
     }
 
-    async invite(topic, actor, body, reauthorize) {
+    async invite(topic, actor, body, reauthorize, redo, { internal = false, game } = {}) {
         if (this.runner.draining) throw failure('HOST_DRAINING', 503);
         if (topic.ownerType !== 'group' || typeof body.agentId !== 'string' ||
             Object.keys(body).some(key => !['requestId', 'agentId'].includes(key))) throw failure('INVALID_GROUP_INVITATION', 400);
-        const input = { inviteAgentId: body.agentId };
+        const input = { inviteAgentId: body.agentId, ...(redo && { redo }), ...(game && { game }) };
         const prior = this.store.replay(actor.principal, body.requestId, { key: topic.key, op: 'send', input });
         if (prior) return prior;
         const config = await prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false, desktopContext: true });
-        if (!isCoreGroupMode(config?.group?.mode)) throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
+        if (!this.supportsGroup(config?.group) || topic.game && !game) throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
+        if (config.group.mode === 'jev' && !internal) throw failure('CORE_JEV_USE_SESSION_COMMAND');
         if (!config.group.members.includes(body.agentId) || !config.agents.some(agent => agent.id === body.agentId && !agent.unavailable)) {
             throw failure('GROUP_MEMBER_UNAVAILABLE', 403);
         }
         reauthorize();
         const result = this.store.admit(topic, actor.principal, body.requestId, input, () => ({
-            config: { ...config, inviteAgentId: body.agentId, groupId: topic.ownerId, topicId: topic.topicId },
-            ...(actor.kind === 'mobile' && { recovery: {
+            config: { ...config, inviteAgentId: body.agentId, groupId: topic.ownerId, topicId: topic.topicId,
+                ...(game && { game }) },
+            ...(actor.kind === 'mobile' && !internal && { recovery: {
                 version: 1, kind: 'invitation', sessionMarker: sessionMarker(actor.principal.slice(7)),
                 payloadHash: payloadHash({ topicKey: topic.key, kind: 'invitation', payload: body })
             } })
         }));
+        if (redo) this.runner.publish(topic.key, 'change_seq', { seq: result.seq });
         this.runner.wake();
         return result;
+    }
+
+    gameEvent(topic, actor, body) {
+        if (!this.gameEnabled || !topic.game) throw failure('CORE_GAME_TOPIC_REQUIRED');
+        if (this.runner.draining) throw failure('HOST_DRAINING', 503);
+        const { id, event, seats } = body;
+        if (typeof id !== 'string' || !id || id.length > 240 || !event || !Array.isArray(seats) || seats.length !== 3 ||
+            typeof event.id !== 'string' && !Number.isSafeInteger(event.id) || Buffer.byteLength(JSON.stringify(body)) > 24 * 1024) {
+            throw failure('INVALID_CORE_GAME_EVENT', 400);
+        }
+        const digest = createHash('sha256').update(id).digest('hex');
+        const msgId = 'game_' + digest;
+        const result = this.store.command(actor.principal, msgId, { key: topic.key, op: 'gameEvent', id, event, seats }, () => {
+            this.store.ensureConversation(topic);
+            const seq = this.store.insertMessage({ id: msgId, key: topic.key, role: 'user',
+                content: nativeGamePrompts().formatPublicEvent({ event, seats }), senderName: '游戏事件', after: this.store.nextGroupOrdinal(topic.key),
+                historyMetadata: { gameEvent: event, gameEventId: id, groupId: topic.ownerId, topicId: topic.key, isGroupMessage: true } });
+            return { messageId: msgId, seq };
+        });
+        this.runner.publish(topic.key, 'change_seq', { seq: result.seq });
+        return result;
+    }
+
+    async gameTurn(topic, actor, body, authorize) {
+        if (!this.gameEnabled || !topic.game) throw failure('CORE_GAME_TOPIC_REQUIRED');
+        const { requestId, agentId, observation, reminder = false, model } = body;
+        if (typeof reminder !== 'boolean' || model !== undefined && (typeof model !== 'string' || !model.trim() || model.length > 200) ||
+            Buffer.byteLength(JSON.stringify(body)) > 64 * 1024) throw failure('INVALID_CORE_GAME_DECISION', 400);
+        const game = { ...gameDecision(observation), reminder, ...(model && { model }),
+            invitePrompt: nativeGamePrompts().formatInvite({ observation, reminder }) };
+        return this.invite(topic, actor, { requestId, agentId }, authorize, null, { internal: true, game });
     }
 
     async deliverSponsoredMessage(work, invocation, args) {
@@ -309,6 +363,70 @@ class CoreService {
         return createHash('sha256').update(JSON.stringify([principal, topic.workspace, topic.key, id, head, hash])).digest('hex');
     }
 
+    async memoryTool(topic, name, args, config) {
+        const actor = this.liveActor(topic.actor.principal);
+        const authorized = this.topic(actor, topic.workspace, topic.key, 'read');
+        const desktop = path.resolve(path.dirname(require.resolve('@vcp/native-history-window')), '../../..');
+        const plugins = path.join(desktop, 'VCPDistributedServer', 'Plugin');
+        if (name === 'DeepMemo') {
+            const { processToolCall } = require(path.join(plugins, 'DeepMemo/DeepMemoService'));
+            const result = await processToolCall(args, { vcpContext: {
+                agentId: topic.ownerId, ownerType: topic.ownerType, topicId: topic.key
+            } }, { config, search: request => this.searchMemories(authorized, actor, request) });
+            this.topic(this.liveActor(topic.actor.principal), topic.workspace, topic.key, 'read');
+            return result;
+        }
+        const { processToolCall } = require(path.join(plugins, 'TopicMemo/TopicMemo'));
+        return processToolCall(args, null, {
+            userName: '用户',
+            findAgent: query => {
+                if (typeof query !== 'string') throw failure('INVALID_MEMORY_QUERY', 400);
+                const row = this.shared.db.prepare(`SELECT * FROM shared_objects
+                    WHERE space_id=? AND kind='agent' AND deleted=0 ORDER BY id`).all(topic.workspace)
+                    .find(item => this.shared.object(item).config.name.includes(query));
+                if (!row) return null;
+                const topics = this.shared.db.prepare(`SELECT * FROM shared_objects
+                    WHERE parent_id=? AND space_id=? AND kind='topic' AND deleted=0 ORDER BY id`).all(row.id, topic.workspace)
+                    .filter(value => this.manages(value) && !this.historyDeleted?.get(value.id))
+                    .map(value => {
+                        this.topic(actor, topic.workspace, value.id, 'read');
+                        const config = this.shared.object(value).config;
+                        return { id: value.id, name: config.name, createdAt: config.createdAt };
+                    });
+                return { name: this.shared.object(row).config.name, uuid: row.id, topics };
+            },
+            history: ({ agentId, topicId }) => {
+                const owner = this.topic(actor, topic.workspace, topicId, 'read');
+                if (owner.ownerId !== agentId) throw failure('CORE_TOPIC_OWNER_MISMATCH', 403);
+                return this.store.compactionHistory(topicId);
+            }
+        });
+    }
+
+    searchMemories(topic, actor, request) {
+        const query = request?.query;
+        if (typeof query !== 'string' || !query.trim() || query.length > 4096) throw failure('INVALID_MEMORY_QUERY', 400);
+        const objectRows = this.shared.db.prepare(`SELECT * FROM shared_objects
+            WHERE space_id=? AND owner_type=? AND owner_id=? AND kind='topic' AND deleted=0 ORDER BY id`)
+            .all(topic.workspace, topic.ownerType, topic.ownerId);
+        const rows = objectRows.filter(row => this.manages(row) && !this.historyDeleted?.get(row.id)).map(row => {
+            this.shared.topic(actor, topic.workspace, row.id, 'read');
+            const messages = this.store.compactionHistory(row.id).map(({ id, role, content, timestamp, name, agentId }) =>
+                ({ id, role, content, timestamp, ...(name && { name }), ...(agentId && { agentId }) }));
+            return { id: row.id, name: this.shared.object(row).config.name, messages };
+        });
+        const params = {
+            query,
+            excludeCurrentTopic: request.excludeCurrentTopic === true,
+            windowBefore: integer(request.windowBefore, 2, 0, 50),
+            windowAfter: integer(request.windowAfter, 2, 0, 50),
+            candidateLimit: integer(request.candidateLimit, 50, 1, 500),
+            resultLimit: integer(request.resultLimit, 8, 1, 100),
+            maxChars: integer(request.maxChars, 60000, 1, 1000000)
+        };
+        return this.cds.search(topic, rows, params);
+    }
+
     router(resolveActor) {
         const router = express.Router({ mergeParams: true });
         const scope = (req, permission) => {
@@ -349,6 +467,21 @@ class CoreService {
         router.post('/:workspace/:key/compact/cancel', route((req, res) => {
             const { actor, topic } = compactionScope(req);
             res.json(this.compaction.cancel(topic, actor, req.body?.requestId));
+        }));
+        router.post('/:workspace/:key/game-event', route((req, res) => {
+            const { topic, actor } = scope(req, 'execute');
+            res.json(this.gameEvent(topic, actor, req.body || {}));
+        }));
+        router.post('/:workspace/:key/game-turn', route(async (req, res) => {
+            const { topic, actor } = scope(req, 'execute');
+            await this.gameTurn(topic, actor, req.body || {}, () => scope(req, 'execute'));
+            res.status(202).json(this.receipt(topic, actor.principal, req.body.requestId));
+        }));
+        router.post('/:workspace/:key/memories', route(async (req, res) => {
+            const { actor, topic } = scope(req, 'read');
+            const result = await this.searchMemories(topic, actor, req.body);
+            scope(req, 'read');
+            res.json(result);
         }));
         router.get('/:workspace/:key/messages', route((req, res) => {
             const { topic } = scope(req, 'read');
@@ -437,14 +570,40 @@ class CoreService {
             await this.send(topic, actor.principal, req.body || {}, () => scope(req, 'execute'), actor);
             res.status(202).json(this.receipt(topic, actor.principal, req.body.requestId));
         }));
+        const jevScope = (req, permission) => {
+            const { actor, topic } = scope(req, permission);
+            if (!this.jev || topic.ownerType !== 'group' ||
+                this.shared.object(this.shared.row(topic.workspace, topic.ownerId)).config.mode !== 'jev') {
+                throw failure('CORE_JEV_TOPIC_REQUIRED');
+            }
+            return { actor, topic };
+        };
+        router.get('/:workspace/:key/jev', route((req, res) => {
+            const { topic } = jevScope(req, 'read');
+            res.json(this.jev.native.getState(topic.ownerId, topic.key));
+        }));
+        router.post('/:workspace/:key/jev', route(async (req, res) => {
+            const { actor, topic } = jevScope(req, 'execute');
+            if (!['start','continue','invite','stop'].includes(req.body?.action)) throw failure('INVALID_JEV_COMMAND', 400);
+            res.json(await this.jev.command(topic, actor, req.body.action, req.body.agentId));
+        }));
         router.post('/:workspace/:key/invitations', route(async (req, res) => {
             const { actor, topic } = scope(req, 'execute');
             if (actor.kind === 'mobile') this.mobile.requireSubmissionContext(req);
             await this.invite(topic, actor, req.body || {}, () => scope(req, 'execute'));
             res.status(202).json(this.receipt(topic, actor.principal, req.body.requestId));
         }));
+        router.post('/:workspace/:key/messages/:id/redo', route(async (req, res) => {
+            const { actor, topic } = scope(req, 'execute');
+            if (actor.kind !== 'desktop') throw failure('CORE_GROUP_REDO_DESKTOP_REQUIRED', 403);
+            const { revision, ...body } = req.body || {};
+            if (!Number.isSafeInteger(revision) || revision < 1) throw failure('MESSAGE_REVISION_CONFLICT', 400);
+            await this.invite(topic, actor, body, () => scope(req, 'execute'), { id: req.params.id, revision });
+            res.status(202).json(this.receipt(topic, actor.principal, body.requestId));
+        }));
         router.post('/:workspace/:key/messages/:id', route((req, res) => {
             const { actor, topic } = scope(req, 'execute');
+            if (topic.game) throw failure('CORE_GAME_HISTORY_IMMUTABLE');
             const { requestId, revision, text, remove = false } = req.body || {};
             if (!Number.isSafeInteger(revision) || revision < 1 || typeof remove !== 'boolean') throw failure('INVALID_CORE_MUTATION', 400);
             const result = this.store.mutateMessage(topic.key, actor.principal, requestId, req.params.id, {
@@ -511,7 +670,10 @@ class CoreService {
     beginDrain() { this.compaction.beginDrain(); this.runner.beginDrain(); }
     async close() {
         await this.compaction.close();
+        const jev = this.jev?.close();
         await this.runner.close();
+        await jev;
+        await this.cds.close();
         await this.attachments.close();
         this.store.db.close();
     }

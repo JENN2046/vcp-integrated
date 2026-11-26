@@ -45,7 +45,11 @@ class PluginExecutionBridgeRegistry {
         for (const bridge of this.bridges) {
             if (await bridge.canHandle(plugin, context)) {
                 const native = require('./requestExecutionContext');
-                if (native.isCoreTurn() && (!['direct-hybrid-service', 'local-stdio', 'nativesync-topic-sponsor'].includes(bridge.name) ||
+                const coreGame = bridge.name === 'distributed' && plugin.name === 'GameController' &&
+                    typeof context.executeCoreGame === 'function';
+                const coreMemory = bridge.name === 'distributed' && ['DeepMemo','TopicMemo'].includes(plugin.name) &&
+                    typeof context.executeCoreMemory === 'function';
+                if (native.isCoreTurn() && ((!coreGame && !coreMemory && !['direct-hybrid-service', 'local-stdio', 'nativesync-topic-sponsor'].includes(bridge.name)) ||
                     plugin.pluginType === 'asynchronous' || plugin.name === 'VCPSleep')) {
                     throw Object.assign(Error('CORE_TOOL_NOT_MIGRATED'), { code: 'CORE_TOOL_NOT_MIGRATED' });
                 }
@@ -232,6 +236,8 @@ function createDefaultExecutionBridgeRegistry() {
         priority: 400,
         canHandle: plugin => plugin.isDistributed === true,
         execute: async (plugin, toolArgs, context) => {
+            if (context.executeCoreMemory) return { result: await context.executeCoreMemory(toolArgs) };
+            if (context.executeCoreGame) return { result: await context.executeCoreGame(toolArgs) };
             if (!context.webSocketServer) {
                 throw new Error(
                     '[PluginManager] WebSocketServer is not initialized. ' +

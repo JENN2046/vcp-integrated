@@ -19,7 +19,7 @@ function clampGameAgentConfig(cfg, modelOverride) {
 }
 
 class GameRuntime {
-    constructor({ gameService, groupChat, loadAgent, toolInstructions, runAgent } = {}) {
+    constructor({ gameService, groupChat, loadAgent, toolInstructions, runAgent, commitCoreEvent } = {}) {
         if (!gameService || !groupChat || typeof loadAgent !== 'function'
             || typeof runAgent !== 'function' || typeof toolInstructions !== 'function') {
             throw new TypeError('GameRuntime requires service, group backend, agent loader and request adapters.');
@@ -45,6 +45,7 @@ class GameRuntime {
                 if (group?.mode !== 'game' || !group.topics?.some(topic => topic.id === topicId)) {
                     throw Object.assign(new Error('游戏后台会话已删除或模式改变。'), { code: 'SESSION_UNAVAILABLE' });
                 }
+                if (await commitCoreEvent?.(payload)) return;
                 await groupChat.appendGroupHistoryMessage(groupId, topicId, {
                     id: messageId, role: 'user', name: '游戏事件',
                     content: formatPublicEvent({ event, seats }),

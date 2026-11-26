@@ -11,12 +11,18 @@ test('compare desktop native HTTP and Core compaction on the same isolated model
     assert.equal(engine.hostname, '127.0.0.1');
     const scenario = process.env.M3_COMPACTION_CASE || 'en';
     const chinese = scenario.startsWith('zh');
+    const fresh = process.env.M4_COMPACTION_FRESH === '1';
     const f = await fixture(t);
     const provider = await localProvider(t);
+    const inference = [];
     provider.setReply((body, res) => void (async () => {
+        const { requestId, ...input } = body;
+        const params = { ...input, temperature: 0, seed: 54, max_tokens: chinese ? 420 : 240,
+            ...(fresh && { cache_prompt: false }) };
+        inference.push(params);
         const upstream = await fetch(new URL('/v1/chat/completions', engine), {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...body, temperature: 0, seed: 54, max_tokens: chinese ? 420 : 240 })
+            body: JSON.stringify(fresh ? params : { ...params, requestId })
         });
         res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('Content-Type') });
         for await (const chunk of upstream.body) res.write(chunk);
@@ -67,6 +73,7 @@ test('compare desktop native HTTP and Core compaction on the same isolated model
 
     assert.equal(provider.calls.length, 2);
     assert.deepEqual(provider.calls[0].messages, provider.calls[1].messages);
+    if (fresh) assert.deepEqual(inference[0], inference[1]);
     const result = message => {
         const { checkpoint, fidelity } = message.contextCompaction;
         return { checkpoint, fidelity, kept: facts.filter(fact => checkpoint.includes(fact)),
@@ -75,6 +82,7 @@ test('compare desktop native HTTP and Core compaction on the same isolated model
     const evidence = {
         model: process.env.M3_COMPACTION_MODEL || 'Qwen2.5-1.5B-Instruct Q4_K_M', case: scenario, engine: 'llama.cpp b12728',
         providerRequests: provider.calls.length, equivalentModelInput: true,
+        ...(fresh && { equivalentInferenceParameters: true, temperature: 0, seed: 54, maxTokens: inference[0].max_tokens, cachePrompt: false }),
         desktopNative: result(nativeCheckpoint), core: result(coreCheckpoint),
         equalOutput: nativeCheckpoint.contextCompaction.checkpoint === coreCheckpoint.contextCompaction.checkpoint
     };

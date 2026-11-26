@@ -3,13 +3,14 @@
   "displayName": "话题回忆插件",
   "version": "1.0.0",
   "description": "获取Vchat的话题列表和完整聊天记录，实现AI的话题级回忆功能。",
-  "pluginType": "synchronous",
+  "pluginType": "hybridservice",
   "communication": {
-    "protocol": "stdio",
+    "protocol": "direct",
     "timeout": 60000
   },
   "entryPoint": {
-    "command": "node TopicMemo.js"
+    "type": "nodejs",
+    "script": "TopicMemo.js"
   },
   "capabilities": {
     "invocationCommands": [
