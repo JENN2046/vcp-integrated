@@ -34,6 +34,13 @@ function createTopicExecutionAuthority({ appDataRoot, getQueue, getRuntime = () 
             };
             const queue = getQueue();
             if (!queue || queue.disposed) throw failure('TOPIC_AUTHORITY_NOT_READY');
+            if (queue.coreClient) {
+                if (ownerOnly) return { success: true, kind: 'shared', core: true };
+                return { success: true, kind: 'shared', core: true, sharedId: queue.coreClient.mapping(normalized).sharedId };
+            }
+            if (process.env.VCPCHAT_LOCAL_CORE_WORKSPACE || await fs.access(path.join(root, '.vcp-core/profile.json')).then(
+                () => true, error => { if (error.code === 'ENOENT') return false; throw error; }
+            )) throw failure('CORE_LOCAL_AUTHORITY_UNAVAILABLE');
             const policy = queue.syncPolicy;
             if (policy?.isRecoveryFence) throw failure('SHARED_STARTUP_RECOVERY_REQUIRED');
             const runtime = getRuntime() || policy?.sharedExecution?.runtime;

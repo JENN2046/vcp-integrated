@@ -443,11 +443,12 @@ class CoreSingleClient {
         const run = async () => {
             const { consumeSharedEvents } = await import('./sharedEventClient.mjs');
             const c = r.connection;
-            const url = c.url + sourceRoute(c, this.route(mapping, 'observe'));
+            const route = this.route(mapping, 'observe');
+            const url = r.observeRequest ? null : c.url + sourceRoute(c, route);
             const signal = r.accessController ? AbortSignal.any([controller.signal, r.accessController.signal]) : controller.signal;
             while (!signal.aborted && !r.closed) {
                 try {
-                    const response = await fetch(url, { headers: {
+                    const response = r.observeRequest ? await r.observeRequest(route, signal) : await fetch(url, { headers: {
                         ...syncHeaders(c), Authorization: 'Bearer ' + c.token,
                         'X-NativeSync-Capabilities': 'shared-space-v1'
                     }, signal, redirect: 'error', cache: 'no-store' });

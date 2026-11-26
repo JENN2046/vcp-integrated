@@ -1,0 +1,6 @@
+{
+  "passed": 13,
+  "previouslySkippedReplaysPassed": 6,
+  "fixture": "isolated reconstruction at the recorded checkpoint from the retained synthetic Journal",
+  "sourceWasReadOnly": true
+}

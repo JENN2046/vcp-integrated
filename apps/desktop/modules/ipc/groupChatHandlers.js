@@ -93,7 +93,7 @@ function initialize(mainWindow, context) {
             gameService, groupChat, loadAgent: getAgentConfigById,
             getCoreGame: ({ groupId, topicId }) => {
                 const descriptor = { itemType: 'group', itemId: groupId, topicId };
-                const client = historyMutationQueue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
+                const client = historyMutationQueue.coreClient || historyMutationQueue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
                 return client?.owns(descriptor) ? { client, descriptor } : null;
             },
             listAgents: async () => {
@@ -259,7 +259,7 @@ function initialize(mainWindow, context) {
 
     const coreGroup = (groupId, topicId) => {
         const descriptor = { itemType: 'group', itemId: groupId, topicId };
-        const client = historyMutationQueue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
+        const client = historyMutationQueue.coreClient || historyMutationQueue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
         return { descriptor, client: client?.owns(descriptor) ? client : null };
     };
 

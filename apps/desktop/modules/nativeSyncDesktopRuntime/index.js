@@ -29,6 +29,23 @@ function registerIntegrated({ historyQueue, appDataRoot, readSettings, mainWindo
         onStartupError: error => console.error('[NativeSync] Desktop runtime startup failed:', error.code || 'SYNC_STARTUP_FAILED'),
         onRuntimeRecovered: () => broadcast('native-sync:executions-changed', { sharedRuntimeRecovered: true }),
         start: async startup => {
+            const { ownedJson } = require('../services/nativeSync/sharedLocal');
+            const marker = await ownedJson(appDataRoot, require('node:path').join(appDataRoot, '.vcp-core/profile.json'), { optional: true });
+            const localWorkspace = process.env.VCPCHAT_LOCAL_CORE_WORKSPACE || marker?.workspace;
+            if (localWorkspace) {
+                if (!isolated) throw Object.assign(new Error('CORE_LOCAL_REQUIRES_SEPARATE_PROFILE'), { code: 'CORE_LOCAL_REQUIRES_SEPARATE_PROFILE' });
+                return require('../services/localCoreRuntime').openLocalCore({
+                    queue: historyQueue(), appDataRoot, workspace: localWorkspace, readSettings, ipcMain, getMainWindow,
+                    readAgent: id => agentConfigManager.readAgentConfig(id),
+                    readGroup: id => groupChat.getAgentGroupConfig(id),
+                    readRules: async ({ itemType, itemId }) => (await require('../services/conversationContext')
+                        .resolve({ type: itemType, id: itemId })).rules,
+                    storeAttachment: (...args) => fileManager.storeFile(...args),
+                    notify: change => broadcast('history-file-updated', change),
+                    notifyExecutionStatus: change => broadcast('native-sync:executions-changed', change),
+                    notifyGroupEvent: event => broadcast('vcp-stream-event', event)
+                });
+            }
             const { createSharedHost } = require('../services/nativeSync/sharedHost');
             const { createNativeSyncRuntime } = require('../services/nativeSync/runtime');
             const sharedHost = createSharedHost({

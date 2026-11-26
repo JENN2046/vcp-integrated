@@ -38,7 +38,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     const excluded = /(?:^|\/)(?:node_modules|DebugLog|logs|TVDaily|dailynote|file|image|Agent|VectorStore|\.file_cache)(?:\/|$)|(?:^|\/)(?:config\.env|\.env(?:\..*)?)(?:$|\/)|\.(?:pem|key|p12|pfx)$/i;
     for (const entry of tracked.toString().split('\0').filter(Boolean)) {
         const rel = entry.slice('apps/server/'.length);
-        if (excluded.test(rel)) continue;
+        if (excluded.test(rel) || (mode === 'core-local' && rel === 'Plugin/NativeSync/plugin-manifest.json')) continue;
         if (rel.startsWith('Plugin/') && !rel.startsWith('Plugin/NativeSync/') &&
             !/^Plugin\/(?:VCPSleep|AgentAssistant)\/(?!plugin-manifest)/.test(rel) &&
             !(delegation && rel === 'Plugin/AgentAssistant/plugin-manifest.json.example')) continue;
@@ -84,7 +84,12 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     const descriptors = {};
     const missingCase = mode === 'idle' && process.env.NS_IDLE_SCENARIOS === 'attachment';
     const idleScale = mode === 'idle' && process.env.NS_IDLE_SCALE === 'large';
-    try {
+    if (mode === 'core-local') {
+        const descriptor = { itemType: 'agent', itemId: 'local-agent', topicId: 'local-topic' };
+        const { mapTopic } = require('../../apps/desktop/modules/services/localCoreRuntime');
+        source = { id: mapTopic(descriptor).sharedId };
+        for (const role of ['A', 'B']) descriptors[role] = { preSubmit: descriptor };
+    } else try {
         const f = await fixture({ after: fn => cleanup.push(fn) }, { syntheticRoot: seed, agentConfig: toolHandoff?.agentConfig });
         source = f.topic;
         const actor = f.actor('C');
@@ -123,7 +128,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
     const data = path.join(out, 'data');
     fs.mkdirSync(data, {recursive:Boolean(observedContext)});
     if (restoreSyntheticState) await restoreSyntheticState({ box, data });
-    else fs.copyFileSync(path.join(seed,'central.sqlite'), path.join(data,'central.sqlite'));
+    else if (mode !== 'core-local') fs.copyFileSync(path.join(seed,'central.sqlite'), path.join(data,'central.sqlite'));
     const calls=[], requests=[];
     const gates={partialClosed:false};
     let releaseLost,activePartial;
@@ -135,7 +140,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             const body=await jsonBody(req);
             const last=body.messages.findLast(row=>row.role==='user')?.content;
             const input=Array.isArray(last)?last.filter(x=>x.type==='text').map(x=>x.text).join(''):last;
-            const which=input===coreInput&&mode==='core-rc'?'coreRC':Object.entries(contract.cases).find(([,content])=>input===content)?.[0];
+            const which=input===coreInput&&(mode==='core-rc'||mode==='core-local')?'coreRC':Object.entries(contract.cases).find(([,content])=>input===content)?.[0];
             const row={case:which,id:body.requestId,stream:Boolean(body.stream),at:Date.now()};
             const ordinaryReply = ordinaryTools?.reply(body, row, calls);
             if (delegation?.classify(body, row)) {
@@ -333,7 +338,8 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             ...(observedContext ? ['--require',observedContext.preload] : []),'server.js'], {
             cwd:box,stdio:['ignore',log,log],env:{
                 ...(process.env.NS_FIXTURE_POLL_WATCHERS === '1' && { CHOKIDAR_USEPOLLING:'true', NS_FIXTURE_POLL_WATCHERS:'1' }),
-                ...(mode==='core-rc'&&{ VCP_CORE_DATA_DIR:path.join(out,'core'), VCP_CORE_WORKSPACE:'sharedAB' }),
+                ...(mode==='core-local'&&{ VCP_CORE_DATA_DIR:path.join(out,'core'), VCP_CORE_MODE:'local' }),
+                ...(mode==='core-rc'&&{ VCP_CORE_DATA_DIR:path.join(out,'core'), VCP_CORE_WORKSPACE:'sharedAB', VCP_CORE_MODE:'shared' }),
                 PATH:'/usr/bin:/bin',HOME:out,LANG:'C.UTF-8',TZ:'UTC',NS_LOADED_REPORT:path.join(out,'backend-loaded.json'),
                 ...(mode === 'idle' && process.env.NS_IDLE_METER !== 'off' ? { NS_METER_BACKEND:'1', NS_METER_PREFIX:path.join(out,'backend') } : {}),
                 ...(observedContext ? { NS_CONTEXT_HANDLER_LOG: observedContext.handlerLog, NS_CONTEXT_INPUT: observedContext.input } : {}),
@@ -341,7 +347,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
                 API_URL:'http://127.0.0.1:'+providerPort,...(mode==='transport-only'?{}:{ApiRetries:'1'}),MaxVCPLoopNonStream:'4',MaxVCPLoopStream:'4',
                 KNOWLEDGEBASE_ROOT_PATH:path.join(out,'empty-diaries'),KNOWLEDGEBASE_STORE_PATH:path.join(data,'vectors'),
                 KNOWLEDGEBASE_FULL_SCAN_ON_STARTUP:'false',TDB_KNOWLEDGE_ENABLED:'false',
-                NativeSyncEnabled:'true',NativeSyncDataDir:data,NativeMobileEnabled:'true',
+                NativeSyncEnabled:mode==='core-local'?'false':'true',NativeSyncDataDir:data,NativeMobileEnabled:mode==='core-local'?'false':'true',
                 NativeMobileOrigin:'https://127.0.0.1:'+proxyPort,NativeMobileStartDelayMs:'0',
                 ...(delegation ? { AdminUsername:'synthetic-admin', AdminPassword:'synthetic-admin-only' } : {}),
                 ...(mode === 'idle' ? { NativeMobileConfigSync:'true', NativeMobileAttachments:'true' } : {}),
@@ -432,7 +438,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         return { htmlStatus: page.status, bundleStatus: bundle.status, connectionStatus: connection.status };
     }
     return { checkMobile, startupError, get backendPid(){return backend.pid;},
-        ...((mode==='core-rc' || ordinaryTools || delegation || groupRelay || toolHandoff?.finalReceipt || toolHandoff?.duo) && { async restartAfterCrash() {
+        ...((mode==='core-rc' || mode==='core-local' || ordinaryTools || delegation || groupRelay || toolHandoff?.finalReceipt || toolHandoff?.duo) && { async restartAfterCrash() {
             const crashed = await stopBackend('SIGKILL');
             assert.deepEqual(crashed, {code:null,signal:'SIGKILL'});
             await startBackend();

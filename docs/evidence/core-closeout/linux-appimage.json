@@ -1,0 +1,7 @@
+{
+  "renderer": "ready",
+  "exitCode": 0,
+  "sandbox": "existing host setuid helper in isolated extraction",
+  "releaseArtifactUnmodified": true,
+  "sha256": "bece39d9cb056293c0ca6af17cb9efe4d9975e1faf2978ed0d18319d220b5fb0"
+}

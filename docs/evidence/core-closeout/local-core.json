@@ -1,0 +1,28 @@
+{
+  "nativeSyncManifestInstalled": false,
+  "nativeSyncServiceLoaded": false,
+  "legacyDatabaseCreated": false,
+  "nativeHistoryWrites": 0,
+  "completedWithoutDesktop": true,
+  "coldReadback": true,
+  "backendRestart": {
+    "code": 0,
+    "signal": null
+  },
+  "formalMessages": 2,
+  "providerCalls": 1,
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  }
+}

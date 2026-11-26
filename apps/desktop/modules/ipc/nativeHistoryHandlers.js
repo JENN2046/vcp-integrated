@@ -3,7 +3,7 @@ const { authorityForQueue } = require('../services/historyAuthority');
 const { mergeTerminal } = require('../services/nativeSync/mergeTerminal');
 function initialize({ ipcMain, historyMutationQueue: queue }) {
     const core = d => {
-        const client = queue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
+        const client = queue.coreClient || queue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
         return client?.owns(d) ? client : null;
     };
     ipcMain.handle('native-history:status', () => queue.syncPolicy?.diagnostics() || { enabled: false });

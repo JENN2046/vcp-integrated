@@ -487,10 +487,10 @@ function initialize(mainWindow, context) {
             }
 
             const historyFile = path.join(USER_DATA_DIR, agentId, 'topics', topicId, 'history.json');
-            let history = [];
-            if (await fs.pathExists(historyFile)) {
-                history = await fs.readJson(historyFile);
-            }
+            const descriptor = { itemType: 'agent', itemId: agentId, topicId };
+            const core = historyMutationQueue?.coreClient || shared?.coreSingle;
+            const history = core?.owns(descriptor) ? (await core.history(descriptor)).history
+                : await fs.pathExists(historyFile) ? await fs.readJson(historyFile) : [];
             const effectiveMessageCount = Array.isArray(history)
                 ? history.filter(message => message && message.role !== 'system' && message.isThinking !== true).length
                 : 0;

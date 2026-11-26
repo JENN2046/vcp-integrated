@@ -1136,6 +1136,7 @@ app.post('/v1/interrupt', (req, res) => {
 
 
 
+let coreHost = null;
 const chatCompletionHandler = new ChatCompletionHandler({
     apiUrl,
     apiKey,
@@ -1408,14 +1409,10 @@ async function initialize() {
 
     await pluginManager.initializeServices(app, adminPanelRoutes, __dirname);
     if (process.env.VCP_CORE_DATA_DIR || process.env.VCP_CORE_WORKSPACE) {
-        const nativeSync = pluginManager.getServiceModule('NativeSync');
-        if (!nativeSync?.enableCore || !process.env.VCP_CORE_DATA_DIR || !process.env.VCP_CORE_WORKSPACE) {
-            throw new Error('CORE_DEVELOPMENT_CONFIGURATION_REQUIRED');
-        }
-        nativeSync.enableCore({
-            directory: process.env.VCP_CORE_DATA_DIR,
-            workspace: process.env.VCP_CORE_WORKSPACE,
-            chat: chatCompletionHandler
+        coreHost = require('./core/host').startCoreHost({
+            app, chat: chatCompletionHandler, serverKey,
+            listenHost: process.env.VCP_LOCAL_LISTEN_HOST || process.env.HOST || '127.0.0.1',
+            legacy: pluginManager.getServiceModule('NativeSync')
         });
     }
     // 在所有服务插件都注册完路由后，再将 adminApiRouter 挂载到主 app 上
@@ -1618,6 +1615,7 @@ async function gracefulShutdown(exitCode = 0, reason = 'signal') {
     shutdownReason = reason;
     shutdownStartedAt = Date.now();
     serverLifecycleState = SERVER_LIFECYCLE.DRAINING;
+    coreHost?.beginDrain();
     pluginManager.getServiceModule('NativeSync')?.beginDrain?.();
 
     console.log(`[Server] Initiating graceful shutdown. reason=${reason}, exitCode=${exitCode}`);
@@ -1669,6 +1667,9 @@ async function gracefulShutdown(exitCode = 0, reason = 'signal') {
             } else {
                 console.log(`[Server][ShutdownTrace] Phase 6/10 - taskScheduler shutdown skipped`);
             }
+
+            await coreHost?.close();
+            coreHost = null;
 
             if (webSocketServer) {
                 console.log(`[Server][ShutdownTrace] Phase 7/10 - webSocketServer.shutdown start`);

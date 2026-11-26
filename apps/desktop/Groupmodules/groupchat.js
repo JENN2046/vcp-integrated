@@ -2511,7 +2511,9 @@ async function regenerateGroupTopicTitle(groupId, topicId) {
             return { success: false, error: `未找到群组话题 ${topicId}。` };
         }
 
-        const groupHistory = await getGroupChatHistory(groupId, topicId);
+        const descriptor = { itemType: 'group', itemId: groupId, topicId };
+        const core = groupHistoryMutationQueue?.coreClient || shared?.coreSingle;
+        const groupHistory = core?.owns(descriptor) ? (await core.history(descriptor)).history : await getGroupChatHistory(groupId, topicId);
         const effectiveMessageCount = Array.isArray(groupHistory)
             ? groupHistory.filter(message => message && message.role !== 'system' && message.isThinking !== true).length
             : 0;

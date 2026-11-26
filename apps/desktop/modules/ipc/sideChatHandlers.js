@@ -526,7 +526,11 @@ function initialize(paths) {
                 rawHistory = explicitMessages;
             } else if (historyMutationQueue && typeof historyMutationQueue.read === 'function') {
                 try {
-                    rawHistory = await historyMutationQueue.read({ itemId: agentId, itemType: 'agent', topicId: parentTopicId });
+                    const descriptor = { itemId: agentId, itemType: 'agent', topicId: parentTopicId };
+                    const core = historyMutationQueue.coreClient || historyMutationQueue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
+                    const parentIsSideChat = await fs.pathExists(path.join(parentDir, 'sidechat-child.json'));
+                    rawHistory = !parentIsSideChat && core?.owns(descriptor)
+                        ? (await core.history(descriptor)).history : await historyMutationQueue.read(descriptor);
                 } catch (readErr) {
                     console.error('[SideChatHandlers] create-snapshot history read error:', readErr);
                     return { success: false, error: readErr.message || 'HISTORY_READ_FAILED' };

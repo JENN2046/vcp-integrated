@@ -75,7 +75,7 @@ class DesktopContext {
             const workspaces = [...new Set(message.content.match(workspacePattern) || [])];
             const canvases = message.content.includes(canvasPlaceholder);
             if (!workspaces.length && !canvases) continue;
-            const binding = this.shared.db.prepare(`SELECT t.local_id AS topicId, t.local_parent AS itemId
+            const binding = this.shared.resourceBinding ? this.shared.resourceBinding(topic) : this.shared.db.prepare(`SELECT t.local_id AS topicId, t.local_parent AS itemId
                 FROM shared_local_bindings t JOIN shared_local_bindings a
                   ON a.source_id=t.source_id AND a.space_id=t.space_id AND a.kind=?
                   AND a.local_id=t.local_parent AND a.object_id=?

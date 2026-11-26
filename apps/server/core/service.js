@@ -34,28 +34,36 @@ const integer = (value, defaultValue, min, max) => {
 };
 
 class CoreService {
-    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
-        if (!shared?.grants.has(workspace) || shared.readOnly || !mobile || shared.coreWorkspace && shared.coreWorkspace !== workspace) throw failure('CORE_WORKSPACE_UNAVAILABLE');
+    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, agentManager, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
+        if (shared && (!shared.grants.has(workspace) || shared.readOnly || !mobile || shared.coreWorkspace && shared.coreWorkspace !== workspace)) throw failure('CORE_WORKSPACE_UNAVAILABLE');
         if (!path.isAbsolute(directory) || directory === path.parse(directory).root) throw failure('CORE_DATA_DIRECTORY_REQUIRED');
         fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
         directory = fs.realpathSync(directory);
-        legacyDirectory = fs.realpathSync(legacyDirectory);
-        if (directory === legacyDirectory || directory.startsWith(legacyDirectory + path.sep) ||
-            legacyDirectory.startsWith(directory + path.sep)) throw failure('CORE_DATA_DIRECTORY_OVERLAP');
+        if (legacyDirectory) {
+            legacyDirectory = fs.realpathSync(legacyDirectory);
+            if (directory === legacyDirectory || directory.startsWith(legacyDirectory + path.sep) ||
+                legacyDirectory.startsWith(directory + path.sep)) throw failure('CORE_DATA_DIRECTORY_OVERLAP');
+        }
         const filename = path.join(directory, 'core.sqlite');
-        if (shared.coreStorageId && !fs.existsSync(filename)) throw failure('CORE_DATABASE_IDENTITY_REQUIRED');
+        if (shared?.coreStorageId && !fs.existsSync(filename)) throw failure('CORE_DATABASE_IDENTITY_REQUIRED');
         if (fs.existsSync(filename) && (fs.lstatSync(filename).isSymbolicLink() || fs.statSync(filename).nlink !== 1)) {
             throw failure('CORE_DATA_FILE_ALIAS');
         }
         this.workspace = workspace;
         this.gameEnabled = gameEnabled;
-        this.shared = shared;
         this.mobile = mobile;
-        this.desktopContext = new DesktopContext(shared, workspace, chat.config?.webSocketServer);
         this.store = new CoreStore(filename);
+        try {
+            this.local = shared ? null : new (require('./localWorkspace').LocalWorkspace)(this.store, workspace, agentManager);
+        } catch (error) {
+            this.store.db.close();
+            throw error;
+        }
+        this.shared = shared || this.local;
+        this.desktopContext = new DesktopContext(this.shared, workspace, chat.config?.webSocketServer);
         this.cds = new CoreCdsIndex(directory, cdsBinary);
         const { db } = this.store;
-        if (shared.coreStorageId && shared.coreStorageId !== this.store.storageId) {
+        if (shared?.coreStorageId && shared.coreStorageId !== this.store.storageId) {
             db.close();
             throw failure('CORE_DATABASE_IDENTITY_MISMATCH');
         }
@@ -69,7 +77,7 @@ class CoreService {
         };
         this.attachments = new AttachmentStore({ store: attachmentsStore, root: directory, topics: [] });
         this.runner = new CoreRunner({
-            store: this.store, chat, memoryTool: (...args) => this.memoryTool(...args), attachments: this.attachments, desktopContext: this.desktopContext, allowedAgents: shared.delegationAgents,
+            store: this.store, chat, memoryTool: (...args) => this.memoryTool(...args), attachments: this.attachments, desktopContext: this.desktopContext, allowedAgents: this.shared.delegationAgents,
             resolveAcceptedTopic: work => this.resolveAcceptedTopic(work),
             buildPacket: (...args) => this.buildPacket(...args),
             sponsor: (...args) => this.deliverSponsoredMessage(...args),
@@ -80,9 +88,12 @@ class CoreService {
         for (const row of db.prepare('SELECT * FROM conversations').all()) {
             if (row.workspace !== workspace) throw failure('CORE_DATABASE_WORKSPACE_MISMATCH');
         }
-        this.jev = jevService && new CoreJev(this, jevService, topic =>
-            prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false, desktopContext: true }));
-        this.activateHistory();
+        this.jev = jevService && new CoreJev(this, jevService, topic => this.configuration(topic));
+        if (shared) this.activateHistory();
+        else if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='history_import_deletions'").get()) {
+            this.historyDeleted = db.prepare(`SELECT 1 FROM history_import_deletions
+                WHERE conversation_id=? AND kind IN ('owner','topic') LIMIT 1`);
+        }
         this.compaction = new CoreCompaction({ store: this.store, chat,
             sourceHash: (...args) => this.compactionSource(...args),
             publish: (key, type, event) => this.runner.publish(key, type, event),
@@ -129,6 +140,16 @@ class CoreService {
             WHERE conversation_id=? AND kind IN ('owner','topic') LIMIT 1`);
     }
 
+    configuration(topic) {
+        if (this.local) return this.local.configuration(topic);
+        return prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false, desktopContext: true });
+    }
+
+    groupMode(row) {
+        if (row.owner_type !== 'group') return undefined;
+        return this.local ? this.local.groupMode(row) : this.shared.object(this.shared.row(this.workspace, row.parent_id)).config.mode;
+    }
+
     supportsGroup(config) {
         const mode = config?.mode;
         return isCoreGroupMode(mode) || mode === 'jev' && Boolean(this.jev) || this.gameEnabled && isCoreGame(config);
@@ -141,7 +162,7 @@ class CoreService {
         const row = this.shared.topic(actor, workspace, key, permission);
         if (!this.manages(row)) throw failure('CORE_CONVERSATION_NOT_MIGRATED', 409);
         if (row.id !== key) throw failure('CORE_CONVERSATION_MOVED');
-        const topicGame = row.owner_type === 'group' && this.shared.object(this.shared.row(workspace, row.parent_id)).config.mode === 'game';
+        const topicGame = this.groupMode(row) === 'game';
         if (topicGame && (actor.kind !== 'desktop' || actor.sourceId !== row.origin_source)) {
             throw failure('CORE_GAME_ORIGIN_REQUIRED', 403);
         }
@@ -152,6 +173,10 @@ class CoreService {
     }
 
     liveActor(principal) {
+        if (this.local) {
+            if (principal === this.local.actor.principal) return this.local.actor;
+            throw failure('WORK_AUTHORITY_REVOKED', 403);
+        }
         const [kind, id] = principal.split(':');
         if (kind === 'desktop') {
             const member = this.shared.db.prepare('SELECT source_id FROM shared_members WHERE space_id=? AND device_id=?')
@@ -221,7 +246,7 @@ class CoreService {
         const input = { text, attachments, ...(options.flowlock && { flowlock: true }), ...(refs.length && { desktopReferences: refs }) };
         const prior = this.store.replay(principal, requestId, { key: topic.key, op: 'send', input });
         if (prior) return prior;
-        const config = await prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false, desktopContext: true });
+        const config = await this.configuration(topic);
         if (!config) throw failure('CORE_CONFIG_PENDING', 503);
         if (topic.ownerType === 'group') {
             if (!this.supportsGroup(config.group) || topic.game) throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
@@ -261,7 +286,7 @@ class CoreService {
         const input = { inviteAgentId: body.agentId, ...(redo && { redo }), ...(game && { game }) };
         const prior = this.store.replay(actor.principal, body.requestId, { key: topic.key, op: 'send', input });
         if (prior) return prior;
-        const config = await prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false, desktopContext: true });
+        const config = await this.configuration(topic);
         if (!this.supportsGroup(config?.group) || topic.game && !game) throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
         if (config.group.mode === 'jev' && !internal) throw failure('CORE_JEV_USE_SESSION_COMMAND');
         if (!config.group.members.includes(body.agentId) || !config.agents.some(agent => agent.id === body.agentId && !agent.unavailable)) {
@@ -325,11 +350,11 @@ class CoreService {
             return topic;
         };
         const source = liveSource(), senderName = JSON.parse(work.frozen_config_json).name;
-        const resolve = topic => resolveDelivery(this.shared, topic.actor,
+        const resolve = topic => this.local ? this.local.resolveSponsor(topic, senderName, args) : resolveDelivery(this.shared, topic.actor,
             this.shared.row(this.workspace, topic.key), senderName, args);
         const initial = resolve(source);
         const target = this.topic(source.actor, this.workspace, initial.target.id, 'execute');
-        const config = await prepareSharedConfiguration(this.mobile.engine.configs, target, { persist: false, desktopContext: true });
+        const config = await this.configuration(target);
         const verified = resolve(liveSource());
         if (!config || target.key !== verified.target.id) throw failure('TOPIC_SPONSOR_TARGET_CHANGED');
         const quote = formatTopicRiverQuote(args.river_context);
@@ -381,6 +406,7 @@ class CoreService {
             userName: '用户',
             findAgent: query => {
                 if (typeof query !== 'string') throw failure('INVALID_MEMORY_QUERY', 400);
+                if (this.local) return this.local.findAgent(query, this.historyDeleted);
                 const row = this.shared.db.prepare(`SELECT * FROM shared_objects
                     WHERE space_id=? AND kind='agent' AND deleted=0 ORDER BY id`).all(topic.workspace)
                     .find(item => this.shared.object(item).config.name.includes(query));
@@ -406,14 +432,14 @@ class CoreService {
     searchMemories(topic, actor, request) {
         const query = request?.query;
         if (typeof query !== 'string' || !query.trim() || query.length > 4096) throw failure('INVALID_MEMORY_QUERY', 400);
-        const objectRows = this.shared.db.prepare(`SELECT * FROM shared_objects
+        const objectRows = this.local ? this.local.topicRows(topic.ownerType, topic.ownerId) : this.shared.db.prepare(`SELECT * FROM shared_objects
             WHERE space_id=? AND owner_type=? AND owner_id=? AND kind='topic' AND deleted=0 ORDER BY id`)
             .all(topic.workspace, topic.ownerType, topic.ownerId);
         const rows = objectRows.filter(row => this.manages(row) && !this.historyDeleted?.get(row.id)).map(row => {
             this.shared.topic(actor, topic.workspace, row.id, 'read');
             const messages = this.store.compactionHistory(row.id).map(({ id, role, content, timestamp, name, agentId }) =>
                 ({ id, role, content, timestamp, ...(name && { name }), ...(agentId && { agentId }) }));
-            return { id: row.id, name: this.shared.object(row).config.name, messages };
+            return { id: row.id, name: this.local ? this.local.definition(row).name : this.shared.object(row).config.name, messages };
         });
         const params = {
             query,
@@ -438,6 +464,10 @@ class CoreService {
             const actor = resolveActor(req, this.workspace, 'execute');
             this.desktopContext.announce(actor, req.body?.routeHash);
             res.json({ success: true });
+        }));
+        if (this.local) router.put('/:workspace/:key/definition', route(async (req, res) => {
+            this.local.authorize(resolveActor(req, req.params.workspace, 'config'), req.params.workspace);
+            res.json(await this.local.define(req.params.key, req.body, config => this.supportsGroup(config)));
         }));
         router.get('/:workspace/directory', route((req, res) => {
             const { workspace } = req.params;
@@ -573,7 +603,7 @@ class CoreService {
         const jevScope = (req, permission) => {
             const { actor, topic } = scope(req, permission);
             if (!this.jev || topic.ownerType !== 'group' ||
-                this.shared.object(this.shared.row(topic.workspace, topic.ownerId)).config.mode !== 'jev') {
+                this.groupMode(this.shared.row(topic.workspace, topic.key)) !== 'jev') {
                 throw failure('CORE_JEV_TOPIC_REQUIRED');
             }
             return { actor, topic };

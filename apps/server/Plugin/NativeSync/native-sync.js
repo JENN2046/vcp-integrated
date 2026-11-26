@@ -145,24 +145,26 @@ function registerApiRoutes(router) {
         catch(e) { res.status(e.status||400).json({error:{code:e.code||'INVALID_EXECUTION_CONFIG'}}); }
     });
 }
-function enableCore({ directory, workspace, chat }) {
-    const { CoreService } = require('../../core/service');
+function coreBinding() {
     const shared = store?.shared;
-    const core = new CoreService({ directory, legacyDirectory: dataDir, workspace, shared, mobile, chat });
-    shared.db.prepare("INSERT OR IGNORE INTO native_sync_metadata(key,value) VALUES('core-single-workspace-v1',?)")
-        .run(JSON.stringify({ workspace, storageId: core.store.storageId }));
-    shared.coreWorkspace = workspace;
-    shared.coreStorageId = core.store.storageId;
-    shared.core = core;
-    shared.coreDesktopRouter = core.router(req => {
-        if (!req.nativeSyncSourceBinding) throw Object.assign(Error('SOURCE_BINDING_REQUIRED'), { status: 403, code: 'SOURCE_BINDING_REQUIRED' });
-        return shared.desktop(req.nativeSyncSourceBinding, req.headers['x-nativesync-capabilities']);
-    });
-    mobile.coreRouter = core.router((req, workspace, permission) => {
-        const session = mobile.currentSession(req);
-        if (!session) throw Object.assign(Error('PAIR_REQUIRED'), { status: 401, code: 'PAIR_REQUIRED' });
-        return shared.mobile({ id: session.id, scopes: JSON.parse(session.scopes) }, workspace, permission);
-    });
+    if (!shared || !mobile) return null;
+    return { options: { shared, mobile, legacyDirectory: dataDir }, attach(core) {
+        const workspace = core.workspace;
+        shared.db.prepare("INSERT OR IGNORE INTO native_sync_metadata(key,value) VALUES('core-single-workspace-v1',?)")
+            .run(JSON.stringify({ workspace, storageId: core.store.storageId }));
+        shared.coreWorkspace = workspace;
+        shared.coreStorageId = core.store.storageId;
+        shared.core = core;
+        shared.coreDesktopRouter = core.router(req => {
+            if (!req.nativeSyncSourceBinding) throw Object.assign(Error('SOURCE_BINDING_REQUIRED'), { status: 403, code: 'SOURCE_BINDING_REQUIRED' });
+            return shared.desktop(req.nativeSyncSourceBinding, req.headers['x-nativesync-capabilities']);
+        });
+        mobile.coreRouter = core.router((req, workspace, permission) => {
+            const session = mobile.currentSession(req);
+            if (!session) throw Object.assign(Error('PAIR_REQUIRED'), { status: 401, code: 'PAIR_REQUIRED' });
+            return shared.mobile({ id: session.id, scopes: JSON.parse(session.scopes) }, workspace, permission);
+        });
+    } };
 }
 function registerRoutes(app, _adminApiRouter, _config, _projectBasePath) {
     if (mounted.has(app)) return;
@@ -176,7 +178,6 @@ async function shutdown() {
     const closing = service;
     service = null;
     releaseSharedBoundary?.();releaseSharedBoundary=null;store?.shared?.native?.close();
-    await store?.shared?.core?.close();
     await mobile?.close(); mobile = null;
     await closing.close(); store = null; dataDir = null; lifecycle.shutdowns++;
 }
@@ -185,7 +186,7 @@ function snapshot() {
 }
 function handleMobile(req,res) { if(!mobile)return res.status(503).json({error:{code:'MOBILE_DISABLED'}});return mobile.router(req,res,()=>res.status(404).end()); }
 function setExecutionEndpoint(value) { mobile?.engine.setEndpoint(value); }
-function beginDrain() { store?.shared?.core?.beginDrain();quiescing=true;service?.beginDrain();mobile?.beginDrain();store?.shared?.native?.beginDrain(); }
+function beginDrain() { quiescing=true;service?.beginDrain();mobile?.beginDrain();store?.shared?.native?.beginDrain(); }
 function drainStatus(){return {quiescing,sync:service?.snapshot(),execution:mobile?.engine.drainStatus(),...(store?.shared?.native?{shared:store.shared.native.snapshot()}:{})};}
 function setMobileHostAuthority(value) {
     if(!value?.agentManager||typeof value.agentManager.isAgent!=='function'||typeof value.agentManager.getAgentPrompt!=='function'||typeof value.verifyKey!=='function')throw new Error('INVALID_MOBILE_HOST_AUTHORITY');
@@ -193,4 +194,4 @@ function setMobileHostAuthority(value) {
     if(mobile){mobile.agentManager=value.agentManager;mobile.engine.agentManager=value.agentManager;mobile.connection.verifyKey=value.verifyKey;}
 }
 function mobileConnectionInfo(){return mobile?.connection.information() || {credentialExchangeAllowed:false};}
-module.exports = { initialize, enableCore, registerApiRoutes, registerRoutes, shutdown, snapshot, handleMobile, setExecutionEndpoint, beginDrain, drainStatus, setMobileHostAuthority, mobileConnectionInfo };
+module.exports = { initialize, coreBinding, registerApiRoutes, registerRoutes, shutdown, snapshot, handleMobile, setExecutionEndpoint, beginDrain, drainStatus, setMobileHostAuthority, mobileConnectionInfo };

@@ -2,18 +2,20 @@
 
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
 const { DatabaseSync } = require('node:sqlite');
 const { coreInput, contract } = require('./service.cjs');
 
 module.exports = async ({ clients: { A }, out, result, service, click, evalJs, waitUntil, start, stop, picture }) => {
     const topic = service.topics.preSubmit.id;
+    const local = result.mode === 'core-local';
     const selection = client => evalJs(client, 'window.VCPStateChannels.get("conversation.current").get()');
     async function select(client, role) {
         const descriptor = service.descriptors[role].preSubmit;
         if (!await evalJs(client, "document.querySelector('#tabContentAgents').classList.contains('active')")) {
             await click(client, '.sidebar-tab-button[data-tab="agents"]');
         }
-        await click(client, '#agentList > li .agent-name', 'Synthetic shared');
+        await click(client, '#agentList > li .agent-name', local ? 'Synthetic local' : 'Synthetic shared');
         await waitUntil(async () => (await selection(client)).itemId === descriptor.itemId, role + ' selected Core agent');
         await click(client, '.sidebar-tab-button[data-tab="topics"]');
         if ((await selection(client)).topicId !== descriptor.topicId) {
@@ -51,6 +53,13 @@ module.exports = async ({ clients: { A }, out, result, service, click, evalJs, w
     } finally {
         database.close();
     }
+    if (local) {
+        assert.equal(fs.existsSync(path.join(out, 'data', 'central.sqlite')), false);
+        assert.equal(fs.existsSync(path.join(out, 'profile-A', '.native-sync', 'shared')), false);
+        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(out, 'profile-A', 'UserData', 'local-agent', 'topics', 'local-topic', 'history.json'), 'utf8')), []);
+        result.core.legacyDatabaseCreated = false;
+        result.core.nativeHistoryWrites = 0;
+    } else {
     const legacy = new DatabaseSync(path.join(out, 'data', 'central.sqlite'), { readOnly: true });
     try {
         result.core.legacyWrites = Object.fromEntries(['journal','shared_admissions','mobile_executions']
@@ -58,6 +67,7 @@ module.exports = async ({ clients: { A }, out, result, service, click, evalJs, w
         assert.ok(Object.values(result.core.legacyWrites).every(count => count === 0));
     } finally {
         legacy.close();
+    }
     }
     result.core.backendRestart = await service.restartWithUpgrade();
     assert.deepEqual(result.core.backendRestart, { code: 0, signal: null });

@@ -1,0 +1,13 @@
+{
+  "capture": "verification receipt displayed in the Windows guest",
+  "platform": "Windows",
+  "osBuild": 22631,
+  "architecture": "x64",
+  "network": "disconnected",
+  "administrator": false,
+  "passed": true,
+  "installerExit": 0,
+  "renderer": "ready",
+  "installerSha256": "1cc54edddd0f3898dd93e2dc8efa7ec45d73c6f9859c62d97ae6294d83b6d72e",
+  "cdsSha256": "1c30d6c8433ee3cc048209a5c585189e33fb2532f735a19ab75a1bffc31bff91"
+}

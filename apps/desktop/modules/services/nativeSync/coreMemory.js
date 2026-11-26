@@ -5,9 +5,21 @@ const { ownedJson } = require('./sharedLocal');
 const { fail } = require('./protocol');
 const { runtimeForRoot } = require('./sharedHost');
 
-function createCoreMemory(root) {
+function createCoreMemory(root, getLocalCore) {
     async function resolve(ownerType, ownerId, topicId) {
         if (!topicId) return null;
+        const local = getLocalCore?.()?.runtime;
+        if (local?.enabled) {
+            const client = local.coreSingle;
+            const known = local.localTopics.get(topicId);
+            if (known) return { client, runtime: local, mapping: known };
+            const descriptor = { itemType: ownerType, itemId: ownerId, topicId };
+            await local.define(descriptor);
+            return { client, runtime: local, mapping: client.mapping(descriptor) };
+        }
+        if (await ownedJson(root, path.join(root, '.vcp-core', 'profile.json'), { optional: true })) {
+            throw fail('CORE_HISTORY_OFFLINE_UNAVAILABLE');
+        }
         const runtime = runtimeForRoot(root);
         const client = runtime?.coreSingle;
         if (!client) {

@@ -154,7 +154,7 @@ class CoreRunner {
             if (!group) await this.automaticCompaction(topic, work, config, signal, fence);
             const execute = (agent, turn) => native.runCoreTurn({
                 workId: id, signal, fence, observe,
-                ...(!group && topic.actor?.kind === 'desktop' && !config.sponsoredByWorkId && { coreSponsor: (invocation, args) => this.sponsor(work, invocation, args) }),
+                ...(this.sponsor && !group && topic.actor?.kind === 'desktop' && !config.sponsoredByWorkId && { coreSponsor: (invocation, args) => this.sponsor(work, invocation, args) }),
                 coreMemory: (name, args, pluginConfig) => this.memoryTool(topic, name, args, pluginConfig),
                 ...(config.game && { coreGame: args => this.desktopContext.gameTool(topic, config.game, agent.name, args) }),
                 coreAA: {
