@@ -1,4 +1,6 @@
 <script setup>
+import MobileIcon from './MobileIcon.vue';
+import AgentAvatar from './AgentAvatar.vue';
 import DesktopRelayStatus from './DesktopRelayStatus.vue';
 import SharedAttachmentImage from './SharedAttachmentImage.vue';
 import {ref,computed,watch,onMounted,onUnmounted,nextTick} from 'vue';
@@ -22,8 +24,40 @@ const attachmentPager=createAttachmentStatusPager(),historyCache=createHistoryCa
 const executionPager=createExecutionPager(),jobsInfo=ref(null),jobsError=ref('');
 const attachmentStates=ref({}),reviewChecks=ref({}),invitedAgent=ref('');
 const conversationPanel=ref(''), topicToggle=ref(null), workToggle=ref(null);
+const viewportHeight=ref(null), shell=ref(null), composer=ref(null);
+const browserOnline=ref(navigator.onLine), coreFeed=ref('');
+const themeModes=['system','light','dark'];
+const theme=ref('system');
+try{const stored=localStorage.getItem('vcp.mobile.theme');if(themeModes.includes(stored))theme.value=stored;}catch{}
+const prefersDark=window.matchMedia('(prefers-color-scheme: dark)');
+function syncTheme(){
+ const dark=theme.value==='dark'||(theme.value==='system'&&prefersDark.matches);
+ document.documentElement.dataset.theme=dark?'dark':'light';
+ document.querySelector('meta[name="theme-color"]')?.setAttribute('content',dark?'#20211f':'#fcfbf8');
+}
+function applyTheme(mode){
+ theme.value=mode;
+ try{localStorage.setItem('vcp.mobile.theme',mode);}catch{}
+ syncTheme();
+}
+syncTheme();
+function fitViewport(){
+ const vv=window.visualViewport;
+ viewportHeight.value=vv&&vv.scale===1?Math.round(vv.height):null;
+}
+function resizeComposer(){
+ const area=composer.value;
+ if(!area)return;
+ area.style.height='0px';
+ area.style.height=area.scrollHeight+'px';
+}
+watch(composer,resizeComposer,{flush:'post'});
 const navigationVisible=computed(()=>conversationPanel.value==='topics' || !selected.value && conversationPanel.value!=='work');
-function togglePanel(name){conversationPanel.value=conversationPanel.value===name?'':name;}
+function togglePanel(name){
+ if(conversationPanel.value===name){closePanel();return;}
+ conversationPanel.value=name;
+ nextTick(()=>shell.value?.querySelector(name==='topics'?'#topics-heading':'#work-heading')?.focus());
+}
 function closePanel(){
  const toggle=conversationPanel.value==='topics'?topicToggle.value:workToggle.value;
  conversationPanel.value='';
@@ -34,23 +68,28 @@ const attachmentPreview=ref(null),attachmentDialog=ref(null);let attachmentReadR
 // text and uploaded attachment references in the device recovery store.
 const drafts=new Map(),composerDraft=ref({text:'',files:[],revision:0});let composerScope='';
 const text=computed({get:()=>composerDraft.value.text,set:value=>{composerDraft.value.text=value;composerDraft.value.revision++;saveDraftEdit(composerDraft.value);}});
+watch(text,resizeComposer,{flush:'post'});
 const pendingFiles=computed({get:()=>composerDraft.value.files,set:value=>{composerDraft.value.files=value;}});
 const nativeResult=ref(null),nativeResultPanel=ref(null);let nativeResultRequest=0;
 let incomingPairing=consumePairingLink({location:window.location,history:window.history,secureContext:window.isSecureContext});
 let connectionInitialized=false;
 const pairingLinkOpen=ref(false);
 const paired=ref(false),pairCode=ref(''),topics=ref([]),selected=ref(''),agentId=ref(''),messages=ref([]),jobs=ref([]),busy=ref(true),notice=ref('正在连接…'),online=ref(false),history=ref(null);
-// When the keyboard shrinks the transcript, keep a bottom-pinned reader on the latest reply.
+// Preserve the reader's position when the keyboard or composer changes height.
 watch(history, (area, previous, onCleanup) => {
  if(!area)return;
  let height=area.clientHeight;
+ const nearEnd=()=>area.scrollHeight-area.scrollTop-area.clientHeight<48;
+ let anchored=nearEnd();
+ const onScroll=()=>{if(area.clientHeight===height)anchored=nearEnd();};
  const observer=new ResizeObserver(()=>{
   const nextHeight=area.clientHeight;
-  if(nextHeight<height && area.scrollHeight-area.scrollTop-height<=2)area.scrollTop=area.scrollHeight;
-  height=nextHeight;
+  if(nextHeight!==height && anchored)area.scrollTop=area.scrollHeight;
+  height=nextHeight;anchored=nearEnd();
  });
+ area.addEventListener('scroll',onScroll,{passive:true});
  observer.observe(area);
- onCleanup(()=>observer.disconnect());
+ onCleanup(()=>{area.removeEventListener('scroll',onScroll);observer.disconnect();});
 });
 const sharedSpaces=ref([]),sharedFeatures=ref([]),sharedStreams=ref([]);
 const corePreviews=ref([]);
@@ -62,13 +101,13 @@ const coreStorageHeaders = () => {
 };
 const corePath = topic => 'core/' + [topic.sharedSpaceId, topic.key].map(encodeURIComponent).join('/');
 function stopCoreObservation() {
- coreObserver?.controller.abort();coreObserver=null;corePreviews.value=[];clearTimeout(coreRefreshTimer);
+ coreObserver?.controller.abort();coreObserver=null;corePreviews.value=[];coreFeed.value='';clearTimeout(coreRefreshTimer);
 }
 function observeCore(topic) {
  if(coreObserver?.key===topic.key)return;
  stopCoreObservation();
  const controller=new AbortController(),entry={key:topic.key,controller,seq:cursor};
- coreObserver=entry;
+ coreObserver=entry;coreFeed.value='connecting';
  const isCurrent=()=>coreObserver===entry&&!controller.signal.aborted;
  const scheduleRefresh=()=>{clearTimeout(coreRefreshTimer);coreRefreshTimer=setTimeout(()=>{if(isCurrent())void refresh();},120);};
  void (async()=>{
@@ -78,6 +117,7 @@ function observeCore(topic) {
       credentials:'same-origin',redirect:'error',cache:'no-store',signal:controller.signal,
       headers:{'X-NativeSync-Capabilities':'shared-space-v1',...coreStorageHeaders()}
     });
+    if(isCurrent() && response.ok && response.headers.get('content-type')?.includes('text/event-stream'))coreFeed.value='live';
     await consumeSharedEvents(response,(data,type)=>{
      if(!isCurrent())return;
      if(type==='change_seq'&&data.seq!==entry.seq){entry.seq=data.seq;scheduleRefresh();}
@@ -89,7 +129,7 @@ function observeCore(topic) {
      if(type==='delta')next.text=((next.text||'')+data.text).slice(-256*1024);
      if(type==='approval_requested')next.approval=data.toolName;
      if(type==='approval_settled')delete next.approval;
-     if(type==='tool')next.tool=data.pluginName;
+     if(type==='tool'){next.tool=data.pluginName;next.toolStatus=data.status;}
      if(type==='resident_presentation')next.presentation=data;
      if(type==='work_state'){
       scheduleRefresh();
@@ -101,7 +141,9 @@ function observeCore(topic) {
      corePreviews.value=[...corePreviews.value.filter(work=>work.id!==data.workId),next];
     },{signal:controller.signal,envelope:true});
    }catch(error){
-    if(!isCurrent()||error.code==='SHARED_EVENT_PERMISSION_REQUIRED')break;
+    if(!isCurrent())break;
+    coreFeed.value='paused';
+    if(error.code==='SHARED_EVENT_PERMISSION_REQUIRED')break;
     await new Promise(resolve=>setTimeout(resolve,1000));
    }
   }
@@ -210,6 +252,14 @@ const visibleAgents=computed(()=>agents.value.filter(sourceMatches));
 const topicSearch=ref('');
 const visibleTopics=computed(()=>topics.value.filter(t=>sourceMatches(t)&&ownerKey(t)===agentId.value));
 const searchedTopics=computed(()=>{const query=topicSearch.value.trim().toLocaleLowerCase();return query?visibleTopics.value.filter(t=>[t.topicName,t.topicId].some(value=>String(value||'').toLocaleLowerCase().includes(query))):visibleTopics.value;});
+const topicLimit=ref(30);
+watch([topicSearch,agentId,sourceFilter],()=>{topicLimit.value=30;});
+const activeAgent=computed(()=>agents.value.find(a=>a.id===agentId.value));
+function openTopic(key){
+ if(busy.value)return;
+ if(key!==selected.value){selected.value=key;void changeTopic();}
+ closePanel();
+}
 const currentTopic=computed(()=>{const topic=topics.value.find(t=>t.key===selected.value);if(topic&&!historyContextReady.value)return{...topic,executable:false,unavailableReason:'HISTORY_CONTEXT_LOADING'};return topic&&!(topic.sharedSpaceId&&topic.ownerType==='agent')&&historyKey===selected.value&&messages.value.some(m=>m.desktopReferences?.length)?{...topic,executable:false,unavailableReason:'DESKTOP_CONTEXT_REQUIRED'}:topic;});
 function draftScope(){const topic=currentTopic.value;return paired.value&&validSessionRecovery(recoveryContext.value)&&topic?JSON.stringify([recoveryContext.value.entryId,recoveryContext.value.sessionMarker,ownerKey(topic),topic.topicId,topic.key]):'';}
 function switchDraft(next=draftScope()){
@@ -263,7 +313,13 @@ function confirmDraft(record,context){
 }
 // Keep the original executions for submission reconciliation. This separate
 // projection only displays bounded, correlated native task facts.
-const displayJobs=computed(()=>jobs.value.map(job=>{try{if(job.topicKey!==selected.value)throw Error('NATIVE_TASK_TOPIC_MISMATCH');if(job.core)return {...job,nativeTasks:(job.tasks||[]).map(task=>({...task,nativeTaskId:task.id,agentBaseName:task.agent,resultRef:task.revision===1?task.id:null})),toolInvocations:[]};return {...job,...projectNativeWork(job)};}catch{return {...job,nativeTasks:[],toolInvocations:[],nativeTaskError:'原生任务关联暂不能核对，请刷新或在宿主检查。'};}}));
+const displayedToolStatus={...toolLabels,dispatched:'工具已派发，等待返回',unknown:'工具结果待核对'};
+const workMessageNames=computed(()=>new Map(messages.value.map(message=>[message.id,
+ typeof message.content==='string'?message.content.slice(0,160).trim():'' ])));
+function workTime(createdAt){
+ return Number.isFinite(createdAt)?new Date(createdAt).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}):'';
+}
+const displayJobs=computed(()=>jobs.value.map(job=>{try{if(job.topicKey!==selected.value)throw Error('NATIVE_TASK_TOPIC_MISMATCH');if(job.core)return {...job,nativeTasks:(job.tasks||[]).map(task=>({...task,nativeTaskId:task.id,agentBaseName:task.agent,resultRef:task.revision===1?task.id:null})),toolInvocations:(job.tools||[]).map(tool=>({invocationId:tool.id,pluginName:tool.name,state:tool.status}))};return {...job,...projectNativeWork(job)};}catch{return {...job,nativeTasks:[],toolInvocations:[],nativeTaskError:'原生任务关联暂不能核对，请刷新或在宿主检查。'};}}));
 const keyAllowed=computed(()=>Boolean(isSecureContext&&server.value?.credentialExchangeAllowed));
 const pendingSubmission=computed(()=>recoveryRecords.value.find(record=>record.entryId===recoveryContext.value?.entryId&&record.topicKey===selected.value)||null);
 const recoveryBlocker=computed(()=>recoveryError.value||(!validSessionRecovery(recoveryContext.value)?'当前服务端未提供可靠提交恢复信息，暂不能发送。':''));
@@ -279,6 +335,23 @@ const workButtonText=computed(()=>{
  if(desktopRelays.value.some(r=>r.state==='first_member'||r.state==='continuing'))return '桌面接力中';
  if(displayJobs.value.some(j=>['running','dispatched','continuing','queued','accepted','publishing'].includes(j.state)))return '任务进行中';
  return '任务状态';
+});
+const workTone=computed(()=>workButtonText.value==='任务状态'?'neutral':workButtonText.value==='任务进行中'||workButtonText.value==='桌面接力中'?'active':'attention');
+const connectionBanner=computed(()=>{
+ if(!selected.value)return '';
+ if(!browserOnline.value)return '当前设备已离线。已加载的内容仍可阅读。';
+ if(!online.value)return '暂未连上服务端。当前显示最近已读到的内容。';
+ if(currentTopic.value?.coreSingle&&coreFeed.value==='paused')return '实时更新已断开，正在核对服务端记录。';
+ return '';
+});
+const visibleNotice=computed(()=>{
+ if(['正在连接…','中央会话已更新',errors.PAIR_REQUIRED].includes(notice.value))return '';
+ if(notice.value.startsWith('云端已接受 · ')){
+  const job=displayJobs.value.find(row=>row.id===acceptedReceipt.value?.id);
+  // An admission receipt is not a live execution status.
+  return job?'':'消息已被服务端接受，可在任务状态中核对。';
+ }
+ return notice.value;
 });
 const newSubmissionBlocked=computed(()=>Boolean(recoveryBlocker.value||pendingSubmission.value||!historyContextReady.value));
 const recoveryMessages={SUBMISSION_LOCK_UNAVAILABLE:'当前浏览器无法取得跨页面提交保护；已有原记录或草稿会继续保留，提交是否受理请先核对。请使用支持此保护的安全浏览器入口。',SUBMISSION_STORE_UNAVAILABLE:'无法保存或读取待确认提交，请检查浏览器存储后再试。',SUBMISSION_STORE_CORRUPT:'本地待确认提交校验失败，原记录已保留，请先核对。',SUBMISSION_STORE_BUDGET:'本地待确认提交已达到保存上限，请先核对已有提交。',SUBMISSION_STORE_UNVERIFIED:'待确认提交未能完成保存校验，本次未获本地确认。',SUBMISSION_CRYPTO_UNAVAILABLE:'当前入口无法校验提交身份，暂不能发送。',SUBMISSION_RECOVERY_UNAVAILABLE:'当前服务端未提供可靠提交恢复信息，暂不能发送。',SUBMISSION_TOPIC_UNAVAILABLE:'当前会话未获此话题授权，原提交继续保留，请使用原有授权核对。',SUBMISSION_CONTEXT_CHANGED:'提交前会话或入口已变化，服务端未受理，原提交保留待核对。',SUBMISSION_PENDING:'本话题有待确认提交，请先核对原提交；其他话题仍可使用。',SUBMISSION_RECORD_CHANGED:'待确认记录已变化，请重新核对，不会另建提交。',SUBMISSION_RECEIPT_UNVERIFIED:'回执未能唯一匹配原提交，已保留记录等待核对。',SUBMISSION_INVALID:'提交内容或身份不完整，本次未发送。'};
@@ -677,10 +750,16 @@ async function deviceVisibilityChanged(){resetHistory({remember:false});if(lastD
 function clearTransientKey(){pageSuspended=true;startupSessionController?.abort();refreshing?.abort();refreshing=null;generation++;clearSharedObservers();sharedObserver.suspend();historyCache.clear();accessKey.value='';pairCode.value='';incomingPairing=null;closeAttachment();}
 function storageChanged(event){if(event.key===SUBMISSION_STORAGE_KEY||event.key===null){if(loadRecovery())syncRejectedDraft();recoveryDetail.value='';}}
 async function refreshView(){if(pageSuspended)return;try{await refreshDirectory();}catch{}if(sharedObserver.hasLive()&&historyContextReady.value&&!pendingSubmission.value&&!sharedRefreshPending)return;await refresh();}
-async function reconnect(){if(pageSuspended||!connectionInitialized)return;clearSharedObservers();sharedObserver.resume();loadRecovery();await session();}
+function markOffline(){browserOnline.value=false;}
+async function reconnect(){browserOnline.value=true;if(pageSuspended||!connectionInitialized)return;clearSharedObservers();sharedObserver.resume();loadRecovery();await session();}
 async function pageShown(){pageSuspended=false;sharedObserver.resume();if(connectionInitialized)await session();}
 onMounted(async()=>{
  loadRecovery();
+ fitViewport();
+ window.visualViewport?.addEventListener('resize',fitViewport);
+ window.addEventListener('resize',resizeComposer);
+ window.addEventListener('offline',markOffline);
+ prefersDark.addEventListener('change',syncTheme);
  window.addEventListener('hashchange',pairingHashChanged);
  window.addEventListener('pagehide',clearTransientKey);
  window.addEventListener('pageshow',pageShown);
@@ -695,39 +774,34 @@ onMounted(async()=>{
  if(controller.signal.aborted&&!pageSuspended)await session();
  applyPairingLink(incomingPairing);incomingPairing=null;timer=setInterval(refreshView,2000);
 });
-onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refreshing?.abort();refreshing=null;clearInterval(timer);window.removeEventListener('hashchange',pairingHashChanged);window.removeEventListener('pagehide',clearTransientKey);window.removeEventListener('pageshow',pageShown);window.removeEventListener('storage',storageChanged);window.removeEventListener('online',reconnect);clearTransientKey();});
+onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport);window.removeEventListener('resize',resizeComposer);window.removeEventListener('offline',markOffline);prefersDark.removeEventListener('change',syncTheme);sharedObserver.close();clearTimeout(sharedRefreshTimer);refreshing?.abort();refreshing=null;clearInterval(timer);window.removeEventListener('hashchange',pairingHashChanged);window.removeEventListener('pagehide',clearTransientKey);window.removeEventListener('pageshow',pageShown);window.removeEventListener('storage',storageChanged);window.removeEventListener('online',reconnect);clearTransientKey();});
 </script>
 <template>
- <div class="shell" @keydown.esc="conversationPanel && closePanel()">
+ <div ref="shell" class="shell" :style="viewportHeight ? {'--visual-height':viewportHeight+'px'} : null" @keydown.esc="conversationPanel && closePanel()">
 <dialog v-if="attachmentPreview" ref="attachmentDialog" id="attachment-viewer" class="attachment-viewer" aria-labelledby="attachment-title" @cancel.prevent="closeAttachment">
    <div class="attachment-viewer-heading"><strong id="attachment-title">{{attachmentPreview.name}}</strong><button id="attachment-close" @click="closeAttachment" autofocus>关闭</button></div>
    <p v-if="attachmentPreview.loading" role="status">正在读取附件…</p><p v-else-if="attachmentPreview.error" role="alert">{{attachmentPreview.error}}</p>
    <template v-else><div class="attachment-viewer-content"><img v-if="attachmentPreview.isImage" :src="attachmentPreview.url" :alt="attachmentPreview.name"><TextPages v-else-if="attachmentPreview.text!==null" :text="attachmentPreview.text" :complete="!attachmentPreview.truncated"/><p v-else>此文件暂无页内预览，可以保存后打开。</p><small v-if="attachmentPreview.truncated">预览已截取，保存文件可查看完整内容。</small></div><button id="attachment-save" @click="downloadAttachment">保存文件</button></template>
   </dialog>
   <header :class="{'chat-header': paired && !settingsOpen}">
-   <img :src="(paired && !settingsOpen && currentTopic?.avatar) || '/mobile/icon.svg'" alt="">
    <template v-if="paired && !settingsOpen">
-    <button id="topic-toggle" ref="topicToggle" class="conversation-title"
-      aria-controls="conversation-navigation" :aria-expanded="navigationVisible" @click="togglePanel('topics')">
-     <span class="title-lines">
+    <button id="topic-toggle" ref="topicToggle" class="icon-button" type="button" aria-controls="conversation-navigation"
+      :aria-expanded="navigationVisible" aria-label="切换话题" @click="togglePanel('topics')"><MobileIcon name="menu"/></button>
+    <div class="conversation-title">
+     <AgentAvatar :src="currentTopic?.avatar||activeAgent?.avatar" :name="currentTopic?.agentName||activeAgent?.name"/>
+     <div class="title-lines">
       <strong>{{ currentTopic?.topicName || '选择话题' }}</strong>
-      <span class="title-meta">
-       <span v-if="currentTopic?.agentName" class="context-name">{{ currentTopic.agentName }}</span>
-       <span class="connection" :class="{offline:!online}">{{ online ? '已连接' : '离线' }}</span>
-      </span>
-     </span>
-     <span class="topic-switch">{{ navigationVisible ? '收起' : '切换' }}<span class="sr-only">话题列表</span></span>
-    </button>
+      <span class="title-meta"><span class="context-name">{{ currentTopic?.agentName || activeAgent?.name || 'VCP Mobile' }}</span><span v-if="!browserOnline||!online" class="connection offline">· 离线</span></span>
+     </div>
+    </div>
    </template>
-   <template v-else>
-    <strong>VCP Mobile</strong>
-    <span class="connection" :class="{offline:!online}">{{online?(paired?'已连接':'服务可达'):'离线'}}</span>
-   </template>
-   <button id="open-settings" class="settings-toggle" @click="conversationPanel='';settingsOpen=!settingsOpen">设置</button>
+   <div v-else class="brand"><img :src="'/mobile/icon.svg'" alt=""><strong>VCP Mobile</strong></div>
+   <button id="open-settings" class="icon-button" type="button" :aria-label="settingsOpen?'关闭设置':'设置'" :aria-expanded="settingsOpen" @click="conversationPanel='';settingsOpen=!settingsOpen"><MobileIcon :name="settingsOpen?'close':'settings'"/></button>
   </header>
   <main v-if="settingsOpen||!paired" class="pairing settings">
-   <div class="intro">连接你的会话</div><p v-if="server?.credentialExchangeAllowed===false">此入口使用电脑生成的一次性配对码，无需输入后端 Key。</p><p v-else>输入 VCPToolBox API Key。服务器和连接参数已自动配置。</p>
-   <form v-if="server?.mode!=='core'" @submit.prevent="connect">
+   <h1 class="intro">{{paired?'设置':'连接你的会话'}}</h1>
+   <p v-if="!paired">{{!server?'正在核对连接方式。':server?.mode==='core'||server?.credentialExchangeAllowed===false?'在电脑上生成手机配对码，即可在这里继续同一个话题。':'使用 VCPToolBox API Key 或一次性配对码连接。'}}</p>
+   <form v-if="server && server.mode!=='core' && server.credentialExchangeAllowed!==false" @submit.prevent="connect">
     <details :open="settingsOpen"><summary>连接设置</summary><label for="server-address">后端地址</label><input id="server-address" v-model="serverUrl" type="url" required @input="tested=false;accessKey=''" :disabled="busy">
     <button id="test-connection" type="button" @click="testConnection" :disabled="busy">测试连接</button>
     <p v-if="server" id="server-info">{{server.service}} · {{server.plugin}}<br>{{server.serverUrl||'尚未配置正式后端'}}</p></details>
@@ -736,14 +810,42 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
     <button id="save-connection" :disabled="busy||!tested||!keyAllowed||!accessKey">{{paired?'重新认证并保存连接':'保存服务器连接'}}</button>
    </form>
    <div v-if="paired" class="device-actions"><button id="disconnect" @click="disconnect" :disabled="busy">断开连接</button><button id="clear-session" @click="disconnect" :disabled="busy">清除设备会话</button><button id="close-settings" @click="settingsOpen=false">返回会话</button></div>
-   <details v-if="!paired" :open="pairingLinkOpen||server?.mode==='core'"><summary>使用一次性配对码</summary><form @submit.prevent="pair"><label for="pair-code">一次性配对码</label><input id="pair-code" v-model="pairCode" type="password" autocomplete="off" required><button id="pair-submit" :disabled="busy">连接会话</button></form></details>
+   <details v-if="!paired" :open="pairingLinkOpen||server?.mode==='core'||server?.credentialExchangeAllowed===false"><summary>使用一次性配对码</summary><form @submit.prevent="pair"><label for="pair-code">一次性配对码</label><input id="pair-code" v-model="pairCode" type="password" autocomplete="off" required><button id="pair-submit" :disabled="busy">连接会话</button></form></details>
+   <fieldset class="theme-settings"><legend>外观</legend><label v-for="(mode,index) in themeModes" :key="mode">
+    <input type="radio" name="appearance" :value="mode" :checked="theme===mode" @change="applyTheme(mode)"><span>{{['跟随系统','浅色','深色'][index]}}</span>
+   </label></fieldset>
    <p v-if="recoveryRecords.length" id="saved-submissions">此设备保留 {{recoveryRecords.length}} 条待确认提交。重新连接后会核对原记录，不会自动重发。</p><p v-if="recoveryError" role="alert">{{recoveryError}}</p><p v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</p><p role="status">{{notice}}</p>
   </main>
   <template v-else>
+   <p v-if="connectionBanner" class="connection-banner" role="status">{{connectionBanner}}</p>
    <div class="conversation-content">
    <nav v-show="navigationVisible" id="conversation-navigation" aria-label="切换话题">
-    <div class="panel-heading"><strong>切换话题</strong><button v-if="selected" type="button" @click="closePanel">返回聊天</button></div>
-    <template v-if="sources.length>1"><label for="source-select">来源</label><select id="source-select" v-model="sourceFilter" @change="selectSource" :disabled="busy"><option value="*">全部已授权来源</option><option v-for="s in sources" :key="s.key" :value="s.key">{{s.label}}</option></select></template><small v-else-if="sources.length" class="source-label">来源：{{sources[0].label}}</small><div class="agent-heading"><img v-if="agents.find(a=>a.id===agentId)?.avatar" :src="agents.find(a=>a.id===agentId).avatar" alt="Agent 头像"><div><label for="agent-select">Agent / 群聊</label><select id="agent-select" v-model="agentId" @change="selectAgent" :disabled="busy"><option v-for="a in visibleAgents" :key="a.id" :value="a.id">{{a.name}}<template v-if="sourceFilter==='*'&&sources.length>1"> · {{sourceName(a)}}</template></option></select></div></div><details class="topic-search-panel"><summary>搜索话题</summary><label for="topic-search">搜索当前 Agent / 群聊的话题</label><input id="topic-search" v-model="topicSearch" type="search" placeholder="话题名称或 ID" maxlength="160"><small class="unread-boundary">列表条数是历史消息总数。</small></details><label for="topic-select">历史话题</label><select id="topic-select" v-model="selected" @change="changeTopic();closePanel()" :disabled="busy"><option v-if="!searchedTopics.some(t=>t.key===selected)" :value="selected" disabled>{{currentTopic?.topicName||'请选择话题'}} · 不在当前筛选结果</option><option v-for="t in searchedTopics" :key="t.key" :value="t.key">{{t.topicName}}<template v-if="t.originLabel"> · 原来源 {{t.originLabel}}</template> · {{t.messageCount}} 条</option></select><small v-if="currentTopic" class="topic-detail"><template v-if="currentTopic.configVersion">配置 v{{currentTopic.configVersion}} · </template>{{currentTopic.topicId}} · {{currentTopic.model||'未配置模型'}} · {{currentTopic.historyReady===false?'等待电脑首次同步':currentTopic.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):'可继续对话'}}<template v-if="currentTopic.updatedAt"> · {{new Date(currentTopic.updatedAt).toLocaleString()}}</template></small><small v-if="visibleTopics.length&&!searchedTopics.length" role="status">没有匹配的话题，当前会话和草稿仍保留。</small><small v-if="!visibleTopics.length">此 Agent 暂无话题；新话题同步后会自动出现。</small><small v-if="directoryNotice" role="status">{{directoryNotice}}</small><small v-if="directoryFetchError" role="status">{{directoryFetchError}}</small><small v-for="progress in sourceProgress" :key="progress.sourceId" class="source-progress">{{progress.sourceLabel||'来源'}} · 最近已知：目录待核对 {{progress.directoryErrors??'未知'}} · 历史待接入 {{progress.pendingImports??'未知'}} · 本地操作待确认 {{progress.pendingOperations??'未知'}} · 冲突 {{progress.conflicts??'未知'}} · 附件待就绪 {{progress.attachmentsPending??'未知'}}<template v-if="progress.configurationPending!==undefined"> · 续聊配置待就绪 {{progress.configurationPending??'核对中'}} · 配置异常 {{progress.configurationErrors}}</template></small>
+    <div class="panel-heading"><h1 id="topics-heading" tabindex="-1">话题</h1><button v-if="selected" class="icon-button" type="button" aria-label="返回聊天" @click="closePanel"><MobileIcon name="close"/></button></div>
+    <div class="topic-filters">
+     <template v-if="sources.length>1"><label for="source-select">来源</label><select id="source-select" v-model="sourceFilter" @change="selectSource" :disabled="busy"><option value="*">全部已授权来源</option><option v-for="s in sources" :key="s.key" :value="s.key">{{s.label}}</option></select></template>
+     <div class="agent-heading"><AgentAvatar :src="activeAgent?.avatar" :name="activeAgent?.name"/><div>
+      <label for="agent-select">Agent / 群聊</label><select id="agent-select" v-model="agentId" @change="selectAgent" :disabled="busy"><option v-for="a in visibleAgents" :key="a.id" :value="a.id">{{a.name}}<template v-if="sourceFilter==='*'&&sources.length>1"> · {{sourceName(a)}}</template></option></select>
+     </div></div>
+     <label class="topic-search"><MobileIcon name="search"/><span class="sr-only">搜索当前 Agent 的话题</span><input id="topic-search" v-model="topicSearch" type="search" placeholder="搜索话题名称或 ID" maxlength="160"></label>
+    </div>
+    <ul v-if="searchedTopics.length" class="topic-list">
+     <li v-for="t in searchedTopics.slice(0,topicLimit)" :key="t.key">
+      <button type="button" :data-topic-key="t.key" :aria-current="t.key===selected?'true':undefined" :disabled="busy" @click="openTopic(t.key)">
+       <span><strong>{{t.topicName}}</strong><small>{{t.messageCount??0}} 条消息<template v-if="t.originLabel"> · {{t.originLabel}}</template></small></span><MobileIcon :name="t.key===selected?'check':'chevron'"/>
+      </button>
+     </li>
+    </ul>
+    <button v-if="searchedTopics.length>topicLimit" class="quiet-button" type="button" @click="topicLimit+=30">显示更多话题</button>
+    <p v-if="visibleTopics.length&&!searchedTopics.length" class="empty" role="status">没有匹配的话题，当前会话和草稿仍保留。</p>
+    <p v-if="!visibleTopics.length" class="empty">此 Agent 暂无话题。</p>
+    <p v-if="directoryNotice" role="status">{{directoryNotice}}</p><p v-if="directoryFetchError" role="status">{{directoryFetchError}}</p>
+    <details class="topic-options">
+     <summary>话题详情与快速跳转</summary>
+     <label for="topic-select">跳转到历史话题</label><select id="topic-select" v-model="selected" @change="changeTopic();closePanel()" :disabled="busy"><option v-if="!searchedTopics.some(t=>t.key===selected)" :value="selected" disabled>{{currentTopic?.topicName||'请选择话题'}} · 不在当前筛选结果</option><option v-for="t in searchedTopics" :key="t.key" :value="t.key">{{t.topicName}}<template v-if="t.originLabel"> · 原来源 {{t.originLabel}}</template> · {{t.messageCount}} 条</option></select>
+     <small v-if="currentTopic" class="topic-detail"><template v-if="currentTopic.configVersion">配置 v{{currentTopic.configVersion}} · </template>{{currentTopic.topicId}} · {{currentTopic.model||'未配置模型'}} · {{currentTopic.historyReady===false?'等待电脑首次同步':currentTopic.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):'可继续对话'}}<template v-if="currentTopic.updatedAt"> · {{new Date(currentTopic.updatedAt).toLocaleString()}}</template></small>
+     <small v-if="sources.length===1" class="source-label">来源：{{sources[0].label}}</small>
+     <small v-for="progress in sourceProgress" :key="progress.sourceId" class="source-progress">{{progress.sourceLabel||'来源'}} · 最近已知：目录待核对 {{progress.directoryErrors??'未知'}} · 历史待接入 {{progress.pendingImports??'未知'}} · 本地操作待确认 {{progress.pendingOperations??'未知'}} · 冲突 {{progress.conflicts??'未知'}} · 附件待就绪 {{progress.attachmentsPending??'未知'}}<template v-if="progress.configurationPending!==undefined"> · 续聊配置待就绪 {{progress.configurationPending??'核对中'}} · 配置异常 {{progress.configurationErrors}}</template></small>
+    </details>
     <details class="topic-options">
      <summary>消息与附件</summary>
      <p>普通草稿暂存于本页。被拒绝的草稿保存在此设备，返回原话题可继续编辑。</p>
@@ -755,41 +857,41 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
    <SharedConfigEditor v-if="currentTopic?.sharedSpaceId&&sharedSpaces.some(s=>s.id===currentTopic.sharedSpaceId&&s.config)" :key="currentTopic.sharedOwnerId" :topic="currentTopic" :context="recoveryContext" :api="api" />
    </details>
    </nav>
-   <section ref="history" id="history" aria-label="聊天历史" :inert="Boolean(conversationPanel) || !selected"><p v-if="historyProgress" class="history-progress" role="status">{{historyProgress.failed?'历史暂未加载完成，稍后重试':historyProgress.checking?'正在核对历史增量':'正在加载历史'}}<template v-if="historyProgress.total"> · {{historyProgress.loaded}} / {{historyProgress.total}}</template></p><button v-if="historyStart>0" class="earlier-messages" @click="showEarlierMessages">查看更早消息（还有 {{historyStart}} 条）</button><article v-for="m in visibleMessages" :key="m.id" class="message" :class="m.role" :data-message-id="m.id"><small>{{m.contextCompaction?'上下文快照':m.role==='user'?(m.name==='Flowlock'?'Flowlock':'你'):(m.name||currentTopic?.agentName||'Agent')}}</small><div v-if="m.content?.length>128000" class="long-message"><button @click="toggleLongText(m)">{{expandedLongText.has(longTextKey(m))?'收起全文':'查看长文本'}} · {{m.content.length}} 字符</button><TextPages v-if="expandedLongText.has(longTextKey(m))" :text="m.content" class="bubble" style="max-height:60vh;overflow:auto"/></div><div v-else class="bubble">{{typeof m.content==='string'?m.content:'此消息包含非文本内容，请在桌面查看'}}</div><details v-if="m.desktopReferences?.length" class="desktop-references"><summary>桌面活引用 {{m.desktopReferences.length}} 项 · 原件和提取文本未同步</summary><div v-for="r in m.desktopReferences" :key="r.id"><strong>{{r.name}}</strong><small>{{r.workspaceRef ? r.workspaceRef.alias+' / '+r.workspaceRef.relPath : r.target}} · 需在来源电脑核对</small></div></details><div v-if="m.attachments?.length" class="attachments"><div v-for="(a,index) in m.attachments" :key="a.id+'/'+index" class="attachment"><template v-if="attachmentStates[m.id+'/'+a.id]?.state==='available'"><SharedAttachmentImage v-if="currentTopic?.sharedSpaceId&&attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :key="generation+'/'+m.id+'/'+a.id" :url="attachmentUrl(m,a)" :alt="a.name||'图片附件'"></SharedAttachmentImage><img v-else-if="attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :src="attachmentUrl(m,a)" :alt="a.name||'图片附件'" loading="lazy"><button class="attachment-open" @click="openAttachment(m,a)">{{a.name||'查看附件'}}</button><details v-if="a.extractedText" class="attachment-text" @toggle="toggleAttachmentText(m,a,index,$event)"><summary>查看文本</summary><TextPages v-if="expandedAttachmentText.has(attachmentTextKey(m,a,index))" :text="a.extractedText"/></details></template><span v-else>{{a.name||'附件'}} · {{attachmentStates[m.id+'/'+a.id]?.state==='unsupported'?'原件类型暂不支持，引用已保留':attachmentStates[m.id+'/'+a.id]?.state==='corrupt'?'完整性校验失败':'附件暂未同步或正在确认'}}</span></div></div></article><p v-if="!messages.length&&!historyProgress&&!visibleSharedStreams.length" class="empty">{{currentTopic?.historyReady===false?'正在等待电脑同步所选历史，完成后即可接续。':currentTopic?.executable===false?'还没有消息。':'还没有消息，发送一条开始会话。'}}</p>
+   <section ref="history" id="history" aria-label="聊天历史" :inert="navigationVisible || conversationPanel==='work'"><p v-if="historyProgress" class="history-progress" role="status">{{historyProgress.failed?'历史暂未加载完成，稍后重试':historyProgress.checking?'正在核对历史增量':'正在加载历史'}}<template v-if="historyProgress.total"> · {{historyProgress.loaded}} / {{historyProgress.total}}</template></p><button v-if="historyStart>0" class="earlier-messages" @click="showEarlierMessages">查看更早消息（还有 {{historyStart}} 条）</button><article v-for="m in visibleMessages" :key="m.id" class="message" :class="[m.role,{'snapshot-message':m.contextCompaction}]" :data-message-id="m.id"><div class="message-author" v-if="m.role!=='user'||m.name==='Flowlock'"><AgentAvatar v-if="m.role!=='user'&&!m.contextCompaction" :src="currentTopic?.ownerType==='group'?undefined:currentTopic?.avatar||activeAgent?.avatar" :name="m.name||currentTopic?.agentName"/><small>{{m.contextCompaction?'上下文快照':m.role==='user'?(m.name==='Flowlock'?'Flowlock':'你'):(m.name||currentTopic?.agentName||'Agent')}}</small></div><div v-if="m.content?.length>128000" class="long-message"><button @click="toggleLongText(m)">{{expandedLongText.has(longTextKey(m))?'收起全文':'查看长文本'}} · {{m.content.length}} 字符</button><TextPages v-if="expandedLongText.has(longTextKey(m))" :text="m.content" class="bubble" style="max-height:60vh;overflow:auto"/></div><div v-else-if="m.content||!m.attachments?.length" class="bubble">{{typeof m.content==='string'?m.content:'此消息包含非文本内容，请在桌面查看'}}</div><details v-if="m.desktopReferences?.length" class="desktop-references"><summary>桌面活引用 {{m.desktopReferences.length}} 项 · 原件和提取文本未同步</summary><div v-for="r in m.desktopReferences" :key="r.id"><strong>{{r.name}}</strong><small>{{r.workspaceRef ? r.workspaceRef.alias+' / '+r.workspaceRef.relPath : r.target}} · 需在来源电脑核对</small></div></details><div v-if="m.attachments?.length" class="attachments"><div v-for="(a,index) in m.attachments" :key="a.id+'/'+index" class="attachment"><template v-if="attachmentStates[m.id+'/'+a.id]?.state==='available'"><SharedAttachmentImage v-if="currentTopic?.sharedSpaceId&&attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :key="generation+'/'+m.id+'/'+a.id" :url="attachmentUrl(m,a)" :alt="a.name||'图片附件'"></SharedAttachmentImage><img v-else-if="attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :src="attachmentUrl(m,a)" :alt="a.name||'图片附件'" loading="lazy"><button class="attachment-open" @click="openAttachment(m,a)"><MobileIcon name="file"/><span>{{a.name||'查看附件'}}</span><MobileIcon name="chevron"/></button><details v-if="a.extractedText" class="attachment-text" @toggle="toggleAttachmentText(m,a,index,$event)"><summary>查看文本</summary><TextPages v-if="expandedAttachmentText.has(attachmentTextKey(m,a,index))" :text="a.extractedText"/></details></template><span v-else>{{a.name||'附件'}} · {{attachmentStates[m.id+'/'+a.id]?.state==='unsupported'?'原件类型暂不支持，引用已保留':attachmentStates[m.id+'/'+a.id]?.state==='corrupt'?'完整性校验失败':'附件暂未同步或正在确认'}}</span></div></div></article><p v-if="!messages.length&&!historyProgress&&!visibleSharedStreams.length" class="empty">{{currentTopic?.historyReady===false?'正在等待电脑同步所选历史，完成后即可接续。':currentTopic?.executable===false?'还没有消息。':'还没有消息，发送一条开始会话。'}}</p>
    <section v-if="currentTopic?.coreSingle && corePreviews.length" aria-label="正在生成的共享回复">
-    <article v-for="work in corePreviews" :key="work.id" class="message assistant">
-     <small v-if="work.approval">等待桌面审批 · {{work.approval}}</small>
-     <small v-else-if="work.tool">工具 · {{work.tool}}</small>
-     <small v-else-if="work.speakerName">{{work.speakerName}}</small>
+    <article v-for="work in corePreviews" :key="work.id" class="message assistant live-message">
+     <div class="message-author"><AgentAvatar :src="currentTopic?.avatar||activeAgent?.avatar" :name="work.speakerName||currentTopic?.agentName"/><small>{{work.speakerName||currentTopic?.agentName||'Agent'}}</small></div>
+     <div class="work-inline" :data-tone="work.approval?'attention':'active'"><MobileIcon :name="work.approval||work.tool?'tool':'work'"/><span>{{work.approval?'等待桌面审批 · '+work.approval:coreFeed!=='live'||!browserOnline?'最近收到的预览':work.tool?work.tool+' · '+(displayedToolStatus[work.toolStatus]||'工具状态待核对'):'正在生成回复'}}</span></div>
      <div v-if="work.text" class="bubble">{{work.text}}</div>
      <div v-if="work.presentation" class="bubble"><strong>{{work.presentation.title}}</strong><p>{{work.presentation.challenge}}</p></div>
     </article>
-    <button v-if="coreSteeringWork && currentTopic?.executable" type="button"
-     :disabled="busy || !text.trim() || pendingFiles.length > 0" @click="sendCoreSteering">追加到当前工作</button>
    </section>
    <section v-if="visibleSharedStreams.length" id="shared-live-replies" aria-label="正在生成的共享回复">
-    <article v-for="stream in visibleSharedStreams" :key="stream.previewId" class="message assistant" :data-live-execution="stream.executionId" :data-native-request="stream.nativeRequestId"><small>{{stream.memberName||currentTopic?.agentName||'Agent'}}<template v-if="stream.kind==='controlled-text'"> · 第 {{stream.nativeGeneration+1}} 代</template> · {{stream.settled?'正在核对最终记录':stream.activity?sharedActivityLabels[stream.activity.state]||'正在核对原生任务':labels[stream.state]||'正在核对原生任务'}} · {{stream.connection==='online'?'实时观察':stream.connection==='disconnected'?'实时连接已暂停':'正在恢复连接'}}</small><div v-if="stream.text" class="bubble">{{stream.text}}</div><small v-if="stream.gap">仅显示目前可核对的临时片段，完整内容以保存后的会话为准。</small><small v-if="stream.settled&&stream.request?.state!=='completed'">{{labels[stream.request?.state]||'执行已暂停，请核对原生状态'}} · 已收到的片段暂存于此页。</small></article>
+    <article v-for="stream in visibleSharedStreams" :key="stream.previewId" class="message assistant live-message" :data-live-execution="stream.executionId" :data-native-request="stream.nativeRequestId"><small>{{stream.memberName||currentTopic?.agentName||'Agent'}}<template v-if="stream.kind==='controlled-text'"> · 第 {{stream.nativeGeneration+1}} 代</template> · {{stream.settled?'正在核对最终记录':stream.activity?sharedActivityLabels[stream.activity.state]||'正在核对原生任务':labels[stream.state]||'正在核对原生任务'}} · {{stream.connection==='online'?'实时观察':stream.connection==='disconnected'?'实时连接已暂停':'正在恢复连接'}}</small><div v-if="stream.text" class="bubble">{{stream.text}}</div><small v-if="stream.gap">仅显示目前可核对的临时片段，完整内容以保存后的会话为准。</small><small v-if="stream.settled&&stream.request?.state!=='completed'">{{labels[stream.request?.state]||'执行已暂停，请核对原生状态'}} · 已收到的片段暂存于此页。</small></article>
    </section>
    </section>
    <section v-show="conversationPanel==='work'" id="conversation-work" aria-label="任务状态">
-    <div class="panel-heading"><strong>任务状态</strong><button type="button" @click="closePanel">返回聊天</button></div>
+    <div class="panel-heading"><h1 id="work-heading" tabindex="-1">任务状态</h1><button class="icon-button" type="button" aria-label="返回聊天" @click="closePanel"><MobileIcon name="close"/></button></div>
     <p v-if="!jobs.length && !desktopRelays.length && !jobsError && !pendingSubmission && !recoveryBlocker && !acceptedReceipt" class="empty">暂无任务记录</p>
-   <section v-if="recoveryBlocker||pendingSubmission||acceptedReceipt||recoveryRecords.length" id="submission-recovery" class="submission-recovery" aria-label="提交确认状态" aria-live="polite"><p v-if="recoveryBlocker" role="alert">{{recoveryBlocker}}</p><div v-if="pendingSubmission" id="pending-submission" :data-request-id="pendingSubmission.requestId"><strong>本地已保存 · 云端接受尚待确认</strong><p>{{pendingSubmission.kind==='invitation'?'邀请成员：'+pendingSubmission.payload.agentId:pendingSubmission.payload.text.slice(0,120)||'附件消息'}}</p><small>提交 {{pendingSubmission.requestId}}<template v-if="pendingSubmission.payload.attachments?.length"> · {{pendingSubmission.payload.attachments.length}} 个附件</template></small><p id="submission-recovery-detail">{{recoveryDetail||'原提交已保留。刷新或重连只核对云端记录，不会自动发送。'}}</p></div><p v-else-if="acceptedReceipt" id="accepted-submission" :data-request-id="acceptedReceipt.requestId"><strong>云端已接受</strong> · 提交 {{acceptedReceipt.requestId}}</p><small v-if="recoveryRecords.length>(pendingSubmission?1:0)">此设备另有 {{recoveryRecords.length-(pendingSubmission?1:0)}} 条待确认提交，返回对应入口和话题可核对。</small></section>
+   <section v-if="recoveryBlocker||pendingSubmission||acceptedReceipt||recoveryRecords.length" id="submission-recovery" class="submission-recovery" :class="{'is-receipt':acceptedReceipt&&!pendingSubmission&&!recoveryBlocker}" aria-label="提交确认状态" aria-live="polite"><p v-if="recoveryBlocker" role="alert">{{recoveryBlocker}}</p><div v-if="pendingSubmission" id="pending-submission" :data-request-id="pendingSubmission.requestId"><strong>本地已保存 · 云端接受尚待确认</strong><p>{{pendingSubmission.kind==='invitation'?'邀请成员：'+pendingSubmission.payload.agentId:pendingSubmission.payload.text.slice(0,120)||'附件消息'}}</p><small>提交 {{pendingSubmission.requestId}}<template v-if="pendingSubmission.payload.attachments?.length"> · {{pendingSubmission.payload.attachments.length}} 个附件</template></small><p id="submission-recovery-detail">{{recoveryDetail||'原提交已保留。刷新或重连只核对云端记录，不会自动发送。'}}</p></div><details v-else-if="acceptedReceipt" id="accepted-submission" :data-request-id="acceptedReceipt.requestId"><summary>查看提交回执</summary><p>服务端已接受 · {{acceptedReceipt.requestId}}</p></details><small v-if="recoveryRecords.length>(pendingSubmission?1:0)">此设备另有 {{recoveryRecords.length-(pendingSubmission?1:0)}} 条待确认提交，返回对应入口和话题可核对。</small></section>
    <section class="executions" aria-label="原生执行状态">
     <p v-if="jobsError" role="status">{{jobsError}}</p>
     <small v-if="desktopRelays.length && !online">最近已知的接力状态，联网后核对。</small>
     <DesktopRelayStatus v-for="relay in desktopRelays" :key="relay.id" :relay="relay"/>
     <div v-if="jobsInfo && (jobs.length || !desktopRelays.length)" class="execution-pages"><small>本页 {{jobs.length}} 项 · 历史范围共 {{jobsInfo.total}} 项 · 待处理／核对范围 {{jobsInfo.attentionTotal}} 项</small><button v-if="jobsInfo.moreAttention" @click="nextExecutions('attention')" :disabled="busy">下一页待处理／核对</button><button v-if="jobsInfo.moreRecent" @click="nextExecutions('recent')" :disabled="busy">更早任务</button><button v-if="jobsInfo.historyPage" @click="latestExecutions" :disabled="busy">返回最新任务</button></div>
-    <small v-if="jobs.length">云端已接受 · {{online?'本次查询的原生执行状态':'最近已知状态，联网后重新核对'}}</small>
+    <small v-if="jobs.length">{{online?'服务端任务记录':'最近已知状态，联网后重新核对'}}</small>
     <article v-for="j in displayJobs" :key="j.id" class="execution-job" :data-exec-id="j.id" :data-state="j.state">
-     <div class="execution-row"><span>{{executionLabel(j)}}<template v-if="j.steps?.length"> · {{j.steps.filter(s=>s.state==='completed').length}} / {{j.stepCount}} 位成员</template></span><template v-if="j.own && j.steps && supportsCancelRemaining">
+     <div class="execution-row"><span class="execution-label"><MobileIcon :name="j.state==='completed'?'check':'work'"/>{{executionLabel(j)}}<template v-if="j.steps?.length"> · {{j.steps.filter(s=>s.state==='completed').length}} / {{j.stepCount}} 位成员</template></span><template v-if="j.own && j.steps && supportsCancelRemaining">
       <button v-if="j.canCancelRemaining" :data-cancel-remaining-id="j.id" :disabled="!online" @click="cancelRemaining(j)">取消剩余接力</button>
      </template>
      <button v-else-if="j.own && ['queued','running','waiting_approval'].includes(j.state)" :data-cancel-id="j.id" @click="cancel(j.id)">{{j.steps?'中止本轮群聊':'请求取消本次回复'}}</button></div>
+     <div v-if="j.core && (workMessageNames.get(j.messageId)||workTime(j.createdAt))" class="work-meta">
+      <span v-if="workMessageNames.get(j.messageId)">{{workMessageNames.get(j.messageId)}}</span><time v-if="workTime(j.createdAt)">{{workTime(j.createdAt)}}</time>
+     </div>
      <p v-if="j.remainingCancelled && j.state!=='cancelled'" role="status">后续接力已取消<template v-if="j.steps?.some(step => ['running','publishing','waiting_approval'].includes(step.state))">，等待当前成员结束</template>。</p>
      <ol v-if="j.steps" class="group-steps"><li v-for="step in j.steps" :key="step.id">{{step.name}} · {{labels[step.state]||step.state}}<small v-if="step.errorCode"> · {{errors[step.errorCode]||'本步异常，详情请核对原生宿主'}}</small></li></ol>
      <p v-if="j.nativeTaskError" class="native-task-error" role="alert">{{j.nativeTaskError}}</p>
-     <details v-if="j.toolInvocations.length" class="native-tools"><summary>原生工具调用 {{j.toolInvocations.length}} 项（返回不等于 AA 完成）</summary><ul><li v-for="call in j.toolInvocations" :key="call.invocationId">{{call.pluginName}} · {{toolLabels[call.state]}}<small> · 调用 {{call.invocationId}}</small></li></ul></details>
+     <details v-if="j.toolInvocations.length" class="native-tools"><summary>工具调用 · {{j.toolInvocations.length}} 项</summary><ul><li v-for="call in j.toolInvocations" :key="call.invocationId">{{call.pluginName}} · {{displayedToolStatus[call.state]||'工具状态待核对'}}<small> · 调用 {{call.invocationId}}</small></li></ul></details>
      <details v-for="task in j.nativeTasks" :key="task.nativeTaskId" class="native-aa-task" :data-task-id="task.nativeTaskId" :data-state="task.state">
       <summary>{{nativeTaskLabels[task.state]}} · {{task.agentBaseName}}</summary>
       <small>任务 {{task.nativeTaskId}}<br>调用 {{task.invocationId}}<template v-if="task.stepId && task.stepId!==j.id"><br>群聊步骤 {{task.stepId}}</template></small>
@@ -804,20 +906,30 @@ onUnmounted(()=>{sharedObserver.close();clearTimeout(sharedRefreshTimer);refresh
    </section>
    </section>
    </div>
-   <footer>
+   <footer v-show="selected && !navigationVisible" :class="{'is-work-view':conversationPanel==='work'}">
     <div class="composer-tools">
-     <div v-if="currentTopic?.ownerType==='group'" class="group-invitation"><label class="sr-only" for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择发言成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div>
+     <div v-if="currentTopic?.ownerType==='group' && conversationPanel!=='work'" class="group-invitation"><label class="sr-only" for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择发言成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div>
      <button id="work-toggle" ref="workToggle" type="button" aria-controls="conversation-work"
-       :aria-expanded="conversationPanel==='work'" :class="{attention:workButtonText!=='任务状态'}" @click="togglePanel('work')">{{workButtonText}}</button>
+       :aria-expanded="conversationPanel==='work'" :data-tone="workTone" @click="togglePanel('work')"><MobileIcon name="work"/><span>{{workButtonText}}</span></button>
     </div>
+    <div v-show="conversationPanel!=='work'" class="composer-body">
+    <div v-if="pendingFiles.length" class="pending-files"><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><MobileIcon name="file"/><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||(item.progress===100?'已上传':item.progress>0?item.progress+'%':'待发送')}}</span><button type="button" @click="removeDraftFile(i)" :disabled="busy" aria-label="移除附件"><MobileIcon name="close"/></button></div></div>
     <form class="message-composer" @submit.prevent="send">
      <label v-if="currentTopic?.attachmentsEnabled" class="attachment-picker" title="添加附件">
-      <span aria-hidden="true">＋</span><span class="sr-only">添加图片或文件</span>
+      <MobileIcon name="plus"/><span class="sr-only">添加图片或文件</span>
       <input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false">
      </label>
-     <label class="sr-only" for="message-text">消息</label><textarea id="message-text" v-model="text" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):'输入消息…'" rows="1" @focus="conversationPanel=''" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea><button id="send" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false">发送</button></form>
-    <div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||item.progress+'%'}}</span><button @click="removeDraftFile(i)" :disabled="busy">移除</button></div>
-    <div class="send-state"><span id="send-state" role="status">{{notice}}</span><span v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</span><button id="retry-last" v-show="pendingSubmission" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div></footer>
+     <label class="sr-only" for="message-text">消息</label>
+     <textarea ref="composer" id="message-text" v-model="text" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):'输入消息…'" rows="1" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea>
+     <button id="send" type="submit" aria-label="发送新消息" title="发送新消息" :disabled="!currentTopic||busy||newSubmissionBlocked||(!text.trim()&&!pendingFiles.length)||currentTopic?.executable===false"><MobileIcon name="send"/></button>
+    </form>
+    <div v-if="corePreviews.length && coreSteeringWork && currentTopic?.executable" class="steering">
+     <small>{{pendingFiles.length?'附件只能作为新消息发送。':'发送是新消息；追加会交给当前工作。'}}</small>
+     <button type="button" :disabled="busy || !text.trim() || pendingFiles.length > 0" @click="sendCoreSteering">追加到当前工作</button>
+    </div>
+    <div v-show="visibleNotice||pairRecoveryNotice||pendingSubmission" class="send-state"><span v-if="visibleNotice" id="send-state" role="status">{{visibleNotice}}</span><span v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</span><button id="retry-last" v-show="pendingSubmission" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div>
+    </div>
+   </footer>
   </template>
  </div>
 </template>

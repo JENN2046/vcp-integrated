@@ -126,7 +126,7 @@ async function layout(page) {
                 visibleHeight:Math.max(0,visibleBottom-visibleTop)};
         };
         return {viewport:{width:viewport.width,height:viewport.height}, scrollWidth:document.documentElement.scrollWidth,
-            header:rect('header'), switchLabel:rect('.topic-switch'), settings:rect('#open-settings'), nav:rect('nav'), history:rect('#history'), footer:rect('footer'), message:rect('#message-text'),
+            header:rect('header'), topicToggle:rect('#topic-toggle'), settings:rect('#open-settings'), nav:rect('nav'), history:rect('#history'), footer:rect('footer'), message:rect('#message-text'),
             latest:rect('#history article:last-of-type'), invite:rect('#group-invite'), send:rect('#send')};
     });
 }
@@ -195,7 +195,7 @@ async function check(browser, scenario){
         await page.screenshot({path:path.join(evidence,name+'-initial.png')});
         if (baseline) return {initial};
         assert.ok(initial.header.height <= 64);
-        assert.ok(initial.switchLabel.width >= 30 && initial.switchLabel.right <= initial.settings.x);
+        assert.ok(initial.topicToggle.width >= 44 && initial.topicToggle.height >= 44);
         assert.ok(initial.settings.width >= 44 && initial.settings.height >= 44 && initial.settings.right <= width);
         await click(page,'#open-settings');
         await click(page,'#close-settings');
@@ -207,8 +207,8 @@ async function check(browser, scenario){
         await page.type('#topic-search','第二个');
         assert.deepEqual(await page.$$eval('#topic-select option', options=>options.filter(option=>!option.disabled).map(option=>option.value)), ['group-alt']);
         await page.$eval('#topic-search', el => {el.value=''; el.dispatchEvent(new Event('input',{bubbles:true}));});
-        await reveal(page,'#topic-select');
-        await page.select('#topic-select','group-alt');
+        await reveal(page,'[data-topic-key="group-alt"]');
+        await click(page,'[data-topic-key="group-alt"]');
         await page.waitForFunction(() => document.querySelector('#history article:last-of-type')?.textContent.includes('group-alt'));
         await reveal(page,'#agent-select');
         await page.select('#agent-select',JSON.stringify(['agent','synthetic-agent']));
