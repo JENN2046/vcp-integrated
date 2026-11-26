@@ -18,7 +18,19 @@ npm --prefix apps/server start
 
 HTTPS 入口使用受客户端信任的证书。反向代理和 ToolBox 运行在同一台主机上。专用域名仅代理 `/core/api/` 与 `/mobile/`，并覆盖 `Host` 及 `X-Forwarded-Proto`。关闭 SSE 响应缓存和缓冲。以下是放在现有 HTTPS virtual host 中的 Nginx location 配置。
 
+启用本机语音识别时，`/mobile/api/voice` 需要转发 WebSocket 升级头。使用精确匹配将升级限定在该路径，普通 HTTP 和 SSE 继续使用下面的通用规则。
+
 ```nginx
+location = /mobile/api/voice {
+    proxy_pass http://127.0.0.1:18081;
+    proxy_http_version 1.1;
+    proxy_set_header Host core.example.net;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_buffering off;
+    proxy_read_timeout 65s;
+}
 location ~ ^/(core/api|mobile)(/|$) {
     proxy_pass http://127.0.0.1:18081;
     proxy_http_version 1.1;
