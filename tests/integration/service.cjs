@@ -72,6 +72,11 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         enabled: true, captureMultimodal: false, autoCleanupEnabled: false
     }));
 
+    if (coreRemote?.risk) {
+        fs.mkdirSync(path.join(box, 'Agent'), { recursive: true });
+        fs.writeFileSync(path.join(box, 'Agent', 'pilot-fixture.txt'), 'Frozen native prompt from the server fixture.');
+        fs.writeFileSync(path.join(box, 'agent_map.json'), JSON.stringify({ 'PilotFixture': 'pilot-fixture.txt' }));
+    }
     ordinaryTools?.stage(box);
     toolHandoff?.stage?.(box);
     streamInterrupt?.stage(box);

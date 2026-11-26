@@ -76,7 +76,7 @@ class LocalWorkspace {
     row(workspace, key) {
         if (workspace !== this.workspace) throw failure('CORE_WORKSPACE_FORBIDDEN', 403);
         const result = this.db.prepare('SELECT * FROM core_topics WHERE id=?').get(key);
-        if (!result || result.deleted) throw failure('CORE_TOPIC_NOT_FOUND', 404);
+        if (!result || result.deleted || this.ownerRecord(result.owner_type, result.owner_id)?.deleted) throw failure('CORE_TOPIC_NOT_FOUND', 404);
         return { ...result, space_id: workspace, kind: 'topic', parent_id: result.owner_id, topic_id: key, origin_source: result.origin_source };
     }
 
@@ -105,7 +105,7 @@ class LocalWorkspace {
     agentConfiguration(id, config) {
         const row = this.ownerRecord('agent', id);
         if (!row || row.deleted) return config;
-        const { unavailable, ...value } = config;
+        const { unavailable, agentAlias, promptTemplate, ...value } = config;
         return { ...value, ...JSON.parse(row.configuration) };
     }
 
@@ -194,13 +194,15 @@ class LocalWorkspace {
     }
 
     findAgent(query, historyDeleted) {
-        for (const { owner_id, id } of this.db.prepare(`SELECT owner_id, min(id) id FROM core_topics
-            WHERE owner_type='agent' AND deleted=0 GROUP BY owner_id ORDER BY owner_id`).all()) {
-            const name = this.configuration({ workspace: this.workspace, key: id }).name;
-            if (!name.includes(query)) continue;
-            const topics = this.topicRows('agent', owner_id).filter(row => !historyDeleted?.get(row.id))
-                .map(row => ({ id: row.id, name: this.definition(row).name }));
-            return { name, uuid: owner_id, topics };
+        const ids = this.db.prepare(`SELECT id FROM core_owners WHERE owner_type='agent' AND deleted=0
+            UNION SELECT owner_id FROM core_topics WHERE owner_type='agent' AND deleted=0 ORDER BY 1`).all();
+        for (const { id } of ids) {
+            const owner = this.ownerRecord('agent', id);
+            if (owner?.deleted) continue;
+            const topics = this.topicRows('agent', id).filter(row => !historyDeleted?.get(row.id));
+            const name = owner ? JSON.parse(owner.configuration).name : topics[0] && this.definition(topics[0]).config.name;
+            if (!name?.includes(query)) continue;
+            return { name, uuid: id, topics: topics.map(row => ({ id: row.id, name: this.definition(row).name })) };
         }
         return null;
     }

@@ -6,6 +6,10 @@ export async function prepareNativeDeletion(api,scope){
  return context;
 }
 export function nativeDeletionOptions(context,mode='all'){
+ if(context.core){
+  if(mode!=='all')throw Error('CORE_DELETE_SCOPE_CHANGED');
+  return undefined;
+ }
  return context.kind==='shared'?{mode,confirmed:true,expectedVersion:context.expectedVersion,operationId:context.operationId,expectedBinding:context.expectedBinding}:undefined;
 }
 export function nativeDeletionText(context,original,name,mode='all'){

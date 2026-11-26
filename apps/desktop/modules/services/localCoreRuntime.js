@@ -69,7 +69,7 @@ class LocalCoreClient extends CoreSingleClient {
 
 async function openLocalCore({ queue, appDataRoot, workspace, readSettings, readAgent, readGroup, readRules,
     ipcMain, getMainWindow, notify, notifyExecutionStatus, notifyGroupEvent, storeAttachment, writeOwner, notifyDirectory,
-    remoteOrigin, remoteToken, remotePairCode }) {
+    remoteOrigin, remoteToken, remotePairCode, expectedStorageId = process.env.VCPCHAT_CORE_EXPECTED_STORAGE_ID }) {
     const settings = await readSettings();
     const remote = Boolean(remoteOrigin);
     const endpoint = new URL(remoteOrigin || settings.vcpServerUrl);
@@ -92,12 +92,18 @@ async function openLocalCore({ queue, appDataRoot, workspace, readSettings, read
         throw fail('CORE_LOCAL_REQUIRES_SEPARATE_PROFILE');
     }
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
-    if (!previous) await durableJson(marker, { workspace, origin: endpoint.origin, ...(remote && { remote: true }) });
+    const binding = { workspace, origin: endpoint.origin, ...(remote && { remote: true }) };
+    if (!previous) await durableJson(marker, { ...binding, storageId: null });
+    if (previous && !Object.hasOwn(previous, 'storageId') && !expectedStorageId) {
+        throw fail('CORE_DATABASE_IDENTITY_REQUIRED');
+    }
+    let storageId = previous?.storageId || expectedStorageId;
+    if (storageId && !/^[0-9a-f-]{36}$/.test(storageId)) throw fail('CORE_DATABASE_IDENTITY_REQUIRED');
     const request = async (route, options = {}) => {
         try {
             const response = await fetch(endpoint.origin + route, {
                 method: options.method || (options.body ? 'POST' : 'GET'),
-                headers: { ...(credential && { Authorization: 'Bearer ' + credential }),
+                headers: { ...(storageId && { 'X-VCP-Core-Storage-Id': storageId }), ...(credential && { Authorization: 'Bearer ' + credential }),
                     ...(options.body && { 'Content-Type': 'application/json' }) },
                 ...(options.body && { body: JSON.stringify(options.body) }),
                 redirect: 'error', cache: 'no-store', signal: options.signal || AbortSignal.timeout(15000)
@@ -134,6 +140,16 @@ async function openLocalCore({ queue, appDataRoot, workspace, readSettings, read
         if (session.workspace !== workspace || !session.permissions?.includes('read')) throw fail('CORE_REMOTE_DEVICE_INVALID');
         permissions = new Set(session.permissions);
     }
+    const identity = await request(workspaceRoute + '/identity').then(response => response.json()).catch(error => {
+        if (!remote && previous?.storageId && error.code === 'NETWORK_UNAVAILABLE') return null;
+        throw error;
+    });
+    if (identity) {
+        if (identity.workspace !== workspace || !/^[0-9a-f-]{36}$/.test(identity.storageId || '') ||
+            storageId && identity.storageId !== storageId) throw fail('CORE_DATABASE_IDENTITY_MISMATCH');
+        storageId = identity.storageId;
+        if (previous?.storageId !== storageId) await durableJson(marker, { ...binding, storageId });
+    }
     const pending = new Map(), written = new Map(), commands = new Map();
     const versions = new Map(), ownerVersions = new Map();
     const nativeFile = (kind, id) => path.join(root, kind === 'agent' ? 'Agents' : 'AgentGroups', id, 'config.json');
@@ -169,7 +185,7 @@ async function openLocalCore({ queue, appDataRoot, workspace, readSettings, read
             const managedTopics = new Set(last?.[identity] || []);
             const kept = (current?.topics || []).filter(topic => !managedTopics.has(topic.id) && !topics.some(row => row.id === topic.id));
             const projected = {
-                ...current, ...coreProjection(kind, config), id, _historyDeleting: false, topics: [...topics, ...kept],
+                ...current, ...coreProjection(kind, kind === 'agent' && config.promptTemplate ? { ...config, systemPrompt: config.promptTemplate } : config), id, _historyDeleting: false, topics: [...topics, ...kept],
                 current_topic_id: topics.some(row => row.id === current?.current_topic_id) ? current.current_topic_id : topics[0]?.id || kept[0]?.id
             };
             await writeOwner(kind, id, projected, Boolean(current));

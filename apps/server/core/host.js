@@ -32,6 +32,7 @@ function startCoreHost({ app, chat, listenHost, serverKey, legacy, env = process
             req.headers.authorization !== 'Bearer ' + serverKey) {
             throw Object.assign(new Error('CORE_LOCAL_ACCESS_REQUIRED'), { code: 'CORE_LOCAL_ACCESS_REQUIRED', status: 403 });
         }
+        core.checkStorage(req);
         return core.local.actor;
     }));
     return core;

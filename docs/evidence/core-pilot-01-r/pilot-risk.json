@@ -1,0 +1,19 @@
+{
+  "baseline": "c08fa7f367141d1bbe77e7ba684b3c4666862bb2",
+  "provider": "synthetic fixture",
+  "nativeDesktopDeletion": true,
+  "memoAndAttachmentsRespectTombstone": true,
+  "nativeAliasPaths": 3,
+  "acceptedPromptFrozen": true,
+  "refusedDifferentStorageAtSameOrigin": true,
+  "restoredSameIdentity": true,
+  "browserIdentityVerified": true,
+  "coldDesktopReadback": true,
+  "durableMessages": 8,
+  "durableWorks": 4,
+  "tombstones": 2,
+  "attachmentHash": "01f4236cd231e3935c2f3780c2288f532da550eda7333454b05402fde0d0102b",
+  "localGuiRegression": true,
+  "localSameOriginReplacementRejected": true,
+  "remoteCleanShutdown": true
+}

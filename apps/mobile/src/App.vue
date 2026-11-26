@@ -55,6 +55,11 @@ watch(history, (area, previous, onCleanup) => {
 const sharedSpaces=ref([]),sharedFeatures=ref([]),sharedStreams=ref([]);
 const corePreviews=ref([]);
 let coreObserver, coreRefreshTimer;
+const coreStorageKey = 'vcp.core.storage-id';
+const coreStorageHeaders = () => {
+ const storageId=localStorage.getItem(coreStorageKey);
+ return storageId ? {'X-VCP-Core-Storage-Id':storageId} : {};
+};
 const corePath = topic => 'core/' + [topic.sharedSpaceId, topic.key].map(encodeURIComponent).join('/');
 function stopCoreObservation() {
  coreObserver?.controller.abort();coreObserver=null;corePreviews.value=[];clearTimeout(coreRefreshTimer);
@@ -71,7 +76,7 @@ function observeCore(topic) {
    try {
     const response=await fetch('/mobile/api/'+corePath(topic)+'/observe',{
       credentials:'same-origin',redirect:'error',cache:'no-store',signal:controller.signal,
-      headers:{'X-NativeSync-Capabilities':'shared-space-v1'}
+      headers:{'X-NativeSync-Capabilities':'shared-space-v1',...coreStorageHeaders()}
     });
     await consumeSharedEvents(response,(data,type)=>{
      if(!isCurrent())return;
@@ -284,11 +289,26 @@ function invalidateSession(){conversationPanel.value='';clearSharedObservers();s
 function captureContext(){if(!paired.value||!selected.value||!validSessionRecovery(recoveryContext.value))throw Object.assign(Error(recoveryMessages.SUBMISSION_RECOVERY_UNAVAILABLE),{code:'SUBMISSION_RECOVERY_UNAVAILABLE'});return {topicKey:selected.value,recovery:{...recoveryContext.value},generation,authEpoch,draftScope:draftScope()};}
 function sameView(context){return context.topicKey===selected.value&&context.generation===generation&&context.authEpoch===authEpoch&&context.recovery?.entryId===recoveryContext.value?.entryId&&context.recovery?.sessionMarker===recoveryContext.value?.sessionMarker;}
 function newSubmissionContext(){if(!loadRecovery())throw Error(recoveryError.value);const context=captureContext();if(!historyContextReady.value)throw Object.assign(Error('正在载入历史并核对上下文'),{code:'HISTORY_CONTEXT_LOADING'});if(!currentTopic.value)throw Object.assign(Error(recoveryMessages.SUBMISSION_TOPIC_UNAVAILABLE),{code:'SUBMISSION_TOPIC_UNAVAILABLE'});if(submissionStore.current({entryId:context.recovery.entryId,topicKey:context.topicKey}))throw Object.assign(Error(recoveryMessages.SUBMISSION_PENDING),{code:'SUBMISSION_PENDING'});return context;}
-const errors={SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保留；完成后请显式重试',SHARED_GROUP_EXECUTION_NOT_READY:'共享群聊暂为只读，发送接线尚未完成',SHARED_CONFIG_PENDING:'共享配置正在核对，请稍后显式发送',SHARED_CONFIG_CONFLICT:'共享配置存在冲突，请先选择采用的版本',SHARED_EXECUTION_PERMISSION_REQUIRED:'本会话尚未授予共享执行权限',ATTACHMENTS_NOT_ENABLED:'当前服务器尚未启用附件传输，已选择的文件和消息草稿仍保留',SHARED_ATTACHMENTS_NOT_READY:'共享附件发送尚未接通，原文件保留',HISTORY_CONTEXT_LOADING:'正在载入历史并核对上下文',DESKTOP_REFERENCE_CLIENT_UPGRADE_REQUIRED:'此历史包含桌面引用，请更新应用后重开',GROUP_MODE_REQUIRES_DESKTOP:'此群聊模式请在桌面执行',GROUP_MEMBER_UNAVAILABLE:'此成员配置暂不可用',DEPENDENCY_REVIEW_REQUIRED:'同一话题有待核对的执行，请先处理暂停任务',DESKTOP_CONTEXT_REQUIRED:'本轮上下文需要桌面专用内容，请在桌面继续',CONFIG_SNAPSHOT_CORRUPT:'执行配置校验失败，请在桌面重新发布',GROUP_CONTEXT_UNAVAILABLE:'有效上下文暂不可用',ATTACHMENT_BLOB_MISSING:'附件暂未同步，请等待电脑补齐',ATTACHMENT_BLOB_CORRUPT:'附件完整性校验失败，请重新同步',ATTACHMENT_TEXT_UNAVAILABLE:'此文件的文本尚不可用',ATTACHMENT_TYPE_REJECTED:'支持 PNG、JPEG、WebP、PDF 和 UTF-8 文本文件',ATTACHMENT_STORAGE_BUDGET:'附件空间已达到上限',ATTACHMENT_REQUEST_BUDGET:'附件请求过多，请稍后重试',MODEL_IMAGE_UNSUPPORTED:'当前模型不支持图片，请在电脑端选择支持图片的模型并发布配置',EXECUTION_CONFIG_REQUIRED:'请先在电脑端发布有效 Agent 配置',PAIR_REQUIRED:'请使用本入口的配对方式连接会话',HTTPS_REQUIRED:'当前入口尚未启用 HTTPS，不能提交 Key',SERVER_NOT_APPROVED:'此地址尚未由服务端批准，请使用已获授权的服务器',PROTECTED_HOST_NOT_READY:'安全链路或服务端接入尚未就绪，暂不接收访问凭据',AUTH_FAILED:'访问凭据不正确',AUTH_RATE_LIMIT:'尝试过于频繁，请稍后重试',AGENT_NOT_EXECUTABLE:'此 Agent 尚未配置服务端执行能力',EXECUTION_INTERRUPTED_REVIEW_REQUIRED:'执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑'};
+const errors={CORE_DATABASE_IDENTITY_MISMATCH:'此地址的 Core 数据库身份已变化，连接已暂停。请恢复原数据库。',SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保留；完成后请显式重试',SHARED_GROUP_EXECUTION_NOT_READY:'共享群聊暂为只读，发送接线尚未完成',SHARED_CONFIG_PENDING:'共享配置正在核对，请稍后显式发送',SHARED_CONFIG_CONFLICT:'共享配置存在冲突，请先选择采用的版本',SHARED_EXECUTION_PERMISSION_REQUIRED:'本会话尚未授予共享执行权限',ATTACHMENTS_NOT_ENABLED:'当前服务器尚未启用附件传输，已选择的文件和消息草稿仍保留',SHARED_ATTACHMENTS_NOT_READY:'共享附件发送尚未接通，原文件保留',HISTORY_CONTEXT_LOADING:'正在载入历史并核对上下文',DESKTOP_REFERENCE_CLIENT_UPGRADE_REQUIRED:'此历史包含桌面引用，请更新应用后重开',GROUP_MODE_REQUIRES_DESKTOP:'此群聊模式请在桌面执行',GROUP_MEMBER_UNAVAILABLE:'此成员配置暂不可用',DEPENDENCY_REVIEW_REQUIRED:'同一话题有待核对的执行，请先处理暂停任务',DESKTOP_CONTEXT_REQUIRED:'本轮上下文需要桌面专用内容，请在桌面继续',CONFIG_SNAPSHOT_CORRUPT:'执行配置校验失败，请在桌面重新发布',GROUP_CONTEXT_UNAVAILABLE:'有效上下文暂不可用',ATTACHMENT_BLOB_MISSING:'附件暂未同步，请等待电脑补齐',ATTACHMENT_BLOB_CORRUPT:'附件完整性校验失败，请重新同步',ATTACHMENT_TEXT_UNAVAILABLE:'此文件的文本尚不可用',ATTACHMENT_TYPE_REJECTED:'支持 PNG、JPEG、WebP、PDF 和 UTF-8 文本文件',ATTACHMENT_STORAGE_BUDGET:'附件空间已达到上限',ATTACHMENT_REQUEST_BUDGET:'附件请求过多，请稍后重试',MODEL_IMAGE_UNSUPPORTED:'当前模型不支持图片，请在电脑端选择支持图片的模型并发布配置',EXECUTION_CONFIG_REQUIRED:'请先在电脑端发布有效 Agent 配置',PAIR_REQUIRED:'请使用本入口的配对方式连接会话',HTTPS_REQUIRED:'当前入口尚未启用 HTTPS，不能提交 Key',SERVER_NOT_APPROVED:'此地址尚未由服务端批准，请使用已获授权的服务器',PROTECTED_HOST_NOT_READY:'安全链路或服务端接入尚未就绪，暂不接收访问凭据',AUTH_FAILED:'访问凭据不正确',AUTH_RATE_LIMIT:'尝试过于频繁，请稍后重试',AGENT_NOT_EXECUTABLE:'此 Agent 尚未配置服务端执行能力',EXECUTION_INTERRUPTED_REVIEW_REQUIRED:'执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑'};
 async function api(route,body,requestHeaders={},signal,suppressPairRequired=false){
  const requestEpoch=authEpoch;
- const r=await fetch('/mobile/api/'+route,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'X-NativeSync-Capabilities':'desktop-references-v1,source-data-v2,shared-space-v1',...(body?{'Content-Type':'application/json'}:{}),...requestHeaders},body:body?JSON.stringify(body):undefined,signal});
- const result=await r.json();if(!r.ok){if(!suppressPairRequired&&r.status===401&&result.error?.code==='PAIR_REQUIRED'&&requestEpoch===authEpoch){paired.value=false;invalidateSession();notice.value=errors.PAIR_REQUIRED+'；本地待确认提交继续保留。';}throw Object.assign(Error(errors[result.error?.code]||'请求未完成，请检查连接'),{code:result.error?.code,status:r.status});}return result;
+ const r=await fetch('/mobile/api/'+route,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'X-NativeSync-Capabilities':'desktop-references-v1,source-data-v2,shared-space-v1',...(body?{'Content-Type':'application/json'}:{}),...requestHeaders,...coreStorageHeaders()},body:body?JSON.stringify(body):undefined,signal});
+ const result=await r.json();
+ const pinned=localStorage.getItem(coreStorageKey);
+ const session=route==='session' && r.ok;
+ const freshId=session && result.server?.mode==='core' && result.storageId;
+ const mismatch=result.error?.code==='CORE_DATABASE_IDENTITY_MISMATCH' ||
+  (session && ((pinned && freshId!==pinned) || (result.server?.mode==='core' && !/^[0-9a-f-]{36}$/.test(freshId||''))));
+ if(mismatch){
+  if(requestEpoch===authEpoch){paired.value=false;invalidateSession();notice.value=errors.CORE_DATABASE_IDENTITY_MISMATCH;}
+  throw Object.assign(Error(errors.CORE_DATABASE_IDENTITY_MISMATCH),{code:'CORE_DATABASE_IDENTITY_MISMATCH',status:409});
+ }
+ if(freshId && !pinned) localStorage.setItem(coreStorageKey,freshId);
+ if(!r.ok){
+  if(!suppressPairRequired&&r.status===401&&result.error?.code==='PAIR_REQUIRED'&&requestEpoch===authEpoch){paired.value=false;invalidateSession();notice.value=errors.PAIR_REQUIRED+'；本地待确认提交继续保留。';}
+  throw Object.assign(Error(errors[result.error?.code]||'请求未完成，请检查连接'),{code:result.error?.code,status:r.status});
+ }
+ return result;
 }
 function cacheBinding(key=historyKey){return paired.value&&validSessionRecovery(recoveryContext.value)?historyCacheKey(recoveryContext.value,topics.value.find(t=>t.key===key)):'';}
 function resetHistory({remember=true}={}){clearSharedObservers();if(remember&&baselineReady&&historyBinding&&historyBinding===cacheBinding())historyCache.put(historyBinding,historyRows,cursor);refreshing?.abort();refreshing=null;historyStart.value=0;historyProgress.value=null;expandedAttachmentText.value=new Set();historyContextReady.value=false;expandedLongText.value=new Set();executionPager.reset();jobsInfo.value=null;jobsError.value='';attachmentPager.reset();baselineReady=false;baselineRequestId='';switchDraft();closeNativeResult();closeAttachment();invitedAgent.value='';reviewChecks.value={};attachmentStates.value={};generation++;submissionNoticeHeld=false;historyKey='';historyBinding='';historyFromCache=false;cursor=0;historyRows=new Map();messages.value=[];jobs.value=[];recoveryDetail.value='';acceptedReceipt.value=null;loadRecovery();}
@@ -355,7 +375,7 @@ async function pair(){
  }catch(e){notice.value=e.message;}
  finally{busy.value=false;}
 }
-async function connectionInfo(){try{server.value=await api('connection');serverUrl.value=server.value.serverUrl||server.value.suggestedServerUrl||'';online.value=true;if(keyAllowed.value){server.value=await api('connection/test',{serverUrl:serverUrl.value});tested.value=true;}}catch{notice.value='安全连接尚未就绪，尚未提交任何凭据';}}
+async function connectionInfo(){try{server.value=await api('connection');serverUrl.value=server.value.serverUrl||server.value.suggestedServerUrl||'';online.value=true;if(keyAllowed.value){server.value=await api('connection/test',{serverUrl:serverUrl.value});tested.value=true;}}catch(error){notice.value=error.code==='CORE_DATABASE_IDENTITY_MISMATCH'?error.message:'安全连接尚未就绪，尚未提交任何凭据';}}
 async function testConnection(){busy.value=true;tested.value=false;accessKey.value='';try{server.value=await api('connection/test',{serverUrl:serverUrl.value});tested.value=true;notice.value='服务器身份和受保护接入已确认';}catch(e){notice.value=e.message;}finally{busy.value=false;}}
 async function connect(){
  if(busy.value||!keyAllowed.value||!tested.value)return;

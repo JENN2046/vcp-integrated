@@ -50,6 +50,18 @@ function createCoreMemory(root, getLocalCore) {
 
     return {
         root,
+        async findAgent(name) {
+            const runtime = getLocalCore?.()?.runtime;
+            if (runtime?.enabled) {
+                const { agent } = await runtime.send(runtime.base + '/' + encodeURIComponent(runtime.workspace) +
+                    '/memo-agent?' + new URLSearchParams({ name }));
+                return agent;
+            }
+            if (await ownedJson(root, path.join(root, '.vcp-core', 'profile.json'), { optional: true })) {
+                throw fail('CORE_HISTORY_OFFLINE_UNAVAILABLE');
+            }
+            return undefined;
+        },
         async search(request) {
             const target = await resolve(request.ownerType, request.ownerId, request.currentTopicId);
             if (!target) return null;

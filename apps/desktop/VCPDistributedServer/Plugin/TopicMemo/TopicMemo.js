@@ -15,7 +15,8 @@ function initialize(options = {}) {
 async function processToolCall(args, scope, core) {
     const maidName = args.maid;
     if (!maidName) throw new Error("请求中缺少 'maid' 参数。");
-    const agentInfo = core ? await core.findAgent(maidName) : await findAgentInfo(dataRoot, maidName);
+    const found = core ? await core.findAgent(maidName) : await coreMemory?.findAgent?.(maidName);
+    const agentInfo = found === undefined && !core ? await findAgentInfo(dataRoot, maidName) : found;
     if (!agentInfo) throw new Error(`未找到名为 "${maidName}" 的Agent。`);
     const command = args.command || 'ListTopics';
     if (command === 'ListTopics') return listTopics(agentInfo);
@@ -35,7 +36,7 @@ async function findAgentInfo(vchatPath, maidName) {
             try {
                 const content = await fs.readFile(configPath, 'utf-8');
                 const config = JSON.parse(content);
-                if (config.name && config.name.includes(maidName)) {
+                if (!config._historyDeleting && config.name && config.name.includes(maidName)) {
                     return {
                         name: config.name,
                         uuid: folder,

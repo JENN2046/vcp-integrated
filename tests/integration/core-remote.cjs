@@ -13,6 +13,7 @@ exports.create = async (out, cert) => {
     const provider = process.env.VCP_TEST_CORE_MODEL_URL;
     if (provider && !/^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(provider)) throw Error('Expected isolated local model origin');
     const model = process.env.VCP_TEST_CORE_MODEL || 'synthetic';
+    const risk = process.env.VCP_TEST_CORE_RISK === '1';
     const physical = process.env.VCP_TEST_CORE_PHONE === '1';
     const browser = process.env.VCP_TEST_CORE_BROWSER === '1';
     const interactive = physical || browser;
@@ -23,7 +24,7 @@ exports.create = async (out, cert) => {
     const context = {
         image, model, tokens,
         serviceOptions: {
-            coreRemote: { model, provider, input: coreInput },
+            coreRemote: { model, provider, input: coreInput, risk },
             httpsPort: Number(process.env.VCP_TEST_CORE_PORT || 0),
             handleFixtureRequest(req, res, route) {
                 if (route !== '/__hardware/pair') return false;
@@ -198,24 +199,29 @@ exports.create = async (out, cert) => {
             assert.ok(service.calls.every(row => row.imageParts === 1 && row.status === 200));
             assert.ok(before.filter(row => row.role === 'assistant').every(row => /red/i.test(row.content)));
         }
-        const update = await call('/core/api/personal/agents/' + descriptor.itemId, { token: tokens.A, method: 'PUT',
-            body: { version: 0, config: { name: 'Renamed synthetic agent', model, systemPrompt: 'Reply in one short sentence.' } } });
-        assert.equal(update.status, 200);
-        const directory = await call('/core/api/personal/desktop-directory', { token: tokens.B });
-        assert.equal(directory.data.agents[0].config.name, 'Renamed synthetic agent');
-        assert.equal(Object.hasOwn(directory.data.agents[0].config, 'systemPrompt'), false);
-        const remove = { requestId: randomUUID(), kind: 'agent', id: descriptor.itemId, topicId: descriptor.topicId };
-        assert.equal((await call('/core/api/personal/remove-definition', { token: tokens.A, body: remove })).status, 200);
-        assert.equal((await call('/core/api/personal/remove-definition', { token: tokens.A, body: remove })).status, 200);
-        assert.equal((await call(desktop + '/messages', { token: tokens.B })).status, 404);
-        assert.equal((await call(desktop + '/blob/' + imageHash, { token: tokens.B, binary: true })).status, 404);
-        assert.equal((await call(desktop + '/definition', { token: tokens.A, method: 'PUT',
-            body: { ownerType: 'agent', ownerId: descriptor.itemId, topicId: descriptor.topicId, name: 'Old topic',
-                config: { name: 'Renamed synthetic agent', model, systemPrompt: '' } } })).status, 404);
-        const removeOwner = { ...remove, requestId: randomUUID(), topicId: undefined };
-        assert.equal((await call('/core/api/personal/remove-definition', { token: tokens.A, body: removeOwner })).status, 200);
-        assert.equal((await call('/core/api/personal/agents/' + descriptor.itemId, { token: tokens.A, method: 'PUT',
-            body: { version: update.data.version, config: { name: 'Cannot restore', model, systemPrompt: '' } } })).status, 404);
+        if (risk) {
+            result.risk = await require('./core-risk.cjs')({ out, service, call, tokens, evalJs, start, stop, picture, click, waitUntil,
+                descriptor, key, before, priorAttachment: attachment.data, imageHash, model, mobileCookie: reader.cookie, browser });
+        } else {
+            const update = await call('/core/api/personal/agents/' + descriptor.itemId, { token: tokens.A, method: 'PUT',
+                body: { version: 0, config: { name: 'Renamed synthetic agent', model, systemPrompt: 'Reply in one short sentence.' } } });
+            assert.equal(update.status, 200);
+            const directory = await call('/core/api/personal/desktop-directory', { token: tokens.B });
+            assert.equal(directory.data.agents[0].config.name, 'Renamed synthetic agent');
+            assert.equal(Object.hasOwn(directory.data.agents[0].config, 'systemPrompt'), false);
+            const remove = { requestId: randomUUID(), kind: 'agent', id: descriptor.itemId, topicId: descriptor.topicId };
+            assert.equal((await call('/core/api/personal/remove-definition', { token: tokens.A, body: remove })).status, 200);
+            assert.equal((await call('/core/api/personal/remove-definition', { token: tokens.A, body: remove })).status, 200);
+            assert.equal((await call(desktop + '/messages', { token: tokens.B })).status, 404);
+            assert.equal((await call(desktop + '/blob/' + imageHash, { token: tokens.B, binary: true })).status, 404);
+            assert.equal((await call(desktop + '/definition', { token: tokens.A, method: 'PUT',
+                body: { ownerType: 'agent', ownerId: descriptor.itemId, topicId: descriptor.topicId, name: 'Old topic',
+                    config: { name: 'Renamed synthetic agent', model, systemPrompt: '' } } })).status, 404);
+            const removeOwner = { ...remove, requestId: randomUUID(), topicId: undefined };
+            assert.equal((await call('/core/api/personal/remove-definition', { token: tokens.A, body: removeOwner })).status, 200);
+            assert.equal((await call('/core/api/personal/agents/' + descriptor.itemId, { token: tokens.A, method: 'PUT',
+                body: { version: update.data.version, config: { name: 'Cannot restore', model, systemPrompt: '' } } })).status, 404);
+        }
         const sessionB = await call('/core/api/session', { token: tokens.B });
         assert.equal(administer(context.env, ['revoke', sessionB.data.deviceId]).revoked, true);
         assert.equal((await call('/core/api/session', { token: tokens.B })).status, 401);

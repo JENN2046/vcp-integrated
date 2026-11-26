@@ -65,6 +65,7 @@ class RemoteAccess {
                 mobile && !['GET', 'HEAD'].includes(req.method) && req.get('origin') !== this.url.origin) {
                 return next(failure('ORIGIN_REJECTED', 403));
             }
+            this.core.checkStorage(req);
             res.set({
                 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin',
                 'Content-Security-Policy': "default-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
@@ -104,7 +105,7 @@ class RemoteAccess {
                 const session = find(req);
                 const permissions = JSON.parse(session.scopes);
                 const directory = this.core.local.mobileDirectory(actor, permissions.includes('shared:' + workspace + ':execute'), this.core.historyDeleted);
-                res.json({ authenticated: true, server, recovery: this.recovery(session), selectedTopic: session.last_topic_key,
+                res.json({ authenticated: true, storageId: this.core.store.storageId, server, recovery: this.recovery(session), selectedTopic: session.last_topic_key,
                     ...directory, directory: { paged: false }, sharedFeatures: [], sharedPermissions: [] });
             });
             router.post('/api/selection', exchange, (req, res) => {

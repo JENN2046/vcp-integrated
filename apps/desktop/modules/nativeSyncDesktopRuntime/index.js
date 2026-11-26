@@ -26,7 +26,12 @@ function registerIntegrated({ historyQueue, appDataRoot, readSettings, mainWindo
 
     return createDesktopRuntimeLifecycle({
         waitForHistory,
-        onStartupError: error => console.error('[NativeSync] Desktop runtime startup failed:', error.code || 'SYNC_STARTUP_FAILED'),
+        onStartupError: error => {
+            if (['CORE_DATABASE_IDENTITY_REQUIRED','CORE_DATABASE_IDENTITY_MISMATCH'].includes(error.code)) {
+                historyQueue().coreIdentityError = error.code;
+            }
+            console.error('[NativeSync] Desktop runtime startup failed:', error.code || 'SYNC_STARTUP_FAILED');
+        },
         onRuntimeRecovered: () => broadcast('native-sync:executions-changed', { sharedRuntimeRecovered: true }),
         start: async startup => {
             const { ownedJson } = require('../services/nativeSync/sharedLocal');

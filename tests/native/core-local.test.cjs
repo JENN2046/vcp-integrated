@@ -19,8 +19,8 @@ test('ToolBox starts local Core without loading the sync runtime and a native to
     const env = { VCP_CORE_DATA_DIR: path.join(root, 'data') };
     const app = express();
     app.use(express.json());
-    const core = startCoreHost({ app, chat, env, listenHost: '127.0.0.1', serverKey: token });
-    const srv = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
+    let core = startCoreHost({ app, chat, env, listenHost: '127.0.0.1', serverKey: token });
+    let srv = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
     t.after(async () => { srv.closeAllConnections(); await new Promise(resolve => srv.close(resolve)); await core.close(); });
     const url = 'http://127.0.0.1:' + srv.address().port;
     const forbidden = await fetch(url + '/api/core/personal/directory');
@@ -47,7 +47,7 @@ test('ToolBox starts local Core without loading the sync runtime and a native to
     await wait(() => core.store.db.prepare('SELECT status FROM works WHERE id=?').get(workId)?.status === 'completed', 'local core work complete');
     await rt.close();
     const reopened = await openLocalCore(args);
-    t.after(() => reopened.close());
+
     const saved = await reopened.coreSingle.history(descriptor);
     assert.deepEqual(saved.history.map(item => item.content), ['Local native input', 'core reply']);
     assert.equal(provider.calls.length, 1);
@@ -71,5 +71,38 @@ test('ToolBox starts local Core without loading the sync runtime and a native to
 
     assert.equal((await queue.inspect(descriptor)).exists, false);
     assert.equal(core.store.db.prepare('SELECT count(*) n FROM core_topics WHERE id=?').get(mapTopic(descriptor).sharedId).n, 1);
+    const actor = { ...core.local.actor };
+    const memory = { key: mapTopic(descriptor).sharedId, workspace: 'personal', actor };
+    const listed = await core.memoryTool(memory, 'TopicMemo', { maid: agent.name, command: 'ListTopics' });
+    assert.match(listed, /Local topic/);
+    const targetKey = require(BOX + '/core/localWorkspace').localTopicKey('agent', 'Agent', 'Disposable');
+    await core.local.define(targetKey, { ownerType: 'agent', ownerId: 'Agent', topicId: 'Disposable',
+        name: 'Deleted memo marker', config: { name: agent.name, model: 'fixture', systemPrompt: 'Disposable' } }, () => true);
+    assert.match(await core.memoryTool(memory, 'TopicMemo', { maid: agent.name }), /Deleted memo marker/);
+    core.local.remove('agent', 'Agent', targetKey, core.local.actor, 'delete_disposable', () => {});
+    assert.doesNotMatch(await core.memoryTool(memory, 'TopicMemo', { maid: agent.name }), /Deleted memo marker/);
+    await assert.rejects(core.memoryTool(memory, 'TopicMemo', {
+        maid: agent.name, command: 'GetTopicContent', topicId: targetKey
+    }), /未找到 ID/);
+
+    const marker = path.join(profile, '.vcp-core', 'profile.json');
+    const bound = JSON.parse(await fs.readFile(marker, 'utf8'));
+    assert.equal(bound.storageId, core.store.storageId);
+    await reopened.close();
+    await new Promise(resolve => srv.close(resolve));
+    await core.close();
+    const offline = await openLocalCore(args);
+    assert.equal((await offline.coreSingle.history(descriptor)).offline, true);
+    await offline.close();
+    const replacement = express();
+    replacement.use(express.json());
+    core = startCoreHost({ app: replacement, chat, env: { VCP_CORE_DATA_DIR: path.join(root, 'empty') },
+        listenHost: '127.0.0.1', serverKey: token });
+    srv = await new Promise(resolve => {
+        const server = replacement.listen(Number(new URL(url).port), '127.0.0.1', () => resolve(server));
+    });
+    await assert.rejects(openLocalCore(args), { code: 'CORE_DATABASE_IDENTITY_MISMATCH' });
+    assert.equal(core.store.db.prepare('SELECT count(*) n FROM core_topics').get().n, 0);
+    assert.deepEqual(JSON.parse(await fs.readFile(marker, 'utf8')), bound);
     assert.ok(!Object.keys(require.cache).some(file => /NativeSync[\\/]native-sync\.js$/.test(file)));
 });

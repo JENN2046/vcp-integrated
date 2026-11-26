@@ -462,6 +462,11 @@ class CoreService {
         return this.cds.search(topic, rows, params);
     }
 
+    checkStorage(req) {
+        const expected = req.get('x-vcp-core-storage-id');
+        if (expected !== undefined && expected !== this.store.storageId) throw failure('CORE_DATABASE_IDENTITY_MISMATCH');
+    }
+
     router(resolveActor) {
         const router = express.Router({ mergeParams: true });
         const scope = (req, permission) => {
@@ -475,6 +480,17 @@ class CoreService {
             res.json({ success: true });
         }));
         if (this.local) {
+            router.get('/:workspace/identity', route((req, res) => {
+                const actor = resolveActor(req, req.params.workspace, 'read');
+                this.local.authorize(actor, req.params.workspace);
+                res.set('Cache-Control', 'no-store').json({ workspace: this.workspace, storageId: this.store.storageId });
+            }));
+            router.get('/:workspace/memo-agent', route((req, res) => {
+                const actor = resolveActor(req, req.params.workspace, 'read');
+                this.local.authorize(actor, req.params.workspace);
+                if (typeof req.query.name !== 'string' || !req.query.name.trim() || req.query.name.length > 200) throw failure('INVALID_MEMORY_QUERY', 400);
+                res.json({ agent: this.local.findAgent(req.query.name, this.historyDeleted) });
+            }));
             const mutationActor = req => {
                 if (this.runner.draining) throw failure('HOST_DRAINING', 503);
                 const actor = resolveActor(req, req.params.workspace, 'config');

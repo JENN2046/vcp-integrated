@@ -50,15 +50,19 @@ class ExecutionConfiguration {
         const references=text=>this.hasAgentReference(text);
         if(authority&&!(authority.sharedSpaceId&&desktopContext)&&/\{\{VCPChat(?:Canvas|WorkSpace)(?::[^{}]*)?\}\}/.test(prompt))throw fail('DESKTOP_CONTEXT_REQUIRED');
         const refs=references(prompt);
+        // Standalone configuration is admitted by the Core workspace. Bind its
+        // explicit template to one native alias, just as the shared path does
+        // with a separately enrolled alias.
+        const agentAlias = topic.agentAlias || (localOwner && refs[0]?.[1]) || undefined;
         if(refs.length){
-            if(!topic.agentAlias||!this.agentManager.isAgent(topic.agentAlias))throw fail('CONFIG_PROMPT_SNAPSHOT_UNAVAILABLE');
-            if(refs.some(reference=>reference[1]!==topic.agentAlias))throw fail('CONFIG_PROMPT_AUTHORITY_CONFLICT');
+            if(!agentAlias||!this.agentManager.isAgent(agentAlias))throw fail('CONFIG_PROMPT_SNAPSHOT_UNAVAILABLE');
+            if(refs.some(reference=>reference[1]!==agentAlias))throw fail('CONFIG_PROMPT_AUTHORITY_CONFLICT');
             promptTemplate=prompt;
-            prompt=await this.agentManager.getAgentPrompt(topic.agentAlias);
+            prompt=await this.agentManager.getAgentPrompt(agentAlias);
             if(typeof prompt!=='string'||!prompt||references(prompt).length||prompt.startsWith('[AgentManager:')||prompt===input.systemPrompt)throw fail('CONFIG_PROMPT_SNAPSHOT_UNAVAILABLE');
             promptPolicy='native-alias-snapshot';
         }
-        const value = {name:input.name,systemPrompt:prompt,...(authority?{authority}:{}),...(promptTemplate?{promptTemplate}:{}),model:input.model.trim(),executionPolicy:this.policy(input.executionPolicy),streamOutput:input.streamOutput===true||input.streamOutput==='true',promptPolicy,...(topic.agentAlias?{agentAlias:topic.agentAlias}:{}),imageSupported:Array.isArray(imageModels)&&imageModels.includes(input.model),tavernRules:this.rules(input.tavernRules)};
+        const value = {name:input.name,systemPrompt:prompt,...(authority?{authority}:{}),...(promptTemplate?{promptTemplate}:{}),model:input.model.trim(),executionPolicy:this.policy(input.executionPolicy),streamOutput:input.streamOutput===true||input.streamOutput==='true',promptPolicy,...(agentAlias && {agentAlias}),imageSupported:Array.isArray(imageModels)&&imageModels.includes(input.model),tavernRules:this.rules(input.tavernRules)};
         if((localOwner||authority?.sharedSpaceId)&&input.stripRegexes!==undefined){
             const validated=require('../Plugin/NativeSync/sync/contracts.generated.cjs').sharedConfig('agent',{name:input.name,systemPrompt:input.systemPrompt,model:input.model,stripRegexes:input.stripRegexes});
             value.stripRegexes=validated.stripRegexes;
