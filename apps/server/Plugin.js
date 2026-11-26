@@ -1615,7 +1615,18 @@ class PluginManager extends EventEmitter {
 
     // New method to get all individual descriptions
     getIndividualPluginDescriptions() {
-        return this.individualPluginDescriptions;
+        if (!nativeExecution.currentCoreSponsor()) return this.individualPluginDescriptions;
+        const descriptions = new Map(this.individualPluginDescriptions);
+        descriptions.set('VCPTopicSponsor', [
+            'TopicSponsor sends a message to an existing single-chat topic in the same shared workspace.',
+            '<<<[TOOL_REQUEST]>>>',
+            'tool_name:「始」TopicSponsor「末」,',
+            'command:「始」ReplyToTopic「末」,',
+            'topic_id:「始」Existing topic ID「末」,',
+            'message:「始」Message to deliver「末」',
+            '<<<[END_TOOL_REQUEST]>>>'
+        ].join('\n'));
+        return descriptions;
     }
 
     /**

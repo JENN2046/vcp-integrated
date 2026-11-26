@@ -229,71 +229,53 @@ class CoreSingleClient {
         return { ...await this.history(descriptor), handled: true, success: true };
     }
 
-    async prepareCompaction(descriptor, retryId) {
+    async compact(descriptor, settings, requestId) {
         const mapping = this.mapping(descriptor);
-        const r = this.runtime;
-        if (r.readOnly) throw fail('SHARED_READ_ONLY');
+        if (this.runtime.readOnly) throw fail('SHARED_READ_ONLY');
+        const r = this.runtime, file = this.file(mapping, 'compaction-command');
         return r.execution.run('compact:' + mapping.sharedId, async () => {
-            const file = this.file(mapping, 'compaction');
-            const pending = await ownedJson(r.root, file, { optional: true });
-            if (pending?.id) {
-                if (retryId && retryId !== pending.id) throw fail('SHARED_CHECKPOINT_SCOPE_CHANGED');
-                return { ...await this.publishCompaction(descriptor, mapping, file, pending), recovered: true };
+            const legacy = await ownedJson(r.root, this.file(mapping, 'compaction'), { optional: true });
+            if (legacy?.id) {
+                const snapshot = await this.history(descriptor);
+                const message = snapshot.history.find(item => item.id === legacy.message?.id);
+                if (!message || message.content !== legacy.message?.content ||
+                    stable(message.contextCompaction) !== stable(fieldsFrom(legacy.message).contextCompaction)) {
+                    throw fail('CORE_COMPACTION_LEGACY_PUBLICATION_PENDING');
+                }
+                await durableJson(this.file(mapping, 'compaction'), {});
+                return { success: true, message, history: snapshot.history };
             }
-            const prepared = await r.send(this.route(mapping, 'compact'));
-            if (!prepared.id || prepared.messageId !== 'checkpoint_' + prepared.id ||
-                !prepared.sourceHash || !Array.isArray(prepared.history)) throw fail('SHARED_COMPACTION_RESPONSE_INVALID');
-            return { ...prepared, handled: true, success: true };
-        });
-    }
-
-    async commitCompaction(descriptor, body) {
-        const mapping = this.mapping(descriptor);
-        const r = this.runtime;
-        if (r.readOnly) throw fail('SHARED_READ_ONLY');
-        return r.execution.run('compact:' + mapping.sharedId, async () => {
-            const file = this.file(mapping, 'compaction');
-            const pending = await ownedJson(r.root, file, { optional: true });
-            if (pending?.id && stable(pending) !== stable(body)) throw fail('SHARED_CHECKPOINT_INTENT_CHANGED');
-            if (!pending?.id) await durableJson(file, body);
-            return this.publishCompaction(descriptor, mapping, file, body);
-        });
-    }
-
-    async cancelCompaction(descriptor, id) {
-        const mapping = this.mapping(descriptor);
-        const r = this.runtime;
-        if (r.readOnly) throw fail('SHARED_READ_ONLY');
-        return r.execution.run('compact:' + mapping.sharedId, async () => {
-            const file = this.file(mapping, 'compaction');
-            const pending = await ownedJson(r.root, file, { optional: true });
-            if (pending?.id !== id) return { success: true, cancelled: true };
-            await this.publishCompaction(descriptor, mapping, file, pending, { acknowledge: false });
-            return { success: true, alreadyCommitted: true };
-        });
-    }
-
-    async publishCompaction(descriptor, mapping, file, body, { acknowledge = true } = {}) {
-        let receipt;
-        try {
-            receipt = await this.runtime.send(this.route(mapping, 'compact'), { body });
-        } catch (error) {
-            if (['WORK_SAFE_BOUNDARY_PENDING', 'SHARED_COMPACTION_SOURCE_CHANGED', 'INVALID_CHECKPOINT_METADATA'].includes(error.code)) {
-                await durableJson(file, {});
+            let body = await ownedJson(r.root, file, { optional: true });
+            if (!body?.requestId) {
+                const templates = ['contextCompactionPrompt', 'contextCompactionSendPrompt', 'contextCompactionMainPrompt'];
+                body = { requestId, model: settings.contextCompactionModel, fallbackModel: settings.contextCompactionFallbackModel || '',
+                    ...Object.fromEntries(templates.filter(field => typeof settings[field] === 'string').map(field => [field, settings[field]])) };
+                await durableJson(file, body);
             }
-            throw error;
-        }
-        if (receipt?.success !== true || receipt.messageId !== body.message.id || !Number.isSafeInteger(receipt.seq)) {
-            throw fail('SHARED_COMPACTION_RESPONSE_INVALID');
-        }
-        const snapshot = await this.history(descriptor);
-        const message = snapshot.history.find(row => row.id === receipt.messageId);
-        if (snapshot.seq < receipt.seq || message?.content !== body.message.content ||
-            stable(message?.contextCompaction) !== stable(fieldsFrom(body.message).contextCompaction)) {
-            throw fail('SHARED_CHECKPOINT_PROJECTION_CONFLICT');
-        }
-        if (acknowledge) await durableJson(file, {});
-        return { handled: true, success: true, id: body.id, messageId: message.id, message, history: snapshot.history };
+            let result;
+            try {
+                result = await r.send(this.route(mapping, 'compact'), { body });
+            } catch (error) {
+                if (error.status && !['NETWORK_UNAVAILABLE', 'CORE_COMPACTION_OUTCOME_UNKNOWN', 'CORE_PROVIDER_OUTCOME_UNKNOWN'].includes(error.code)) {
+                    await durableJson(file, {});
+                }
+                throw error;
+            }
+            const snapshot = await this.history(descriptor);
+            const message = snapshot.history.find(item => item.id === result.messageId);
+            if (!result?.success || snapshot.seq < result.seq || !message?.contextCompaction) throw fail('SHARED_CHECKPOINT_PROJECTION_CONFLICT');
+            await durableJson(file, {});
+            return { success: true, message, history: snapshot.history };
+        });
+    }
+
+    async cancelCompact(descriptor) {
+        if (this.runtime.readOnly) throw fail('SHARED_READ_ONLY');
+        const mapping = this.mapping(descriptor);
+        const file = this.file(mapping, 'compaction-command');
+        const pending = await ownedJson(this.runtime.root, file, { optional: true });
+        if (!pending?.requestId) return { success: true, cancelRequested: false };
+        return this.runtime.send(this.route(mapping, 'compact/cancel'), { body: { requestId: pending.requestId } });
     }
 
     async control(descriptor, executionId, action, requestId = randomUUID()) {
@@ -317,16 +299,27 @@ class CoreSingleClient {
     }
 
     async stopTask(descriptor, workId, taskId) {
+        if (this.runtime.readOnly) throw fail('SHARED_READ_ONLY');
         const mapping = this.mapping(descriptor);
         const result = await this.runtime.send(this.route(mapping,
             'works/' + encodeURIComponent(workId) + '/tasks/' + encodeURIComponent(taskId) + '/stop'), { body: {} });
         return { ...result, success: true };
     }
 
+    async setFlowlock(descriptor, action, options = {}) {
+        if (this.runtime.readOnly) throw fail('SHARED_READ_ONLY');
+        const mapping = this.mapping(descriptor);
+        const response = await this.runtime.send(this.route(mapping, 'flowlock'), {
+            body: { ...options, action, requestId: randomUUID() }
+        });
+        this.observe(mapping);
+        return { ...response, success: true };
+    }
+
     async status(descriptor) {
         const mapping = this.mapping(descriptor);
         this.observe(mapping);
-        const { works } = await this.runtime.send(this.route(mapping, 'works'));
+        const { works, flowlock } = await this.runtime.send(this.route(mapping, 'works'));
         const topic = this.topic(mapping);
         for (const work of works.filter(work => active.has(work.status))) {
             const known = this.previews.get(work.id) || { executionId: work.id, sharedId: mapping.sharedId, text: '',
@@ -334,10 +327,10 @@ class CoreSingleClient {
             known.canCancel = work.owner && ['queued', 'running', 'waiting_approval'].includes(work.status);
             this.previews.set(work.id, known);
         }
-        return { enabled: true, connection: 'online', topic,
+        return { enabled: true, connection: 'online', topic, coreFlowlock: flowlock,
             executions: works.map(work => ({ ...work, shared: true,
                 nativeTasks: (work.tasks || []).map(task => ({ ...task, nativeTaskId: task.id, agentBaseName: task.agent,
-                    stopAllowed: work.owner && active.has(task.state), resultRef: task.revision === 1 ? task.id : null })), state: work.status, requestId: work.id, canCancel: work.owner && active.has(work.status),
+                    stopAllowed: work.owner && ['accepted', 'waiting', 'running'].includes(task.state), resultRef: task.revision === 1 ? task.id : null })), state: work.status, requestId: work.id, canCancel: work.owner && active.has(work.status),
                 canAbandon: work.owner && work.status === 'review_required' })),
             serverSessions: [...this.previews.values()].filter(item => item.sharedId === mapping.sharedId) };
     }
@@ -379,7 +372,7 @@ class CoreSingleClient {
     onEvent(mapping, data, type) {
         const r = this.runtime;
         const topic = this.topic(mapping);
-        if (type === 'native_task') { r.notifyExecutionStatus({ topic }); return; }
+        if (type === 'native_task' || type === 'flowlock_state') { r.notifyExecutionStatus({ topic }); return; }
         if (type === 'change_seq') {
             const local = mapping.local;
             if (data.seq !== this.lastSeq || this.lastKey !== mapping.sharedId) {

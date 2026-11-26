@@ -106,11 +106,15 @@ class ExecutionConfigs {
         return value;
     }
     policy(value={}) {
-        const keys=['userName','enableThoughtChainInjection','enableContextSanitizer','contextSanitizerDepth','enableVcpToolInjection'];
+        const compactionModels=['contextCompactionModel','contextCompactionFallbackModel'];
+        const keys=['userName','enableThoughtChainInjection','enableContextSanitizer','contextSanitizerDepth','enableVcpToolInjection','enableContextCompaction',...compactionModels];
         if(!value||Object.keys(value).some(k=>!keys.includes(k))||value.userName!==undefined&&(typeof value.userName!=='string'||value.userName.length>200))throw fail('INVALID_EXECUTION_POLICY',400);
-        for(const key of ['enableThoughtChainInjection','enableContextSanitizer','enableVcpToolInjection'])if(value[key]!==undefined&&typeof value[key]!=='boolean')throw fail('INVALID_EXECUTION_POLICY',400);
+        for(const key of ['enableThoughtChainInjection','enableContextSanitizer','enableVcpToolInjection','enableContextCompaction'])if(value[key]!==undefined&&typeof value[key]!=='boolean')throw fail('INVALID_EXECUTION_POLICY',400);
+        for (const key of compactionModels) if (value[key] !== undefined && (typeof value[key] !== 'string' || value[key].length > 200)) throw fail('INVALID_EXECUTION_POLICY',400);
         const depth=value.contextSanitizerDepth??2;if(!Number.isSafeInteger(depth)||depth<0||depth>10000)throw fail('INVALID_EXECUTION_POLICY',400);
-        return {userName:value.userName||'用户',enableThoughtChainInjection:value.enableThoughtChainInjection===true,enableContextSanitizer:value.enableContextSanitizer===true,contextSanitizerDepth:depth,enableVcpToolInjection:value.enableVcpToolInjection===true};
+        return {userName:value.userName||'用户',enableThoughtChainInjection:value.enableThoughtChainInjection===true,enableContextSanitizer:value.enableContextSanitizer===true,contextSanitizerDepth:depth,enableVcpToolInjection:value.enableVcpToolInjection===true,
+            ...(typeof value.enableContextCompaction==='boolean' && {enableContextCompaction:value.enableContextCompaction}),
+            ...Object.fromEntries(compactionModels.filter(key=>value[key]).map(key=>[key,value[key].trim()]))};
     }
     rules(value=[]) {
         const keys=['id','name','type','enabled','content','scope','builtinKey','isBuiltin','role','depth','wrap','order','source'];

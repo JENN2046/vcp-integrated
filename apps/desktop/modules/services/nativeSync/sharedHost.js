@@ -37,7 +37,10 @@ function projectNativeConfig(runtime,kind,raw,base){
  });
  return kind==='group'?runtime.groupToShared(value):value;
 }
-function policyProjection(s={}){return {userName:s.userName||'用户',enableThoughtChainInjection:s.enableThoughtChainInjection===true,enableContextSanitizer:s.enableContextSanitizer===true,contextSanitizerDepth:s.contextSanitizerDepth===undefined?2:Number(s.contextSanitizerDepth),enableVcpToolInjection:s.enableVcpToolInjection===true};}
+function policyProjection(s={}){return {userName:s.userName||'用户',enableThoughtChainInjection:s.enableThoughtChainInjection===true,enableContextSanitizer:s.enableContextSanitizer===true,contextSanitizerDepth:s.contextSanitizerDepth===undefined?2:Number(s.contextSanitizerDepth),enableVcpToolInjection:s.enableVcpToolInjection===true,
+ ...(typeof s.enableContextCompaction==='boolean'&&{enableContextCompaction:s.enableContextCompaction}),
+ ...Object.fromEntries(['contextCompactionModel','contextCompactionFallbackModel']
+  .filter(key=>typeof s[key]==='string').map(key=>[key,s[key].trim()]))};}
 function createSharedHost({appDataRoot,agentConfigManager,groupChat,tavernHandlers,settingsManager,readSettings,thumbnail,prepareViews,notify=()=>{}}){
  const root=path.resolve(appDataRoot);
  if(!agentConfigManager?.readAgentConfig||!agentConfigManager.updateAgentConfig||!agentConfigManager.writeAgentConfig)throw fail('SHARED_NATIVE_CONFIG_AUTHORITY_REQUIRED');

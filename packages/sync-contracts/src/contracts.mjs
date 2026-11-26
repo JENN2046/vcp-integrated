@@ -280,8 +280,9 @@ export function sharedConfig(kind,value) {
   if(!Array.isArray(value.tavernRules)||value.tavernRules.length>200||value.tavernRules.some(r=>!object(r)||Object.keys(r).some(k=>!allowed.includes(k))||!['system_suffix','user_suffix','context_inject'].includes(r.type)||typeof r.content!=='string'||r.enabled!==undefined&&typeof r.enabled!=='boolean'||r.type==='context_inject'&&(!['user','assistant'].includes(r.role)||!Number.isSafeInteger(r.depth)||r.depth<0||r.depth>10000)))fail();
  }
  if(value.executionPolicy!==undefined){
-  const p=value.executionPolicy,flags=['enableThoughtChainInjection','enableContextSanitizer','enableVcpToolInjection'];
-  if(!object(p)||Object.keys(p).some(k=>!['userName','contextSanitizerDepth',...flags].includes(k))||flags.some(k=>p[k]!==undefined&&typeof p[k]!=='boolean')||p.userName!==undefined&&(typeof p.userName!=='string'||p.userName.length>200)||p.contextSanitizerDepth!==undefined&&(!Number.isSafeInteger(p.contextSanitizerDepth)||p.contextSanitizerDepth<0||p.contextSanitizerDepth>10000))fail();
+  const p=value.executionPolicy,flags=['enableThoughtChainInjection','enableContextSanitizer','enableVcpToolInjection','enableContextCompaction'];
+  const models=['contextCompactionModel','contextCompactionFallbackModel'];
+  if(!object(p)||Object.keys(p).some(k=>!['userName','contextSanitizerDepth',...flags,...models].includes(k))||flags.some(k=>p[k]!==undefined&&typeof p[k]!=='boolean')||models.some(k=>p[k]!==undefined&&(typeof p[k]!=='string'||p[k].length>200))||p.userName!==undefined&&(typeof p.userName!=='string'||p.userName.length>200)||p.contextSanitizerDepth!==undefined&&(!Number.isSafeInteger(p.contextSanitizerDepth)||p.contextSanitizerDepth<0||p.contextSanitizerDepth>10000))fail();
  }
  return JSON.parse(JSON.stringify(value));
 }

@@ -1,0 +1,14 @@
+{
+  "model": "SmolVLM-500M-Instruct-Q8_0",
+  "engine": "llama.cpp b12728",
+  "scope": "isolated Core service with native ToolBox turn handler, desktop runtime and paired HTTP client",
+  "checkpoint": " 大神只能使用 Azure 文档来看，程序默认关注的紧随本系统指令。主要是说：历史数据已结束。最终任务约束：使用它想获取的信息，不需要等待。只要正文写成完成，没有省略关键的问题。与此同时，必须不设固定字数目标，保留精确标识符、关键参数、最后提问和选项。在日记中，必须使用宿主的关闭，不设与还是主的。只需要硬约事项和精确的字数目标。日记由宿主保留，不重建日记。只输出报告正文。",
+  "followup": " FROZEN_SHARED_PROMPT",
+  "codenamePreserved": false,
+  "followupUsedActualCheckpoint": true,
+  "providerRequests": 3,
+  "formalMessages": 5,
+  "legacyDispatches": 0,
+  "legacyJournalRows": 0,
+  "compactionSourceSha256": "9b3c30e9394f72ba3a81af9aa287ba157c852b4994971f0fe7138dadc86988be"
+}

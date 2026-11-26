@@ -10,6 +10,8 @@ module.exports = {
         getNativeDeletionContext: invoke('native-sync:directory-context', 'scope'),
         getNativeExecutionStatus: invoke('native-sync:executions', 'itemId', 'itemType', 'topicId', 'refresh'),
         getNativeTaskResult: invoke('native-sync:task-result', 'itemId', 'itemType', 'topicId', 'executionId', 'nativeTaskId'),
+        coreCompact: invoke('native-sync:core-compact', 'payload'),
+        coreFlowlock: invoke('native-sync:core-flowlock', 'payload'),
         stopNativeTask: invoke('native-sync:task-stop', 'payload'),
         onNativeExecutionStatusChanged: on('native-sync:executions-changed'),
         onSharedDirectoryChanged:on('native-sync:directory-changed'),

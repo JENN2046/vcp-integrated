@@ -423,11 +423,12 @@
         return result;
     }
 
-    global.flowlockProtocol = Object.freeze({
+    const protocol = Object.freeze({
         parse,
         transformForRender,
         createSafeScanText
     });
 
-    console.log('[Flowlock Protocol] Safe parser initialized.');
-})(window);
+    if (typeof module === 'object' && module.exports && typeof window === 'undefined') module.exports = protocol;
+    else global.flowlockProtocol = protocol;
+})(typeof window !== 'undefined' ? window : globalThis);

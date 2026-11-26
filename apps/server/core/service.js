@@ -2,12 +2,12 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { createHash, randomUUID } = require('node:crypto');
+const { createHash } = require('node:crypto');
 const express = require('express');
 const { CoreStore, failure } = require('./store');
 const { CoreRunner } = require('./runner');
 const { DesktopContext } = require('./desktopContext');
-const { effectiveContextHistory, isContextCheckpoint, checkpointFailure } = require('@vcp/native-history-window');
+const { CoreCompaction } = require('./compaction');
 const { fieldsFrom } = require('../Plugin/NativeSync/sync/metadata');
 const { AttachmentStore } = require('../Plugin/NativeSync/mobile/attachments');
 const { attachmentRoutes } = require('../Plugin/NativeSync/mobile/attachmentRoutes');
@@ -73,11 +73,18 @@ class CoreService {
             store: this.store, chat, allowedAgents: shared.delegationAgents,
             resolveAcceptedTopic: work => this.resolveAcceptedTopic(work),
             buildPacket: (...args) => this.buildPacket(...args),
-            sponsor: (...args) => this.deliverSponsoredMessage(...args)
+            sponsor: (...args) => this.deliverSponsoredMessage(...args),
+            send: (...args) => this.send(...args),
+            automaticCompaction: (...args) => this.compaction.automatic(...args),
+            isCompacting: key => this.compaction.running.has(key)
         });
         for (const row of db.prepare('SELECT * FROM conversations').all()) {
             if (row.workspace !== workspace) throw failure('CORE_DATABASE_WORKSPACE_MISMATCH');
         }
+        this.compaction = new CoreCompaction({ store: this.store, chat,
+            sourceHash: (...args) => this.compactionSource(...args),
+            publish: (key, type, event) => this.runner.publish(key, type, event),
+            onBusy: () => this.runner.flowlock.schedule() });
         this.runner.recover();
     }
 
@@ -124,7 +131,7 @@ class CoreService {
                     content: previousTurn.content, timestamp: Date.now() });
             }
         }
-        const latest = history.filter(message => message.sourceWorkId === work.id).at(-1)?.id || work.user_message_id;
+        const latest = history.filter(message => message.sourceWorkId === work.id && !message.contextCompaction).at(-1)?.id || work.user_message_id;
         const budget = { bytes: 0 };
         const messages = await effectiveRequest(history, config, latest, async message => {
             const parts = message.attachments?.length
@@ -145,7 +152,7 @@ class CoreService {
         });
     }
 
-    async send(topic, principal, body, reauthorize, actor) {
+    async send(topic, principal, body, reauthorize, actor, options = {}) {
         if (this.runner.draining) throw failure('HOST_DRAINING', 503);
         const { requestId, attachments = [], desktopReferences = [] } = body;
         const text = requireText(body.text);
@@ -158,7 +165,7 @@ class CoreService {
             throw failure('INVALID_DESKTOP_REFERENCE', 400);
         }
         const refs = desktopReferences.length ? fieldsFrom({ desktopReferences }).desktopReferences : [];
-        const input = { text, attachments, ...(refs.length && { desktopReferences: refs }) };
+        const input = { text, attachments, ...(options.flowlock && { flowlock: true }), ...(refs.length && { desktopReferences: refs }) };
         const prior = this.store.replay(principal, requestId, { key: topic.key, op: 'send', input });
         if (prior) return prior;
         const config = await prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false, desktopContext: true });
@@ -174,10 +181,10 @@ class CoreService {
                 }
             }
             return {
-                config, attachments: files, desktopReferences: refs.map(ref => ({ ...ref, sourceId: actor.sourceId })),
+                config, attachments: files, ...(options.flowlock && { senderName: 'Flowlock' }), desktopReferences: refs.map(ref => ({ ...ref, sourceId: actor.sourceId })),
                 ...(principal.startsWith('mobile:') && { recovery: {
                     version: 1, kind: 'message', sessionMarker: sessionMarker(principal.slice(7)),
-                    payloadHash: payloadHash({ topicKey: topic.key, kind: 'message', payload: { requestId, ...input } })
+                    payloadHash: payloadHash({ topicKey: topic.key, kind: 'message', payload: { requestId, text, attachments } })
                 } }),
                 link: id => this.attachments.associate({ ...topic, msgId: id }, { attachments: files }, principal)
             };
@@ -214,7 +221,7 @@ class CoreService {
             args.source_topic_id && '[该发言发送自' + args.source_topic_id + '话题]'].filter(Boolean).join('\n\n');
         const operationId = 'sponsor_' + invocation.invocationId.replaceAll('-', '');
         const result = this.store.admit(target, work.principal, operationId, { text, source: work.id }, () => ({
-            config: { ...config, sponsoredByWorkId: work.id }, attachments: [], senderName
+            config: { ...config, sponsoredByWorkId: work.id }, attachments: [], senderName, senderRole: 'assistant'
         }));
         this.runner.publish(target.key, 'change_seq', { seq: result.seq });
         this.runner.wake();
@@ -264,48 +271,25 @@ class CoreService {
             this.shared.authorize(value.actor, value.topic.workspace, 'config');
             return value;
         };
-        router.get('/:workspace/:key/compact', route((req, res) => {
-            const { actor, topic } = compactionScope(req);
-            this.store.requireIdleCompaction(topic.key);
-            const history = effectiveContextHistory(this.store.compactionHistory(topic.key));
-            if (!history.length) throw failure('CORE_COMPACTION_EMPTY');
-            if (history.some(message => message.desktopReferences?.length)) throw failure('CORE_COMPACTION_LIVE_REFERENCES');
-            const id = randomUUID();
-            res.json({ id, messageId: 'checkpoint_' + id, sourceHash: this.compactionSource(topic, actor.principal, id), history });
+        router.get('/:workspace/:key/compact', route((req, _res) => {
+            compactionScope(req);
+            throw failure('CORE_COMPACTION_EXECUTION_MOVED');
         }));
-        router.post('/:workspace/:key/compact', route((req, res) => {
+        router.post('/:workspace/:key/compact', route(async (req, res) => {
             const { actor, topic } = compactionScope(req);
-            const { id, sourceHash, message } = req.body || {};
-            if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/.test(id) || typeof sourceHash !== 'string' ||
-                !/^[0-9a-f]{64}$/.test(sourceHash) || message?.id !== 'checkpoint_' + id ||
-                !isContextCheckpoint(message) || message.isThinking || message.attachments?.length ||
-                typeof message.content !== 'string' || !message.content.trim() ||
-                Buffer.byteLength(message.content) > 512000 || checkpointFailure(message.contextCompaction.checkpoint)) {
-                throw failure('INVALID_CHECKPOINT_METADATA', 400);
-            }
-            let metadata;
-            try { metadata = fieldsFrom(message).contextCompaction; }
-            catch { throw failure('INVALID_CHECKPOINT_METADATA', 400); }
-            if (!metadata) throw failure('INVALID_CHECKPOINT_METADATA', 400);
-            const result = this.store.command(actor.principal, 'compact_' + id, {
-                key: topic.key, sourceHash, content: message.content, metadata
-            }, () => {
-                this.store.requireIdleCompaction(topic.key);
-                if (this.compactionSource(topic, actor.principal, id) !== sourceHash) {
-                    throw failure('SHARED_COMPACTION_SOURCE_CHANGED');
-                }
-                const seq = this.store.insertMessage({
-                    id: message.id, key: topic.key, role: 'user', content: message.content, checkpoint: metadata
-                });
-                return { success: true, messageId: message.id, seq };
-            });
-            this.runner.publish(topic.key, 'change_seq', { seq: result.seq });
-            res.json(result);
+            if (this.runner.draining) throw failure('HOST_DRAINING', 503);
+            res.json(await this.compaction.manual(topic, actor, req.body || {}, () => compactionScope(req)));
+        }));
+        router.post('/:workspace/:key/compact/cancel', route((req, res) => {
+            const { actor, topic } = compactionScope(req);
+            res.json(this.compaction.cancel(topic, actor, req.body?.requestId));
         }));
         router.get('/:workspace/:key/messages', route((req, res) => {
             const { topic } = scope(req, 'read');
             const limit = integer(req.query.limit, 100, 1, 500);
-            const before = integer(req.query.before, Number.MAX_SAFE_INTEGER, 1, Number.MAX_SAFE_INTEGER);
+            const before = req.query.before === undefined ? Number.MAX_SAFE_INTEGER : Number(req.query.before);
+            if (!Number.isFinite(before) || before < 1 || before > Number.MAX_SAFE_INTEGER ||
+                !Number.isInteger(before) && before % 1 !== 0.5) throw failure('INVALID_CORE_CURSOR', 400);
             const messages = this.store.snapshot(topic.key, before, limit);
             res.json({ messages, seq: this.store.head(topic.key), nextBefore: messages[0]?.ordinal, hasMore: messages.length === limit });
         }));
@@ -347,7 +331,13 @@ class CoreService {
  }));
             const tasks = await Promise.all(works.map(work => this.runner.agentAssistant.list(this.store.work(work.id))));
             scope(req, 'read');
-            res.json({ works: works.map((work, index) => ({ ...work, tasks: tasks[index] })) });
+            res.json({ works: works.map((work, index) => ({ ...work, tasks: tasks[index] })),
+                flowlock: this.runner.flowlock.state(topic.key, actor.principal) });
+        }));
+        router.post('/:workspace/:key/flowlock', route((req, res) => {
+            const { topic, actor } = scope(req, 'execute');
+            if (this.runner.draining) throw failure('HOST_DRAINING', 503);
+            res.json(this.runner.flowlock.control(topic, actor.principal, req.body || {}));
         }));
         router.get('/:workspace/:key/observe', route((req, res) => {
             const { topic } = scope(req, 'read');
@@ -444,8 +434,9 @@ class CoreService {
         return router;
     }
 
-    beginDrain() { this.runner.beginDrain(); }
+    beginDrain() { this.compaction.beginDrain(); this.runner.beginDrain(); }
     async close() {
+        await this.compaction.close();
         await this.runner.close();
         await this.attachments.close();
         this.store.db.close();

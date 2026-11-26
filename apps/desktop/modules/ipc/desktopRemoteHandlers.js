@@ -184,7 +184,7 @@ async function handleFlowlockControl(commandPayload) {
         console.log(`[DesktopRemoteHandlers] handleFlowlockControl received command: ${command}`, commandPayload);
 
         if (!mainWindowRef || mainWindowRef.isDestroyed()) {
-            throw new Error('Main window is not available.');
+            return { status: 'error', code: 'DESKTOP_SURFACE_OFFLINE', message: 'Main window is not available.' };
         }
 
         if (command === 'get' || command === 'status') {

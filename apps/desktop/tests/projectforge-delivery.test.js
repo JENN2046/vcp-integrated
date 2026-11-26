@@ -223,7 +223,7 @@ test('main voice configures every newly started process before creating a sessio
 test('Flowlock ignores payload marker literals but honors real nesting', () => {
     const vm = require('node:vm');
     const context = { window: {}, console: { log() {} } };
-    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'Flowlockmodules/flowlock-protocol.js'), 'utf8'), context);
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'modules/chat/historyWindow/flowlockProtocol.js'), 'utf8'), context);
     const scan = context.window.flowlockProtocol.createSafeScanText;
     const start = '[[VCP调用结果信息汇总:', end = 'VCP调用结果结束]]';
     for (const newline of ['\n', '\r\n']) {

@@ -5,21 +5,25 @@ const { CoreTurnSink } = require('./turnSink');
 const { failure } = require('./store');
 
 class CoreRunner {
-    constructor({ store, chat, resolveAcceptedTopic, buildPacket, allowedAgents, sponsor }) {
+    constructor({ store, chat, resolveAcceptedTopic, buildPacket, allowedAgents, sponsor, send, automaticCompaction, isCompacting }) {
         this.store = store;
         this.chat = chat;
         this.resolveAcceptedTopic = resolveAcceptedTopic;
         this.buildPacket = buildPacket;
         this.sponsor = sponsor;
+        this.automaticCompaction = automaticCompaction;
         this.running = new Map();
         this.observers = new Map();
         const { CoreAgentAssistant } = require('./agentAssistant');
-        this.agentAssistant = new CoreAgentAssistant({ store, chat, resolveAcceptedTopic, allowedAgents,
-            publish: (key, type, value) => this.publish(key, type, value) });
+        const publish = (key, type, value) => this.publish(key, type, value);
+        this.agentAssistant = new CoreAgentAssistant({ store, chat, resolveAcceptedTopic, allowedAgents, publish });
+        const { CoreFlowlock } = require('./flowlock');
+        this.flowlock = new CoreFlowlock({ store, resolveTopic: resolveAcceptedTopic, send, publish, isCompacting });
     }
 
     recover() {
-        this.store.recover(work => Boolean(this.resolveAcceptedTopic(work)));
+        this.store.recover(work => Boolean(this.resolveAcceptedTopic(work)),
+            (work, content) => this.flowlock.afterFinal(work, content));
         this.wake();
     }
 
@@ -47,6 +51,7 @@ class CoreRunner {
     }
 
     wake() {
+        this.flowlock.schedule();
         if (this.scheduled || this.draining) return;
         this.scheduled = true;
         setImmediate(() => {
@@ -121,7 +126,13 @@ class CoreRunner {
                     return false;
                 }
                 this.store.saveFinal(work, content);
-                const result = this.store.transaction(() => this.store.finish(id));
+                let flowlockChanged;
+                const result = this.store.transaction(() => {
+                    const receipt = this.store.finish(id);
+                    flowlockChanged = this.flowlock.afterFinal(work, content);
+                    return receipt;
+                });
+                if (flowlockChanged) this.publish(key, 'flowlock_state', {});
                 this.publish(key, 'change_seq', { seq: result.seq });
                 observe('work_state', result);
             }
@@ -131,6 +142,7 @@ class CoreRunner {
             const topic = this.resolveAcceptedTopic(work);
             if (!topic) throw failure('WORK_AUTHORITY_REVOKED');
             const config = JSON.parse(work.frozen_config_json);
+            await this.automaticCompaction(topic, work, config, signal, fence);
             await native.runCoreTurn({
                 workId: id, signal, fence, observe,
                 ...(topic.actor?.kind === 'desktop' && !config.sponsoredByWorkId && { coreSponsor: (invocation, args) => this.sponsor(work, invocation, args) }),
@@ -179,19 +191,22 @@ class CoreRunner {
             return;
         }
         const result = this.store.transaction(() => {
+            this.flowlock.endWork(work);
             if (this.store.unresolved(id)) return this.store.review(id, 'TOOL_EXECUTION_UNCONFIRMED');
-            if (sink.errorCode === 'CORE_PROVIDER_OUTCOME_UNKNOWN') return this.store.review(id, sink.errorCode);
+            if (['CORE_PROVIDER_OUTCOME_UNKNOWN', 'CORE_COMPACTION_OUTCOME_UNKNOWN'].includes(sink.errorCode)) return this.store.review(id, sink.errorCode);
             if (state.status === 'cancelling' || signal.aborted) return this.store.setState(id, 'cancelled');
             if (state.dispatched && !sink.errorCode) return this.store.review(id, 'UPSTREAM_INCOMPLETE');
             return this.store.setState(id, 'failed', sink.errorCode || 'TURN_FAILED');
         });
+        this.publish(key, 'flowlock_state', {});
         observe('work_state', result);
     }
 
-    beginDrain() { this.draining = true; }
+    beginDrain() { this.draining = true; this.flowlock.beginDrain(); }
     async close() {
         this.beginDrain();
         this.agentAssistant.close();
+        await this.flowlock.close();
         for (const runtime of this.running.values()) runtime.controller.abort();
         await Promise.allSettled([...this.running.values()].map(runtime => runtime.done));
     }

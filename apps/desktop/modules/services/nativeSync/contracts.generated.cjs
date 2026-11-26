@@ -1,4 +1,4 @@
-// Generated during release assembly; source SHA256 8582d769bd7226640610b30d5f46f42df7af926aae84eb55b88226103e8c0d83
+// Generated during release assembly; source SHA256 1295246c85b6c585ed27a6355cd7a7fdcd75eb0931bb84a9f691164ffc84ec50
 Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
 // packages/sync-contracts/src/contracts.mjs
 function createProtocol({ canonicalizeMessage, BoundedWarnings, messageContentHash, stableStringify, sha256 }, metadata) {
@@ -663,13 +663,16 @@ function sharedConfig(kind, value) {
 		const p = value.executionPolicy, flags = [
 			"enableThoughtChainInjection",
 			"enableContextSanitizer",
-			"enableVcpToolInjection"
+			"enableVcpToolInjection",
+			"enableContextCompaction"
 		];
+		const models = ["contextCompactionModel", "contextCompactionFallbackModel"];
 		if (!object(p) || Object.keys(p).some((k) => ![
 			"userName",
 			"contextSanitizerDepth",
-			...flags
-		].includes(k)) || flags.some((k) => p[k] !== void 0 && typeof p[k] !== "boolean") || p.userName !== void 0 && (typeof p.userName !== "string" || p.userName.length > 200) || p.contextSanitizerDepth !== void 0 && (!Number.isSafeInteger(p.contextSanitizerDepth) || p.contextSanitizerDepth < 0 || p.contextSanitizerDepth > 1e4)) fail();
+			...flags,
+			...models
+		].includes(k)) || flags.some((k) => p[k] !== void 0 && typeof p[k] !== "boolean") || models.some((k) => p[k] !== void 0 && (typeof p[k] !== "string" || p[k].length > 200)) || p.userName !== void 0 && (typeof p.userName !== "string" || p.userName.length > 200) || p.contextSanitizerDepth !== void 0 && (!Number.isSafeInteger(p.contextSanitizerDepth) || p.contextSanitizerDepth < 0 || p.contextSanitizerDepth > 1e4)) fail();
 	}
 	return JSON.parse(JSON.stringify(value));
 }

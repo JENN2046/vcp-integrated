@@ -78,7 +78,9 @@ export function createContextCompactionService({
         // Same upstream Stop reply gateway; never wait for an unresponsive server
         // before revoking the local request and rejecting late model results.
         try {
-            Promise.resolve(interruptRequest?.(controller.requestId)).catch(error =>
+            Promise.resolve(controller.core
+                ? sharedCompaction.coreCompact({ descriptor: scope, action: 'cancel' })
+                : interruptRequest?.(controller.requestId)).catch(error=>
                 console.warn('[ContextCompaction] Upstream interrupt failed:', error));
         } catch (error) {
             console.warn('[ContextCompaction] Upstream interrupt failed:', error);
@@ -129,6 +131,21 @@ export function createContextCompactionService({
                 controller.signal.addEventListener('abort', () => reject(new Error('上下文压缩已取消')), { once: true });
             });
             const runRequest = async () => {
+                if (authority.core) {
+                    controller.core = true;
+                    const configuration = Object.fromEntries(['contextCompactionModel', 'contextCompactionFallbackModel',
+                        'contextCompactionPrompt', 'contextCompactionSendPrompt', 'contextCompactionMainPrompt']
+                        .filter(key => typeof settings[key] === 'string').map(key => [key, settings[key]]));
+                    const result = await sharedCompaction?.coreCompact?.({
+                        descriptor: scope, action: 'execute', settings: configuration, requestId: controller.requestId
+                    });
+                    if (!result?.success || !result.message?.contextCompaction || !Array.isArray(result.history)) {
+                        throw Object.assign(Error(result?.error || 'CORE_COMPACTION_UNAVAILABLE'),
+                            { code: result?.error || 'CORE_COMPACTION_UNAVAILABLE' });
+                    }
+                    recovered = result;
+                    return;
+                }
                 const preparation = authority.kind === 'shared' && typeof sharedCompaction?.prepareSharedCompaction === 'function'
                     ? await sharedCompaction.prepareSharedCompaction({descriptor:scope, ...(retryPublications.has(key) && {retryId:retryPublications.get(key)})}) : null;
                 if (authority.kind === 'shared' && !preparation?.handled) throw Object.assign(new Error(preparation?.error || '共享压缩协议不可用'), {code: preparation?.error || 'SHARED_COMPACTION_UNAVAILABLE'});

@@ -50,3 +50,9 @@ Core 通过 VCPDistributedServer 原生 WebSocket 按桌面 Source 绑定读取�
 Core 记录 AgentAssistant 的父 Work、调用、原生子任务和模型轮次。原生 AgentAssistant 继续负责循环、取消和归档，内层模型轮次走进程内 ToolBox。桌面与 PWA 查询原生报告时按会话作用域复核。隔离用例使用真实 AgentAssistant 和回环模型，验证正式归档、按原身份读回及后续上下文。Core 子任务退出旧共享执行账本和通用回调发布。
 
 TopicSponsor 在已授权桌面发起的 Core Work 上复用发送方、目标及话题绑定校验。向既有 Core 单聊留言时直接接纳目标 Work，正式写入由 Core 裁决。隔离用例覆盖桌面不再参与执行、目标话题生成回应及旧授权票据和 Journal 无写入。
+
+### M2-R2 Flowlock 与摘要执行
+
+Core 为主聊天解析原生 Flowlock 控制标记，以现有 Work 队列接续。续写提示标明 Flowlock 来源。桌面只投影 Core 会话状态并转交控制命令，输入框仍归桌面表面。Core 手动与自动压缩复用同一原生提示、摘要请求和检查点生成，正式提交与命令回执由 Core 持有。
+
+[R2 验收及旧职责退出清单](evidence/core-m2-r2/README.md)

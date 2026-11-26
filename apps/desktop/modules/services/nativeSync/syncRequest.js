@@ -24,7 +24,7 @@ function createSyncRequest(connection,timeoutMs=8000) {
         }
         route=require('./connection').sourceRoute(connection,route);
         const bulk=connection.scopeMode==='source'&&(/\/source\/(push|pull)(?:\?|$)/.test(route)||/\/source\/baselines(?:\/|$)/.test(route)||Boolean(connection.sharedSpaceId)&&/\/shared\/(?:baselines|baseline|pull)(?:\?|$)/.test(route));
-        const deadline=bulk?Math.max(timeoutMs,60000):route.startsWith('/api/v1/sync/shared/wait?')?Math.max(timeoutMs,40000):timeoutMs;
+        const deadline=body&&/^\/api\/plugins\/NativeSync\/(?:source\/)?core\/.+\/compact$/.test(route)?Math.max(timeoutMs,600000):bulk?Math.max(timeoutMs,60000):route.startsWith('/api/v1/sync/shared/wait?')?Math.max(timeoutMs,40000):timeoutMs;
         let response,value;const responseDeadline=Date.now()+deadline;
         try {
             response=await fetch(url+route,{method:body?'POST':'GET',headers:{...syncHeaders(connection),Authorization:`Bearer ${token}`,'Content-Type':'application/json','X-NativeSync-Protocol':'2','X-NativeSync-Capabilities':'attachments-v1,message-intents-v1,desktop-references-v1,source-data-v2'+(connection.sharedSpaceId?',shared-space-v1,shared-merge-v1,shared-attachments-v1,shared-context-v1,shared-steering-v1,shared-controlled-text-v1,shared-controlled-tools-v1,group-member-handoff-v1,group-member-handoff-v2,shared-controlled-tool-pair-v1,shared-controlled-aa-v1,shared-model-save-v1,shared-inline-receipts-v1,shared-native-inline-v1,shared-session-v1,shared-events-v1,shared-topic-sponsor-v1':'')+(sharedSessionHistory?',shared-session-history-v1':'')},body:serialized,redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(deadline)]):AbortSignal.timeout(deadline)});

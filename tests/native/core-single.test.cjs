@@ -389,92 +389,109 @@ test('Core single chat sends existing text and PDF attachments through one nativ
     }
 });
 
-test('Core single chat publishes a native checkpoint once and resumes from its canonical context window', async t => {
+test('Core executes manual compression in-process and reconciles a lost command receipt', async t => {
     const f = await fixture(t);
     const provider = await localProvider(t);
-    const { chat } = host(provider);
-    const { core, route } = await mountCore(f, chat);
-    f.control.nativeResponder = (req, res) => ctx.runNativeHandler(() => chat.handle(req, res));
+    const { core, route } = await mountCore(f, host(provider).chat);
+    const summaryModel = 'fixture-summary';
+    let pending;
+    const complete = (res, content) => {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.end('data: ' + JSON.stringify({ choices: [{ delta: { content }, finish_reason: 'stop' }] }) + '\n\ndata: [DONE]\n\n');
+    };
     provider.setReply((body, response) => {
-        if (body.stream) {
-            response.setHeader('Content-Type', 'text/event-stream');
-            const frame = { choices: [{ delta: { content: '<context_checkpoint>CORE_CHECKPOINT_FIXTURE</context_checkpoint>' }, finish_reason: 'stop' }] };
-            response.end('data: ' + JSON.stringify(frame) + '\n\ndata: [DONE]\n\n');
-            return;
-        }
+        if (body.model === summaryModel) { pending = response; return; }
         response.end(JSON.stringify({ choices: [{ message: { content: 'core reply' }, finish_reason: 'stop' }] }));
     });
     try {
-        const desktop = await f.desktop('A');
-        const phone = await f.phone();
-        const { descriptor, runtime } = desktop;
-        assert.throws(() => f.shared.compaction.prepare(f.actor('A'), {
-            sharedSpaceId: 'sharedAB', sharedId: f.topic.id, opId: 'legacy-core-compaction', expectedHead: 0
-        }), { code: 'CORE_ROUTE_REQUIRED' });
-        const oldInput = await phone.call(route + '/send', { requestId: 'checkpoint-source', text: 'ORIGINAL_FIXTURE_BODY' }, 202);
-        await wait(() => core.store.work(oldInput.id)?.status === 'completed', 'checkpoint source Work');
+        const desktop = await f.desktop('A'), phone = await f.phone(), { descriptor, runtime } = desktop;
+        const input = await phone.call(route + '/send', { requestId: 'checkpoint-source', text: 'ORIGINAL_FIXTURE_BODY' }, 202);
+        await wait(() => core.store.work(input.id)?.status === 'completed', 'checkpoint source');
+        const settings = { enableContextCompaction: true, contextCompactionModel: summaryModel };
+        const stale = runtime.coreSingle.compact(descriptor, settings, 'core-compact-stale');
+        const rejection = assert.rejects(stale, { code: 'SHARED_COMPACTION_SOURCE_CHANGED' });
+        await wait(() => pending, 'manual native model reached');
+        await phone.call(route + '/messages/' + input.messageId, { requestId: 'checkpoint-source-edit', revision: 1, text: 'EDITED_FIXTURE_BODY' });
+        complete(pending, 'STALE_CHECKPOINT');
+        await rejection;
+        await phone.call(route + '/compact', { requestId: 'mobile-manual-compact', model: summaryModel }, 403);
+        await assert.rejects(runtime.prepareSharedCompaction({ descriptor }), { code: 'CORE_COMPACTION_EXECUTION_MOVED' });
 
-        const { createContextCompactionService, requestContextCompaction } = await import(CHAT + '/modules/chat/contextCompactionService.js');
-        const { prepareCompactionState } = await import(CHAT + '/modules/chat/contextCompactionState.js');
-        const { createCheckpointMessage } = await import(CHAT + '/modules/chat/contextCompactionPrompts.js');
-        const settings = {
-            enableContextCompaction: true, contextCompactionModel: 'synthetic',
-            vcpServerUrl: f.url + '/v1/chat/completions'
-        };
-        const original = await runtime.prepareSharedCompaction({ descriptor });
-        const stale = createCheckpointMessage(prepareCompactionState(original.history), 'STALE_CHECKPOINT', settings, { id: original.messageId });
-        await phone.call(route + '/messages/' + oldInput.messageId, { requestId: 'checkpoint-source-edit', revision: 1, text: 'EDITED_FIXTURE_BODY' });
-        await assert.rejects(runtime.commitSharedCompaction({
-            descriptor, id: original.id, sourceHash: original.sourceHash, message: stale
-        }), { code: 'SHARED_COMPACTION_SOURCE_CHANGED' });
-        await phone.call(route + '/compact', undefined, 403);
-
-        let summaries = 0, dropReceipt = true;
-        const request = runtime.send;
+        const send = runtime.send;
         runtime.send = async (url, options) => {
-            const response = await request(url, options);
-            if (dropReceipt && url.endsWith('/compact') && options?.body) {
-                dropReceipt = false;
-                throw Object.assign(new Error('Receipt lost'), { code: 'NETWORK_UNAVAILABLE' });
-            }
-            return response;
+            const result = await send(url, options);
+            if (url.endsWith('/compact')) throw Object.assign(Error('Receipt lost'), { code: 'NETWORK_UNAVAILABLE' });
+            return result;
         };
-        const compaction = createContextCompactionService({
-            historyMutationAuthority: { mutate() { assert.fail('Core checkpoint entered desktop History writer'); } },
+        pending = null;
+        const { createContextCompactionService } = await import(CHAT + '/modules/chat/contextCompactionService.js');
+        const nativeUi = createContextCompactionService({
+            historyMutationAuthority: { mutate() { assert.fail('Desktop History writer must not receive a Core checkpoint'); } },
+            request() { assert.fail('Desktop must not execute the summary model'); },
             getExecutionAuthority: () => ({ success: true, kind: 'shared', core: true }),
-            sharedCompaction: runtime,
-            async request(input) {
-                const { state } = input;
-                summaries++;
-                assert.match(JSON.stringify(state.messages), /EDITED_FIXTURE_BODY/);
-                assert.doesNotMatch(JSON.stringify(state.messages), /ORIGINAL_FIXTURE_BODY/);
-                return requestContextCompaction(input);
-            }
+            sharedCompaction: { coreCompact: ({ descriptor, settings, requestId }) => runtime.coreSingle.compact(descriptor, settings, requestId) }
         });
-        const current = await runtime.coreSingle.history(descriptor);
-        await assert.rejects(compaction.compact({ scope: descriptor, history: current.history, settings }), { code: 'NETWORK_UNAVAILABLE' });
+        const original = await runtime.coreSingle.history(descriptor);
+        const disputed = assert.rejects(nativeUi.compact({ scope: descriptor, history: original.history, settings }), { code: 'NETWORK_UNAVAILABLE' });
+        await wait(() => pending, 'Core summary started through native UI');
+        assert.match(JSON.stringify(provider.calls.at(-1).messages), /EDITED_FIXTURE_BODY/);
+        complete(pending, '<context_checkpoint>CORE_CHECKPOINT_FIXTURE</context_checkpoint>');
+        await disputed;
         await desktop.close();
-
         const reopened = await f.desktop('A');
-        const recovered = await reopened.runtime.prepareSharedCompaction({ descriptor: reopened.descriptor });
-        assert.equal(recovered.recovered, true);
-        assert.equal(summaries, 1);
+        const recovered = await reopened.runtime.coreSingle.compact(reopened.descriptor, settings, 'core-compact-retry');
         assert.equal(recovered.history.filter(message => message.contextCompaction).length, 1);
+        assert.equal(provider.calls.filter(call => call.model === summaryModel).length, 2);
         assert.equal(recovered.history[0].content, 'EDITED_FIXTURE_BODY');
-        const checkpoint = recovered.message;
-        await phone.call(route + '/messages/' + checkpoint.id, { requestId: 'checkpoint-delete-try', revision: 1, remove: true }, 409);
+        const next = await phone.call(route + '/send', { requestId: 'checkpoint-follow-up', text: 'Use the checkpoint.' }, 202);
+        await wait(() => core.store.work(next.id)?.status === 'completed', 'follow-up uses checkpoint');
+        assert.match(JSON.stringify(provider.calls.at(-1).messages), /CORE_CHECKPOINT_FIXTURE/);
+        assert.doesNotMatch(JSON.stringify(provider.calls.at(-1).messages), /EDITED_FIXTURE_BODY/);
+        assert.equal(f.calls(), 0);
+        nativeUi.dispose();
+    } finally {
+        await core.close();
+        await fs.rm(f.root + '-core', { recursive: true, force: true });
+    }
+});
 
-        const followup = await phone.call(route + '/send', { requestId: 'checkpoint-follow-up', text: 'Use this checkpoint.' }, 202);
-        await wait(() => core.store.work(followup.id)?.status === 'completed', 'follow-up through native window');
-        assert.equal(provider.calls.length, 3);
-        assert.equal(f.calls(), 1);
-        assert.match(JSON.stringify(provider.calls[2].messages), /CORE_CHECKPOINT_FIXTURE/);
-        assert.doesNotMatch(JSON.stringify(provider.calls[2].messages), /EDITED_FIXTURE_BODY|ORIGINAL_FIXTURE_BODY/);
-        const snapshot = await phone.call(route + '/messages');
-        assert.equal(snapshot.messages.length, 5);
-        assert.equal(snapshot.messages[2].id, checkpoint.id);
-        assert.equal(f.store.db.prepare('SELECT count(*) AS count FROM journal').get().count, 0);
-        compaction.dispose();
+test('Core automatic compression uses the same native summary before the pending input', async t => {
+    const f = await fixture(t);
+    const provider = await localProvider(t);
+    const { core, route } = await mountCore(f, host(provider).chat);
+    try {
+        const phone = await f.phone();
+        const previous = await phone.call(route + '/send', {
+            requestId: 'auto-compact-source', text: 'Original-past-marker. '.repeat(200)
+        }, 202);
+        await wait(() => core.store.work(previous.id)?.status === 'completed', 'automatic compaction source');
+        const before = f.shared.get(f.actor('A'), 'sharedAB', f.owner.id);
+        f.shared.saveConfig(f.actor('A'), { sharedSpaceId: 'sharedAB', sharedId: f.owner.id, opId: 'auto-compact-limit',
+            expectedVersion: before.version, config: { ...before.config, contextTokenLimit: 800 } });
+        f.shared.create(f.actor('A'), { sharedSpaceId: 'sharedAB', opId: 'auto-compact-rules', kind: 'rules', localId: 'shared_rules',
+            config: { name: 'Workspace rules', executionPolicy: { enableContextCompaction: true, contextCompactionModel: 'fixture-auto-summary' } } });
+        provider.setReply((body, res) => {
+            if (body.model === 'fixture-auto-summary') {
+                res.setHeader('Content-Type', 'text/event-stream');
+                res.end('data: {"choices":[{"delta":{"content":"AUTOMATIC_CHECKPOINT_FIXTURE"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+            } else res.end(JSON.stringify({ choices: [{ message: { content: 'Next reply.' }, finish_reason: 'stop' }] }));
+        });
+        const followup = await phone.call(route + '/send', { requestId: 'auto-compact-followup', text: 'New input.' }, 202);
+        await wait(() => {
+            const work = core.store.work(followup.id);
+            if (work.error_code) throw Error(work.error_code);
+            return work.status === 'completed';
+        }, 'automatic summary and message');
+        assert.deepEqual(provider.calls.map(call => call.model), ['synthetic', 'fixture-auto-summary', 'synthetic']);
+        const messageText = JSON.stringify(provider.calls.at(-1).messages);
+        assert.match(messageText, /AUTOMATIC_CHECKPOINT_FIXTURE/);
+        assert.match(messageText, /New input/);
+        assert.doesNotMatch(messageText, /Original-past-marker/);
+        const { messages } = await phone.call(route + '/messages');
+        assert.equal(messages[2].contextCompaction.checkpoint, 'AUTOMATIC_CHECKPOINT_FIXTURE');
+        assert.equal(messages[3].content, 'New input.');
+        assert.equal((await phone.call(route + '/messages?before=' + messages[2].ordinal)).messages.length, 2);
+        assert.equal(f.calls(), 0);
     } finally {
         await core.close();
         await fs.rm(f.root + '-core', { recursive: true, force: true });
@@ -673,6 +690,40 @@ test('Core TopicSponsor delivers a canonical peer message without a desktop reci
         assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM shared_topic_sponsor_grants').get().n, 0);
         assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM journal').get().n, 0);
         assert.equal(f.calls(), 0);
+    } finally {
+        await core.close();
+        await fs.rm(f.root + '-core', { recursive: true, force: true });
+    }
+});
+
+test('Core Flowlock schedules one native continuation after the initiating desktop closes', async t => {
+    const f = await fixture(t);
+    const provider = await localProvider(t);
+    const { core, route } = await mountCore(f, host(provider).chat);
+    let inputCount = 0;
+    provider.setReply((body, response) => {
+        inputCount++;
+        const output = inputCount === 1
+            ? 'Initial reply.\n[[Flowlock::Start]]\n[[Flowlock::NextHeartbeat::1]]\n[[Flowlock::NextPrompt]]CORE_HEARTBEAT[[/Flowlock::NextPrompt]]'
+            : 'Final reply.\n[[Flowlock::Stop]]';
+        response.end(JSON.stringify({ choices: [{ message: { content: output }, finish_reason: 'stop' }] }));
+    });
+    try {
+        const desktop = await f.desktop('A');
+        const phone = await f.phone();
+        const first = await desktop.runtime.prepareSharedSend({ descriptor: desktop.descriptor, serverSession: true,
+            message: { id: 'core-flowlock-parent', role: 'user', content: 'Start the bounded fixture.', attachments: [] } });
+        await desktop.close();
+        await wait(() => core.store.work(first.serverSession.executionId)?.status === 'completed', 'initial Flowlock turn');
+        const state = await phone.call(route + '/works');
+        assert.equal(state.flowlock.active, true);
+        await phone.call(route + '/flowlock', { action: 'stop', requestId: 'unowned-flowlock-stop' }, 403);
+        await wait(() => core.store.db.prepare("SELECT count(*) AS n FROM works WHERE status='completed'").get().n === 2, 'headless Flowlock continuation');
+        assert.equal((await phone.call(route + '/works')).flowlock.active, false);
+        assert.equal(provider.calls.length, 2);
+        assert.match(JSON.stringify(provider.calls[1].messages.at(-1)), /CORE_HEARTBEAT/);
+        assert.equal((await phone.call(route + '/messages')).messages.length, 4);
+        assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM journal').get().n, 0);
     } finally {
         await core.close();
         await fs.rm(f.root + '-core', { recursive: true, force: true });

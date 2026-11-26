@@ -132,10 +132,10 @@ class CoreStore {
             if (this.db.prepare('SELECT count(*) AS n FROM works WHERE principal=? AND created_at>?').get(principal, Date.now() - 60000).n >= 20) {
                 throw failure('SUBMISSION_RATE_LIMIT', 429);
             }
-            const { attachments, config, link, recovery, desktopReferences, senderName } = prepare();
+            const { attachments, config, link, recovery, desktopReferences, senderName, senderRole } = prepare();
             const userId = randomUUID();
             const workId = randomUUID();
-            const seq = this.insertMessage({ id: userId, key: topic.key, role: senderName ? 'assistant' : 'user', content: input.text, attachments, desktopReferences, senderName });
+            const seq = this.insertMessage({ id: userId, key: topic.key, role: senderRole || 'user', content: input.text, attachments, desktopReferences, senderName });
             link?.(userId);
             this.db.prepare(`INSERT INTO works
                 (id,conversation_id,principal,request_id,status,admitted_seq,user_message_id,frozen_config_json,created_at)
@@ -287,12 +287,16 @@ class CoreStore {
         return { workId: id, replyId, seq, status: 'completed' };
     }
 
-    recover(isValid) {
+    recover(isValid, onFinal) {
         this.transaction(() => {
             for (const work of this.db.prepare("SELECT * FROM works WHERE status IN ('queued','running','waiting_approval','cancelling') ORDER BY admitted_seq").all()) {
                 const valid = isValid(work);
                 if (valid && work.status === 'running' && work.pending_final_json) {
-                    try { this.finish(work.id); continue; }
+                    try {
+                        this.finish(work.id);
+                        onFinal?.(work, parse(work.pending_final_json).content);
+                        continue;
+                    }
                     catch (error) { if (error.code !== 'WORK_FINAL_UNSETTLED') throw error; }
                 }
                 if (this.unresolved(work.id) || work.dispatched) {

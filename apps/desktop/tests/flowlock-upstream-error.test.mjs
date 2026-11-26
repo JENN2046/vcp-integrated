@@ -37,7 +37,7 @@ function createFlowlockEnvironment(logger = console) {
         CSS: { escape: s => s }
     });
 
-    const protocolSrc = fs.readFileSync(path.join(__dirname, '../Flowlockmodules/flowlock-protocol.js'), 'utf8');
+    const protocolSrc = fs.readFileSync(path.join(__dirname, '../modules/chat/historyWindow/flowlockProtocol.js'), 'utf8');
     vm.runInContext(protocolSrc, context, { filename: 'flowlock-protocol.js' });
 
     const managerSrc = fs.readFileSync(path.join(__dirname, '../Flowlockmodules/flowlock.js'), 'utf8');

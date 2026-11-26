@@ -32,7 +32,7 @@ function registerNativeSyncQueries({ipcMain,getRuntime,getMainWindow,queue,proje
             if (stopped) return Promise.resolve({success:false,error:'SYNC_BRIDGE_CLOSED'});
             const operation = Promise.resolve().then(()=>{
                 if (!trusted(args[0])) return {success:false,error:'NATIVE_SYNC_MAIN_WINDOW_REQUIRED'};
-                return ['native-sync:task-stop','native-sync:session-cancel','native-sync:prepare-send','native-sync:stage-input','native-sync:continue','native-sync:input-ready','native-sync:retry-input','native-sync:handoff','native-sync:compact-prepare','native-sync:compact-commit','native-sync:compact-cancel','native-sync:model-confirm','native-sync:send-failure','native-sync:steer','native-sync:abandon-send','native-sync:shared-config-request','native-sync-setup:check-opened-attachment'].includes(name)?require('../quitAdmission.cjs').run(()=>action(...args)):action(...args);
+                return ['native-sync:core-compact','native-sync:core-flowlock','native-sync:task-stop','native-sync:session-cancel','native-sync:prepare-send','native-sync:stage-input','native-sync:continue','native-sync:input-ready','native-sync:retry-input','native-sync:handoff','native-sync:compact-prepare','native-sync:compact-commit','native-sync:compact-cancel','native-sync:model-confirm','native-sync:send-failure','native-sync:steer','native-sync:abandon-send','native-sync:shared-config-request','native-sync-setup:check-opened-attachment'].includes(name)?require('../quitAdmission.cjs').run(()=>action(...args)):action(...args);
             }).catch(error=>({success:false,error:error.code || fallback}));
             pending.add(operation); operation.finally(()=>pending.delete(operation));
             return operation;
@@ -86,6 +86,16 @@ function registerNativeSyncQueries({ipcMain,getRuntime,getMainWindow,queue,proje
             if (!runtime) return {success:true,enabled:false};
             return {success:true,...await runtime.getExecutionStatus({itemId,itemType,topicId},{refresh})};
         },'EXECUTION_STATUS_UNAVAILABLE');
+        register('native-sync:core-compact', async (_event, { descriptor, action, settings, requestId }) => {
+            const client = getRuntime()?.coreSingle;
+            if (!client?.owns(descriptor)) throw fail('CORE_COMPACTION_UNAVAILABLE');
+            return action === 'cancel' ? client.cancelCompact(descriptor) : client.compact(descriptor, settings, requestId);
+        }, 'CORE_COMPACTION_UNAVAILABLE');
+        register('native-sync:core-flowlock', async (_event, { descriptor, action, options }) => {
+            const client = getRuntime()?.coreSingle;
+            if (!client?.owns(descriptor)) throw fail('CORE_FLOWLOCK_UNAVAILABLE');
+            return client.setFlowlock(descriptor, action, options);
+        }, 'CORE_FLOWLOCK_UNAVAILABLE');
         register('native-sync:task-stop', async (_event, payload) => {
             const runtime = getRuntime();
             if (!runtime?.stopNativeTask) throw fail('NATIVE_TASK_STOP_UNAVAILABLE');

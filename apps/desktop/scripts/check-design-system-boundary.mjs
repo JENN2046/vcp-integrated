@@ -225,7 +225,7 @@ const allowedSourceDifferences = new Set([
     'modules/renderer/toolResultRegions.js',
     'modules/renderer/streamManager.js',
     'modules/renderer/desktopPushConsumer.js',
-    'Flowlockmodules/flowlock-protocol.js',
+    'modules/chat/historyWindow/flowlockProtocol.js',
     'modules/ipc/mainChatVoiceCoordinator.js',
     'tests/projectforge-delivery.test.js',
     // Trace P1: parse workspace declarations as data, never execute them.

@@ -6,6 +6,7 @@
   "exports": {
     ".": "./index.mjs",
     "./tavern-context": "./tavernContext.mjs",
-    "./request-metadata": "./requestMetadata.mjs"
+    "./request-metadata": "./requestMetadata.mjs",
+    "./flowlock-protocol": "./flowlockProtocol.js"
   }
 }

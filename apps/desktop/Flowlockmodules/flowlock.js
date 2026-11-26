@@ -84,6 +84,20 @@ class FlowlockManager {
             return { success: false, message: '缺少 agentId 或 topicId' };
         }
 
+        if (this.electronAPI?.coreFlowlock && this.electronAPI?.getTopicExecutionAuthority) {
+            const descriptor = { itemType: 'agent', itemId: agentId, topicId };
+            const authority = await this.electronAPI.getTopicExecutionAuthority(descriptor);
+            if (authority?.core) {
+                const settings = this.globalSettingsRef?.get?.() || {};
+                const response = await this.electronAPI.coreFlowlock({ descriptor, action: 'start', options: {
+                    immediate: options.startImmediately === true, ...(typeof options.prompt === 'string' && { prompt: options.prompt }),
+                    delaySeconds: options.delaySeconds ?? settings.flowlockContinueDelay ?? 5,
+                } });
+                if (response?.success) this.projectCoreFlowlock(agentId, topicId, { active: true, round: 0 });
+                return response;
+            }
+        }
+
         // 如果该 Agent 已有活动 Session，先停止旧的
         if (this.sessions.has(agentId)) {
             console.log(`[Flowlock] Agent ${agentId} already has an active session, stopping old one.`);
@@ -164,6 +178,15 @@ class FlowlockManager {
         if (!session) {
             console.log(`[Flowlock] No active session for agent: ${agentId}`);
             return { success: false, message: '心流锁未运行' };
+        }
+
+        if (session.core) {
+            const response = await this.electronAPI.coreFlowlock({
+                descriptor: { itemType: 'agent', itemId: agentId, topicId: session.topicId }, action: 'stop',
+            });
+            if (!response?.success) return response;
+            this.projectCoreFlowlock(agentId, session.topicId, { active: false });
+            return { success: true, message: '心流锁已停止' };
         }
 
         // 取消待执行的定时器
@@ -338,6 +361,7 @@ class FlowlockManager {
         }
 
         const suspendedSession = this.sessions.get(context.agentId);
+        if (suspendedSession?.core) return;
         if (suspendedSession?.contextCompactionLease && suspendedSession.topicId === context.topicId) {
             if (!suspendedSession.activeMessageId || suspendedSession.activeMessageId === messageId) {
                 suspendedSession.lastCompletedAt = Date.now();
@@ -516,7 +540,7 @@ class FlowlockManager {
      */
     suspendForContextCompaction(agentId, topicId) {
         const session = this.sessions.get(agentId);
-        if (!session || session.status !== 'active' || session.topicId !== topicId) return null;
+        if (!session || session.core || session.status !== 'active' || session.topicId !== topicId) return null;
         if (session.contextCompactionLease) return session.contextCompactionLease;
         if (session.pendingTimer) clearTimeout(session.pendingTimer);
         session.pendingTimer = null;
@@ -573,7 +597,7 @@ class FlowlockManager {
      */
     scheduleNextRound(agentId, delayMs) {
         const session = this.sessions.get(agentId);
-        if (!session || session.status !== 'active' || session.contextCompactionLease) return;
+        if (!session || session.core || session.status !== 'active' || session.contextCompactionLease) return;
 
         // 取消已有的定时器
         if (session.pendingTimer) {
@@ -779,9 +803,27 @@ class FlowlockManager {
         session.sharedExecution={executionId,requestId,messageId};return true;
     }
 
+    projectCoreFlowlock(agentId, topicId, state) {
+        const previous = this.sessions.get(agentId);
+        if (!state?.active) {
+            if (!previous?.core || previous.topicId !== topicId) return;
+            this.sessions.delete(agentId);
+        } else {
+            if (previous?.pendingTimer) clearTimeout(previous.pendingTimer);
+            this.sessions.set(agentId, { agentId, topicId, core: true, status: 'active', round: state.round || 0,
+                nextHeartbeatAt: state.nextAt || null });
+        }
+        this.updateSidebarIndicator(agentId, state.active);
+        this.updateCurrentHeaderIndicator(agentId, state.active);
+    }
+
     async handleSharedSessionStatus(change) {
         const topic=change?.topic;
         if(topic?.ownerType!=='agent')return;
+        if (change.coreFlowlock) {
+            this.projectCoreFlowlock(topic.ownerId, topic.topicId, change.coreFlowlock);
+            return;
+        }
         const session=this.sessions.get(topic.ownerId),binding=session?.sharedExecution;
         if(!session||session.status!=='active'||session.topicId!==topic.topicId||!binding)return;
         for(const value of change.serverSession?[change.serverSession]:change.serverSessions||[]){
