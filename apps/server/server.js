@@ -906,104 +906,31 @@ app.use(specialModelRouter);
 
 
 
+const queryModelCatalog = require('./modules/modelCatalog').createModelCatalog({
+    apiUrl, apiKey, modelRedirectHandler, semanticModelRouter, debug: DEBUG_MODE,
+    embeddingModelIds: Object.entries(process.env)
+        .filter(([name]) => /^(WhitelistEmbeddingModel|EmbeddingModelBackups?|EmbeddingModelBackup[0-9]+)$/.test(name))
+        .flatMap(([,value]) => value.split(',').map(id => id.trim()).filter(Boolean))
+});
 app.get('/v1/models', async (req, res) => {
-    const { default: fetch } = await import('node-fetch');
-    const appendSemanticRouterModels = (modelsData) => {
-        const virtualModels = semanticModelRouter.getVirtualModels();
-        if (!virtualModels.length) return modelsData;
-
-        if (!modelsData || typeof modelsData !== 'object') {
-            modelsData = { object: 'list', data: [] };
-        }
-        if (!Array.isArray(modelsData.data)) {
-            modelsData.data = [];
-        }
-
-        const existingIds = new Set(modelsData.data.map(model => model && model.id).filter(Boolean));
-        for (const virtualModel of virtualModels) {
-            if (!existingIds.has(virtualModel.id)) {
-                modelsData.data.push(virtualModel);
-                existingIds.add(virtualModel.id);
-            }
-        }
-        return modelsData;
-    };
-
     try {
-        const modelsApiUrl = `${apiUrl}/v1/models`;
-        const apiResponse = await fetch(modelsApiUrl, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                ...(req.headers['user-agent'] && { 'User-Agent': req.headers['user-agent'] }),
-                'Accept': req.headers['accept'] || 'application/json',
-            },
+        const chatOnly = req.query.purpose === 'chat';
+        const result = await queryModelCatalog({
+            userAgent: req.headers['user-agent'], accept: req.headers.accept, chatOnly
         });
-
-        if (apiResponse.ok) {
-            const responseText = await apiResponse.text();
-            try {
-                let modelsData = JSON.parse(responseText);
-
-                // 新增：如果启用了模型重定向，需要处理模型列表响应
-                if (modelRedirectHandler.isEnabled()) {
-                    if (modelsData.data && Array.isArray(modelsData.data)) {
-                        modelsData.data = modelsData.data.map(model => {
-                            if (model.id) {
-                                const publicModelName = modelRedirectHandler.redirectModelForClient(model.id);
-                                if (publicModelName !== model.id) {
-                                    if (DEBUG_MODE) {
-                                        console.log(`[ModelRedirect] 模型列表重定向: ${model.id} -> ${publicModelName}`);
-                                    }
-                                    return { ...model, id: publicModelName };
-                                }
-                            }
-                            return model;
-                        });
-                    }
-                }
-
-                modelsData = appendSemanticRouterModels(modelsData);
-
-                // 设置响应头
-                res.status(apiResponse.status);
-                apiResponse.headers.forEach((value, name) => {
-                    if (!['content-encoding', 'transfer-encoding', 'connection', 'content-length', 'keep-alive'].includes(name.toLowerCase())) {
-                        res.setHeader(name, value);
-                    }
-                });
-
-                // 发送修改后的响应
-                res.json(modelsData);
-                return;
-            } catch (parseError) {
-                console.warn('[Models] 解析模型列表响应失败，返回语义路由虚拟模型列表:', parseError.message);
-                const fallbackModelsData = appendSemanticRouterModels({ object: 'list', data: [] });
-                if (fallbackModelsData.data.length > 0) {
-                    return res.status(200).json(fallbackModelsData);
-                }
-                // 如果解析失败且没有虚拟模型，回退到错误响应
-            }
+        if (result.data) {
+            result.headers?.forEach((value, name) => {
+                const header = name.toLowerCase();
+                if (!['content-encoding', 'transfer-encoding', 'connection', 'content-length', 'keep-alive'].includes(header) &&
+                    !(chatOnly && header === 'etag')) res.setHeader(name, value);
+            });
+            return res.status(result.status).json(result.data);
         }
-
-        // 上游模型列表不可用时，仍返回语义路由虚拟模型，避免前端无法选择 VCPModelAuto。
-        const fallbackModelsData = appendSemanticRouterModels({ object: 'list', data: [] });
-        if (fallbackModelsData.data.length > 0) {
-            return res.status(200).json(fallbackModelsData);
-        }
-
-        res.status(apiResponse.status);
-        const errorText = await apiResponse.text();
-        res.type('text/plain').send(errorText);
-
+        return res.status(result.status).type('text/plain').send(result.text);
     } catch (error) {
         console.error('转发 /v1/models 请求时出错:', error.message, error.stack);
-        if (!res.headersSent) {
-            res.status(500).json({ error: 'Internal Server Error', details: error.message });
-        } else if (!res.writableEnded) {
-            console.error('[STREAM ERROR] Headers already sent. Cannot send JSON error. Ending stream if not already ended.');
-            res.end();
-        }
+        if (!res.headersSent) res.status(500).json({ error: 'Internal Server Error', details: error.message });
+        else res.end();
     }
 });
 // 新增：标准化任务创建API端点
@@ -1415,7 +1342,7 @@ async function initialize() {
     await pluginManager.initializeServices(app, adminPanelRoutes, __dirname);
     if (process.env.VCP_CORE_DATA_DIR || process.env.VCP_CORE_WORKSPACE) {
         coreHost = require('./core/host').startCoreHost({
-            app, chat: chatCompletionHandler, serverKey,
+            app, chat: chatCompletionHandler, serverKey, modelCatalog: queryModelCatalog,
             listenHost: process.env.VCP_LOCAL_LISTEN_HOST || process.env.HOST || '127.0.0.1',
             legacy: pluginManager.getServiceModule('NativeSync')
         });

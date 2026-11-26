@@ -9,14 +9,14 @@ const mobileCookies = req => String(req.headers.cookie || '').split(';').map(val
 const protectedHttps = req => Boolean(req.socket?.encrypted) || (req.secure === true && ['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket?.remoteAddress));
 
 class PairedSessions {
-    constructor(db, origin, hours = 8) {
+    constructor(db, origin, hours = 8, { recoverExpired = false } = {}) {
         this.db = db;
         this.origin = origin;
         this.sessionSeconds = Math.floor(hours * 3600);
         this.db.exec(`CREATE TABLE IF NOT EXISTS mobile_pairings(hash TEXT PRIMARY KEY,expires INTEGER NOT NULL,scopes TEXT NOT NULL,used INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS mobile_sessions(hash TEXT PRIMARY KEY,id TEXT NOT NULL UNIQUE,expires INTEGER NOT NULL,scopes TEXT NOT NULL);`);
         if(!this.db.prepare('PRAGMA table_info(mobile_sessions)').all().some(c=>c.name==='last_topic_key'))this.db.exec('ALTER TABLE mobile_sessions ADD COLUMN last_topic_key TEXT');
-        this.pairRecovery = new PairRecovery(this.db, this.origin);
+        this.pairRecovery = new PairRecovery(this.db, this.origin, recoverExpired ? this.sessionSeconds : 0);
     }
 
     createCode(scopes) {

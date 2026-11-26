@@ -26,7 +26,7 @@ export function validSessionRecovery(value) {
 
 function clonePayload(kind, payload) {
   if (!KINDS.has(kind) || !object(payload) || !boundedString(payload.requestId, 80)) fail('SUBMISSION_INVALID');
-  const keys = kind === 'message' ? ['requestId','text','attachments'] : ['requestId','agentId'];
+  const keys = kind === 'message' ? ['requestId','text','attachments','model'] : ['requestId','agentId'];
   if (Object.keys(payload).some(key => !keys.includes(key))) fail('SUBMISSION_INVALID');
   if (kind === 'invitation') {
     if (!boundedString(payload.agentId, 256)) fail('SUBMISSION_INVALID');
@@ -35,7 +35,9 @@ function clonePayload(kind, payload) {
   if (typeof payload.text !== 'string' || payload.text.length > 12000) fail('SUBMISSION_INVALID');
   if (payload.attachments !== undefined && (!Array.isArray(payload.attachments) || payload.attachments.length > 8 || payload.attachments.some(id => !boundedString(id, 256)))) fail('SUBMISSION_INVALID');
   if (!payload.text.trim() && !payload.attachments?.length) fail('SUBMISSION_INVALID');
-  return {requestId:payload.requestId, text:payload.text, ...(payload.attachments === undefined ? {} : {attachments:[...payload.attachments]})};
+  const model=payload.model;
+  if(model!==undefined&&(!boundedString(model,256)||model.trim()!==model))fail('SUBMISSION_INVALID');
+  return {requestId:payload.requestId, text:payload.text, ...(model!==undefined&&{model}), ...(payload.attachments === undefined ? {} : {attachments:[...payload.attachments]})};
 }
 
 export async function submissionPayloadHash({topicKey, kind, payload}, cryptoApi = globalThis.crypto) {
@@ -188,9 +190,12 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
     const lockName = SUBMISSION_STORAGE_KEY + ':send:' + record.entryId + ':' + record.requestId;
     return mutate(() => submit(requireCurrent(record)), lockName);
   }
-  async function releaseDesktopRejection(record, rejection, executions, session, readDraft) {
-    if (record.kind !== 'message' || rejection?.status !== 409 || rejection.code !== 'DESKTOP_CONTEXT_REQUIRED'
-        || (await inspect(record, executions, session)).state !== 'absent') return false;
+  async function releaseRejectedMessage(record, rejection, executions, session, readDraft) {
+    const knownRejection = rejection?.code === 'DESKTOP_CONTEXT_REQUIRED' ||
+        (rejection?.code === 'CORE_MODEL_NOT_ALLOWED' && Boolean(record.payload?.model)) ||
+        (rejection?.code === 'MODEL_IMAGE_UNSUPPORTED' && Boolean(record.payload?.attachments?.length));
+    if (record.kind !== 'message' || rejection?.status !== 409 || !knownRejection ||
+        (await inspect(record, executions, session)).state !== 'absent') return false;
     return mutate(() => {
       const {records, drafts} = readState();
       const index = records.findIndex(previous => sameScope(previous, record));
@@ -217,5 +222,5 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
       return true;
     });
   }
-  return {load, current, prepare, verify, requireCurrent, inspect, confirm, withSendLock, releaseDesktopRejection, rejectedDraft, updateRejectedDraft};
+  return {load, current, prepare, verify, requireCurrent, inspect, confirm, withSendLock, releaseRejectedMessage, rejectedDraft, updateRejectedDraft};
 }

@@ -257,6 +257,7 @@ export const modelCheckStore = {
  * @param {HTMLElement} options.wrap 容器元素（包含触发按钮和弹层的外壳）
  * @param {HTMLElement} options.trigger 触发按钮
  * @param {Function} options.getCatalog 异步获取完整模型与收藏列表: () => Promise<{ ids: string[], favorites: Set<string> | string[] }>
+ * @param {Function} [options.refreshCatalog] 用已读缓存立即渲染，再获取新目录
  * @param {Function} options.getActiveModel 获取当前选中的模型 ID: () => string
  * @param {Function} options.onSelect 选中模型的回调: (modelId: string) => void
  * @param {Function} [options.positionMenu] 自定义定位函数，缺省时吸附于 wrap
@@ -268,6 +269,7 @@ export function createModelPickerPopup({
     wrap,
     trigger,
     getCatalog,
+    refreshCatalog,
     getActiveModel = () => '',
     onSelect,
     positionMenu: customPositionMenu = null,
@@ -315,10 +317,75 @@ export function createModelPickerPopup({
         return activeMenu?.dataset?.mode || null;
     }
 
+    function bindCatalog(menuEl, searchInput, listContainer, render) {
+        const status = doc.createElement('div');
+        status.className = 'vcp-model-picker-empty';
+        const message = doc.createElement('span');
+        message.setAttribute('role', 'status');
+        const retry = doc.createElement('button');
+        retry.type = 'button';
+        retry.className = 'vcp-model-picker-action-btn';
+        retry.textContent = '重试';
+        status.append(message, ' ', retry);
+        menuEl.insertBefore(status, listContainer);
+
+        const normalize = raw => ({
+            ids: Array.isArray(raw?.ids) ? raw.ids : [],
+            favorites: new Set(raw?.favorites instanceof Set || Array.isArray(raw?.favorites) ? raw.favorites : [])
+        });
+        let catalog = normalize();
+        let state = 'loading';
+        let sequence = 0;
+
+        const paint = () => {
+            message.textContent = state === 'loading' ? (catalog.ids.length ? '正在刷新…' : '加载中…')
+                : state === 'failed' ? '加载失败，可重试' : '';
+            retry.hidden = state !== 'failed';
+            status.hidden = state === 'ready';
+            listContainer.setAttribute('aria-busy', String(state === 'loading'));
+            render(catalog, state === 'ready');
+        };
+
+        async function load(readCache) {
+            const request = ++sequence;
+            const current = () => request === sequence && activeMenu === menuEl && !isDisposed;
+            state = 'loading';
+            paint();
+            try {
+                if (readCache || !refreshCatalog) {
+                    try {
+                        const raw = await getCatalog();
+                        if (!current()) return;
+                        catalog = normalize(raw);
+                    } catch (error) {
+                        if (!refreshCatalog) throw error;
+                    }
+                }
+                if (!current()) return;
+                if (refreshCatalog) {
+                    paint();
+                    const raw = await refreshCatalog(catalog);
+                    if (!current()) return;
+                    catalog = normalize(raw);
+                }
+                state = 'ready';
+            } catch {
+                if (!current()) return;
+                state = 'failed';
+            }
+            paint();
+        }
+
+        retry.addEventListener('click', () => { void load(false); });
+        searchInput.addEventListener('input', paint);
+        searchInput.focus();
+        void load(true);
+    }
+
     /**
      * 打开左键选择菜单（展示常用候选模型）
      */
-    async function openSelectMenu() {
+    function openSelectMenu() {
         if (isDisposed) return;
         close();
         trigger.setAttribute('aria-expanded', 'true');
@@ -350,29 +417,11 @@ export function createModelPickerPopup({
             if (card) menuResizeObserver.observe(card);
         }
 
-        listContainer.innerHTML = '<div class="vcp-model-picker-empty">加载中…</div>';
-
-        let catalog = { ids: [], favorites: new Set() };
-        try {
-            const raw = await getCatalog();
-            catalog = {
-                ids: Array.isArray(raw?.ids) ? raw.ids : [],
-                favorites: raw?.favorites instanceof Set ? raw.favorites : new Set(Array.isArray(raw?.favorites) ? raw.favorites : [])
-            };
-        } catch (err) {
-            console.warn('[ModelPickerPopup] 获取模型目录失败:', err);
-        }
-
-        if (activeMenu !== menuEl || isDisposed) return;
-
-        const { ids, favorites: favSet } = catalog;
-        const checkedSet = modelCheckStore.get(win);
-        // 自适应：若用户从未配置勾选池，默认显示全部模型，避免冷启动白屏
-        const isDefaultAll = checkedSet.size === 0;
-        const availableIds = isDefaultAll ? ids : ids.filter(id => checkedSet.has(id));
-        const currentSelected = getActiveModel();
-
-        const render = () => {
+        const render = ({ ids, favorites: favSet }, ready) => {
+            const checkedSet = modelCheckStore.get(win);
+            const isDefaultAll = checkedSet.size === 0;
+            const availableIds = isDefaultAll ? ids : ids.filter(id => checkedSet.has(id));
+            const currentSelected = getActiveModel();
             const q = searchInput.value.trim().toLowerCase();
             listContainer.replaceChildren();
 
@@ -429,11 +478,11 @@ export function createModelPickerPopup({
             addGroup(favs.length && rest.length ? '收藏' : '', favs);
             addGroup(favs.length && rest.length ? '全部' : '', rest);
 
-            if (!favs.length && !rest.length) {
+            if (!favs.length && !rest.length && (ready || ids.length)) {
                 const empty = doc.createElement('div');
                 empty.className = 'vcp-model-picker-empty vcp-model-select-empty side-chat-model-empty';
                 if (availableIds.length === 0) {
-                    empty.textContent = ids.length ? '未勾选任何常用模型（右键按钮进行勾选）' : '没有可用的模型，请检查服务器连接';
+                    empty.textContent = ids.length ? '未勾选任何常用模型（右键按钮进行勾选）' : '没有可用的模型';
                 } else {
                     empty.textContent = '没有匹配的模型';
                 }
@@ -443,15 +492,13 @@ export function createModelPickerPopup({
             listContainer.appendChild(fragment);
         };
 
-        searchInput.addEventListener('input', render);
-        render();
-        searchInput.focus();
+        bindCatalog(menuEl, searchInput, listContainer, render);
     }
 
     /**
      * 打开右键勾选配置菜单（展示全量模型供勾选）
      */
-    async function openCheckMenu() {
+    function openCheckMenu() {
         if (!enableCheckMenu || isDisposed) return;
         close();
         trigger.setAttribute('aria-expanded', 'true');
@@ -507,22 +554,8 @@ export function createModelPickerPopup({
             if (card) menuResizeObserver.observe(card);
         }
 
-        listContainer.innerHTML = '<div class="vcp-model-picker-empty">加载中…</div>';
-
-        let catalog = { ids: [], favorites: new Set() };
-        try {
-            const raw = await getCatalog();
-            catalog = {
-                ids: Array.isArray(raw?.ids) ? raw.ids : [],
-                favorites: raw?.favorites instanceof Set ? raw.favorites : new Set(Array.isArray(raw?.favorites) ? raw.favorites : [])
-            };
-        } catch (err) {
-            console.warn('[ModelPickerPopup] 获取模型目录失败:', err);
-        }
-
-        if (activeMenu !== menuEl || isDisposed) return;
-
-        const { ids, favorites: favSet } = catalog;
+        let ids = [];
+        let repaint;
         let checkedSet = modelCheckStore.get(win);
 
         const updateCount = () => {
@@ -540,17 +573,21 @@ export function createModelPickerPopup({
             e.stopPropagation();
             ids.forEach(id => checkedSet.add(id));
             modelCheckStore.set(checkedSet, win);
-            render();
+            repaint();
         };
 
         clearAllBtn.onclick = (e) => {
             e.stopPropagation();
             checkedSet.clear();
             modelCheckStore.set(checkedSet, win);
-            render();
+            repaint();
         };
 
-        const render = () => {
+        const render = (catalog, ready) => {
+            ids = catalog.ids;
+            const favSet = catalog.favorites;
+            repaint = () => render(catalog, ready);
+            selectAllBtn.disabled = ids.length === 0;
             updateCount();
             const q = searchInput.value.trim().toLowerCase();
             listContainer.replaceChildren();
@@ -601,19 +638,17 @@ export function createModelPickerPopup({
             addGroup(favs.length && rest.length ? '收藏' : '', favs);
             addGroup(favs.length && rest.length ? '全部' : '', rest);
 
-            if (!favs.length && !rest.length) {
+            if (!favs.length && !rest.length && (ready || ids.length)) {
                 const empty = doc.createElement('div');
                 empty.className = 'vcp-model-picker-empty vcp-model-select-empty side-chat-model-empty';
-                empty.textContent = ids.length ? '没有匹配的模型' : '没有可用的模型，请检查服务器连接';
+                empty.textContent = ids.length ? '没有匹配的模型' : '没有可用的模型';
                 fragment.appendChild(empty);
             }
 
             listContainer.appendChild(fragment);
         };
 
-        searchInput.addEventListener('input', render);
-        render();
-        searchInput.focus();
+        bindCatalog(menuEl, searchInput, listContainer, render);
     }
 
     // 事件绑定与拦截防穿透

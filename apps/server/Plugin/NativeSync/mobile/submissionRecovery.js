@@ -12,10 +12,12 @@ function normalizeSubmission({ topicKey, kind, payload }) {
     if (typeof topicKey !== 'string' || !/^(?:[a-zA-Z0-9_-]{1,64}|local_[a-f0-9]{64})$/.test(topicKey) || !payload || typeof payload !== 'object' || Array.isArray(payload)) invalid();
     if (typeof payload.requestId !== 'string' || !/^[a-zA-Z0-9_-]{8,80}$/.test(payload.requestId)) invalid();
     if (kind === 'message') {
-        if (Object.keys(payload).some(k => !['requestId', 'text', 'attachments'].includes(k)) || typeof payload.text !== 'string' || payload.text.length > 12000) invalid();
+        if (Object.keys(payload).some(k => !['requestId', 'text', 'attachments', 'model'].includes(k)) || typeof payload.text !== 'string' || payload.text.length > 12000) invalid();
+        const model = payload.model;
+        if (model !== undefined && (typeof model !== 'string' || !model || model.length > 256 || model.trim() !== model)) invalid();
         const attachments = payload.attachments === undefined ? [] : payload.attachments;
         if (!Array.isArray(attachments) || attachments.length > 8 || attachments.some(id => typeof id !== 'string') || (!payload.text.trim() && !attachments.length)) invalid();
-        return { topicKey, kind, payload: { requestId: payload.requestId, text: payload.text, attachments: [...attachments] } };
+        return { topicKey, kind, payload: { requestId: payload.requestId, text: payload.text, attachments: [...attachments], ...(model !== undefined && { model }) } };
     }
     if (kind === 'invitation') {
         if (Object.keys(payload).some(k => !['requestId', 'agentId'].includes(k)) || typeof payload.agentId !== 'string' || !payload.agentId) invalid();

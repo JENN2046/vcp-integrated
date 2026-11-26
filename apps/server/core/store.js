@@ -124,11 +124,15 @@ class CoreStore {
         }
     }
 
-    replay(principal, requestId, data) {
+    commandReceipt(principal, requestId) {
         if (typeof requestId !== 'string' || !/^[a-zA-Z0-9_-]{8,100}$/.test(requestId)) {
             throw failure('INVALID_REQUEST_ID', 400);
         }
-        const prior = this.db.prepare('SELECT * FROM idempotency_receipts WHERE principal=? AND op_id=?').get(principal, requestId);
+        return this.db.prepare('SELECT * FROM idempotency_receipts WHERE principal=? AND op_id=?').get(principal, requestId);
+    }
+
+    replay(principal, requestId, data) {
+        const prior = this.commandReceipt(principal, requestId);
         if (!prior) return null;
         if (prior.request_hash !== digest(data)) throw failure('REQUEST_ID_REUSED');
         return parse(prior.result_json);
@@ -314,6 +318,19 @@ class CoreStore {
             this.db.prepare('UPDATE works SET steering_count=steering_count+1 WHERE id=?').run(id);
             return { workId: id, messageId, seq };
         });
+    }
+
+    steeringReceipt(key, principal, requestId, workId) {
+        const record = this.commandReceipt(principal, requestId);
+        if (!record) return null;
+        const result = parse(record.result_json);
+        if (result.workId !== workId || typeof result.messageId !== 'string' || !Number.isSafeInteger(result.seq)) return null;
+        // Steering creates a user message sourced from this Work in the same
+        // transaction. Ordinary admission and other commands don't have that link.
+        const message = this.db.prepare(`SELECT 1 FROM messages
+            WHERE id=? AND conversation_id=? AND source_work_id=? AND created_seq=? AND role='user'`)
+            .get(result.messageId, key, workId, result.seq);
+        return message ? { requestId, workId, messageId: result.messageId, seq: result.seq } : null;
     }
 
     setState(id, status, errorCode = null) {

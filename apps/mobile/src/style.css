@@ -123,6 +123,8 @@ nav .topic-search {position:relative; display:flex; align-items:center; margin-b
 .review-state p,.submission-recovery p {margin:4px 0}
 .desktop-relay>p {margin:5px 0; font-size:.875rem}
 .shell>footer {flex:none; max-height:50%; min-height:58px; overflow:auto; overscroll-behavior:contain; padding:0 max(14px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left)); border-top:1px solid var(--line); background:var(--paper)}
+/* The open picker extends above the scrollable composer into the history area. */
+.shell>footer:has(#composer-model-options) {overflow:visible; z-index:2}
 .shell>footer.is-work-view {min-height:0}
 footer>* {max-width:var(--content); margin-inline:auto}
 .composer-tools {display:flex; align-items:center; justify-content:flex-end; gap:4px}
@@ -197,3 +199,18 @@ footer>* {max-width:var(--content); margin-inline:auto}
 .task-quote .icon-button,.quote-exit {background:transparent; color:inherit}
 .quote-exit {padding:4px 8px; white-space:nowrap; font-size:.81rem; font-weight:650}
 @media(max-height:480px) {.task-quote {margin-bottom:2px}}
+
+.attachment-selection-notice { max-height:6em; overflow:auto; margin:0 0 4px; padding-inline-start:1.4em; color:var(--warning); font-size:.82rem; overflow-wrap:anywhere }
+.failed-work { margin-block:0 12px; padding:10px 12px; border-radius:10px; background:var(--warning-soft); color:var(--warning); font-size:.85rem }
+.failed-work p { margin:4px 0 }
+.failed-work button { padding:4px 0; background:transparent; color:inherit; text-decoration:underline }
+.return-latest { position:absolute; inset-inline-end:16px; bottom:12px; z-index:1; padding:8px 12px; border-radius:20px; background:var(--accent-soft); color:var(--accent); box-shadow:0 1px 5px #0002 }
+.pair-help,.pair-error { font-size:.85rem; overflow-wrap:anywhere }
+.pair-error { margin:4px 0; color:var(--warning) }
+
+.composer-model { position:relative; min-width:0; font-size:.8rem; color:var(--muted) }
+.composer-model > button,.composer-model > span { display:block; max-width:100%; padding:7px 8px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; border-radius:8px; background:var(--accent-soft); color:var(--accent) }
+.composer-model-options { position:absolute; z-index:3; inset-inline-start:0; bottom:calc(100% + 6px); width:min(16rem,68vw); max-height:40vh; overflow:auto; padding:6px; border:1px solid var(--line); border-radius:10px; background:var(--surface); box-shadow:0 3px 14px #0003 }
+.composer-model-options button { display:block; width:100%; padding:7px 8px; text-align:start; overflow-wrap:anywhere; background:transparent; color:var(--ink) }
+.composer-model-options button[aria-pressed=true] { background:var(--accent-soft); color:var(--accent) }
+.composer-model-options p { margin:6px; overflow-wrap:anywhere }

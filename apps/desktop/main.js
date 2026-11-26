@@ -1395,40 +1395,21 @@ if (!gotTheLock) {
         // 注意：原 desktop-only 模式已移除。--desktop-only 参数现在仅作为
         // "启动后自动打开桌面窗口"的标志，所有 IPC 始终完整初始化。
 
-        // Function to fetch and cache models from the VCP server
+        let modelFetchGeneration = 0;
         async function fetchAndCacheModels() {
-            console.log('[Main] fetchAndCacheModels called');
-            try {
-                const settings = await appSettingsManager.readSettings();
-                const vcpServerUrl = settings.vcpServerUrl;
-                const vcpApiKey = settings.vcpApiKey; // Get the API key
-
-                if (!vcpServerUrl) {
-                    console.warn('[Main] VCP Server URL is not configured. Cannot fetch models.');
-                    cachedModels = []; // Clear cache if URL is not set
-                    return;
+            const generation = ++modelFetchGeneration;
+            const settings = await appSettingsManager.readSettings();
+            const { fetchDesktopModelCatalog } = require('./modules/services/modelCatalog');
+            const catalog = await fetchDesktopModelCatalog({
+                root: APP_DATA_ROOT_IN_PROJECT, settings,
+                getCoreClient: async () => {
+                    if (!historyMutationQueue.coreClient && nativeSyncLifecycle) await nativeSyncLifecycle.ready;
+                    return historyMutationQueue.coreClient;
                 }
-                // Correctly construct the base URL by removing known API paths.
-                const urlObject = new URL(vcpServerUrl);
-                const baseUrl = `${urlObject.protocol}//${urlObject.host}`;
-                const modelsUrl = new URL('/v1/models', baseUrl).toString();
-
-                console.log(`[Main] Fetching models from: ${modelsUrl}`);
-                const response = await fetch(modelsUrl, {
-                    headers: {
-                        'Authorization': `Bearer ${vcpApiKey}` // Add the Authorization header
-                    }
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                cachedModels = data.data || []; // Assuming the response has a 'data' field containing the models array
-                console.log('[Main] Models fetched and cached successfully:', cachedModels.map(m => m.id));
-            } catch (error) {
-                console.error('[Main] Failed to fetch and cache models:', error);
-                cachedModels = []; // Clear cache on error
-            }
+            });
+            const models = catalog ?? [];
+            if (generation === modelFetchGeneration) cachedModels = models;
+            return { models, generation, catalog };
         }
 
         // Create the native window first, but load the renderer only after IPC registration.
@@ -1562,20 +1543,6 @@ if (!gotTheLock) {
         const menu = Menu.buildFromTemplate(menuTemplate);
         Menu.setApplicationMenu(menu);
 
-        // Fetch models in the background and notify the renderer when done.
-        console.log('[Main] Fetching models in the background...');
-        fetchAndCacheModels().then(() => {
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                console.log('[Main] Background model fetch complete. Notifying renderer.');
-                mainWindow.webContents.send('models-updated', cachedModels);
-            }
-        }).catch(error => {
-            console.error('[Main] Background model fetch failed:', error);
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.webContents.send('models-update-failed', error.message);
-            }
-        });
-
         // IPC handler to provide cached models to the renderer process
         ipcMain.handle('get-cached-models', () => {
             return cachedModels;
@@ -1616,26 +1583,20 @@ if (!gotTheLock) {
 
         // IPC handler to trigger a refresh of the model list
         ipcMain.handle('refresh-models', async (event) => {
-            console.log('[Main] Received refresh-models request. Re-fetching models...');
-            await fetchAndCacheModels();
-
-            const result = {
-                success: Array.isArray(cachedModels) && cachedModels.length > 0,
-                models: cachedModels,
-                count: Array.isArray(cachedModels) ? cachedModels.length : 0
-            };
-
-            if (event?.sender && !event.sender.isDestroyed()) {
-                event.sender.send('models-updated', cachedModels);
+            try {
+                const { models, generation } = await fetchAndCacheModels();
+                if (generation === modelFetchGeneration) {
+                    if (event?.sender && !event.sender.isDestroyed()) event.sender.send('models-updated', models);
+                    if (mainWindow && !mainWindow.isDestroyed() && event?.sender !== mainWindow.webContents) {
+                        mainWindow.webContents.send('models-updated', models);
+                    }
+                }
+                return { success: true, models, count: models.length };
+            } catch (error) {
+                console.error('[Main] Failed to refresh model catalog:', error.message);
+                return { success: false, models: cachedModels, count: cachedModels.length };
             }
-
-            if (mainWindow && !mainWindow.isDestroyed() && event?.sender !== mainWindow.webContents) {
-                mainWindow.webContents.send('models-updated', cachedModels);
-            }
-
-            return result;
         });
-
 
         // Add IPC handler for path operations
         ipcMain.handle('path:dirname', (event, p) => {
@@ -1797,6 +1758,7 @@ if (!gotTheLock) {
             historyMutationQueue,
             topicAdmission: topicAdmissionHost.service,
             jevService: globalJevService,
+            getModelCatalog: async () => (await fetchAndCacheModels()).catalog,
             gameService
         });
         regexHandlers.initialize({ AGENT_DIR });
@@ -2100,6 +2062,20 @@ if (!gotTheLock) {
             agentOps: () => pluginAgentOperationService,
         }, new Map([[runtimeEntry, runtimeServices]]));
         nativeSyncLifecycle = appFeatures.getHandle('NativeSyncDesktopRuntime');
+
+        // Fetch models in the background and notify the renderer when done.
+        console.log('[Main] Fetching models in the background...');
+        fetchAndCacheModels().then(({ models, generation }) => {
+            if (generation === modelFetchGeneration && mainWindow && !mainWindow.isDestroyed()) {
+                console.log('[Main] Background model fetch complete. Notifying renderer.');
+                mainWindow.webContents.send('models-updated', models);
+            }
+        }).catch(error => {
+            console.error('[Main] Background model fetch failed:', error);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('models-update-failed', error.message);
+            }
+        });
 
         ipcMain.on('minimize-to-tray', () => {
             if (mainWindow) {

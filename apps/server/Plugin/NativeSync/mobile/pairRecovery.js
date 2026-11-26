@@ -32,9 +32,11 @@ function recoveryPublicKey(value) {
 const pairRequired = () => error('PAIR_REQUIRED', 401);
 
 class PairRecovery {
-    constructor(db, origin) {
+    constructor(db, origin, renewSeconds = 0) {
         this.db = db;
         this.origin = origin;
+        this.renewSeconds = renewSeconds;
+        this.trustedDevice = Number(renewSeconds > 0);
         const columns = db.prepare('PRAGMA table_info(mobile_sessions)').all();
         for (const [name, type] of [
             ['recovery_public_key', 'TEXT'],
@@ -64,17 +66,21 @@ class PairRecovery {
         const now = Date.now();
         // A request using only the public key can reuse a live challenge but
         // cannot invalidate one that another caller is already signing.
-        const read = this.db.prepare(`SELECT recovery_challenge, recovery_challenge_expires FROM mobile_sessions
-            WHERE recovery_public_key=? AND expires>?`);
-        const current = read.get(key, now);
+        // The remote Core can recover an expired Cookie using the enrolled
+        // device proof. Legacy callers keep the original session deadline.
+        const read = this.db.prepare(`SELECT expires, recovery_challenge, recovery_challenge_expires FROM mobile_sessions
+            WHERE recovery_public_key=? AND (expires>? OR ?=1)`);
+        const current = read.get(key, now, this.trustedDevice);
         if (!current) throw pairRequired();
         if (current.recovery_challenge_expires > now) return current.recovery_challenge;
 
+        const proofExpires = now + challengeLifetimeMs;
         const row = this.db.prepare(`UPDATE mobile_sessions
-            SET recovery_challenge=?, recovery_challenge_expires=min(expires, ?)
-            WHERE recovery_public_key=? AND expires>? AND coalesce(recovery_challenge_expires, 0)<=?
-            RETURNING recovery_challenge`).get(randomBytes(32).toString('base64url'), now + challengeLifetimeMs, key, now, now);
-        const challenge = row?.recovery_challenge ?? read.get(key, now)?.recovery_challenge;
+            SET recovery_challenge=?, recovery_challenge_expires=?
+            WHERE recovery_public_key=? AND (expires>? OR ?=1) AND coalesce(recovery_challenge_expires, 0)<=?
+            RETURNING recovery_challenge`).get(randomBytes(32).toString('base64url'),
+                this.trustedDevice ? proofExpires : Math.min(current.expires, proofExpires), key, now, this.trustedDevice, now);
+        const challenge = row?.recovery_challenge ?? read.get(key, now, this.trustedDevice)?.recovery_challenge;
         if (!challenge) throw pairRequired();
         return challenge;
     }
@@ -85,17 +91,19 @@ class PairRecovery {
         if (!proof || !canonicalBytes(challenge, 32) || !canonicalBytes(key, 65)) throw pairRequired();
         const startedAt = Date.now();
         const row = this.db.prepare(`SELECT id FROM mobile_sessions
-            WHERE recovery_public_key=? AND recovery_challenge=? AND expires>? AND recovery_challenge_expires>?`)
-            .get(key, challenge, startedAt, startedAt);
+            WHERE recovery_public_key=? AND recovery_challenge=? AND (expires>? OR ?=1) AND recovery_challenge_expires>?`)
+            .get(key, challenge, startedAt, this.trustedDevice, startedAt);
         if (!row) throw pairRequired();
         const publicKey = recoveryPublicKey(key);
         const message = Buffer.from(JSON.stringify([proofContext, this.origin, challenge]));
         if (!publicKey || !verify('sha256', message, { key: publicKey, dsaEncoding: 'ieee-p1363' }, proof)) throw pairRequired();
         const now = Date.now();
         const recovered = this.db.prepare(`UPDATE mobile_sessions
-            SET hash=?, recovery_challenge=NULL, recovery_challenge_expires=NULL
-            WHERE id=? AND recovery_public_key=? AND recovery_challenge=? AND expires>? AND recovery_challenge_expires>?
-            RETURNING expires`).get(cookieHash, row.id, key, challenge, now, now);
+            SET hash=?, expires=CASE WHEN ?=1 THEN ? ELSE expires END,
+                recovery_challenge=NULL, recovery_challenge_expires=NULL
+            WHERE id=? AND recovery_public_key=? AND recovery_challenge=? AND (expires>? OR ?=1) AND recovery_challenge_expires>?
+            RETURNING expires`).get(cookieHash, this.trustedDevice, now + this.renewSeconds * 1000,
+                row.id, key, challenge, now, this.trustedDevice, now);
         if (!recovered) throw pairRequired();
         return recovered.expires;
     }

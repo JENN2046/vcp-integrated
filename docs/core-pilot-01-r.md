@@ -33,7 +33,7 @@ location ~ ^/(core/api|mobile)(/|$) {
 location / { return 404; }
 ```
 
-图片模型沿用 `VCP_CORE_IMAGE_MODELS` 的 JSON 模型名列表。设备会话默认 8 小时，可用 `VCP_CORE_REMOTE_SESSION_HOURS` 设置为 1 至 720 小时。
+图片模型沿用 `VCP_CORE_IMAGE_MODELS` 的 JSON 模型名列表。设备 Cookie 默认有效 8 小时，可用 `VCP_CORE_REMOTE_SESSION_HOURS` 设置为 1 至 720 小时。远程 Core 的手机浏览器登记设备恢复凭据后，可以在 Cookie 到期时恢复原身份。断开设备或管理员撤销会结束该配对；清除浏览器数据后需要重新配对。
 
 ## 配对设备
 

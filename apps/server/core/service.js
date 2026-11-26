@@ -13,6 +13,7 @@ const { isCoreGroupMode } = require('./group');
 const { DesktopContext } = require('./desktopContext');
 const { CoreCompaction } = require('./compaction');
 const { fieldsFrom } = require('../Plugin/NativeSync/sync/metadata');
+const { filterChatModels } = require('../Plugin/NativeSync/sync/contracts.generated.cjs');
 const { AttachmentStore } = require('../Plugin/NativeSync/mobile/attachments');
 const { attachmentRoutes } = require('../Plugin/NativeSync/mobile/attachmentRoutes');
 const { prepareSharedConfiguration } = require('../Plugin/NativeSync/mobile/sharedConfiguration');
@@ -34,7 +35,7 @@ const integer = (value, defaultValue, min, max) => {
 };
 
 class CoreService {
-    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, agentManager, remoteConfig, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
+    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, agentManager, remoteConfig, modelCatalog, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
         if (shared && (!shared.grants.has(workspace) || shared.readOnly || !mobile || shared.coreWorkspace && shared.coreWorkspace !== workspace)) throw failure('CORE_WORKSPACE_UNAVAILABLE');
         if (!path.isAbsolute(directory) || directory === path.parse(directory).root) throw failure('CORE_DATA_DIRECTORY_REQUIRED');
         fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -51,6 +52,7 @@ class CoreService {
         }
         this.workspace = workspace;
         this.gameEnabled = gameEnabled;
+        this.modelCatalog = modelCatalog;
         this.observers = new Set();
         this.mobile = mobile;
         this.store = new CoreStore(filename);
@@ -241,22 +243,34 @@ class CoreService {
 
     async send(topic, principal, body, reauthorize, actor, options = {}) {
         if (this.runner.draining) throw failure('HOST_DRAINING', 503);
-        const { requestId, attachments = [], desktopReferences = [] } = body;
+        const { requestId, attachments = [], desktopReferences = [], model } = body;
+        const hasModel = Object.hasOwn(body, 'model');
         const text = requireText(body.text);
         if (!Array.isArray(attachments) ||
-            (!text.trim() && !attachments.length && !desktopReferences?.length) || Object.keys(body).some(k => !['requestId','text','attachments','desktopReferences'].includes(k))) {
+            (!text.trim() && !attachments.length && !desktopReferences?.length) || Object.keys(body).some(k => !['requestId','text','attachments','desktopReferences','model'].includes(k))) {
             throw failure('INVALID_CORE_SUBMISSION', 400);
         }
         if (!Array.isArray(desktopReferences) || desktopReferences.length > 8 ||
             desktopReferences.some(ref => ref?.kind !== 'workspace') || desktopReferences.length && actor?.kind !== 'desktop') {
             throw failure('INVALID_DESKTOP_REFERENCE', 400);
         }
+        if (hasModel && (!this.remote || actor?.kind !== 'mobile' || topic.ownerType !== 'agent' ||
+            typeof model !== 'string' || !model || model.length > 256 || model.trim() !== model)) {
+            throw failure('INVALID_CORE_MODEL_OVERRIDE', 400);
+        }
+        const override = hasModel ? { model } : {};
         const refs = desktopReferences.length ? fieldsFrom({ desktopReferences }).desktopReferences : [];
-        const input = { text, attachments, ...(options.flowlock && { flowlock: true }), ...(refs.length && { desktopReferences: refs }) };
+        const input = { text, attachments, ...override, ...(options.flowlock && { flowlock: true }), ...(refs.length && { desktopReferences: refs }) };
         const prior = this.store.replay(principal, requestId, { key: topic.key, op: 'send', input });
         if (prior) return prior;
-        const config = await this.configuration(topic);
+        let config = await this.configuration(topic);
         if (!config) throw failure('CORE_CONFIG_PENDING', 503);
+        if (hasModel) {
+            const ids = await this.availableChatModelIds();
+            reauthorize();
+            if (!ids.includes(model)) throw failure('CORE_MODEL_NOT_ALLOWED', 409);
+            config = { ...config, model, imageSupported: this.local.imageModels.includes(model) };
+        }
         if (topic.ownerType === 'group') {
             if (!this.supportsGroup(config.group) || topic.game) throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
             Object.assign(config, { groupId: topic.ownerId, topicId: topic.topicId });
@@ -277,7 +291,7 @@ class CoreService {
                 config, attachments: files, ...(config.group && { senderName: config.executionPolicy?.userName || '用户' }), ...(options.flowlock && { senderName: 'Flowlock' }), desktopReferences: refs.map(ref => ({ ...ref, sourceId: actor.sourceId })),
                 ...(principal.startsWith('mobile:') && { recovery: {
                     version: 1, kind: 'message', sessionMarker: sessionMarker(principal.slice(7)),
-                    payloadHash: payloadHash({ topicKey: topic.key, kind: 'message', payload: { requestId, text, attachments } })
+                    payloadHash: payloadHash({ topicKey: topic.key, kind: 'message', payload: { requestId, text, attachments, ...override } })
                 } }),
                 link: id => this.attachments.associate({ ...topic, msgId: id }, { attachments: files }, principal)
             };
@@ -462,6 +476,19 @@ class CoreService {
         return this.cds.search(topic, rows, params);
     }
 
+    async availableChatModelIds() {
+        if (!this.modelCatalog) throw failure('CORE_MODEL_CATALOG_UNAVAILABLE', 503);
+        let result;
+        try { result = await this.modelCatalog({ signal: AbortSignal.timeout(10000), chatOnly: true }); }
+        catch { throw failure('CORE_MODEL_CATALOG_UNAVAILABLE', 502); }
+        if (!result || !Number.isInteger(result.status) || result.status < 200 || result.status >= 300 ||
+            !Array.isArray(result.data?.data)) throw failure('CORE_MODEL_CATALOG_UNAVAILABLE', 502);
+        const { data, purpose } = result.data;
+        const rows = purpose === 'chat' ? data : filterChatModels(data);
+        return [...new Set(rows.map(row => row?.id)
+            .filter(id => typeof id === 'string' && id && id.length <= 256 && id.trim() === id))];
+    }
+
     checkStorage(req) {
         const expected = req.get('x-vcp-core-storage-id');
         if (expected !== undefined && expected !== this.store.storageId) throw failure('CORE_DATABASE_IDENTITY_MISMATCH');
@@ -484,6 +511,14 @@ class CoreService {
                 const actor = resolveActor(req, req.params.workspace, 'read');
                 this.local.authorize(actor, req.params.workspace);
                 res.set('Cache-Control', 'no-store').json({ workspace: this.workspace, storageId: this.store.storageId });
+            }));
+            router.get('/:workspace/models', route(async (req, res) => {
+                const actor = resolveActor(req, req.params.workspace, 'read');
+                this.local.authorize(actor, req.params.workspace, 'read');
+                if (actor.kind !== 'desktop') throw failure('CORE_DESKTOP_REQUIRED', 403);
+                const ids = await this.availableChatModelIds();
+                this.local.authorize(actor, req.params.workspace, 'read');
+                res.set('Cache-Control', 'no-store').json({ object: 'list', purpose: 'chat', data: ids.map(id => ({ id })) });
             }));
             router.get('/:workspace/memo-agent', route((req, res) => {
                 const actor = resolveActor(req, req.params.workspace, 'read');
@@ -619,7 +654,8 @@ class CoreService {
         router.get('/:workspace/:key/works', route(async (req, res) => {
             const { actor, topic } = scope(req, 'read');
             const works = this.store.db.prepare(`SELECT id, principal, status, user_message_id AS messageId,
-                reply_message_id AS replyId, error_code AS errorCode, created_at AS createdAt
+                reply_message_id AS replyId, error_code AS errorCode, created_at AS createdAt,
+                json_extract(frozen_config_json,'$.model') AS model
                 FROM works WHERE conversation_id=? ORDER BY admitted_seq DESC,rowid DESC LIMIT 100`).all(topic.key)
                 .map(({ principal, ...work }) => ({ ...work, owner: principal === actor.principal,
                     tools: this.store.db.prepare('SELECT id, plugin_name AS name, status, error_code AS errorCode FROM work_invocations WHERE work_id=?').all(work.id),
@@ -654,8 +690,20 @@ class CoreService {
             res.once('close', () => { this.observers.delete(res); stop(); clearInterval(timer); });
             write('change_seq', { seq: this.store.head(topic.key) });
         }));
+        if (this.remote) router.get('/:workspace/:key/models', route(async (req, res) => {
+            const { actor, topic } = scope(req, 'execute');
+            if (actor.kind !== 'mobile' || topic.ownerType !== 'agent') throw failure('CORE_MODEL_OVERRIDE_UNAVAILABLE', 403);
+            const models = await this.availableChatModelIds();
+            scope(req, 'execute');
+            res.set('Cache-Control', 'no-store').json({ models, purpose: 'chat' });
+        }));
         router.get('/:workspace/:key/receipt', route((req, res) => {
             const { actor, topic } = scope(req, 'read');
+            // An empty result used to release a rejected submission must be
+            // read under the original Cookie binding, even across tab changes.
+            if (actor.kind === 'mobile' && (req.get('x-nativesync-entry-id') !== undefined || req.get('x-nativesync-session-marker') !== undefined)) {
+                (this.mobile || this.remote).requireSubmissionContext(req);
+            }
             if (typeof req.query.requestId !== 'string') throw failure('INVALID_REQUEST_ID', 400);
             const receipt = this.receipt(topic, actor.principal, req.query.requestId);
             res.json({ executions: receipt ? [receipt] : [] });
@@ -710,6 +758,10 @@ class CoreService {
             this.runner.publish(topic.key, 'change_seq', { seq: result.seq });
             res.json(result);
         }));
+        router.get('/:workspace/:key/works/:id/steering-receipt', route((req, res) => {
+            const { actor, topic } = scope(req, 'read');
+            res.json({ receipt: this.store.steeringReceipt(topic.key, actor.principal, req.query.requestId, req.params.id) });
+        }));
         router.post('/:workspace/:key/works/:id/:action', route((req, res) => {
             const { actor, topic } = scope(req, 'execute');
             const { id, action } = req.params;
@@ -718,6 +770,9 @@ class CoreService {
                 if (this.runner.draining) throw failure('HOST_DRAINING', 503);
                 const text = requireText(req.body?.text);
                 if (!text.trim()) throw failure('INVALID_MESSAGE_TEXT', 400);
+                if (actor.kind === 'mobile' && (req.get('x-nativesync-entry-id') || req.get('x-nativesync-session-marker'))) {
+                    (this.mobile || this.remote).requireSubmissionContext(req);
+                }
                 const result = this.store.steer(topic.key, actor.principal, req.body?.requestId, id, text);
                 this.runner.publish(topic.key, 'change_seq', { seq: result.seq });
                 return res.status(202).json(result);

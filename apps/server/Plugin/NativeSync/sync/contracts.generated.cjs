@@ -1,5 +1,29 @@
-// Generated during release assembly; source SHA256 1295246c85b6c585ed27a6355cd7a7fdcd75eb0931bb84a9f691164ffc84ec50
+// Generated during release assembly; source SHA256 cc47db7432b74ea923d8ac043d07c656a4eb9541ef91424011445984ff4c89c2
 Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+// packages/sync-contracts/src/chatModelCatalog.mjs
+const embeddingCapability = /^(?:(?:\/?v1\/)?embeddings?|embed|text[-_ ]embeddings?|feature[-_ ]extraction|vector(?:ization)?)$/i;
+const chatCapability = /^(?:(?:\/?v1\/)?chat(?:[-_ /]completions?)?|(?:\/?v1\/)?completions?|text[-_ ]generation|generate[-_ ]content|responses)$/i;
+const namedEmbedding = /(?:^|[._:-])(?:embed|embeddings?)(?:[._:-]|$)|^(?:bge-(?:m3|small|base|large)|(?:multilingual-)?e5-(?:small|base|large|mistral)|gte-(?:small|base|large|multilingual|qwen)|(?:all|paraphrase)-minilm)(?:[._:-]|$)/i;
+function filterChatModels(models, knownEmbeddingIds = []) {
+	const known = new Set(knownEmbeddingIds);
+	return models.filter((model) => {
+		const id = typeof model === "string" ? model : model?.id;
+		if (typeof id !== "string") return true;
+		const capabilities = model?.capabilities;
+		const endpoints = model?.supported_endpoints || model?.supported_endpoint_types;
+		const tags = [
+			model?.type,
+			model?.mode,
+			model?.task,
+			model?.object,
+			...Array.isArray(capabilities) ? capabilities : Object.keys(capabilities || {}).filter((key) => capabilities[key] === true),
+			...Array.isArray(endpoints) ? endpoints : []
+		].filter((tag) => typeof tag === "string").map((tag) => tag.trim());
+		if (tags.some((tag) => chatCapability.test(tag))) return true;
+		return !known.has(id) && !tags.some((tag) => embeddingCapability.test(tag)) && !namedEmbedding.test(id.split("/").at(-1));
+	});
+}
+
 // packages/sync-contracts/src/contracts.mjs
 function createProtocol({ canonicalizeMessage, BoundedWarnings, messageContentHash, stableStringify, sha256 }, metadata) {
 	function identity(value) {
@@ -422,7 +446,8 @@ function submissionText({ topicKey, kind, payload }) {
 	const canonical = kind === "message" ? {
 		attachments: payload.attachments || [],
 		requestId: payload.requestId,
-		text: payload.text
+		text: payload.text,
+		...payload.model !== void 0 && { model: payload.model }
 	} : {
 		agentId: payload.agentId,
 		requestId: payload.requestId
@@ -694,6 +719,7 @@ exports.SHARED_SPACE_CAPABILITY = SHARED_SPACE_CAPABILITY;
 exports.createMetadata = createMetadata;
 exports.createProtocol = createProtocol;
 exports.createSourceScope = createSourceScope;
+exports.filterChatModels = filterChatModels;
 exports.sharedAgentExecution = sharedAgentExecution;
 exports.sharedConfig = sharedConfig;
 exports.sharedContextTransform = sharedContextTransform;

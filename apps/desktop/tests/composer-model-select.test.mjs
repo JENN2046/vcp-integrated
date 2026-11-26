@@ -337,3 +337,87 @@ test('ComposerModelSelect: dispose之后保存完成不得回写选中项和设�
     assert.equal(h.current.config.model, 'model-a');
     assert.equal(h.document.getElementById('agentModel').value, '');
 });
+function setupCatalogRefresh(t, initial = []) {
+    const { dom, document, window } = setupTestEnv();
+    let cache = initial;
+    let current = { type: 'agent', id: 'agent_1', config: { model: 'default-model' } };
+    const requests = [];
+    const instance = window.ComposerModelSelect.init({
+        electronAPI: {
+            getCachedModels: async () => cache,
+            getFavoriteModels: async () => [],
+            refreshModels: () => new Promise(resolve => requests.push(result => {
+                if (result.success) cache = result.models;
+                resolve(result);
+            })),
+            saveAgentConfig: async () => ({ success: true })
+        },
+        selectedItemRef: { get: () => current, set: value => { current = value; } }
+    });
+    t.after(() => { instance.dispose(); dom.window.close(); });
+    return {
+        trigger: document.querySelector('.vcp-model-select-trigger'),
+        menu: () => document.querySelector('.vcp-model-picker-popup'),
+        options: () => [...document.querySelectorAll('.vcp-model-picker-item')].map(node => node.dataset.model),
+        requests, readModel: () => current.config.model
+    };
+}
+
+test('ComposerModelSelect reloads a slow empty cache in the same open menu', async t => {
+    const env = setupCatalogRefresh(t);
+    env.trigger.click();
+    const menu = env.menu();
+    await new Promise(resolve => setTimeout(resolve, 1700));
+    const at1700 = menu.textContent;
+    env.requests[0]({ success: true, models: [{id:'slow-model'}] });
+    await tick();
+    assert.deepEqual(env.options(), ['slow-model'], 'the menu must show the slow response without reopening');
+    assert.match(at1700, /加载中/);
+    assert.equal(env.menu(), menu);
+    menu.querySelector('[data-model="slow-model"]').click();
+    await tick();
+    assert.equal(env.readModel(), 'slow-model');
+});
+
+test('ComposerModelSelect keeps a warm list through failure, retries in place and shows a confirmed empty result', async t => {
+    const env = setupCatalogRefresh(t, ['cached-model']);
+    env.trigger.click();
+    await tick();
+    const menu = env.menu();
+    assert.deepEqual(env.options(), ['cached-model']);
+    assert.match(menu.textContent, /正在刷新/);
+    env.requests[0]({ success: false, models: [{id:'cached-model'}] });
+    await tick();
+    assert.deepEqual(env.options(), ['cached-model']);
+    assert.match(menu.textContent, /加载失败，可重试/);
+    assert.doesNotMatch(menu.textContent, /没有可用的模型/);
+    [...menu.querySelectorAll('button')].find(button => button.textContent === '重试').click();
+    await tick();
+    assert.equal(env.menu(), menu);
+    assert.deepEqual(env.options(), ['cached-model']);
+    env.requests[1]({ success: true, models: [] });
+    await tick();
+    assert.equal(env.menu(), menu);
+    assert.deepEqual(env.options(), []);
+    assert.match(menu.textContent, /没有可用的模型/);
+    assert.equal(menu.querySelector('[role="status"]').parentElement.hidden, true);
+});
+
+test('ComposerModelSelect ignores an out-of-order reply after a fast close and reopen', async t => {
+    const env = setupCatalogRefresh(t);
+    env.trigger.click();
+    await tick();
+    const oldMenu = env.menu();
+    env.trigger.click();
+    assert.equal(env.menu(), null);
+    env.trigger.click();
+    await tick();
+    const newMenu = env.menu();
+    assert.notEqual(newMenu, oldMenu);
+    env.requests[1]({ success: true, models: [{id:'new-result'}] });
+    await tick();
+    env.requests[0]({ success: true, models: [{id:'old-result'}] });
+    await tick();
+    assert.equal(env.menu(), newMenu);
+    assert.deepEqual(env.options(), ['new-result']);
+});

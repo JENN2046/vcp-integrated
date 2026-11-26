@@ -54,6 +54,7 @@ function initialize(mainWindow, context) {
         historyMutationQueue = new HistoryMutationQueue({ userDataDir: USER_DATA_DIR, fileWatcher }),
         jevService = null,
         gameService = null,
+        getModelCatalog = null,
         topicAdmission = null
     } = context;
 
@@ -108,52 +109,32 @@ function initialize(mainWindow, context) {
             },
             listModels: async ({ forceRefresh = false } = {}) => {
                 const modelUsageTracker = require('../modelUsageTracker');
+                const { fetchDesktopModelCatalog, gameModelChoices } = require('../services/modelCatalog');
                 const [favoriteModels, hotModels, agentConfigs] = await Promise.all([
                     modelUsageTracker.getFavoriteModels().catch(() => []),
                     modelUsageTracker.getHotModels(15).catch(() => []),
                     readAllAgentConfigs().catch(() => []),
                 ]);
                 const now = Date.now();
-                if (forceRefresh || !modelCache.ids.length || now - modelCache.fetchedAt > 30000) {
+                if (forceRefresh || !modelCache.fetchedAt || now - modelCache.fetchedAt > 30000) {
                     try {
-                        const settingsPath = path.join(path.dirname(USER_DATA_DIR), 'settings.json');
-                        const settings = await fs.pathExists(settingsPath) ? await fs.readJson(settingsPath) : {};
-                        if (settings?.vcpServerUrl) {
-                            const parsed = new URL(settings.vcpServerUrl);
-                            const modelsUrl = new URL('/v1/models', `${parsed.protocol}//${parsed.host}`).toString();
-                            const headers = settings.vcpApiKey
-                                ? { Authorization: `Bearer ${settings.vcpApiKey}` }
-                                : {};
-                            const response = await fetch(modelsUrl, {
-                                headers,
-                                signal: AbortSignal.timeout(4000),
+                        const models = getModelCatalog ? await getModelCatalog() : await (async () => {
+                            const root = path.dirname(USER_DATA_DIR);
+                            const settingsPath = path.join(root, 'settings.json');
+                            const settings = await fs.pathExists(settingsPath) ? await fs.readJson(settingsPath) : {};
+                            return fetchDesktopModelCatalog({
+                                root, settings, getCoreClient: async () => historyMutationQueue.coreClient
                             });
-                            if (response.ok) {
-                                const payload = await response.json();
-                                const remoteIds = (Array.isArray(payload?.data) ? payload.data : [])
-                                    .map(item => (typeof item?.id === 'string' ? item.id.trim() : ''))
-                                    .filter(Boolean);
-                                if (remoteIds.length) {
-                                    modelCache = { fetchedAt: now, ids: remoteIds };
-                                }
-                            }
-                        }
+                        })();
+                        modelCache = Array.isArray(models) ? { fetchedAt: now, ids: models } : { fetchedAt: 0, ids: [] };
                     } catch {
                         // Fall back to cached / local agent models without blocking table setup.
                     }
                 }
-                const clean = list => [...new Set((Array.isArray(list) ? list : [])
-                    .map(id => (typeof id === 'string' ? id.trim() : ''))
-                    .filter(Boolean))];
-                const agentModels = agentConfigs
-                    .map(cfg => (typeof cfg.model === 'string' ? cfg.model.trim() : ''))
-                    .filter(Boolean);
-                const models = clean([...favoriteModels, ...hotModels, ...agentModels, ...modelCache.ids]);
-                return {
-                    models,
-                    favoriteModels: clean(favoriteModels),
-                    hotModels: clean(hotModels),
-                };
+                return gameModelChoices({
+                    catalog: modelCache.fetchedAt ? modelCache.ids : null,
+                    favoriteModels, hotModels, agentModels: agentConfigs.map(config => config.model)
+                });
             },
         });
     }

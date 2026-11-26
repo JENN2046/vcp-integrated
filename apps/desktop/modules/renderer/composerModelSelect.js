@@ -149,26 +149,18 @@
             return list.map(m => (typeof m === 'string' ? m : m?.id)).filter(Boolean);
         }
 
-        async function fetchModelsAndFavorites() {
-            let models = [];
-            let favorites = [];
-            try {
-                [models, favorites] = await Promise.all([
-                    electronAPI.getCachedModels?.() ?? [],
-                    electronAPI.getFavoriteModels?.() ?? [],
-                ]);
-                if ((!normalize(models).length) && electronAPI.refreshModels) {
-                    electronAPI.refreshModels();
-                    await new Promise(r => setTimeout(r, 1500));
-                    models = await electronAPI.getCachedModels();
-                }
-            } catch (error) {
-                console.warn('[ComposerModelSelect] 获取模型列表失败', error);
-            }
-            return {
-                ids: normalize(models),
-                favorites: new Set(Array.isArray(favorites) ? favorites : [])
-            };
+        async function readCatalog() {
+            const [models, favorites] = await Promise.all([
+                electronAPI.getCachedModels?.() ?? [],
+                Promise.resolve().then(() => electronAPI.getFavoriteModels?.() ?? []).catch(() => []),
+            ]);
+            return { ids: normalize(models), favorites };
+        }
+
+        async function refreshCatalog(cached) {
+            const result = await electronAPI.refreshModels();
+            if (!result?.success || !Array.isArray(result.models)) throw new Error('model-refresh-failed');
+            return { ids: normalize(result.models), favorites: cached.favorites };
         }
 
         let popup = null;
@@ -179,7 +171,8 @@
                 popup = factory({
                     wrap,
                     trigger,
-                    getCatalog: fetchModelsAndFavorites,
+                    getCatalog: readCatalog,
+                    refreshCatalog: typeof electronAPI.refreshModels === 'function' ? refreshCatalog : undefined,
                     getActiveModel: () => readModel(currentItem()),
                     onSelect: choose,
                     enableCheckMenu: true

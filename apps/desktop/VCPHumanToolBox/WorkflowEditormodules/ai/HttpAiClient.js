@@ -14,7 +14,7 @@
         }
 
         async listModels() {
-            const url = `${this.baseUrl}/v1/models`;
+            const url = this.baseUrl + '/v1/models?purpose=chat';
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000);
             try {
@@ -22,7 +22,8 @@
                 clearTimeout(timeoutId);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
-                return Array.isArray(data?.data) ? data.data : (Array.isArray(data?.models) ? data.models : []);
+                const models = Array.isArray(data?.data) ? data.data : (Array.isArray(data?.models) ? data.models : []);
+                return data?.purpose === 'chat' ? models : VCPChatModelCatalog.filterChatModels(models);
             } catch (e) {
                 clearTimeout(timeoutId);
                 throw e;
