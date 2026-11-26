@@ -93,6 +93,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         const topic = await define('main'), other = await define('other');
         const imageTopic = await define('image-rejection'), probeTopic = await define('image-failed-probe');
         const gatewayTopic = await define('html-gateway');
+        const draftTopic = await define('draft-restore');
         core.store.ensureConversation({ workspace:'personal', key:topic, ownerId:'fixture' });
         core.store.transaction(() => {
             for (let i = 0; i < 18; i++) core.store.insertMessage({ id:'seed-'+i, key:topic,
@@ -458,6 +459,26 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         const responseFor = (key,status) => page.waitForResponse(response=>
             new URL(response.url()).pathname===imageSend(key) && response.request().method()==='POST' && response.status()===status);
 
+        await chooseTopic(draftTopic);
+        const beforeDraftPosts=posts.length, beforeDraftUploads=attachmentPosts.length;
+        await fill('拍摄草稿');
+        await chooseModel(visionModel);
+        await attachImage();
+        await page.reload({waitUntil:'domcontentloaded'});
+        await chooseTopic(draftTopic);
+        assert.equal(await value(),'拍摄草稿');
+        assert.match(await readModelLabel(),/下一条.*fixture-vision/);
+        assert.match(await page.$eval('#attachment-reselection-notice', el=>el.textContent),/1 个草稿附件未恢复，请重新选择/);
+        assert.equal(await page.$('.pending-file'),null);
+        await chooseTopic(imageTopic);
+        assert.match(await readModelLabel(),/当前模型.*synthetic/);
+        assert.equal(await page.$('#attachment-reselection-notice'),null);
+        await chooseTopic(draftTopic);
+        await attachImage();
+        assert.equal(await page.$('#attachment-reselection-notice'),null);
+        assert.equal(posts.length,beforeDraftPosts);
+        assert.equal(attachmentPosts.length,beforeDraftUploads);
+
         await chooseTopic(imageTopic);
         await chooseModel(nextModel);
         await attachImage();
@@ -509,10 +530,13 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
             message.content.some(part=>part.type==='image_url')));
         await page.reload({waitUntil:'domcontentloaded'});
         await page.waitForSelector('#pending-submission');
+        assert.equal(await page.$('#attachment-reselection-notice'),null,'prepared attachments are owned by the pending submission');
+        assert.match(await readModelLabel(),/待确认.*fixture-vision/);
         assert.equal(posts.filter(route=>route===imageSend(imageTopic)).length,2);
         holdReceipt=false;
         await page.waitForFunction(()=>!document.querySelector('#pending-submission') &&
             document.querySelector('#message-text')?.value==='');
+        assert.match(await readModelLabel(),/当前模型.*synthetic/);
         assert.equal(posts.filter(route=>route===imageSend(imageTopic)).length,2);
         assert.equal(counts()[0],beforeImage[0]+1);
         t.diagnostic('Verified image rejection kept the edited draft and upload; manual vision send committed once despite a lost 202.');

@@ -67,7 +67,7 @@ function closePanel(){
 }
 const attachmentPreview=ref(null),attachmentDialog=ref(null);let attachmentReadRequest=0,attachmentReadController=null;
 const attachmentTextPreviewLimit=256*1024;
-// Persist composer text and its quote by paired identity and topic. Selected local files
+// Persist composer intent by paired identity and topic. Selected local files
 // stay in the page; verified rejections use the existing recovery store.
 const drafts=new Map(),composerDraft=ref({text:'',files:[],revision:0});let composerScope='';
 const steeringStoragePrefix='vcp.mobile.steering.v1:', steeringStorageError=ref('');
@@ -281,7 +281,7 @@ const currentTopic=computed(()=>{const topic=topics.value.find(t=>t.key===select
 function draftScope(){const topic=currentTopic.value;return paired.value&&validSessionRecovery(recoveryContext.value)&&topic?JSON.stringify([recoveryContext.value.entryId,recoveryContext.value.sessionMarker,ownerKey(topic),topic.topicId,topic.key]):'';}
 function switchDraft(next=draftScope()){
  if(next===composerScope)return;
- if(composerScope&&!text.value&&!pendingFiles.value.length&&!composerDraft.value.submitted&&!composerDraft.value.coreSteering&&!composerDraft.value.nextModel)drafts.delete(composerScope);
+ if(composerScope&&!text.value&&!pendingFiles.value.length&&!composerDraft.value.submitted&&!composerDraft.value.coreSteering&&!composerDraft.value.nextModel&&!composerDraft.value.missingAttachments)drafts.delete(composerScope);
  composerScope=next;composerDraft.value=drafts.get(next)||{text:'',files:[],revision:0};
  steeringStorageError.value='';
  steeringRecordCorrupt.value=false;
@@ -289,9 +289,12 @@ function switchDraft(next=draftScope()){
  if(next){
   const draft=composerDraft.value;
   drafts.set(next,draft);
-  if(!draft.revision&&!draft.text&&!draft.coreSteering){
+  if(!draft.revision&&!draft.ordinaryEditId&&!draft.coreSteering){
    const saved=readOrdinaryText(next);
-   if(saved?.quote){draft.text=saved.text;draft.taskQuote=saved.quote;draft.ordinaryEditId=saved.editId;}
+   if(saved?.quote&&!draft.text){draft.text=saved.text;draft.taskQuote=saved.quote;draft.ordinaryEditId=saved.editId;}
+   if(typeof saved?.nextModel==='string')draft.nextModel=saved.nextModel;
+   if(Number.isInteger(saved?.localAttachments)&&saved.localAttachments>0&&saved.localAttachments<=8)
+    draft.missingAttachments=saved.localAttachments;
   }
   syncSteeringDraft();
   syncRejectedDraft();
@@ -312,7 +315,7 @@ function syncRejectedDraft(){
 const composerText=computed({get:()=>text.value,set:value=>{
  text.value=value;
  const draft=composerDraft.value;
- if(draft.taskQuote||!draft.rejected)rememberOrdinaryText(draft,composerScope);
+ if(draft.taskQuote||!draft.rejected||draft.nextModel||draftLocalAttachmentCount(draft))rememberOrdinaryText(draft,composerScope);
  else delete draft.ordinaryEditId;
 }});
 const ordinaryDraftPrefix='vcp.mobile.draft.v1:';
@@ -340,14 +343,20 @@ function restoreOrdinaryText(draft,scope){
  const saved=readOrdinaryText(scope);
  if(saved){draft.text=saved.text;draft.ordinaryEditId=saved.editId;}
 }
+function draftLocalAttachmentCount(draft){
+ const prepared=draft.submitted?.prepared?draft.submitted.files:[];
+ return (draft.missingAttachments||0)+(draft.files||[]).filter(item=>item.file&&!prepared.includes(item)).length;
+}
 function rememberOrdinaryText(draft,scope){
  if(!scope)return false;
  try{
   const previous=storedOrdinaryText(scope);
-  if(draft.text||draft.taskQuote){
+  const localAttachments=draftLocalAttachmentCount(draft);
+  if(draft.text||draft.taskQuote||draft.nextModel||localAttachments){
    const editId=crypto.randomUUID();
    localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({text:draft.text,editId,
-    ...(draft.taskQuote&&{quote:draft.taskQuote})}));
+    ...(draft.taskQuote&&{quote:draft.taskQuote}),...(draft.nextModel&&{nextModel:draft.nextModel}),
+    ...(localAttachments&&{localAttachments})}));
    draft.ordinaryEditId=editId;
   }else{
    localStorage.removeItem(ordinaryDraftPrefix+scope);
@@ -364,7 +373,11 @@ function rememberOrdinaryText(draft,scope){
 function markOrdinarySubmission(draft,scope,requestId){
  const saved=readOrdinaryText(scope);
  if(!saved||saved.editId!==draft.ordinaryEditId)return;
- try{localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({...saved,requestId}));}
+ // The durable submission owns its model and upload references from here.
+ // Later edits keep their own draft ID and must survive this request's receipt.
+ try{localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({...saved,
+  requestId:draft.revision===draft.submitted.revision?requestId:undefined,
+  nextModel:draft.nextModel,localAttachments:draftLocalAttachmentCount(draft)||undefined}));}
  catch{ordinaryDraftError.value='草稿暂无法保存在此浏览器，刷新前请检查存储。';}
 }
 function forgetOrdinarySubmission(record,scope){
@@ -375,7 +388,7 @@ function forgetOrdinarySubmission(record,scope){
 }
 function confirmOrdinaryText(draft,record,scope){
  const saved=forgetOrdinarySubmission(record,scope);
- if(saved&&draft.ordinaryEditId===saved.editId){draft.text='';delete draft.ordinaryEditId;}
+ if(saved&&draft.ordinaryEditId===saved.editId){draft.text='';delete draft.ordinaryEditId;delete draft.missingAttachments;}
 }
 watch(composerDraft,draft=>{
  ordinaryDraftError.value='';
@@ -400,7 +413,9 @@ function saveDraftEdit(draft){
  });
 }
 function removeDraftFile(index){
- const draft=composerDraft.value;draft.files.splice(index,1);draft.revision++;saveDraftEdit(draft);
+ const draft=composerDraft.value,[removed]=draft.files.splice(index,1);
+ draft.revision++;saveDraftEdit(draft);
+ if(removed?.file)rememberOrdinaryText(draft,composerScope);
 }
 function confirmDraft(record,context){
  const draft=drafts.get(context.draftScope),sent=draft?.submitted;
@@ -716,6 +731,7 @@ async function postPrepared(record,context){
    }
    draft.rejected=saved;
    if(imageRejected&&record.payload.model&&!draft.nextModel)draft.nextModel=record.payload.model;
+   if(draft.nextModel||draftLocalAttachmentCount(draft))rememberOrdinaryText(draft,context.draftScope);
    if(!loadRecovery())throw Error(recoveryError.value);
    if(sameView(context)){
     submissionNoticeHeld=true;
@@ -738,9 +754,13 @@ async function submit(submission,kind='message',context=newSubmissionContext()){
  try{
   if(!sameView(context))return;
   const record=await submissionStore.prepare({entryId:context.recovery.entryId,sessionMarker:context.recovery.sessionMarker,topicKey:context.topicKey,kind,payload:submission,rejected:context.rejected});
-  if(!loadRecovery())throw Error(recoveryError.value);
   const draft=drafts.get(context.draftScope);
   if(submission.model&&draft?.nextModel===submission.model)delete draft.nextModel;
+  if(draft?.submitted?.requestId===record.requestId){
+   draft.submitted.prepared=true;
+   markOrdinarySubmission(draft,context.draftScope,record.requestId);
+  }
+  if(!loadRecovery())throw Error(recoveryError.value);
   if(sameView(context)){recoveryDetail.value='本地已保存，尚未收到可核验的云端接受回执。';acceptedReceipt.value=null;}
   await postPrepared(record,context);
  }catch(error){loadRecovery();if(sameView(context)){submissionNoticeHeld=true;notice.value='尚未完成提交确认：'+(noteConnectionFailure(error)?(error.status===502?'网关暂时不可用':'暂未连上服务端')+'，原提交仍待核对。':recoveryMessage(error));}}
@@ -748,12 +768,18 @@ async function submit(submission,kind='message',context=newSubmissionContext()){
 }
 function selectFiles(event){
  const draft=composerDraft.value,rejected=[];
+ const originalCount=draft.files.length;
  for(const file of event.target.files||[]){
   const reason=file.size>20*1024*1024?'单个附件超过 20 MB':draft.files.length>=8?'最多添加 8 个附件':'';
   if(reason)rejected.push({name:file.name,reason});
   else draft.files.push({file,progress:0,error:'',uploadId:null});
  }
  draft.fileRejections=rejected;
+ const added=draft.files.length-originalCount;
+ if(added){
+  if(draft.missingAttachments)draft.missingAttachments=Math.max(0,draft.missingAttachments-added);
+  rememberOrdinaryText(draft,composerScope);
+ }
  event.target.value='';
 }
 function attachmentUrl(message,attachment){if(currentTopic.value?.coreSingle)return '/mobile/api/'+corePath(currentTopic.value)+'/blob/'+encodeURIComponent(attachment.hash);return '/mobile/api/conversations/'+encodeURIComponent(selected.value)+'/attachments/messages/'+encodeURIComponent(message.id)+'/'+encodeURIComponent(attachment.id);}
@@ -835,6 +861,7 @@ function pickNextModel(model){
  if(model&&!modelPicker.value.models.includes(model))return;
  if(model)composerDraft.value.nextModel=model;
  else delete composerDraft.value.nextModel;
+ rememberOrdinaryText(composerDraft.value,composerScope);
  modelPicker.value=null;
 }
 const quoteClosed=computed(()=>{
@@ -1066,7 +1093,29 @@ async function sendCoreSteering(quote){
 async function send(){
  if((!text.value.trim()&&!pendingFiles.value.length)||busy.value||currentTopic.value?.executable===false)return;
  let context;busy.value=true;submissionNoticeHeld=false;
- try{context=newSubmissionContext();const draft=composerDraft.value;await draftWrites.get(draft);if(!sameView(context))return;context.rejected=draft.rejected;const snapshot={text:draft.text,revision:draft.revision,files:[...draft.files],model:draft.nextModel},ids=[];for(const item of snapshot.files){item.error='';try{if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;if(!item.uploadId&&!item.file)throw Error('请移除已上传附件并重新选择原文件');item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n,currentTopic.value?.coreSingle?corePath(currentTopic.value)+'/attachments':undefined);item.uploadSessionMarker=context.recovery.sessionMarker;ids.push(item.uploadId);}catch(e){item.error=e.message;throw e;}}if(!sameView(context))return;const requestId=crypto.randomUUID();draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};if(draft.revision===snapshot.revision)markOrdinarySubmission(draft,context.draftScope,requestId);await submit({requestId,text:snapshot.text,attachments:ids,...(snapshot.model&&{model:snapshot.model})},'message',context);}
+ try{
+  context=newSubmissionContext();
+  const draft=composerDraft.value;
+  await draftWrites.get(draft);
+  if(!sameView(context))return;
+  context.rejected=draft.rejected;
+  const snapshot={text:draft.text,revision:draft.revision,files:[...draft.files],model:draft.nextModel},ids=[];
+  for(const item of snapshot.files){
+   item.error='';
+   try{
+    if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;
+    if(!item.uploadId&&!item.file)throw Error('请移除已上传附件并重新选择原文件');
+    item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n,
+     currentTopic.value?.coreSingle?corePath(currentTopic.value)+'/attachments':undefined);
+    item.uploadSessionMarker=context.recovery.sessionMarker;
+    ids.push(item.uploadId);
+   }catch(error){item.error=error.message;throw error;}
+  }
+  if(!sameView(context))return;
+  const requestId=crypto.randomUUID();
+  draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};
+  await submit({requestId,text:snapshot.text,attachments:ids,...(snapshot.model&&{model:snapshot.model})},'message',context);
+ }
  catch(error){if(!context||sameView(context)){submissionNoticeHeld=true;notice.value=recoveryMessage(error);}}finally{busy.value=false;}
 }
 async function refreshRetrySession(context){
@@ -1415,6 +1464,9 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
     <ul v-if="composerDraft.fileRejections?.length" id="attachment-selection-notice" class="attachment-selection-notice" aria-label="未添加的附件" role="status">
      <li v-for="(item,index) in composerDraft.fileRejections" :key="index">{{item.name}} · 未添加（{{item.reason}}）</li>
     </ul>
+    <p v-if="composerDraft.missingAttachments&&!pendingSubmission" id="attachment-reselection-notice" class="attachment-selection-notice" role="status">
+     {{composerDraft.missingAttachments}} 个草稿附件未恢复，请重新选择。
+    </p>
     <p v-if="ordinaryDraftError" class="pair-error" role="status">{{ordinaryDraftError}}</p>
     <div v-if="taskQuote" id="task-quote" class="task-quote" :data-closed="Boolean(quoteClosed)">
      <MobileIcon name="reply"/>
