@@ -147,9 +147,13 @@ footer>* {max-width:var(--content); margin-inline:auto}
 .message-composer .attachment-picker input {position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; padding:0}
 .pending-files {max-height:100px; overflow:auto; margin-bottom:4px}
 .pending-file {display:flex; align-items:center; gap:6px; font-size:.82rem; padding-left:6px}
-.pending-file span {flex:1; min-width:0; overflow-wrap:anywhere}
+.pending-file-label {flex:1; min-width:0; overflow-wrap:anywhere}
+.pending-file-label small {display:block; color:var(--muted)}
 .pending-file svg {flex:none; width:16px; height:16px}
 .pending-file button {padding:0; width:44px; display:grid; place-items:center; color:var(--ink); background:transparent}
+.pending-file .pending-image {height:44px; flex:none; overflow:hidden; border-radius:8px; background:var(--surface)}
+.pending-image img {width:100%; height:100%; object-fit:cover}
+.pending-file .pending-preview {text-decoration:underline}
 .send-state {display:flex; align-items:center; gap:6px; justify-content:space-between; margin-top:3px; line-height:1.4}
 .send-state {color:var(--muted); font-size:.8rem}
 .send-state {flex-wrap:wrap}

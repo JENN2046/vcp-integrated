@@ -3,6 +3,7 @@ import MobileIcon from './MobileIcon.vue';
 import AgentAvatar from './AgentAvatar.vue';
 import DesktopRelayStatus from './DesktopRelayStatus.vue';
 import SharedAttachmentImage from './SharedAttachmentImage.vue';
+import DraftImageThumbnail from './DraftImageThumbnail.vue';
 import {ref,computed,watch,onMounted,onUnmounted,nextTick} from 'vue';
 import TextPages from './TextPages.vue';
 import SharedConfigEditor from './SharedConfigEditor.vue';
@@ -65,6 +66,7 @@ function closePanel(){
  nextTick(()=>toggle?.focus());
 }
 const attachmentPreview=ref(null),attachmentDialog=ref(null);let attachmentReadRequest=0,attachmentReadController=null;
+const attachmentTextPreviewLimit=256*1024;
 // Persist composer text and its quote by paired identity and topic. Selected local files
 // stay in the page; verified rejections use the existing recovery store.
 const drafts=new Map(),composerDraft=ref({text:'',files:[],revision:0});let composerScope='';
@@ -75,6 +77,10 @@ const steeringRecordCorrupt=ref(false), steeringRemovalPrompt=ref(false);
 const text=computed({get:()=>composerDraft.value.text,set:value=>{composerDraft.value.text=value;composerDraft.value.revision++;saveDraftEdit(composerDraft.value);}});
 watch(text,resizeComposer,{flush:'post'});
 const pendingFiles=computed({get:()=>composerDraft.value.files,set:value=>{composerDraft.value.files=value;}});
+watch(()=>pendingFiles.value.map(item=>item.file),files=>{
+ const file=attachmentPreview.value?.localFile;
+ if(file&&!files.includes(file))closeAttachment();
+});
 const nativeResult=ref(null),nativeResultPanel=ref(null);let nativeResultRequest=0;
 let incomingPairing=consumePairingLink({location:window.location,history:window.history,secureContext:window.isSecureContext});
 let connectionInitialized=false;
@@ -751,10 +757,34 @@ function selectFiles(event){
  event.target.value='';
 }
 function attachmentUrl(message,attachment){if(currentTopic.value?.coreSingle)return '/mobile/api/'+corePath(currentTopic.value)+'/blob/'+encodeURIComponent(attachment.hash);return '/mobile/api/conversations/'+encodeURIComponent(selected.value)+'/attachments/messages/'+encodeURIComponent(message.id)+'/'+encodeURIComponent(attachment.id);}
+function draftPreviewKind(file){
+ if(file?.type.startsWith('image/'))return 'image';
+ if(/\.txt$/i.test(file?.name||''))return 'text';
+}
 function closeAttachment(){
  attachmentReadRequest++;attachmentReadController?.abort();attachmentReadController=null;
  if(attachmentPreview.value?.url)URL.revokeObjectURL(attachmentPreview.value.url);
  attachmentPreview.value=null;if(attachmentDialog.value?.open)attachmentDialog.value.close();
+}
+async function openDraftAttachment(file){
+ const kind=draftPreviewKind(file);
+ if(!kind)return;
+ closeAttachment();
+ const request=attachmentReadRequest;
+ const current=()=>request===attachmentReadRequest;
+ attachmentPreview.value={name:file.name,localFile:file,loading:true};
+ await nextTick();
+ if(!current())return;
+ attachmentDialog.value?.showModal();
+ try{
+  const isImage=kind==='image';
+  const text=isImage?null:await file.slice(0,attachmentTextPreviewLimit).text();
+  if(!current())return;
+  attachmentPreview.value={name:file.name,localFile:file,isImage,text,
+   url:isImage?URL.createObjectURL(file):null,truncated:!isImage&&file.size>attachmentTextPreviewLimit};
+ }catch{
+  if(current())attachmentPreview.value={name:file.name,localFile:file,error:'无法预览此文件。'};
+ }
 }
 async function openAttachment(message,attachment){
  closeAttachment();const request=attachmentReadRequest,epoch=authEpoch,view=generation,url=attachmentUrl(message,attachment);
@@ -764,10 +794,14 @@ async function openAttachment(message,attachment){
  await nextTick();if(!current())return;attachmentDialog.value?.showModal();
  try{
   const blob=await readAttachment(url,{signal}),isImage=blob.type.startsWith('image/');
-  const limit=256*1024,previewText=isImage?null:/^(text\/|application\/json(?:;|$))/.test(blob.type)?await blob.slice(0,limit).text():attachment.extractedText?.slice(0,limit)||null;
+  const limit=attachmentTextPreviewLimit,previewText=isImage?null:/^(text\/|application\/json(?:;|$))/.test(blob.type)?await blob.slice(0,limit).text():attachment.extractedText?.slice(0,limit)||null;
   if(!current())return;
   attachmentPreview.value={name:attachment.name||'附件',loading:false,error:'',blob,url:isImage?URL.createObjectURL(blob):null,isImage,text:previewText,truncated:!isImage&&blob.size>limit};
  }catch(error){if(current())attachmentPreview.value={name:attachment.name||'附件',loading:false,error:error.status?error.message:'附件暂时无法读取，请检查连接',url:null};}
+}
+function draftImageError(event){
+ const preview=attachmentPreview.value;
+ if(preview?.localFile&&event.target.src===preview.url)preview.error='无法预览此图片。';
 }
 function downloadAttachment(){const item=attachmentPreview.value;if(item?.blob)saveAttachment(item.blob,item.name);}
 const steerableStates=['running','waiting_approval'];
@@ -1182,7 +1216,15 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
 <dialog v-if="attachmentPreview" ref="attachmentDialog" id="attachment-viewer" class="attachment-viewer" aria-labelledby="attachment-title" @cancel.prevent="closeAttachment">
    <div class="attachment-viewer-heading"><strong id="attachment-title">{{attachmentPreview.name}}</strong><button id="attachment-close" @click="closeAttachment" autofocus>关闭</button></div>
    <p v-if="attachmentPreview.loading" role="status">正在读取附件…</p><p v-else-if="attachmentPreview.error" role="alert">{{attachmentPreview.error}}</p>
-   <template v-else><div class="attachment-viewer-content"><img v-if="attachmentPreview.isImage" :src="attachmentPreview.url" :alt="attachmentPreview.name"><TextPages v-else-if="attachmentPreview.text!==null" :text="attachmentPreview.text" :complete="!attachmentPreview.truncated"/><p v-else>此文件暂无页内预览，可以保存后打开。</p><small v-if="attachmentPreview.truncated">预览已截取，保存文件可查看完整内容。</small></div><button id="attachment-save" @click="downloadAttachment">保存文件</button></template>
+   <template v-else>
+    <div class="attachment-viewer-content">
+     <img v-if="attachmentPreview.isImage" :src="attachmentPreview.url" :alt="attachmentPreview.name" @error="draftImageError">
+     <TextPages v-else-if="attachmentPreview.text!==null" :text="attachmentPreview.text" :complete="!attachmentPreview.truncated"/>
+     <p v-else>此文件暂无页内预览，可以保存后打开。</p>
+     <small v-if="attachmentPreview.truncated">{{attachmentPreview.localFile?'仅显示文件开头。':'预览已截取，保存文件可查看完整内容。'}}</small>
+    </div>
+    <button v-if="!attachmentPreview.localFile" id="attachment-save" @click="downloadAttachment">保存文件</button>
+   </template>
   </dialog>
   <header :class="{'chat-header': paired && !settingsOpen}">
    <template v-if="paired && !settingsOpen">
@@ -1354,7 +1396,22 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
        :aria-expanded="conversationPanel==='work'" :data-tone="workTone" @click="togglePanel('work')"><MobileIcon name="work"/><span>{{workButtonText}}</span></button>
     </div>
     <div v-show="conversationPanel!=='work'" class="composer-body">
-    <div v-if="pendingFiles.length" class="pending-files"><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><MobileIcon name="file"/><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||(item.progress===100?'已上传':item.progress>0?item.progress+'%':'待发送')}}</span><button type="button" @click="removeDraftFile(i)" :disabled="busy" aria-label="移除附件"><MobileIcon name="close"/></button></div></div>
+    <div v-if="pendingFiles.length" class="pending-files">
+     <div v-for="(item,i) in pendingFiles" :key="i" class="pending-file">
+      <button v-if="draftPreviewKind(item.file)==='image'" type="button" class="pending-image"
+       :aria-label="'预览 '+item.file.name" @click="openDraftAttachment(item.file)">
+       <DraftImageThumbnail :file="item.file"/>
+      </button>
+      <MobileIcon v-else name="file"/>
+      <div class="pending-file-label">
+       <span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||(item.progress===100?'已上传':item.progress>0?item.progress+'%':'待发送')}}</span>
+       <small v-if="!draftPreviewKind(item.file)">{{item.file?'不支持预览':'本机无原文件，无法预览'}}</small>
+      </div>
+      <button v-if="draftPreviewKind(item.file)==='text'" type="button" class="pending-preview"
+       :aria-label="'预览 '+item.file.name" @click="openDraftAttachment(item.file)">预览</button>
+      <button type="button" @click="removeDraftFile(i)" :disabled="busy" aria-label="移除附件"><MobileIcon name="close"/></button>
+     </div>
+    </div>
     <ul v-if="composerDraft.fileRejections?.length" id="attachment-selection-notice" class="attachment-selection-notice" aria-label="未添加的附件" role="status">
      <li v-for="(item,index) in composerDraft.fileRejections" :key="index">{{item.name}} · 未添加（{{item.reason}}）</li>
     </ul>

@@ -37,10 +37,11 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
     const origin = 'https://127.0.0.1:' + server.address().port;
     const directory = path.join(root, 'core');
     const core = new CoreService({ directory, workspace:'personal', chat, modelCatalog, remoteConfig:{origin, hours:1} });
-    const posts = [], pairCalls = [];
+    const posts = [], pairCalls = [], attachmentPosts = [];
     let truncateSend = false, holdReceipt = false, proxyRateLimited = false, htmlGateway = false, holdImageRejection;
     app.use((req, res, next) => {
         if (req.method === "POST" && req.path.startsWith("/mobile/api/pair")) pairCalls.push(req.path);
+        if (req.method === 'POST' && req.path.includes('/attachments/')) attachmentPosts.push(req.path);
         if (req.method === 'GET' && req.path.endsWith('/receipt') && holdReceipt) {
             return res.status(503).json({ error:{code:'FIXTURE_RECEIPT_UNAVAILABLE'} });
         }
@@ -137,7 +138,8 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
             input.dispatchEvent(new Event('change', { bubbles:true }));
         }, entries);
         const removeFiles = async () => {
-            while (await page.$('.pending-file button')) await page.$eval('.pending-file button', button=>button.click());
+            const remove = '.pending-file [aria-label="移除附件"]';
+            while (await page.$(remove)) await page.$eval(remove, button=>button.click());
         };
         await selectFiles(Array.from({length:9}, (_v, i)=>['file-'+(i+1)+'.txt', 'x']));
         assert.equal(await page.$$eval('.pending-file', rows => rows.length),8);
@@ -145,6 +147,16 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await removeFiles();
         await selectFiles([['same.txt','A'],['same.txt','B']]);
         results.sameMetadataBothAdded = await page.$$eval('.pending-file', rows => rows.length===2);
+        await removeFiles();
+
+        await selectFiles([['preview.txt','<b>local preview</b>'],['other.bin','opaque']]);
+        assert.match(await page.$eval('.pending-files', element=>element.textContent), /不支持预览/);
+        await page.click('[aria-label="预览 preview.txt"]');
+        await page.waitForFunction(()=>document.querySelector('#attachment-viewer[open] .attachment-viewer-content')
+            ?.innerText.includes('<b>local preview</b>'));
+        assert.equal(await page.$('#attachment-save'),null);
+        assert.equal(attachmentPosts.length,0);
+        await page.click('#attachment-close');
         await removeFiles();
 
         await fill('本机话题草稿');
