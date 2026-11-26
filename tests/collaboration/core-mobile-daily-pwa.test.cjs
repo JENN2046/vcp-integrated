@@ -21,7 +21,8 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
     const { administer } = require(BOX + '/core/pairDevice');
     const { createModelCatalog } = require(BOX + '/modules/modelCatalog');
     const baseModel = 'synthetic', nextModel = 'model-b';
-    provider.setModels([{id:baseModel, owned_by:'fixture-private'}, {id:nextModel}, {id:nextModel}, {id:''}]);
+    provider.setModels([{id:baseModel, owned_by:'fixture-private'}, {id:nextModel}, {id:nextModel},
+        {id:'gemini-embedding-2-preview'}, {id:'opaque-vector', mode:'embedding'}, {id:''}]);
     const modelCatalog = createModelCatalog({
         apiUrl:provider.url, apiKey:'fixture', modelRedirectHandler:{isEnabled:()=>false},
         semanticModelRouter:{getVirtualModels:()=>[]}

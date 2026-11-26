@@ -18,7 +18,8 @@ async function fixture(t, remote) {
 test('bound remote desktop fetches through its paired Core client, not legacy Bearer', async t => {
     const args = await fixture(t, true);
     const expected = [{ id: 'public-model' }];
-    assert.deepEqual(await fetchDesktopModelCatalog({ ...args, getCoreClient: async () => ({ listModels: async () => expected }),
+    const unfiltered = [...expected, { id:'provider/bge-m3' }, { id:'opaque-vector', capabilities:{embeddings:true} }];
+    assert.deepEqual(await fetchDesktopModelCatalog({ ...args, getCoreClient: async () => ({ listModels: async () => unfiltered }),
         fetchImpl: () => assert.fail('legacy route used for remote Core') }), expected);
     await assert.rejects(fetchDesktopModelCatalog({ ...args, getCoreClient: async () => null,
         fetchImpl: () => assert.fail('remote authority must fail closed') }), { code: 'CORE_LOCAL_AUTHORITY_UNAVAILABLE' });
@@ -28,9 +29,9 @@ test('legacy and local clients retain original model catalog interface', async t
     const models = await fetchDesktopModelCatalog({ ...args, settings: { ...args.settings, vcpApiKey: 'fixture-key' },
         getCoreClient: () => assert.fail('legacy mode requested Core'),
         fetchImpl: async (url, options) => {
-            assert.equal(url.toString(), 'https://core.example.invalid/v1/models');
+            assert.equal(url.toString(), 'https://core.example.invalid/v1/models?purpose=chat');
             assert.equal(options.headers.Authorization, 'Bearer fixture-key');
-            return Response.json({ data: [{ id: 'legacy', owned_by: 'fixture' }] });
+            return Response.json({ data: [{ id:'legacy', owned_by:'fixture' }, { id:'opaque', mode:'embedding' }, { id:'nomic-embed-text' }] });
         }
     });
     assert.deepEqual(models, [{ id: 'legacy', owned_by: 'fixture' }]);

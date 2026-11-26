@@ -1,6 +1,8 @@
 'use strict';
 
-function createModelCatalog({ apiUrl, apiKey, modelRedirectHandler, semanticModelRouter, debug = false, fetchImpl }) {
+const { filterChatModels } = require('../Plugin/NativeSync/sync/contracts.generated.cjs');
+
+function createModelCatalog({ apiUrl, apiKey, modelRedirectHandler, semanticModelRouter, debug = false, fetchImpl, embeddingModelIds = [] }) {
     function appendVirtualModels(value) {
         const virtual = semanticModelRouter.getVirtualModels();
         if (!virtual.length) return value;
@@ -12,7 +14,7 @@ function createModelCatalog({ apiUrl, apiKey, modelRedirectHandler, semanticMode
         }
         return value;
     }
-    return async function query({ userAgent, accept, signal } = {}) {
+    return async function query({ userAgent, accept, signal, chatOnly = false } = {}) {
         const fetch = fetchImpl || (await import('node-fetch')).default;
         const response = await fetch(apiUrl + '/v1/models', {
             method: 'GET',
@@ -27,6 +29,8 @@ function createModelCatalog({ apiUrl, apiKey, modelRedirectHandler, semanticMode
         if (response.ok) {
             try {
                 let data = JSON.parse(text);
+                // Apply the filter before public aliases can hide the upstream ID.
+                if (chatOnly && Array.isArray(data?.data)) data.data = filterChatModels(data.data, embeddingModelIds);
                 if (modelRedirectHandler.isEnabled() && Array.isArray(data?.data)) {
                     data.data = data.data.map(model => {
                         if (!model?.id) return model;

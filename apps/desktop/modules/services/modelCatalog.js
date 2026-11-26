@@ -2,6 +2,7 @@
 
 const path = require('node:path');
 const { ownedJson } = require('./nativeSync/sharedLocal');
+const { filterChatModels } = require('./nativeSync/contracts.generated.cjs');
 const { fail } = require('./nativeSync/protocol');
 
 async function fetchDesktopModelCatalog({ root, settings, getCoreClient, env = process.env, fetchImpl = fetch }) {
@@ -9,10 +10,10 @@ async function fetchDesktopModelCatalog({ root, settings, getCoreClient, env = p
     if (env.VCPCHAT_CORE_REMOTE_ORIGIN || marker?.remote) {
         const client = await getCoreClient();
         if (!client?.listModels) throw fail('CORE_LOCAL_AUTHORITY_UNAVAILABLE');
-        return client.listModels();
+        return filterChatModels(await client.listModels());
     }
     if (!settings?.vcpServerUrl) return [];
-    const url = new URL('/v1/models', new URL(settings.vcpServerUrl).origin);
+    const url = new URL('/v1/models?purpose=chat', new URL(settings.vcpServerUrl).origin);
     const response = await fetchImpl(url, {
         headers: { Authorization: 'Bearer ' + (settings.vcpApiKey || '') },
         signal: AbortSignal.timeout(15000)
@@ -20,6 +21,6 @@ async function fetchDesktopModelCatalog({ root, settings, getCoreClient, env = p
     if (!response.ok) throw Error('HTTP error! status: ' + response.status);
     const data = await response.json();
     if (!Array.isArray(data?.data)) throw fail('MODEL_CATALOG_INVALID');
-    return data.data;
+    return filterChatModels(data.data);
 }
 module.exports = { fetchDesktopModelCatalog };

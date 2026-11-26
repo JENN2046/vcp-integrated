@@ -13,6 +13,7 @@ const { isCoreGroupMode } = require('./group');
 const { DesktopContext } = require('./desktopContext');
 const { CoreCompaction } = require('./compaction');
 const { fieldsFrom } = require('../Plugin/NativeSync/sync/metadata');
+const { filterChatModels } = require('../Plugin/NativeSync/sync/contracts.generated.cjs');
 const { AttachmentStore } = require('../Plugin/NativeSync/mobile/attachments');
 const { attachmentRoutes } = require('../Plugin/NativeSync/mobile/attachmentRoutes');
 const { prepareSharedConfiguration } = require('../Plugin/NativeSync/mobile/sharedConfiguration');
@@ -475,14 +476,15 @@ class CoreService {
         return this.cds.search(topic, rows, params);
     }
 
-    async availableModelIds() {
+    async availableModelIds({ chatOnly = false } = {}) {
         if (!this.modelCatalog) throw failure('CORE_MODEL_CATALOG_UNAVAILABLE', 503);
         let result;
-        try { result = await this.modelCatalog({ signal: AbortSignal.timeout(10000) }); }
+        try { result = await this.modelCatalog({ signal: AbortSignal.timeout(10000), chatOnly }); }
         catch { throw failure('CORE_MODEL_CATALOG_UNAVAILABLE', 502); }
         if (!result || !Number.isInteger(result.status) || result.status < 200 || result.status >= 300 ||
             !Array.isArray(result.data?.data)) throw failure('CORE_MODEL_CATALOG_UNAVAILABLE', 502);
-        return [...new Set(result.data.data.map(row => row?.id)
+        const rows = chatOnly ? filterChatModels(result.data.data) : result.data.data;
+        return [...new Set(rows.map(row => row?.id)
             .filter(id => typeof id === 'string' && id && id.length <= 256 && id.trim() === id))];
     }
 
@@ -513,7 +515,7 @@ class CoreService {
                 const actor = resolveActor(req, req.params.workspace, 'read');
                 this.local.authorize(actor, req.params.workspace, 'read');
                 if (actor.kind !== 'desktop') throw failure('CORE_DESKTOP_REQUIRED', 403);
-                const ids = await this.availableModelIds();
+                const ids = await this.availableModelIds({ chatOnly: true });
                 this.local.authorize(actor, req.params.workspace, 'read');
                 res.set('Cache-Control', 'no-store').json({ object: 'list', data: ids.map(id => ({ id })) });
             }));
@@ -690,7 +692,7 @@ class CoreService {
         if (this.remote) router.get('/:workspace/:key/models', route(async (req, res) => {
             const { actor, topic } = scope(req, 'execute');
             if (actor.kind !== 'mobile' || topic.ownerType !== 'agent') throw failure('CORE_MODEL_OVERRIDE_UNAVAILABLE', 403);
-            const models = await this.availableModelIds();
+            const models = await this.availableModelIds({ chatOnly: true });
             scope(req, 'execute');
             res.set('Cache-Control', 'no-store').json({ models });
         }));

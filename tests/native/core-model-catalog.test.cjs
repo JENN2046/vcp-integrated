@@ -27,6 +27,28 @@ test('native model catalog preserves redirect, virtual models, metadata and upst
     assert.deepEqual((await catalog(async () => Response.json({ data: [] }), [])()).data.data, []);
 });
 
+test('chat catalogs remove embedding-only models before aliasing and preserve the general catalog', async () => {
+    const { createModelCatalog } = require(BOX + '/modules/modelCatalog');
+    const models = [
+        { id:'provider/text-embedding-3-small' },
+        { id:'opaque-vector-alias', supported_endpoints:['/v1/embeddings'] },
+        { id:'configured-vector' },
+        { id:'BAAI/bge-m3' },
+        { id:'sentence-transformers/all-MiniLM-L6-v2' },
+        { id:'hybrid-embedding-chat', capabilities:{embedding:true,chat:true} },
+        { id:'vendor/unknown-id' }
+    ];
+    const query = createModelCatalog({
+        apiUrl:'http://127.0.0.1:1', apiKey:'fixture', embeddingModelIds:['configured-vector'],
+        modelRedirectHandler:{isEnabled:()=>true,redirectModelForClient:id=>id==='provider/text-embedding-3-small'?'opaque-redirect':id},
+        semanticModelRouter:{getVirtualModels:()=>[{id:'VCPModelAuto'}]},
+        fetchImpl:async()=>Response.json({data:models})
+    });
+    const ids = result => result.data.data.map(model=>model.id);
+    assert.deepEqual(ids(await query({chatOnly:true})),['hybrid-embedding-chat','vendor/unknown-id','VCPModelAuto']);
+    assert.deepEqual(ids(await query()),['opaque-redirect',...models.slice(1).map(model=>model.id),'VCPModelAuto']);
+});
+
 test('remote Core catalog uses the existing device read authority and returns only public IDs', async t => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'core-model-catalog-'));
     t.after(() => fs.rm(root, { recursive: true, force: true }));
@@ -40,7 +62,7 @@ test('remote Core catalog uses the existing device read authority and returns on
         queries++;
         if (revokeDuringQuery) revokeDuringQuery();
         if (failProvider) throw Error('upstream confidential error');
-        return Response.json({ data: [{ id: 'internal', private_field: 'never expose' }, { id: 'public-model' }] });
+        return Response.json({ data: [{ id: 'internal', private_field: 'never expose' }, { id: 'public-model' }, { id: 'Qwen3-Embedding-0.6B' }, { id: 'opaque', type: 'embedding' }] });
     });
     const core = startCoreHost({ app, chat: { config: {} }, modelCatalog: provider, listenHost: '127.0.0.1',
         serverKey: 'fixture-toolbox-key', env: { VCP_CORE_DATA_DIR: path.join(root, 'db'), VCP_CORE_MODE: 'remote', VCP_CORE_REMOTE_ORIGIN: origin } });

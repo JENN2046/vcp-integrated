@@ -134,7 +134,7 @@ module.exports = function(options = {}) {
 
     router.get('/ai/models', async (req, res) => {
         await proxyJsonRequest(req, res, {
-            targetPath: '/v1/models',
+            targetPath: '/v1/models?purpose=chat',
             timeoutMs: modelsTimeoutMs,
             logLabel: '/v1/models',
             defaultRequestBody: undefined

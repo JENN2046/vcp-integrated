@@ -907,16 +907,22 @@ app.use(specialModelRouter);
 
 
 const queryModelCatalog = require('./modules/modelCatalog').createModelCatalog({
-    apiUrl, apiKey, modelRedirectHandler, semanticModelRouter, debug: DEBUG_MODE
+    apiUrl, apiKey, modelRedirectHandler, semanticModelRouter, debug: DEBUG_MODE,
+    embeddingModelIds: Object.entries(process.env)
+        .filter(([name]) => /^(WhitelistEmbeddingModel|EmbeddingModelBackups?|EmbeddingModelBackup[0-9]+)$/.test(name))
+        .flatMap(([,value]) => value.split(',').map(id => id.trim()).filter(Boolean))
 });
 app.get('/v1/models', async (req, res) => {
     try {
-        const result = await queryModelCatalog({ userAgent: req.headers['user-agent'], accept: req.headers.accept });
+        const chatOnly = req.query.purpose === 'chat';
+        const result = await queryModelCatalog({
+            userAgent: req.headers['user-agent'], accept: req.headers.accept, chatOnly
+        });
         if (result.data) {
             result.headers?.forEach((value, name) => {
-                if (!['content-encoding', 'transfer-encoding', 'connection', 'content-length', 'keep-alive'].includes(name.toLowerCase())) {
-                    res.setHeader(name, value);
-                }
+                const header = name.toLowerCase();
+                if (!['content-encoding', 'transfer-encoding', 'connection', 'content-length', 'keep-alive'].includes(header) &&
+                    !(chatOnly && header === 'etag')) res.setHeader(name, value);
             });
             return res.status(result.status).json(result.data);
         }

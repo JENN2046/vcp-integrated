@@ -12,6 +12,7 @@ import {createExecutionPager} from './executionPages.js';
 import {readDirectoryPages,readHistoryBaseline,applyHistoryDelta,directorySources} from './directoryHistory.js';
 import {createAttachmentStatusPager} from './attachmentStatus.js';
 import {createHistoryCache,historyCacheKey} from './historyCache.js';
+import {filterChatModels} from './contracts.generated.js';
 import {consumePairingLink} from './pairingLink.js';
 import {createPairRecovery} from './pairRecovery.js';
 import {uploadAttachment} from './attachmentUpload.js';
@@ -765,7 +766,8 @@ async function toggleModelPicker(){
  try{
   const {models}=await api(corePath(topic)+'/models');
   if(!sameView(context)||modelPicker.value!==picker)return;
-  picker.models=models;
+  if(!Array.isArray(models))throw Error('Invalid model catalog');
+  picker.models=filterChatModels(models);
  }catch(error){
   if(sameView(context)&&modelPicker.value===picker)picker.error=errors[error.code]||'暂时无法读取 Core 模型目录';
  }finally{picker.loading=false;}

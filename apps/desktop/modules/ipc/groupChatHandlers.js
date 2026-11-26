@@ -115,7 +115,7 @@ function initialize(mainWindow, context) {
                     readAllAgentConfigs().catch(() => []),
                 ]);
                 const now = Date.now();
-                if (forceRefresh || !modelCache.ids.length || now - modelCache.fetchedAt > 30000) {
+                if (forceRefresh || !modelCache.fetchedAt || now - modelCache.fetchedAt > 30000) {
                     try {
                         const models = getModelCatalog ? await getModelCatalog() : await (async () => {
                             const root = path.dirname(USER_DATA_DIR);
@@ -126,7 +126,7 @@ function initialize(mainWindow, context) {
                             });
                         })();
                         const remoteIds = models.map(item => typeof item?.id === 'string' ? item.id.trim() : '').filter(Boolean);
-                        if (remoteIds.length) modelCache = { fetchedAt: now, ids: remoteIds };
+                        modelCache = { fetchedAt: now, ids: remoteIds };
                     } catch {
                         // Fall back to cached / local agent models without blocking table setup.
                     }
@@ -137,11 +137,16 @@ function initialize(mainWindow, context) {
                 const agentModels = agentConfigs
                     .map(cfg => (typeof cfg.model === 'string' ? cfg.model.trim() : ''))
                     .filter(Boolean);
-                const models = clean([...favoriteModels, ...hotModels, ...agentModels, ...modelCache.ids]);
+                const { filterChatModels } = require('../services/nativeSync/contracts.generated.cjs');
+                const available = new Set(modelCache.ids);
+                // Usage and Agent hints rank live choices, but can't re-add
+                // excluded models under an old favorite or a public alias.
+                const visible = list => filterChatModels(clean(list))
+                    .filter(id => !modelCache.fetchedAt || available.has(id));
                 return {
-                    models,
-                    favoriteModels: clean(favoriteModels),
-                    hotModels: clean(hotModels),
+                    models: visible([...favoriteModels, ...hotModels, ...agentModels, ...modelCache.ids]),
+                    favoriteModels: visible(favoriteModels),
+                    hotModels: visible(hotModels),
                 };
             },
         });
