@@ -380,7 +380,9 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await page.click('#steering-confirm-remove');
         await page.waitForSelector('#send:not([disabled])');
         assert.equal(await value(),'目录移除后保留这个草稿');
-        assert.equal(await page.evaluate(key=>localStorage.getItem(key),storageKeys[topic]),null);
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForSelector('#send:not([disabled])');
+        assert.equal(await page.$('#steering-remove-local'),null);
         assert.notEqual(await page.evaluate(key=>localStorage.getItem(key),storageKeys[other]),null);
         await chooseTopic(other);
         await page.waitForSelector('#steering-remove-local',{visible:true});
@@ -528,7 +530,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await chooseTopic(topic);
         const beforeTabs = posts.length;
         const key=storageKeys[topic];
-        await page.evaluate(key=>localStorage.setItem(key,'{truncated'),key);
+        await page.evaluate(key=>localStorage.setItem(key,'{truncated in the race'),key);
         await page.reload({waitUntil:'domcontentloaded'});
         await page.waitForSelector('#steering-remove-local',{visible:true});
         await page.click('#steering-remove-local');
@@ -543,11 +545,25 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
                     window.holdsSteeringLock=true;
                     await ready.promise;
                     localStorage.setItem(key,record);
+                    window.steeringValueAtWrite=localStorage.getItem(key);
                     window.steeringWriteDone=true;
                 });
             },key,record);
             await peer.waitForFunction(()=>window.holdsSteeringLock===true);
             await page.bringToFront();
+            const beforeHandoff=await page.evaluate(key=>{
+                const request=navigator.locks.request.bind(navigator.locks);
+                navigator.locks.request=(name,...args)=>{
+                    const [callback]=args;
+                    if(name!==key||args.length!==1||typeof callback!=='function')return request(name,...args);
+                    return request(name,async lock=>{
+                        window.steeringOnLock=localStorage.getItem(key);
+                        try{return await callback(lock);}
+                        finally{window.steeringAfterCleanup=localStorage.getItem(key);}
+                    });
+                };
+                return localStorage.getItem(key);
+            },key);
             await page.$eval('#steering-confirm-remove',button=>button.click());
             const poll={polling:50,timeout:5000};
             await page.waitForFunction(async key=>(await navigator.locks.query()).pending.some(lock=>lock.name===key),poll,key);
@@ -557,7 +573,23 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
                 const {held,pending}=await navigator.locks.query();
                 return ![...held,...pending].some(lock=>lock.name===key);
             },poll,key);
-            assert.equal(await page.evaluate(key=>localStorage.getItem(key),key),record);
+            const atWrite=await peer.evaluate(()=>window.steeringValueAtWrite);
+            const {onLock,afterCleanup}=await page.evaluate(()=>({
+                onLock:window.steeringOnLock,afterCleanup:window.steeringAfterCleanup
+            }));
+            const afterLocks=await page.evaluate(key=>localStorage.getItem(key),key);
+            await Promise.all([page.reload({waitUntil:'domcontentloaded'}),peer.reload({waitUntil:'domcontentloaded'})]);
+            const reopened=await Promise.all([page,peer].map(tab=>tab.evaluate(key=>localStorage.getItem(key),key)));
+            const label=value=>value===record?'valid':value===null?'missing':value===undefined?'unobserved':'corrupt';
+            t.diagnostic('Cross-tab storage: '+JSON.stringify({
+                beforeHandoff:label(beforeHandoff), atWrite:label(atWrite), onLock:label(onLock),
+                afterCleanup:label(afterCleanup), afterLocks:label(afterLocks), reopened:reopened.map(label)
+            }));
+            assert.equal(atWrite,record,'B wrote the valid record before releasing the lock');
+            assert.notEqual(onLock,undefined,'the A lock handoff was observed');
+            assert.notEqual(afterCleanup,null,'A must never remove the shared pending slot');
+            assert.deepEqual(reopened,[record,record],'both fresh pages must see the persisted valid record');
+            await page.bringToFront();
             await page.waitForFunction(()=>document.querySelector('#task-quote')?.textContent.includes('尚未确认'),poll);
             assert.equal(await page.$('#steering-remove-local'),null);
             assert.equal(posts.length,beforeTabs,'the two-tab race neither erases nor resends the valid record');

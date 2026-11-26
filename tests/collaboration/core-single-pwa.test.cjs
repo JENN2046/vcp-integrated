@@ -44,7 +44,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
     }) + '\n\ndata: [DONE]\n\n');
     const composerPosts = [];
     let proxy, browser, steeringFault, holdSteeringReceipt = false;
-    let steeringReads = 0, heldSteering, issuedRejection;
+    let steeringReads = 0, heldSteering, issuedRejection, holdObserverReceipt = true;
     try {
         const grant = f.portal.createPairing({ scopeMode: 'shared', sharedSpaceId: 'sharedAB', permissions: ['read','execute'] });
         const cert = path.join(f.root, 'core-pwa-cert.pem');
@@ -71,7 +71,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
             }
             if (req.method === 'GET' && req.url.includes('/steering-receipt?')) {
                 steeringReads++;
-                if (holdSteeringReceipt) return res.writeHead(503, { 'Content-Type':'application/json' }).end('{}');
+                if (holdSteeringReceipt || (holdObserverReceipt && req.headers['x-fixture-tab']==='observer')) return res.writeHead(503, { 'Content-Type':'application/json' }).end('{}');
             }
             const forward = http.request(f.url + req.url, { method: req.method, headers: {
                 ...req.headers, 'x-forwarded-proto': 'https', origin: 'https://synthetic-shared.invalid'
@@ -154,6 +154,11 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         assert.equal(core.store.work(first.serverSession.executionId).steering_count, 1);
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForFunction(text => document.querySelector('#message-text')?.value === text,{},quotedDraft);
+        const observer=await browser.newPage();
+        await observer.setExtraHTTPHeaders({'x-fixture-tab':'observer'});
+        await observer.goto(entry,{waitUntil:'domcontentloaded'});
+        await observer.waitForFunction(()=>document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
+        await page.bringToFront();
         holdSteeringReceipt = false;
         await page.waitForFunction(() => !document.querySelector('#message-text').value &&
             document.querySelector('#steering-delivery')?.textContent.includes('已送达'));
@@ -166,32 +171,38 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         holdSteeringReceipt = true;
         await page.$eval('.message-composer', form => form.requestSubmit());
         await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
-        const editor = await browser.newPage();
-        try {
-            await editor.goto(entry,{waitUntil:'domcontentloaded'});
-            await editor.waitForFunction(()=>document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
-            await editor.type('#message-text','这是另一个标签页后来编辑的内容。');
-            assert.equal(await editor.$eval('#message-text',el=>el.value),'这次追加仍需确认。这是另一个标签页后来编辑的内容。');
-        } finally {
-            await editor.close();
-        }
-        await page.bringToFront();
-        holdSteeringReceipt = false;
-        await page.waitForFunction(() => !document.querySelector('#task-quote') &&
+        holdSteeringReceipt=false;
+        await page.waitForFunction(()=>!document.querySelector('#message-text').value &&
             document.querySelector('#steering-delivery')?.textContent.includes('已送达'));
-        const reopened = await browser.newPage();
-        try {
-            await reopened.goto(entry,{waitUntil:'domcontentloaded'});
-            await reopened.waitForSelector('#message-text:not([disabled])');
-            assert.equal(await reopened.$eval('#message-text',el=>el.value),'这次追加仍需确认。这是另一个标签页后来编辑的内容。');
-            await reopened.waitForSelector('#task-quote',{visible:true});
-            assert.equal(composerPosts.length,2);
-            await reopened.$eval('#message-text',el=>{el.value='';el.dispatchEvent(new Event('input',{bubbles:true}));});
-            await reopened.click('#quote-clear');
-        } finally {
-            await reopened.close();
-        }
+        assert.equal(core.store.work(first.serverSession.executionId).steering_count,2);
+        assert.equal(await observer.$eval('#message-text',el=>el.value),quotedDraft);
+        holdObserverReceipt=false;
+        await observer.bringToFront();
+        await observer.waitForFunction(()=>!document.querySelector('#message-text').value &&
+            document.querySelector('#steering-delivery')?.textContent.includes('已送达'));
+
+        const readAfterReload = async tab => {
+            await tab.bringToFront();
+            await tab.reload({waitUntil:'domcontentloaded'});
+            await tab.waitForSelector('#message-text:not([disabled])');
+            return tab.$eval('#message-text',el=>el.value);
+        };
+        assert.equal(await readAfterReload(page),'','delayed first receipt must not revive either delivered text in A');
+        assert.equal(await readAfterReload(observer),'','delayed first receipt must not revive either delivered text in B');
+        await observer.waitForSelector('#quote-task',{visible:true});
+        await observer.click('#quote-task');
+        const unsent='真正还没发的下一段草稿';
+        await observer.type('#message-text',unsent);
+        assert.equal(await readAfterReload(page),unsent);
+        assert.equal(await readAfterReload(observer),unsent);
+        assert.equal(composerPosts.length,2);
+        t.diagnostic('Second receipt settled before delayed first receipt; neither delivered edit revived in either tab; unsent text survived; two POSTs.');
+        await observer.$eval('#message-text',el=>{el.value='';el.dispatchEvent(new Event('input',{bubbles:true}));});
+        await observer.click('#quote-clear');
+        await observer.close();
         await page.bringToFront();
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForFunction(()=>!document.querySelector('#message-text')?.value);
         finish(upstream[0], '按原计划整理。');
         await wait(() => upstream.length === 2, 'steering reached provider for same work');
         assert.match(JSON.stringify(provider.calls[1].messages), /请把白底主图放在第一组/);

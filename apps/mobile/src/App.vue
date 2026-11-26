@@ -69,6 +69,7 @@ const attachmentPreview=ref(null),attachmentDialog=ref(null);let attachmentReadR
 // stay in the page; verified rejections use the existing recovery store.
 const drafts=new Map(),composerDraft=ref({text:'',files:[],revision:0});let composerScope='';
 const steeringStoragePrefix='vcp.mobile.steering.v1:', steeringStorageError=ref('');
+const dismissedSteeringPrefix='vcp.mobile.steering-dismissed.v1:';
 const steeringRecordCorrupt=ref(false), steeringRemovalPrompt=ref(false);
 const text=computed({get:()=>composerDraft.value.text,set:value=>{composerDraft.value.text=value;composerDraft.value.revision++;saveDraftEdit(composerDraft.value);}});
 watch(text,resizeComposer,{flush:'post'});
@@ -309,12 +310,21 @@ const composerText=computed({get:()=>text.value,set:value=>{
 }});
 const ordinaryDraftPrefix='vcp.mobile.draft.v1:';
 const steeringDeliveredEditPrefix='vcp.mobile.steering-delivered-edit.v1:';
+const steeringDeliveredEditKey=(scope,editId)=>steeringDeliveredEditPrefix+scope+':'+editId;
 const ordinaryDraftError=ref('');
-function readOrdinaryText(scope){
+function storedOrdinaryText(scope){
  try{
   const item=JSON.parse(localStorage.getItem(ordinaryDraftPrefix+scope));
   if(typeof item?.text!=='string'||typeof item.editId!=='string')return null;
-  if(item.quote&&(!validTaskQuote(item.quote)||localStorage.getItem(steeringDeliveredEditPrefix+scope)===item.editId))return null;
+  if(item.quote&&!validTaskQuote(item.quote))return null;
+  return item;
+ }catch{return null;}
+}
+function readOrdinaryText(scope){
+ try{
+  const item=storedOrdinaryText(scope);
+  if(item?.quote&&(localStorage.getItem(steeringDeliveredEditKey(scope,item.editId))==='1'||
+     localStorage.getItem(steeringDeliveredEditPrefix+scope)===item.editId))return null;
   return item;
  }catch{return null;}
 }
@@ -326,6 +336,7 @@ function restoreOrdinaryText(draft,scope){
 function rememberOrdinaryText(draft,scope){
  if(!scope)return false;
  try{
+  const previous=storedOrdinaryText(scope);
   if(draft.text||draft.taskQuote){
    const editId=crypto.randomUUID();
    localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({text:draft.text,editId,
@@ -335,6 +346,7 @@ function rememberOrdinaryText(draft,scope){
    localStorage.removeItem(ordinaryDraftPrefix+scope);
    delete draft.ordinaryEditId;
   }
+  if(previous?.quote)localStorage.removeItem(steeringDeliveredEditKey(scope,previous.editId));
   ordinaryDraftError.value='';
   return true;
  }catch{
@@ -830,20 +842,24 @@ const validTaskQuote=quote=>validSteeringId(quote?.id)&&typeof quote.name==='str
 function readSteeringDraft(scope){
  const raw=localStorage.getItem(steeringStoragePrefix+scope);
  if(raw===null)return null;
- const corrupt=()=>Object.assign(Error('Invalid steering draft'),{code:'STEERING_RECORD_CORRUPT'});
+ const corrupt=()=>{
+  if(localStorage.getItem(dismissedSteeringPrefix+scope)===raw)return null;
+  throw Object.assign(Error('Invalid steering draft'),{code:'STEERING_RECORD_CORRUPT',raw});
+ };
  let saved;
- try{saved=JSON.parse(raw);}catch{throw corrupt();}
+ try{saved=JSON.parse(raw);}catch{return corrupt();}
  const intent=saved?.intent,quote=saved?.quote;
  if(!validSteeringId(intent?.requestId)||!validTaskQuote(quote)||intent.workId!==quote.id||
     (intent.editId!==undefined&&!validSteeringId(intent.editId))||
     typeof intent.text!=='string'||!intent.text.trim()||intent.text.length>12000||
     typeof saved.text!=='string'||saved.text.length>12000||
     !Number.isSafeInteger(intent.revision)||intent.revision<0||
-    !Number.isSafeInteger(saved.revision)||saved.revision<0)throw corrupt();
+    !Number.isSafeInteger(saved.revision)||saved.revision<0)return corrupt();
  return saved;
 }
-function writeSteeringDraft(key,draft){
- localStorage.setItem(key,JSON.stringify({intent:draft.coreSteering,quote:draft.taskQuote,text:draft.text,revision:draft.revision}));
+function writeSteeringDraft(scope,draft){
+ localStorage.setItem(steeringStoragePrefix+scope,JSON.stringify({intent:draft.coreSteering,quote:draft.taskQuote,text:draft.text,revision:draft.revision}));
+ localStorage.removeItem(dismissedSteeringPrefix+scope);
 }
 function syncSteeringDraft(){
  if(!composerScope||composerDraft.value.coreSteering)return;
@@ -876,7 +892,10 @@ async function removeCorruptSteeringRecord(){
   try{readSteeringDraft(context.draftScope);}
   catch(error){
    if(error.code!=='STEERING_RECORD_CORRUPT')throw error;
-   localStorage.removeItem(key);
+   // A Web Lock orders callbacks, but the other tab's storage update may
+   // still be invisible here. Dismiss this bad value without deleting the
+   // shared pending slot, which may already contain a valid replacement.
+   localStorage.setItem(dismissedSteeringPrefix+context.draftScope,error.raw);
   }
   syncSteeringDraft();
  };
@@ -904,10 +923,13 @@ async function confirmSteering(context,intent,receipt){
   try{
    const saved=readSteeringDraft(scope);
    if(saved&&!sameSteering(saved.intent,intent))return;
-   // Keep the editable draft in its own slot. A receipt marks only the
-   // submitted edit, so it can never delete another tab's later write.
+   // Delayed receipts may update this tab but cannot overwrite another
+   // edit's durable delivery mark.
    const submittedEdit=intent.editId;
-   if(submittedEdit)localStorage.setItem(steeringDeliveredEditPrefix+scope,submittedEdit);
+   if(submittedEdit){
+    if(saved&&storedOrdinaryText(scope)?.editId===submittedEdit)
+     localStorage.setItem(steeringDeliveredEditKey(scope,submittedEdit),'1');
+   }
    else if(saved?.revision>intent.revision&&!readOrdinaryText(scope)?.quote){
     const later={text:saved.text,taskQuote:saved.quote};
     if(!rememberOrdinaryText(later,scope))return;
@@ -976,7 +998,7 @@ async function sendCoreSteering(quote){
    if(draft.coreSteering||steeringStorageError.value)return;
    if(!draft.ordinaryEditId&&!rememberOrdinaryText(draft,context.draftScope))return;
    const intent={workId:quote.id,text:original,requestId:crypto.randomUUID(),revision,editId:draft.ordinaryEditId};
-   writeSteeringDraft(key,{...draft,coreSteering:intent});
+   writeSteeringDraft(context.draftScope,{...draft,coreSteering:intent});
    draft.coreSteering=intent;
    delete draft.steeringDelivery;
    return intent;
