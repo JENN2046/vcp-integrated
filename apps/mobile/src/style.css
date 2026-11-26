@@ -123,6 +123,8 @@ nav .topic-search {position:relative; display:flex; align-items:center; margin-b
 .review-state p,.submission-recovery p {margin:4px 0}
 .desktop-relay>p {margin:5px 0; font-size:.875rem}
 .shell>footer {flex:none; max-height:50%; min-height:58px; overflow:auto; overscroll-behavior:contain; padding:0 max(14px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left)); border-top:1px solid var(--line); background:var(--paper)}
+/* The open picker extends above the scrollable composer into the history area. */
+.shell>footer:has(#composer-model-options) {overflow:visible; z-index:2}
 .shell>footer.is-work-view {min-height:0}
 footer>* {max-width:var(--content); margin-inline:auto}
 .composer-tools {display:flex; align-items:center; justify-content:flex-end; gap:4px}

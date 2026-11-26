@@ -271,7 +271,16 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
             await page.waitForSelector('#composer-model-options button');
             const ids = await page.$$eval('#composer-model-options button', buttons=>buttons.map(button=>button.textContent.trim()));
             assert.deepEqual(ids, [baseModel, nextModel]);
-            await page.$$eval('#composer-model-options button', (buttons,id)=>buttons.find(button=>button.textContent.trim()===id).click(), nextModel);
+            const target = await page.$$eval('#composer-model-options button', (buttons,id)=>{
+                const button=buttons.find(row=>row.textContent.trim()===id);
+                const rect=button.getBoundingClientRect();
+                const x=rect.left+rect.width/2, y=rect.top+rect.height/2;
+                return { x,y,reachable:button.contains(document.elementFromPoint(x,y)) };
+            }, nextModel);
+            assert.ok(target.reachable,'the rendered model option must receive touches above the composer');
+            await page.touchscreen.tap(target.x,target.y);
+            await page.waitForFunction(id=>document.querySelector('#composer-model-current')?.textContent.includes(id) &&
+                !document.querySelector('#composer-model-options'),{},nextModel);
         };
         const workFor = text => core.store.db.prepare(`SELECT works.id,works.status,works.frozen_config_json
             FROM works JOIN messages ON works.user_message_id=messages.id WHERE messages.content=?`).get(text);
