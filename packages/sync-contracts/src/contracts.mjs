@@ -204,7 +204,7 @@ return {normalizeScope,scopeHash,permits,expansion};
 // Validation belongs to each existing caller. This function seals only its
 // already validated fixed-key submission shape; attachment order is meaningful.
 export function submissionText({topicKey,kind,payload}){
- const canonical=kind==='message'?{attachments:payload.attachments||[],requestId:payload.requestId,text:payload.text}:{agentId:payload.agentId,requestId:payload.requestId};
+ const canonical=kind==='message'?{attachments:payload.attachments||[],requestId:payload.requestId,text:payload.text,...(payload.model!==undefined&&{model:payload.model})}:{agentId:payload.agentId,requestId:payload.requestId};
  return JSON.stringify({kind,payload:canonical,topicKey});
 }
 

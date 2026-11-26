@@ -205,3 +205,10 @@ footer>* {max-width:var(--content); margin-inline:auto}
 .return-latest { position:absolute; inset-inline-end:16px; bottom:12px; z-index:1; padding:8px 12px; border-radius:20px; background:var(--accent-soft); color:var(--accent); box-shadow:0 1px 5px #0002 }
 .pair-help,.pair-error { font-size:.85rem; overflow-wrap:anywhere }
 .pair-error { margin:4px 0; color:var(--warning) }
+
+.composer-model { position:relative; min-width:0; font-size:.8rem; color:var(--muted) }
+.composer-model > button,.composer-model > span { display:block; max-width:100%; padding:7px 8px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; border-radius:8px; background:var(--accent-soft); color:var(--accent) }
+.composer-model-options { position:absolute; z-index:3; inset-inline-start:0; bottom:calc(100% + 6px); width:min(16rem,68vw); max-height:40vh; overflow:auto; padding:6px; border:1px solid var(--line); border-radius:10px; background:var(--surface); box-shadow:0 3px 14px #0003 }
+.composer-model-options button { display:block; width:100%; padding:7px 8px; text-align:start; overflow-wrap:anywhere; background:transparent; color:var(--ink) }
+.composer-model-options button[aria-pressed=true] { background:var(--accent-soft); color:var(--accent) }
+.composer-model-options p { margin:6px; overflow-wrap:anywhere }

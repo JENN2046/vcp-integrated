@@ -56,7 +56,7 @@ class RemoteAccess {
             req => this.sessions.sessionForToken(/^Bearer ([A-Za-z0-9_-]{43})$/.exec(req.get('authorization') || '')?.[1]);
         const workspace = this.core.workspace;
         const authorize = (req, space, permission) => this.actor(find(req), kind, space, permission);
-        const server = { serverUrl: this.url.origin, credentialExchangeAllowed: false, mode: 'core' };
+        const server = { serverUrl: this.url.origin, credentialExchangeAllowed: false, mode: 'core', modelSelection: Boolean(this.core.modelCatalog) };
         router.use((req, res, next) => {
             // The only proxy trusted for this surface is the colocated TLS terminator.
             if (!protectedHttps(req) || (!req.socket.encrypted && req.get('x-forwarded-proto') !== 'https') ||

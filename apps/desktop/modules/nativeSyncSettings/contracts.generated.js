@@ -1,4 +1,4 @@
-// Generated during release assembly; source SHA256 1295246c85b6c585ed27a6355cd7a7fdcd75eb0931bb84a9f691164ffc84ec50
+// Generated during release assembly; source SHA256 814ebefb5532606d2b15f9fe84d15576770db9043875fceb7b93da22cd04cd1b
 // packages/sync-contracts/src/contracts.mjs
 function createProtocol({ canonicalizeMessage, BoundedWarnings, messageContentHash, stableStringify, sha256 }, metadata) {
 	function identity(value) {
@@ -421,7 +421,8 @@ function submissionText({ topicKey, kind, payload }) {
 	const canonical = kind === "message" ? {
 		attachments: payload.attachments || [],
 		requestId: payload.requestId,
-		text: payload.text
+		text: payload.text,
+		...payload.model !== void 0 && { model: payload.model }
 	} : {
 		agentId: payload.agentId,
 		requestId: payload.requestId

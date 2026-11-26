@@ -217,16 +217,16 @@ test('the PWA releases only a verified desktop-only rejection and serializes sam
     const record = await first.prepare({...session, topicKey:'shared-single', kind:'message',
         payload:{requestId:'desktop-only', text:'{{VCPChatCanvas}}', attachments:['ready-upload']}});
     const rejection = {status:409, code:'DESKTOP_CONTEXT_REQUIRED'};
-    assert.equal(await first.releaseDesktopRejection(record, {status:409, code:'SHARED_TOPIC_BUSY'}, [], session), false);
-    assert.equal(await first.releaseDesktopRejection(record, {code:'NETWORK_UNAVAILABLE'}, [], session), false);
-    assert.equal(await first.releaseDesktopRejection(record, rejection, [], {...session, sessionMarker:'c'.repeat(64)}), false);
-    assert.equal(await first.releaseDesktopRejection(record, rejection, undefined, session), false);
+    assert.equal(await first.releaseRejectedMessage(record, {status:409, code:'SHARED_TOPIC_BUSY'}, [], session), false);
+    assert.equal(await first.releaseRejectedMessage(record, {code:'NETWORK_UNAVAILABLE'}, [], session), false);
+    assert.equal(await first.releaseRejectedMessage(record, rejection, [], {...session, sessionMarker:'c'.repeat(64)}), false);
+    assert.equal(await first.releaseRejectedMessage(record, rejection, undefined, session), false);
     const prior = {id:'accepted-earlier', state:'queued', topicKey:record.topicKey, requestId:record.requestId,
         recovery:{version:1, kind:record.kind, payloadHash:record.payloadHash, sessionMarker:session.sessionMarker}};
-    assert.equal(await first.releaseDesktopRejection(record, rejection, [prior], session), false);
+    assert.equal(await first.releaseRejectedMessage(record, rejection, [prior], session), false);
     assert.deepEqual(first.current(record), record);
     failWrite = true;
-    await assert.rejects(first.releaseDesktopRejection(record, rejection, [], session), {code:'SUBMISSION_STORE_UNAVAILABLE'});
+    await assert.rejects(first.releaseRejectedMessage(record, rejection, [], session), {code:'SUBMISSION_STORE_UNAVAILABLE'});
     failWrite = false;
     assert.deepEqual(otherPage.current(record), record);
     assert.equal(otherPage.rejectedDraft(record), null);
@@ -235,7 +235,7 @@ test('the PWA releases only a verified desktop-only rejection and serializes sam
     const waitForResponse = new Promise(resolve => { settle = resolve; });
     const answer = first.withSendLock(record, async () => {
         await waitForResponse;
-        return first.releaseDesktopRejection(record, rejection, [], session);
+        return first.releaseRejectedMessage(record, rejection, [], session);
     });
     const queuedRetry = otherPage.withSendLock(record, () => assert.fail('released request posted again'));
     const stopped = assert.rejects(queuedRetry, {code:'SUBMISSION_RECORD_CHANGED'});

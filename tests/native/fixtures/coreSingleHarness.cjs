@@ -6,10 +6,14 @@ const { BOX } = require('./sharedSingleHarness.cjs');
 
 async function localProvider(t) {
     const calls = [];
+    let modelRows = [];
     let reply = (_body, res) => res.end(JSON.stringify({
         choices: [{ message: { role: 'assistant', content: 'core reply' }, finish_reason: 'stop' }]
     }));
     const server = createServer(async (req, res) => {
+        if (req.method === 'GET' && req.url === '/v1/models') {
+            return res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ data:modelRows }));
+        }
         const chunks = [];
         for await (const chunk of req) chunks.push(chunk);
         const body = JSON.parse(Buffer.concat(chunks));
@@ -18,7 +22,7 @@ async function localProvider(t) {
     });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     t.after(() => { server.closeAllConnections(); return new Promise(resolve => server.close(resolve)); });
-    return { calls, url: 'http://127.0.0.1:' + server.address().port, setReply: fn => { reply = fn; } };
+    return { calls, url: 'http://127.0.0.1:' + server.address().port, setReply: fn => { reply = fn; }, setModels: rows => { modelRows = rows; } };
 }
 
 function host(provider) {

@@ -11,7 +11,7 @@ const { execFileSync } = require('node:child_process');
 const { wait, BOX } = require('../native/fixtures/sharedSingleHarness.cjs');
 const { localProvider, host } = require('../native/fixtures/coreSingleHarness.cjs');
 
-test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scroll and pairing', { timeout: 50000 }, async t => {
+test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scroll, pairing and one-message model selection', { timeout: 65000 }, async t => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'core-mobile-daily-'));
     const provider = await localProvider(t);
     const { chat } = host(provider);
@@ -19,6 +19,13 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
     const { CoreService } = require(BOX + '/core/service');
     const { localTopicKey } = require(BOX + '/core/localWorkspace');
     const { administer } = require(BOX + '/core/pairDevice');
+    const { createModelCatalog } = require(BOX + '/modules/modelCatalog');
+    const baseModel = 'synthetic', nextModel = 'model-b';
+    provider.setModels([{id:baseModel, owned_by:'fixture-private'}, {id:nextModel}, {id:nextModel}, {id:''}]);
+    const modelCatalog = createModelCatalog({
+        apiUrl:provider.url, apiKey:'fixture', modelRedirectHandler:{isEnabled:()=>false},
+        semanticModelRouter:{getVirtualModels:()=>[]}
+    });
     const certPath = path.join(root, 'cert.pem'), keyPath = path.join(root, 'key.pem');
     execFileSync('openssl', ['req','-x509','-newkey','rsa:2048','-nodes','-keyout',keyPath,'-out',certPath,
         '-days','1','-subj','/CN=localhost'], { stdio:'ignore' });
@@ -28,7 +35,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const origin = 'https://127.0.0.1:' + server.address().port;
     const directory = path.join(root, 'core');
-    const core = new CoreService({ directory, workspace:'personal', chat, remoteConfig:{origin, hours:1} });
+    const core = new CoreService({ directory, workspace:'personal', chat, modelCatalog, remoteConfig:{origin, hours:1} });
     const posts = [];
     let truncateSend = false, holdReceipt = false;
     app.use((req, res, next) => {
@@ -213,6 +220,85 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await chooseTopic(other);
         assert.equal(await value(),'','a new pairing does not inherit another topic’s draft either');
         assert.equal(posts.length,3);
+
+        await chooseTopic(topic);
+        const initialConfig = core.local.configuration({ workspace:'personal', key:topic });
+        const firstModelCall = provider.calls.length;
+        const activeStreams = [];
+        provider.setReply((_body, res) => {
+            activeStreams.push(res);
+            res.writeHead(200, {'Content-Type':'text/event-stream'});
+            res.write('data: {"choices":[{"delta":{"content":"模型回复"}}]}\n\n');
+        });
+        const finishModelTurn = res => res.end('data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+        const sendText = async text => {
+            await fill(text);
+            await page.waitForSelector('#send:not([disabled])');
+            await page.$eval('#send', button => button.click());
+        };
+        const readModelLabel = () => page.$eval('#composer-model-current', el=>el.textContent.trim());
+        const selectB = async () => {
+            await page.waitForSelector('#composer-model-current:not([disabled])');
+            await page.click('#composer-model-current');
+            await page.waitForSelector('#composer-model-options button');
+            const ids = await page.$$eval('#composer-model-options button', buttons=>buttons.map(button=>button.textContent.trim()));
+            assert.deepEqual(ids, [baseModel, nextModel]);
+            await page.$$eval('#composer-model-options button', (buttons,id)=>buttons.find(button=>button.textContent.trim()===id).click(), nextModel);
+        };
+        const workFor = text => core.store.db.prepare(`SELECT works.id,works.status,works.frozen_config_json
+            FROM works JOIN messages ON works.user_message_id=messages.id WHERE messages.content=?`).get(text);
+
+        assert.match(await readModelLabel(), /当前模型.*synthetic/);
+        await sendText('模型 A 的旧任务');
+        await wait(() => activeStreams.length===1, 'old task reached provider with A');
+        const oldWork = workFor('模型 A 的旧任务');
+        assert.equal(provider.calls[firstModelCall].model, baseModel);
+        await selectB();
+        assert.match(await readModelLabel(), /下一条.*model-b/);
+        await page.waitForSelector('#quote-task', { visible:true });
+        await page.click('#quote-task');
+        assert.match(await readModelLabel(), /追加沿用.*synthetic/);
+        await sendText('追加到 A 任务');
+        await page.waitForSelector('#task-quote', { hidden:true });
+        assert.match(await readModelLabel(), /下一条.*model-b/);
+        finishModelTurn(activeStreams[0]);
+        await wait(() => activeStreams.length===2, 'steered turn reached provider');
+        assert.equal(provider.calls[firstModelCall+1].model, baseModel);
+        assert.match(JSON.stringify(provider.calls[firstModelCall+1].messages), /追加到 A 任务/);
+        assert.equal(JSON.parse(core.store.work(oldWork.id).frozen_config_json).model, baseModel);
+        finishModelTurn(activeStreams[1]);
+        await wait(() => workFor('模型 A 的旧任务').status==='completed', 'old A work completed');
+
+        truncateSend = true;
+        holdReceipt = true;
+        await sendText('选择 B 后的新消息');
+        await wait(() => activeStreams.length===3, 'B work reached provider');
+        const selectedWork = workFor('选择 B 后的新消息');
+        assert.notEqual(selectedWork.id,oldWork.id);
+        assert.equal(provider.calls[firstModelCall+2].model,nextModel);
+        assert.equal(JSON.parse(selectedWork.frozen_config_json).model,nextModel);
+        await page.waitForSelector('#pending-submission');
+        assert.match(await readModelLabel(), /待确认.*model-b/);
+        holdReceipt = false;
+        finishModelTurn(activeStreams[2]);
+        await wait(() => workFor('选择 B 后的新消息').status==='completed', 'B work completed');
+        await page.waitForFunction(() => document.querySelector('#composer-model-current')?.textContent.includes('当前模型') &&
+            document.querySelector('#message-text')?.value==='');
+        await sendText('下一条使用默认 A');
+        await wait(() => activeStreams.length===4, 'one-shot selection returned to A');
+        assert.equal(provider.calls[firstModelCall+3].model,baseModel);
+        finishModelTurn(activeStreams[3]);
+        await wait(() => workFor('下一条使用默认 A').status==='completed', 'default A work completed');
+        assert.deepEqual(core.local.configuration({ workspace:'personal', key:topic }), initialConfig);
+
+        await selectB();
+        provider.setModels([{id:baseModel}]);
+        await sendText('目录移除后保留这个草稿');
+        await page.waitForFunction(() => document.querySelector('#send-state')?.textContent.includes('不在 Core 允许的目录'));
+        assert.equal(await value(),'目录移除后保留这个草稿');
+        assert.equal(workFor('目录移除后保留这个草稿'),undefined);
+        assert.equal(provider.calls.length,firstModelCall+4);
+        assert.equal(posts.length,8,'receipt recovery does not resubmit B; removed model reaches no provider');
         assert.deepEqual(errors, []);
         assert.deepEqual(Object.entries(results).filter(([,passed])=>!passed).map(([name])=>name), [], JSON.stringify(results));
     } finally {
