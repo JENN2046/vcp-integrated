@@ -1404,7 +1404,7 @@ fn emit_initial_watch_events(
 
 #[napi]
 pub struct VexusWatcher {
-    watcher: Arc<Mutex<Option<notify::RecommendedWatcher>>>,
+    watcher: Arc<Mutex<Option<Box<dyn notify::Watcher + Send>>>>,
     // 同一路径只保留一个可重置状态和一个 worker；重复 notify 事件仅刷新 generation。
     path_generations: Arc<Mutex<HashMap<PathBuf, WatchPendingPath>>>,
     generation_counter: Arc<AtomicU64>,
@@ -1492,7 +1492,7 @@ impl VexusWatcher {
             generations.clear();
         }
 
-        let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
+        let handle_event = move |res: notify::Result<Event>| {
             if !running.load(Ordering::Acquire) {
                 return;
             }
@@ -1723,13 +1723,27 @@ impl VexusWatcher {
                     eprintln!("[VexusWatcher] ❌ Native watch error: {:?}", e);
                 }
             }
-        })
-        .map_err(|e| Error::from_reason(format!("Failed to create native watcher: {:?}", e)))?;
+        };
 
-        // 开始递归监听
-        watcher
-            .watch(&root_path_buf, RecursiveMode::Recursive)
-            .map_err(|e| Error::from_reason(format!("Failed to start watching path: {:?}", e)))?;
+        let native = notify::recommended_watcher(handle_event.clone()).and_then(|mut watcher| {
+            watcher.watch(&root_path_buf, RecursiveMode::Recursive)?;
+            Ok(watcher)
+        });
+        let watcher: Box<dyn Watcher + Send> = match native {
+            Ok(watcher) => Box::new(watcher),
+            Err(error) if cfg!(target_os = "linux") && matches!(error.kind, notify::ErrorKind::MaxFilesWatch) => {
+                eprintln!("[VexusWatcher] inotify watch limit reached; polling this knowledge root.");
+                let mut watcher = notify::PollWatcher::new(
+                    handle_event,
+                    notify::Config::default().with_poll_interval(Duration::from_secs(2)),
+                )
+                .map_err(|e| Error::from_reason(format!("Failed to create polling watcher: {:?}", e)))?;
+                watcher.watch(&root_path_buf, RecursiveMode::Recursive)
+                    .map_err(|e| Error::from_reason(format!("Failed to start polling watcher: {:?}", e)))?;
+                Box::new(watcher)
+            }
+            Err(error) => return Err(Error::from_reason(format!("Failed to start native watcher: {:?}", error))),
+        };
 
         // 初始对账由 Rust watcher 完成，和 notify 事件使用同一个回调与
         // generation 序列。这样 JS 不再递归扫描文件系统，也不会制造第二套

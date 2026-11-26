@@ -3,12 +3,13 @@ const authorityControl=require('./historyAuthority');
 const fs=require('node:fs/promises');
 const {NativeSyncAdapter}=require('./adapter');
 const {SharedQueue}=require('./sharedQueue');
-const {fail,stable}=require('./protocol');
+const {fail,stable,wireTopic}=require('./protocol');
+const {durableJson}=require('./durableJson');
 const {sharedIdentity}=require('./contracts.generated.cjs');
 
 // This is the existing message adapter behind a verified descriptor map, not a
 // second message synchronizer. Host configuration/discovery owns the mappings.
-async function openSharedReplica({queue,statePath,connection,mappings,send,notify=()=>{},historyAuthority=authorityControl.authorityForQueue(queue)}){
+async function openSharedReplica({queue,statePath,connection,mappings,coreMappings=[],send,notify=()=>{},historyAuthority=authorityControl.authorityForQueue(queue)}){
  sharedIdentity(connection.sharedSpaceId);
  const mapped=new SharedQueue(queue,mappings,connection.sharedSpaceId);
  const query=new URLSearchParams({sharedSpaceId:connection.sharedSpaceId});
@@ -25,8 +26,24 @@ async function openSharedReplica({queue,statePath,connection,mappings,send,notif
   throw fail('SHARED_ROUTE_NOT_APPROVED');
  };
  let previous;try{previous=JSON.parse(await fs.readFile(statePath,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
- const topics=(previous?.topics||mappings.map(m=>m.shared)).map(d=>({itemId:d.itemId,itemType:d.itemType||'agent',topicId:d.topicId}));
- if(topics.some(topic=>!mappings.some(m=>stable(m.shared)===stable(topic))))throw fail('SHARED_LOCAL_MAPPING_REQUIRED');
+ const descriptors=(previous?.topics||mappings.map(m=>m.shared)).map(d=>({itemId:d.itemId,itemType:d.itemType||'agent',topicId:d.topicId}));
+ const isMapped=(list,topic)=>list.some(m=>stable(m.shared)===stable(topic));
+ const retired=descriptors.filter(topic=>!isMapped(mappings,topic));
+ if(retired.some(topic=>!isMapped(coreMappings,topic)))throw fail('SHARED_LOCAL_MAPPING_REQUIRED');
+ const topics=descriptors.filter(topic=>isMapped(mappings,topic));
+ if(retired.length){
+  if(previous.deviceId!=='desktop:'+connection.deviceId||previous.sharedSpaceId!==connection.sharedSpaceId||
+     !Array.isArray(previous.outbox)||!Array.isArray(previous.inbox)||!previous.localCommits)throw fail('INVALID_SYNC_STATE');
+  const retiredKeys=new Set(retired.map(topic=>JSON.stringify(wireTopic(topic))));
+  const belongs=event=>event&&retiredKeys.has(JSON.stringify({ownerId:event.ownerId,ownerType:event.ownerType,topicId:event.topicId}));
+  if(previous.outbox.some(belongs)||previous.inbox.some(row=>belongs(row.event))||
+     belongs(previous.pending?.event)||Object.keys(previous.localCommits).some(key=>retiredKeys.has(key))){
+   throw fail('CORE_LEGACY_PROJECTION_UNSETTLED');
+  }
+  // Keep completed acknowledgements and their cursor. Only stop scheduling
+  // topics the server now serves through Core.
+  await durableJson(statePath,{...previous,topics});
+ }
  if(mapped.policy)mapped.policy.topics=topics;
  const adapter=await NativeSyncAdapter.open({queue:mapped,historyAuthority,statePath,sharedSpaceId:connection.sharedSpaceId,deviceId:'desktop:'+connection.deviceId,url:connection.url,token:connection.token,topics,request,notify:event=>{
   const local=mapped.local({itemId:event.ownerId||event.agentId,itemType:event.ownerType||'agent',topicId:event.topicId});

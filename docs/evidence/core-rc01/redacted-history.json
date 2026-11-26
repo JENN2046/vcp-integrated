@@ -1,0 +1,15 @@
+{
+  "source": "daily desktop History and local CDS, opened read-only",
+  "sourceHistoryWrapper": "array",
+  "sourceContentShapes": [
+    "string"
+  ],
+  "sampledMessages": 5,
+  "physicalAttachmentReferenceResolved": true,
+  "attachmentBytes": "generated anonymized PNG",
+  "deletionFactFromDailyCds": true,
+  "deletionScope": "separate anonymized conversation",
+  "centralEdit": "synthetic in isolation",
+  "repeatImport": true,
+  "reopen": true
+}

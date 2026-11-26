@@ -1,0 +1,12 @@
+{
+  "provider": "typesafe",
+  "decisions": 1,
+  "received": false,
+  "stopReason": "JEV_HTTP_401",
+  "failureCode": "JEV_HTTP_401",
+  "workStates": [
+    "completed"
+  ],
+  "localModelCalls": 0,
+  "active": false
+}

@@ -147,7 +147,7 @@ class SharedRuntime {
   await this.ensureRules();
   await this.materialize();
   const mappings=this.legacyMappings();
-  this.replica=await openSharedReplica({queue:this.queue,statePath:path.join(this.dir,'messages.json'),connection:this.connection,mappings,send:this.send,notify:this.notify,historyAuthority:authorityControl.authorityFor(this)});
+  this.replica=await openSharedReplica({queue:this.queue,statePath:path.join(this.dir,'messages.json'),connection:this.connection,mappings,coreMappings:this.mappings().filter(mapping=>this.coreSingle.owns(mapping.shared)),send:this.send,notify:this.notify,historyAuthority:authorityControl.authorityFor(this)});
   // Origin histories already have verified per-message bases. Retain them so
   // baseline reconciliation never mistakes a current v2 for an empty v1 base.
   await this.replica.adapter.transaction(next=>{

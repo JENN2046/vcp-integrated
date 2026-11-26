@@ -62,7 +62,7 @@ const ordinaryFixture = ordinaryMode || approvalRestore ? {
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', compactionRetryMode, ...compactionFallbackModes, 'local-stream-interrupt', 'desktop-stream-close'].includes(requested) || process.argv.length > 3) {
+if (![...modes, ...toolHandoffModes, ...Object.keys(ordinaryModes), ...Object.keys(approvalRestoreModes), 'all', 'ready', 'core-rc', '--dev', 'idle', 'aa-desktop', 'native-local-queue', 'compact-e2e', 'compact-cross-device', compactionRetryMode, ...compactionFallbackModes, 'local-stream-interrupt', 'desktop-stream-close'].includes(requested) || process.argv.length > 3) {
     throw Error('Usage: node tests/integration/run.cjs [all|lost-only|transport-only|pre-only|local-only|ready|--dev|idle|config-only|shutdown-only|ordinary-shared|ordinary-local|approval-restore|approval-restore-stale|aa-desktop|native-local-queue|compact-e2e|compact-cross-device|compact-history-identity|' + duoModes.join('|') + '|' + [compactionAckMode, ...compactionFallbackModes].join('|') + '|tool-handoff-baseline|tool-handoff|tool-handoff-unknown|tool-handoff-stream|tool-final-receipt-lost|tool-final-receipt-unknown|tool-final-publication-ack|' + [...readbackModes, legacyReadbackMode].join('|') + '|local-stream-interrupt|desktop-stream-close]');
 }
 let out, cert, fingerprint, display;
@@ -352,7 +352,7 @@ async function runCase(root, mode) {
                 start, stop, click, evalJs, waitUntil, sha,
             });
         } else if (mode !== 'ready') {
-            const runScenario = desktopStreamClose ? require('../desktop-stream-close/scenario.cjs') : toolHandoff ? require('../tool-work-handoff/scenario.cjs')
+            const runScenario = mode === 'core-rc' ? require('./core-rc.cjs') : desktopStreamClose ? require('../desktop-stream-close/scenario.cjs') : toolHandoff ? require('../tool-work-handoff/scenario.cjs')
                 : compaction ? require('../compact-e2e/scenario.cjs')
                 : streamInterrupt ? require('../local-stream-interrupt/scenario.cjs')
                 : aaDesktop ? require('../aa-desktop/scenario.cjs')

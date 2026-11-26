@@ -10,6 +10,7 @@ const { fixture } = require('./seedFixture.cjs');
 
 const contract=require('./seed-contract.json');
 const auth='synthetic-only';
+const coreInput='RC-01 local Core checkout';
 
 function listen(server, port = 0) {
     return new Promise((resolve, reject) => server.once('error', reject).listen(port, '127.0.0.1', () => resolve(server.address().port)));
@@ -134,7 +135,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             const body=await jsonBody(req);
             const last=body.messages.findLast(row=>row.role==='user')?.content;
             const input=Array.isArray(last)?last.filter(x=>x.type==='text').map(x=>x.text).join(''):last;
-            const which=Object.entries(contract.cases).find(([,content])=>input===content)?.[0];
+            const which=input===coreInput&&mode==='core-rc'?'coreRC':Object.entries(contract.cases).find(([,content])=>input===content)?.[0];
             const row={case:which,id:body.requestId,stream:Boolean(body.stream),at:Date.now()};
             const ordinaryReply = ordinaryTools?.reply(body, row, calls);
             if (delegation?.classify(body, row)) {
@@ -147,7 +148,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             if (groupRelay && await groupRelay.respond(body, row, res)) return;
             if (await observedContext?.respond?.(body, row, res)) return;
             observedContext?.recordProvider?.(req.url, body);
-            if(which==='lostAck')await lostGate;
+            if(which==='lostAck'||which==='coreRC')await lostGate;
             if(which==='interrupted'){
                 if(!body.stream)throw Error('Partial fixture expected streaming provider input');
                 if (hardwareStream) { hardwareStream.provider.accept(res); return; }
@@ -332,6 +333,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
             ...(observedContext ? ['--require',observedContext.preload] : []),'server.js'], {
             cwd:box,stdio:['ignore',log,log],env:{
                 ...(process.env.NS_FIXTURE_POLL_WATCHERS === '1' && { CHOKIDAR_USEPOLLING:'true', NS_FIXTURE_POLL_WATCHERS:'1' }),
+                ...(mode==='core-rc'&&{ VCP_CORE_DATA_DIR:path.join(out,'core'), VCP_CORE_WORKSPACE:'sharedAB' }),
                 PATH:'/usr/bin:/bin',HOME:out,LANG:'C.UTF-8',TZ:'UTC',NS_LOADED_REPORT:path.join(out,'backend-loaded.json'),
                 ...(mode === 'idle' && process.env.NS_IDLE_METER !== 'off' ? { NS_METER_BACKEND:'1', NS_METER_PREFIX:path.join(out,'backend') } : {}),
                 ...(observedContext ? { NS_CONTEXT_HANDLER_LOG: observedContext.handlerLog, NS_CONTEXT_INPUT: observedContext.input } : {}),
@@ -430,7 +432,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         return { htmlStatus: page.status, bundleStatus: bundle.status, connectionStatus: connection.status };
     }
     return { checkMobile, startupError, get backendPid(){return backend.pid;},
-        ...((ordinaryTools || delegation || groupRelay || toolHandoff?.finalReceipt || toolHandoff?.duo) && { async restartAfterCrash() {
+        ...((mode==='core-rc' || ordinaryTools || delegation || groupRelay || toolHandoff?.finalReceipt || toolHandoff?.duo) && { async restartAfterCrash() {
             const crashed = await stopBackend('SIGKILL');
             assert.deepEqual(crashed, {code:null,signal:'SIGKILL'});
             await startBackend();
@@ -445,4 +447,4 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         cutPartial(){assert.ok(activePartial&&!activePartial.destroyed);gates.providerTransportCut=true;
             trace('actual-provider-socket-cut',{hadPrefix:true});activePartial.destroy();}, close};
 }
-module.exports={start,contract};
+module.exports={start,contract,coreInput};

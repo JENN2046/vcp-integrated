@@ -1,0 +1,55 @@
+{
+  "mode": "core-rc",
+  "core": {
+    "id": "1f367d95-2af4-4f9f-b5ea-691d18f51530",
+    "completedWithoutDesktop": true,
+    "messages": [
+      {
+        "id": "6716156e-c638-499a-8d71-b84291f2b95f",
+        "role": "user",
+        "content": "RC-01 local Core checkout"
+      },
+      {
+        "id": "reply_1f367d95-2af4-4f9f-b5ea-691d18f51530",
+        "role": "assistant",
+        "content": "合成回复完成。"
+      }
+    ],
+    "legacyWrites": {
+      "journal": 0,
+      "shared_admissions": 0,
+      "mobile_executions": 0
+    },
+    "backendRestart": {
+      "code": 0,
+      "signal": null
+    },
+    "coldReadback": true
+  },
+  "mobile": {
+    "htmlStatus": 200,
+    "bundleStatus": 200,
+    "connectionStatus": 200,
+    "chromium": {
+      "title": "VCP Mobile",
+      "secureContext": true,
+      "connectionReady": true
+    }
+  },
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "providerCalls": 1,
+  "nativeFileWatcherFallbackObserved": true
+}
