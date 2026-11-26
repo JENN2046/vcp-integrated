@@ -231,6 +231,8 @@ function initialize(httpServer, config) {
             return;
         }
 
+        if (serverConfig.handleMobileVoiceUpgrade?.(request, socket, head)) return;
+
         const parsedUrl = url.parse(request.url, true);
         const pathname = parsedUrl.pathname;
 
