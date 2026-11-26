@@ -37,13 +37,17 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
     const directory = path.join(root, 'core');
     const core = new CoreService({ directory, workspace:'personal', chat, modelCatalog, remoteConfig:{origin, hours:1} });
     const posts = [];
-    let truncateSend = false, holdReceipt = false;
+    let truncateSend = false, holdReceipt = false, proxyRateLimited = false;
     app.use((req, res, next) => {
         if (req.method === 'GET' && req.path.endsWith('/receipt') && holdReceipt) {
             return res.status(503).json({ error:{code:'FIXTURE_RECEIPT_UNAVAILABLE'} });
         }
         if (req.method === 'POST' && /\/(?:send|steer)$/.test(req.path)) {
             posts.push(req.path);
+            if (proxyRateLimited && req.path.endsWith('/steer')) {
+                proxyRateLimited = false;
+                return res.status(429).json({error:{code:'RATE_LIMITED'}});
+            }
             if (truncateSend && req.path.endsWith('/send')) {
                 truncateSend = false;
                 const send = res.json.bind(res);
@@ -332,6 +336,60 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await chooseTopic(topic);
         assert.equal(await value(),'目录移除后保留这个草稿');
         assert.equal(posts.length,8);
+        await sendText('代理限流任务');
+        await wait(()=>activeStreams.length===5,'work held for the proxy 429');
+        await page.waitForSelector('#quote-task',{visible:true});
+        await page.click('#quote-task');
+        proxyRateLimited=true;
+        const limitedResponse=page.waitForResponse(response=>response.url().endsWith('/steer')&&response.status()===429);
+        await sendText('代理限流后仍待核对的追加');
+        assert.equal((await (await limitedResponse).json()).error.code,'RATE_LIMITED');
+        await page.waitForFunction(()=>document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
+        assert.equal(await page.$('#quote-exit-rejected'),null);
+        assert.equal(posts.length,10);
+        const record = await page.evaluate(key=>localStorage.getItem(key),storageKeys[topic]);
+        assert.ok(record);
+        finishModelTurn(activeStreams[4]);
+        await wait(()=>workFor('代理限流任务').status==='completed','proxy limit work completed');
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForFunction(()=>document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
+        assert.equal(await value(),'代理限流后仍待核对的追加');
+        assert.equal(posts.length,10);
+        t.diagnostic('Generic proxy HTTP 429 preserved the pending intent across reload, with no additional POST.');
+
+        const key=storageKeys[topic];
+        await page.evaluate(key=>localStorage.setItem(key,'{truncated'),key);
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForSelector('#steering-remove-local',{visible:true});
+        await page.click('#steering-remove-local');
+        const peer=await browser.newPage();
+        try {
+            await peer.goto(origin+'/mobile/',{waitUntil:'domcontentloaded'});
+            await peer.waitForSelector('#steering-remove-local');
+            await peer.evaluate((key,record)=>{
+                const ready=Promise.withResolvers();
+                window.writeSteeringRecord=ready.resolve;
+                void navigator.locks.request(key,async()=>{
+                    window.holdsSteeringLock=true;
+                    await ready.promise;
+                    localStorage.setItem(key,record);
+                });
+            },key,record);
+            await peer.waitForFunction(()=>window.holdsSteeringLock===true);
+            await page.bringToFront();
+            await page.$eval('#steering-confirm-remove',button=>button.click());
+            const poll={polling:50,timeout:5000};
+            await page.waitForFunction(async key=>(await navigator.locks.query()).pending.some(lock=>lock.name===key),poll,key);
+            await peer.evaluate(()=>window.writeSteeringRecord());
+            await page.waitForFunction(async key=>!(await navigator.locks.query()).pending.some(lock=>lock.name===key),poll,key);
+            assert.equal(await page.evaluate(key=>localStorage.getItem(key),key),record);
+            await page.waitForFunction(()=>document.querySelector('#task-quote')?.textContent.includes('尚未确认'),poll);
+            assert.equal(await page.$('#steering-remove-local'),null);
+            assert.equal(posts.length,10,'the two-tab race neither erases nor resends the valid record');
+            t.diagnostic('Tab B replaced the corrupt value while Tab A waited for the same lock; Tab A preserved the exact valid record.');
+        } finally {
+            await peer.close();
+        }
         assert.deepEqual(errors, []);
         assert.deepEqual(Object.entries(results).filter(([,passed])=>!passed).map(([name])=>name), [], JSON.stringify(results));
     } finally {

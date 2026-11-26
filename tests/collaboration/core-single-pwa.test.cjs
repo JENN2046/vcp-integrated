@@ -273,8 +273,38 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         finish(upstream[5], 'New message reply');
         await page.waitForFunction(() => [...document.querySelectorAll('#history .bubble')].some(row=>row.textContent.includes('New message reply')));
 
+        const limited = await startWork('steering-limit-mobile', 'Work for the ninth steering attempt');
+        const limitedWork = limited.serverSession.executionId;
+        await wait(() => upstream.length === 7, 'Work for steering limit running');
+        const phone = await f.phone();
+        const steer = '/core/sharedAB/' + f.topic.id + '/works/' + limitedWork + '/steer';
+        for (let i = 1; i <= 8; i++) {
+            await phone.call(steer, { requestId:'limit-fixture-000'+i, text:'Existing steering '+i }, 202);
+        }
+        await page.waitForSelector('#quote-task', {visible:true});
+        await page.click('#quote-task');
+        await page.type('#message-text','第九次追加草稿');
+        await page.waitForSelector('#send:not([disabled])');
+        const limitResponse = page.waitForResponse(response=>response.url().endsWith('/works/'+limitedWork+'/steer') &&
+            response.request().method()==='POST');
+        await page.$eval('.message-composer',form=>form.requestSubmit());
+        const denied = await limitResponse;
+        assert.equal(denied.status(),429);
+        assert.equal((await denied.json()).error.code,'WORK_STEERING_LIMIT');
+        await page.waitForSelector('#quote-exit-rejected',{visible:true,timeout:5000});
+        assert.equal(await page.$eval('#message-text', el=>el.value),'第九次追加草稿');
+        assert.equal(core.store.work(limitedWork).steering_count,8);
+        assert.equal(composerPosts.length,6,'the ninth attempt must not be replayed');
+        t.diagnostic('Core WORK_STEERING_LIMIT HTTP 429 on the ninth attempt released the quote lock; eight additions and one denied PWA POST.');
+        await page.click('#quote-exit-rejected');
+        await page.$eval('#message-text', el=>{el.value='';el.dispatchEvent(new Event('input',{bubbles:true}));});
+        finish(upstream[6],'First limited turn');
+        await wait(() => upstream.length === 8, 'the original eight steering inputs reach Core provider');
+        finish(upstream[7],'Limited work finished');
+        await wait(() => core.store.work(limitedWork).status==='completed','Limited work completed');
+
         const before = await startWork('before-steering-disconnect', 'Work A for unsent steering');
-        await wait(() => upstream.length === 7, 'Work A running');
+        await wait(() => upstream.length === 9, 'Work A running');
         await page.waitForSelector('#quote-task', { visible:true });
         await page.click('#quote-task');
         await page.type('#message-text', '未到达 Core 的追加');
@@ -282,7 +312,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.waitForSelector('#task-quote');
         await page.waitForSelector('#send:not([disabled])');
         await page.$eval('.message-composer', form => form.requestSubmit());
-        await wait(() => composerPosts.length === 6, 'steering POST interrupted before reaching Core');
+        await wait(() => composerPosts.length === 7, 'steering POST interrupted before reaching Core');
         await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认'), { timeout: 5000 });
         assert.equal(core.store.work(before.serverSession.executionId).steering_count, 0);
         await page.reload({ waitUntil:'domcontentloaded' });
@@ -291,10 +321,10 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.setOfflineMode(true);
         await page.waitForSelector('.connection-banner', { visible:true });
         await page.setOfflineMode(false);
-        finish(upstream[6], 'Work A finished');
+        finish(upstream[8], 'Work A finished');
         await wait(() => core.store.work(before.serverSession.executionId).status === 'completed', 'Work A completed');
         const next = await startWork('replacement-work-b', 'Work B in same topic');
-        await wait(() => upstream.length === 8, 'Work B running');
+        await wait(() => upstream.length === 10, 'Work B running');
         await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认') &&
             document.querySelector('#message-text')?.value === '未到达 Core 的追加，后来编辑' &&
             document.querySelector('#send')?.disabled);
@@ -302,10 +332,10 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         assert.equal(await page.$('#quote-task'), null);
         assert.equal(await page.$('#steering-remove-local'), null, 'a valid unknown intent is never offered as a corrupt record');
         await page.$eval('.message-composer', form => form.requestSubmit());
-        assert.equal(composerPosts.length, 6, 'recovery never POSTs, including after the task ends and a new one starts');
-        assert.ok(composerPosts[5].endsWith('/works/' + before.serverSession.executionId + '/steer'));
+        assert.equal(composerPosts.length, 7, 'recovery never POSTs, including after the task ends and a new one starts');
+        assert.ok(composerPosts[6].endsWith('/works/' + before.serverSession.executionId + '/steer'));
         assert.equal(core.store.work(next.serverSession.executionId).steering_count, 0);
-        finish(upstream[7], 'Work B finished');
+        finish(upstream[9], 'Work B finished');
         await nextDesktop.close();
         assert.deepEqual(errors, []);
     } finally {

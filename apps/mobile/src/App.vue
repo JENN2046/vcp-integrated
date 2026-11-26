@@ -876,7 +876,8 @@ function confirmSteering(context,intent,receipt){
 }
 async function rejectSteering(context,intent,error){
  const definite=error.status===409&&error.code==='WORK_STEERING_WINDOW_CLOSED'||
-  error.status===404&&error.code==='WORK_NOT_FOUND';
+  error.status===404&&error.code==='WORK_NOT_FOUND'||
+  error.status===429&&error.code==='WORK_STEERING_LIMIT';
  if(!definite)return;
  const key=steeringStoragePrefix+context.draftScope;
  await navigator.locks.request(key,()=>{
