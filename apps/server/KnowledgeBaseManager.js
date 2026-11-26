@@ -721,6 +721,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
 
         startWatch.call(watcher, {
             rootPath: __dirname,
+            recursive: false,
             ignoreFolders: ['node_modules', '.git', 'dist', 'target', 'image'],
             ignorePrefixes: [],
             ignoreSuffixes: [],

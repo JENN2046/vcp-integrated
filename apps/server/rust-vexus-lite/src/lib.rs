@@ -1039,6 +1039,7 @@ pub struct WatchEvent {
 #[napi(object)]
 pub struct WatcherConfig {
     pub root_path: String,
+    pub recursive: Option<bool>,
     pub ignore_folders: Vec<String>,
     pub ignore_prefixes: Vec<String>,
     pub ignore_suffixes: Vec<String>,
@@ -1725,8 +1726,13 @@ impl VexusWatcher {
             }
         };
 
+        let watch_mode = if config.recursive.unwrap_or(true) {
+            RecursiveMode::Recursive
+        } else {
+            RecursiveMode::NonRecursive
+        };
         let native = notify::recommended_watcher(handle_event.clone()).and_then(|mut watcher| {
-            watcher.watch(&root_path_buf, RecursiveMode::Recursive)?;
+            watcher.watch(&root_path_buf, watch_mode)?;
             Ok(watcher)
         });
         let watcher: Box<dyn Watcher + Send> = match native {
@@ -1738,7 +1744,7 @@ impl VexusWatcher {
                     notify::Config::default().with_poll_interval(Duration::from_secs(2)),
                 )
                 .map_err(|e| Error::from_reason(format!("Failed to create polling watcher: {:?}", e)))?;
-                watcher.watch(&root_path_buf, RecursiveMode::Recursive)
+                watcher.watch(&root_path_buf, watch_mode)
                     .map_err(|e| Error::from_reason(format!("Failed to start polling watcher: {:?}", e)))?;
                 Box::new(watcher)
             }
@@ -2092,6 +2098,7 @@ mod watcher_reconciliation_tests {
         let watcher = VexusWatcher::new();
         watcher.start_watch(WatcherConfig {
             root_path: dir.0.to_string_lossy().into_owned(),
+            recursive: None,
             ignore_folders: vec![],
             ignore_prefixes: vec![],
             ignore_suffixes: vec![],

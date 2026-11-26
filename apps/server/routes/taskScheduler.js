@@ -3,11 +3,13 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const schedule = require('node-schedule');
+const chokidar = require('chokidar');
 const { safeFilePath } = require('../modules/safeFilePath');
 
 let pluginManager;
 let webSocketServer;
 let DEBUG_MODE = false;
+let timedContactWatcher;
 
 const TIMED_CONTACTS_DIR = path.join(__dirname, '..', 'VCPTimedContacts');
 const TIMED_RESULTS_DIR = path.join(__dirname, '..', 'VCPTimedResults');
@@ -181,9 +183,10 @@ async function scheduleTaskFromFile(filePath) {
 function startTimedContactWatcher() {
     console.log(`[TaskScheduler] 启动目录监视: ${TIMED_CONTACTS_DIR}`);
     try {
-        fsSync.watch(TIMED_CONTACTS_DIR, (eventType, filename) => {
-            if (filename && filename.endsWith('.json')) {
-                const filePath = path.join(TIMED_CONTACTS_DIR, filename);
+        fsSync.mkdirSync(TIMED_CONTACTS_DIR, { recursive: true });
+        const onFileChanged = (filePath) => {
+            const filename = path.basename(filePath);
+            if (filename.endsWith('.json')) {
                 const taskId = filename.replace('.json', '');
 
                 fs.access(filePath, fsSync.constants.F_OK)
@@ -202,29 +205,18 @@ function startTimedContactWatcher() {
                       }
                   });
             }
-        });
+        };
+        const polling = process.env.VCP_TIMED_TASK_POLLING === '1';
+        // Include the initial add events so one watcher owns both startup and later arrivals.
+        timedContactWatcher = chokidar.watch(TIMED_CONTACTS_DIR, {
+            depth: 0,
+            ...(polling && { usePolling: true, interval: 1000 })
+        }).on('add', onFileChanged)
+            .on('change', onFileChanged)
+            .on('unlink', onFileChanged)
+            .on('error', error => console.error('[TaskScheduler] 目录监视异常:', error));
     } catch (error) {
         console.error(`[TaskScheduler] 启动目录监视失败 ${TIMED_CONTACTS_DIR}:`, error);
-    }
-}
-
-async function scheduleAllPendingTasks() {
-    try {
-        await fs.mkdir(TIMED_CONTACTS_DIR, { recursive: true });
-        const files = await fs.readdir(TIMED_CONTACTS_DIR);
-        const jsonFiles = files.filter(f => f.endsWith('.json'));
-        
-        if (jsonFiles.length > 0) {
-            console.log(`[TaskScheduler] 发现 ${jsonFiles.length} 个待处理的定时任务，开始调度...`);
-            for (const file of jsonFiles) {
-                const filePath = path.join(TIMED_CONTACTS_DIR, file);
-                await scheduleTaskFromFile(filePath);
-            }
-        } else {
-            console.log(`[TaskScheduler] 未发现待处理的定时任务。调度器将保持待命。`);
-        }
-    } catch (error) {
-        console.error('[TaskScheduler] 初始化定时任务调度器失败:', error);
     }
 }
 
@@ -234,12 +226,13 @@ function initialize(_pluginManager, _webSocketServer, _debugMode) {
     DEBUG_MODE = _debugMode;
     
     console.log('正在初始化通用任务调度器...');
-    scheduleAllPendingTasks();
     startTimedContactWatcher();
     console.log('通用任务调度器已初始化并开始监视任务。');
 }
 
 function shutdown() {
+    void timedContactWatcher?.close().catch(error => console.error('[TaskScheduler] 关闭目录监视失败:', error));
+    timedContactWatcher = undefined;
     if (scheduledJobs.size > 0) {
         console.log(`[TaskScheduler] 正在清除 ${scheduledJobs.size} 个已调度的任务...`);
         for (const [taskId, job] of scheduledJobs.entries()) {
