@@ -3,6 +3,7 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
+const { filterChatModels } = require('./nativeSync/contracts.generated.cjs');
 const { CoreSingleClient } = require('./nativeSync/coreSingleClient');
 const { registerNativeSyncQueries } = require('./nativeSync/queries');
 const { durableJson } = require('./nativeSync/durableJson');
@@ -42,7 +43,7 @@ class LocalCoreClient extends CoreSingleClient {
         this.runtime.assertSharedAccess();
         const data = await this.runtime.send(this.runtime.base + '/' + encodeURIComponent(this.runtime.workspace) + '/models');
         if (!Array.isArray(data?.data)) throw fail('CORE_MODEL_CATALOG_UNAVAILABLE');
-        return data.data;
+        return data.purpose === 'chat' ? data.data : filterChatModels(data.data);
     }
 
     async announceResources() {

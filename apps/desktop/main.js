@@ -1400,15 +1400,16 @@ if (!gotTheLock) {
             const generation = ++modelFetchGeneration;
             const settings = await appSettingsManager.readSettings();
             const { fetchDesktopModelCatalog } = require('./modules/services/modelCatalog');
-            const models = await fetchDesktopModelCatalog({
+            const catalog = await fetchDesktopModelCatalog({
                 root: APP_DATA_ROOT_IN_PROJECT, settings,
                 getCoreClient: async () => {
                     if (!historyMutationQueue.coreClient && nativeSyncLifecycle) await nativeSyncLifecycle.ready;
                     return historyMutationQueue.coreClient;
                 }
             });
+            const models = catalog ?? [];
             if (generation === modelFetchGeneration) cachedModels = models;
-            return { models, generation };
+            return { models, generation, catalog };
         }
 
         // Create the native window first, but load the renderer only after IPC registration.
@@ -1757,7 +1758,7 @@ if (!gotTheLock) {
             historyMutationQueue,
             topicAdmission: topicAdmissionHost.service,
             jevService: globalJevService,
-            getModelCatalog: async () => (await fetchAndCacheModels()).models,
+            getModelCatalog: async () => (await fetchAndCacheModels()).catalog,
             gameService
         });
         regexHandlers.initialize({ AGENT_DIR });

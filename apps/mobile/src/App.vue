@@ -764,10 +764,10 @@ async function toggleModelPicker(){
  modelPicker.value={loading:true,models:[],error:''};
  const picker=modelPicker.value;
  try{
-  const {models}=await api(corePath(topic)+'/models');
+  const {models,purpose}=await api(corePath(topic)+'/models');
   if(!sameView(context)||modelPicker.value!==picker)return;
   if(!Array.isArray(models))throw Error('Invalid model catalog');
-  picker.models=filterChatModels(models);
+  picker.models=purpose==='chat'?models:filterChatModels(models);
  }catch(error){
   if(sameView(context)&&modelPicker.value===picker)picker.error=errors[error.code]||'暂时无法读取 Core 模型目录';
  }finally{picker.loading=false;}

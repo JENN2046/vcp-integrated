@@ -109,6 +109,7 @@ function initialize(mainWindow, context) {
             },
             listModels: async ({ forceRefresh = false } = {}) => {
                 const modelUsageTracker = require('../modelUsageTracker');
+                const { fetchDesktopModelCatalog, gameModelChoices } = require('../services/modelCatalog');
                 const [favoriteModels, hotModels, agentConfigs] = await Promise.all([
                     modelUsageTracker.getFavoriteModels().catch(() => []),
                     modelUsageTracker.getHotModels(15).catch(() => []),
@@ -121,33 +122,19 @@ function initialize(mainWindow, context) {
                             const root = path.dirname(USER_DATA_DIR);
                             const settingsPath = path.join(root, 'settings.json');
                             const settings = await fs.pathExists(settingsPath) ? await fs.readJson(settingsPath) : {};
-                            return require('../services/modelCatalog').fetchDesktopModelCatalog({
+                            return fetchDesktopModelCatalog({
                                 root, settings, getCoreClient: async () => historyMutationQueue.coreClient
                             });
                         })();
-                        const remoteIds = models.map(item => typeof item?.id === 'string' ? item.id.trim() : '').filter(Boolean);
-                        modelCache = { fetchedAt: now, ids: remoteIds };
+                        modelCache = Array.isArray(models) ? { fetchedAt: now, ids: models } : { fetchedAt: 0, ids: [] };
                     } catch {
                         // Fall back to cached / local agent models without blocking table setup.
                     }
                 }
-                const clean = list => [...new Set((Array.isArray(list) ? list : [])
-                    .map(id => (typeof id === 'string' ? id.trim() : ''))
-                    .filter(Boolean))];
-                const agentModels = agentConfigs
-                    .map(cfg => (typeof cfg.model === 'string' ? cfg.model.trim() : ''))
-                    .filter(Boolean);
-                const { filterChatModels } = require('../services/nativeSync/contracts.generated.cjs');
-                const available = new Set(modelCache.ids);
-                // Usage and Agent hints rank live choices, but can't re-add
-                // excluded models under an old favorite or a public alias.
-                const visible = list => filterChatModels(clean(list))
-                    .filter(id => !modelCache.fetchedAt || available.has(id));
-                return {
-                    models: visible([...favoriteModels, ...hotModels, ...agentModels, ...modelCache.ids]),
-                    favoriteModels: visible(favoriteModels),
-                    hotModels: visible(hotModels),
-                };
+                return gameModelChoices({
+                    catalog: modelCache.fetchedAt ? modelCache.ids : null,
+                    favoriteModels, hotModels, agentModels: agentConfigs.map(config => config.model)
+                });
             },
         });
     }

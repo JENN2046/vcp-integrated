@@ -9,7 +9,8 @@ const { BOX } = require('./fixtures/sharedSingleHarness.cjs');
 function catalog(fetchImpl, virtual = [{ id: 'VCPModelAuto' }]) {
     return require(BOX + '/modules/modelCatalog').createModelCatalog({
         apiUrl: 'http://127.0.0.1:1', apiKey: 'fixture-provider-key',
-        modelRedirectHandler: { isEnabled: () => true, redirectModelForClient: id => id === 'internal' ? 'public-model' : id },
+        modelRedirectHandler: { isEnabled: () => true, redirectModelForClient:
+            id => ({ internal:'public-model', 'dialogue-original':'embedding-lookalike' })[id] || id },
         semanticModelRouter: { getVirtualModels: () => virtual }, fetchImpl
     });
 }
@@ -62,7 +63,14 @@ test('remote Core catalog uses the existing device read authority and returns on
         queries++;
         if (revokeDuringQuery) revokeDuringQuery();
         if (failProvider) throw Error('upstream confidential error');
-        return Response.json({ data: [{ id: 'internal', private_field: 'never expose' }, { id: 'public-model' }, { id: 'Qwen3-Embedding-0.6B' }, { id: 'opaque', type: 'embedding' }] });
+        return Response.json({ data: [
+            { id: 'internal', private_field: 'never expose' },
+            { id: 'public-model' },
+            { id: 'Qwen3-Embedding-0.6B' },
+            { id: 'opaque', type: 'embedding' },
+            { id: 'hybrid-embedding-chat', capabilities: { chat:true, embedding:true } },
+            { id: 'dialogue-original' }
+        ] });
     });
     const core = startCoreHost({ app, chat: { config: {} }, modelCatalog: provider, listenHost: '127.0.0.1',
         serverKey: 'fixture-toolbox-key', env: { VCP_CORE_DATA_DIR: path.join(root, 'db'), VCP_CORE_MODE: 'remote', VCP_CORE_REMOTE_ORIGIN: origin } });
@@ -101,7 +109,7 @@ test('remote Core catalog uses the existing device read authority and returns on
     const ok = await call(route, auth);
     assert.equal(ok.status, 200);
     assert.equal(ok.headers.get('cache-control'), 'no-store');
-    assert.deepEqual(await ok.json(), { object: 'list', data: [{ id: 'public-model' }, { id: 'VCPModelAuto' }] });
+    assert.deepEqual(await ok.json(), { object:'list', purpose:'chat', data:[{id:'public-model'},{id:'hybrid-embedding-chat'},{id:'embedding-lookalike'},{id:'VCPModelAuto'}] });
     assert.equal(queries, 1);
     failProvider = true;
     const unavailable = await call(route, auth);
@@ -125,7 +133,7 @@ test('remote Core catalog uses the existing device read authority and returns on
     const mobileExecutor = grant('mobile', true);
     const mobileCatalog = await call(mobileRoute, { Cookie:'__Secure-vcp_mobile=' + mobileExecutor.token });
     assert.equal(mobileCatalog.status, 200);
-    assert.deepEqual(await mobileCatalog.json(), { models:['public-model','VCPModelAuto'] });
+    assert.deepEqual(await mobileCatalog.json(), { models:['public-model','hybrid-embedding-chat','embedding-lookalike','VCPModelAuto'], purpose:'chat' });
     assert.equal(core.store.db.prepare('SELECT count(*) n FROM works').get().n, 0);
     assert.equal(core.store.db.prepare('SELECT count(*) n FROM messages').get().n, 0);
 });

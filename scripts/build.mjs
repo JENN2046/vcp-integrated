@@ -21,7 +21,9 @@ function run(script, args, cwd) {
 }
 
 const input = path.join(root, 'packages/sync-contracts/src/contracts.mjs');
-const hash = createHash('sha256').update(await readFile(input)).digest('hex');
+const modelCatalogInput = path.join(path.dirname(input), 'chatModelCatalog.mjs');
+const modelCatalogSource = await readFile(modelCatalogInput);
+const hash = createHash('sha256').update(await readFile(input)).update(modelCatalogSource).digest('hex');
 const lock = JSON.parse(await readFile(path.join(mobile, 'package-lock.json')));
 const compiler = local.resolve('rolldown/package.json');
 if (local(compiler).version !== lock.packages['node_modules/rolldown'].version) throw Error('Use locked mobile dependencies');
@@ -41,6 +43,18 @@ try {
         }
     }
 } finally { await bundle.close(); }
+
+// The standalone workflow editor uses classic scripts, including on file URLs.
+const workflowBundle = await rolldown({ cwd: root, input: modelCatalogInput, platform: 'neutral' });
+try {
+    const { output } = await workflowBundle.generate({ format:'iife', name:'VCPChatModelCatalog', sourcemap:false });
+    if (output.length !== 1 || output[0].type !== 'chunk' || output[0].imports.length || output[0].dynamicImports.length) {
+        throw Error('Workflow model catalog must be standalone');
+    }
+    const workflowHash = createHash('sha256').update(modelCatalogSource).digest('hex');
+    await writeFile(path.join(desktop,'VCPHumanToolBox/WorkflowEditormodules/ai/modelCatalog.generated.js'),
+        '// Generated during release assembly; source SHA256 '+workflowHash+'\n'+output[0].code);
+} finally { await workflowBundle.close(); }
 
 // Stage a complete PWA before replacing the server's build output.
 const parent = path.join(server, 'Plugin/NativeSync');

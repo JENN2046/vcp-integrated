@@ -22,7 +22,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
     const { createModelCatalog } = require(BOX + '/modules/modelCatalog');
     const baseModel = 'synthetic', nextModel = 'model-b';
     provider.setModels([{id:baseModel, owned_by:'fixture-private'}, {id:nextModel}, {id:nextModel},
-        {id:'gemini-embedding-2-preview'}, {id:'opaque-vector', mode:'embedding'}, {id:''}]);
+        {id:'gemini-embedding-2-preview'}, {id:'opaque-vector', mode:'embedding'}, {id:'hybrid-embedding-chat', capabilities:{chat:true,embedding:true}}, {id:''}]);
     const modelCatalog = createModelCatalog({
         apiUrl:provider.url, apiKey:'fixture', modelRedirectHandler:{isEnabled:()=>false},
         semanticModelRouter:{getVirtualModels:()=>[]}
@@ -271,7 +271,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
             await page.click('#composer-model-current');
             await page.waitForSelector('#composer-model-options button');
             const ids = await page.$$eval('#composer-model-options button', buttons=>buttons.map(button=>button.textContent.trim()));
-            assert.deepEqual(ids, [baseModel, nextModel]);
+            assert.deepEqual(ids, [baseModel, nextModel, 'hybrid-embedding-chat']);
             const target = await page.$$eval('#composer-model-options button', (buttons,id)=>{
                 const button=buttons.find(row=>row.textContent.trim()===id);
                 const rect=button.getBoundingClientRect();

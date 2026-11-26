@@ -483,7 +483,8 @@ class CoreService {
         catch { throw failure('CORE_MODEL_CATALOG_UNAVAILABLE', 502); }
         if (!result || !Number.isInteger(result.status) || result.status < 200 || result.status >= 300 ||
             !Array.isArray(result.data?.data)) throw failure('CORE_MODEL_CATALOG_UNAVAILABLE', 502);
-        const rows = chatOnly ? filterChatModels(result.data.data) : result.data.data;
+        const { data, purpose } = result.data;
+        const rows = chatOnly && purpose !== 'chat' ? filterChatModels(data) : data;
         return [...new Set(rows.map(row => row?.id)
             .filter(id => typeof id === 'string' && id && id.length <= 256 && id.trim() === id))];
     }
@@ -517,7 +518,7 @@ class CoreService {
                 if (actor.kind !== 'desktop') throw failure('CORE_DESKTOP_REQUIRED', 403);
                 const ids = await this.availableModelIds({ chatOnly: true });
                 this.local.authorize(actor, req.params.workspace, 'read');
-                res.set('Cache-Control', 'no-store').json({ object: 'list', data: ids.map(id => ({ id })) });
+                res.set('Cache-Control', 'no-store').json({ object: 'list', purpose: 'chat', data: ids.map(id => ({ id })) });
             }));
             router.get('/:workspace/memo-agent', route((req, res) => {
                 const actor = resolveActor(req, req.params.workspace, 'read');
@@ -694,7 +695,7 @@ class CoreService {
             if (actor.kind !== 'mobile' || topic.ownerType !== 'agent') throw failure('CORE_MODEL_OVERRIDE_UNAVAILABLE', 403);
             const models = await this.availableModelIds({ chatOnly: true });
             scope(req, 'execute');
-            res.set('Cache-Control', 'no-store').json({ models });
+            res.set('Cache-Control', 'no-store').json({ models, purpose: 'chat' });
         }));
         router.get('/:workspace/:key/receipt', route((req, res) => {
             const { actor, topic } = scope(req, 'read');

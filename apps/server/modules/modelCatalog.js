@@ -41,13 +41,17 @@ function createModelCatalog({ apiUrl, apiKey, modelRedirectHandler, semanticMode
                 }
                 data = appendVirtualModels(data);
                 if (!Array.isArray(data?.data)) throw Error('Invalid model catalog');
+                if (chatOnly) data.purpose = 'chat';
                 return { status: response.status, headers: response.headers, data };
             } catch (error) {
                 console.warn('[Models] 模型列表解析失败:', error.message);
             }
         }
         const fallback = appendVirtualModels({ object: 'list', data: [] });
-        if (fallback.data.length) return { status: 200, data: fallback };
+        if (fallback.data.length) {
+            if (chatOnly) fallback.purpose = 'chat';
+            return { status: 200, data: fallback };
+        }
         return { status: response.ok ? 502 : response.status, text: response.ok ? 'Invalid model catalog' : text };
     };
 }
