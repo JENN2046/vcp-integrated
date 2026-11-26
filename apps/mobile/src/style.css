@@ -197,3 +197,11 @@ footer>* {max-width:var(--content); margin-inline:auto}
 .task-quote .icon-button,.quote-exit {background:transparent; color:inherit}
 .quote-exit {padding:4px 8px; white-space:nowrap; font-size:.81rem; font-weight:650}
 @media(max-height:480px) {.task-quote {margin-bottom:2px}}
+
+.attachment-selection-notice { max-height:6em; overflow:auto; margin:0 0 4px; padding-inline-start:1.4em; color:var(--warning); font-size:.82rem; overflow-wrap:anywhere }
+.failed-work { margin-block:0 12px; padding:10px 12px; border-radius:10px; background:var(--warning-soft); color:var(--warning); font-size:.85rem }
+.failed-work p { margin:4px 0 }
+.failed-work button { padding:4px 0; background:transparent; color:inherit; text-decoration:underline }
+.return-latest { position:absolute; inset-inline-end:16px; bottom:12px; z-index:1; padding:8px 12px; border-radius:20px; background:var(--accent-soft); color:var(--accent); box-shadow:0 1px 5px #0002 }
+.pair-help,.pair-error { font-size:.85rem; overflow-wrap:anywhere }
+.pair-error { margin:4px 0; color:var(--warning) }

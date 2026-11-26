@@ -64,8 +64,8 @@ function closePanel(){
  nextTick(()=>toggle?.focus());
 }
 const attachmentPreview=ref(null),attachmentDialog=ref(null);let attachmentReadRequest=0,attachmentReadController=null;
-// Ordinary drafts live in this page. Verified rejections also keep editable
-// text and uploaded attachment references in the device recovery store.
+// Persist ordinary text by paired identity and topic. Selected local files
+// stay in the page; verified rejections use the existing recovery store.
 const drafts=new Map(),composerDraft=ref({text:'',files:[],revision:0});let composerScope='';
 const steeringStoragePrefix='vcp.mobile.steering.v1:', steeringStorageError=ref('');
 const text=computed({get:()=>composerDraft.value.text,set:value=>{composerDraft.value.text=value;composerDraft.value.revision++;saveDraftEdit(composerDraft.value);}});
@@ -74,19 +74,27 @@ const pendingFiles=computed({get:()=>composerDraft.value.files,set:value=>{compo
 const nativeResult=ref(null),nativeResultPanel=ref(null);let nativeResultRequest=0;
 let incomingPairing=consumePairingLink({location:window.location,history:window.history,secureContext:window.isSecureContext});
 let connectionInitialized=false;
-const pairingLinkOpen=ref(false);
+const pairingLinkOpen=ref(false), pairError=ref('');
 const paired=ref(false),pairCode=ref(''),topics=ref([]),selected=ref(''),agentId=ref(''),messages=ref([]),jobs=ref([]),busy=ref(true),notice=ref('正在连接…'),online=ref(false),history=ref(null);
+const historyAtEnd=ref(true);
+const nearHistoryEnd=area=>!area||area.scrollHeight-area.scrollTop-area.clientHeight<48;
+function trackHistoryEnd(){historyAtEnd.value=nearHistoryEnd(history.value);}
+function returnToLatest(){
+ const area=history.value;
+ if(area)area.scrollTop=area.scrollHeight;
+ trackHistoryEnd();
+}
 // Preserve the reader's position when the keyboard or composer changes height.
 watch(history, (area, previous, onCleanup) => {
  if(!area)return;
  let height=area.clientHeight;
- const nearEnd=()=>area.scrollHeight-area.scrollTop-area.clientHeight<48;
+ const nearEnd=()=>nearHistoryEnd(area);
  let anchored=nearEnd();
  const onScroll=()=>{if(area.clientHeight===height)anchored=nearEnd();};
  const observer=new ResizeObserver(()=>{
   const nextHeight=area.clientHeight;
   if(nextHeight!==height && anchored)area.scrollTop=area.scrollHeight;
-  height=nextHeight;anchored=nearEnd();
+  height=nextHeight;anchored=nearEnd();trackHistoryEnd();
  });
  area.addEventListener('scroll',onScroll,{passive:true});
  observer.observe(area);
@@ -207,10 +215,10 @@ function toggleAttachmentText(m,a,index,event){if(!event.target.isConnected)retu
 async function showEarlierMessages(){const element=history.value,top=element?.scrollTop||0,height=element?.scrollHeight||0,epoch=generation,key=selected.value;historyStart.value=Math.max(0,historyStart.value-40);await nextTick();if(element&&element===history.value&&epoch===generation&&key===selected.value)element.scrollTop=top+element.scrollHeight-height;}
 async function displayHistory(rows,current){
  if(!current())return;
- const element=history.value,stick=!element||element.scrollHeight-element.scrollTop-element.clientHeight<80,anchor=messages.value[historyStart.value]?.id;
+ const element=history.value,stick=nearHistoryEnd(element),anchor=messages.value[historyStart.value]?.id;
  const sorted=rows.sort((a,b)=>(a.ordinal??a.timestamp)-(b.ordinal??b.timestamp)),index=anchor?sorted.findIndex(m=>m.id===anchor):-1;
  historyStart.value=stick?Math.max(0,sorted.length-40):Math.max(0,index);messages.value=sorted;
- await nextTick();if(current()&&stick&&history.value)history.value.scrollTop=history.value.scrollHeight;
+ await nextTick();if(current()){if(stick)returnToLatest();else trackHistoryEnd();}
 }
 const longTextKey=m=>JSON.stringify([selected.value,m.id]);
 function toggleLongText(m){const next=new Set(expandedLongText.value),key=longTextKey(m);if(next.has(key))next.delete(key);else next.add(key);expandedLongText.value=next;}
@@ -243,12 +251,6 @@ function scheduleSharedRefresh(context){
 }
 function clearSharedObservers(){stopCoreObservation();clearTimeout(sharedRefreshTimer);sharedRefreshTimer=null;sharedRefreshPending=false;sharedObserver.reset();}
 const visibleSharedStreams=computed(()=>sharedSessionPreviews(sharedStreams.value,messages.value.map(message=>message.id)));
-watch(visibleSharedStreams, async () => {
- const area=history.value, key=selected.value;
- if(!area || !visibleSharedStreams.value.length || area.scrollHeight-area.clientHeight-area.scrollTop>=80)return;
- await nextTick();
- if(area===history.value && key===selected.value)area.scrollTop=area.scrollHeight;
-});
 const sharedActivityLabels={started:'原生工具执行中',accepted:'原生任务已接收',settled:'原生工具已返回',observed:'原生任务状态已更新',waiting_approval:'等待原生审批',running:'原生执行中'};
 const ownerKey=t=>JSON.stringify([t.ownerType||'agent',t.sharedOwnerId||t.ownerId||t.agentName]);
 const labels={accepted:'已受理，等待执行',dispatched:'原生执行中',waiting_approval:'等待原生工具审批',review_required:'执行中断 · 接力已暂停',blocked_config:'上下文或配置不可用 · 接力已暂停',recovering:'正在恢复已保存的结果',interrupted:'已中断 · 不自动重跑',preparing:'正在持久保存',queued:'已接受 · 等待执行',running:'服务端执行中',cancelling:'正在取消',cancelled:'已取消',publishing:'正在保存回复',completed:'回复已保存',failed:'执行失败'};
@@ -290,6 +292,58 @@ function syncRejectedDraft(){
   draft.files=saved?rejectedDraftFiles(saved):[];
  }catch(error){recoveryError.value=recoveryMessage(error);}
 }
+const composerText=computed({get:()=>text.value,set:value=>{
+ text.value=value;
+ const draft=composerDraft.value;
+ if(!draft.taskQuote&&!draft.rejected)rememberOrdinaryText(draft,composerScope);
+ else delete draft.ordinaryEditId;
+}});
+const ordinaryDraftPrefix='vcp.mobile.draft.v1:';
+const ordinaryDraftError=ref('');
+function readOrdinaryText(scope){
+ try{
+  const item=JSON.parse(localStorage.getItem(ordinaryDraftPrefix+scope));
+  return typeof item?.text==='string'&&typeof item.editId==='string'?item:null;
+ }catch{return null;}
+}
+function restoreOrdinaryText(draft,scope){
+ if(draft.rejected||draft.revision||draft.coreSteering||draft.text)return;
+ const saved=readOrdinaryText(scope);
+ if(saved){draft.text=saved.text;draft.ordinaryEditId=saved.editId;}
+}
+function rememberOrdinaryText(draft,scope){
+ if(!scope)return;
+ try{
+  if(draft.text){
+   draft.ordinaryEditId=crypto.randomUUID();
+   localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({text:draft.text,editId:draft.ordinaryEditId}));
+  }else{
+   localStorage.removeItem(ordinaryDraftPrefix+scope);
+   delete draft.ordinaryEditId;
+  }
+  ordinaryDraftError.value='';
+ }catch{ordinaryDraftError.value='草稿暂无法保存在此浏览器，刷新前请检查存储。';}
+}
+function markOrdinarySubmission(draft,scope,requestId){
+ const saved=readOrdinaryText(scope);
+ if(!saved||saved.editId!==draft.ordinaryEditId)return;
+ try{localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({...saved,requestId}));}
+ catch{ordinaryDraftError.value='草稿暂无法保存在此浏览器，刷新前请检查存储。';}
+}
+function confirmOrdinaryText(draft,record,scope){
+ const saved=readOrdinaryText(scope);
+ if(saved?.requestId!==record.requestId)return;
+ try{localStorage.removeItem(ordinaryDraftPrefix+scope);}
+ catch{ordinaryDraftError.value='本机草稿的送达状态暂无法更新。';return;}
+ if(draft.ordinaryEditId===saved.editId){draft.text='';delete draft.ordinaryEditId;}
+}
+watch(composerDraft,draft=>{
+ ordinaryDraftError.value='';
+ if(composerScope)restoreOrdinaryText(draft,composerScope);
+});
+watch([composerDraft,()=>composerDraft.value.taskQuote],([draft,quote],[previous,previousQuote])=>{
+ if(draft===previous&&previousQuote&&!quote&&!draft.rejected)rememberOrdinaryText(draft,composerScope);
+},{flush:'sync'});
 function draftContents(draft,sessionMarker){
  return {text:draft.text,attachments:draft.files.filter(file=>file.uploadId&&file.uploadSessionMarker===sessionMarker).map(file=>file.uploadId)};
 }
@@ -320,6 +374,7 @@ function removeDraftFile(index){
 function confirmDraft(record,context){
  const draft=drafts.get(context.draftScope),sent=draft?.submitted;
  if(!draft)return;
+ confirmOrdinaryText(draft,record,context.draftScope);
  if(!sent||sent.requestId!==record.requestId){syncRejectedDraft();return;}
  draft.rejected=submissionStore.rejectedDraft(record);
  if(draft.revision===sent.revision&&draft.text===record.payload.text)draft.text='';
@@ -336,6 +391,16 @@ function workTime(createdAt){
  return Number.isFinite(createdAt)?new Date(createdAt).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}):'';
 }
 const displayJobs=computed(()=>jobs.value.map(job=>{try{if(job.topicKey!==selected.value)throw Error('NATIVE_TASK_TOPIC_MISMATCH');if(job.core)return {...job,nativeTasks:(job.tasks||[]).map(task=>({...task,nativeTaskId:task.id,agentBaseName:task.agent,resultRef:task.revision===1?task.id:null})),toolInvocations:(job.tools||[]).map(tool=>({invocationId:tool.id,pluginName:tool.name,state:tool.status}))};return {...job,...projectNativeWork(job)};}catch{return {...job,nativeTasks:[],toolInvocations:[],nativeTaskError:'原生任务关联暂不能核对，请刷新或在宿主检查。'};}}));
+const failedByMessage=computed(()=>new Map(jobs.value.filter(work=>work.core&&work.state==='failed'&&work.messageId)
+ .map(work=>[work.messageId,work])));
+watch([visibleSharedStreams,corePreviews,failedByMessage],async()=>{
+ const area=history.value,key=selected.value,stick=nearHistoryEnd(area);
+ if(!area)return;
+ await nextTick();
+ if(area!==history.value||key!==selected.value)return;
+ if(stick)returnToLatest();
+ else trackHistoryEnd();
+});
 const keyAllowed=computed(()=>Boolean(isSecureContext&&server.value?.credentialExchangeAllowed));
 const pendingSubmission=computed(()=>recoveryRecords.value.find(record=>record.entryId===recoveryContext.value?.entryId&&record.topicKey===selected.value)||null);
 const recoveryBlocker=computed(()=>recoveryError.value||(!validSessionRecovery(recoveryContext.value)?'当前服务端未提供可靠提交恢复信息，暂不能发送。':''));
@@ -378,7 +443,12 @@ function invalidateSession(){conversationPanel.value='';clearSharedObservers();s
 function captureContext(){if(!paired.value||!selected.value||!validSessionRecovery(recoveryContext.value))throw Object.assign(Error(recoveryMessages.SUBMISSION_RECOVERY_UNAVAILABLE),{code:'SUBMISSION_RECOVERY_UNAVAILABLE'});return {topicKey:selected.value,recovery:{...recoveryContext.value},generation,authEpoch,draftScope:draftScope()};}
 function sameView(context){return context.topicKey===selected.value&&context.generation===generation&&context.authEpoch===authEpoch&&context.recovery?.entryId===recoveryContext.value?.entryId&&context.recovery?.sessionMarker===recoveryContext.value?.sessionMarker;}
 function newSubmissionContext(){if(!loadRecovery())throw Error(recoveryError.value);const context=captureContext();if(!historyContextReady.value)throw Object.assign(Error('正在载入历史并核对上下文'),{code:'HISTORY_CONTEXT_LOADING'});if(!currentTopic.value)throw Object.assign(Error(recoveryMessages.SUBMISSION_TOPIC_UNAVAILABLE),{code:'SUBMISSION_TOPIC_UNAVAILABLE'});if(submissionStore.current({entryId:context.recovery.entryId,topicKey:context.topicKey}))throw Object.assign(Error(recoveryMessages.SUBMISSION_PENDING),{code:'SUBMISSION_PENDING'});return context;}
-const errors={CORE_DATABASE_IDENTITY_MISMATCH:'此地址的 Core 数据库身份已变化，连接已暂停。请恢复原数据库。',SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保留；完成后请显式重试',SHARED_GROUP_EXECUTION_NOT_READY:'共享群聊暂为只读，发送接线尚未完成',SHARED_CONFIG_PENDING:'共享配置正在核对，请稍后显式发送',SHARED_CONFIG_CONFLICT:'共享配置存在冲突，请先选择采用的版本',SHARED_EXECUTION_PERMISSION_REQUIRED:'本会话尚未授予共享执行权限',ATTACHMENTS_NOT_ENABLED:'当前服务器尚未启用附件传输，已选择的文件和消息草稿仍保留',SHARED_ATTACHMENTS_NOT_READY:'共享附件发送尚未接通，原文件保留',HISTORY_CONTEXT_LOADING:'正在载入历史并核对上下文',DESKTOP_REFERENCE_CLIENT_UPGRADE_REQUIRED:'此历史包含桌面引用，请更新应用后重开',GROUP_MODE_REQUIRES_DESKTOP:'此群聊模式请在桌面执行',GROUP_MEMBER_UNAVAILABLE:'此成员配置暂不可用',DEPENDENCY_REVIEW_REQUIRED:'同一话题有待核对的执行，请先处理暂停任务',DESKTOP_CONTEXT_REQUIRED:'本轮上下文需要桌面专用内容，请在桌面继续',CONFIG_SNAPSHOT_CORRUPT:'执行配置校验失败，请在桌面重新发布',GROUP_CONTEXT_UNAVAILABLE:'有效上下文暂不可用',ATTACHMENT_BLOB_MISSING:'附件暂未同步，请等待电脑补齐',ATTACHMENT_BLOB_CORRUPT:'附件完整性校验失败，请重新同步',ATTACHMENT_TEXT_UNAVAILABLE:'此文件的文本尚不可用',ATTACHMENT_TYPE_REJECTED:'支持 PNG、JPEG、WebP、PDF 和 UTF-8 文本文件',ATTACHMENT_STORAGE_BUDGET:'附件空间已达到上限',ATTACHMENT_REQUEST_BUDGET:'附件请求过多，请稍后重试',MODEL_IMAGE_UNSUPPORTED:'当前模型不支持图片，请在电脑端选择支持图片的模型并发布配置',EXECUTION_CONFIG_REQUIRED:'请先在电脑端发布有效 Agent 配置',PAIR_REQUIRED:'请使用本入口的配对方式连接会话',HTTPS_REQUIRED:'当前入口尚未启用 HTTPS，不能提交 Key',SERVER_NOT_APPROVED:'此地址尚未由服务端批准，请使用已获授权的服务器',PROTECTED_HOST_NOT_READY:'安全链路或服务端接入尚未就绪，暂不接收访问凭据',AUTH_FAILED:'访问凭据不正确',AUTH_RATE_LIMIT:'尝试过于频繁，请稍后重试',AGENT_NOT_EXECUTABLE:'此 Agent 尚未配置服务端执行能力',EXECUTION_INTERRUPTED_REVIEW_REQUIRED:'执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑'};
+const errors={INVALID_PAIRING:'配对码无效、已使用或过期，请生成新码。',CORE_DATABASE_IDENTITY_MISMATCH:'此地址的 Core 数据库身份已变化，连接已暂停。请恢复原数据库。',SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保留；完成后请显式重试',SHARED_GROUP_EXECUTION_NOT_READY:'共享群聊暂为只读，发送接线尚未完成',SHARED_CONFIG_PENDING:'共享配置正在核对，请稍后显式发送',SHARED_CONFIG_CONFLICT:'共享配置存在冲突，请先选择采用的版本',SHARED_EXECUTION_PERMISSION_REQUIRED:'本会话尚未授予共享执行权限',ATTACHMENTS_NOT_ENABLED:'当前服务器尚未启用附件传输，已选择的文件和消息草稿仍保留',SHARED_ATTACHMENTS_NOT_READY:'共享附件发送尚未接通，原文件保留',HISTORY_CONTEXT_LOADING:'正在载入历史并核对上下文',DESKTOP_REFERENCE_CLIENT_UPGRADE_REQUIRED:'此历史包含桌面引用，请更新应用后重开',GROUP_MODE_REQUIRES_DESKTOP:'此群聊模式请在桌面执行',GROUP_MEMBER_UNAVAILABLE:'此成员配置暂不可用',DEPENDENCY_REVIEW_REQUIRED:'同一话题有待核对的执行，请先处理暂停任务',DESKTOP_CONTEXT_REQUIRED:'本轮上下文需要桌面专用内容，请在桌面继续',CONFIG_SNAPSHOT_CORRUPT:'执行配置校验失败，请在桌面重新发布',GROUP_CONTEXT_UNAVAILABLE:'有效上下文暂不可用',ATTACHMENT_BLOB_MISSING:'附件暂未同步，请等待电脑补齐',ATTACHMENT_BLOB_CORRUPT:'附件完整性校验失败，请重新同步',ATTACHMENT_TEXT_UNAVAILABLE:'此文件的文本尚不可用',ATTACHMENT_TYPE_REJECTED:'支持 PNG、JPEG、WebP、PDF 和 UTF-8 文本文件',ATTACHMENT_STORAGE_BUDGET:'附件空间已达到上限',ATTACHMENT_REQUEST_BUDGET:'附件请求过多，请稍后重试',MODEL_IMAGE_UNSUPPORTED:'当前模型不支持图片，请在电脑端选择支持图片的模型并发布配置',EXECUTION_CONFIG_REQUIRED:'请先在电脑端发布有效 Agent 配置',PAIR_REQUIRED:'请使用本入口的配对方式连接会话',HTTPS_REQUIRED:'当前入口尚未启用 HTTPS，不能提交 Key',SERVER_NOT_APPROVED:'此地址尚未由服务端批准，请使用已获授权的服务器',PROTECTED_HOST_NOT_READY:'安全链路或服务端接入尚未就绪，暂不接收访问凭据',AUTH_FAILED:'访问凭据不正确',AUTH_RATE_LIMIT:'尝试过于频繁，请稍后重试',AGENT_NOT_EXECUTABLE:'此 Agent 尚未配置服务端执行能力',EXECUTION_INTERRUPTED_REVIEW_REQUIRED:'执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑'};
+function noteConnectionFailure(error){
+ if(!(error instanceof TypeError&&!error.status)&&![502,503,504].includes(error.status))return false;
+ online.value=false;
+ return true;
+}
 async function api(route,body,requestHeaders={},signal,suppressPairRequired=false){
  const requestEpoch=authEpoch;
  const r=await fetch('/mobile/api/'+route,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'X-NativeSync-Capabilities':'desktop-references-v1,source-data-v2,shared-space-v1',...(body?{'Content-Type':'application/json'}:{}),...requestHeaders,...coreStorageHeaders()},body:body?JSON.stringify(body):undefined,signal});
@@ -448,20 +518,22 @@ async function session({startupSignal}={}){const epoch=authEpoch;try{
  directoryPaged=r.directory?.paged===true;
  const currentEpoch=authEpoch,result=directoryPaged?await readDirectoryPages(api,()=>currentEpoch===authEpoch):{topics:r.topics,agents:r.agents};
  if(!result||currentEpoch!==authEpoch)return;await setDirectory(result,{initial:true,selectedTopic:r.selectedTopic});loadRecovery();await refresh();
- }catch(e){if(!startupSignal?.aborted)notice.value=e.message;}}
+ }catch(e){if(!startupSignal?.aborted&&epoch===authEpoch&&!noteConnectionFailure(e))notice.value=e.message;}}
 
 async function pair(){
  if(busy.value)return;
- busy.value=true;invalidateSession();
+ busy.value=true;pairError.value='';invalidateSession();
  try{
   await pairingRecovery.withSessionLock(async()=>{
    if(!pairCode.value||pageSuspended)return;
    const enrolled=await pairingRecovery.pair(api,pairCode.value);
    pairCode.value='';
    pairRecoveryNotice.value=enrolled?'':'此浏览器或服务端未启用设备恢复。若浏览器丢失会话，请重新配对。';
-   resetHistory();await session();settingsOpen.value=false;
+   notice.value='';
+   resetHistory();await session();
+   if(paired.value)settingsOpen.value=false;
   });
- }catch(e){notice.value=e.message;}
+ }catch(e){pairError.value=noteConnectionFailure(e)?'暂未连上服务端，请联网后重试。':e.message;}
  finally{busy.value=false;}
 }
 async function connectionInfo(){try{server.value=await api('connection');serverUrl.value=server.value.serverUrl||server.value.suggestedServerUrl||'';online.value=true;if(keyAllowed.value){server.value=await api('connection/test',{serverUrl:serverUrl.value});tested.value=true;}}catch(error){notice.value=error.code==='CORE_DATABASE_IDENTITY_MISMATCH'?error.message:'安全连接尚未就绪，尚未提交任何凭据';}}
@@ -489,7 +561,7 @@ async function disconnect(){
    await pairingRecovery.changeSession(()=>api('connection/disconnect',{}));
    pairRecoveryNotice.value='';
    paired.value=false;invalidateSession();topics.value=[];directoryAgents.value=null;sourceProgress.value=[];directoryRevision='';resetHistory();tested.value=false;settingsOpen.value=true;
-   notice.value='此设备会话已撤销，待确认提交继续保留，可重新认证核对。';
+   notice.value='此设备会话已撤销。下次连接需要重新配对或认证，待确认提交继续保留。';
   });
  }catch(e){notice.value=e.message;}
  finally{busy.value=false;}
@@ -500,7 +572,7 @@ function selectSource(){
  agentId.value=visibleAgents.value.some(a=>a.id===agentId.value)?agentId.value:visibleAgents.value[0]?.id||'';
  selected.value=visibleTopics.value[0]?.key||'';changeTopic();
 }
-async function changeTopic(){resetHistory();if(!selected.value)return;try{await api('selection',{key:selected.value});await refresh();}catch(e){if(e.status===401||e.status===403)historyCache.remove(cacheBinding(selected.value));notice.value=e.message;}}
+async function changeTopic(){resetHistory();if(!selected.value)return;try{await api('selection',{key:selected.value});await refresh();}catch(e){if(e.status===401||e.status===403)historyCache.remove(cacheBinding(selected.value));if(!noteConnectionFailure(e))notice.value=e.message;}}
 async function authorizeCachedHistory(readApi,current){
  const live=await readApi('session');if(!current())return false;
  if(!validSessionRecovery(live.recovery)||live.recovery.entryId!==recoveryContext.value?.entryId||live.recovery.sessionMarker!==recoveryContext.value?.sessionMarker||Boolean(live.directory?.paged)!==directoryPaged){paired.value=false;invalidateSession();notice.value='设备会话已变化，请刷新页面重新核对；原待确认提交继续保留。';return false;}
@@ -534,7 +606,7 @@ async function refresh(){
   if(currentTopic.value?.attachmentsEnabled){const batch=attachmentPager.select(messages.value);attachmentStates.value=batch.retained;if(batch.ids.length){const status=await readApi('conversations/'+encodeURIComponent(key)+'/attachments/status',{messageIds:batch.ids});if(selected.value!==key||epoch!==generation||sessionEpoch!==authEpoch)return;attachmentStates.value=attachmentPager.merge(batch,status.attachments,messages.value);}}
   syncSharedObservers();
   if(!busy.value&&!submissionNoticeHeld)notice.value=recoveryBlocker.value||(pendingSubmission.value?'本地提交仍待核对，未发起新请求。':'中央会话已更新');
- }catch(e){if(selected.value===key&&epoch===generation&&sessionEpoch===authEpoch){historyContextReady.value=false;if(e.status===401||e.status===403||['HISTORY_PAGE_INVALID','HISTORY_CACHE_INVALID','SYNC_STORAGE_CORRUPT'].includes(e.code)){historyCache.remove(historyBinding);resetHistory({remember:false});}online.value=false;if(historyProgress.value)historyProgress.value={...historyProgress.value,failed:true};if(!submissionNoticeHeld){notice.value=recoveryMessage(e);if(e.code?.startsWith('SUBMISSION_'))submissionNoticeHeld=true;}}}finally{if(refreshing===controller)refreshing=null;}
+ }catch(e){if(selected.value===key&&epoch===generation&&sessionEpoch===authEpoch){historyContextReady.value=false;if(e.status===401||e.status===403||['HISTORY_PAGE_INVALID','HISTORY_CACHE_INVALID','SYNC_STORAGE_CORRUPT'].includes(e.code)){historyCache.remove(historyBinding);resetHistory({remember:false});}online.value=false;if(historyProgress.value)historyProgress.value={...historyProgress.value,failed:true};if(!noteConnectionFailure(e)&&!submissionNoticeHeld){notice.value=recoveryMessage(e);if(e.code?.startsWith('SUBMISSION_'))submissionNoticeHeld=true;}}}finally{if(refreshing===controller)refreshing=null;}
 }
 async function nextExecutions(mode){executionPager.next(mode);await refresh();}
 async function latestExecutions(){executionPager.reset();await refresh();}
@@ -547,6 +619,9 @@ async function reconcileSubmission(record,executions,context){
   if(sameView(context)){
    submissionNoticeHeld=false;
    acceptedReceipt.value={requestId:record.requestId,id:result.execution.id};recoveryDetail.value='';
+   if(notice.value.startsWith('尚未完成提交确认：')||notice.value==='本地已保存 · 正在等待云端确认…'){
+    notice.value='云端已接受 · '+executionLabel(result.execution);
+   }
    if(record.kind==='invitation'&&invitedAgent.value===record.payload.agentId)invitedAgent.value='';
   }
  }else if(sameView(context)){recoveryDetail.value=result.state==='absent'?'尚未查到云端接受记录。点击核对 / 重试只会使用原提交身份和内容。':recoveryReasons[result.reason];}
@@ -603,10 +678,19 @@ async function submit(submission,kind='message',context=newSubmissionContext()){
   if(!loadRecovery())throw Error(recoveryError.value);
   if(sameView(context)){recoveryDetail.value='本地已保存，尚未收到可核验的云端接受回执。';acceptedReceipt.value=null;}
   await postPrepared(record,context);
- }catch(error){loadRecovery();if(sameView(context)){submissionNoticeHeld=true;notice.value='尚未完成提交确认：'+recoveryMessage(error);}}
+ }catch(error){loadRecovery();if(sameView(context)){submissionNoticeHeld=true;notice.value='尚未完成提交确认：'+(noteConnectionFailure(error)?'暂未连上服务端，原提交仍待核对。':recoveryMessage(error));}}
  finally{busy.value=false;}
 }
-function selectFiles(event){for(const file of event.target.files||[]){if(pendingFiles.value.length>=8)break;if(file.size>20*1024*1024){notice.value='单个附件需在 20 MB 以内';continue;}if(!pendingFiles.value.some(f=>f.file?.name===file.name&&f.file.size===file.size&&f.file.lastModified===file.lastModified))pendingFiles.value.push({file,progress:0,error:'',uploadId:null});}event.target.value='';}
+function selectFiles(event){
+ const draft=composerDraft.value,rejected=[];
+ for(const file of event.target.files||[]){
+  const reason=file.size>20*1024*1024?'单个附件超过 20 MB':draft.files.length>=8?'最多添加 8 个附件':'';
+  if(reason)rejected.push({name:file.name,reason});
+  else draft.files.push({file,progress:0,error:'',uploadId:null});
+ }
+ draft.fileRejections=rejected;
+ event.target.value='';
+}
 function attachmentUrl(message,attachment){if(currentTopic.value?.coreSingle)return '/mobile/api/'+corePath(currentTopic.value)+'/blob/'+encodeURIComponent(attachment.hash);return '/mobile/api/conversations/'+encodeURIComponent(selected.value)+'/attachments/messages/'+encodeURIComponent(message.id)+'/'+encodeURIComponent(attachment.id);}
 function closeAttachment(){
  attachmentReadRequest++;attachmentReadController?.abort();attachmentReadController=null;
@@ -748,7 +832,7 @@ async function sendCoreSteering(quote){
 async function send(){
  if((!text.value.trim()&&!pendingFiles.value.length)||busy.value||currentTopic.value?.executable===false)return;
  let context;busy.value=true;submissionNoticeHeld=false;
- try{context=newSubmissionContext();const draft=composerDraft.value;await draftWrites.get(draft);if(!sameView(context))return;context.rejected=draft.rejected;const snapshot={text:draft.text,revision:draft.revision,files:[...draft.files]},ids=[];for(const item of snapshot.files){item.error='';try{if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;if(!item.uploadId&&!item.file)throw Error('请移除已上传附件并重新选择原文件');item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n,currentTopic.value?.coreSingle?corePath(currentTopic.value)+'/attachments':undefined);item.uploadSessionMarker=context.recovery.sessionMarker;ids.push(item.uploadId);}catch(e){item.error=e.message;throw e;}}if(!sameView(context))return;const requestId=crypto.randomUUID();draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};await submit({requestId,text:snapshot.text,attachments:ids},'message',context);}
+ try{context=newSubmissionContext();const draft=composerDraft.value;await draftWrites.get(draft);if(!sameView(context))return;context.rejected=draft.rejected;const snapshot={text:draft.text,revision:draft.revision,files:[...draft.files]},ids=[];for(const item of snapshot.files){item.error='';try{if(item.uploadSessionMarker!==context.recovery.sessionMarker)item.uploadId=null;if(!item.uploadId&&!item.file)throw Error('请移除已上传附件并重新选择原文件');item.uploadId=item.uploadId||await uploadAttachment(api,context.topicKey,item.file,n=>item.progress=n,currentTopic.value?.coreSingle?corePath(currentTopic.value)+'/attachments':undefined);item.uploadSessionMarker=context.recovery.sessionMarker;ids.push(item.uploadId);}catch(e){item.error=e.message;throw e;}}if(!sameView(context))return;const requestId=crypto.randomUUID();draft.submitted={requestId,revision:snapshot.revision,files:snapshot.files};if(draft.revision===snapshot.revision)markOrdinarySubmission(draft,context.draftScope,requestId);await submit({requestId,text:snapshot.text,attachments:ids},'message',context);}
  catch(error){if(!context||sameView(context)){submissionNoticeHeld=true;notice.value=recoveryMessage(error);}}finally{busy.value=false;}
 }
 async function refreshRetrySession(context){
@@ -926,8 +1010,22 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
     <label for="server-key">访问凭据 · VCPToolBox API Key</label><input id="server-key" v-model="accessKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" :disabled="busy||!keyAllowed||!tested" :placeholder="keyAllowed&&tested?'只需输入你的 Key':'HTTPS 安全入口就绪后可输入'" :required="keyAllowed&&tested">
     <button id="save-connection" :disabled="busy||!tested||!keyAllowed||!accessKey">{{paired?'重新认证并保存连接':'保存服务器连接'}}</button>
    </form>
-   <div v-if="paired" class="device-actions"><button id="disconnect" @click="disconnect" :disabled="busy">断开连接</button><button id="clear-session" @click="disconnect" :disabled="busy">清除设备会话</button><button id="close-settings" @click="settingsOpen=false">返回会话</button></div>
-   <details v-if="!paired" :open="pairingLinkOpen||server?.mode==='core'||server?.credentialExchangeAllowed===false"><summary>使用一次性配对码</summary><form @submit.prevent="pair"><label for="pair-code">一次性配对码</label><input id="pair-code" v-model="pairCode" type="password" autocomplete="off" required><button id="pair-submit" :disabled="busy">连接会话</button></form></details>
+   <div v-if="paired" class="device-actions"><button id="disconnect" @click="disconnect" :disabled="busy">断开此设备</button><button id="close-settings" @click="settingsOpen=false">返回会话</button></div>
+   <p v-if="paired" class="pair-help">临时断网会自动尝试重连。断开此设备、会话失效或浏览器无法恢复会话时，需要重新连接。</p>
+   <details v-if="!paired" :open="pairingLinkOpen||server?.mode==='core'||server?.credentialExchangeAllowed===false">
+    <summary>使用一次性配对码</summary>
+    <form @submit.prevent="pair">
+     <p id="pair-help" class="pair-help">
+      <template v-if="server?.mode==='core'">在运行 ToolBox 的电脑上，请管理员用 ToolBox 账户在安装目录执行 <code>node apps/server/core/pairDevice.js pair mobile</code> 生成新码。</template>
+      <template v-else>请让管理 ToolBox 的人从 NativeSync 生成此设备的一次性配对码。</template>
+     </p>
+     <label for="pair-code">一次性配对码</label>
+     <input id="pair-code" v-model="pairCode" type="password" autocomplete="off" required
+       :aria-invalid="Boolean(pairError)" :aria-describedby="pairError?'pair-help pair-error':'pair-help'" @input="pairError=''">
+     <p v-if="pairError" id="pair-error" class="pair-error" role="alert">{{pairError}}</p>
+     <button id="pair-submit" :disabled="busy">连接会话</button>
+    </form>
+   </details>
    <fieldset class="theme-settings"><legend>外观</legend><label v-for="(mode,index) in themeModes" :key="mode">
     <input type="radio" name="appearance" :value="mode" :checked="theme===mode" @change="applyTheme(mode)"><span>{{['跟随系统','浅色','深色'][index]}}</span>
    </label></fieldset>
@@ -974,7 +1072,13 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
    <SharedConfigEditor v-if="currentTopic?.sharedSpaceId&&sharedSpaces.some(s=>s.id===currentTopic.sharedSpaceId&&s.config)" :key="currentTopic.sharedOwnerId" :topic="currentTopic" :context="recoveryContext" :api="api" />
    </details>
    </nav>
-   <section ref="history" id="history" aria-label="聊天历史" :inert="navigationVisible || conversationPanel==='work'"><p v-if="historyProgress" class="history-progress" role="status">{{historyProgress.failed?'历史暂未加载完成，稍后重试':historyProgress.checking?'正在核对历史增量':'正在加载历史'}}<template v-if="historyProgress.total"> · {{historyProgress.loaded}} / {{historyProgress.total}}</template></p><button v-if="historyStart>0" class="earlier-messages" @click="showEarlierMessages">查看更早消息（还有 {{historyStart}} 条）</button><article v-for="m in visibleMessages" :key="m.id" class="message" :class="[m.role,{'snapshot-message':m.contextCompaction}]" :data-message-id="m.id"><div class="message-author" v-if="m.role!=='user'||m.name==='Flowlock'"><AgentAvatar v-if="m.role!=='user'&&!m.contextCompaction" :src="currentTopic?.ownerType==='group'?undefined:currentTopic?.avatar||activeAgent?.avatar" :name="m.name||currentTopic?.agentName"/><small>{{m.contextCompaction?'上下文快照':m.role==='user'?(m.name==='Flowlock'?'Flowlock':'你'):(m.name||currentTopic?.agentName||'Agent')}}</small></div><div v-if="m.content?.length>128000" class="long-message"><button @click="toggleLongText(m)">{{expandedLongText.has(longTextKey(m))?'收起全文':'查看长文本'}} · {{m.content.length}} 字符</button><TextPages v-if="expandedLongText.has(longTextKey(m))" :text="m.content" class="bubble" style="max-height:60vh;overflow:auto"/></div><div v-else-if="m.content||!m.attachments?.length" class="bubble">{{typeof m.content==='string'?m.content:'此消息包含非文本内容，请在桌面查看'}}</div><details v-if="m.desktopReferences?.length" class="desktop-references"><summary>桌面活引用 {{m.desktopReferences.length}} 项 · 原件和提取文本未同步</summary><div v-for="r in m.desktopReferences" :key="r.id"><strong>{{r.name}}</strong><small>{{r.workspaceRef ? r.workspaceRef.alias+' / '+r.workspaceRef.relPath : r.target}} · 需在来源电脑核对</small></div></details><div v-if="m.attachments?.length" class="attachments"><div v-for="(a,index) in m.attachments" :key="a.id+'/'+index" class="attachment"><template v-if="attachmentStates[m.id+'/'+a.id]?.state==='available'"><SharedAttachmentImage v-if="currentTopic?.sharedSpaceId&&attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :key="generation+'/'+m.id+'/'+a.id" :url="attachmentUrl(m,a)" :alt="a.name||'图片附件'"></SharedAttachmentImage><img v-else-if="attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :src="attachmentUrl(m,a)" :alt="a.name||'图片附件'" loading="lazy"><button class="attachment-open" @click="openAttachment(m,a)"><MobileIcon name="file"/><span>{{a.name||'查看附件'}}</span><MobileIcon name="chevron"/></button><details v-if="a.extractedText" class="attachment-text" @toggle="toggleAttachmentText(m,a,index,$event)"><summary>查看文本</summary><TextPages v-if="expandedAttachmentText.has(attachmentTextKey(m,a,index))" :text="a.extractedText"/></details></template><span v-else>{{a.name||'附件'}} · {{attachmentStates[m.id+'/'+a.id]?.state==='unsupported'?'原件类型暂不支持，引用已保留':attachmentStates[m.id+'/'+a.id]?.state==='corrupt'?'完整性校验失败':'附件暂未同步或正在确认'}}</span></div></div></article><p v-if="!messages.length&&!historyProgress&&!visibleSharedStreams.length" class="empty">{{currentTopic?.historyReady===false?'正在等待电脑同步所选历史，完成后即可接续。':currentTopic?.executable===false?'还没有消息。':'还没有消息，发送一条开始会话。'}}</p>
+   <section ref="history" id="history" @scroll.passive="trackHistoryEnd" aria-label="聊天历史" :inert="navigationVisible || conversationPanel==='work'"><p v-if="historyProgress" class="history-progress" role="status">{{historyProgress.failed?'历史暂未加载完成，稍后重试':historyProgress.checking?'正在核对历史增量':'正在加载历史'}}<template v-if="historyProgress.total"> · {{historyProgress.loaded}} / {{historyProgress.total}}</template></p><button v-if="historyStart>0" class="earlier-messages" @click="showEarlierMessages">查看更早消息（还有 {{historyStart}} 条）</button><template v-for="m in visibleMessages" :key="m.id"><article class="message" :class="[m.role,{'snapshot-message':m.contextCompaction}]" :data-message-id="m.id"><div class="message-author" v-if="m.role!=='user'||m.name==='Flowlock'"><AgentAvatar v-if="m.role!=='user'&&!m.contextCompaction" :src="currentTopic?.ownerType==='group'?undefined:currentTopic?.avatar||activeAgent?.avatar" :name="m.name||currentTopic?.agentName"/><small>{{m.contextCompaction?'上下文快照':m.role==='user'?(m.name==='Flowlock'?'Flowlock':'你'):(m.name||currentTopic?.agentName||'Agent')}}</small></div><div v-if="m.content?.length>128000" class="long-message"><button @click="toggleLongText(m)">{{expandedLongText.has(longTextKey(m))?'收起全文':'查看长文本'}} · {{m.content.length}} 字符</button><TextPages v-if="expandedLongText.has(longTextKey(m))" :text="m.content" class="bubble" style="max-height:60vh;overflow:auto"/></div><div v-else-if="m.content||!m.attachments?.length" class="bubble">{{typeof m.content==='string'?m.content:'此消息包含非文本内容，请在桌面查看'}}</div><details v-if="m.desktopReferences?.length" class="desktop-references"><summary>桌面活引用 {{m.desktopReferences.length}} 项 · 原件和提取文本未同步</summary><div v-for="r in m.desktopReferences" :key="r.id"><strong>{{r.name}}</strong><small>{{r.workspaceRef ? r.workspaceRef.alias+' / '+r.workspaceRef.relPath : r.target}} · 需在来源电脑核对</small></div></details><div v-if="m.attachments?.length" class="attachments"><div v-for="(a,index) in m.attachments" :key="a.id+'/'+index" class="attachment"><template v-if="attachmentStates[m.id+'/'+a.id]?.state==='available'"><SharedAttachmentImage v-if="currentTopic?.sharedSpaceId&&attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :key="generation+'/'+m.id+'/'+a.id" :url="attachmentUrl(m,a)" :alt="a.name||'图片附件'"></SharedAttachmentImage><img v-else-if="attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :src="attachmentUrl(m,a)" :alt="a.name||'图片附件'" loading="lazy"><button class="attachment-open" @click="openAttachment(m,a)"><MobileIcon name="file"/><span>{{a.name||'查看附件'}}</span><MobileIcon name="chevron"/></button><details v-if="a.extractedText" class="attachment-text" @toggle="toggleAttachmentText(m,a,index,$event)"><summary>查看文本</summary><TextPages v-if="expandedAttachmentText.has(attachmentTextKey(m,a,index))" :text="a.extractedText"/></details></template><span v-else>{{a.name||'附件'}} · {{attachmentStates[m.id+'/'+a.id]?.state==='unsupported'?'原件类型暂不支持，引用已保留':attachmentStates[m.id+'/'+a.id]?.state==='corrupt'?'完整性校验失败':'附件暂未同步或正在确认'}}</span></div></div></article>
+    <article v-if="failedByMessage.has(m.id)" class="failed-work" :data-failed-work="failedByMessage.get(m.id).id">
+     <strong>任务执行失败</strong>
+     <p>{{failedByMessage.get(m.id).errorCode==='UPSTREAM_ERROR'?'模型服务暂不可用。':'本次任务已停止。'}}请先核对任务状态，再决定是否发起新消息。</p>
+     <button type="button" @click="togglePanel('work')">查看任务状态</button>
+    </article>
+   </template><p v-if="!messages.length&&!historyProgress&&!visibleSharedStreams.length" class="empty">{{currentTopic?.historyReady===false?'正在等待电脑同步所选历史，完成后即可接续。':currentTopic?.executable===false?'还没有消息。':'还没有消息，发送一条开始会话。'}}</p>
    <section v-if="currentTopic?.coreSingle && corePreviews.length" aria-label="正在生成的共享回复">
     <article v-for="work in corePreviews" :key="work.id" class="message assistant live-message">
      <div class="message-author"><AgentAvatar :src="currentTopic?.avatar||activeAgent?.avatar" :name="work.speakerName||currentTopic?.agentName"/><small>{{work.speakerName||currentTopic?.agentName||'Agent'}}</small></div>
@@ -987,6 +1091,8 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
     <article v-for="stream in visibleSharedStreams" :key="stream.previewId" class="message assistant live-message" :data-live-execution="stream.executionId" :data-native-request="stream.nativeRequestId"><small>{{stream.memberName||currentTopic?.agentName||'Agent'}}<template v-if="stream.kind==='controlled-text'"> · 第 {{stream.nativeGeneration+1}} 代</template> · {{stream.settled?'正在核对最终记录':stream.activity?sharedActivityLabels[stream.activity.state]||'正在核对原生任务':labels[stream.state]||'正在核对原生任务'}} · {{stream.connection==='online'?'实时观察':stream.connection==='disconnected'?'实时连接已暂停':'正在恢复连接'}}</small><div v-if="stream.text" class="bubble">{{stream.text}}</div><small v-if="stream.gap">仅显示目前可核对的临时片段，完整内容以保存后的会话为准。</small><small v-if="stream.settled&&stream.request?.state!=='completed'">{{labels[stream.request?.state]||'执行已暂停，请核对原生状态'}} · 已收到的片段暂存于此页。</small></article>
    </section>
    </section>
+   <button v-if="selected&&!historyAtEnd&&!navigationVisible&&conversationPanel!=='work'"
+    id="return-latest" class="return-latest" type="button" @click="returnToLatest">回到最新</button>
    <section v-show="conversationPanel==='work'" id="conversation-work" aria-label="任务状态">
     <div class="panel-heading"><h1 id="work-heading" tabindex="-1">任务状态</h1><button class="icon-button" type="button" aria-label="返回聊天" @click="closePanel"><MobileIcon name="close"/></button></div>
     <p v-if="!jobs.length && !desktopRelays.length && !jobsError && !pendingSubmission && !recoveryBlocker && !acceptedReceipt" class="empty">暂无任务记录</p>
@@ -1034,6 +1140,10 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
     </div>
     <div v-show="conversationPanel!=='work'" class="composer-body">
     <div v-if="pendingFiles.length" class="pending-files"><div v-for="(item,i) in pendingFiles" :key="i" class="pending-file"><MobileIcon name="file"/><span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||(item.progress===100?'已上传':item.progress>0?item.progress+'%':'待发送')}}</span><button type="button" @click="removeDraftFile(i)" :disabled="busy" aria-label="移除附件"><MobileIcon name="close"/></button></div></div>
+    <ul v-if="composerDraft.fileRejections?.length" id="attachment-selection-notice" class="attachment-selection-notice" aria-label="未添加的附件" role="status">
+     <li v-for="(item,index) in composerDraft.fileRejections" :key="index">{{item.name}} · 未添加（{{item.reason}}）</li>
+    </ul>
+    <p v-if="ordinaryDraftError" class="pair-error" role="status">{{ordinaryDraftError}}</p>
     <div v-if="taskQuote" id="task-quote" class="task-quote" :data-closed="Boolean(quoteClosed)">
      <MobileIcon name="reply"/>
      <div class="task-quote-copy" role="status">
@@ -1051,7 +1161,7 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
       <input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false">
      </label>
      <label class="sr-only" for="message-text">消息</label>
-     <textarea ref="composer" id="message-text" v-model="text" :aria-describedby="taskQuote?'task-quote':undefined" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):taskQuote?'补充给当前任务…':'输入消息…'" rows="1" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea>
+     <textarea ref="composer" id="message-text" v-model="composerText" :aria-describedby="taskQuote?'task-quote':undefined" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):taskQuote?'补充给当前任务…':'输入消息…'" rows="1" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea>
      <button id="send" type="submit" :aria-label="taskQuote?'发送追加指令':'发送新消息'" :title="taskQuote?'发送追加指令':'发送新消息'" :disabled="!currentTopic||busy||newSubmissionBlocked||currentTopic?.executable===false||(taskQuote?quoteSendBlocked:(!text.trim()&&!pendingFiles.length))"><MobileIcon name="send"/></button>
     </form>
     <div v-show="visibleNotice||pairRecoveryNotice||pendingSubmission" class="send-state"><span v-if="visibleNotice" id="send-state" role="status">{{visibleNotice}}</span><span v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</span><button id="retry-last" v-show="pendingSubmission" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div>
