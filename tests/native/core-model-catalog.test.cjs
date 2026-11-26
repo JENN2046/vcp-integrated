@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { BOX } = require('./fixtures/sharedSingleHarness.cjs');
+const { BOX, wait } = require('./fixtures/sharedSingleHarness.cjs');
+const { localProvider, host } = require('./fixtures/coreSingleHarness.cjs');
 
 function catalog(fetchImpl, virtual = [{ id: 'VCPModelAuto' }]) {
     return require(BOX + '/modules/modelCatalog').createModelCatalog({
@@ -58,7 +59,7 @@ test('remote Core catalog uses the existing device read authority and returns on
     const origin = 'https://core.example.invalid';
     const app = express();
     app.set('trust proxy', 'loopback');
-    let queries = 0, failProvider = false, revokeDuringQuery = null;
+    let queries = 0, failProvider = false, revokeDuringQuery = null, removeHybrid = false;
     const provider = catalog(async () => {
         queries++;
         if (revokeDuringQuery) revokeDuringQuery();
@@ -68,11 +69,13 @@ test('remote Core catalog uses the existing device read authority and returns on
             { id: 'public-model' },
             { id: 'Qwen3-Embedding-0.6B' },
             { id: 'opaque', type: 'embedding' },
-            { id: 'hybrid-embedding-chat', capabilities: { chat:true, embedding:true } },
+            ...(!removeHybrid ? [{ id:'hybrid-embedding-chat', capabilities:{chat:true,embedding:true} }] : []),
             { id: 'dialogue-original' }
         ] });
     });
-    const core = startCoreHost({ app, chat: { config: {} }, modelCatalog: provider, listenHost: '127.0.0.1',
+    const upstream = await localProvider(t);
+    const { chat } = host(upstream);
+    const core = startCoreHost({ app, chat, modelCatalog: provider, listenHost: '127.0.0.1',
         serverKey: 'fixture-toolbox-key', env: { VCP_CORE_DATA_DIR: path.join(root, 'db'), VCP_CORE_MODE: 'remote', VCP_CORE_REMOTE_ORIGIN: origin } });
     app.use('/core/api', core.remoteDesktopRouter);
     app.use('/mobile', core.remoteMobileRouter);
@@ -81,9 +84,12 @@ test('remote Core catalog uses the existing device read authority and returns on
     t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await core.close(); });
     const base = 'http://127.0.0.1:' + server.address().port;
     // Exercise the actual proxy host contract; undici can normalize Host to the socket URL.
-    const call = (route, headers = {}) => new Promise((resolve, reject) => {
-        const req = require('node:http').get(base + route, {
-            headers: { Host: 'core.example.invalid', 'X-Forwarded-Proto': 'https', ...headers }
+    const call = (route, headers = {}, body) => new Promise((resolve, reject) => {
+        const wire = body === undefined ? undefined : JSON.stringify(body);
+        const req = require('node:http').request(base + route, {
+            method: wire === undefined ? 'GET' : 'POST',
+            headers: { Host: 'core.example.invalid', 'X-Forwarded-Proto': 'https', ...headers,
+                ...(wire !== undefined && {'Content-Type':'application/json','Content-Length':Buffer.byteLength(wire)}) }
         }, res => {
             const chunks = [];
             res.on('data', chunk => chunks.push(chunk));
@@ -91,6 +97,7 @@ test('remote Core catalog uses the existing device read authority and returns on
             res.on('error', reject);
         });
         req.on('error', reject);
+        req.end(wire);
     });
     const grant = (role, execute = false) => {
         const scopes = ['shared:personal:read', ...(execute ? ['shared:personal:execute'] : []), ...(role === 'desktop' ? ['desktop'] : [])];
@@ -136,4 +143,42 @@ test('remote Core catalog uses the existing device read authority and returns on
     assert.deepEqual(await mobileCatalog.json(), { models:['public-model','hybrid-embedding-chat','embedding-lookalike','VCPModelAuto'], purpose:'chat' });
     assert.equal(core.store.db.prepare('SELECT count(*) n FROM works').get().n, 0);
     assert.equal(core.store.db.prepare('SELECT count(*) n FROM messages').get().n, 0);
+
+    const deviceHeaders = { Cookie:'__Secure-vcp_mobile=' + mobileExecutor.token };
+    const session = await (await call('/mobile/api/session', deviceHeaders)).json();
+    const sendHeaders = { ...deviceHeaders, Origin:origin, 'X-NativeSync-Entry-Id':session.recovery.entryId,
+        'X-NativeSync-Session-Marker':session.recovery.sessionMarker };
+    const topicRoute = '/mobile/api/core/personal/' + key;
+    const counts = () => ['works','messages','idempotency_receipts'].map(table=>
+        core.store.db.prepare('SELECT count(*) n FROM '+table).get().n);
+    const denied = await call(topicRoute+'/send',sendHeaders,{ requestId:'vector-denied',text:'Embedding-only intent',model:'Qwen3-Embedding-0.6B' });
+    assert.equal(denied.status,409);
+    assert.deepEqual(await denied.json(),{error:{code:'CORE_MODEL_NOT_ALLOWED'}});
+    assert.deepEqual(counts(),[0,0,0]);
+    assert.equal(upstream.calls.length,0);
+    assert.deepEqual(await (await call(topicRoute+'/receipt?requestId=vector-denied',deviceHeaders)).json(),{executions:[]});
+
+    const send = async (requestId, model) => {
+        const body={requestId,text:'Catalog fixture '+requestId,model};
+        const response=await call(topicRoute+'/send',sendHeaders,body);
+        assert.equal(response.status,202);
+        const accepted=await response.json();
+        await wait(()=>core.store.work(accepted.id).status==='completed','catalog fixture Work completed');
+        return body;
+    };
+    await send('chat-accepted','public-model');
+    const hybrid = await send('hybrid-accepted','hybrid-embedding-chat');
+    assert.deepEqual(upstream.calls.map(call=>call.model),['public-model','hybrid-embedding-chat']);
+
+    const receiptRoute = topicRoute+'/receipt?requestId='+hybrid.requestId;
+    const known = await (await call(receiptRoute,deviceHeaders)).json();
+    removeHybrid=true;
+    assert.ok(!(await (await call(mobileRoute,deviceHeaders)).json()).models.includes(hybrid.model));
+    const beforeCounts = counts(), beforeLookups = queries;
+    const replay = await call(topicRoute+'/send',sendHeaders,hybrid);
+    assert.equal(replay.status,202);
+    assert.deepEqual(await replay.json(),known.executions[0]);
+    assert.equal(queries,beforeLookups,'original replay precedes catalog lookup');
+    assert.deepEqual(counts(),beforeCounts);
+    assert.equal(upstream.calls.length,2);
 });
