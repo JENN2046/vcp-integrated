@@ -181,6 +181,7 @@ class DistributedServer {
         this.pluginAgentOperationService = config.pluginAgentOperationService || null;
         this.chartService = config.chartService || null;
         this.gameService = config.gameService || null;
+        this.readCoreContext = config.readCoreContext;
         this.workspaceService = config.workspaceService || null; // 工作区只读门面（白名单来源）
         this.crownEvidenceService = createCrownEvidenceService();
         this.onToolResult = typeof config.onToolResult === 'function' ? config.onToolResult : null; // 工具调用成功后的旁路通知，不影响返回结果
@@ -509,14 +510,14 @@ class DistributedServer {
             this.initialConnection = false; // Ensure this only runs once
         }
 
-        if (manifests.length > 0) {
+        if (manifests.length > 0 || this.readCoreContext) {
             const payload = {
                 type: 'register_tools',
                 data: {
                     ...(this.nodeId !== undefined ? { nodeId: this.nodeId } : {}),
                     ...(this.nativeSyncRouteId ? { nativeSyncRouteId: this.nativeSyncRouteId } : {}),
                     serverName: this.serverName,
-                    tools: manifests
+                    tools: this.readCoreContext ? [...manifests, { name: 'internal_core_context' }] : manifests
                 }
             };
             this.sendMessage(payload);
@@ -802,6 +803,15 @@ class DistributedServer {
         this.crownEvidenceService.receive(data, frameSha);
         let responsePayload;
         try {
+            if (toolName === 'internal_core_context') {
+                try {
+                    const result = await this.readCoreContext(toolArgs);
+                    this.sendMessage({ type: 'tool_result', data: { requestId, status: 'success', result } });
+                } catch {
+                    this.sendMessage({ type: 'tool_result', data: { requestId, status: 'error', error: 'CORE_RESOURCE_UNAVAILABLE' } });
+                }
+                return;
+            }
             // --- 新增：处理内部文件请求 ---
             if (toolName === 'internal_request_file') {
                 // 关键改进：对接 FileFetcherServer 的新协议

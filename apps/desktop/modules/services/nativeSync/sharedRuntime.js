@@ -171,6 +171,7 @@ class SharedRuntime {
   this.execution=await require('./sharedExecution').SharedExecution.open(this);adapter.sharedExecution=this.execution;await this.execution.reconcile();this.sessions=new (require('./sharedSessionClient').SharedSessionClient)(this,{openEvents:this.openEvents});
   if(this.isStopping())throw fail('APPLICATION_SHUTTING_DOWN');
   this.ready=true;await this.sessions.reconcile();
+  if (coreAdvertised) await this.coreSingle.announceResources().catch(error => console.warn('[Core] resource node announcement:', error.code || error.name));
   this.topicSponsor=new (require('./sharedTopicSponsor').SharedTopicSponsor)(this);
   this.topicSponsorRecovery=this.topicSponsor.recover().catch(error=>console.warn('[NativeSync] TopicSponsor recovery pending:',error.code||'UNKNOWN'));
   if(this.isStopping())throw fail('APPLICATION_SHUTTING_DOWN');
@@ -857,7 +858,7 @@ if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');let record;
   this.assertSharedAccess();
   if(this.coreSingle?.owns(descriptor)){
    if(localOnly)return {handled:false};
-   if(!serverSession||options.controlMode||message.desktopReferences?.length)throw fail('CORE_COMMAND_NOT_MIGRATED');
+   if(!serverSession||options.controlMode)throw fail('CORE_COMMAND_NOT_MIGRATED');
    return this.coreSingle.send(descriptor,message);
   }
   if(options.controlMode!==undefined){
@@ -970,7 +971,7 @@ if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');let record;
   }));
   value.displayJobs = require('./sharedTaskList').sharedTaskList(value.executions, value.reportJobs);
  }
- async stopNativeTask({descriptor, workId, nativeTaskId} = {}) {this.assertSharedAccess();
+ async stopNativeTask({descriptor, workId, nativeTaskId} = {}) {this.assertSharedAccess();if(this.coreSingle?.owns(descriptor))return this.coreSingle.stopTask(descriptor,workId,nativeTaskId);
   if (this.closed || !this.ready) throw fail('APPLICATION_SHUTTING_DOWN');
   if (this.readOnly) throw fail('SHARED_READ_ONLY');
   require('./contracts.generated.cjs').sharedIdentity(workId);
@@ -983,7 +984,7 @@ if(this.closed||!this.ready)throw fail('APPLICATION_SHUTTING_DOWN');let record;
   await this.send(endpoint + 'task-stop', {body});
   return {success: true};
  }
- async getNativeTaskResult(d,workId,nativeTaskId){this.assertSharedAccess();if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(d);const known=await this.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId}));if(known.request?.sharedId!==mapping.sharedId)throw fail('NATIVE_TASK_RESULT_MISMATCH');const value=await this.send(endpoint+'task-result?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId,nativeTaskId}));return {...value,topic:{ownerType:d.itemType||'agent',ownerId:d.itemId,topicId:d.topicId}};}
+ async getNativeTaskResult(d,workId,nativeTaskId){this.assertSharedAccess();if(this.coreSingle?.owns(d))return this.coreSingle.taskResult(d,workId,nativeTaskId);if(this.closed)throw fail('APPLICATION_SHUTTING_DOWN');const mapping=this.execution.mapping(d);const known=await this.send(endpoint+'work?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId}));if(known.request?.sharedId!==mapping.sharedId)throw fail('NATIVE_TASK_RESULT_MISMATCH');const value=await this.send(endpoint+'task-result?'+new URLSearchParams({sharedSpaceId:this.connection.sharedSpaceId,workId,nativeTaskId}));return {...value,topic:{ownerType:d.itemType||'agent',ownerId:d.itemId,topicId:d.topicId}};}
  async close(){if(this.closed)return;this.closed=true;this.nativeTaskViews?.clear();const watchClosed=this.waitClient.close();clearTimeout(this.timer);await this.coreSingle?.close();await this.sessions?.close();try{await this.recoverSharedCompactionPrepares();}catch{}for(const [id,prepared]of Object.entries(this.execution?.state.compactionPreparations||{}))if(!prepared.cancelled&&!this.execution.state.compactions?.[id]?.body)try{await this.cancelSharedCompaction({descriptor:prepared.descriptor,id,closing:true});}catch{}clearTimeout(this.timer);if(this.changed)this.agentConfigEvents?.off?.('agent-config-updated',this.changed);await Promise.allSettled([watchClosed,this.running,this.refreshing,this.attachments?.work?.running,this.coreTail,this.registrationTail,this.registryDisk,this.topicSponsorRecovery]);await this.execution?.close();await this.replica?.close();this.releaseHost?.();}
 }
 module.exports={SharedRuntime,startupFence};

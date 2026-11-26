@@ -45,7 +45,7 @@ class PluginExecutionBridgeRegistry {
         for (const bridge of this.bridges) {
             if (await bridge.canHandle(plugin, context)) {
                 const native = require('./requestExecutionContext');
-                if (native.isCoreTurn() && (!['direct-hybrid-service', 'local-stdio'].includes(bridge.name) ||
+                if (native.isCoreTurn() && (!['direct-hybrid-service', 'local-stdio', 'nativesync-topic-sponsor'].includes(bridge.name) ||
                     plugin.pluginType === 'asynchronous' || plugin.name === 'VCPSleep')) {
                     throw Object.assign(Error('CORE_TOOL_NOT_MIGRATED'), { code: 'CORE_TOOL_NOT_MIGRATED' });
                 }

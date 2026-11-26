@@ -56,7 +56,7 @@ function withTurnSignal(signal, execute) {
 }
 
 function runCoreTurn(scope, execute) {
-    return local.run({ ...scope, requestId: scope.workId, core: true, toolRun: { waiting: 0 } }, execute);
+    return local.run({ ...scope, requestId: scope.requestId || scope.workId, core: true, toolRun: { waiting: 0 } }, execute);
 }
 
 function notifyCoreApproval(type, details) {
@@ -173,7 +173,7 @@ function assertToolsAllowed(pluginName, args, { indirect = false, allowToolPassw
     assertToolOutcomeKnown();
     throwIfCancelled();
     const scope = local.getStore();
-    if (scope?.core && (['AgentAssistant', 'TopicSponsor'].includes(pluginName) || Object.hasOwn(args || {}, 'timely_contact'))) {
+    if (scope?.core && (pluginName === 'TopicSponsor' && !scope.coreSponsor || Object.hasOwn(args || {}, 'timely_contact'))) {
         throw toolError('CORE_TOOL_NOT_MIGRATED');
     }
     if (scope?.textOnly) throw Object.assign(Error('CONTROLLED_TEXT_TOOLS_FORBIDDEN'), { code: 'CONTROLLED_TEXT_TOOLS_FORBIDDEN' });
@@ -368,6 +368,7 @@ async function acceptNativeTask({ pluginName, nativeTaskId, agentBaseName }) {
     throwIfCancelled();
     const identity = Object.freeze({ ...context.invocation, pluginName, nativeTaskId, agentBaseName });
     if (context.delegation) context.toolBatch.accepted = true;
+    if (context.core) return context.coreAA.accept(identity);
     await context.bridge.onTaskAccepted(identity);
     // The child outlives the parent response. Each new model round still
     // passes through the original Work's request registry and dispatch fence.
@@ -434,6 +435,8 @@ module.exports = {
     middleware, events, waitForApproval, throwIfCancelled, register, agentPrompt,setSharedBoundary,
     interruptWork, controlNativeTask,
     sharedTaskLink(pluginName, nativeTaskId) {
+        const scope = local.getStore();
+        if (scope?.core) return scope.coreAA?.link(pluginName, nativeTaskId) || null;
         if (!sharedBoundary || typeof nativeTaskId !== 'string') return null;
         const tasks = sharedBoundary.engine.nativeTasks;
         const row = tasks.get(pluginName, nativeTaskId);
@@ -457,6 +460,7 @@ module.exports = {
     assertToolsAllowed, controlledToolWork, assertToolBatch, assertToolBoundary, executeControlledToolBatch, trackToolInvocation,
     settleToolPause: () => local.getStore()?.settleToolPause?.(),
     currentTopicSponsorCall, approvalOwner,
+    currentCoreSponsor: () => local.getStore()?.coreSponsor,
     controlledDelegation, assertDelegationDispatch, assertDelegationInvocation,
     runToolInvocation, acceptNativeTask, registerNativeTaskProvider, queryNativeTask, hasNativeTaskProvider, verifyNativeTaskArchive,
     toolStarted: () => note('tool', { started: true }),

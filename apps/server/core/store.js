@@ -27,7 +27,7 @@ class CoreStore {
                 created_seq INTEGER NOT NULL UNIQUE, ordinal INTEGER NOT NULL,
                 role TEXT NOT NULL CHECK (role IN ('user','assistant')),
                 content TEXT NOT NULL, attachments_json TEXT NOT NULL DEFAULT '[]',
-                rev INTEGER NOT NULL DEFAULT 1, deleted INTEGER NOT NULL DEFAULT 0, source_work_id TEXT, checkpoint_json TEXT,
+                rev INTEGER NOT NULL DEFAULT 1, deleted INTEGER NOT NULL DEFAULT 0, source_work_id TEXT, checkpoint_json TEXT, desktop_refs_json TEXT, sender_name TEXT,
                 last_change_seq INTEGER NOT NULL, created_at INTEGER NOT NULL,
                 UNIQUE(conversation_id, ordinal)
             );
@@ -60,6 +60,12 @@ class CoreStore {
         `);
         if (!this.db.prepare('PRAGMA table_info(messages)').all().some(column => column.name === 'checkpoint_json')) {
             this.db.exec('ALTER TABLE messages ADD COLUMN checkpoint_json TEXT');
+        }
+        if (!this.db.prepare('PRAGMA table_info(messages)').all().some(column => column.name === 'desktop_refs_json')) {
+            this.db.exec('ALTER TABLE messages ADD COLUMN desktop_refs_json TEXT');
+        }
+        if (!this.db.prepare('PRAGMA table_info(messages)').all().some(column => column.name === 'sender_name')) {
+            this.db.exec('ALTER TABLE messages ADD COLUMN sender_name TEXT');
         }
         this.db.prepare("INSERT OR IGNORE INTO core_metadata VALUES('storage_id',?)").run(randomUUID());
         this.storageId = this.db.prepare("SELECT value FROM core_metadata WHERE key='storage_id'").get().value;
@@ -108,12 +114,12 @@ class CoreStore {
             .run(key, id, action, rev).lastInsertRowid;
     }
 
-    insertMessage({ id, key, role, content, attachments = [], after, sourceWorkId = null, checkpoint = null }) {
+    insertMessage({ id, key, role, content, attachments = [], after, sourceWorkId = null, checkpoint = null, desktopReferences = null, senderName = null }) {
         const seq = this.appendChange(key, id, 'upsert', 1);
         this.db.prepare(`INSERT INTO messages
-            (id,conversation_id,created_seq,ordinal,role,content,attachments_json,last_change_seq,created_at,source_work_id,checkpoint_json)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(id, key, seq, after ?? seq * 1024, role, content, json(attachments), seq, Date.now(),
-            sourceWorkId, checkpoint ? json(checkpoint) : null);
+            (id,conversation_id,created_seq,ordinal,role,content,attachments_json,last_change_seq,created_at,source_work_id,checkpoint_json,desktop_refs_json,sender_name)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, key, seq, after ?? seq * 1024, role, content, json(attachments), seq, Date.now(),
+            sourceWorkId, checkpoint ? json(checkpoint) : null, desktopReferences?.length ? json(desktopReferences) : null, senderName);
         return seq;
     }
 
@@ -126,10 +132,10 @@ class CoreStore {
             if (this.db.prepare('SELECT count(*) AS n FROM works WHERE principal=? AND created_at>?').get(principal, Date.now() - 60000).n >= 20) {
                 throw failure('SUBMISSION_RATE_LIMIT', 429);
             }
-            const { attachments, config, link, recovery } = prepare();
+            const { attachments, config, link, recovery, desktopReferences, senderName } = prepare();
             const userId = randomUUID();
             const workId = randomUUID();
-            const seq = this.insertMessage({ id: userId, key: topic.key, role: 'user', content: input.text, attachments });
+            const seq = this.insertMessage({ id: userId, key: topic.key, role: senderName ? 'assistant' : 'user', content: input.text, attachments, desktopReferences, senderName });
             link?.(userId);
             this.db.prepare(`INSERT INTO works
                 (id,conversation_id,principal,request_id,status,admitted_seq,user_message_id,frozen_config_json,created_at)
@@ -145,8 +151,10 @@ class CoreStore {
         if (!includeAttachmentText) {
             for (const attachment of attachments) delete attachment.extractedText;
         }
+        const refs = row.desktop_refs_json && parse(row.desktop_refs_json);
+        const desktopReferences = includeAttachmentText ? refs : refs?.map(({ sourceId, ...reference }) => reference);
         return { id: row.id, role: row.role, content: row.content, timestamp: row.created_at,
-            ordinal: row.ordinal, ...(row.checkpoint_json && { contextCompaction: parse(row.checkpoint_json) }), ...(row.source_work_id && { sourceWorkId: row.source_work_id }), revision: row.rev, attachments };
+            ordinal: row.ordinal, ...(row.sender_name && { name: row.sender_name }), ...(desktopReferences && { desktopReferences }), ...(row.checkpoint_json && { contextCompaction: parse(row.checkpoint_json) }), ...(row.source_work_id && { sourceWorkId: row.source_work_id }), revision: row.rev, attachments };
     }
 
     history(work) {
@@ -268,7 +276,7 @@ class CoreStore {
             typeof final.content !== 'string' || !final.content.trim()) {
             throw failure('WORK_FINAL_UNSETTLED');
         }
-        const user = this.db.prepare("SELECT ordinal FROM messages WHERE id=? AND conversation_id=? AND role='user' AND deleted=0")
+        const user = this.db.prepare("SELECT ordinal FROM messages WHERE id=? AND conversation_id=? AND deleted=0")
             .get(work.user_message_id, work.conversation_id);
         if (!user) throw failure('WORK_FINAL_UNSETTLED');
         const replyId = 'reply_' + id;

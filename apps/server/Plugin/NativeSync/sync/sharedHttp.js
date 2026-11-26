@@ -61,7 +61,7 @@ function sharedInfo(shared,sourceId){
   ...(shared.native?.engine&&controlled.enabled(shared,controlled.AA_MODE)?[controlled.AA_CAPABILITY]:[]),
   ...(shared.native?.engine&&policy.sharedControlledText?[require('./sharedControlledText').CAPABILITY]:[]),
  );
- return {capability:SHARED_SPACE_CAPABILITY,schemaVersion:1,features,readOnly:shared.readOnly,spaces:[...shared.grants].filter(([,sources])=>sources.has(sourceId)).map(([id])=>({id,...((shared.coreWorkspace||shared.core?.workspace)===id&&{coreSingle:true})}))};
+ return {capability:SHARED_SPACE_CAPABILITY,schemaVersion:1,features,readOnly:shared.readOnly,spaces:[...shared.grants].filter(([,sources])=>sources.has(sourceId)).map(([id])=>({id,...((shared.coreWorkspace||shared.core?.workspace)===id&&{coreSingle:true,...(shared.core?.desktopContext&&{coreResources:true})})}))};
 }
 function openSharedWatch(store,req,res,url,onClose,heartbeatMs=15000){
  const shared=store.shared;

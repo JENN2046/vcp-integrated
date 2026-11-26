@@ -76,6 +76,7 @@ function observeCore(topic) {
     await consumeSharedEvents(response,(data,type)=>{
      if(!isCurrent())return;
      if(type==='change_seq'&&data.seq!==entry.seq){entry.seq=data.seq;scheduleRefresh();}
+     if(type==='native_task'){scheduleRefresh();return;}
      if(!data.workId)return;
      const prior=corePreviews.value.find(work=>work.id===data.workId);
      const next={...prior,id:data.workId};
@@ -257,7 +258,7 @@ function confirmDraft(record,context){
 }
 // Keep the original executions for submission reconciliation. This separate
 // projection only displays bounded, correlated native task facts.
-const displayJobs=computed(()=>jobs.value.map(job=>{try{if(job.topicKey!==selected.value)throw Error('NATIVE_TASK_TOPIC_MISMATCH');if(job.core)return {...job,nativeTasks:[],toolInvocations:[]};return {...job,...projectNativeWork(job)};}catch{return {...job,nativeTasks:[],toolInvocations:[],nativeTaskError:'原生任务关联暂不能核对，请刷新或在宿主检查。'};}}));
+const displayJobs=computed(()=>jobs.value.map(job=>{try{if(job.topicKey!==selected.value)throw Error('NATIVE_TASK_TOPIC_MISMATCH');if(job.core)return {...job,nativeTasks:(job.tasks||[]).map(task=>({...task,nativeTaskId:task.id,agentBaseName:task.agent,resultRef:task.revision===1?task.id:null})),toolInvocations:[]};return {...job,...projectNativeWork(job)};}catch{return {...job,nativeTasks:[],toolInvocations:[],nativeTaskError:'原生任务关联暂不能核对，请刷新或在宿主检查。'};}}));
 const keyAllowed=computed(()=>Boolean(isSecureContext&&server.value?.credentialExchangeAllowed));
 const pendingSubmission=computed(()=>recoveryRecords.value.find(record=>record.entryId===recoveryContext.value?.entryId&&record.topicKey===selected.value)||null);
 const recoveryBlocker=computed(()=>recoveryError.value||(!validSessionRecovery(recoveryContext.value)?'当前服务端未提供可靠提交恢复信息，暂不能发送。':''));
@@ -595,8 +596,11 @@ async function showNativeResult(job,task){
  const current=()=>request===nativeResultRequest&&context.topicKey===selected.value&&context.generation===generation&&context.authEpoch===authEpoch;
  nativeResult.value={taskId:task.nativeTaskId,loading:true,content:null,error:null};
  try{
-  const value=await api('conversations/'+encodeURIComponent(context.topicKey)+'/executions/'+encodeURIComponent(job.id)+'/native-tasks/'+encodeURIComponent(task.nativeTaskId)+'/result');
-  const verified=await verifyNativeResult(value,job.id,task,resultHash);
+  const base=job.core ? corePath(currentTopic.value)+'/works/'+encodeURIComponent(job.id)+'/tasks/' :
+    'conversations/'+encodeURIComponent(context.topicKey)+'/executions/'+encodeURIComponent(job.id)+'/native-tasks/';
+  const value=await api(base+encodeURIComponent(task.nativeTaskId)+(job.core?'':'/result'));
+  const verified=job.core?value:await verifyNativeResult(value,job.id,task,resultHash);
+  if(job.core&&(verified.id!==task.nativeTaskId||verified.revision!==task.revision||typeof verified.content!=='string'))throw Error('NATIVE_TASK_RESULT_MISMATCH');
   if(current()){nativeResult.value={taskId:task.nativeTaskId,loading:false,content:verified.content,error:null};await nextTick();if(current())nativeResultPanel.value?.scrollIntoView({block:'nearest'});}
  }catch(error){if(current())nativeResult.value={taskId:task.nativeTaskId,loading:false,content:null,error:'报告暂不可核对，原任务记录保留。'+(error.code?'（'+error.code+'）':'')};}
 }

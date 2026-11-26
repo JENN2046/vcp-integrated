@@ -30,9 +30,13 @@ function executionContext() {
 }
 
 async function execute(host, prepared, plugin, toolArgs, context) {
+    const { _nativeSyncTopicSponsor: ignored, ...args } = toolArgs;
+    if (typeof context.deliverCoreTopic === 'function') {
+        if (!isExistingReply(args)) throw Object.assign(Error('CORE_TOPIC_SPONSOR_REPLY_REQUIRED'), { code: 'CORE_TOPIC_SPONSOR_REPLY_REQUIRED' });
+        return { result: await context.deliverCoreTopic(args) };
+    }
     const toolHost = context.webSocketServer;
     if (!toolHost) throw new Error('[PluginManager] WebSocketServer is not initialized. Cannot call distributed tool.');
-    const { _nativeSyncTopicSponsor: ignored, ...args } = toolArgs;
     const options = context.executionOptions;
     const call = prepared.get(options);
     prepared.delete(options);
@@ -80,8 +84,9 @@ function register(registry) {
         releasePreparation = ToolExecutor.registerToolPreparation(registry, 'TopicSponsor', ({ args, river, executionOptions }) => {
             delete args._nativeSyncTopicSponsor;
             const call = host.currentTopicSponsorCall();
-            if (!call || !isExistingReply(args)) return;
+            if ((!call && !host.currentCoreSponsor?.()) || !isExistingReply(args)) return;
             projectRiver(args, river);
+            if (!call) return;
             prepared.set(executionOptions, call);
         });
     }

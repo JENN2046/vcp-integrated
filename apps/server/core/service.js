@@ -6,12 +6,13 @@ const { createHash, randomUUID } = require('node:crypto');
 const express = require('express');
 const { CoreStore, failure } = require('./store');
 const { CoreRunner } = require('./runner');
+const { DesktopContext } = require('./desktopContext');
 const { effectiveContextHistory, isContextCheckpoint, checkpointFailure } = require('@vcp/native-history-window');
 const { fieldsFrom } = require('../Plugin/NativeSync/sync/metadata');
 const { AttachmentStore } = require('../Plugin/NativeSync/mobile/attachments');
 const { attachmentRoutes } = require('../Plugin/NativeSync/mobile/attachmentRoutes');
 const { prepareSharedConfiguration } = require('../Plugin/NativeSync/mobile/sharedConfiguration');
-const { effectiveRequest, assertPortableHistory } = require('../Plugin/NativeSync/mobile/effectiveContext');
+const { effectiveRequest } = require('../Plugin/NativeSync/mobile/effectiveContext');
 const { sanitize, assertPortableContext } = require('../Plugin/NativeSync/mobile/groupRequest');
 const { payloadHash, sessionMarker } = require('../Plugin/NativeSync/mobile/submissionRecovery');
 const { nativePacket } = require('../Plugin/NativeSync/mobile/nativePacket');
@@ -52,6 +53,7 @@ class CoreService {
         this.workspace = workspace;
         this.shared = shared;
         this.mobile = mobile;
+        this.desktopContext = new DesktopContext(shared, workspace, chat.config?.webSocketServer);
         this.store = new CoreStore(filename);
         const { db } = this.store;
         if (shared.coreStorageId && shared.coreStorageId !== this.store.storageId) {
@@ -68,9 +70,10 @@ class CoreService {
         };
         this.attachments = new AttachmentStore({ store: attachmentsStore, root: directory, topics: [] });
         this.runner = new CoreRunner({
-            store: this.store, chat,
+            store: this.store, chat, allowedAgents: shared.delegationAgents,
             resolveAcceptedTopic: work => this.resolveAcceptedTopic(work),
-            buildPacket: (...args) => this.buildPacket(...args)
+            buildPacket: (...args) => this.buildPacket(...args),
+            sponsor: (...args) => this.deliverSponsoredMessage(...args)
         });
         for (const row of db.prepare('SELECT * FROM conversations').all()) {
             if (row.workspace !== workspace) throw failure('CORE_DATABASE_WORKSPACE_MISMATCH');
@@ -85,7 +88,7 @@ class CoreService {
         const row = this.shared.topic(actor, workspace, key, permission);
         if (!this.manages(row)) throw failure('CORE_CONVERSATION_NOT_MIGRATED', 409);
         if (row.id !== key) throw failure('CORE_CONVERSATION_MOVED');
-        const topic = { key, workspace, sharedSpaceId: workspace, ownerType: 'agent', ownerId: row.owner_id, topicId: row.topic_id };
+        const topic = { key, workspace, sharedSpaceId: workspace, ownerType: 'agent', ownerId: row.owner_id, topicId: row.topic_id, originSource: row.origin_source };
         this.attachments.topics.set(key, topic);
         return topic;
     }
@@ -104,7 +107,7 @@ class CoreService {
                 if (!session) return null;
                 actor = this.shared.mobile({ id, scopes: JSON.parse(session.scopes) }, this.workspace, 'execute');
             } else return null;
-            return this.topic(actor, this.workspace, work.conversation_id, 'execute');
+            return { ...this.topic(actor, this.workspace, work.conversation_id, 'execute'), actor };
         } catch (error) {
             if (error.status >= 400 && error.status < 500) return null;
             throw error;
@@ -121,13 +124,17 @@ class CoreService {
                     content: previousTurn.content, timestamp: Date.now() });
             }
         }
-        assertPortableHistory(effectiveContextHistory(history));
         const latest = history.filter(message => message.sourceWorkId === work.id).at(-1)?.id || work.user_message_id;
         const budget = { bytes: 0 };
-        const messages = await effectiveRequest(history, config, latest, message => {
-            if (!message.attachments?.length) return [{ type: 'text', text: message.content }];
-            return this.attachments.content(topic.key, message, config.imageSupported, budget, { nativeImages: true });
+        const messages = await effectiveRequest(history, config, latest, async message => {
+            const parts = message.attachments?.length
+                ? await this.attachments.content(topic.key, message, config.imageSupported, budget, { nativeImages: true })
+                : [{ type: 'text', text: message.content }];
+            return this.desktopContext.appendReferences(message, parts);
         });
+        if (config.sponsoredByWorkId) messages.push({ role: 'user', content: '[系统提示:] 本话题收到伙伴留言。请结合上下文回应。' });
+        await this.desktopContext.prompt(topic, messages);
+        this.runner.agentAssistant.expandResults(topic.key, messages);
         const prepared = sanitize(messages, config.executionPolicy, true);
         assertPortableContext(prepared);
         return nativePacket(prepared, { agentId: topic.ownerId, agentName: config.name, topicId: topic.key }, work.id, {
@@ -138,18 +145,23 @@ class CoreService {
         });
     }
 
-    async send(topic, principal, body, reauthorize) {
+    async send(topic, principal, body, reauthorize, actor) {
         if (this.runner.draining) throw failure('HOST_DRAINING', 503);
-        const { requestId, attachments = [] } = body;
+        const { requestId, attachments = [], desktopReferences = [] } = body;
         const text = requireText(body.text);
         if (!Array.isArray(attachments) ||
-            (!text.trim() && !attachments.length) || Object.keys(body).some(k => !['requestId','text','attachments'].includes(k))) {
+            (!text.trim() && !attachments.length && !desktopReferences?.length) || Object.keys(body).some(k => !['requestId','text','attachments','desktopReferences'].includes(k))) {
             throw failure('INVALID_CORE_SUBMISSION', 400);
         }
-        const input = { text, attachments };
+        if (!Array.isArray(desktopReferences) || desktopReferences.length > 8 ||
+            desktopReferences.some(ref => ref?.kind !== 'workspace') || desktopReferences.length && actor?.kind !== 'desktop') {
+            throw failure('INVALID_DESKTOP_REFERENCE', 400);
+        }
+        const refs = desktopReferences.length ? fieldsFrom({ desktopReferences }).desktopReferences : [];
+        const input = { text, attachments, ...(refs.length && { desktopReferences: refs }) };
         const prior = this.store.replay(principal, requestId, { key: topic.key, op: 'send', input });
         if (prior) return prior;
-        const config = await prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false });
+        const config = await prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false, desktopContext: true });
         if (!config) throw failure('CORE_CONFIG_PENDING', 503);
         reauthorize();
         const result = this.store.admit(topic, principal, requestId, input, () => {
@@ -162,7 +174,7 @@ class CoreService {
                 }
             }
             return {
-                config, attachments: files,
+                config, attachments: files, desktopReferences: refs.map(ref => ({ ...ref, sourceId: actor.sourceId })),
                 ...(principal.startsWith('mobile:') && { recovery: {
                     version: 1, kind: 'message', sessionMarker: sessionMarker(principal.slice(7)),
                     payloadHash: payloadHash({ topicKey: topic.key, kind: 'message', payload: { requestId, ...input } })
@@ -173,6 +185,40 @@ class CoreService {
         this.runner.publish(topic.key, 'change_seq', { seq: result.seq });
         this.runner.wake();
         return result;
+    }
+
+    async deliverSponsoredMessage(work, invocation, args) {
+        const { resolveDelivery } = require('../Plugin/NativeSync/sync/sharedTopicSponsor');
+        const { formatTopicRiverQuote } = require('../Plugin/NativeSync/sync/topicRiverQuote');
+        const liveSource = () => {
+            const topic = this.resolveAcceptedTopic(work);
+            const invocationRow = this.store.db.prepare("SELECT 1 FROM work_invocations WHERE id=? AND work_id=? AND plugin_name='TopicSponsor' AND status='dispatched'")
+                .get(invocation?.invocationId, work.id);
+            if (!topic || !invocationRow || this.store.work(work.id)?.status !== 'running' || this.runner.draining) {
+                throw failure('TOPIC_SPONSOR_SOURCE_REQUIRED', 403);
+            }
+            return topic;
+        };
+        const source = liveSource(), senderName = JSON.parse(work.frozen_config_json).name;
+        const resolve = topic => resolveDelivery(this.shared, topic.actor,
+            this.shared.row(this.workspace, topic.key), senderName, args);
+        const initial = resolve(source);
+        const target = this.topic(source.actor, this.workspace, initial.target.id, 'execute');
+        const config = await prepareSharedConfiguration(this.mobile.engine.configs, target, { persist: false, desktopContext: true });
+        const verified = resolve(liveSource());
+        if (!config || target.key !== verified.target.id) throw failure('TOPIC_SPONSOR_TARGET_CHANGED');
+        const quote = formatTopicRiverQuote(args.river_context);
+        const prefix = '[' + senderName + '的发言]';
+        const message = quote ? args.message.trimEnd() : args.message;
+        const text = [message.startsWith(prefix) ? message : prefix + ':\n' + message, quote,
+            args.source_topic_id && '[该发言发送自' + args.source_topic_id + '话题]'].filter(Boolean).join('\n\n');
+        const operationId = 'sponsor_' + invocation.invocationId.replaceAll('-', '');
+        const result = this.store.admit(target, work.principal, operationId, { text, source: work.id }, () => ({
+            config: { ...config, sponsoredByWorkId: work.id }, attachments: [], senderName
+        }));
+        this.runner.publish(target.key, 'change_seq', { seq: result.seq });
+        this.runner.wake();
+        return { status: 'success', result: { ...result, operationId, targetSharedId: target.key, sourceSharedId: source.key } };
     }
 
     receipt(topic, principal, requestId) {
@@ -198,6 +244,12 @@ class CoreService {
             const actor = resolveActor(req, req.params.workspace, permission);
             return { actor, topic: this.topic(actor, req.params.workspace, req.params.key, permission) };
         };
+        router.post('/:workspace/resource-node', route((req, res) => {
+            if (req.params.workspace !== this.workspace) throw failure('CORE_WORKSPACE_NOT_ENABLED', 404);
+            const actor = resolveActor(req, this.workspace, 'execute');
+            this.desktopContext.announce(actor, req.body?.routeHash);
+            res.json({ success: true });
+        }));
         router.get('/:workspace/directory', route((req, res) => {
             const { workspace } = req.params;
             if (workspace !== this.workspace) throw failure('CORE_WORKSPACE_NOT_ENABLED', 404);
@@ -217,6 +269,7 @@ class CoreService {
             this.store.requireIdleCompaction(topic.key);
             const history = effectiveContextHistory(this.store.compactionHistory(topic.key));
             if (!history.length) throw failure('CORE_COMPACTION_EMPTY');
+            if (history.some(message => message.desktopReferences?.length)) throw failure('CORE_COMPACTION_LIVE_REFERENCES');
             const id = randomUUID();
             res.json({ id, messageId: 'checkpoint_' + id, sourceHash: this.compactionSource(topic, actor.principal, id), history });
         }));
@@ -263,14 +316,38 @@ class CoreService {
             const changes = this.store.changes(topic.key, after, limit);
             res.json({ changes, next: changes.at(-1)?.seq ?? after, head: this.store.head(topic.key) });
         }));
-        router.get('/:workspace/:key/works', route((req, res) => {
+        router.get('/:workspace/:key/works/:id/tasks', route(async (req, res) => {
+            const { topic } = scope(req, 'read');
+            const work = this.store.work(req.params.id);
+            if (!work || work.conversation_id !== topic.key) throw failure('WORK_NOT_FOUND', 404);
+            const tasks = await this.runner.agentAssistant.list(work);
+            scope(req, 'read');
+            res.json({ tasks });
+        }));
+        router.get('/:workspace/:key/works/:id/tasks/:taskId', route((req, res) => {
+            const { topic } = scope(req, 'read');
+            const work = this.store.work(req.params.id);
+            if (!work || work.conversation_id !== topic.key) throw failure('WORK_NOT_FOUND', 404);
+            res.json(this.runner.agentAssistant.result(work, req.params.taskId));
+        }));
+        router.post('/:workspace/:key/works/:id/tasks/:taskId/stop', route(async (req, res) => {
+            const { actor, topic } = scope(req, 'execute');
+            const work = this.store.work(req.params.id);
+            if (!work || work.conversation_id !== topic.key) throw failure('WORK_NOT_FOUND', 404);
+            if (work.principal !== actor.principal) throw failure('WORK_CONTROL_FORBIDDEN', 403);
+            res.json(await this.runner.agentAssistant.stop(work, req.params.taskId));
+        }));
+        router.get('/:workspace/:key/works', route(async (req, res) => {
             const { actor, topic } = scope(req, 'read');
             const works = this.store.db.prepare(`SELECT id, principal, status, user_message_id AS messageId,
                 reply_message_id AS replyId, error_code AS errorCode, created_at AS createdAt
                 FROM works WHERE conversation_id=? ORDER BY admitted_seq DESC LIMIT 100`).all(topic.key)
                 .map(({ principal, ...work }) => ({ ...work, owner: principal === actor.principal,
-                    tools: this.store.db.prepare('SELECT id, plugin_name AS name, status, error_code AS errorCode FROM work_invocations WHERE work_id=?').all(work.id) }));
-            res.json({ works });
+                    tools: this.store.db.prepare('SELECT id, plugin_name AS name, status, error_code AS errorCode FROM work_invocations WHERE work_id=?').all(work.id),
+ }));
+            const tasks = await Promise.all(works.map(work => this.runner.agentAssistant.list(this.store.work(work.id))));
+            scope(req, 'read');
+            res.json({ works: works.map((work, index) => ({ ...work, tasks: tasks[index] })) });
         }));
         router.get('/:workspace/:key/observe', route((req, res) => {
             const { topic } = scope(req, 'read');
@@ -300,7 +377,7 @@ class CoreService {
             // Configuration resolution may await native prompt templates. Recheck
             // before admitting if the session or its binding changed meanwhile.
             if (actor.kind === 'mobile') this.mobile.requireSubmissionContext(req);
-            await this.send(topic, actor.principal, req.body || {}, () => scope(req, 'execute'));
+            await this.send(topic, actor.principal, req.body || {}, () => scope(req, 'execute'), actor);
             res.status(202).json(this.receipt(topic, actor.principal, req.body.requestId));
         }));
         router.post('/:workspace/:key/messages/:id', route((req, res) => {

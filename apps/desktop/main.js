@@ -528,6 +528,13 @@ function startDistributedServerAfterRenderer() {
                 gameService,
                 // 工作区只读门面：direct 插件据此动态获取写入白名单
                 workspaceService: workspaceHandlers.workspaceService,
+                readCoreContext: input => require('./modules/services/nativeSync/coreContextNode').readCoreContext(input, {
+                    workspace: workspaceHandlers.workspaceService,
+                    selection: () => mainWindow?.webContents.executeJavaScript(
+                        'window.VCPStateChannels?.get("conversation.current")?.get()'
+                    ),
+                    canvas: () => require('./modules/ipc/canvasHandlers').handleGetLatestCanvasContent({ activeOnly: true })
+                }),
                 // 工具调用成功后通知挂钩的功能（例如播报闹钟、新话题）
                 onToolResult: (...args) => hostHooks.emit('tools:result', ...args)
             });

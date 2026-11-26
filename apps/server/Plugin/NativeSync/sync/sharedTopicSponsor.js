@@ -39,25 +39,33 @@ function resolve(shared,{actor,admissionId,spaceId},args,{redeeming=false}={}){
  if(args.mode!==undefined||![undefined,false,'false'].includes(args.flowlock))throw fail('INVALID_TOPIC_SPONSOR_OPERATION',400);
  const source=shared.admission(actor,spaceId,admissionId);
  if(source.principal!==actor.principal||!(source.state==='dispatched'||redeeming&&source.state==='review_required'))throw fail('TOPIC_SPONSOR_SOURCE_REQUIRED',403);
+ const result=resolveDelivery(shared,actor,shared.topic(actor,source.space_id,source.topic_id,'execute'),
+  JSON.parse(source.config_json).owner.config.name,args);
+ return {source,...result};
+}
+function resolveDelivery(shared,actor,sourceTopic,sourceName,args){
+ if(shared.readOnly||shared.configurationOnly)throw fail('SHARED_READ_ONLY');
+ if(actor?.kind!=='desktop')throw fail('SHARED_DEVICE_REQUIRED',403);
+ if(typeof args.topic_id!=='string'||!args.topic_id.trim()||typeof args.message!=='string'||!args.message.trim()||
+    args.message.length>12000||Buffer.byteLength(stable(args))>500*1024)throw fail('INVALID_TOPIC_SPONSOR_MESSAGE',400);
+ if(args.mode!==undefined||![undefined,false,'false'].includes(args.flowlock))throw fail('INVALID_TOPIC_SPONSOR_OPERATION',400);
  const candidates=shared.db.prepare(`SELECT DISTINCT o.id FROM shared_objects o
  LEFT JOIN shared_local_bindings b ON b.object_id=o.id AND b.space_id=o.space_id AND b.source_id=? AND b.kind='topic'
  WHERE o.space_id=? AND o.kind='topic' AND o.deleted=0 AND
  (o.id=? OR o.topic_id=? OR (b.local_id=? AND b.hidden=0))`)
- .all(actor.sourceId,source.space_id,args.topic_id??null,args.topic_id??null,args.topic_id??null);
+ .all(actor.sourceId,sourceTopic.space_id,args.topic_id??null,args.topic_id??null,args.topic_id??null);
  if(!candidates.length)throw fail('TOPIC_SPONSOR_TARGET_NOT_BOUND',404);
  if(candidates.length!==1)throw fail('TOPIC_SPONSOR_TARGET_AMBIGUOUS');
- const sourceTopic=shared.topic(actor,source.space_id,source.topic_id,'execute');
- const target=shared.topic(actor,source.space_id,candidates[0].id,'execute');
+ const target=shared.topic(actor,sourceTopic.space_id,candidates[0].id,'execute');
  if(target.id===sourceTopic.id)throw fail('TOPIC_SPONSOR_SELF_TARGET');
  const sourceBinding=binding(shared,actor,sourceTopic,args.source_topic_id,[args.sender_id]),targetBinding=binding(shared,actor,target,args.topic_id,[args.target_agent,args.maid]);
- const sourceName=JSON.parse(source.config_json).owner.config.name;
- const targetName=shared.object(shared.row(source.space_id,target.parent_id)).config.name;
+ const targetName=shared.object(shared.row(sourceTopic.space_id,target.parent_id)).config.name;
  if(args.source_topic_id!==undefined&&![sourceTopic.id,sourceTopic.topic_id,sourceBinding.topicId].includes(args.source_topic_id) ||
     args.sender_id!==undefined&&![sourceTopic.parent_id,sourceTopic.owner_id,sourceBinding.agentId].includes(args.sender_id) ||
     args.sender_name!==undefined&&args.sender_name!==sourceName)throw fail('TOPIC_SPONSOR_SOURCE_CHANGED',403);
  const targetNames=[target.parent_id,target.owner_id,targetName,targetBinding.agentId];
  if([args.target_agent,args.maid].some(v=>v!==undefined&&!targetNames.includes(v)))throw fail('TOPIC_SPONSOR_TARGET_CHANGED',403);
- return {source,target,sourceTopic,sourceName};
+ return {target,sourceTopic,sourceName,sourceBinding,targetBinding};
 }
 function bindRecipient(toolHost, authority) {
  const send = authority.routeHash && toolHost?.bindDistributedTool?.('TopicSponsor', authority.routeHash);
@@ -124,4 +132,4 @@ async function accept(shared,actor,body){
  if(!result.replayed)require('./sharedSession').notify(shared.native.engine,result);
  return result;
 }
-module.exports={CAPABILITY,ENVELOPE,dispatchKey,schema,resolve,bindRecipient,grant,committed,accept};
+module.exports={CAPABILITY,ENVELOPE,dispatchKey,schema,resolve,resolveDelivery,bindRecipient,grant,committed,accept};

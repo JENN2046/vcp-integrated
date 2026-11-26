@@ -572,11 +572,12 @@ async function requestCanvasEdit(payload = {}) {
     });
 }
 
-async function handleGetLatestCanvasContent() {
+async function handleGetLatestCanvasContent({ activeOnly = false } = {}) {
     if (!canvasWindow || canvasWindow.isDestroyed()) {
         return { error: 'Canvas window is not open.' };
     }
     if (!activeCanvasPath) {
+        if (activeOnly) return { error: 'No active Canvas.' };
         // If no path is active, try to get the first one from history
         const history = await getCanvasHistory();
         if (history.length > 0) {

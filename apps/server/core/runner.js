@@ -5,13 +5,17 @@ const { CoreTurnSink } = require('./turnSink');
 const { failure } = require('./store');
 
 class CoreRunner {
-    constructor({ store, chat, resolveAcceptedTopic, buildPacket }) {
+    constructor({ store, chat, resolveAcceptedTopic, buildPacket, allowedAgents, sponsor }) {
         this.store = store;
         this.chat = chat;
         this.resolveAcceptedTopic = resolveAcceptedTopic;
         this.buildPacket = buildPacket;
+        this.sponsor = sponsor;
         this.running = new Map();
         this.observers = new Map();
+        const { CoreAgentAssistant } = require('./agentAssistant');
+        this.agentAssistant = new CoreAgentAssistant({ store, chat, resolveAcceptedTopic, allowedAgents,
+            publish: (key, type, value) => this.publish(key, type, value) });
     }
 
     recover() {
@@ -129,6 +133,12 @@ class CoreRunner {
             const config = JSON.parse(work.frozen_config_json);
             await native.runCoreTurn({
                 workId: id, signal, fence, observe,
+                ...(topic.actor?.kind === 'desktop' && !config.sponsoredByWorkId && { coreSponsor: (invocation, args) => this.sponsor(work, invocation, args) }),
+                coreAA: {
+                    assertAllowed: (args, indirect) => this.agentAssistant.assertAllowed(work, args, indirect),
+                    link: (plugin, taskId) => this.agentAssistant.link(work, plugin, taskId),
+                    accept: identity => this.agentAssistant.accept(work, identity)
+                },
                 agentAlias: config.agentAlias, agentPrompt: config.systemPrompt,
                 phase: () => this.store.db.prepare('UPDATE works SET dispatched=1 WHERE id=? AND dispatched=0').run(id),
                 bridge: {
@@ -181,6 +191,7 @@ class CoreRunner {
     beginDrain() { this.draining = true; }
     async close() {
         this.beginDrain();
+        this.agentAssistant.close();
         for (const runtime of this.running.values()) runtime.controller.abort();
         await Promise.allSettled([...this.running.values()].map(runtime => runtime.done));
     }

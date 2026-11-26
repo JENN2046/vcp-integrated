@@ -1103,11 +1103,13 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
             if (state.link?.requests) {
                 lastChildId = `${delegationId}-round-${state.currentRound + 1}`;
                 payloadForVCP.requestId = lastChildId;
-                release = state.link.requests.register(payloadForVCP);
+                release = state.link.requests.register?.(payloadForVCP);
             }
             let responseFromVCP;
             try {
-                responseFromVCP = await axios.post(`${VCP_API_TARGET_URL}/chat/completions`, payloadForVCP, {
+                responseFromVCP = state.link?.requests?.execute
+                    ? await state.link.requests.execute(payloadForVCP)
+                    : await axios.post(`${VCP_API_TARGET_URL}/chat/completions`, payloadForVCP, {
                     headers: { 'Authorization': `Bearer ${VCP_SERVER_ACCESS_KEY}`, 'Content-Type': 'application/json', ...release?.headers },
                     timeout: (parseInt(process.env.PLUGIN_COMMUNICATION_TIMEOUT) || DEFAULT_PLUGIN_COMMUNICATION_TIMEOUT_MS),
                 });
@@ -1264,7 +1266,7 @@ async function executeDelegation(delegationId, agentConfig, taskPromptContent, t
     rememberCompletedDelegation(state);
     activeDelegations.delete(delegationId);
     if (completionStatus === 'Succeed') awardAgentPoints(agentConfig.baseName, agentConfig.name, 5, `成功完成异步委托任务: ${delegationId}`);
-    await sendDelegationCallback(delegationId, completionStatus, report, agentConfig.baseName);
+    if (!state.link?.core) await sendDelegationCallback(delegationId, completionStatus, report, agentConfig.baseName);
 }
 
 /**

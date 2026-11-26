@@ -7,7 +7,7 @@ const { fail, stable } = require('./protocol');
 const { syncHeaders } = require('./syncRequest');
 const { sourceRoute } = require('./connection');
 const { ownedJson } = require('./sharedLocal');
-const { fieldsFrom } = require('./metadata');
+const { fieldsFrom, projectDesktopReferences } = require('./metadata');
 const { durableJson } = require('./durableJson');
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -156,27 +156,42 @@ class CoreSingleClient {
         return response.uploadId;
     }
 
+    async announceResources() {
+        const r = this.runtime;
+        const space = r.capabilities?.spaces?.find(item => item.id === r.connection.sharedSpaceId);
+        if (!space?.coreResources) return;
+        const { nativeSyncRouteId } = require('./sharedTopicSponsor');
+        await r.send('/api/plugins/NativeSync/core/' + encodeURIComponent(space.id) + '/resource-node', {
+            body: { routeHash: digest(nativeSyncRouteId) }
+        });
+    }
+
     async send(descriptor, message) {
+        const projected = projectDesktopReferences(message);
+        const references = projected.desktopReferences || [];
+        if (references.some(ref => ref.kind !== 'workspace')) throw fail('CORE_RESOURCE_REFERENCE_NOT_SUPPORTED');
         const mapping = this.mapping(descriptor);
         const r = this.runtime;
         return r.execution.run(mapping.sharedId, async () => {
+            await this.announceResources();
             const file = this.file(mapping, 'draft');
             let draft = await ownedJson(r.root, file, { optional: true });
-            const signature = stable({ text: message.content, attachments: message.attachments?.map(item => [
+            const signature = stable({ text: message.content, attachments: projected.attachments?.map(item => [
                 item.name, item.hash || item._fileManagerData?.hash, item.size
-            ]) || [] });
+            ]) || [], ...(references.length && { desktopReferences: references }) });
             if (draft?.signature && draft.signature !== signature) throw fail('CORE_PREVIOUS_SUBMISSION_UNCONFIRMED');
             if (!draft?.requestId) {
                 const requestId = randomUUID();
                 const attachments = [];
-                for (const item of message.attachments || []) attachments.push(await this.upload(mapping, requestId, item));
-                draft = { requestId, signature, text: message.content, attachments };
+                for (const item of projected.attachments || []) attachments.push(await this.upload(mapping, requestId, item));
+                draft = { requestId, signature, text: message.content, attachments, ...(references.length && { desktopReferences: references }) };
                 await durableJson(file, draft);
             }
             let accepted;
             try {
                 accepted = await r.send(this.route(mapping, 'send'), { body: {
-                    requestId: draft.requestId, text: draft.text, attachments: draft.attachments
+                    requestId: draft.requestId, text: draft.text, attachments: draft.attachments,
+                    ...(draft.desktopReferences?.length && { desktopReferences: draft.desktopReferences })
                 } });
             } catch (error) {
                 if (error.status >= 400 && error.status < 500 && error.code !== 'REQUEST_ID_REUSED') await durableJson(file, {});
@@ -294,6 +309,20 @@ class CoreSingleClient {
             { body: { requestId, text } });
     }
 
+    async taskResult(descriptor, workId, taskId) {
+        const mapping = this.mapping(descriptor);
+        const result = await this.runtime.send(this.route(mapping,
+            'works/' + encodeURIComponent(workId) + '/tasks/' + encodeURIComponent(taskId)));
+        return { ...result, executionId: workId, task: { nativeTaskId: result.id }, topic: this.topic(mapping) };
+    }
+
+    async stopTask(descriptor, workId, taskId) {
+        const mapping = this.mapping(descriptor);
+        const result = await this.runtime.send(this.route(mapping,
+            'works/' + encodeURIComponent(workId) + '/tasks/' + encodeURIComponent(taskId) + '/stop'), { body: {} });
+        return { ...result, success: true };
+    }
+
     async status(descriptor) {
         const mapping = this.mapping(descriptor);
         this.observe(mapping);
@@ -306,7 +335,9 @@ class CoreSingleClient {
             this.previews.set(work.id, known);
         }
         return { enabled: true, connection: 'online', topic,
-            executions: works.map(work => ({ ...work, state: work.status, requestId: work.id, canCancel: work.owner && active.has(work.status),
+            executions: works.map(work => ({ ...work, shared: true,
+                nativeTasks: (work.tasks || []).map(task => ({ ...task, nativeTaskId: task.id, agentBaseName: task.agent,
+                    stopAllowed: work.owner && active.has(task.state), resultRef: task.revision === 1 ? task.id : null })), state: work.status, requestId: work.id, canCancel: work.owner && active.has(work.status),
                 canAbandon: work.owner && work.status === 'review_required' })),
             serverSessions: [...this.previews.values()].filter(item => item.sharedId === mapping.sharedId) };
     }
@@ -348,6 +379,7 @@ class CoreSingleClient {
     onEvent(mapping, data, type) {
         const r = this.runtime;
         const topic = this.topic(mapping);
+        if (type === 'native_task') { r.notifyExecutionStatus({ topic }); return; }
         if (type === 'change_seq') {
             const local = mapping.local;
             if (data.seq !== this.lastSeq || this.lastKey !== mapping.sharedId) {

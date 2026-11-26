@@ -480,3 +480,201 @@ test('Core single chat publishes a native checkpoint once and resumes from its c
         await fs.rm(f.root + '-core', { recursive: true, force: true });
     }
 });
+
+test('Core reads Canvas, Workspace, and live files through the enrolled native resource node', async t => {
+    const f = await fixture(t, { attachments: true });
+    const provider = await localProvider(t);
+    const { chat, pluginManager } = host(provider);
+    const webSockets = require(BOX + '/WebSocketServer');
+    const WebSocket = require(BOX + '/node_modules/ws');
+    const wsServer = require('node:http').createServer();
+    webSockets.setPluginManager(pluginManager);
+    webSockets.initialize(wsServer, { vcpKey: 'core-node-fixture' });
+    await new Promise(resolve => wsServer.listen(0, '127.0.0.1', resolve));
+    chat.config.webSocketServer = webSockets;
+    const { core, route } = await mountCore(f, chat);
+    let node;
+    try {
+        const desktop = await f.desktop('A');
+        const phone = await f.phone();
+        const current = f.shared.get(f.actor('A'), 'sharedAB', f.owner.id);
+        f.shared.saveConfig(f.actor('A'), { sharedSpaceId: 'sharedAB', sharedId: f.owner.id, opId: 'core-context-agent',
+            expectedVersion: current.version, config: { ...current.config, systemPrompt: '{{VCPChatCanvas}} {{VCPChatWorkSpace:fixture}}' } });
+        const resources = path.join(f.root, 'workspace-fixture');
+        await fs.mkdir(resources);
+        const file = path.join(resources, 'notes.txt');
+        await fs.writeFile(file, 'actual workspace revision one');
+        const { readCoreContext } = require(CHAT + '/modules/services/nativeSync/coreContextNode');
+        const { nativeSyncRouteId } = require(CHAT + '/modules/services/nativeSync/sharedTopicSponsor');
+        const url = 'ws://127.0.0.1:' + wsServer.address().port + '/vcp-distributed-server/VCP_Key=core-node-fixture';
+        node = new WebSocket(url);
+        await new Promise((resolve, reject) => { node.once('open', resolve); node.once('error', reject); });
+        node.send(JSON.stringify({ type: 'register_tools', data: { nativeSyncRouteId, tools: [{ name: 'internal_core_context' }] } }));
+        node.on('message', async raw => {
+            const frame = JSON.parse(raw);
+            if (frame.type !== 'execute_tool') return;
+            const { requestId, toolName, toolArgs } = frame.data;
+            assert.equal(toolName, 'internal_core_context');
+            try {
+                const result = await readCoreContext(toolArgs, {
+                    workspace: {
+                        expandPlaceholders: async () => '[VCPChat 工作区: fixture]\nnotes.txt',
+                        list: () => [{ id: 'fixture-workspace', enabled: true, path: resources }]
+                    },
+                    selection: async () => desktop.descriptor,
+                    canvas: async () => ({ content: 'active CANVAS FIXTURE' })
+                });
+                node.send(JSON.stringify({ type: 'tool_result', data: { requestId, status: 'success', result } }));
+            } catch (error) {
+                t.diagnostic(error.code || error.name);
+                node.send(JSON.stringify({ type: 'tool_result', data: { requestId, status: 'error', error: 'CORE_RESOURCE_UNAVAILABLE' } }));
+            }
+        });
+        const routeHash = require('node:crypto').createHash('sha256').update(nativeSyncRouteId).digest('hex');
+        await wait(() => webSockets.bindDistributedTool('internal_core_context', routeHash), 'native resource node registered');
+        assert.equal(pluginManager.getPlugin('internal_core_context'), undefined);
+        await phone.call('/core/sharedAB/resource-node', { routeHash }, 403);
+        const accepted = await desktop.runtime.prepareSharedSend({
+            descriptor: desktop.descriptor, serverSession: true,
+            message: { id: 'node-resources', role: 'user', content: 'Read the live context.', attachments: [{
+                id: 'node-file', name: 'notes.txt', type: 'text/plain',
+                _fileManagerData: { isLiveReference: true, workspaceRef: { workspaceId: 'fixture-workspace', alias: 'fixture', relPath: 'notes.txt' } }
+            }] }
+        });
+        await wait(() => {
+            const work = core.store.work(accepted.serverSession.executionId);
+            if (work?.error_code) throw Error('Core resource turn failed: ' + work.error_code);
+            return work?.status === 'completed';
+        }, 'desktop resource turn');
+        assert.match(JSON.stringify(provider.calls[0].messages), /active CANVAS FIXTURE/);
+        assert.match(JSON.stringify(provider.calls[0].messages), /VCPChat 工作区: fixture/);
+        assert.match(JSON.stringify(provider.calls[0].messages), /actual workspace revision one/);
+        await fs.writeFile(file, 'actual workspace revision two');
+        const next = await phone.call(route + '/send', { requestId: 'resource-phone', text: 'Read the new version.' }, 202);
+        await wait(() => core.store.work(next.id)?.status === 'completed', 'shared resource turn');
+        assert.match(JSON.stringify(provider.calls[1].messages), /actual workspace revision two/);
+        assert.doesNotMatch(JSON.stringify(provider.calls[1].messages), /revision one/);
+        const { messages } = await phone.call(route + '/messages');
+        assert.equal(messages[0].desktopReferences[0].name, 'notes.txt');
+        assert.equal(messages[0].desktopReferences[0].sourceId, undefined);
+        assert.doesNotMatch(JSON.stringify(messages), /actual workspace revision/);
+
+        node.terminate();
+        await wait(() => !webSockets.bindDistributedTool('internal_core_context', routeHash), 'node offline');
+        const offline = await phone.call(route + '/send', { requestId: 'resource-offline', text: 'Read after disconnect.' }, 202);
+        await wait(() => core.store.work(offline.id)?.status === 'failed', 'resource offline result');
+        assert.equal(core.store.work(offline.id).error_code, 'CORE_RESOURCE_NODE_OFFLINE');
+        assert.equal(provider.calls.length, 2);
+        assert.equal(f.calls(), 0);
+    } finally {
+        node?.terminate();
+        await webSockets.shutdown();
+        await new Promise(resolve => wsServer.close(resolve));
+        await core.close();
+        await fs.rm(f.root + '-core', { recursive: true, force: true });
+    }
+});
+
+test('Core associates the actual AgentAssistant child and reads its verified native archive', async t => {
+    assert.ok(process.env.VCP_TEST_SERVER, 'Run through the isolated native suite');
+    const f = await fixture(t);
+    const provider = await localProvider(t);
+    const { chat, pluginManager } = host(provider);
+    const name = 'CoreFixtureDelegate', childModel = 'core-fixture-child';
+    const aaDir = path.join(BOX, 'Plugin', 'AgentAssistant');
+    await fs.writeFile(path.join(aaDir, 'config.json'), JSON.stringify({
+        delegationMaxRounds: 1, delegationTimeout: 60000,
+        agents: [{ baseName: 'COREFIXTURE', modelId: childModel, chineseName: name, systemPrompt: 'Isolated AA fixture.' }]
+    }));
+    const assistant = require(aaDir + '/AgentAssistant');
+    assistant.initialize({ PORT: new URL(f.url).port, Key: 'fixture-only' }, {});
+    f.shared.delegationAgents.add(name);
+    pluginManager.plugins.set('AgentAssistant', { name: 'AgentAssistant', pluginType: 'hybridservice', communication: { protocol: 'direct' } });
+    pluginManager.serviceModules.set('AgentAssistant', { module: assistant });
+    const { core, route } = await mountCore(f, chat);
+    const block = ['<<<[TOOL_REQUEST]>>>', 'tool_name:「始」AgentAssistant「末」,',
+        'agent_name:「始」' + name + '「末」,', 'task_delegation:「始」true「末」,',
+        'prompt:「始」Prepare the bounded report.「末」', '<<<[END_TOOL_REQUEST]>>>'].join('\n');
+    const pattern = /\{\{VCP_ASYNC_RESULT::AgentAssistant::(aa-delegation-[a-zA-Z0-9-]+)\}\}/;
+    provider.setReply((body, res) => {
+        const content = JSON.stringify(body.messages);
+        const result = body.model === childModel ? '[[Flowlock::Complete]]\nVerified child report.' :
+            content.includes('Use the report') ? 'Report received.' : content.match(pattern)?.[0] || block;
+        res.end(JSON.stringify({ model: body.model, choices: [{ message: { content: result }, finish_reason: 'stop' }] }));
+    });
+    try {
+        const phone = await f.phone();
+        const accepted = await phone.call(route + '/send', { requestId: 'core-native-aa-parent', text: 'Ask the delegate.' }, 202);
+        await wait(() => core.store.work(accepted.id)?.status === 'completed', 'parent Core Work completed');
+        let task;
+        await wait(async () => {
+            const { tasks } = await phone.call(route + '/works/' + accepted.id + '/tasks');
+            task = tasks[0];
+            return task?.state === 'completed';
+        }, 'native archive proved');
+        const archive = await phone.call(route + '/works/' + accepted.id + '/tasks/' + task.id);
+        assert.equal(archive.content, 'Verified child report.');
+        assert.equal(provider.calls.filter(call => call.model === childModel).length, 1);
+        assert.equal(f.calls(), 0, 'child and parent never entered the old handler route');
+        const next = await phone.call(route + '/send', { requestId: 'core-native-aa-follow-up', text: 'Use the report.' }, 202);
+        await wait(() => core.store.work(next.id)?.status === 'completed', 'report in subsequent Core context');
+        assert.match(JSON.stringify(provider.calls.at(-1).messages), /Verified child report/);
+        await phone.call(route + '/works/' + next.id + '/tasks/' + task.id, undefined, 404);
+        assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM mobile_executions').get().n, 0);
+    } finally {
+        assistant.shutdown();
+        pluginManager.plugins.delete('AgentAssistant');
+        pluginManager.serviceModules.delete('AgentAssistant');
+        await core.close();
+        await fs.rm(f.root + '-core', { recursive: true, force: true });
+    }
+});
+
+test('Core TopicSponsor delivers a canonical peer message without a desktop recipient', async t => {
+    const f = await fixture(t);
+    const provider = await localProvider(t);
+    const { chat, pluginManager } = host(provider);
+    require(BOX + '/Plugin/NativeSync/sync/sponsorExecutionBridge').register(pluginManager.executionBridgeRegistry);
+    const peer = f.shared.create(f.actor('A'), { sharedSpaceId: 'sharedAB', opId: 'core-sponsor-peer-agent',
+        kind: 'agent', localId: 'peer-agent', config: { name: 'Peer Agent', model: 'peer-model', systemPrompt: 'Peer context' } }).object;
+    const destination = f.shared.create(f.actor('A'), { sharedSpaceId: 'sharedAB', opId: 'core-sponsor-peer-topic',
+        kind: 'topic', localId: 'peer-topic', localParent: 'peer-agent', parentId: peer.id,
+        config: { name: 'Peer destination' } }).object;
+    const { core } = await mountCore(f, chat);
+    try {
+        const desktop = await f.desktop('A');
+        const phone = await f.phone();
+        const localTarget = desktop.runtime.mappings().find(mapping => mapping.sharedId === destination.id).local;
+        const block = ['<<<[TOOL_REQUEST]>>>', 'tool_name:「始」TopicSponsor「末」,',
+            'command:「始」ReplyToTopic「末」,', 'topic_id:「始」' + localTarget.topicId + '「末」,',
+            'source_topic_id:「始」' + desktop.descriptor.topicId + '「末」,',
+            'message:「始」Peer delivery fixture.「末」', '<<<[END_TOOL_REQUEST]>>>'].join('\n');
+        provider.setReply((body, response) => {
+            const text = body.model === 'peer-model' ? 'Peer reply.' : body.messages.some(row => JSON.stringify(row.content).includes('targetSharedId'))
+                ? 'Sent to peer.' : block;
+            response.end(JSON.stringify({ choices: [{ message: { content: text }, finish_reason: 'stop' }] }));
+        });
+        const accepted = await desktop.runtime.prepareSharedSend({ descriptor: desktop.descriptor, serverSession: true,
+            message: { id: 'core-sponsor-user', role: 'user', content: 'Send the peer message.', attachments: [] } });
+        await desktop.close();
+        await wait(() => {
+            const work = core.store.work(accepted.serverSession.executionId);
+            if (work.error_code) throw Error(work.error_code);
+            return work.status === 'completed';
+        }, 'Sponsor source completed');
+        await wait(() => core.store.db.prepare("SELECT 1 FROM works WHERE conversation_id=? AND status='completed'").get(destination.id), 'Sponsor destination completed');
+        const { messages } = await phone.call('/core/sharedAB/' + destination.id + '/messages');
+        assert.equal(messages.length, 2);
+        assert.equal(messages[0].role, 'assistant');
+        assert.equal(messages[0].name, 'Synthetic shared');
+        assert.match(messages[0].content, /Peer delivery fixture/);
+        assert.equal(messages[1].content, 'Peer reply.');
+        assert.equal(provider.calls.length, 3);
+        assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM shared_topic_sponsor_grants').get().n, 0);
+        assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM journal').get().n, 0);
+        assert.equal(f.calls(), 0);
+    } finally {
+        await core.close();
+        await fs.rm(f.root + '-core', { recursive: true, force: true });
+    }
+});

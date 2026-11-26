@@ -117,6 +117,7 @@ function isSensitiveNativeMessage(message) {
     return message !== null && typeof message === 'object' && (
         Object.prototype.hasOwnProperty.call(message, 'authorization') ||
         message.type === 'tool_approval_response' ||
+        (message.type === 'tool_result' && pendingToolRequests.get(message.data?.requestId)?.privateResult === true) ||
         (message.type === 'register_tools' && (Object.hasOwn(message.data || {}, 'toolRouteId') || Object.hasOwn(message.data || {}, 'nativeSyncRouteId'))) ||
         (typeof message.type === 'string' && /^native/i.test(message.type))
     );
@@ -823,7 +824,8 @@ async function handleDistributedServerMessage(serverId, message) {
             const serverEntry = distributedServers.get(serverId);
             if (serverEntry && message.data && Array.isArray(message.data.tools)) {
                 // 过滤掉内部工具，不让它们显示在插件列表中
-                const externalTools = message.data.tools.filter(t => t.name !== 'internal_request_file');
+                const externalTools = message.data.tools.filter(t => !['internal_request_file', 'internal_core_context'].includes(t.name));
+                serverEntry.coreContext = message.data.tools.some(tool => tool.name === 'internal_core_context');
                 pluginManager.registerDistributedTools(serverId, externalTools);
                 serverEntry.tools = externalTools.map(t => t.name);
                 serverEntry.toolRouteHash = toolRegistrationHash(message.data);
@@ -1016,7 +1018,7 @@ function bindDistributedTool(toolName, routeHash) {
     function currentRecipient() {
         const matches = [...distributedServers].filter(([, server]) =>
             server.ws.readyState === WebSocket.OPEN && server.toolRouteHash === routeHash);
-        return matches.length === 1 && matches[0][1].tools?.includes(toolName) ? matches[0] : null;
+        return matches.length === 1 && (toolName === 'internal_core_context' ? matches[0][1].coreContext : matches[0][1].tools?.includes(toolName)) ? matches[0] : null;
     }
     const recipient = currentRecipient();
     if (!recipient) return null;
@@ -1071,7 +1073,8 @@ async function executeDistributedTool(serverIdOrName, toolName, toolArgs, timeou
             resolve,
             reject,
             timeout: null,
-            cancelSent: false
+            cancelSent: false,
+            privateResult: toolName === 'internal_core_context'
         };
         pending.timeout = setTimeout(() => {
             pendingToolRequests.delete(requestId);

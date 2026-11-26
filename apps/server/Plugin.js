@@ -1722,7 +1722,9 @@ class PluginManager extends EventEmitter {
     // }
 
     getPlugin(name) {
-        return this.plugins.get(name);
+        return this.plugins.get(name) || (name === 'TopicSponsor' && nativeExecution.currentCoreSponsor()
+            ? { name, pluginType: 'hybridservice', isDistributed: true, communication: { protocol: 'direct' } }
+            : undefined);
     }
 
     getServiceModule(name) {
@@ -1875,7 +1877,7 @@ class PluginManager extends EventEmitter {
             && typeof toolArgs?.operation === 'string'
             && toolArgs.operation.startsWith('PROPOSE_');
 
-        const plugin = this.plugins.get(toolName);
+        const plugin = this.getPlugin(toolName);
         if (!plugin) {
             if (residentProposalCall) {
                 const fixedCode = 'RESIDENT_PROPOSAL_DISPATCH_FAILED';
@@ -2056,6 +2058,9 @@ class PluginManager extends EventEmitter {
                 pluginName: toolName,
                 executionOptions,
                 webSocketServer: this.webSocketServer,
+                ...(toolName === 'TopicSponsor' && nativeExecution.currentCoreSponsor() && {
+                    deliverCoreTopic: args => invokeDirect(invocation => nativeExecution.currentCoreSponsor()(invocation, args))
+                }),
                 debugMode: this.debugMode,
                 debugLog: (...args) => {
                     if (this.debugMode) console.log('[PluginManager]', ...args);
