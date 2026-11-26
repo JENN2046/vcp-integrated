@@ -523,6 +523,23 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         assert.equal(provider.calls.length,beforeCalls);
         assert.equal(posts.filter(route=>route===imageSend(imageTopic)).length,1);
 
+        const uploadsAfterRejection=attachmentPosts.length;
+        await page.reload({waitUntil:'domcontentloaded'});
+        await chooseTopic(imageTopic);
+        await page.waitForSelector('.pending-file');
+        assert.equal(await value(),'要保留的图片消息，后来编辑');
+        assert.equal(await page.$('#attachment-reselection-notice'),null,'the rejected upload is already recoverable');
+        await selectFiles([['local-only.txt','not uploaded']]);
+        await page.reload({waitUntil:'domcontentloaded'});
+        await chooseTopic(imageTopic);
+        await page.waitForSelector('.pending-file');
+        assert.equal(await page.$$eval('.pending-file',files=>files.length),1,'only the reusable upload is restored');
+        assert.match(await page.$eval('#attachment-reselection-notice', el=>el.textContent),/1 个草稿附件未恢复，请重新选择/);
+        await selectFiles([['local-only.txt','not uploaded']]);
+        await page.click('.pending-file:last-child [aria-label="移除附件"]');
+        assert.equal(await page.$('#attachment-reselection-notice'),null);
+        assert.equal(attachmentPosts.length,uploadsAfterRejection);
+
         await chooseModel(visionModel);
         truncateSend=true;
         holdReceipt=true;
@@ -531,6 +548,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await page.$eval('#send',button=>button.click());
         const visionRequest=JSON.parse((await acceptedImage).request().postData());
         assert.deepEqual(visionRequest.attachments,deniedBody.attachments,'reuse the original upload IDs');
+        assert.equal(attachmentPosts.length,uploadsAfterRejection,'sending the recovered upload does not upload it again');
         assert.notEqual(visionRequest.requestId,deniedBody.requestId);
         await wait(()=>workFor('要保留的图片消息，后来编辑')?.status==='completed','vision Work settled');
         await page.waitForSelector('#pending-submission');

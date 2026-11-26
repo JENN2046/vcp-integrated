@@ -349,7 +349,12 @@ function restoreOrdinaryText(draft,scope){
 }
 function draftLocalAttachmentCount(draft){
  const prepared=draft.submitted?.prepared?draft.submitted.files:[];
- return (draft.missingAttachments||0)+(draft.files||[]).filter(item=>item.file&&!prepared.includes(item)).length;
+ const rejected=draft.rejected;
+ const localOnly=(draft.files||[]).filter(item=>{
+  const recoverable=rejected&&item.uploadSessionMarker===rejected.sessionMarker&&rejected.attachments.includes(item.uploadId);
+  return item.file&&!prepared.includes(item)&&!recoverable;
+ });
+ return (draft.missingAttachments||0)+localOnly.length;
 }
 function rememberOrdinaryText(draft,scope){
  if(!scope)return false;
