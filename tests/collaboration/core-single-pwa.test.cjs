@@ -44,7 +44,8 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
     }) + '\n\ndata: [DONE]\n\n');
     const composerPosts = [];
     let proxy, browser, steeringFault, holdSteeringReceipt = false;
-    let steeringReads = 0, heldSteering, issuedRejection, holdObserverReceipt = true;
+    let steeringReads = 0, heldSteering, issuedRejection;
+    let holdObserverReceipt = true, holdStaleReceipt = true, holdNewRequestId;
     try {
         const grant = f.portal.createPairing({ scopeMode: 'shared', sharedSpaceId: 'sharedAB', permissions: ['read','execute'] });
         const cert = path.join(f.root, 'core-pwa-cert.pem');
@@ -71,7 +72,12 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
             }
             if (req.method === 'GET' && req.url.includes('/steering-receipt?')) {
                 steeringReads++;
-                if (holdSteeringReceipt || (holdObserverReceipt && req.headers['x-fixture-tab']==='observer')) return res.writeHead(503, { 'Content-Type':'application/json' }).end('{}');
+                const tab = req.headers['x-fixture-tab'];
+                const id = new URL(req.url,'https://fixture.invalid').searchParams.get('requestId');
+                if (holdSteeringReceipt || id === holdNewRequestId || (holdObserverReceipt && tab === 'observer') ||
+                    (holdStaleReceipt && tab === 'stale')) {
+                    return res.writeHead(503, { 'Content-Type':'application/json' }).end('{}');
+                }
             }
             const forward = http.request(f.url + req.url, { method: req.method, headers: {
                 ...req.headers, 'x-forwarded-proto': 'https', origin: 'https://synthetic-shared.invalid'
@@ -158,6 +164,14 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await observer.setExtraHTTPHeaders({'x-fixture-tab':'observer'});
         await observer.goto(entry,{waitUntil:'domcontentloaded'});
         await observer.waitForFunction(()=>document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
+        const stale = await browser.newPage();
+        await stale.setExtraHTTPHeaders({'x-fixture-tab':'stale'});
+        await stale.goto(entry,{waitUntil:'domcontentloaded'});
+        await stale.waitForFunction(()=>document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
+        const snapshot = await stale.evaluate(()=>{
+            const key = Object.keys(localStorage).find(name=>name.startsWith('vcp.mobile.steering.v1:'));
+            return { key, raw:localStorage.getItem(key) };
+        });
         await page.bringToFront();
         holdSteeringReceipt = false;
         await page.waitForFunction(() => !document.querySelector('#message-text').value &&
@@ -171,9 +185,51 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         holdSteeringReceipt = true;
         await page.$eval('.message-composer', form => form.requestSubmit());
         await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
+        await wait(()=>composerPosts.length===2 && core.store.work(first.serverSession.executionId).steering_count===2,
+            'second request accepted with its receipt withheld');
+        const newer = await page.evaluate(key=>localStorage.getItem(key),snapshot.key);
+        holdNewRequestId = JSON.parse(newer).intent.requestId;
+        assert.notEqual(newer,snapshot.raw);
+        await stale.evaluate(({key,raw})=>{
+            const request = navigator.locks.request.bind(navigator.locks);
+            const get = Storage.prototype.getItem;
+            let armed = true;
+            navigator.locks.request=(name,...args)=>{
+                if(name!==key||!armed||args.length!==1||typeof args[0]!=='function')return request(name,...args);
+                return request(name,async lock=>{
+                    armed=false;
+                    // Reproduce the stale localStorage read observed after a
+                    // real cross-tab lock handoff, for this slot only.
+                    Storage.prototype.getItem=function(name){
+                        return this===localStorage&&name===key?raw:get.call(this,name);
+                    };
+                    try{return await args[0](lock);}
+                    finally{Storage.prototype.getItem=get;window.staleReceiptSettled=true;}
+                });
+            };
+        },snapshot);
         holdSteeringReceipt=false;
+        holdStaleReceipt=false;
+        await stale.bringToFront();
+        await stale.waitForFunction(()=>window.staleReceiptSettled===true,{polling:50,timeout:5000});
+
+        const verifier=await browser.newPage();
+        try {
+            await verifier.goto(entry,{waitUntil:'domcontentloaded'});
+            assert.equal(await verifier.evaluate(key=>localStorage.getItem(key),snapshot.key),newer,
+                'an old receipt on a stale tab cannot erase the newer durable intent');
+            await verifier.waitForFunction(()=>document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
+            assert.equal(composerPosts.length,2);
+        } finally {
+            await verifier.close();
+            await stale.close();
+        }
+
+        holdNewRequestId=undefined;
+        await page.bringToFront();
         await page.waitForFunction(()=>!document.querySelector('#message-text').value &&
             document.querySelector('#steering-delivery')?.textContent.includes('已送达'));
+        t.diagnostic('A delayed first receipt with a stale read preserved the newer pending request after reopening; two POSTs.');
         assert.equal(core.store.work(first.serverSession.executionId).steering_count,2);
         assert.equal(await observer.$eval('#message-text',el=>el.value),quotedDraft);
         holdObserverReceipt=false;

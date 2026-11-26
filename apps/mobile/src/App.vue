@@ -70,6 +70,7 @@ const attachmentPreview=ref(null),attachmentDialog=ref(null);let attachmentReadR
 const drafts=new Map(),composerDraft=ref({text:'',files:[],revision:0});let composerScope='';
 const steeringStoragePrefix='vcp.mobile.steering.v1:', steeringStorageError=ref('');
 const dismissedSteeringPrefix='vcp.mobile.steering-dismissed.v1:';
+const confirmedSteeringKey=(scope,requestId)=>'vcp.mobile.steering-confirmed.v1:'+scope+':'+requestId;
 const steeringRecordCorrupt=ref(false), steeringRemovalPrompt=ref(false);
 const text=computed({get:()=>composerDraft.value.text,set:value=>{composerDraft.value.text=value;composerDraft.value.revision++;saveDraftEdit(composerDraft.value);}});
 watch(text,resizeComposer,{flush:'post'});
@@ -855,10 +856,17 @@ function readSteeringDraft(scope){
     typeof saved.text!=='string'||saved.text.length>12000||
     !Number.isSafeInteger(intent.revision)||intent.revision<0||
     !Number.isSafeInteger(saved.revision)||saved.revision<0)return corrupt();
+ if(localStorage.getItem(confirmedSteeringKey(scope,intent.requestId))===intent.workId)return null;
  return saved;
 }
 function writeSteeringDraft(scope,draft){
- localStorage.setItem(steeringStoragePrefix+scope,JSON.stringify({intent:draft.coreSteering,quote:draft.taskQuote,text:draft.text,revision:draft.revision}));
+ const key=steeringStoragePrefix+scope;
+ const intent=draft.coreSteering;
+ let previous;
+ try{previous=JSON.parse(localStorage.getItem(key))?.intent;}catch{/* Ignore the discarded invalid version. */}
+ localStorage.setItem(key,JSON.stringify({intent,quote:draft.taskQuote,text:draft.text,revision:draft.revision}));
+ if(validSteeringId(previous?.requestId)&&previous.requestId!==intent.requestId)
+  localStorage.removeItem(confirmedSteeringKey(scope,previous.requestId));
  localStorage.removeItem(dismissedSteeringPrefix+scope);
 }
 function syncSteeringDraft(){
@@ -939,7 +947,9 @@ async function confirmSteering(context,intent,receipt){
      draft.revision=saved.revision;
     }
    }
-   if(saved)localStorage.removeItem(key);
+   // A stale read can survive the lock handoff. Record the verified
+   // request, leaving the shared pending slot available to a newer writer.
+   if(saved)localStorage.setItem(confirmedSteeringKey(scope,intent.requestId),intent.workId);
    const sent=submittedEdit?draft.ordinaryEditId===submittedEdit:
     draft.revision===intent.revision&&draft.text===intent.text;
    if(sent){draft.text='';delete draft.taskQuote;delete draft.ordinaryEditId;}
