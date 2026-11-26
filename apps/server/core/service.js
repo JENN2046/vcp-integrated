@@ -710,6 +710,10 @@ class CoreService {
             this.runner.publish(topic.key, 'change_seq', { seq: result.seq });
             res.json(result);
         }));
+        router.get('/:workspace/:key/works/:id/steering-receipt', route((req, res) => {
+            const { actor, topic } = scope(req, 'read');
+            res.json({ receipt: this.store.steeringReceipt(topic.key, actor.principal, req.query.requestId, req.params.id) });
+        }));
         router.post('/:workspace/:key/works/:id/:action', route((req, res) => {
             const { actor, topic } = scope(req, 'execute');
             const { id, action } = req.params;
@@ -718,6 +722,9 @@ class CoreService {
                 if (this.runner.draining) throw failure('HOST_DRAINING', 503);
                 const text = requireText(req.body?.text);
                 if (!text.trim()) throw failure('INVALID_MESSAGE_TEXT', 400);
+                if (actor.kind === 'mobile' && (req.get('x-nativesync-entry-id') || req.get('x-nativesync-session-marker'))) {
+                    (this.mobile || this.remote).requireSubmissionContext(req);
+                }
                 const result = this.store.steer(topic.key, actor.principal, req.body?.requestId, id, text);
                 this.runner.publish(topic.key, 'change_seq', { seq: result.seq });
                 return res.status(202).json(result);

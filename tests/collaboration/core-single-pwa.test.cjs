@@ -43,7 +43,8 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         choices: [{ delta: { content }, finish_reason: 'stop' }]
     }) + '\n\ndata: [DONE]\n\n');
     const composerPosts = [];
-    let proxy, browser;
+    let proxy, browser, steeringFault, holdSteeringReceipt = false;
+    let steeringReads = 0;
     try {
         const grant = f.portal.createPairing({ scopeMode: 'shared', sharedSpaceId: 'sharedAB', permissions: ['read','execute'] });
         const cert = path.join(f.root, 'core-pwa-cert.pem');
@@ -52,10 +53,36 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         const certificate = await fs.readFile(cert);
         const spki = createHash('sha256').update(new X509Certificate(certificate).publicKey.export({ type: 'spki', format: 'der' })).digest('base64');
         proxy = https.createServer({ cert: certificate, key: await fs.readFile(key) }, (req, res) => {
-            if(req.method==='POST' && /\/(?:send|steer)$/.test(req.url))composerPosts.push(req.url);
+            let fault;
+            if (req.method === 'POST' && /\/(?:send|steer)$/.test(req.url)) {
+                composerPosts.push(req.url);
+                if (req.url.endsWith('/steer')) {
+                    fault = steeringFault;
+                    steeringFault = null;
+                }
+            }
+            if (fault === 'before') {
+                // Send headers before breaking the response so Chromium does
+                // not retry a stale keep-alive connection at the transport layer.
+                res.writeHead(503, { 'Content-Type':'application/json', 'Content-Length':100 });
+                res.write('{');
+                setTimeout(() => res.destroy(), 30);
+                return;
+            }
+            if (req.method === 'GET' && req.url.includes('/steering-receipt?')) {
+                steeringReads++;
+                if (holdSteeringReceipt) return res.writeHead(503, { 'Content-Type':'application/json' }).end('{}');
+            }
             const forward = http.request(f.url + req.url, { method: req.method, headers: {
                 ...req.headers, 'x-forwarded-proto': 'https', origin: 'https://synthetic-shared.invalid'
-            } }, response => { res.writeHead(response.statusCode, response.headers); response.pipe(res); });
+            } }, response => {
+                res.writeHead(response.statusCode, response.headers);
+                if (fault !== 'after') return response.pipe(res);
+                assert.equal(response.statusCode, 202);
+                response.resume();
+                res.write('{');
+                setTimeout(() => res.destroy(), 30);
+            });
             forward.on('error', () => { if (!res.headersSent && !res.destroyed) { res.statusCode = 502; res.end(); } });
             res.on('close', () => { if (!res.writableEnded) forward.destroy(); });
             req.pipe(forward);
@@ -107,12 +134,35 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         assert.equal(await page.$eval('#send', button=>button.getAttribute('aria-label')),'发送新消息');
         assert.deepEqual(composerPosts,[]);
         await page.click('#quote-task');
+        steeringFault = 'after';
+        holdSteeringReceipt = true;
         await page.click('#send');
-        await page.waitForFunction(() => !document.querySelector('#message-text').value);
+        await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
+        assert.equal(core.store.work(first.serverSession.executionId).steering_count, 1);
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => document.querySelector('#message-text')?.value === '请把白底主图放在第一组。');
+        holdSteeringReceipt = false;
+        await page.waitForFunction(() => !document.querySelector('#message-text').value &&
+            document.querySelector('#steering-delivery')?.textContent.includes('已送达'));
+        assert.ok(steeringReads >= 1);
+        assert.equal(composerPosts.length, 1);
+        await page.waitForSelector('#quote-task', { visible:true });
+        await page.click('#quote-task');
+        await page.type('#message-text', '这次追加仍需确认。');
+        steeringFault = 'after';
+        holdSteeringReceipt = true;
+        await page.$eval('.message-composer', form => form.requestSubmit());
+        await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
+        await page.type('#message-text', '这是后来编辑的内容。');
+        holdSteeringReceipt = false;
+        await page.waitForFunction(() => !document.querySelector('#task-quote') &&
+            document.querySelector('#steering-delivery')?.textContent.includes('已送达'));
+        assert.equal(await page.$eval('#message-text', el=>el.value), '这次追加仍需确认。这是后来编辑的内容。');
+        await page.$eval('#message-text', el => { el.value=''; el.dispatchEvent(new Event('input',{bubbles:true})); });
         finish(upstream[0], '按原计划整理。');
         await wait(() => upstream.length === 2, 'steering reached provider for same work');
         assert.match(JSON.stringify(provider.calls[1].messages), /请把白底主图放在第一组/);
-        assert.equal(composerPosts.length,1);
+        assert.equal(composerPosts.length,2);
         assert.ok(composerPosts[0].endsWith('/works/'+first.serverSession.executionId+'/steer'));
         await page.waitForSelector('#quote-task',{visible:true});
         await page.click('#quote-task');
@@ -127,11 +177,11 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await shot(page, '02c-completed-keeps-draft');
         await page.$eval('.message-composer', form=>form.requestSubmit());
         await page.evaluate(() => new Promise(requestAnimationFrame));
-        assert.equal(composerPosts.length,1,'a stale quote never falls through to a new message');
+        assert.equal(composerPosts.length,2,'a stale quote never falls through to a new message');
         await page.click('#quote-new-message');
         assert.equal(await page.$eval('#message-text', el=>el.value),preservedDraft);
         assert.equal(await page.$eval('#send', button=>button.getAttribute('aria-label')),'发送新消息');
-        assert.equal(composerPosts.length,1,'conversion changes only the draft, not the server');
+        assert.equal(composerPosts.length,2,'conversion changes only the draft, not the server');
         await shot(page, '01-core-light-chat');
         await page.click('#topic-toggle');
         await page.waitForSelector('.topic-list button[aria-current="true"]',{visible:true});
@@ -177,9 +227,47 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => [...document.querySelectorAll('[data-message-id] .bubble')].some(node => node.textContent.includes('拍摄安排已更新')));
         assert.equal(await page.$eval('html',el=>el.dataset.theme),'dark');
-        assert.equal(composerPosts.length,2);
-        assert.ok(composerPosts[1].endsWith('/send'));
+        assert.equal(composerPosts.length,3);
+        assert.ok(composerPosts[2].endsWith('/send'));
         assert.equal(upstream.length,4,'reconnect and reload must not create another execution');
+        const nextDesktop = await f.desktop('A');
+        const startWork = async (id, content) => nextDesktop.runtime.prepareSharedSend({
+            descriptor: nextDesktop.descriptor, serverSession: true,
+            message: { id, role:'user', content, attachments:[] }
+        });
+        const before = await startWork('before-steering-disconnect', 'Work A for unsent steering');
+        await wait(() => upstream.length === 5, 'Work A running');
+        await page.waitForSelector('#quote-task', { visible:true });
+        await page.click('#quote-task');
+        await page.type('#message-text', '未到达 Core 的追加');
+        steeringFault = 'before';
+        await page.waitForSelector('#task-quote');
+        await page.waitForSelector('#send:not([disabled])');
+        await page.$eval('.message-composer', form => form.requestSubmit());
+        await wait(() => composerPosts.length === 4, 'steering POST interrupted before reaching Core');
+        await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认'), { timeout: 5000 });
+        assert.equal(core.store.work(before.serverSession.executionId).steering_count, 0);
+        await page.reload({ waitUntil:'domcontentloaded' });
+        await page.waitForFunction(() => document.querySelector('#message-text')?.value === '未到达 Core 的追加');
+        await page.type('#message-text', '，后来编辑');
+        await page.setOfflineMode(true);
+        await page.waitForSelector('.connection-banner', { visible:true });
+        await page.setOfflineMode(false);
+        finish(upstream[4], 'Work A finished');
+        await wait(() => core.store.work(before.serverSession.executionId).status === 'completed', 'Work A completed');
+        const next = await startWork('replacement-work-b', 'Work B in same topic');
+        await wait(() => upstream.length === 6, 'Work B running');
+        await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认') &&
+            document.querySelector('#message-text')?.value === '未到达 Core 的追加，后来编辑' &&
+            document.querySelector('#send')?.disabled);
+        assert.equal(await page.$('#quote-new-message'), null);
+        assert.equal(await page.$('#quote-task'), null);
+        await page.$eval('.message-composer', form => form.requestSubmit());
+        assert.equal(composerPosts.length, 4, 'recovery never POSTs, including after the task ends and a new one starts');
+        assert.ok(composerPosts[3].endsWith('/works/' + before.serverSession.executionId + '/steer'));
+        assert.equal(core.store.work(next.serverSession.executionId).steering_count, 0);
+        finish(upstream[5], 'Work B finished');
+        await nextDesktop.close();
         assert.deepEqual(errors, []);
     } finally {
         await browser?.close();
