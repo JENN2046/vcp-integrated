@@ -1,13 +1,13 @@
 # RC-01 · 本机发行候选
 
-施工基线为 `03039ad`。本批升级修复、隔离构建、样本迁移和实机入口核对均使用独立目录。此候选保留 [M4 原生能力及旧职责核对](../core-m4/README.md)。
+施工基线为 `03039ad`，产物源码提交为 `ead84e2`。补充验收仅更新证据和测试脚本，沿用原安装包。本批升级修复、隔离构建、样本迁移和实机入口核对均使用独立目录。此候选保留 [M4 原生能力及旧职责核对](../core-m4/README.md)。
 
 ## 运行与安装
 
 - Linux 使用完整 ToolBox 后台、真实 Electron、独立 CDS 与原生 PWA 配对页。桌面发出 Core 消息并收到受理回执，两个桌面正常退出后 Core 继续完成。完整后台重新启动后，另一个桌面冷启动读回同一组消息 ID 和正文。合成 Provider 共调用一次，旧 Journal、admission 和移动执行台账为零写入。 [机器回执](linux-core.json) · [冷启动画面](linux-core-cold-readback.png)
 - Linux x64 AppImage 从干净源码副本和全新安装的锁定依赖打包。校验 140 项运行文件后，从发行文件实际启动 Electron，达到渲染器 ready，并以退出码 0 退出。启动采用 AppImage 的提取运行模式。 [回执](linux-appimage.json)
-- Windows x64 从锁定依赖和已核对的 Electron 44.9.3 发行二进制构建。CDS 采用 Rust release 交叉构建并带匹配的 authority sidecar。NSIS 生成了本地未签名候选。隔离 Windows 11 虚拟机已启动，安装介质以只读方式挂载。普通测试账户登录及安装启动仍待完成。
-- 当前为 Linux x64 宿主，无 macOS 原生验收环境。
+- Windows x64 从锁定依赖和已核对的 Electron 44.9.3 发行二进制构建。CDS 采用 Rust release 交叉构建并带匹配的 authority sidecar。未签名 NSIS 完成干净 Windows 11 x64（22631）断网虚拟机的普通用户安装，退出码 0。已安装客户端渲染器达到 ready，从安装目录运行的 CDS 哈希与交付二进制一致，安装器 SHA-256 与交付文件一致。 [机器回执](windows-install.json) · [已安装桌面](windows-installed-desktop.png) · [验收脚本](../../../tests/hardware/verify-core-rc01-install.ps1)
+- 原生回归 355 通过、6 跳过，协作回归 61 通过。当前无 macOS 原生验收环境。
 
 ## 修复与旧职责退出
 
@@ -19,7 +19,7 @@
 ## 迁移和外部 JEV
 
 - 在明确授权后，用只读方式在日用桌面抽取一个话题中五条消息的顺序和原始格式，确认附件关联可在本机解析。用中性 PNG 替换原件正文与文件名，从真实本地 CDS 选取一条删除事实并保留其独立话题归属。中央编辑使用合成重叠行验证。首次导入、重复导入、重开和替换附件的字节哈希核对均通过。真实中央数据库和真实附件字节保留在源端。旧格式兼容另外由合成回归覆盖。 [脱敏回执](redacted-history.json)
-- 按授权使用隔离配置，向 Typesafe 外部 JEV 发出一次合成仲裁请求。Provider 返回 HTTP 401，未得到有效仲裁。Core 已保存合成输入，原生仲裁场景仍由确定性 fixture 验证。 [外部请求回执](external-jev.json)
+- 首轮 Typesafe 外部请求返回 HTTP 401。更新隔离配置后的首次 Core 复验收到有效仲裁，JEV 按继续阈值收敛。用明确点名并要求回答的合成输入复跑后，Typesafe 仲裁选中指定成员。Core 向隔离模型端点派发一次，成员 Work 完成，配对客户端从正式历史读回同一条回复。继续概率为 0.48，高于原生默认阈值 0.45。本轮测试限定一次外部仲裁。 [首轮回执](external-jev.json) · [成功回执](external-jev-recheck.json)
 
 ## 复建
 

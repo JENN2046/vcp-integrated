@@ -1,0 +1,19 @@
+{
+  "provider": "typesafe",
+  "decisions": 1,
+  "received": true,
+  "decisionInputs": {
+    "speakerProbability": 0.99,
+    "endProbability": 0.01,
+    "continueProbability": 0.48
+  },
+  "stopReason": "safety_limit",
+  "failureCode": null,
+  "workStates": [
+    "completed",
+    "completed"
+  ],
+  "localModelCalls": 1,
+  "committedSpeakers": 1,
+  "active": false
+}

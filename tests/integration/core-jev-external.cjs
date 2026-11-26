@@ -16,6 +16,7 @@ test('authorized JEV provider arbitrates one synthetic Core conversation', { tim
     const provider = await localProvider(t);
     const { chat } = host(provider);
     let decisions = 0, received = false, failureCode;
+    let decisionInputs;
     const suppressed = { log() {}, warn() {}, error() {}, info() {} };
     const { core } = await mountCore(fixtureState, chat, { jevService: {
         async decide(state, questions, { signal }) {
@@ -23,6 +24,13 @@ test('authorized JEV provider arbitrates one synthetic Core conversation', { tim
             try {
                 const result = await native.decide(state, questions, { signal, timeoutMs: 25000, maxRetries: 0 });
                 received = true;
+                const route = result.answers.speaker_routing?.probabilities;
+                const continuation = result.answers.continue_discussion?.noul;
+                decisionInputs = {
+                    speakerProbability: typeof route?.agent_0 === 'number' ? route.agent_0 : null,
+                    endProbability: typeof route?.end_conversation === 'number' ? route.end_conversation : null,
+                    continueProbability: typeof continuation === 'number' ? continuation : null
+                };
                 return result;
             } catch (error) {
                 failureCode = typeof error.code === 'string' && /^[A-Z0-9_]+$/.test(error.code) ? error.code : 'PROVIDER_REQUEST_FAILED';
@@ -45,17 +53,31 @@ test('authorized JEV provider arbitrates one synthetic Core conversation', { tim
     const desktop = await fixtureState.desktop('A');
     const local = desktop.runtime.localFor(topic.id);
     const descriptor = { itemType: 'group', itemId: local.localParent, topicId: local.localId };
-    await desktop.runtime.coreSingle.send(descriptor, { id: 'synthetic-external-jev', role: 'user',
-        content: 'Synthetic test only. Which of the sample participants should explain why the sky appears blue?' });
+    const text = '这是合成联验。请 Synthetic shared 直接回答还未解决的问题：天空为什么通常看起来是蓝色的？请给出一句解释。';
+    const accepted = await desktop.runtime.coreSingle.send(descriptor, { id: 'synthetic-external-jev', role: 'user', content: text });
     for (let index = 0; index < 420 && (core.jev.native.getState(group.id, topic.id).running || !decisions); index++) await delay(100);
     const state = core.jev.native.getState(group.id, topic.id);
     const stopReason = /^[A-Za-z0-9_-]+$/.test(state.stopReason || '') ? state.stopReason : null;
-    const works = core.store.db.prepare('SELECT status FROM works WHERE conversation_id=? ORDER BY rowid').all(topic.id);
+    const works = core.store.db.prepare('SELECT id, status, reply_message_id FROM works WHERE conversation_id=? ORDER BY rowid').all(topic.id);
+    const inputWork = works.find(work => work.id === accepted.serverSession.executionId);
+    const speakerWorks = works.filter(work => work.id !== inputWork?.id);
+    const phone = await fixtureState.phone();
+    const history = await phone.call('/core/sharedAB/' + topic.id + '/messages');
+    const committedSpeakers = speakerWorks.filter(work => history.messages.some(message =>
+        message.role === 'assistant' && message.id === work.reply_message_id &&
+        message.sourceWorkId === work.id && message.agentId === fixtureState.owner.id && message.content.trim()));
     console.log('RC01_JEV ' + JSON.stringify({ provider: status.provider, decisions, received,
-        stopReason, failureCode: failureCode || null, workStates: works.map(row => row.status), localModelCalls: provider.calls.length,
+        decisionInputs, stopReason, failureCode: failureCode || null, workStates: works.map(row => row.status),
+        localModelCalls: provider.calls.length, committedSpeakers: committedSpeakers.length,
         active: state.running }));
     assert.equal(received, true, failureCode || 'no external decision');
     assert.equal(state.running, false);
     assert.equal(decisions, 1);
-    assert.ok(!failureCode && works.length >= 1 && works.every(row => row.status === 'completed'));
+    assert.equal(inputWork?.status, 'completed');
+    assert.equal(history.messages[0]?.content, text);
+    assert.equal(history.messages[0]?.id, accepted.userMessage.id);
+    assert.ok(speakerWorks.length > 0, 'JEV did not select a member for the synthetic request');
+    assert.ok(speakerWorks.every(work => work.status === 'completed'));
+    assert.equal(committedSpeakers.length, speakerWorks.length);
+    assert.equal(provider.calls.length, speakerWorks.length);
 });

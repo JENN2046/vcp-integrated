@@ -1,0 +1,12 @@
+{
+  "platform": "Windows",
+  "osBuild": 22631,
+  "account": "VcpRcUser",
+  "passed": true,
+  "administrator": false,
+  "installerSha256": "af2c225ed15e5808eb78b1182189a31491d8a312b3aa7e4abb798f4fff4e9090",
+  "installerExit": 0,
+  "renderer": "ready",
+  "cdsSha256": "1c30d6c8433ee3cc048209a5c585189e33fb2532f735a19ab75a1bffc31bff91",
+  "installedExecutable": "VCP聊天客户端.exe"
+}
