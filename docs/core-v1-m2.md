@@ -1,5 +1,7 @@
 # Core M2 施工入口
 
+> **历史文档｜Core M2 阶段施工说明。** 以下保留当时正文，非现行部署或后续施工指令。请从 [现行文档导航](README.md)、[架构说明](ARCHITECTURE.md) 或 [历史档案索引](archive/README.md) 查阅相应资料。
+
 M1 普通共享单聊在 `579be87` 收口。正式历史由 Core SQLite 提交，桌面退出后 Work 继续执行。实体 Android 实时观察并追问，桌面冷启动读回四条相同消息及原图。真实多模态推理、设备截图和固定代码回执见 [M1-R1 验收](evidence/core-m1-r1/README.md)。
 
 ## 独立工作项

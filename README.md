@@ -10,6 +10,10 @@ VCP Integrated 基于 [VCPToolBox](https://github.com/lioensky/VCPToolBox) 与 [
 >
 > 固定候选：[vcp-core-v1-pilot-01-r](https://github.com/JENN2046/vcp-integrated/tree/vcp-core-v1-pilot-01-r) · [部署与设备配对](docs/core-pilot-01-r.md)
 
+## 文档
+
+[文档导航](docs/README.md) · [现行架构](docs/ARCHITECTURE.md) · [部署与配对](docs/core-pilot-01-r.md) · [历史档案与证据索引](docs/archive/README.md)
+
 ## 架构
 
 ```mermaid
