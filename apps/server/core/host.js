@@ -21,7 +21,9 @@ function startCoreHost({ app, chat, listenHost, serverKey, legacy, modelCatalog,
     const adapter = local ? null : legacy?.coreBinding?.();
     if (!local && (!configuredWorkspace || !adapter)) throw new Error('CORE_SHARED_AUTHORITY_UNAVAILABLE');
     const { CoreService } = require('./service');
-    const core = new CoreService({ directory, workspace: configuredWorkspace || 'personal', chat, modelCatalog, ...(remote && { remoteConfig: { origin: remoteOrigin, hours } }), ...adapter?.options });
+    const speech = remote ? require('./localSpeech').localSpeechConfig(env) : null;
+    const core = new CoreService({ directory, workspace: configuredWorkspace || 'personal', chat, modelCatalog,
+        ...(remote && { remoteConfig: { origin: remoteOrigin, hours, speech } }), ...adapter?.options });
     if (adapter) adapter.attach(core);
     if (remote) {
         core.remoteDesktopRouter = core.remote.router('desktop');

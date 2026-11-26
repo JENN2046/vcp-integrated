@@ -1,5 +1,9 @@
 <script setup>
 import MobileIcon from './MobileIcon.vue';
+import VoiceOrb from './VoiceOrb.vue';
+import VoiceStage from './VoiceStage.vue';
+import {createVoiceDictation} from './voiceDictation.js';
+import {localSpeechRecognition} from './localSpeech.js';
 import AgentAvatar from './AgentAvatar.vue';
 import DesktopRelayStatus from './DesktopRelayStatus.vue';
 import SharedAttachmentImage from './SharedAttachmentImage.vue';
@@ -924,8 +928,104 @@ function clearTaskQuote(){
  rememberOrdinaryText(composerDraft.value,composerScope);
  composer.value?.focus();
 }
+const voice=ref({status:'idle',message:'',preview:''}),voiceDisclosure=ref(false),voiceLevel=ref(0);
+let voiceConsent=false;
+const voiceActive=computed(()=>voice.value.status!=='idle');
+const appendVoice=(original,additional)=>original+(original&&additional&&!/\s$/u.test(original)?' ':'')+additional;
+const displayedComposer=computed({
+ get:()=>voiceActive.value&&voice.value.preview?appendVoice(composerText.value,voice.value.preview).slice(0,12000):composerText.value,
+ set:value=>{if(!voiceActive.value)composerText.value=value;}
+});
+let voiceFlight=null;
+function clearVoiceFlight(){voiceFlight?.cancel();voiceFlight=null;}
+function animateVoiceTranscript(delta){
+ const orb=shell.value?.querySelector('.voice-stage-orb'),field=composer.value;
+ if(!delta.trim()||!orb||!field||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+ const from=orb.getBoundingClientRect(),to=field.getBoundingClientRect();
+ if(!from.width||!to.width||to.top<=from.top)return;
+ clearVoiceFlight();
+ const node=document.createElement('span');node.className='voice-transcript-flight';node.setAttribute('aria-hidden','true');
+ node.textContent=Array.from(delta.trim()).slice(-12).join('');
+ Object.assign(node.style,{left:(from.left+from.width*.5)+'px',top:(from.top+from.height*.65)+'px'});
+ document.body.appendChild(node);
+ const dx=to.left+Math.min(to.width*.46,130)-from.left-from.width*.5;
+ const dy=to.bottom-22-from.top-from.height*.65;
+ const animation=node.animate([
+  {opacity:0,transform:'translateX(-50%) scale(.65)'},
+  {opacity:.92,offset:.20,transform:'translate(-50%,12px) scale(.86)'},
+  {opacity:.65,offset:.75,transform:`translate(calc(-50% + ${dx*.74}px),${dy*.78}px) scale(.92)`},
+  {opacity:0,transform:`translate(calc(-50% + ${dx}px),${dy}px) scale(1)`}
+ ],{duration:500,easing:'cubic-bezier(.34,.2,.28,1)'});
+ voiceFlight=animation;
+ const remove=()=>{node.remove();if(voiceFlight===animation)voiceFlight=null;};
+ animation.finished.then(remove,remove);
+}
+watch(displayedComposer,(value,previous)=>{
+ resizeComposer();
+ if(!voiceActive.value||!voice.value.preview||!composer.value)return;
+ composer.value.scrollTop=composer.value.scrollHeight;
+ const before=Array.from(previous||''),after=Array.from(value);
+ let common=0;
+ while(common<before.length&&common<after.length&&before[common]===after[common])common++;
+ animateVoiceTranscript(after.slice(common).join(''));
+},{flush:'post'});
+watch(voiceActive,active=>{if(!active)clearVoiceFlight();});
+const voiceScope=computed(()=>{
+ if(!browserOnline.value||!paired.value||!currentTopic.value||currentTopic.value.executable===false||settingsOpen.value||conversationPanel.value==='work'||navigationVisible.value||busy.value||newSubmissionBlocked.value)return '';
+ const scope=draftScope();
+ return scope?JSON.stringify([scope,taskQuote.value?.id||null]):'';
+});
+const recognitionConstructor=()=>server.value?.localSpeech ? localSpeechRecognition() : null;
+const dictation=createVoiceDictation({
+ getRecognition:recognitionConstructor,
+ getScope:()=>document.hidden?'':voiceScope.value,
+ update:state=>{voice.value=state;},
+ onLevel:level=>{voiceLevel.value=Number.isFinite(level)?level:0;},
+ commit:transcript=>{
+  const original=composerText.value;
+  let next=appendVoice(original,transcript);
+  if(next.length===original.length||original.length>=12000)return '草稿已满，未写入识别文字。';
+  const clipped=next.length>12000;
+  if(clipped)next=next.slice(0,12000).replace(/[\uD800-\uDBFF]$/u,'');
+  if(next.slice(original.length).trim())composerText.value=next;
+  return clipped?'草稿达到字数上限，部分语音未写入。':'';
+ }
+});
+function toggleVoice(){
+ if(voiceActive.value){dictation.stop();return;}
+ if(!voiceScope.value)return;
+ if(!server.value?.localSpeech){
+  dictation.cancel('当前入口未启用本机语音识别。可以打字，或使用系统键盘听写。');
+  return;
+ }
+ if(!recognitionConstructor()){dictation.start();return;}
+ if(!voiceConsent){voiceDisclosure.value=!voiceDisclosure.value;return;}
+ dictation.start();
+}
+function allowVoice(){
+ if(!voiceScope.value||document.hidden||!server.value?.localSpeech)return;
+ voiceConsent=true;voiceDisclosure.value=false;
+ dictation.start();
+}
+function resetVoice(){voiceDisclosure.value=false;dictation.cancel();}
+function hideVoice(){if(document.hidden)resetVoice();}
+watch(voiceScope,()=>{
+ if(!browserOnline.value&&voiceActive.value){
+  voiceDisclosure.value=false;
+  dictation.cancel('连接已断开，原草稿已保留。可以继续打字。');
+ }else resetVoice();
+},{flush:'sync'});
+onMounted(()=>{
+ document.addEventListener('visibilitychange',hideVoice);
+ window.addEventListener('pagehide',resetVoice);
+});
+onUnmounted(()=>{
+ document.removeEventListener('visibilitychange',hideVoice);
+ window.removeEventListener('pagehide',resetVoice);
+ resetVoice();
+});
 async function submitComposer(){
- if(busy.value||newSubmissionBlocked.value||currentTopic.value?.executable===false)return;
+ if(voiceActive.value||busy.value||newSubmissionBlocked.value||currentTopic.value?.executable===false)return;
  if(taskQuote.value){
   if(!currentTopic.value?.executable||quoteSendBlocked.value)return;
   await sendCoreSteering(taskQuote.value);
@@ -1525,14 +1625,25 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
       <button id="steering-cancel-remove" type="button" @click="steeringRemovalPrompt=false">取消</button>
      </template>
     </div>
-    <form class="message-composer" @submit.prevent="submitComposer">
-     <label v-if="currentTopic?.attachmentsEnabled&&!taskQuote" class="attachment-picker" title="添加附件">
+    <section v-if="voiceDisclosure" class="voice-panel" aria-label="语音输入说明">
+     <p>麦克风音频只送到当前私有入口的本机识别服务。识别文字只进入草稿，发送由你确认。</p>
+     <div><button id="voice-start" type="button" @click="allowVoice">开始语音输入</button><button type="button" @click="voiceDisclosure=false">不用了</button></div>
+    </section>
+    <VoiceStage v-else-if="voiceActive" :level="voiceLevel" :phrase="voice.preview" :phase="voice.status"
+      @stop="dictation.stop()" @cancel="dictation.cancel('已取消语音输入，草稿未改动。')"/>
+    <div v-else-if="voice.message" class="voice-feedback"><span role="status">{{voice.message}}</span>
+     <button type="button" aria-label="关闭语音提示" @click="resetVoice">关闭</button>
+    </div>
+    <form class="message-composer" :class="{dictating:voiceActive}" @submit.prevent="submitComposer">
+     <label v-if="currentTopic?.attachmentsEnabled&&!taskQuote&&!voiceActive" class="attachment-picker" title="添加附件">
       <MobileIcon name="plus"/><span class="sr-only">添加图片或文件</span>
       <input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false">
      </label>
      <label class="sr-only" for="message-text">消息</label>
-     <textarea ref="composer" id="message-text" v-model="composerText" :aria-describedby="taskQuote?'task-quote':undefined" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):taskQuote?'补充给当前任务…':'输入消息…'" rows="1" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea>
-     <button id="send" type="submit" :aria-label="taskQuote?'发送追加指令':'发送新消息'" :title="taskQuote?'发送追加指令':'发送新消息'" :disabled="!currentTopic||busy||newSubmissionBlocked||currentTopic?.executable===false||(taskQuote?quoteSendBlocked:composerDraft.modelUnavailable||(!text.trim()&&!pendingFiles.length))"><MobileIcon name="send"/></button>
+     <textarea ref="composer" id="message-text" v-model="displayedComposer" :readonly="voiceActive" :aria-describedby="taskQuote?'task-quote':undefined" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):taskQuote?'补充给当前任务…':'输入消息…'" rows="1" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea>
+     <button v-if="!voiceActive" id="voice-input" type="button" :disabled="!voiceScope" :aria-pressed="voiceActive"
+       aria-label="语音输入" title="语音输入" @click="toggleVoice"><VoiceOrb/></button>
+     <button id="send" type="submit" :aria-label="taskQuote?'发送追加指令':'发送新消息'" :title="taskQuote?'发送追加指令':'发送新消息'" :disabled="voiceActive||!currentTopic||busy||newSubmissionBlocked||currentTopic?.executable===false||(taskQuote?quoteSendBlocked:composerDraft.modelUnavailable||(!text.trim()&&!pendingFiles.length))"><MobileIcon name="send"/></button>
     </form>
     <div v-show="visibleNotice||pairRecoveryNotice||pendingSubmission" class="send-state"><span v-if="visibleNotice" id="send-state" role="status">{{visibleNotice}}</span><span v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</span><button id="retry-last" v-show="pendingSubmission" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div>
     </div>

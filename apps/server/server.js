@@ -1518,7 +1518,8 @@ async function startServer() {
             debugMode: DEBUG_MODE,
             vcpKey: vcpKeyValue,
             distributedMusicPlaylistSyncEnabled,
-            heartbeatEnabled: webSocketHeartbeatEnabled
+            heartbeatEnabled: webSocketHeartbeatEnabled,
+            handleMobileVoiceUpgrade: (request, socket, head) => coreHost?.remote?.upgradeSpeech(request, socket, head),
         });
 
         // --- 注入依赖 ---

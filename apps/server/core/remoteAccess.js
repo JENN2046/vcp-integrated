@@ -5,6 +5,7 @@ const path = require('node:path');
 const { PairedSessions, protectedHttps } = require('../Plugin/NativeSync/mobile/pairedSessions');
 const { entryId, sessionMarker } = require('../Plugin/NativeSync/mobile/submissionRecovery');
 const { failure } = require('./store');
+const { createLocalSpeech, denySpeechUpgrade } = require('./localSpeech');
 
 function remoteOrigin(value) {
     const url = new URL(value);
@@ -13,11 +14,36 @@ function remoteOrigin(value) {
 }
 
 class RemoteAccess {
-    constructor(core, { origin, hours }) {
+    constructor(core, { origin, hours, speech }) {
         this.core = core;
         this.url = remoteOrigin(origin);
         this.db = core.store.db;
         this.sessions = new PairedSessions(this.db, origin, hours, { recoverExpired: true });
+        this.speech = speech && createLocalSpeech(speech, actor => {
+            try { return Boolean(this.live(actor.principal, 'read')); }
+            catch { return false; }
+        });
+    }
+
+    upgradeSpeech(req, socket, head) {
+        if (req.url !== '/mobile/api/voice') return false;
+        if (!this.speech || this.core.runner.draining) {
+            denySpeechUpgrade(socket, '404 Not Found');
+            return true;
+        }
+        const secure = req.socket.encrypted || (['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress) &&
+            req.headers['x-forwarded-proto'] === 'https');
+        if (!secure || req.headers.host !== this.url.host || req.headers.origin !== this.url.origin) {
+            denySpeechUpgrade(socket, '403 Forbidden');
+            return true;
+        }
+        try {
+            const actor = this.actor(this.sessions.currentSession(req), 'mobile', this.core.workspace, 'read');
+            this.speech.upgrade(req, socket, head, actor);
+        } catch {
+            denySpeechUpgrade(socket, '401 Unauthorized');
+        }
+        return true;
     }
 
     actor(row, kind, workspace, permission) {
@@ -56,7 +82,8 @@ class RemoteAccess {
             req => this.sessions.sessionForToken(/^Bearer ([A-Za-z0-9_-]{43})$/.exec(req.get('authorization') || '')?.[1]);
         const workspace = this.core.workspace;
         const authorize = (req, space, permission) => this.actor(find(req), kind, space, permission);
-        const server = { serverUrl: this.url.origin, credentialExchangeAllowed: false, mode: 'core', modelSelection: Boolean(this.core.modelCatalog) };
+        const server = { serverUrl: this.url.origin, credentialExchangeAllowed: false, mode: 'core',
+            modelSelection: Boolean(this.core.modelCatalog), ...(mobile && this.speech && { localSpeech: true }) };
         router.use((req, res, next) => {
             // The only proxy trusted for this surface is the colocated TLS terminator.
             if (!protectedHttps(req) || (!req.socket.encrypted && req.get('x-forwarded-proto') !== 'https') ||
@@ -115,8 +142,9 @@ class RemoteAccess {
                 res.json({ selectedTopic: topic.key });
             });
             router.post('/api/connection/disconnect', (req, res) => {
-                authorize(req, workspace, 'read');
+                const actor = authorize(req, workspace, 'read');
                 this.sessions.disconnect(req, res, find(req));
+                this.speech?.disconnect(actor.deviceId);
             });
             router.use('/api', (_req, res) => res.status(404).json({ error: { code: 'NOT_FOUND' } }));
             router.use(express.static(path.join(__dirname, '../Plugin/NativeSync/mobile-dist'), {

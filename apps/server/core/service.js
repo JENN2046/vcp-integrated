@@ -823,6 +823,7 @@ class CoreService {
     beginDrain() {
         this.compaction.beginDrain();
         this.runner.beginDrain();
+        this.remote?.speech?.close();
         for (const observer of this.observers) observer.end();
         this.observers.clear();
     }
