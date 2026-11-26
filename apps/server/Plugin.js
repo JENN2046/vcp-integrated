@@ -1927,7 +1927,9 @@ class PluginManager extends EventEmitter {
 
         // --- 预先拉取所有的异地文件，将其透明化 ---
         // 逻辑漏洞修复：如果是分布式插件，则不进行预拉取，直接透传 file:// 协议，由分布式端自行处理
-        if (!plugin.isDistributed) {
+        // Core has no authenticated legacy file-source identity. Do not resolve
+        // its arguments via the shared legacy file cache or prefetch path.
+        if (!plugin.isDistributed && !nativeExecution.isCoreTurn()) {
             try {
                 await resolveArgsFileUrls(pluginSpecificArgs, requestIp, this.debugMode);
             } catch (resolveError) {
