@@ -138,6 +138,10 @@ test('Core only requeues undispatched Work and commits a matching pending final 
         assert.equal(store.work(invalid.workId).status, 'review_required');
         assert.equal(db.prepare("SELECT status FROM work_invocations WHERE id='fixture-tool'").get().status, 'unknown');
         assert.deepEqual(store.snapshot(topic.key, Number.MAX_SAFE_INTEGER, 20).filter(m => m.role === 'assistant').map(m => m.content), ['recovered final']);
+        const workCount = db.prepare('SELECT count(*) AS n FROM works').get().n;
+        store.transaction(() => store.insertMessage({ id: 'independent-message', key: topic.key, role: 'assistant', content: 'Independent message.' }));
+        assert.equal(db.prepare("SELECT source_work_id FROM messages WHERE id='independent-message'").get().source_work_id, null);
+        assert.equal(db.prepare('SELECT count(*) AS n FROM works').get().n, workCount);
         db.close();
     } finally {
         await fs.rm(root, { recursive: true, force: true });
@@ -600,7 +604,7 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
     const name = 'CoreFixtureDelegate', childModel = 'core-fixture-child';
     const aaDir = path.join(BOX, 'Plugin', 'AgentAssistant');
     await fs.writeFile(path.join(aaDir, 'config.json'), JSON.stringify({
-        delegationMaxRounds: 1, delegationTimeout: 60000,
+        delegationMaxRounds: 2, delegationTimeout: 60000,
         agents: [{ baseName: 'COREFIXTURE', modelId: childModel, chineseName: name, systemPrompt: 'Isolated AA fixture.' }]
     }));
     const assistant = require(aaDir + '/AgentAssistant');
@@ -638,6 +642,37 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
         assert.match(JSON.stringify(provider.calls.at(-1).messages), /Verified child report/);
         await phone.call(route + '/works/' + next.id + '/tasks/' + task.id, undefined, 404);
         assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM mobile_executions').get().n, 0);
+
+        let parentResponse;
+        let childResponse;
+        let childRounds = 0;
+        const complete = (body, res, content) => res.end(JSON.stringify({
+            model: body.model, choices: [{ message: { content }, finish_reason: 'stop' }]
+        }));
+        provider.setReply((body, res) => {
+            if (body.model === childModel) {
+                if (++childRounds === 1) childResponse = { body, res };
+                else complete(body, res, '[[Flowlock::Complete]]\nChild finished after parent cancellation.');
+            } else if (pattern.test(JSON.stringify(body.messages))) parentResponse = res;
+            else complete(body, res, block);
+        });
+        const interrupted = await phone.call(route + '/send', {
+            requestId: 'core-native-aa-interrupted', text: 'Delegate, then cancel the parent reply.'
+        }, 202);
+        await wait(() => parentResponse && childResponse, 'parent and AA child both dispatched');
+        const interruptedTasks = route + '/works/' + interrupted.id + '/tasks';
+        const { tasks: running } = await phone.call(interruptedTasks);
+        assert.equal(running[0].state, 'running');
+        await phone.call(route + '/works/' + interrupted.id + '/cancel', { requestId: 'cancel-aa-parent-only' });
+        await wait(() => core.store.work(interrupted.id)?.status === 'cancelled', 'only the parent was cancelled');
+        assert.equal(childResponse.res.destroyed, false);
+        complete(childResponse.body, childResponse.res, '[[Flowlock::Start]]\n[[Flowlock::NextHeartbeat::1]]');
+        await wait(async () => (await phone.call(interruptedTasks)).tasks[0]?.state === 'completed',
+            'child continues into another round and archives after parent cancellation');
+        const finishedChild = await phone.call(interruptedTasks + '/' + running[0].id);
+        assert.equal(finishedChild.content, 'Child finished after parent cancellation.');
+        assert.equal(childRounds, 2);
+        assert.equal(core.store.work(interrupted.id).reply_message_id, null);
     } finally {
         assistant.shutdown();
         pluginManager.plugins.delete('AgentAssistant');

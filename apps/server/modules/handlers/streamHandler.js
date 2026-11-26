@@ -230,8 +230,8 @@ class StreamHandler {
         let clientReasoningEndsWithNewline = false;
         let deferredClientWrites = [];
         const workerTurnStart = workerParts?.length;
-        const writeProviderClientChunk = (chunk, parsedData) => {
-          const frame = { rawLine: chunk, parsedData, displayDelta: parsedData?.choices?.[0]?.delta?.content };
+        const writeProviderClientChunk = (chunk, parsedData, { textDelta = '', reasoningDelta = '' } = {}) => {
+          const frame = { rawLine: chunk, parsedData, textDelta, reasoningDelta, displayDelta: parsedData?.choices?.[0]?.delta?.content };
           const keepalive = typeof chunk === 'string' && chunk.startsWith(': vcp-keepalive');
           if (!residentProposalFramingActive || keepalive) {
             return sink.onDelta(frame);
@@ -274,7 +274,7 @@ class StreamHandler {
             choices: [{ index: 0, delta: { content }, finish_reason: null }]
           };
           workerParts?.push(content);
-          sink.onDelta({ rawLine: `data: ${JSON.stringify(payload)}\n\n`, parsedData: payload, displayDelta: content });
+          sink.onDelta({ rawLine: `data: ${JSON.stringify(payload)}\n\n`, parsedData: payload, textDelta: content, reasoningDelta: '', displayDelta: content });
         };
 
         let finishReason = null;
@@ -383,10 +383,12 @@ class StreamHandler {
         };
         const writeClientLine = (line, parsedData, isDoneLine) => {
           if (isDoneLine) return writeClientReasoningCloseChunk();
+          const delta = parsedData?.choices?.[0]?.delta;
+          const fields = { textDelta: typeof delta?.content === 'string' ? delta.content : '', reasoningDelta: extractReasoningText(delta) };
           const nativeStop = publishFinalReply && parsedData?.choices?.[0]?.finish_reason === 'stop';
           if (!parsedData || (!reasoningToContentEnabled && !nativeStop)) {
             if (parsedData) appendWorkerDelta(parsedData);
-            return writeProviderClientChunk(line + '\n', parsedData);
+            return writeProviderClientChunk(line + '\n', parsedData, fields);
           }
           const packet = transformParsedDataForClient(parsedData);
           const choice = packet.choices?.[0];
@@ -394,7 +396,7 @@ class StreamHandler {
           if (displayParts && typeof choice?.delta?.content === 'string') displayParts.push(choice.delta.content);
           // ToolBox emits the formal stop below, after the native receipt is durable.
           if (nativeStop) choice.finish_reason = null;
-          writeProviderClientChunk(`data: ${JSON.stringify(packet)}\n`, packet);
+          writeProviderClientChunk(`data: ${JSON.stringify(packet)}\n`, packet, fields);
         };
         // 🌟 核心修复：注入 SSE 幽灵心跳保活，防止上游卡顿时浏览器假死
         keepAliveTimer = setInterval(() => {

@@ -91,8 +91,8 @@ class CoreAgentAssistant {
         const { signal } = controller;
         const fence = () => {
             signal.throwIfAborted();
-            if (this.closed || !this.resolveAcceptedTopic(work) || !active.has(this.row(taskId)?.state) ||
-                ['cancelled', 'cancelling', 'review_required'].includes(this.store.work(work.id)?.status)) {
+            // Once accepted, the native task has its own lifecycle and stop command.
+            if (this.closed || !this.resolveAcceptedTopic(work) || !active.has(this.row(taskId)?.state)) {
                 throw failure('CORE_AA_REQUEST_FENCED');
             }
         };

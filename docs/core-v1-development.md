@@ -15,6 +15,12 @@
 
 桌面通过绑定的 source 和设备认证，PWA 通过现有配对会话及权限认证。已认证的桌面和 PWA 均可观察正式消息与执行。取消和释放待核对 Work 需要原提交主体，追加补充输入需要该空间 execute 权限。追加输入会在当前原生轮确定完成后进入下一轮，Work ID 不变。图片通过现有受控上传和哈希读取接口处理。
 
+## 回合增量与取消边界
+
+`TurnSink.onDelta` 分开传递 `textDelta`、`reasoningDelta` 和 `displayDelta`，并保留既有协议字段。Core SSE 的 `text` 仍是显示正文，与 `displayDelta` 一致。需要朗读正文的消费者可以读取 `textDelta`。
+
+`messages.source_work_id` 可空，消息存储可独立于 Work 写入。取消当前回合会中止该回合和待审工具。已接纳的 AgentAssistant 子任务按自己的状态和权限继续，可以通过原生任务停止入口终止。
+
 ## 验证入口
 
 ```sh

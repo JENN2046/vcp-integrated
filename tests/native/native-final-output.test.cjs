@@ -50,3 +50,34 @@ for (const streaming of [false, true]) {
         });
     }
 }
+
+test('Core delta frames separate provider text, reasoning, and display markup', async t => {
+    const { CoreTurnSink } = require(box + '/core/turnSink');
+    const { signal } = new AbortController();
+    const events = [];
+    const sink = new CoreTurnSink({ signal, observe: (type, value) => events.push({ type, ...value }) });
+    const frames = [];
+    const onDelta = sink.onDelta.bind(sink);
+    t.mock.method(sink, 'onDelta', frame => { frames.push(frame); onDelta(frame); });
+    const stream = new StreamHandler({
+        originalBody: { requestId: 'delta-contract', model: 'synthetic', messages: [] },
+        ToolCallParser, abortController: { signal }, reasoningToContentEnabled: true, reasoningToContentModels: ['synthetic'],
+    });
+    const packet = delta => 'data: ' + JSON.stringify({ choices: [{ delta }] }) + '\n\n';
+    const body = Readable.from([
+        packet({ reasoning_content: 'First thought.', content: 'Reply.' }),
+        packet({ reasoning_content: 'Last thought.' }),
+        'data: [DONE]\n\n',
+    ].map(part => Buffer.from(part)));
+    const outcome = await stream.execute(sink, { ok: true, body });
+    const emitted = events.filter(event => event.type === 'delta');
+    assert.ok(outcome.completed);
+    assert.equal(outcome.content, 'Reply.');
+    assert.equal(frames.map(frame => frame.textDelta).join(''), 'Reply.');
+    assert.equal(frames.map(frame => frame.reasoningDelta).join(''), 'First thought.Last thought.');
+    assert.equal(emitted.map(event => event.textDelta).join(''), 'Reply.');
+    assert.equal(emitted.map(event => event.displayDelta).join(''), '<think>\nFirst thought.\n</think>\nReply.<think>\nLast thought.\n</think>\n');
+    assert.ok(emitted.every(event => event.text === event.displayDelta));
+    const closing = frames.find(frame => frame.displayDelta === '\n</think>\n');
+    assert.deepEqual([closing.textDelta, closing.reasoningDelta], ['', '']);
+});
