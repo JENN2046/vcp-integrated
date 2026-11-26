@@ -19,6 +19,7 @@ async function fetchDesktopModelCatalog({ root, settings, getCoreClient, env = p
     });
     if (!response.ok) throw Error('HTTP error! status: ' + response.status);
     const data = await response.json();
-    return Array.isArray(data?.data) ? data.data : [];
+    if (!Array.isArray(data?.data)) throw fail('MODEL_CATALOG_INVALID');
+    return data.data;
 }
 module.exports = { fetchDesktopModelCatalog };
