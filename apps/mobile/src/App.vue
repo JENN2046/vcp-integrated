@@ -461,27 +461,32 @@ function noteConnectionFailure(error){
  online.value=false;
  return true;
 }
+function apiResponseError(status,code){
+ const fallback=status===502?'网关暂时不可用':status>=200&&status<300?'服务端回执无法读取，暂无法确认结果':'请求未完成，请检查连接';
+ return Object.assign(Error(errors[code]||fallback),{code,status});
+}
 async function api(route,body,requestHeaders={},signal,suppressPairRequired=false){
  const requestEpoch=authEpoch;
  const r=await fetch('/mobile/api/'+route,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'X-NativeSync-Capabilities':'desktop-references-v1,source-data-v2,shared-space-v1',...(body?{'Content-Type':'application/json'}:{}),...requestHeaders,...coreStorageHeaders()},body:body?JSON.stringify(body):undefined,signal});
- const result=await r.json();
+ let result;
+ try{result=await r.json();}catch{throw apiResponseError(r.status);}
  const pinned=localStorage.getItem(coreStorageKey);
  const session=route==='session' && r.ok;
- const freshId=session && result.server?.mode==='core' && result.storageId;
- const mismatch=result.error?.code==='CORE_DATABASE_IDENTITY_MISMATCH' ||
-  (session && ((pinned && freshId!==pinned) || (result.server?.mode==='core' && !/^[0-9a-f-]{36}$/.test(freshId||''))));
+ const freshId=session && result?.server?.mode==='core' && result.storageId;
+ const mismatch=result?.error?.code==='CORE_DATABASE_IDENTITY_MISMATCH' ||
+  (session && ((pinned && freshId!==pinned) || (result?.server?.mode==='core' && !/^[0-9a-f-]{36}$/.test(freshId||''))));
  if(mismatch){
   if(requestEpoch===authEpoch){paired.value=false;invalidateSession();notice.value=errors.CORE_DATABASE_IDENTITY_MISMATCH;}
   throw Object.assign(Error(errors.CORE_DATABASE_IDENTITY_MISMATCH),{code:'CORE_DATABASE_IDENTITY_MISMATCH',status:409});
  }
  if(freshId && !pinned) localStorage.setItem(coreStorageKey,freshId);
  if(!r.ok){
-  if(!suppressPairRequired&&r.status===401&&result.error?.code==='PAIR_REQUIRED'&&requestEpoch===authEpoch){
+  if(!suppressPairRequired&&r.status===401&&result?.error?.code==='PAIR_REQUIRED'&&requestEpoch===authEpoch){
    const recover=paired.value&&server.value?.mode==='core';
    markPairRequired();
    needsSessionRecovery=recover;
   }
-  throw Object.assign(Error(errors[result.error?.code]||'请求未完成，请检查连接'),{code:result.error?.code,status:r.status});
+  throw apiResponseError(r.status,result?.error?.code);
  }
  return result;
 }
@@ -719,7 +724,7 @@ async function submit(submission,kind='message',context=newSubmissionContext()){
   if(submission.model&&draft?.nextModel===submission.model)delete draft.nextModel;
   if(sameView(context)){recoveryDetail.value='本地已保存，尚未收到可核验的云端接受回执。';acceptedReceipt.value=null;}
   await postPrepared(record,context);
- }catch(error){loadRecovery();if(sameView(context)){submissionNoticeHeld=true;notice.value='尚未完成提交确认：'+(noteConnectionFailure(error)?'暂未连上服务端，原提交仍待核对。':recoveryMessage(error));}}
+ }catch(error){loadRecovery();if(sameView(context)){submissionNoticeHeld=true;notice.value='尚未完成提交确认：'+(noteConnectionFailure(error)?(error.status===502?'网关暂时不可用':'暂未连上服务端')+'，原提交仍待核对。':recoveryMessage(error));}}
  finally{busy.value=false;}
 }
 function selectFiles(event){

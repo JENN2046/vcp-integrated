@@ -38,7 +38,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
     const directory = path.join(root, 'core');
     const core = new CoreService({ directory, workspace:'personal', chat, modelCatalog, remoteConfig:{origin, hours:1} });
     const posts = [], pairCalls = [];
-    let truncateSend = false, holdReceipt = false, proxyRateLimited = false, holdImageRejection;
+    let truncateSend = false, holdReceipt = false, proxyRateLimited = false, htmlGateway = false, holdImageRejection;
     app.use((req, res, next) => {
         if (req.method === "POST" && req.path.startsWith("/mobile/api/pair")) pairCalls.push(req.path);
         if (req.method === 'GET' && req.path.endsWith('/receipt') && holdReceipt) {
@@ -46,6 +46,10 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         }
         if (req.method === 'POST' && /\/(?:send|steer)$/.test(req.path)) {
             posts.push(req.path);
+            if (htmlGateway && req.path.endsWith('/send')) {
+                htmlGateway=false;
+                return res.status(502).type('html').send('<html><h1>Proxy fixture gateway error</h1></html>');
+            }
             if (proxyRateLimited && req.path.endsWith('/steer')) {
                 proxyRateLimited = false;
                 return res.status(429).json({error:{code:'RATE_LIMITED'}});
@@ -87,6 +91,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
     try {
         const topic = await define('main'), other = await define('other');
         const imageTopic = await define('image-rejection'), probeTopic = await define('image-failed-probe');
+        const gatewayTopic = await define('html-gateway');
         core.store.ensureConversation({ workspace:'personal', key:topic, ownerId:'fixture' });
         core.store.transaction(() => {
             for (let i = 0; i < 18; i++) core.store.insertMessage({ id:'seed-'+i, key:topic,
@@ -560,6 +565,29 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         } finally {
             await peer.close();
         }
+        await chooseTopic(gatewayTopic);
+        const gatewayRoute=imageSend(gatewayTopic);
+        const priorGateway=counts(), priorProviderCalls=provider.calls.length;
+        htmlGateway=true;
+        const gatewayResponse = responseFor(gatewayTopic,502);
+        await sendText('网关中断期间的原草稿');
+        const gateway = await gatewayResponse;
+        assert.match(gateway.headers()['content-type'],/text\/html/);
+        await page.waitForFunction(()=>document.querySelector('#send-state')?.textContent.includes('网关暂时不可用，原提交仍待核对'),{timeout:5000});
+        assert.ok(await page.$('.connection-banner'));
+        const requestId=JSON.parse(gateway.request().postData()).requestId;
+        assert.equal(await page.$eval('#pending-submission',el=>el.dataset.requestId),requestId);
+        assert.equal(await value(),'网关中断期间的原草稿');
+        assert.equal(posts.filter(route=>route===gatewayRoute).length,1);
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForSelector('#pending-submission');
+        assert.equal(await page.$eval('#pending-submission',el=>el.dataset.requestId),requestId);
+        assert.equal(await value(),'网关中断期间的原草稿');
+        assert.deepEqual(counts(),priorGateway);
+        assert.equal(provider.calls.length,priorProviderCalls);
+        assert.equal(posts.filter(route=>route===gatewayRoute).length,1);
+        t.diagnostic('HTML 502 is a connection failure; the original intent survives reload without an additional POST.');
+
         assert.equal(administer(env,['revoke',enrolled.id]).revoked,true);
         await page.reload({waitUntil:'domcontentloaded'});
         await page.waitForSelector('#pair-code',{visible:true});
