@@ -21,7 +21,7 @@ function administer(env, [command, value]) {
         if (entries.authority !== 'local' || !entries.local_workspace || entries.remote_origin !== origin) {
             throw Error('CORE_REMOTE_AUTHORITY_NOT_INITIALIZED');
         }
-        if (command === 'list' && value === undefined) return db.prepare('SELECT id,expires,scopes FROM mobile_sessions WHERE expires>? ORDER BY expires').all(Date.now());
+        if (command === 'list' && value === undefined) return db.prepare('SELECT id,expires,scopes FROM mobile_sessions WHERE expires>? OR recovery_public_key IS NOT NULL ORDER BY expires').all(Date.now());
         if (command === 'revoke' && /^[0-9a-f-]{36}$/.test(value || '')) {
             return { revoked: Boolean(db.prepare('DELETE FROM mobile_sessions WHERE id=?').run(value).changes) };
         }

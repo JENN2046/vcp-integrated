@@ -233,7 +233,7 @@ const recoveryContext=ref(null),recoveryRecords=ref([]),recoveryError=ref(''),re
 const browserOrigin=window.location.origin;
 const pairingRecovery=createPairRecovery({origin:browserOrigin,indexedDB:window.indexedDB,crypto:window.crypto,locks:navigator.locks,secureContext:window.isSecureContext});
 const pairRecoveryNotice=ref('');
-let startupSessionController=null;
+let startupSessionController=null, needsSessionRecovery=false;
 const submissionStore=createSubmissionRecovery({origin:browserOrigin,getStorage:()=>window.localStorage});
 let timer,refreshing=null,historyKey='',cursor=0,historyRows=new Map(),generation=0,authEpoch=0,submissionNoticeHeld=false,historyBinding='',historyFromCache=false;
 let pageSuspended=false,sharedRefreshTimer=null,sharedRefreshPending=false;
@@ -474,7 +474,11 @@ async function api(route,body,requestHeaders={},signal,suppressPairRequired=fals
  }
  if(freshId && !pinned) localStorage.setItem(coreStorageKey,freshId);
  if(!r.ok){
-  if(!suppressPairRequired&&r.status===401&&result.error?.code==='PAIR_REQUIRED'&&requestEpoch===authEpoch){paired.value=false;invalidateSession();notice.value=errors.PAIR_REQUIRED+'；本地待确认提交继续保留。';}
+  if(!suppressPairRequired&&r.status===401&&result.error?.code==='PAIR_REQUIRED'&&requestEpoch===authEpoch){
+   const recover=paired.value&&server.value?.mode==='core';
+   markPairRequired();
+   needsSessionRecovery=recover;
+  }
   throw Object.assign(Error(errors[result.error?.code]||'请求未完成，请检查连接'),{code:result.error?.code,status:r.status});
  }
  return result;
@@ -501,12 +505,20 @@ async function setDirectory(result,{initial=false,selectedTopic=null,adjustSelec
   if(previous!==selected.value)resetHistory();else switchDraft();
  }
 }
+const pairRequiredNotice=errors.PAIR_REQUIRED+'；本地待确认提交继续保留。';
+function markPairRequired(){
+ paired.value=false;invalidateSession();notice.value=pairRequiredNotice;
+}
+const pairRequired=error=>error.status===401&&error.code==='PAIR_REQUIRED';
+function readPairedSession(signal){
+ return pairingRecovery.openSession((route,body)=>api(route,body,{},signal,true));
+}
 async function refreshDirectory(force=false,{adjustSelection=true}={}){
  if(!paired.value||(!directoryPaged&&server.value?.mode!=='core')||directoryLoading)return;
  directoryLoading=true;const request=++directoryRequest,epoch=authEpoch;const current=()=>request===directoryRequest&&epoch===authEpoch&&paired.value;
  try{
   if(server.value?.mode==='core'){
-   const snapshot=await api('session');if(!current())return;
+   const snapshot=await readPairedSession();if(!current())return;
    if(snapshot.recovery?.sessionMarker!==recoveryContext.value?.sessionMarker){await session();return;}
    await setDirectory({topics:snapshot.topics,agents:snapshot.agents});return;
   }
@@ -514,21 +526,28 @@ async function refreshDirectory(force=false,{adjustSelection=true}={}){
   sourceProgress.value=marker.sourceProgress||[];
   if(!force&&marker.revision===directoryRevision){directoryFetchError.value='';return;}
   const result=await readDirectoryPages(api,current);if(result&&current())await setDirectory(result,{adjustSelection});
- }catch(e){if(current()){directoryFetchError.value='目录暂未更新，保留上次列表：'+e.message;throw e;}}
+ }catch(e){if(current()){
+  if(pairRequired(e))markPairRequired();
+  else directoryFetchError.value='目录暂未更新，保留上次列表：'+e.message;
+  throw e;
+ }}
  finally{directoryLoading=false;}
 }
-async function session({startupSignal}={}){const epoch=authEpoch;try{
- const r=startupSignal
-  ? await pairingRecovery.openSession((route,body)=>api(route,body,{},startupSignal,true))
-  : await api('session');
+async function session({startupSignal,alreadyLocked=false}={}){const epoch=authEpoch;try{
+ needsSessionRecovery=false;
+ const r=alreadyLocked?await api('session',undefined,{},startupSignal,true):await readPairedSession(startupSignal);
  if(epoch!==authEpoch||startupSignal?.aborted||r.authenticated!==true)return;
+ if(notice.value===pairRequiredNotice)notice.value='';
  const nextRecovery=validSessionRecovery(r.recovery)?{version:1,entryId:r.recovery.entryId,sessionMarker:r.recovery.sessionMarker}:null;
  if(nextRecovery?.entryId!==recoveryContext.value?.entryId||nextRecovery?.sessionMarker!==recoveryContext.value?.sessionMarker){authEpoch++;switchDraft('');clearSharedObservers();historyCache.clear();closeNativeResult();closeAttachment();submissionNoticeHeld=false;acceptedReceipt.value=null;recoveryDetail.value='';}
  sharedFeatures.value=Array.isArray(r.sharedFeatures)?r.sharedFeatures:[];recoveryContext.value=nextRecovery;sharedSpaces.value=(r.sharedPermissions||[]).filter(v=>v.endsWith(':read')).map(v=>({id:v.split(':')[1],config:r.sharedPermissions.includes(v.replace(/:read$/,':config'))}));paired.value=true;online.value=true;server.value=r.server||server.value;serverUrl.value=r.server?.serverUrl||serverUrl.value;
  directoryPaged=r.directory?.paged===true;
  const currentEpoch=authEpoch,result=directoryPaged?await readDirectoryPages(api,()=>currentEpoch===authEpoch):{topics:r.topics,agents:r.agents};
  if(!result||currentEpoch!==authEpoch)return;await setDirectory(result,{initial:true,selectedTopic:r.selectedTopic});loadRecovery();await refresh();
- }catch(e){if(!startupSignal?.aborted&&epoch===authEpoch&&!noteConnectionFailure(e))notice.value=e.message;}}
+ }catch(e){if(!startupSignal?.aborted&&epoch===authEpoch){
+  if(pairRequired(e))markPairRequired();
+  else if(!noteConnectionFailure(e))notice.value=e.message;
+ }}}
 
 async function pair(){
  if(busy.value)return;
@@ -540,7 +559,7 @@ async function pair(){
    pairCode.value='';
    pairRecoveryNotice.value=enrolled?'':'此浏览器或服务端未启用设备恢复。若浏览器丢失会话，请重新配对。';
    notice.value='';
-   resetHistory();await session();
+   resetHistory();await session({alreadyLocked:true});
    if(paired.value)settingsOpen.value=false;
   });
  }catch(e){pairError.value=noteConnectionFailure(e)?'暂未连上服务端，请联网后重试。':e.message;}
@@ -556,7 +575,7 @@ async function connect(){
    if(pageSuspended)return;
    await pairingRecovery.changeSession(()=>api('connection/authenticate',{serverUrl:serverUrl.value,apiKey:key}));
    pairRecoveryNotice.value='';
-   resetHistory();await session();settingsOpen.value=false;
+   resetHistory();await session({alreadyLocked:true});settingsOpen.value=false;
    if(paired.value)notice.value='已保存服务器连接，使用受限设备会话；待确认提交继续保留。';
   });
  }catch(e){notice.value=e.message;}
@@ -1062,7 +1081,7 @@ function pairingHashChanged(){applyPairingLink(consumePairingLink({location:wind
 async function deviceVisibilityChanged(){resetHistory({remember:false});if(lastDirectory)await setDirectory(lastDirectory);await refreshDirectory(true);await refresh();}
 function clearTransientKey(){pageSuspended=true;startupSessionController?.abort();refreshing?.abort();refreshing=null;generation++;clearSharedObservers();sharedObserver.suspend();historyCache.clear();accessKey.value='';pairCode.value='';incomingPairing=null;closeAttachment();}
 function storageChanged(event){if(event.key===steeringStoragePrefix+composerScope)syncSteeringDraft();if(event.key===SUBMISSION_STORAGE_KEY||event.key===null){if(loadRecovery())syncRejectedDraft();recoveryDetail.value='';}}
-async function refreshView(){if(pageSuspended)return;try{await refreshDirectory();}catch{}if(sharedObserver.hasLive()&&historyContextReady.value&&!pendingSubmission.value&&!sharedRefreshPending)return;await refresh();}
+async function refreshView(){if(pageSuspended)return;if(needsSessionRecovery&&browserOnline.value){await session();return;}try{await refreshDirectory();}catch{}if(sharedObserver.hasLive()&&historyContextReady.value&&!pendingSubmission.value&&!sharedRefreshPending)return;await refresh();}
 function markOffline(){browserOnline.value=false;}
 async function reconnect(){browserOnline.value=true;if(pageSuspended||!connectionInitialized)return;clearSharedObservers();sharedObserver.resume();loadRecovery();await session();}
 async function pageShown(){pageSuspended=false;sharedObserver.resume();if(connectionInitialized)await session();}
@@ -1123,7 +1142,7 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
     <button id="save-connection" :disabled="busy||!tested||!keyAllowed||!accessKey">{{paired?'重新认证并保存连接':'保存服务器连接'}}</button>
    </form>
    <div v-if="paired" class="device-actions"><button id="disconnect" @click="disconnect" :disabled="busy">断开此设备</button><button id="close-settings" @click="settingsOpen=false">返回会话</button></div>
-   <p v-if="paired" class="pair-help">临时断网会自动尝试重连。断开此设备、会话失效或浏览器无法恢复会话时，需要重新连接。</p>
+   <p v-if="paired" class="pair-help">临时断网会自动重连。此浏览器的配对保留期间，重新打开可直接进入。断开此设备、配对被撤销或清除浏览器数据后，需要重新配对。</p>
    <details v-if="!paired" :open="pairingLinkOpen||server?.mode==='core'||server?.credentialExchangeAllowed===false">
     <summary>使用一次性配对码</summary>
     <form @submit.prevent="pair">

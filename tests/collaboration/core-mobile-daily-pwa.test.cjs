@@ -36,9 +36,10 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
     const origin = 'https://127.0.0.1:' + server.address().port;
     const directory = path.join(root, 'core');
     const core = new CoreService({ directory, workspace:'personal', chat, modelCatalog, remoteConfig:{origin, hours:1} });
-    const posts = [];
+    const posts = [], pairCalls = [];
     let truncateSend = false, holdReceipt = false, proxyRateLimited = false;
     app.use((req, res, next) => {
+        if (req.method === "POST" && req.path.startsWith("/mobile/api/pair")) pairCalls.push(req.path);
         if (req.method === 'GET' && req.path.endsWith('/receipt') && holdReceipt) {
             return res.status(503).json({ error:{code:'FIXTURE_RECEIPT_UNAVAILABLE'} });
         }
@@ -226,6 +227,29 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         assert.equal(posts.length,3);
 
         await chooseTopic(topic);
+        const readIdentity = () => page.evaluate(async () => (await (await fetch('/mobile/api/session')).json()).recovery);
+        const enrolled = core.store.db.prepare('SELECT id,scopes FROM mobile_sessions WHERE last_topic_key=? ORDER BY rowid DESC LIMIT 1').get(topic);
+        const identity = await readIdentity();
+        const pairBaseline = pairCalls.length;
+        const expire = () => core.store.db.prepare('UPDATE mobile_sessions SET expires=0 WHERE id=?').run(enrolled.id);
+        const active = () => core.store.db.prepare('SELECT expires,scopes FROM mobile_sessions WHERE id=?').get(enrolled.id);
+        expire();
+        const env = { VCP_CORE_DATA_DIR: directory, VCP_CORE_REMOTE_ORIGIN: origin };
+        assert.ok(administer(env,['list']).some(device=>device.id===enrolled.id));
+        await wait(() => active().expires>Date.now(), 'already-open PWA restores expired session');
+        assert.deepEqual(await readIdentity(),identity);
+        assert.equal(active().scopes,enrolled.scopes);
+        expire();
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForSelector('#message-text:not([disabled])');
+        assert.deepEqual(await readIdentity(),identity);
+        assert.deepEqual(pairCalls.slice(pairBaseline),[
+            '/mobile/api/pair/challenge','/mobile/api/pair/recover',
+            '/mobile/api/pair/challenge','/mobile/api/pair/recover'
+        ]);
+        assert.equal(posts.length,3);
+        t.diagnostic('An expired trusted-device cookie was renewed in an open PWA and after reload, with the same identity and scopes.');
+
         const initialConfig = core.local.configuration({ workspace:'personal', key:topic });
         const firstModelCall = provider.calls.length;
         const activeStreams = [];
@@ -390,6 +414,10 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         } finally {
             await peer.close();
         }
+        assert.equal(administer(env,['revoke',enrolled.id]).revoked,true);
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForSelector('#pair-code',{visible:true});
+        assert.equal(await page.$('#topic-select'),null);
         assert.deepEqual(errors, []);
         assert.deepEqual(Object.entries(results).filter(([,passed])=>!passed).map(([name])=>name), [], JSON.stringify(results));
     } finally {

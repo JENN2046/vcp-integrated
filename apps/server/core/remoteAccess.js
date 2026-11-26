@@ -17,7 +17,7 @@ class RemoteAccess {
         this.core = core;
         this.url = remoteOrigin(origin);
         this.db = core.store.db;
-        this.sessions = new PairedSessions(this.db, origin, hours);
+        this.sessions = new PairedSessions(this.db, origin, hours, { recoverExpired: true });
     }
 
     actor(row, kind, workspace, permission) {
