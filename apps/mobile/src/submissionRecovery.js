@@ -192,7 +192,8 @@ export function createSubmissionRecovery({origin, getStorage = () => globalThis.
   }
   async function releaseRejectedMessage(record, rejection, executions, session, readDraft) {
     const knownRejection = rejection?.code === 'DESKTOP_CONTEXT_REQUIRED' ||
-        (rejection?.code === 'CORE_MODEL_NOT_ALLOWED' && Boolean(record.payload?.model));
+        (rejection?.code === 'CORE_MODEL_NOT_ALLOWED' && Boolean(record.payload?.model)) ||
+        (rejection?.code === 'MODEL_IMAGE_UNSUPPORTED' && Boolean(record.payload?.attachments?.length));
     if (record.kind !== 'message' || rejection?.status !== 409 || !knownRejection ||
         (await inspect(record, executions, session)).state !== 'absent') return false;
     return mutate(() => {

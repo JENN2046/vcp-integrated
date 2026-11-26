@@ -171,7 +171,11 @@ test('remote Core catalog uses the existing device read authority and returns on
     assert.deepEqual(upstream.calls.map(call=>call.model),['public-model','hybrid-embedding-chat']);
 
     const receiptRoute = topicRoute+'/receipt?requestId='+hybrid.requestId;
-    const known = await (await call(receiptRoute,deviceHeaders)).json();
+    const known = await (await call(receiptRoute,sendHeaders)).json();
+    const differentDevice = grant('mobile',true);
+    const mismatchedProbe = await call(receiptRoute,{...sendHeaders,Cookie:'__Secure-vcp_mobile='+differentDevice.token});
+    assert.equal(mismatchedProbe.status,409);
+    assert.deepEqual(await mismatchedProbe.json(),{error:{code:'SUBMISSION_CONTEXT_CHANGED'}});
     removeHybrid=true;
     assert.ok(!(await (await call(mobileRoute,deviceHeaders)).json()).models.includes(hybrid.model));
     const beforeCounts = counts(), beforeLookups = queries;

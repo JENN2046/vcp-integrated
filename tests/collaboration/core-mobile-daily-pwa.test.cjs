@@ -38,7 +38,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
     const directory = path.join(root, 'core');
     const core = new CoreService({ directory, workspace:'personal', chat, modelCatalog, remoteConfig:{origin, hours:1} });
     const posts = [], pairCalls = [];
-    let truncateSend = false, holdReceipt = false, proxyRateLimited = false;
+    let truncateSend = false, holdReceipt = false, proxyRateLimited = false, holdImageRejection;
     app.use((req, res, next) => {
         if (req.method === "POST" && req.path.startsWith("/mobile/api/pair")) pairCalls.push(req.path);
         if (req.method === 'GET' && req.path.endsWith('/receipt') && holdReceipt) {
@@ -49,6 +49,17 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
             if (proxyRateLimited && req.path.endsWith('/steer')) {
                 proxyRateLimited = false;
                 return res.status(429).json({error:{code:'RATE_LIMITED'}});
+            }
+            if (holdImageRejection && req.path.endsWith('/send')) {
+                const gate = holdImageRejection;
+                holdImageRejection = null;
+                const send = res.json.bind(res);
+                res.json = value => {
+                    if (res.statusCode !== 409 || value.error?.code !== 'MODEL_IMAGE_UNSUPPORTED') return send(value);
+                    gate.seen.resolve();
+                    void gate.release.promise.then(() => send(value));
+                    return res;
+                };
             }
             if (truncateSend && req.path.endsWith('/send')) {
                 truncateSend = false;
@@ -75,6 +86,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
     const results = {};
     try {
         const topic = await define('main'), other = await define('other');
+        const imageTopic = await define('image-rejection'), probeTopic = await define('image-failed-probe');
         core.store.ensureConversation({ workspace:'personal', key:topic, ownerId:'fixture' });
         core.store.transaction(() => {
             for (let i = 0; i < 18; i++) core.store.insertMessage({ id:'seed-'+i, key:topic,
@@ -340,7 +352,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
 
         const storageKeys = await page.evaluate(async () => {
             const {recovery,topics}=await (await fetch('/mobile/api/session')).json();
-            return Object.fromEntries(topics.map(topic=>{
+            return Object.fromEntries(topics.filter(topic=>['main','other'].includes(topic.topicId)).map(topic=>{
                 const owner=JSON.stringify([topic.ownerType,topic.sharedOwnerId||topic.ownerId||topic.agentName]);
                 const scope=JSON.stringify([recovery.entryId,recovery.sessionMarker,owner,topic.topicId,topic.key]);
                 const key='vcp.mobile.steering.v1:'+scope;
@@ -391,6 +403,125 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         assert.equal(posts.length,10);
         t.diagnostic('Generic proxy HTTP 429 preserved the pending intent across reload, with no additional POST.');
 
+        const visionModel = 'fixture-vision';
+        core.local.imageModels.push(visionModel);
+        provider.setModels([{id:baseModel}, {id:nextModel}, {id:visionModel}]);
+        provider.setReply((_body, response) => {
+            response.setHeader('Content-Type','text/event-stream');
+            response.end('data: {"choices":[{"delta":{"content":"fixture vision reply"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+        });
+        const chooseModel = async id => {
+            await page.waitForSelector('#composer-model-current:not([disabled])');
+            await page.click('#composer-model-current');
+            await page.waitForFunction(id=>[...document.querySelectorAll('#composer-model-options button[aria-pressed]')]
+                .some(button=>button.textContent.trim()===id),{},id);
+            const target = await page.$$eval('#composer-model-options button[aria-pressed]', (buttons,id)=>{
+                const button=buttons.find(button=>button.textContent.trim()===id);
+                const rect=button.getBoundingClientRect(),x=rect.left+rect.width/2,y=rect.top+rect.height/2;
+                return {x,y};
+            },id);
+            await page.touchscreen.tap(target.x,target.y);
+            await page.waitForFunction(id => document.querySelector('#composer-model-current')?.textContent.includes(id),{},id);
+        };
+        const image = (await require(BOX+'/node_modules/sharp')({
+            create:{width:16,height:16,channels:3,background:'#ff0000'}
+        }).png().toBuffer()).toString('base64');
+        const attachImage = () => page.$eval('.attachment-picker input',(input,image)=>{
+            const bytes=Uint8Array.from(atob(image),ch=>ch.charCodeAt(0));
+            const files=new DataTransfer();
+            files.items.add(new File([bytes],'fixture.png',{type:'image/png'}));
+            input.files=files.files;
+            input.dispatchEvent(new Event('change',{bubbles:true}));
+        },image);
+        const counts = () => ['works','messages','idempotency_receipts'].map(table=>
+            core.store.db.prepare('SELECT count(*) n FROM '+table).get().n);
+        const imageSend = key => '/mobile/api/core/personal/'+key+'/send';
+        const responseFor = (key,status) => page.waitForResponse(response=>
+            new URL(response.url()).pathname===imageSend(key) && response.request().method()==='POST' && response.status()===status);
+
+        await chooseTopic(imageTopic);
+        await chooseModel(nextModel);
+        await attachImage();
+        const beforeImage = counts(), beforeCalls=provider.calls.length;
+        const imageGate = { seen:Promise.withResolvers(), release:Promise.withResolvers() };
+        holdImageRejection=imageGate;
+        const rejectedImage = responseFor(imageTopic,409);
+        const checkedImage = page.waitForResponse(response=>response.status()===200 &&
+            response.request().headers()['x-nativesync-session-marker'] &&
+            new URL(response.url()).pathname===imageSend(imageTopic).replace('/send','/receipt'));
+        await sendText('要保留的图片消息');
+        await imageGate.seen.promise;
+        try { await fill('要保留的图片消息，后来编辑'); }
+        finally { imageGate.release.resolve(); }
+        const deniedImage = await rejectedImage;
+        assert.equal((await deniedImage.json()).error.code,'MODEL_IMAGE_UNSUPPORTED');
+        const deniedBody=JSON.parse(deniedImage.request().postData());
+        const probe = await checkedImage;
+        assert.equal(new URL(probe.url()).searchParams.get('requestId'),deniedBody.requestId);
+        for (const header of ['x-nativesync-entry-id','x-nativesync-session-marker']) {
+            assert.equal(probe.request().headers()[header],deniedImage.request().headers()[header]);
+            assert.ok(probe.request().headers()[header]);
+        }
+        assert.deepEqual(await probe.json(),{executions:[]});
+        await page.waitForFunction(()=>document.querySelector('#send-state')?.textContent.includes('草稿和附件已保留'), {timeout:5000});
+        assert.equal(await value(),'要保留的图片消息，后来编辑');
+        assert.equal(await page.$$eval('.pending-file',files=>files.length),1);
+        assert.match(await readModelLabel(),/下一条.*model-b/);
+        assert.equal(await page.$('#pending-submission'),null);
+        assert.deepEqual(counts(),beforeImage);
+        assert.equal(provider.calls.length,beforeCalls);
+        assert.equal(posts.filter(route=>route===imageSend(imageTopic)).length,1);
+
+        await chooseModel(visionModel);
+        truncateSend=true;
+        holdReceipt=true;
+        const acceptedImage = responseFor(imageTopic,202);
+        await page.waitForSelector('#send:not([disabled])');
+        await page.$eval('#send',button=>button.click());
+        const visionRequest=JSON.parse((await acceptedImage).request().postData());
+        assert.deepEqual(visionRequest.attachments,deniedBody.attachments,'reuse the original upload IDs');
+        assert.notEqual(visionRequest.requestId,deniedBody.requestId);
+        await wait(()=>workFor('要保留的图片消息，后来编辑')?.status==='completed','vision Work settled');
+        await page.waitForSelector('#pending-submission');
+        assert.equal(await value(),'要保留的图片消息，后来编辑');
+        assert.equal(provider.calls.length,beforeCalls+1);
+        assert.equal(provider.calls.at(-1).model,visionModel);
+        assert.ok(provider.calls.at(-1).messages.some(message=>Array.isArray(message.content)&&
+            message.content.some(part=>part.type==='image_url')));
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForSelector('#pending-submission');
+        assert.equal(posts.filter(route=>route===imageSend(imageTopic)).length,2);
+        holdReceipt=false;
+        await page.waitForFunction(()=>!document.querySelector('#pending-submission') &&
+            document.querySelector('#message-text')?.value==='');
+        assert.equal(posts.filter(route=>route===imageSend(imageTopic)).length,2);
+        assert.equal(counts()[0],beforeImage[0]+1);
+        t.diagnostic('Verified image rejection kept the edited draft and upload; manual vision send committed once despite a lost 202.');
+
+        await chooseTopic(probeTopic);
+        await chooseModel(nextModel);
+        await attachImage();
+        holdReceipt=true;
+        const rejectWithFailedProbe=responseFor(probeTopic,409);
+        const failedProbe=page.waitForResponse(response=>response.status()===503 &&
+            response.request().headers()['x-nativesync-session-marker'] &&
+            new URL(response.url()).pathname===imageSend(probeTopic).replace('/send','/receipt'));
+        await sendText('回执不可查的图片追加');
+        assert.equal((await (await rejectWithFailedProbe).json()).error.code,'MODEL_IMAGE_UNSUPPORTED');
+        await failedProbe;
+        const beforeRestore = await page.waitForSelector('#pending-submission');
+        assert.ok(beforeRestore);
+        holdReceipt=false;
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForSelector('#pending-submission');
+        await page.waitForFunction(()=>document.querySelector('#send')?.disabled);
+        assert.equal(posts.filter(route=>route===imageSend(probeTopic)).length,1);
+        assert.equal(workFor('回执不可查的图片追加'),undefined);
+        assert.equal(provider.calls.length,beforeCalls+1);
+        t.diagnostic('A failed original receipt lookup kept an image rejection pending; later absence alone created no retry.');
+
+        await chooseTopic(topic);
+        const beforeTabs = posts.length;
         const key=storageKeys[topic];
         await page.evaluate(key=>localStorage.setItem(key,'{truncated'),key);
         await page.reload({waitUntil:'domcontentloaded'});
@@ -407,6 +538,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
                     window.holdsSteeringLock=true;
                     await ready.promise;
                     localStorage.setItem(key,record);
+                    window.steeringWriteDone=true;
                 });
             },key,record);
             await peer.waitForFunction(()=>window.holdsSteeringLock===true);
@@ -415,11 +547,15 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
             const poll={polling:50,timeout:5000};
             await page.waitForFunction(async key=>(await navigator.locks.query()).pending.some(lock=>lock.name===key),poll,key);
             await peer.evaluate(()=>window.writeSteeringRecord());
-            await page.waitForFunction(async key=>!(await navigator.locks.query()).pending.some(lock=>lock.name===key),poll,key);
+            await peer.waitForFunction(()=>window.steeringWriteDone===true,poll);
+            await page.waitForFunction(async key=>{
+                const {held,pending}=await navigator.locks.query();
+                return ![...held,...pending].some(lock=>lock.name===key);
+            },poll,key);
             assert.equal(await page.evaluate(key=>localStorage.getItem(key),key),record);
             await page.waitForFunction(()=>document.querySelector('#task-quote')?.textContent.includes('尚未确认'),poll);
             assert.equal(await page.$('#steering-remove-local'),null);
-            assert.equal(posts.length,10,'the two-tab race neither erases nor resends the valid record');
+            assert.equal(posts.length,beforeTabs,'the two-tab race neither erases nor resends the valid record');
             t.diagnostic('Tab B replaced the corrupt value while Tab A waited for the same lock; Tab A preserved the exact valid record.');
         } finally {
             await peer.close();

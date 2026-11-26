@@ -669,13 +669,16 @@ async function postPrepared(record,context){
    accepted=await api(target,record.payload,{'X-NativeSync-Entry-Id':record.entryId,'X-NativeSync-Session-Marker':record.sessionMarker});
   }catch(error){
    const topic=currentTopic.value;
-   const modelRejected=error.code==='CORE_MODEL_NOT_ALLOWED'&&topic?.coreSingle&&record.payload.model;
-   const desktopRejected=error.code==='DESKTOP_CONTEXT_REQUIRED'&&topic?.sharedSpaceId&&topic.executionProtocol===2;
-   if(error.status!==409||record.kind!=='message'||!sameView(context)||topic?.ownerType!=='agent'||(!modelRejected&&!desktopRejected))throw error;
+   const imageRejected=error.code==='MODEL_IMAGE_UNSUPPORTED'&&topic?.coreSingle&&record.payload.attachments?.length;
+   const modelRejected=error.code==='CORE_MODEL_NOT_ALLOWED'&&topic?.coreSingle&&topic.ownerType==='agent'&&record.payload.model;
+   const coreRejected=imageRejected||modelRejected;
+   const desktopRejected=error.code==='DESKTOP_CONTEXT_REQUIRED'&&topic?.ownerType==='agent'&&topic.sharedSpaceId&&topic.executionProtocol===2;
+   if(error.status!==409||record.kind!=='message'||!sameView(context)||(!coreRejected&&!desktopRejected))throw error;
    const draft=drafts.get(context.draftScope);
    if(!draft)throw error;
-   const receiptRoute=modelRejected?corePath(topic)+'/receipt':conversation+'/execution-request';
-   const response=await api(receiptRoute+'?'+new URLSearchParams({requestId:record.requestId}));
+   const receiptRoute=coreRejected?corePath(topic)+'/receipt':conversation+'/execution-request';
+   const receiptHeaders=coreRejected?{'X-NativeSync-Entry-Id':record.entryId,'X-NativeSync-Session-Marker':record.sessionMarker}:{};
+   const response=await api(receiptRoute+'?'+new URLSearchParams({requestId:record.requestId}),undefined,receiptHeaders);
    if(!sameView(context))throw error;
    const saved=await submissionStore.releaseRejectedMessage(record,error,response.executions,context.recovery,()=>
     draft.submitted?.requestId===record.requestId?draftContents(draft,record.sessionMarker):null);
@@ -687,11 +690,13 @@ async function postPrepared(record,context){
     draft.text=saved.text;draft.files=rejectedDraftFiles(saved);
    }
    draft.rejected=saved;
+   if(imageRejected&&record.payload.model&&!draft.nextModel)draft.nextModel=record.payload.model;
    if(!loadRecovery())throw Error(recoveryError.value);
    if(sameView(context)){
     submissionNoticeHeld=true;
     recoveryDetail.value='';acceptedReceipt.value=null;
-    notice.value=recoveryMessage(error)+'。草稿和附件已保留，可编辑后重新发送。';
+    notice.value=imageRejected?'当前模型不支持图片。草稿和附件已保留，可换用支持图片的模型或移除图片后手动发送。':
+     recoveryMessage(error)+'。草稿和附件已保留，可编辑后重新发送。';
    }
    return;
   }

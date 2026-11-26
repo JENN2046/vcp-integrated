@@ -699,6 +699,11 @@ class CoreService {
         }));
         router.get('/:workspace/:key/receipt', route((req, res) => {
             const { actor, topic } = scope(req, 'read');
+            // An empty result used to release a rejected submission must be
+            // read under the original Cookie binding, even across tab changes.
+            if (actor.kind === 'mobile' && (req.get('x-nativesync-entry-id') !== undefined || req.get('x-nativesync-session-marker') !== undefined)) {
+                (this.mobile || this.remote).requireSubmissionContext(req);
+            }
             if (typeof req.query.requestId !== 'string') throw failure('INVALID_REQUEST_ID', 400);
             const receipt = this.receipt(topic, actor.principal, req.query.requestId);
             res.json({ executions: receipt ? [receipt] : [] });
