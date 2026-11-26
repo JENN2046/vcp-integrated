@@ -68,6 +68,7 @@ const attachmentPreview=ref(null),attachmentDialog=ref(null);let attachmentReadR
 // stay in the page; verified rejections use the existing recovery store.
 const drafts=new Map(),composerDraft=ref({text:'',files:[],revision:0});let composerScope='';
 const steeringStoragePrefix='vcp.mobile.steering.v1:', steeringStorageError=ref('');
+const steeringRecordCorrupt=ref(false), steeringRemovalPrompt=ref(false);
 const text=computed({get:()=>composerDraft.value.text,set:value=>{composerDraft.value.text=value;composerDraft.value.revision++;saveDraftEdit(composerDraft.value);}});
 watch(text,resizeComposer,{flush:'post'});
 const pendingFiles=computed({get:()=>composerDraft.value.files,set:value=>{composerDraft.value.files=value;}});
@@ -274,6 +275,8 @@ function switchDraft(next=draftScope()){
  if(composerScope&&!text.value&&!pendingFiles.value.length&&!composerDraft.value.submitted&&!composerDraft.value.coreSteering&&!composerDraft.value.nextModel)drafts.delete(composerScope);
  composerScope=next;composerDraft.value=drafts.get(next)||{text:'',files:[],revision:0};
  steeringStorageError.value='';
+ steeringRecordCorrupt.value=false;
+ steeringRemovalPrompt.value=false;
  if(next){
   drafts.set(next,composerDraft.value);
   syncSteeringDraft();
@@ -312,7 +315,7 @@ function restoreOrdinaryText(draft,scope){
  if(saved){draft.text=saved.text;draft.ordinaryEditId=saved.editId;}
 }
 function rememberOrdinaryText(draft,scope){
- if(!scope)return;
+ if(!scope)return false;
  try{
   if(draft.text){
    draft.ordinaryEditId=crypto.randomUUID();
@@ -322,7 +325,11 @@ function rememberOrdinaryText(draft,scope){
    delete draft.ordinaryEditId;
   }
   ordinaryDraftError.value='';
- }catch{ordinaryDraftError.value='草稿暂无法保存在此浏览器，刷新前请检查存储。';}
+  return true;
+ }catch{
+  ordinaryDraftError.value='草稿暂无法保存在此浏览器，刷新前请检查存储。';
+  return false;
+ }
 }
 function markOrdinarySubmission(draft,scope,requestId){
  const saved=readOrdinaryText(scope);
@@ -753,7 +760,7 @@ function pickNextModel(model){
 }
 const quoteClosed=computed(()=>{
  const quote=taskQuote.value, state=quotedWork.value?.state;
- return quote?.closed || (state&&!steerableStates.includes(state)?state:'');
+ return quote?.rejected?'rejected':quote?.closed || (state&&!steerableStates.includes(state)?state:'');
 });
 const quoteUnavailable=computed(()=>!browserOnline.value||!online.value||!coreSteeringWork.value||
  coreSteeringWork.value.id!==taskQuote.value?.id);
@@ -761,7 +768,7 @@ const canQuoteTask=computed(()=>Boolean(coreSteeringWork.value&&currentTopic.val
  !busy.value&&!newSubmissionBlocked.value&&browserOnline.value&&online.value&&!pendingFiles.value.length&&!taskQuote.value));
 const quoteSendBlocked=computed(()=>quoteUnavailable.value||Boolean(quoteClosed.value)||!text.value.trim()||pendingFiles.value.length>0);
 const quoteStatus=computed(()=>composerDraft.value.coreSteering?'追加指令尚未确认':quoteClosed.value
- ? quoteClosed.value==='completed'?'任务已完成':'此任务已停止接收追加'
+ ? quoteClosed.value==='rejected'?'服务端已拒绝这条追加':quoteClosed.value==='completed'?'任务已完成':'此任务已停止接收追加'
  : quoteUnavailable.value?'暂时无法核对任务状态':pendingFiles.value.length?'附件只能作为新消息发送。':'');
 function quoteTask(){
  if(!canQuoteTask.value)return;
@@ -776,8 +783,9 @@ function clearTaskQuote(){
  composer.value?.focus();
 }
 async function submitComposer(){
+ if(busy.value||newSubmissionBlocked.value||currentTopic.value?.executable===false)return;
  if(taskQuote.value){
-  if(busy.value||newSubmissionBlocked.value||!currentTopic.value?.executable||quoteSendBlocked.value)return;
+  if(!currentTopic.value?.executable||quoteSendBlocked.value)return;
   await sendCoreSteering(taskQuote.value);
   return;
  }
@@ -786,10 +794,17 @@ async function submitComposer(){
 function readSteeringDraft(scope){
  const raw=localStorage.getItem(steeringStoragePrefix+scope);
  if(raw===null)return null;
- const saved=JSON.parse(raw);
- if(!saved?.intent?.requestId||saved.intent.workId!==saved.quote?.id||
-    typeof saved.intent.text!=='string'||typeof saved.text!=='string'||
-    !Number.isSafeInteger(saved.revision)||!Number.isSafeInteger(saved.intent.revision))throw Error('Invalid steering draft');
+ const corrupt=()=>Object.assign(Error('Invalid steering draft'),{code:'STEERING_RECORD_CORRUPT'});
+ let saved;
+ try{saved=JSON.parse(raw);}catch{throw corrupt();}
+ const intent=saved?.intent,quote=saved?.quote;
+ const validId=value=>typeof value==='string'&&/^[a-zA-Z0-9_-]{8,100}$/.test(value);
+ if(!validId(intent?.requestId)||!validId(intent?.workId)||intent.workId!==quote?.id||
+    typeof quote.name!=='string'||typeof quote.label!=='string'||
+    typeof intent.text!=='string'||!intent.text.trim()||intent.text.length>12000||
+    typeof saved.text!=='string'||saved.text.length>12000||
+    !Number.isSafeInteger(intent.revision)||intent.revision<0||
+    !Number.isSafeInteger(saved.revision)||saved.revision<0)throw corrupt();
  return saved;
 }
 function writeSteeringDraft(key,draft){
@@ -799,6 +814,11 @@ function syncSteeringDraft(){
  if(!composerScope||composerDraft.value.coreSteering)return;
  try{
   const saved=readSteeringDraft(composerScope);
+  if(steeringRecordCorrupt.value){
+   steeringRecordCorrupt.value=false;
+   steeringRemovalPrompt.value=false;
+   steeringStorageError.value='';
+  }
   if(!saved)return;
   const draft=composerDraft.value;
   if(!draft.revision&&!draft.text){
@@ -807,24 +827,76 @@ function syncSteeringDraft(){
   }
   draft.coreSteering=saved.intent;
   draft.taskQuote=saved.quote;
- }catch{steeringStorageError.value='无法读取本机追加记录，请检查浏览器存储。';}
+ }catch(error){
+  steeringRecordCorrupt.value=error.code==='STEERING_RECORD_CORRUPT';
+  steeringStorageError.value=steeringRecordCorrupt.value?'当前话题的本机追加记录损坏。':'无法读取本机追加记录，请检查浏览器存储。';
+ }
+}
+async function removeCorruptSteeringRecord(){
+ if(busy.value||!steeringRecordCorrupt.value||!steeringRemovalPrompt.value)return;
+ const context=captureContext(),key=steeringStoragePrefix+context.draftScope;
+ const remove=()=>{
+  if(!sameView(context)||context.draftScope!==composerScope||composerDraft.value.coreSteering)return;
+  try{readSteeringDraft(context.draftScope);}
+  catch(error){
+   if(error.code!=='STEERING_RECORD_CORRUPT')throw error;
+   localStorage.removeItem(key);
+  }
+  syncSteeringDraft();
+ };
+ try{
+  if(navigator.locks)await navigator.locks.request(key,remove);
+  else remove();
+ }catch{
+  if(sameView(context))steeringStorageError.value='无法移除本机追加记录，请检查浏览器存储。';
+ }
 }
 const steeringPath=(topic,workId)=>corePath(topic)+'/works/'+encodeURIComponent(workId);
-function confirmSteering(context,intent,receipt){
- if(!sameView(context)||receipt?.requestId!==intent.requestId||receipt.workId!==intent.workId||
-    typeof receipt.messageId!=='string'||!receipt.messageId||!Number.isSafeInteger(receipt.seq)||receipt.seq<1)return;
+const sameSteering=(a,b)=>a?.requestId===b.requestId&&a.workId===b.workId;
+function originalSteeringDraft(context,intent){
+ if(!sameView(context)||context.draftScope!==composerScope)return;
  const draft=drafts.get(context.draftScope);
- if(draft?.coreSteering?.requestId!==intent.requestId)return;
+ if(sameSteering(draft?.coreSteering,intent))return draft;
+}
+function confirmSteering(context,intent,receipt){
+ if(!sameSteering(receipt,intent)||
+    typeof receipt.messageId!=='string'||!receipt.messageId||!Number.isSafeInteger(receipt.seq)||receipt.seq<1)return;
+ const draft=originalSteeringDraft(context,intent);
+ if(!draft)return;
  try{
-  if(readSteeringDraft(context.draftScope)?.intent.requestId===intent.requestId){
-   localStorage.removeItem(steeringStoragePrefix+context.draftScope);
-  }
+  const saved=readSteeringDraft(context.draftScope);
+  if(saved&&!sameSteering(saved.intent,intent))return;
+  if(saved)localStorage.removeItem(steeringStoragePrefix+context.draftScope);
  }catch{steeringStorageError.value='已核对送达，浏览器暂无法更新本地追加记录。';return;}
  if(draft.revision===intent.revision&&draft.text===intent.text)draft.text='';
  delete draft.coreSteering;
  delete draft.taskQuote;
  draft.steeringDelivery='追加指令已送达';
  steeringStorageError.value='';
+}
+async function rejectSteering(context,intent,error){
+ const definite=error.status===409&&error.code==='WORK_STEERING_WINDOW_CLOSED'||
+  error.status===404&&error.code==='WORK_NOT_FOUND';
+ if(!definite)return;
+ const key=steeringStoragePrefix+context.draftScope;
+ await navigator.locks.request(key,()=>{
+  const draft=originalSteeringDraft(context,intent);
+  if(!draft)return;
+  try{
+   const saved=readSteeringDraft(context.draftScope);
+   if(saved&&!sameSteering(saved.intent,intent))return;
+   if(saved?.revision>draft.revision&&draft.revision===intent.revision&&draft.text===intent.text){
+    draft.text=saved.text;
+    draft.revision=saved.revision;
+   }
+   if(!rememberOrdinaryText(draft,context.draftScope))return;
+   if(saved)localStorage.removeItem(key);
+   delete draft.coreSteering;
+   if(draft.taskQuote?.id===intent.workId)draft.taskQuote.rejected=true;
+   draft.steeringDelivery='服务端已拒绝追加，草稿已保留。';
+   steeringStorageError.value='';
+  }catch{steeringStorageError.value='服务端已拒绝追加，浏览器暂无法更新本机记录。';}
+ });
 }
 async function reconcileSteering(topic,readApi,context){
  const intent=drafts.get(context.draftScope)?.coreSteering;
@@ -853,13 +925,17 @@ async function sendCoreSteering(quote){
    return intent;
   });
   if(!intent||!sameView(context))return;
+  let receipt;
   try{
-   const receipt=await api(steeringPath(topic,intent.workId)+'/steer',{requestId:intent.requestId,text:original},{
+   receipt=await api(steeringPath(topic,intent.workId)+'/steer',{requestId:intent.requestId,text:original},{
     'X-NativeSync-Entry-Id':context.recovery.entryId,'X-NativeSync-Session-Marker':context.recovery.sessionMarker
    });
-   confirmSteering(context,intent,{...receipt,requestId:intent.requestId});
-  }catch{/* A failed or truncated response leaves the saved intent unconfirmed. */}
-  await refresh();
+  }catch(error){
+   // Only a recognized business rejection from this POST can release its intent.
+   await rejectSteering(context,intent,error);
+  }
+  if(receipt)confirmSteering(context,intent,{...receipt,requestId:intent.requestId});
+  void refresh();
  }catch(error){
   if(!context||sameView(context))notice.value=recoveryMessage(error);
  }finally{busy.value=false;}
@@ -1201,10 +1277,19 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
       <span :title="taskQuote.label">{{taskQuote.label}}</span>
      </div>
      <p v-if="composerDraft.coreSteering" class="quote-delivery-note">原追加已保留，正在只读核对。</p>
+     <button v-else-if="taskQuote.rejected" id="quote-exit-rejected" class="quote-exit" type="button" :disabled="busy" @click="clearTaskQuote">退出引用</button>
      <button v-else-if="quoteClosed" id="quote-new-message" class="quote-exit" type="button" :disabled="busy" @click="clearTaskQuote">改发新消息</button>
      <button v-else id="quote-clear" class="icon-button" type="button" :disabled="busy" aria-label="取消引用，保留草稿" @click="clearTaskQuote"><MobileIcon name="close"/></button>
     </div>
     <p v-if="steeringStorageError||composerDraft.steeringDelivery" id="steering-delivery" role="status">{{steeringStorageError||composerDraft.steeringDelivery}}</p>
+    <div v-if="steeringRecordCorrupt" class="send-state">
+     <button v-if="!steeringRemovalPrompt" id="steering-remove-local" type="button" :disabled="busy" @click="steeringRemovalPrompt=true">移除本机记录</button>
+     <template v-else>
+      <p id="steering-remove-warning">只移除当前话题的本机追加记录。不会撤回已发内容，也不能证明未送达。</p>
+      <button id="steering-confirm-remove" type="button" :disabled="busy" @click="removeCorruptSteeringRecord">确认移除</button>
+      <button id="steering-cancel-remove" type="button" @click="steeringRemovalPrompt=false">取消</button>
+     </template>
+    </div>
     <form class="message-composer" @submit.prevent="submitComposer">
      <label v-if="currentTopic?.attachmentsEnabled&&!taskQuote" class="attachment-picker" title="添加附件">
       <MobileIcon name="plus"/><span class="sr-only">添加图片或文件</span>

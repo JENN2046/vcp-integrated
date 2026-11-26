@@ -299,6 +299,39 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         assert.equal(workFor('目录移除后保留这个草稿'),undefined);
         assert.equal(provider.calls.length,firstModelCall+4);
         assert.equal(posts.length,8,'receipt recovery does not resubmit B; removed model reaches no provider');
+
+        const storageKeys = await page.evaluate(async () => {
+            const {recovery,topics}=await (await fetch('/mobile/api/session')).json();
+            return Object.fromEntries(topics.map(topic=>{
+                const owner=JSON.stringify([topic.ownerType,topic.sharedOwnerId||topic.ownerId||topic.agentName]);
+                const scope=JSON.stringify([recovery.entryId,recovery.sessionMarker,owner,topic.topicId,topic.key]);
+                const key='vcp.mobile.steering.v1:'+scope;
+                localStorage.setItem(key,topic.topicId==='main'?'{truncated':JSON.stringify({intent:{requestId:'incomplete'}}));
+                return [topic.key,key];
+            }));
+        });
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForSelector('#topic-select');
+        await chooseTopic(topic);
+        await page.waitForSelector('#steering-remove-local',{visible:true,timeout:5000});
+        assert.equal(await page.$eval('#send', button=>button.disabled),true);
+        await page.$eval('.message-composer', form=>form.requestSubmit());
+        assert.equal(posts.length,8);
+        await page.click('#steering-remove-local');
+        assert.match(await page.$eval('#steering-remove-warning',el=>el.textContent),/不会撤回已发内容，也不能证明未送达/);
+        await page.click('#steering-cancel-remove');
+        assert.notEqual(await page.evaluate(key=>localStorage.getItem(key),storageKeys[topic]),null);
+        await page.click('#steering-remove-local');
+        await page.click('#steering-confirm-remove');
+        await page.waitForSelector('#send:not([disabled])');
+        assert.equal(await value(),'目录移除后保留这个草稿');
+        assert.equal(await page.evaluate(key=>localStorage.getItem(key),storageKeys[topic]),null);
+        assert.notEqual(await page.evaluate(key=>localStorage.getItem(key),storageKeys[other]),null);
+        await chooseTopic(other);
+        await page.waitForSelector('#steering-remove-local',{visible:true});
+        await chooseTopic(topic);
+        assert.equal(await value(),'目录移除后保留这个草稿');
+        assert.equal(posts.length,8);
         assert.deepEqual(errors, []);
         assert.deepEqual(Object.entries(results).filter(([,passed])=>!passed).map(([name])=>name), [], JSON.stringify(results));
     } finally {
