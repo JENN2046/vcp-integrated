@@ -186,9 +186,8 @@ footer>* {max-width:var(--content); margin-inline:auto}
 .native-tools ul {padding-inline-start:20px}
 .native-tools li small {display:block}
 
-.quote-task {display:flex; align-items:center; gap:7px; min-height:44px; padding:4px 0; background:transparent; color:var(--accent); text-align:start; font-size:.83rem; font-weight:600}
+.quote-task {display:flex; align-items:center; gap:7px; min-height:44px; margin-inline-end:auto; padding:4px 6px; background:transparent; color:var(--accent); text-align:start; font-size:.83rem; font-weight:600}
 .quote-task svg,.task-quote>svg {width:17px; height:17px; flex:none}
-.quote-task-action {color:var(--muted); border-inline-start:1px solid var(--line); padding-inline-start:7px; white-space:nowrap}
 .quote-task:active {color:var(--ink)}
 .task-quote {display:flex; align-items:center; gap:8px; padding:2px 0 2px 9px; margin-bottom:4px; border-inline-start:2px solid var(--accent); border-radius:4px 12px 12px 4px; background:var(--accent-soft); color:var(--accent)}
 .task-quote[data-closed="true"] {border-color:var(--warning); background:var(--warning-soft); color:var(--warning)}

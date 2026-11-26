@@ -904,17 +904,11 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
    <section v-if="currentTopic?.coreSingle && corePreviews.length" aria-label="正在生成的共享回复">
     <article v-for="work in corePreviews" :key="work.id" class="message assistant live-message">
      <div class="message-author"><AgentAvatar :src="currentTopic?.avatar||activeAgent?.avatar" :name="work.speakerName||currentTopic?.agentName"/><small>{{work.speakerName||currentTopic?.agentName||'Agent'}}</small></div>
-     <button v-if="coreSteeringWork?.id===work.id && canQuoteTask" class="quote-task" id="quote-task" type="button" @click="quoteTask">
-      <MobileIcon name="reply"/><span>{{work.approval?'等待桌面审批 · '+work.approval:'任务进行中'}}</span><span class="quote-task-action">追加指令</span>
-     </button>
-     <div v-if="coreSteeringWork?.id!==work.id||!canQuoteTask||work.tool" class="work-inline" :data-tone="work.approval?'attention':'active'"><MobileIcon :name="work.approval||work.tool?'tool':'work'"/><span>{{work.approval?'等待桌面审批 · '+work.approval:coreFeed!=='live'||!browserOnline?'最近收到的预览':work.tool?work.tool+' · '+(displayedToolStatus[work.toolStatus]||'工具状态待核对'):'正在生成回复'}}</span></div>
+     <div class="work-inline" :data-tone="work.approval?'attention':'active'"><MobileIcon :name="work.approval||work.tool?'tool':'work'"/><span>{{work.approval?'等待桌面审批 · '+work.approval:coreFeed!=='live'||!browserOnline?'最近收到的预览':work.tool?work.tool+' · '+(displayedToolStatus[work.toolStatus]||'工具状态待核对'):'正在生成回复'}}</span></div>
      <div v-if="work.text" class="bubble">{{work.text}}</div>
      <div v-if="work.presentation" class="bubble"><strong>{{work.presentation.title}}</strong><p>{{work.presentation.challenge}}</p></div>
     </article>
    </section>
-   <button v-if="canQuoteTask&&!corePreviews.some(work=>work.id===coreSteeringWork.id)" class="quote-task" id="quote-task" type="button" @click="quoteTask">
-    <MobileIcon name="reply"/><span>{{currentTopic.agentName}} 正在工作</span><span class="quote-task-action">追加指令</span>
-   </button>
    <section v-if="visibleSharedStreams.length" id="shared-live-replies" aria-label="正在生成的共享回复">
     <article v-for="stream in visibleSharedStreams" :key="stream.previewId" class="message assistant live-message" :data-live-execution="stream.executionId" :data-native-request="stream.nativeRequestId"><small>{{stream.memberName||currentTopic?.agentName||'Agent'}}<template v-if="stream.kind==='controlled-text'"> · 第 {{stream.nativeGeneration+1}} 代</template> · {{stream.settled?'正在核对最终记录':stream.activity?sharedActivityLabels[stream.activity.state]||'正在核对原生任务':labels[stream.state]||'正在核对原生任务'}} · {{stream.connection==='online'?'实时观察':stream.connection==='disconnected'?'实时连接已暂停':'正在恢复连接'}}</small><div v-if="stream.text" class="bubble">{{stream.text}}</div><small v-if="stream.gap">仅显示目前可核对的临时片段，完整内容以保存后的会话为准。</small><small v-if="stream.settled&&stream.request?.state!=='completed'">{{labels[stream.request?.state]||'执行已暂停，请核对原生状态'}} · 已收到的片段暂存于此页。</small></article>
    </section>
@@ -957,6 +951,9 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
    </div>
    <footer v-show="selected && !navigationVisible" :class="{'is-work-view':conversationPanel==='work'}">
     <div class="composer-tools">
+     <button v-if="canQuoteTask && conversationPanel!=='work'" class="quote-task" id="quote-task" type="button" @click="quoteTask">
+      <MobileIcon name="reply"/><span>追加指令</span>
+     </button>
      <div v-if="currentTopic?.ownerType==='group' && conversationPanel!=='work'" class="group-invitation"><label class="sr-only" for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择发言成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div>
      <button id="work-toggle" ref="workToggle" type="button" aria-controls="conversation-work"
        :aria-expanded="conversationPanel==='work'" :data-tone="workTone" @click="togglePanel('work')"><MobileIcon name="work"/><span>{{workButtonText}}</span></button>

@@ -89,8 +89,15 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.waitForFunction(() => document.querySelector('.live-message .bubble')?.textContent.includes('共用布光'));
         await page.waitForSelector('#quote-task',{visible:true});
         assert.equal(await page.$eval('#send', button=>button.getAttribute('aria-label')),'发送新消息');
+        assert.equal(await page.$$eval('#quote-task', rows=>rows.length),1);
+        assert.ok(await page.$eval('footer #quote-task', button=>{
+            const entry=button.getBoundingClientRect();
+            const editor=document.querySelector('#message-text').getBoundingClientRect();
+            return entry.height>=44 && entry.bottom<=editor.top && editor.top-entry.bottom<=12;
+        }), 'the one-tap control should be directly above the composer');
         await shot(page, '02a-quote-entry');
-        await page.click('#quote-task');
+        await page.tap('#quote-task');
+        assert.equal(await page.evaluate(()=>document.activeElement?.id),'message-text');
         assert.equal(await page.$eval('#send', button=>button.getAttribute('aria-label')),'发送追加指令');
         assert.equal(await page.$eval('.message-composer', form=>form.querySelectorAll('button[type="submit"]').length),1);
         await page.type('#message-text', '请把白底主图放在第一组。');
