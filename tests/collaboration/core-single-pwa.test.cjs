@@ -139,13 +139,21 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         assert.equal(await page.$eval('#send', button=>button.getAttribute('aria-label')),'发送新消息');
         assert.deepEqual(composerPosts,[]);
         await page.click('#quote-task');
+        await page.type('#message-text', '再确认。');
+        const quotedDraft = '请把白底主图放在第一组。再确认。';
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForSelector('#message-text:not([disabled])');
+        assert.equal(await page.$eval('#message-text',el=>el.value),quotedDraft);
+        await page.waitForSelector('#task-quote',{visible:true});
+        assert.equal(await page.$eval('#send',el=>el.getAttribute('aria-label')),'发送追加指令');
+        assert.deepEqual(composerPosts,[]);
         steeringFault = 'after';
         holdSteeringReceipt = true;
         await page.click('#send');
         await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
         assert.equal(core.store.work(first.serverSession.executionId).steering_count, 1);
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await page.waitForFunction(() => document.querySelector('#message-text')?.value === '请把白底主图放在第一组。');
+        await page.waitForFunction(text => document.querySelector('#message-text')?.value === text,{},quotedDraft);
         holdSteeringReceipt = false;
         await page.waitForFunction(() => !document.querySelector('#message-text').value &&
             document.querySelector('#steering-delivery')?.textContent.includes('已送达'));
@@ -158,12 +166,32 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         holdSteeringReceipt = true;
         await page.$eval('.message-composer', form => form.requestSubmit());
         await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
-        await page.type('#message-text', '这是后来编辑的内容。');
+        const editor = await browser.newPage();
+        try {
+            await editor.goto(entry,{waitUntil:'domcontentloaded'});
+            await editor.waitForFunction(()=>document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
+            await editor.type('#message-text','这是另一个标签页后来编辑的内容。');
+            assert.equal(await editor.$eval('#message-text',el=>el.value),'这次追加仍需确认。这是另一个标签页后来编辑的内容。');
+        } finally {
+            await editor.close();
+        }
+        await page.bringToFront();
         holdSteeringReceipt = false;
         await page.waitForFunction(() => !document.querySelector('#task-quote') &&
             document.querySelector('#steering-delivery')?.textContent.includes('已送达'));
-        assert.equal(await page.$eval('#message-text', el=>el.value), '这次追加仍需确认。这是后来编辑的内容。');
-        await page.$eval('#message-text', el => { el.value=''; el.dispatchEvent(new Event('input',{bubbles:true})); });
+        const reopened = await browser.newPage();
+        try {
+            await reopened.goto(entry,{waitUntil:'domcontentloaded'});
+            await reopened.waitForSelector('#message-text:not([disabled])');
+            assert.equal(await reopened.$eval('#message-text',el=>el.value),'这次追加仍需确认。这是另一个标签页后来编辑的内容。');
+            await reopened.waitForSelector('#task-quote',{visible:true});
+            assert.equal(composerPosts.length,2);
+            await reopened.$eval('#message-text',el=>{el.value='';el.dispatchEvent(new Event('input',{bubbles:true}));});
+            await reopened.click('#quote-clear');
+        } finally {
+            await reopened.close();
+        }
+        await page.bringToFront();
         finish(upstream[0], '按原计划整理。');
         await wait(() => upstream.length === 2, 'steering reached provider for same work');
         assert.match(JSON.stringify(provider.calls[1].messages), /请把白底主图放在第一组/);
@@ -176,6 +204,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         const finalText = '\n\n第一组｜白底产品主图\n先固定机位、白平衡和产品朝向，再补正面与侧面。\n\n第二组｜细节与功能\n保留原布光，拉近拍材质与缝线。两组都拍完后，再切换到上身布景。';
         finish(upstream[1], finalText);
         await page.waitForFunction(id => Boolean(document.querySelector('[data-message-id="' + id + '"] .bubble')?.textContent.includes('第二组')), {}, first.replyId);
+        await page.reload({waitUntil:'domcontentloaded'});
         await page.waitForSelector('#task-quote[data-closed="true"]');
         assert.equal(await page.$eval('#message-text', el=>el.value),preservedDraft);
         assert.equal(await page.$eval('#send', button=>button.disabled),true);

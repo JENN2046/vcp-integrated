@@ -65,7 +65,7 @@ function closePanel(){
  nextTick(()=>toggle?.focus());
 }
 const attachmentPreview=ref(null),attachmentDialog=ref(null);let attachmentReadRequest=0,attachmentReadController=null;
-// Persist ordinary text by paired identity and topic. Selected local files
+// Persist composer text and its quote by paired identity and topic. Selected local files
 // stay in the page; verified rejections use the existing recovery store.
 const drafts=new Map(),composerDraft=ref({text:'',files:[],revision:0});let composerScope='';
 const steeringStoragePrefix='vcp.mobile.steering.v1:', steeringStorageError=ref('');
@@ -279,7 +279,12 @@ function switchDraft(next=draftScope()){
  steeringRecordCorrupt.value=false;
  steeringRemovalPrompt.value=false;
  if(next){
-  drafts.set(next,composerDraft.value);
+  const draft=composerDraft.value;
+  drafts.set(next,draft);
+  if(!draft.revision&&!draft.text&&!draft.coreSteering){
+   const saved=readOrdinaryText(next);
+   if(saved?.quote){draft.text=saved.text;draft.taskQuote=saved.quote;draft.ordinaryEditId=saved.editId;}
+  }
   syncSteeringDraft();
   syncRejectedDraft();
  }
@@ -287,7 +292,7 @@ function switchDraft(next=draftScope()){
 function syncRejectedDraft(){
  if(!composerScope||composerScope!==draftScope())return;
  const draft=composerDraft.value;
- if(draft.revision||draft.submitted||draft.coreSteering||draft.files.some(item=>item.file))return;
+ if(draft.revision||draft.submitted||draft.taskQuote||draft.coreSteering||draft.files.some(item=>item.file))return;
  try{
   const saved=submissionStore.rejectedDraft({...recoveryContext.value,topicKey:selected.value});
   if(!saved&&!draft.rejected)return;
@@ -299,15 +304,18 @@ function syncRejectedDraft(){
 const composerText=computed({get:()=>text.value,set:value=>{
  text.value=value;
  const draft=composerDraft.value;
- if(!draft.taskQuote&&!draft.rejected)rememberOrdinaryText(draft,composerScope);
+ if(draft.taskQuote||!draft.rejected)rememberOrdinaryText(draft,composerScope);
  else delete draft.ordinaryEditId;
 }});
 const ordinaryDraftPrefix='vcp.mobile.draft.v1:';
+const steeringDeliveredEditPrefix='vcp.mobile.steering-delivered-edit.v1:';
 const ordinaryDraftError=ref('');
 function readOrdinaryText(scope){
  try{
   const item=JSON.parse(localStorage.getItem(ordinaryDraftPrefix+scope));
-  return typeof item?.text==='string'&&typeof item.editId==='string'?item:null;
+  if(typeof item?.text!=='string'||typeof item.editId!=='string')return null;
+  if(item.quote&&(!validTaskQuote(item.quote)||localStorage.getItem(steeringDeliveredEditPrefix+scope)===item.editId))return null;
+  return item;
  }catch{return null;}
 }
 function restoreOrdinaryText(draft,scope){
@@ -318,9 +326,11 @@ function restoreOrdinaryText(draft,scope){
 function rememberOrdinaryText(draft,scope){
  if(!scope)return false;
  try{
-  if(draft.text){
-   draft.ordinaryEditId=crypto.randomUUID();
-   localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({text:draft.text,editId:draft.ordinaryEditId}));
+  if(draft.text||draft.taskQuote){
+   const editId=crypto.randomUUID();
+   localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({text:draft.text,editId,
+    ...(draft.taskQuote&&{quote:draft.taskQuote})}));
+   draft.ordinaryEditId=editId;
   }else{
    localStorage.removeItem(ordinaryDraftPrefix+scope);
    delete draft.ordinaryEditId;
@@ -352,20 +362,11 @@ watch(composerDraft,draft=>{
  ordinaryDraftError.value='';
  if(composerScope)restoreOrdinaryText(draft,composerScope);
 });
-watch([composerDraft,()=>composerDraft.value.taskQuote],([draft,quote],[previous,previousQuote])=>{
- if(draft===previous&&previousQuote&&!quote&&!draft.rejected)rememberOrdinaryText(draft,composerScope);
-},{flush:'sync'});
 function draftContents(draft,sessionMarker){
  return {text:draft.text,attachments:draft.files.filter(file=>file.uploadId&&file.uploadSessionMarker===sessionMarker).map(file=>file.uploadId)};
 }
 const draftWrites=new WeakMap();
 function saveDraftEdit(draft){
- if(draft.coreSteering){
-  try{
-   const key=steeringStoragePrefix+composerScope;
-   if(readSteeringDraft(composerScope)?.intent.requestId===draft.coreSteering.requestId)writeSteeringDraft(key,draft);
-  }catch{steeringStorageError.value='追加草稿暂未保存，请检查浏览器存储。';}
- }
  if(!draft.rejected)return;
  const contents=draftContents(draft,draft.rejected.sessionMarker);
  const prior=draftWrites.get(draft)||Promise.resolve();
@@ -801,11 +802,13 @@ function quoteTask(){
  const work=coreSteeringWork.value;
  composerDraft.value.taskQuote={id:work.id,name:currentTopic.value.agentName||'Agent',
   label:workMessageNames.value.get(work.messageId)||currentTopic.value.topicName||'当前任务'};
+ rememberOrdinaryText(composerDraft.value,composerScope);
  composer.value?.focus();
 }
 function clearTaskQuote(){
  if(busy.value||composerDraft.value.coreSteering)return;
  delete composerDraft.value.taskQuote;
+ rememberOrdinaryText(composerDraft.value,composerScope);
  composer.value?.focus();
 }
 async function submitComposer(){
@@ -817,6 +820,8 @@ async function submitComposer(){
  }
  await send();
 }
+const validSteeringId=value=>typeof value==='string'&&/^[a-zA-Z0-9_-]{8,100}$/.test(value);
+const validTaskQuote=quote=>validSteeringId(quote?.id)&&typeof quote.name==='string'&&typeof quote.label==='string';
 function readSteeringDraft(scope){
  const raw=localStorage.getItem(steeringStoragePrefix+scope);
  if(raw===null)return null;
@@ -824,9 +829,8 @@ function readSteeringDraft(scope){
  let saved;
  try{saved=JSON.parse(raw);}catch{throw corrupt();}
  const intent=saved?.intent,quote=saved?.quote;
- const validId=value=>typeof value==='string'&&/^[a-zA-Z0-9_-]{8,100}$/.test(value);
- if(!validId(intent?.requestId)||!validId(intent?.workId)||intent.workId!==quote?.id||
-    typeof quote.name!=='string'||typeof quote.label!=='string'||
+ if(!validSteeringId(intent?.requestId)||!validTaskQuote(quote)||intent.workId!==quote.id||
+    (intent.editId!==undefined&&!validSteeringId(intent.editId))||
     typeof intent.text!=='string'||!intent.text.trim()||intent.text.length>12000||
     typeof saved.text!=='string'||saved.text.length>12000||
     !Number.isSafeInteger(intent.revision)||intent.revision<0||
@@ -847,12 +851,13 @@ function syncSteeringDraft(){
   }
   if(!saved)return;
   const draft=composerDraft.value;
-  if(!draft.revision&&!draft.text){
+  if(!draft.revision&&!draft.ordinaryEditId&&!draft.text){
    draft.text=saved.text;
    draft.revision=saved.revision;
+   if(saved.intent.editId)draft.ordinaryEditId=saved.intent.editId;
   }
   draft.coreSteering=saved.intent;
-  draft.taskQuote=saved.quote;
+  draft.taskQuote ??= saved.quote;
  }catch(error){
   steeringRecordCorrupt.value=error.code==='STEERING_RECORD_CORRUPT';
   steeringStorageError.value=steeringRecordCorrupt.value?'当前话题的本机追加记录损坏。':'无法读取本机追加记录，请检查浏览器存储。';
@@ -884,21 +889,40 @@ function originalSteeringDraft(context,intent){
  const draft=drafts.get(context.draftScope);
  if(sameSteering(draft?.coreSteering,intent))return draft;
 }
-function confirmSteering(context,intent,receipt){
+async function confirmSteering(context,intent,receipt){
  if(!sameSteering(receipt,intent)||
     typeof receipt.messageId!=='string'||!receipt.messageId||!Number.isSafeInteger(receipt.seq)||receipt.seq<1)return;
- const draft=originalSteeringDraft(context,intent);
- if(!draft)return;
- try{
-  const saved=readSteeringDraft(context.draftScope);
-  if(saved&&!sameSteering(saved.intent,intent))return;
-  if(saved)localStorage.removeItem(steeringStoragePrefix+context.draftScope);
- }catch{steeringStorageError.value='已核对送达，浏览器暂无法更新本地追加记录。';return;}
- if(draft.revision===intent.revision&&draft.text===intent.text)draft.text='';
- delete draft.coreSteering;
- delete draft.taskQuote;
- draft.steeringDelivery='追加指令已送达';
- steeringStorageError.value='';
+ const scope=context.draftScope,key=steeringStoragePrefix+scope;
+ const settle=()=>{
+  const draft=originalSteeringDraft(context,intent);
+  if(!draft)return;
+  try{
+   const saved=readSteeringDraft(scope);
+   if(saved&&!sameSteering(saved.intent,intent))return;
+   // Keep the editable draft in its own slot. A receipt marks only the
+   // submitted edit, so it can never delete another tab's later write.
+   const submittedEdit=intent.editId;
+   if(submittedEdit)localStorage.setItem(steeringDeliveredEditPrefix+scope,submittedEdit);
+   else if(saved?.revision>intent.revision&&!readOrdinaryText(scope)?.quote){
+    const later={text:saved.text,taskQuote:saved.quote};
+    if(!rememberOrdinaryText(later,scope))return;
+    if(draft.revision===intent.revision&&draft.text===intent.text){
+     draft.text=later.text;
+     draft.ordinaryEditId=later.ordinaryEditId;
+     draft.revision=saved.revision;
+    }
+   }
+   if(saved)localStorage.removeItem(key);
+   const sent=submittedEdit?draft.ordinaryEditId===submittedEdit:
+    draft.revision===intent.revision&&draft.text===intent.text;
+   if(sent){draft.text='';delete draft.taskQuote;delete draft.ordinaryEditId;}
+   delete draft.coreSteering;
+   draft.steeringDelivery='追加指令已送达';
+   steeringStorageError.value='';
+  }catch{steeringStorageError.value='已核对送达，浏览器暂无法更新本地追加记录。';}
+ };
+ if(navigator.locks)await navigator.locks.request(key,settle);
+ else settle();
 }
 async function rejectSteering(context,intent,error){
  const definite=error.status===409&&error.code==='WORK_STEERING_WINDOW_CLOSED'||
@@ -916,7 +940,7 @@ async function rejectSteering(context,intent,error){
     draft.text=saved.text;
     draft.revision=saved.revision;
    }
-   if(!rememberOrdinaryText(draft,context.draftScope))return;
+   if(!readOrdinaryText(context.draftScope)?.quote&&!rememberOrdinaryText(draft,context.draftScope))return;
    if(saved)localStorage.removeItem(key);
    delete draft.coreSteering;
    if(draft.taskQuote?.id===intent.workId)draft.taskQuote.rejected=true;
@@ -930,7 +954,7 @@ async function reconcileSteering(topic,readApi,context){
  if(!intent||!sameView(context))return;
  try{
   const {receipt}=await readApi(steeringPath(topic,intent.workId)+'/steering-receipt?'+new URLSearchParams({requestId:intent.requestId}));
-  confirmSteering(context,intent,receipt);
+  await confirmSteering(context,intent,receipt);
  }catch{/* Unknown remains pending. This read never resubmits the intent. */}
 }
 async function sendCoreSteering(quote){
@@ -945,7 +969,8 @@ async function sendCoreSteering(quote){
    if(!sameView(context)||draft.revision!==revision||draft.taskQuote!==quote)return;
    syncSteeringDraft();
    if(draft.coreSteering||steeringStorageError.value)return;
-   const intent={workId:quote.id,text:original,requestId:crypto.randomUUID(),revision};
+   if(!draft.ordinaryEditId&&!rememberOrdinaryText(draft,context.draftScope))return;
+   const intent={workId:quote.id,text:original,requestId:crypto.randomUUID(),revision,editId:draft.ordinaryEditId};
    writeSteeringDraft(key,{...draft,coreSteering:intent});
    draft.coreSteering=intent;
    delete draft.steeringDelivery;
@@ -961,7 +986,7 @@ async function sendCoreSteering(quote){
    // Only a recognized business rejection from this POST can release its intent.
    await rejectSteering(context,intent,error);
   }
-  if(receipt)confirmSteering(context,intent,{...receipt,requestId:intent.requestId});
+  if(receipt)await confirmSteering(context,intent,{...receipt,requestId:intent.requestId});
   void refresh();
  }catch(error){
   if(!context||sameView(context))notice.value=recoveryMessage(error);
