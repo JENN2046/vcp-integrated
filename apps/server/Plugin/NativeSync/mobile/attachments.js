@@ -57,7 +57,7 @@ class AttachmentStore{
   try{this.db.prepare("INSERT INTO attachment_uploads(id,principal,topic_key,request_id,name,declared_type,size,expected_hash,expires,state,msg_id,attachment_id,frame_index) VALUES(?,?,?,?,?,?,?,?,?,'uploading',?,?,?)").run(id,principal,key,input.requestId,input.name,input.type||null,input.size,input.expectedHash||null,Date.now()+TTL,input.messageId||null,input.attachmentId||null,input.frameIndex??null);}catch(e){fs.unlinkSync(file);throw e;}
   return this.public(this.get(principal,key,id));
  }
- get(principal,key,id){this.topic(key);const r=this.db.prepare('SELECT * FROM attachment_uploads WHERE id=? AND principal=? AND topic_key=?').get(id,principal,key);if(!r)throw fail('UPLOAD_NOT_FOUND',404);if(r.expires<=Date.now()&&r.state!=='ready')throw fail('UPLOAD_EXPIRED',410);return r;}
+ get(principal,key,id,admittedAt){this.topic(key);const r=this.db.prepare('SELECT * FROM attachment_uploads WHERE id=? AND principal=? AND topic_key=?').get(id,principal,key);if(!r)throw fail('UPLOAD_NOT_FOUND',404);if(r.expires<=(admittedAt??Date.now())&&r.state!=='ready')throw fail('UPLOAD_EXPIRED',410);return r;}
  public(r){return {uploadId:r.id,offset:r.offset,size:r.size,chunkSize:CHUNK,state:r.state,hash:r.hash||null,type:r.actual_type||null,parseError:r.parse_error||null};}
  chunk(principal,key,id,input){
   if(this.closing)throw fail('ATTACHMENT_SERVICE_DRAINING',503);
@@ -129,9 +129,26 @@ class AttachmentStore{
    for(const [index,frame]of(a.frameHashes||[]).entries()){const grant=this.db.prepare("SELECT 1 FROM attachment_uploads WHERE principal=? AND topic_key=? AND hash=? AND state='ready' AND expires>? LIMIT 1").get(principal||'',topic.key,frame,Date.now());if(grant)this.db.prepare('INSERT INTO attachment_frames VALUES(?,?,?,?,?) ON CONFLICT(topic_identity,msg_id,attachment_id,frame_index) DO UPDATE SET hash=excluded.hash').run(byIdentity(id),id.msgId,a.id,index,frame);}
   }
  }
- claim(principal,key,ids){
+ claim(principal,key,ids,admittedAt){
   if(!Array.isArray(ids)||ids.length>8||new Set(ids).size!==ids.length)throw fail('INVALID_ATTACHMENT_SUBMISSION',400);
-  return ids.map(id=>{const r=this.get(principal,key,id);if(r.state!=='ready'||r.expires<=Date.now())throw fail('UPLOAD_NOT_READY');this.readBlob(r.hash);return {id:'attachment_'+r.hash,name:r.name,type:r.actual_type,size:r.size,hash:r.hash,...(r.extracted_text!==null?{extractedText:r.extracted_text}:{}),blobHash:r.hash};});
+  return ids.map(id=>{const r=this.get(principal,key,id,admittedAt);if(r.state!=='ready'||r.expires<=(admittedAt??Date.now()))throw fail('UPLOAD_NOT_READY');this.readBlob(r.hash);return {id:'attachment_'+r.hash,name:r.name,type:r.actual_type,size:r.size,hash:r.hash,...(r.extracted_text!==null?{extractedText:r.extracted_text}:{}),blobHash:r.hash};});
+ }
+ // Ordinary Core image sends require every claimed attachment to be
+ // linked before their message and receipt transaction can commit.
+ linkClaimedUpload(principal,key,uploadId,messageId,attachment,admittedAt){
+  if(!this.db.isTransaction||!Number.isSafeInteger(admittedAt))throw fail('ATTACHMENT_LINK_FAILED',500);
+  const identity=byIdentity(this.topic(key));
+  const inserted=this.db.prepare(`
+   INSERT INTO attachment_links(topic_identity,msg_id,attachment_id,hash)
+   SELECT ?,?,?,u.hash FROM attachment_uploads u
+    JOIN attachment_blobs b ON b.hash=u.hash AND b.state='ready'
+   WHERE u.id=? AND u.principal=? AND u.topic_key=? AND u.hash=? AND u.state='ready' AND u.expires>?
+   ON CONFLICT(topic_identity,msg_id,attachment_id) DO UPDATE SET hash=excluded.hash
+  `).run(identity,messageId,attachment.id,uploadId,principal,key,attachment.hash,admittedAt);
+  const linked=inserted.changes===1&&this.db.prepare(`
+   SELECT 1 FROM attachment_links WHERE topic_identity=? AND msg_id=? AND attachment_id=? AND hash=?
+  `).get(identity,messageId,attachment.id,attachment.hash);
+  if(!linked)throw fail('ATTACHMENT_LINK_FAILED',500);
  }
  hasExecutions(){return Boolean(this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mobile_executions'").get());}
  bindExecution(principal,key,ids,executionId,messageId){

@@ -1,0 +1,151 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const http = require('node:http');
+const https = require('node:https');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const { createHash, X509Certificate } = require('node:crypto');
+const { execFileSync } = require('node:child_process');
+const { fixture, wait, BOX } = require('../native/fixtures/sharedSingleHarness.cjs');
+const { localProvider, host, mountCore, setStream } = require('../native/fixtures/coreSingleHarness.cjs');
+
+test('Core PWA retires each finished preview across a missed or late event', {timeout:30000}, async t => {
+    const f = await fixture(t);
+    const provider = await localProvider(t);
+    setStream(f,true);
+    const { core, route } = await mountCore(f,host(provider).chat);
+    const streams = [];
+    provider.setReply((_body,res) => {
+        res.writeHead(200,{'Content-Type':'text/event-stream'});
+        res.write('data: {"choices":[{"delta":{"content":"Fixture preview"}}]}\n\n');
+        streams.push(res);
+    });
+    const finish = (index,text) => streams[index].end('data: '+JSON.stringify({
+        choices:[{delta:{content:text},finish_reason:'stop'}]
+    })+'\n\ndata: [DONE]\n\n');
+    const key = path.join(f.root,'preview.key'), cert = path.join(f.root,'preview.pem');
+    execFileSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=localhost'],{stdio:'ignore'});
+    const certificate = await fs.readFile(cert);
+    const spki = createHash('sha256').update(new X509Certificate(certificate).publicKey.export({type:'spki',format:'der'})).digest('base64');
+    let feed, holdChanges = false, holdWorks = false, worksBeforeSecondFinal, writes = 0;
+    const proxy = https.createServer({key:await fs.readFile(key),cert:certificate},(req,res) => {
+        const request = new URL(req.url,'https://localhost');
+        if (req.method==='POST' && /\/(?:send|steer)$/.test(request.pathname)) writes++;
+        if (request.pathname.endsWith('/observe')) {
+            // The real snapshots advance independently of this controlled SSE feed.
+            feed = res;
+            res.writeHead(200,{'Content-Type':'text/event-stream'}).flushHeaders();
+            return;
+        }
+        if (holdChanges && request.pathname.endsWith('/changes')) {
+            const after = Number(request.searchParams.get('after'));
+            return res.writeHead(200,{'Content-Type':'application/json'}).end(JSON.stringify({changes:[],next:after,head:after}));
+        }
+        if (holdWorks && request.pathname.endsWith('/works')) {
+            return res.writeHead(200,{'Content-Type':'application/json'}).end(JSON.stringify(worksBeforeSecondFinal));
+        }
+        const forward = http.request(f.url+req.url,{method:req.method,headers:{
+            ...req.headers,'x-forwarded-proto':'https',origin:'https://synthetic-shared.invalid'
+        }}, response => {
+            res.writeHead(response.statusCode,response.headers);
+            response.pipe(res);
+        });
+        forward.on('error',() => { if(!res.headersSent&&!res.destroyed)res.writeHead(502).end(); });
+        res.on('close',() => { if(!res.writableEnded)forward.destroy(); });
+        req.pipe(forward);
+    });
+    await new Promise(resolve => proxy.listen(0,'127.0.0.1',resolve));
+    const push = (event,data) => feed.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    const origin = 'https://127.0.0.1:'+proxy.address().port;
+    const grant = f.portal.createPairing({scopeMode:'shared',sharedSpaceId:'sharedAB',permissions:['read']});
+    let browser;
+    try {
+        browser = await require(BOX+'/node_modules/puppeteer').launch({
+            executablePath:process.env.CHROME_BIN||'/opt/google/chrome/chrome',headless:true,
+            userDataDir:path.join(f.root,'preview-browser'),
+            args:['--ignore-certificate-errors-spki-list='+spki,'--disable-background-networking','--no-first-run',
+                '--no-proxy-server','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1']
+        });
+        const page = await browser.newPage();
+        page.setDefaultTimeout(10000);
+        const errors = [];
+        page.on('pageerror',error => errors.push(error.message));
+        await page.goto(origin+'/mobile/',{waitUntil:'domcontentloaded'});
+        await page.waitForSelector('#pair-code',{visible:true});
+        await page.type('#pair-code',grant.pairingCode);
+        await page.click('#pair-submit');
+        await page.waitForSelector('#topic-select');
+        await page.select('#topic-select',f.topic.id);
+        await wait(() => feed,'PWA observation feed');
+        const sender = await f.phone();
+        const send = requestId => sender.call(route+'/send',{requestId,text:requestId},202);
+        const first = await send('fixture-preview-first');
+        await wait(() => streams.length===1,'first Work running');
+        const firstRun = '[data-run-id="'+first.id+'"]';
+        const secondLabel = 'SECOND_WORK_LIVE';
+        const liveText = text => page.waitForFunction(text =>
+            Array.from(document.querySelectorAll('.live-message')).some(el=>el.textContent.includes(text)),{},text);
+        const live = () => page.$$eval('.live-message',rows=>rows.map(row=>row.textContent));
+        const settled = workId => core.store.work(workId).status==='completed';
+        push('work_preview',{workId:first.id,text:'FIRST_WORK_OLD_PREVIEW'});
+        await liveText('FIRST_WORK_OLD_PREVIEW');
+        await page.waitForSelector(firstRun+'[data-run-state=running]');
+        // Match the handset: the observer misses the terminal event. The /works
+        // snapshot sees completion before the message delta reaches this page.
+        holdChanges=true;
+        finish(0,'Original first reply.');
+        await wait(() => settled(first.id),'first Work committed without terminal SSE');
+        const firstReply = core.store.work(first.id).reply_message_id;
+        const second = await send('fixture-preview-second');
+        await wait(() => streams.length===2,'another Work remains in flight');
+        push('work_preview',{workId:second.id,text:secondLabel});
+        await liveText(secondLabel);
+        await page.waitForSelector(firstRun+'[data-run-state=completed]');
+        assert.deepEqual((await live()).map(text=>text.includes(secondLabel)),[true],
+            'a completed snapshot must retire only that Work preview');
+        assert.match(await page.$eval(firstRun+' summary',el=>el.textContent),/正在同步回复/);
+        assert.equal(await page.$(firstRun+' .work-reply'),null);
+
+        push('work_preview',{workId:first.id,text:'FIRST_WORK_LATE_PREVIEW'});
+        push('delta',{workId:first.id,text:'FIRST_WORK_LATE_DELTA'});
+        push('delta',{workId:second.id,text:'_AFTER_LATE_EVENT'});
+        await liveText(secondLabel+'_AFTER_LATE_EVENT');
+        assert.deepEqual((await live()).map(text=>text.includes(secondLabel)),[true],
+            'late preview and delta must not resurrect the first Work');
+
+        holdChanges=false;
+        await page.click(firstRun+' summary');
+        await page.waitForSelector(firstRun+' .work-reply',{visible:true});
+        await page.click(firstRun+' .work-reply');
+        assert.equal(await page.evaluate(()=>document.activeElement?.dataset.messageId),firstReply);
+        assert.equal(await page.$eval('[data-message-id="'+firstReply+'"] .bubble',el=>el.textContent),'Fixture previewOriginal first reply.');
+        assert.deepEqual((await live()).map(text=>text.includes(secondLabel)),[true]);
+
+        // Invert the order for the second Work: the terminal event now arrives
+        // while the /works snapshot still reports running.
+        worksBeforeSecondFinal = await sender.call(route+'/works');
+        holdChanges=holdWorks=true;
+        finish(1,'Original second reply.');
+        await wait(() => settled(second.id),'second Work completed in Core');
+        const secondReply = core.store.work(second.id).reply_message_id;
+        const secondRun = '[data-run-id="'+second.id+'"]';
+        push('work_state',{workId:second.id,status:'completed',replyId:secondReply});
+        push('work_preview',{workId:second.id,text:'SECOND_WORK_LATE_PREVIEW'});
+        await page.waitForSelector(secondRun+'[data-run-state=completed]');
+        assert.match(await page.$eval(secondRun+' summary',el=>el.textContent),/正在同步回复/);
+        assert.deepEqual(await live(),[]);
+        holdChanges=holdWorks=false;
+        await page.waitForSelector('[data-message-id="'+secondReply+'"]');
+        assert.equal(await page.$$eval('.live-message',rows=>rows.length),0);
+        assert.equal(writes,0);
+        assert.deepEqual(errors,[]);
+    } finally {
+        await browser?.close();
+        proxy.closeAllConnections();
+        await new Promise(resolve => proxy.close(resolve));
+        await core.close();
+        await fs.rm(f.root+'-core',{recursive:true,force:true});
+    }
+});

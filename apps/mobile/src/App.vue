@@ -8,7 +8,8 @@ import AgentAvatar from './AgentAvatar.vue';
 import DesktopRelayStatus from './DesktopRelayStatus.vue';
 import SharedAttachmentImage from './SharedAttachmentImage.vue';
 import DraftImageThumbnail from './DraftImageThumbnail.vue';
-import {ref,computed,watch,onMounted,onUnmounted,nextTick} from 'vue';
+import InlineAgentRun from './InlineAgentRun.vue';
+import {ref,shallowReactive,computed,watch,onMounted,onUnmounted,nextTick} from 'vue';
 import TextPages from './TextPages.vue';
 import SharedConfigEditor from './SharedConfigEditor.vue';
 import SharedDirectoryView from './SharedDirectoryView.vue';
@@ -115,7 +116,18 @@ watch(history, (area, previous, onCleanup) => {
  onCleanup(()=>{area.removeEventListener('scroll',onScroll);observer.disconnect();});
 });
 const sharedSpaces=ref([]),sharedFeatures=ref([]),sharedStreams=ref([]);
-const corePreviews=ref([]), lastClosedSteeringId=ref('');
+const corePreviews=ref([]);
+const terminalCoreStates=new Set(['completed','failed','cancelled','review_required','review_released']);
+const terminalCoreWorks=shallowReactive(new Map());
+function rememberTerminalCoreWork(id,status,replyId){
+ if(!terminalCoreStates.has(status))return false;
+ const previous=terminalCoreWorks.get(id);
+ // A stale snapshot or event cannot undo a confirmed completion or lose its reply ID.
+ if(!previous||status==='completed'&&(previous.status!=='completed'||replyId&&replyId!==previous.replyId))
+  terminalCoreWorks.set(id,{status,replyId});
+ return true;
+}
+
 let coreObserver, coreRefreshTimer;
 const coreStorageKey = 'vcp.core.storage-id';
 const coreStorageHeaders = () => {
@@ -146,6 +158,16 @@ function observeCore(topic) {
      if(type==='change_seq'&&data.seq!==entry.seq){entry.seq=data.seq;scheduleRefresh();}
      if(type==='native_task'){scheduleRefresh();return;}
      if(!data.workId)return;
+     if(type==='work_state'){
+      scheduleRefresh();
+      if(rememberTerminalCoreWork(data.workId,data.status,data.replyId)){
+       const quote=composerDraft.value.taskQuote;
+       if(quote?.id===data.workId)quote.closed=data.status;
+       corePreviews.value=corePreviews.value.filter(work=>work.id!==data.workId);
+       return;
+      }
+     }
+     if(terminalCoreWorks.has(data.workId))return;
      const prior=corePreviews.value.find(work=>work.id===data.workId);
      const next={...prior,id:data.workId};
      if(type==='work_preview'){next.text=data.text;next.speakerName=data.speakerName;}
@@ -154,16 +176,6 @@ function observeCore(topic) {
      if(type==='approval_settled')delete next.approval;
      if(type==='tool'){next.tool=data.pluginName;next.toolStatus=data.status;}
      if(type==='resident_presentation')next.presentation=data;
-     if(type==='work_state'){
-      scheduleRefresh();
-      if(['completed','failed','cancelled','review_required','review_released'].includes(data.status)){
-       lastClosedSteeringId.value=data.workId;
-       const quote=composerDraft.value.taskQuote;
-       if(quote?.id===data.workId)quote.closed=data.status;
-       corePreviews.value=corePreviews.value.filter(work=>work.id!==data.workId);
-       return;
-      }
-     }
      corePreviews.value=[...corePreviews.value.filter(work=>work.id!==data.workId),next];
     },{signal:controller.signal,envelope:true});
    }catch(error){
@@ -199,6 +211,9 @@ async function refreshCore(topic, readApi, context, current) {
  }while(before);
  const {works}=await readApi(base+'/works');
  if(!current())return;
+ for(const {id,status,replyId} of works)rememberTerminalCoreWork(id,status,replyId);
+ if(corePreviews.value.some(work=>terminalCoreWorks.has(work.id)))
+  corePreviews.value=corePreviews.value.filter(work=>!terminalCoreWorks.has(work.id));
  await displayHistory(rows,current);
  if(!current())return;
  cursor=seq;historyKey=topic.key;baselineReady=true;
@@ -447,10 +462,41 @@ function confirmDraft(record,context){
 const displayedToolStatus={...toolLabels,dispatched:'工具已派发，等待返回',unknown:'工具结果待核对'};
 const workMessageNames=computed(()=>new Map(messages.value.map(message=>[message.id,
  typeof message.content==='string'?message.content.slice(0,160).trim():'' ])));
+const hasWorkReply=job=>job.core&&job.state==='completed'&&workMessageNames.value.has(job.replyId);
+const workReplySyncing=job=>job.core&&job.state==='completed'&&Boolean(job.replyId)&&!hasWorkReply(job);
+function observedCoreWork(job){
+ const terminal=terminalCoreWorks.get(job.id);
+ return terminal?.status==='completed'
+  ? {...job,state:'completed',replyId:terminal.replyId||job.replyId}
+  : job;
+}
+async function openWorkReply(job){
+ if(job.topicKey!==selected.value||!hasWorkReply(job))return;
+ const epoch=generation,area=history.value;
+ const index=messages.value.findIndex(message=>message.id===job.replyId);
+ historyStart.value=Math.min(historyStart.value,index);
+ conversationPanel.value='';
+ await nextTick();
+ if(epoch!==generation||area!==history.value)return;
+ const reply=area?.querySelector('[data-message-id="'+CSS.escape(job.replyId)+'"]');
+ reply?.focus({preventScroll:true});
+ reply?.scrollIntoView({block:'nearest'});
+ trackHistoryEnd();
+}
 function workTime(createdAt){
  return Number.isFinite(createdAt)?new Date(createdAt).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}):'';
 }
-const displayJobs=computed(()=>jobs.value.map(job=>{try{if(job.topicKey!==selected.value)throw Error('NATIVE_TASK_TOPIC_MISMATCH');if(job.core)return {...job,nativeTasks:(job.tasks||[]).map(task=>({...task,nativeTaskId:task.id,agentBaseName:task.agent,resultRef:task.revision===1?task.id:null})),toolInvocations:(job.tools||[]).map(tool=>({invocationId:tool.id,pluginName:tool.name,state:tool.status}))};return {...job,...projectNativeWork(job)};}catch{return {...job,nativeTasks:[],toolInvocations:[],nativeTaskError:'原生任务关联暂不能核对，请刷新或在宿主检查。'};}}));
+const displayJobs=computed(()=>jobs.value.map(job=>{try{if(job.topicKey!==selected.value)throw Error('NATIVE_TASK_TOPIC_MISMATCH');if(job.core)return {...observedCoreWork(job),nativeTasks:(job.tasks||[]).map(task=>({...task,nativeTaskId:task.id,agentBaseName:task.agent,resultRef:task.revision===1?task.id:null})),toolInvocations:(job.tools||[]).map(tool=>({invocationId:tool.id,pluginName:tool.name,state:tool.status}))};return {...job,...projectNativeWork(job)};}catch{return {...job,nativeTasks:[],toolInvocations:[],nativeTaskError:'原生任务关联暂不能核对，请刷新或在宿主检查。'};}}));
+const inlineRuns=computed(()=>{
+ const byMessage=new Map();
+ for(const job of jobs.value){
+  if(!job.core||job.topicKey!==selected.value||!job.messageId)continue;
+  if(!byMessage.has(job.messageId))byMessage.set(job.messageId,[]);
+  byMessage.get(job.messageId).push(observedCoreWork(job));
+ }
+ return byMessage;
+});
+const inlineLive=computed(()=>new Map(corePreviews.value.map(work=>[work.id,work])));
 const failedByMessage=computed(()=>new Map(jobs.value.filter(work=>work.core&&work.state==='failed'&&work.messageId)
  .map(work=>[work.messageId,work])));
 watch([visibleSharedStreams,corePreviews,failedByMessage],async()=>{
@@ -539,7 +585,7 @@ async function api(route,body,requestHeaders={},signal,suppressPairRequired=fals
  return result;
 }
 function cacheBinding(key=historyKey){return paired.value&&validSessionRecovery(recoveryContext.value)?historyCacheKey(recoveryContext.value,topics.value.find(t=>t.key===key)):'';}
-function resetHistory({remember=true}={}){clearSharedObservers();if(remember&&baselineReady&&historyBinding&&historyBinding===cacheBinding())historyCache.put(historyBinding,historyRows,cursor);refreshing?.abort();refreshing=null;historyStart.value=0;historyProgress.value=null;expandedAttachmentText.value=new Set();historyContextReady.value=false;expandedLongText.value=new Set();executionPager.reset();jobsInfo.value=null;jobsError.value='';attachmentPager.reset();baselineReady=false;baselineRequestId='';switchDraft();closeNativeResult();closeAttachment();invitedAgent.value='';reviewChecks.value={};attachmentStates.value={};generation++;submissionNoticeHeld=false;historyKey='';historyBinding='';historyFromCache=false;cursor=0;historyRows=new Map();messages.value=[];jobs.value=[];recoveryDetail.value='';acceptedReceipt.value=null;loadRecovery();}
+function resetHistory({remember=true}={}){clearSharedObservers();terminalCoreWorks.clear();if(remember&&baselineReady&&historyBinding&&historyBinding===cacheBinding())historyCache.put(historyBinding,historyRows,cursor);refreshing?.abort();refreshing=null;historyStart.value=0;historyProgress.value=null;expandedAttachmentText.value=new Set();historyContextReady.value=false;expandedLongText.value=new Set();executionPager.reset();jobsInfo.value=null;jobsError.value='';attachmentPager.reset();baselineReady=false;baselineRequestId='';switchDraft();closeNativeResult();closeAttachment();invitedAgent.value='';reviewChecks.value={};attachmentStates.value={};generation++;submissionNoticeHeld=false;historyKey='';historyBinding='';historyFromCache=false;cursor=0;historyRows=new Map();messages.value=[];jobs.value=[];recoveryDetail.value='';acceptedReceipt.value=null;loadRecovery();}
 async function setDirectory(result,{initial=false,selectedTopic=null,adjustSelection=true}={}){
  lastDirectory=result;
  const previous=selected.value,previousAgent=agentId.value;
@@ -851,7 +897,7 @@ function draftImageError(event){
 function downloadAttachment(){const item=attachmentPreview.value;if(item?.blob)saveAttachment(item.blob,item.name);}
 const steerableStates=['running','waiting_approval'];
 const coreSteeringWork=computed(()=>currentTopic.value?.coreSingle && currentTopic.value.ownerType==='agent'
- ? jobs.value.find(work=>work.id!==lastClosedSteeringId.value&&steerableStates.includes(work.state)) : null);
+ ? jobs.value.find(work=>!terminalCoreWorks.has(work.id)&&steerableStates.includes(work.state)) : null);
 const taskQuote=computed(()=>composerDraft.value.taskQuote||null);
 const quotedWork=computed(()=>jobs.value.find(work=>work.id===taskQuote.value?.id));
 const modelPicker=ref(null);
@@ -1310,6 +1356,7 @@ function waitingForGroupTasks(job){
   job.steps.every(step=>step.state==='completed') && job.nativeTasks.some(task=>['accepted','running','waiting','cancelling'].includes(task.state));
 }
 function executionLabel(j){
+ if(workReplySyncing(j))return '正在同步回复';
  if(j.state==='completed'&&j.kind==='group_message'&&j.stepCount===0)return '消息已保存 · 未触发成员回复';
  if(waitingForGroupTasks(j))return '成员回复已保存，等待原生任务结束';
  if(j.remainingCancelled && j.state==='cancelled')return '剩余接力已取消';
@@ -1497,7 +1544,9 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
    <SharedConfigEditor v-if="currentTopic?.sharedSpaceId&&sharedSpaces.some(s=>s.id===currentTopic.sharedSpaceId&&s.config)" :key="currentTopic.sharedOwnerId" :topic="currentTopic" :context="recoveryContext" :api="api" />
    </details>
    </nav>
-   <section ref="history" id="history" @scroll.passive="trackHistoryEnd" aria-label="聊天历史" :inert="navigationVisible || conversationPanel==='work'"><p v-if="historyProgress" class="history-progress" role="status">{{historyProgress.failed?'历史暂未加载完成，稍后重试':historyProgress.checking?'正在核对历史增量':'正在加载历史'}}<template v-if="historyProgress.total"> · {{historyProgress.loaded}} / {{historyProgress.total}}</template></p><button v-if="historyStart>0" class="earlier-messages" @click="showEarlierMessages">查看更早消息（还有 {{historyStart}} 条）</button><template v-for="m in visibleMessages" :key="m.id"><article class="message" :class="[m.role,{'snapshot-message':m.contextCompaction}]" :data-message-id="m.id"><div class="message-author" v-if="m.role!=='user'||m.name==='Flowlock'"><AgentAvatar v-if="m.role!=='user'&&!m.contextCompaction" :src="currentTopic?.ownerType==='group'?undefined:currentTopic?.avatar||activeAgent?.avatar" :name="m.name||currentTopic?.agentName"/><small>{{m.contextCompaction?'上下文快照':m.role==='user'?(m.name==='Flowlock'?'Flowlock':'你'):(m.name||currentTopic?.agentName||'Agent')}}</small></div><div v-if="m.content?.length>128000" class="long-message"><button @click="toggleLongText(m)">{{expandedLongText.has(longTextKey(m))?'收起全文':'查看长文本'}} · {{m.content.length}} 字符</button><TextPages v-if="expandedLongText.has(longTextKey(m))" :text="m.content" class="bubble" style="max-height:60vh;overflow:auto"/></div><div v-else-if="m.content||!m.attachments?.length" class="bubble">{{typeof m.content==='string'?m.content:'此消息包含非文本内容，请在桌面查看'}}</div><details v-if="m.desktopReferences?.length" class="desktop-references"><summary>桌面活引用 {{m.desktopReferences.length}} 项 · 原件和提取文本未同步</summary><div v-for="r in m.desktopReferences" :key="r.id"><strong>{{r.name}}</strong><small>{{r.workspaceRef ? r.workspaceRef.alias+' / '+r.workspaceRef.relPath : r.target}} · 需在来源电脑核对</small></div></details><div v-if="m.attachments?.length" class="attachments"><div v-for="(a,index) in m.attachments" :key="a.id+'/'+index" class="attachment"><template v-if="attachmentStates[m.id+'/'+a.id]?.state==='available'"><SharedAttachmentImage v-if="currentTopic?.sharedSpaceId&&attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :key="generation+'/'+m.id+'/'+a.id" :url="attachmentUrl(m,a)" :alt="a.name||'图片附件'"></SharedAttachmentImage><img v-else-if="attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :src="attachmentUrl(m,a)" :alt="a.name||'图片附件'" loading="lazy"><button class="attachment-open" @click="openAttachment(m,a)"><MobileIcon name="file"/><span>{{a.name||'查看附件'}}</span><MobileIcon name="chevron"/></button><details v-if="a.extractedText" class="attachment-text" @toggle="toggleAttachmentText(m,a,index,$event)"><summary>查看文本</summary><TextPages v-if="expandedAttachmentText.has(attachmentTextKey(m,a,index))" :text="a.extractedText"/></details></template><span v-else>{{a.name||'附件'}} · {{attachmentStates[m.id+'/'+a.id]?.state==='unsupported'?'原件类型暂不支持，引用已保留':attachmentStates[m.id+'/'+a.id]?.state==='corrupt'?'完整性校验失败':'附件暂未同步或正在确认'}}</span></div></div></article>
+   <section ref="history" id="history" @scroll.passive="trackHistoryEnd" aria-label="聊天历史" :inert="navigationVisible || conversationPanel==='work'"><p v-if="historyProgress" class="history-progress" role="status">{{historyProgress.failed?'历史暂未加载完成，稍后重试':historyProgress.checking?'正在核对历史增量':'正在加载历史'}}<template v-if="historyProgress.total"> · {{historyProgress.loaded}} / {{historyProgress.total}}</template></p><button v-if="historyStart>0" class="earlier-messages" @click="showEarlierMessages">查看更早消息（还有 {{historyStart}} 条）</button><template v-for="m in visibleMessages" :key="m.id"><article class="message" :class="[m.role,{'snapshot-message':m.contextCompaction}]" :data-message-id="m.id" :tabindex="m.role==='assistant'?-1:undefined"><div class="message-author" v-if="m.role!=='user'||m.name==='Flowlock'"><AgentAvatar v-if="m.role!=='user'&&!m.contextCompaction" :src="currentTopic?.ownerType==='group'?undefined:currentTopic?.avatar||activeAgent?.avatar" :name="m.name||currentTopic?.agentName"/><small>{{m.contextCompaction?'上下文快照':m.role==='user'?(m.name==='Flowlock'?'Flowlock':'你'):(m.name||currentTopic?.agentName||'Agent')}}</small></div><div v-if="m.content?.length>128000" class="long-message"><button @click="toggleLongText(m)">{{expandedLongText.has(longTextKey(m))?'收起全文':'查看长文本'}} · {{m.content.length}} 字符</button><TextPages v-if="expandedLongText.has(longTextKey(m))" :text="m.content" class="bubble" style="max-height:60vh;overflow:auto"/></div><div v-else-if="m.content||!m.attachments?.length" class="bubble">{{typeof m.content==='string'?m.content:'此消息包含非文本内容，请在桌面查看'}}</div><details v-if="m.desktopReferences?.length" class="desktop-references"><summary>桌面活引用 {{m.desktopReferences.length}} 项 · 原件和提取文本未同步</summary><div v-for="r in m.desktopReferences" :key="r.id"><strong>{{r.name}}</strong><small>{{r.workspaceRef ? r.workspaceRef.alias+' / '+r.workspaceRef.relPath : r.target}} · 需在来源电脑核对</small></div></details><div v-if="m.attachments?.length" class="attachments"><div v-for="(a,index) in m.attachments" :key="a.id+'/'+index" class="attachment"><template v-if="attachmentStates[m.id+'/'+a.id]?.state==='available'"><SharedAttachmentImage v-if="currentTopic?.sharedSpaceId&&attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :key="generation+'/'+m.id+'/'+a.id" :url="attachmentUrl(m,a)" :alt="a.name||'图片附件'"></SharedAttachmentImage><img v-else-if="attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :src="attachmentUrl(m,a)" :alt="a.name||'图片附件'" loading="lazy"><button class="attachment-open" @click="openAttachment(m,a)"><MobileIcon name="file"/><span>{{a.name||'查看附件'}}</span><MobileIcon name="chevron"/></button><details v-if="a.extractedText" class="attachment-text" @toggle="toggleAttachmentText(m,a,index,$event)"><summary>查看文本</summary><TextPages v-if="expandedAttachmentText.has(attachmentTextKey(m,a,index))" :text="a.extractedText"/></details></template><span v-else>{{a.name||'附件'}} · {{attachmentStates[m.id+'/'+a.id]?.state==='unsupported'?'原件类型暂不支持，引用已保留':attachmentStates[m.id+'/'+a.id]?.state==='corrupt'?'完整性校验失败':'附件暂未同步或正在确认'}}</span></div></div></article>
+    <InlineAgentRun v-for="run in inlineRuns.get(m.id)" :key="run.id" :job="run" :live="inlineLive.get(run.id)"
+      :connected="online&&browserOnline&&coreFeed==='live'" :has-reply="hasWorkReply(run)" :reply-syncing="workReplySyncing(run)" @open-reply="openWorkReply(run)"/>
     <article v-if="failedByMessage.has(m.id)" class="failed-work" :data-failed-work="failedByMessage.get(m.id).id">
      <strong>任务执行失败</strong>
      <p>{{failedByMessage.get(m.id).errorCode==='UPSTREAM_ERROR'?'模型服务暂不可用。':'本次任务已停止。'}}请先核对任务状态，再决定是否发起新消息。</p>
@@ -1536,6 +1585,7 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
      <div v-if="j.core && (workMessageNames.get(j.messageId)||workTime(j.createdAt))" class="work-meta">
       <span v-if="workMessageNames.get(j.messageId)">{{workMessageNames.get(j.messageId)}}</span><time v-if="workTime(j.createdAt)">{{workTime(j.createdAt)}}</time>
      </div>
+     <button v-if="hasWorkReply(j)" class="work-reply" type="button" @click="openWorkReply(j)">查看原回复</button>
      <p v-if="j.remainingCancelled && j.state!=='cancelled'" role="status">后续接力已取消<template v-if="j.steps?.some(step => ['running','publishing','waiting_approval'].includes(step.state))">，等待当前成员结束</template>。</p>
      <ol v-if="j.steps" class="group-steps"><li v-for="step in j.steps" :key="step.id">{{step.name}} · {{labels[step.state]||step.state}}<small v-if="step.errorCode"> · {{errors[step.errorCode]||'本步异常，详情请核对原生宿主'}}</small></li></ol>
      <p v-if="j.nativeTaskError" class="native-task-error" role="alert">{{j.nativeTaskError}}</p>

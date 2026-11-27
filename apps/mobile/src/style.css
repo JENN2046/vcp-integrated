@@ -252,3 +252,16 @@ footer>* {max-width:var(--content); margin-inline:auto}
 .voice-transcript-flight{position:fixed;z-index:21;pointer-events:none;color:#172536;font-size:1rem;font-weight:600;white-space:nowrap;text-shadow:0 1px 6px #fff,0 0 3px #fff}
 :root[data-theme="dark"] .voice-transcript-flight{color:#fff;text-shadow:0 1px 6px #000,0 0 3px #000}
 @media(prefers-reduced-motion:reduce){.voice-stage{animation:none}}
+
+.inline-agent-run {width:min(100%,362px);border:1px solid var(--edge);background:var(--surface);color:var(--ink);border-radius:16px;margin:0 0 12px auto;font-size:.8rem}
+.inline-agent-run summary {display:flex;align-items:center;list-style:none;gap:7px;padding:0 10px;color:inherit;overflow-wrap:anywhere}
+.inline-agent-run summary::-webkit-details-marker {display:none}
+.inline-agent-run summary svg {margin-left:auto;width:16px;height:16px;flex:none}
+.inline-agent-run[open] summary svg {transform:rotate(90deg)}
+.inline-agent-run time {color:var(--muted);font-variant-numeric:tabular-nums}
+.inline-agent-run ol {margin:0;padding:0 14px 10px 30px;color:var(--muted)}
+.run-dot {width:7px;height:7px;flex:none;background:var(--muted);border-radius:50%}
+.inline-agent-run[data-running="true"] .run-dot {background:var(--accent)}
+.work-reply {min-height:44px;max-width:100%;padding:0 12px;color:inherit;font:inherit;text-decoration:underline;background:transparent;border:0;cursor:pointer}
+.inline-agent-run .work-reply {margin-left:8px}
+#history .message[tabindex="-1"]:focus {outline:2px solid currentColor;outline-offset:-2px}

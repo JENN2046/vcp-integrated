@@ -279,7 +279,9 @@ class CoreService {
         let admitted = false;
         const result = this.store.admit(topic, principal, requestId, input, () => {
             admitted = true;
-            const files = this.attachments.claim(principal, topic.key, attachments);
+            const admittedAt = actor.kind === 'mobile' && attachments.length ? Date.now() : undefined;
+            const files = this.attachments.claim(principal, topic.key, attachments, admittedAt);
+            const imageSend = admittedAt !== undefined && files.some(file => file.type.startsWith('image/'));
             for (const file of files) {
                 if (file.type.startsWith('image/')) {
                     if (!(config.group ? config.imageModels?.length : config.imageSupported)) throw failure('MODEL_IMAGE_UNSUPPORTED');
@@ -293,7 +295,14 @@ class CoreService {
                     version: 1, kind: 'message', sessionMarker: sessionMarker(principal.slice(7)),
                     payloadHash: payloadHash({ topicKey: topic.key, kind: 'message', payload: { requestId, text, attachments, ...override } })
                 } }),
-                link: id => this.attachments.associate({ ...topic, msgId: id }, { attachments: files }, principal)
+                link: id => {
+                    if (imageSend) {
+                        files.forEach((file, index) => this.attachments.linkClaimedUpload(
+                            principal, topic.key, attachments[index], id, file, admittedAt));
+                    } else {
+                        this.attachments.associate({ ...topic, msgId: id }, { attachments: files }, principal);
+                    }
+                }
             };
         });
         this.runner.publish(topic.key, 'change_seq', { seq: result.seq });
