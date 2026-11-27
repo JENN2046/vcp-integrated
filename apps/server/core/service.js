@@ -16,6 +16,7 @@ const { fieldsFrom } = require('../Plugin/NativeSync/sync/metadata');
 const { filterChatModels } = require('../Plugin/NativeSync/sync/contracts.generated.cjs');
 const { AttachmentStore } = require('../Plugin/NativeSync/mobile/attachments');
 const { attachmentRoutes } = require('../Plugin/NativeSync/mobile/attachmentRoutes');
+const { projectMessage, projectPreview, readSticker } = require('./nativeStickers');
 const { prepareSharedConfiguration } = require('../Plugin/NativeSync/mobile/sharedConfiguration');
 const { effectiveRequest } = require('../Plugin/NativeSync/mobile/effectiveContext');
 const { sanitize, assertPortableContext } = require('../Plugin/NativeSync/mobile/groupRequest');
@@ -35,7 +36,7 @@ const integer = (value, defaultValue, min, max) => {
 };
 
 class CoreService {
-    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, agentManager, remoteConfig, modelCatalog, defaultAgentModel, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
+    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, agentManager, remoteConfig, modelCatalog, defaultAgentModel, nativeStickers, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
         if (shared && (!shared.grants.has(workspace) || shared.readOnly || !mobile || shared.coreWorkspace && shared.coreWorkspace !== workspace)) throw failure('CORE_WORKSPACE_UNAVAILABLE');
         if (!path.isAbsolute(directory) || directory === path.parse(directory).root) throw failure('CORE_DATA_DIRECTORY_REQUIRED');
         fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -53,6 +54,7 @@ class CoreService {
         this.workspace = workspace;
         this.gameEnabled = gameEnabled;
         this.modelCatalog = modelCatalog;
+        this.nativeStickers = nativeStickers;
         this.defaultAgentModel = defaultAgentModel?.trim() || null;
         this.observers = new Set();
         this.mobile = mobile;
@@ -661,19 +663,22 @@ class CoreService {
             res.json(result);
         }));
         router.get('/:workspace/:key/messages', route((req, res) => {
-            const { topic } = scope(req, 'read');
+            const { actor, topic } = scope(req, 'read');
             const limit = integer(req.query.limit, 100, 1, 500);
             const before = req.query.before === undefined ? Number.MAX_SAFE_INTEGER : Number(req.query.before);
             if (!Number.isFinite(before) || before < 1 || before > Number.MAX_SAFE_INTEGER ||
                 !Number.isInteger(before) && before % 1 !== 0.5) throw failure('INVALID_CORE_CURSOR', 400);
-            const messages = this.store.snapshot(topic.key, before, limit);
+            const rows = this.store.snapshot(topic.key, before, limit);
+            const messages = actor.kind === 'mobile' ? rows.map(message => projectMessage(message, this.nativeStickers)) : rows;
             res.json({ messages, seq: this.store.head(topic.key), nextBefore: messages[0]?.ordinal, hasMore: messages.length === limit });
         }));
         router.get('/:workspace/:key/changes', route((req, res) => {
-            const { topic } = scope(req, 'read');
+            const { actor, topic } = scope(req, 'read');
             const after = integer(req.query.after, 0, 0, Number.MAX_SAFE_INTEGER);
             const limit = integer(req.query.limit, 100, 1, 500);
-            const changes = this.store.changes(topic.key, after, limit);
+            const rows = this.store.changes(topic.key, after, limit);
+            const changes = actor.kind === 'mobile' ? rows.map(change => change.message
+                ? { ...change, message: projectMessage(change.message, this.nativeStickers) } : change) : rows;
             res.json({ changes, next: changes.at(-1)?.seq ?? after, head: this.store.head(topic.key) });
         }));
         router.get('/:workspace/:key/works/:id/tasks', route(async (req, res) => {
@@ -718,7 +723,7 @@ class CoreService {
             res.json(this.runner.flowlock.control(topic, actor.principal, req.body || {}));
         }));
         router.get('/:workspace/:key/observe', route((req, res) => {
-            const { topic } = scope(req, 'read');
+            const { actor, topic } = scope(req, 'read');
             if (this.runner.draining) throw failure('HOST_DRAINING', 503);
             this.observers.add(res);
             res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
@@ -727,8 +732,29 @@ class CoreService {
                 scope(req, 'read');
                 if (!res.writableEnded && !res.write(`event: ${name}\ndata: ${JSON.stringify(value)}\n\n`)) res.end();
             };
+            let mobilePreview;
             const stop = this.runner.observe(topic.key, (name, value) => {
-                try { write(name, value); } catch { res.end(); }
+                try {
+                    if (actor.kind === 'mobile' && (name === 'delta' || name === 'work_preview')) {
+                        const running = this.runner.running.get(topic.key);
+                        const raw = name === 'work_preview' ? value : running?.id === value.workId ? running : null;
+                        if (raw) {
+                            const text = projectPreview(raw.text);
+                            const existing = mobilePreview?.workId === value.workId ? mobilePreview.text : '';
+                            if (name === 'delta' && mobilePreview?.workId === value.workId && text.startsWith(existing)) {
+                                if (text.length > existing.length) write('delta', { workId: value.workId, text: text.slice(existing.length) });
+                            } else {
+                                write('work_preview', { workId: value.workId, text,
+                                    speakerName: name === 'work_preview' ? value.speakerName : raw.speaker?.speakerName });
+                            }
+                            mobilePreview = { workId: value.workId, text };
+                        }
+                    } else {
+                        if (name === 'work_state' && mobilePreview?.workId === value.workId &&
+                            ['completed','failed','cancelled','review_required'].includes(value.status)) mobilePreview = undefined;
+                        write(name, value);
+                    }
+                } catch { res.end(); }
             });
             const timer = setInterval(() => {
                 try { write('change_seq', { seq: this.store.head(topic.key) }); } catch { res.end(); }
@@ -843,6 +869,17 @@ class CoreService {
                 req.coreActor = scope(req, req.method === 'GET' && !req.path.startsWith('/uploads') ? 'read' : 'execute').actor;
             },
             principal: req => req.coreActor.principal
+        }));
+        router.get('/:workspace/:key/stickers/:messageId/:index', route((req, res) => {
+            const { actor, topic } = scope(req, 'read');
+            if (actor.kind !== 'mobile' || !/^\d{1,2}$/.test(req.params.index)) throw failure('STICKER_UNAVAILABLE', 404);
+            this.attachments.spend(actor.principal);
+            const message = this.store.db.prepare('SELECT content FROM messages WHERE conversation_id=? AND id=? AND deleted=0')
+                .get(topic.key, req.params.messageId);
+            const asset = readSticker(message?.content, Number(req.params.index), this.nativeStickers);
+            if (!asset) throw failure('STICKER_UNAVAILABLE', 404);
+            this.attachments.spend(actor.principal, asset.bytes.length);
+            res.set({ 'Content-Type': asset.type, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store' }).end(asset.bytes);
         }));
         router.get('/:workspace/:key/blob/:hash', route((req, res) => {
             const { actor, topic } = scope(req, 'read');

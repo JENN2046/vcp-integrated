@@ -1,6 +1,6 @@
 'use strict';
 
-function startCoreHost({ app, chat, listenHost, serverKey, legacy, modelCatalog, env = process.env }) {
+function startCoreHost({ app, chat, listenHost, serverKey, legacy, modelCatalog, nativeStickers, env = process.env }) {
     const directory = env.VCP_CORE_DATA_DIR, configuredWorkspace = env.VCP_CORE_WORKSPACE;
     if (!directory && !configuredWorkspace) return null;
     if (!directory || env.VCP_CORE_MODE && !['local', 'remote', 'shared'].includes(env.VCP_CORE_MODE)) {
@@ -24,7 +24,7 @@ function startCoreHost({ app, chat, listenHost, serverKey, legacy, modelCatalog,
     const speech = remote ? require('./localSpeech').localSpeechConfig(env) : null;
     const core = new CoreService({ directory, workspace: configuredWorkspace || 'personal', chat, modelCatalog,
         defaultAgentModel: env.VCP_CORE_DEFAULT_AGENT_MODEL,
-        ...(remote && { remoteConfig: { origin: remoteOrigin, hours, speech } }), ...adapter?.options });
+        ...(remote && { remoteConfig: { origin: remoteOrigin, hours, speech }, nativeStickers }), ...adapter?.options });
     if (adapter) adapter.attach(core);
     if (remote) {
         core.remoteDesktopRouter = core.remote.router('desktop');

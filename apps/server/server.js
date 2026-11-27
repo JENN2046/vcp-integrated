@@ -1343,6 +1343,11 @@ async function initialize() {
     if (process.env.VCP_CORE_DATA_DIR || process.env.VCP_CORE_WORKSPACE) {
         coreHost = require('./core/host').startCoreHost({
             app, chat: chatCompletionHandler, serverKey, modelCatalog: queryModelCatalog,
+            nativeStickers: {
+                root: path.join(__dirname, 'image'),
+                origin: require('./core/nativeStickers').originForNativeImages(process.env),
+                imageKey: () => pluginManager.getResolvedPluginConfigValue('ImageServer', 'Image_Key'),
+            },
             listenHost: process.env.VCP_LOCAL_LISTEN_HOST || process.env.HOST || '127.0.0.1',
             legacy: pluginManager.getServiceModule('NativeSync')
         });
