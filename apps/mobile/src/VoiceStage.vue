@@ -1,6 +1,6 @@
 <script setup>
 import {onMounted,onUnmounted,ref,watch} from 'vue';
-const props=defineProps({level:Number,phase:String,phrase:String});
+const props=defineProps({level:Number,phase:String,phrase:String,keyboard:Boolean});
 const emit=defineEmits(['stop','cancel']);
 const canvas=ref(null),stopButton=ref(null);
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
@@ -62,15 +62,19 @@ function paint(now){
  context.globalAlpha=1;
  raf=requestAnimationFrame(paint);
 }
-onMounted(()=>{stopButton.value?.focus({preventScroll:true});raf=requestAnimationFrame(paint);});
+onMounted(()=>{if(!props.keyboard)stopButton.value?.focus({preventScroll:true});raf=requestAnimationFrame(paint);});
 onUnmounted(()=>cancelAnimationFrame(raf));
 </script>
 <template>
- <section class="voice-stage" aria-label="语音听写">
-  <button ref="stopButton" class="voice-stage-orb" type="button" :disabled="phase==='finishing'" aria-label="结束语音输入" @click="emit('stop')">
+ <section class="voice-stage" :class="{'keyboard-voice-stage':keyboard}" :aria-hidden="keyboard?'true':undefined" :aria-label="keyboard?undefined:'语音听写'">
+  <div v-if="keyboard" class="voice-stage-orb">
+   <canvas ref="canvas" width="512" height="512" aria-hidden="true"></canvas>
+   <span class="keyboard-orb-phrase">{{Array.from(phrase || '').slice(-42).join('')}}</span>
+  </div>
+  <button v-else ref="stopButton" class="voice-stage-orb" type="button" :disabled="phase==='finishing'" aria-label="结束语音输入" @click="emit('stop')">
    <canvas ref="canvas" width="512" height="512" aria-hidden="true"></canvas>
   </button>
-  <div class="voice-stage-controls">
+  <div v-if="!keyboard" class="voice-stage-controls">
    <span class="voice-stage-state" role="status">{{phase==='starting'?'正在开启麦克风':phase==='finishing'?'正在完成识别':'正在听 · 说完停顿即可'}}</span>
    <button class="voice-stage-cancel" type="button" id="voice-cancel" @click="emit('cancel')">取消</button>
   </div>

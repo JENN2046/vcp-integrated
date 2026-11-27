@@ -35,7 +35,7 @@ const integer = (value, defaultValue, min, max) => {
 };
 
 class CoreService {
-    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, agentManager, remoteConfig, modelCatalog, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
+    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, agentManager, remoteConfig, modelCatalog, defaultAgentModel, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
         if (shared && (!shared.grants.has(workspace) || shared.readOnly || !mobile || shared.coreWorkspace && shared.coreWorkspace !== workspace)) throw failure('CORE_WORKSPACE_UNAVAILABLE');
         if (!path.isAbsolute(directory) || directory === path.parse(directory).root) throw failure('CORE_DATA_DIRECTORY_REQUIRED');
         fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -53,6 +53,7 @@ class CoreService {
         this.workspace = workspace;
         this.gameEnabled = gameEnabled;
         this.modelCatalog = modelCatalog;
+        this.defaultAgentModel = defaultAgentModel?.trim() || null;
         this.observers = new Set();
         this.mobile = mobile;
         this.store = new CoreStore(filename);
@@ -496,6 +497,42 @@ class CoreService {
         const rows = purpose === 'chat' ? data : filterChatModels(data);
         return [...new Set(rows.map(row => row?.id)
             .filter(id => typeof id === 'string' && id && id.length <= 256 && id.trim() === id))];
+    }
+
+    async createMobileAgent(actor, body, reauthorize) {
+        const { requestId, name, instructions = '', model = '' } = body || {};
+        if (!body || Object.keys(body).some(key => !['requestId', 'name', 'instructions', 'model'].includes(key)) ||
+            typeof name !== 'string' || !name.trim() || name.length > 100 ||
+            typeof instructions !== 'string' || instructions.length > 1000 ||
+            typeof model !== 'string' || model.length > 200) throw failure('INVALID_CORE_AGENT_CREATION', 400);
+        // This surface accepts plain instructions, without native prompt references.
+        if (/\{\{|\}\}|\[\[|\]\]/.test(name + '\n' + instructions)) throw failure('CORE_AGENT_INSTRUCTIONS_PLAIN_TEXT', 400);
+        const input = { name: name.trim(), instructions: instructions.trim(), model: model.trim() };
+        const command = { op: 'createAgent', ...input };
+        const prior = this.store.replay(actor.principal, requestId, command);
+        if (prior) return prior;
+        // The client submits the exact model shown in the form, including a
+        // preselected default. The current catalog can reject that choice.
+        if (!input.model) throw failure('CORE_AGENT_MODEL_REQUIRED', 400);
+        const { models } = await this.agentCreationModels();
+        if (!models.includes(input.model)) {
+            reauthorize();
+            const settled = this.store.replay(actor.principal, requestId, command);
+            if (settled) return settled;
+            throw failure('CORE_MODEL_NOT_ALLOWED', 409);
+        }
+        const config = await this.local.configValidator.normalize(
+            { ownerType: 'agent', imageModels: this.local.imageModels },
+            { name: input.name, systemPrompt: input.instructions || `你是 ${input.name}。`, model: input.model, streamOutput: true },
+            { localOwner: true }
+        );
+        reauthorize();
+        return this.local.createMobileAgent(actor, requestId, input, config);
+    }
+
+    async agentCreationModels() {
+        const models = (await this.availableChatModelIds()).filter(model => model.length <= 200);
+        return { models, defaultModel: models.includes(this.defaultAgentModel) ? this.defaultAgentModel : null };
     }
 
     checkStorage(req) {

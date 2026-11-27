@@ -10,7 +10,7 @@ watch([opened,()=>props.topic?.sharedOwnerId,()=>props.context?.sessionMarker,()
 });
 onUnmounted(()=>{epoch++;editor?.dispose();});
 </script>
-<template><section class="shared-config"><button v-if="!opened" id="shared-config-open" @click="opened=true">{{topic?.configurationEditable===false?'查看共享配置':'编辑共享 Agent／群聊配置'}}</button><template v-else><button @click="opened=false">收起</button><div ref="host"/></template></section></template>
+<template><section class="shared-config"><button id="shared-config-open" class="shared-panel-toggle" type="button" :aria-expanded="opened" @click="opened=!opened">{{opened?'收起配置':topic?.configurationEditable===false?'查看共享配置':'编辑共享 Agent／群聊配置'}}</button><div v-if="opened" ref="host"/></section></template>
 <style>
 .shared-config{padding:12px;border:1px solid var(--border,#8885);border-radius:8px;margin:8px 0}
 .shared-config .heading{display:flex;justify-content:space-between;align-items:center}

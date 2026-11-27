@@ -126,6 +126,27 @@ class RemoteAccess {
             });
             router.post('/api/pair/challenge', exchange, (req, res) => res.json(this.sessions.challenge(req)));
             router.post('/api/pair/recover', exchange, (req, res) => this.sessions.recover(req, res));
+            const agentCreator = req => {
+                authorize(req, req.params.workspace, 'read');
+                const actor = authorize(req, req.params.workspace, 'create-agent');
+                authorize(req, req.params.workspace, 'execute');
+                return actor;
+            };
+            router.get('/api/core/:workspace/agent-creation/models', async (req, res) => {
+                agentCreator(req);
+                const options = await this.core.agentCreationModels();
+                agentCreator(req);
+                res.json(options);
+            });
+            router.post('/api/core/:workspace/agent-creation', exchange, async (req, res) => {
+                const admit = () => {
+                    if (this.core.runner.draining) throw failure('HOST_DRAINING', 503);
+                    const actor = agentCreator(req);
+                    this.requireSubmissionContext(req);
+                    return actor;
+                };
+                res.json(await this.core.createMobileAgent(admit(), req.body, admit));
+            });
             router.use(service, core);
             router.get('/api/session', (req, res) => {
                 const actor = authorize(req, workspace, 'read');
@@ -133,9 +154,13 @@ class RemoteAccess {
                 const permissions = JSON.parse(session.scopes);
                 const directory = this.core.local.mobileDirectory(actor, permissions.includes('shared:' + workspace + ':execute'), this.core.historyDeleted);
                 res.json({ authenticated: true, storageId: this.core.store.storageId, server, recovery: this.recovery(session), selectedTopic: session.last_topic_key,
+                    workspace, canCreateAgent: ['execute', 'create-agent'].every(permission => permissions.includes('shared:' + workspace + ':' + permission)),
                     ...directory, directory: { paged: false }, sharedFeatures: [], sharedPermissions: [] });
             });
             router.post('/api/selection', exchange, (req, res) => {
+                if (req.get('x-nativesync-entry-id') !== undefined || req.get('x-nativesync-session-marker') !== undefined) {
+                    this.requireSubmissionContext(req);
+                }
                 const actor = authorize(req, workspace, 'read');
                 const topic = this.core.topic(actor, workspace, req.body?.key, 'read');
                 this.db.prepare('UPDATE mobile_sessions SET last_topic_key=? WHERE id=?').run(topic.key, actor.deviceId);

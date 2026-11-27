@@ -128,20 +128,95 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await enter(pair());
         await page.waitForSelector('#topic-select');
         await chooseTopic(topic);
+        await page.waitForSelector('#history .message.user .bubble');
+        const bubbles = await page.evaluate(() => {
+            const root = document.documentElement;
+            const original = root.dataset.theme;
+            const user = document.querySelector('#history .message.user .bubble');
+            const agent = document.querySelector('#history .message.assistant .bubble');
+            const values = mode => {
+                root.dataset.theme = mode;
+                return [getComputedStyle(user).backgroundColor, getComputedStyle(user).color,
+                    getComputedStyle(agent).backgroundColor, getComputedStyle(document.querySelector('#history')).backgroundColor];
+            };
+            const result = { light:values('light'), dark:values('dark') };
+            root.dataset.theme = original;
+            return result;
+        });
+        assert.deepEqual(bubbles.light.slice(0,2), ['rgb(49, 92, 223)', 'rgb(255, 255, 255)']);
+        assert.notEqual(bubbles.light[2], bubbles.light[0], 'Agent replies stay neutral');
+        assert.equal(bubbles.dark[0], 'rgb(42, 44, 40)');
+        assert.equal(bubbles.dark[3], 'rgb(0, 0, 0)');
         await page.click('#open-settings');
         results.pairErrorCleared = await page.evaluate(() => !/请求未完成|配对码无效/.test(document.querySelector('.settings').textContent));
         results.singleDisconnect = await page.$$eval('.device-actions #disconnect,.device-actions #clear-session', buttons => buttons.length===1);
         await page.click('#close-settings');
 
-        const selectFiles = entries => page.$eval('.attachment-picker input', (input, entries) => {
+        const keyboardEdit = (value,inputType) => page.$eval('#message-text',(field,{value,inputType})=>{
+            field.value=value;
+            field.dispatchEvent(new InputEvent('input',{bubbles:true,inputType}));
+        },{value,inputType});
+        const orbPhrase = () => page.$eval('.keyboard-orb-phrase',el=>el.textContent.trim());
+        const cdp = await page.createCDPSession();
+        const voiceSockets=[];
+        cdp.on('Network.webSocketCreated',({url})=>{if(new URL(url).pathname.endsWith('/voice'))voiceSockets.push(url);});
+        await cdp.send('Network.enable');
+        await page.evaluate(()=>{
+            window.keyboardOrbMicCalls=0;
+            navigator.mediaDevices.getUserMedia=()=>{window.keyboardOrbMicCalls++;throw Error('Unexpected mic request');};
+        });
+        await keyboardEdit('原草稿：','insertText');
+        assert.equal(await page.$('.keyboard-voice-stage'),null);
+        assert.equal(await page.$('#keyboard-orb'),null);
+        await page.click('#open-settings');
+        assert.equal(await page.$eval('#keyboard-orb-setting',el=>el.checked),false);
+        await page.click('#keyboard-orb-setting');
+        await page.click('#close-settings');
+        await page.focus('#message-text');
+        assert.equal(await page.$eval('#message-text',el=>el===document.activeElement),true);
+        assert.equal(await page.$('.keyboard-voice-stage'),null);
+        await keyboardEdit('原草稿：补拍冒檐','insertText');
+        await page.waitForSelector('.voice-transcript-flight');
+        assert.equal(await orbPhrase(),'补拍冒檐');
+        await keyboardEdit('原草稿：补拍帽檐','insertReplacementText');
+        assert.equal(await orbPhrase(),'补拍帽檐');
+        assert.equal(await page.$eval('.voice-transcript-flight',el=>el.textContent),'帽');
+        await keyboardEdit('原草稿：补拍帽檐和侧面','insertText');
+        assert.equal(await orbPhrase(),'补拍帽檐和侧面');
+        assert.equal(await value(),'原草稿：补拍帽檐和侧面');
+        assert.equal(await page.evaluate(()=>window.keyboardOrbMicCalls),0);
+        await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForSelector('#topic-select');
+        await chooseTopic(topic);
+        assert.equal(await value(),'原草稿：补拍帽檐和侧面');
+        assert.equal(await page.$('.keyboard-voice-stage'),null);
+        await page.focus('#message-text');
+        await keyboardEdit('原草稿：补拍帽檐和侧面，再补背面','insertText');
+        assert.equal(await orbPhrase(),'，再补背面');
+        await page.click('#open-settings');
+        assert.equal(await page.$eval('#keyboard-orb-setting',el=>el.checked),true);
+        await page.click('#keyboard-orb-setting');
+        await page.click('#close-settings');
+        await page.focus('#message-text');
+        await keyboardEdit('普通输入','insertText');
+        assert.equal(await page.$('.keyboard-voice-stage'),null);
+        assert.equal(voiceSockets.length,0);
+        assert.equal(posts.length,0);
+        await fill('');
+
+        const selectFiles = entries => page.$eval('#composer-file-picker', (input, entries) => {
             const selection = new DataTransfer();
             for (const [name, content] of entries) selection.items.add(new File([content], name, { type:'text/plain', lastModified:42 }));
             input.files = selection.files;
             input.dispatchEvent(new Event('change', { bubbles:true }));
         }, entries);
         const removeFiles = async () => {
-            const remove = '.pending-file [aria-label="移除附件"]';
-            while (await page.$(remove)) await page.$eval(remove, button=>button.click());
+            while (await page.$('.pending-file')){
+                await page.$eval('.pending-file .attachment-detail-toggle',button=>{
+                    if(button.getAttribute('aria-expanded')==='false')button.click();
+                });
+                await page.$eval('.pending-file [aria-label="移除附件"]',button=>button.click());
+            }
         };
         await selectFiles(Array.from({length:9}, (_v, i)=>['file-'+(i+1)+'.txt', 'x']));
         assert.equal(await page.$$eval('.pending-file', rows => rows.length),8);
@@ -152,7 +227,11 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await removeFiles();
 
         await selectFiles([['preview.txt','<b>local preview</b>'],['other.bin','opaque']]);
+        assert.equal(await page.$('.attachment-draft-detail'),null,'selected files start collapsed');
+        await page.click('[aria-label="附件 2 详情"]');
         assert.match(await page.$eval('.pending-files', element=>element.textContent), /不支持预览/);
+        await page.click('[aria-label="附件 1 详情"]');
+        assert.equal(await page.$('#attachment-viewer'),null,'expanding file details does not open the preview');
         await page.click('[aria-label="预览 preview.txt"]');
         await page.waitForFunction(()=>document.querySelector('#attachment-viewer[open] .attachment-viewer-content')
             ?.innerText.includes('<b>local preview</b>'));
@@ -186,6 +265,12 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await page.waitForFunction(() => document.querySelector('[data-state=failed]'));
         const failedInline = () => page.evaluate(id => document.querySelector('#history [data-failed-work="'+id+'"]')?.textContent.includes('执行失败') || false, failed);
         results.failureInHistory = await failedInline();
+        const runSelector = '#history [data-run-id="'+failed+'"]';
+        const linked = await page.$eval(runSelector,(run,messageId) => run.previousElementSibling?.dataset.messageId===messageId,
+            core.store.work(failed).user_message_id);
+        assert.equal(linked,true);
+        await page.click(runSelector+' summary');
+        assert.equal(await page.$eval(runSelector,run=>run.open&&run.dataset.runState==='failed'),true);
         await page.setOfflineMode(true);
         await page.waitForSelector('.connection-banner', {visible:true});
         // Let the scheduled history poll fail while offline.
@@ -299,12 +384,38 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         const readModelLabel = () => page.$eval('#composer-model-current', el=>el.textContent.trim());
         const selectB = async () => {
             await page.waitForSelector('#composer-model-current:not([disabled])');
+            assert.ok(await page.$('.chat-header .agent-avatar + .header-model #composer-model-current'));
             await page.click('#composer-model-current');
-            await page.waitForSelector('#composer-model-options button');
-            const ids = await page.$$eval('#composer-model-options button', buttons=>buttons.map(button=>button.textContent.trim()));
+            await page.waitForFunction(()=>{const el=document.querySelector('#composer-model-options');return el&&getComputedStyle(el).transform==='none';});
+            await page.waitForSelector('#composer-model-options [role="menuitemradio"]:not(.model-menu-default)');
+            const ids = await page.$$eval('#composer-model-options [role="menuitemradio"]:not(.model-menu-default)', buttons=>buttons.map(button=>button.textContent.trim()));
             assert.deepEqual(ids, [baseModel, nextModel, 'hybrid-embedding-chat']);
-            const target = await page.$$eval('#composer-model-options button', (buttons,id)=>{
+            assert.ok(await page.$$eval('.model-tile-row', rows=>rows.every(row=>{
+                const widths=[...row.children].map(child=>child.getBoundingClientRect().width);
+                return widths.length<=Number(row.dataset.capacity)&&Math.max(...widths)-Math.min(...widths)<1;
+            })));
+            assert.ok(await page.$$eval('.model-menu-items button:not(.model-menu-default)', rows=>{
+                const counts=new Map();
+                for(const row of rows){const y=row.getBoundingClientRect().top;counts.set(y,(counts.get(y)||0)+1);}
+                return Math.max(...counts.values())<=3;
+            }));
+            const bounds=()=>page.$eval('#composer-model-options', el=>{const box=el.getBoundingClientRect();return {top:box.top,height:box.height};});
+            const full=await bounds();
+            assert.ok(full.height<=461);
+            await page.type('#model-picker-search','  MODEL-B ');
+            assert.deepEqual(await page.$$eval('#composer-model-options [role="menuitemradio"]', rows=>rows.map(row=>row.textContent.trim())),[nextModel]);
+            const filtered=await bounds();
+            assert.ok(filtered.height<full.height,'filtering shrinks the result panel');
+            assert.equal(filtered.top,full.top,'the search stays put while filtering');
+            await page.type('#model-picker-search','x');
+            await page.waitForFunction(()=>document.querySelector('#composer-model-options')?.textContent.includes('没有匹配的模型'));
+            await page.click('.model-search-clear');
+            await page.waitForSelector('.model-menu-default');
+            assert.equal(await page.$$eval('#composer-model-options [role="menuitemradio"][aria-checked="true"]', rows=>rows.length),1);
+            assert.equal(await page.$eval('#composer-model-options .model-menu-default', row=>row.getAttribute('aria-checked')),'true');
+            const target = await page.$$eval('#composer-model-options [role="menuitemradio"]', (buttons,id)=>{
                 const button=buttons.find(row=>row.textContent.trim()===id);
+                button.scrollIntoView({block:'nearest'});
                 const rect=button.getBoundingClientRect();
                 const x=rect.left+rect.width/2, y=rect.top+rect.height/2;
                 return { x,y,reachable:button.contains(document.elementFromPoint(x,y)) };
@@ -313,6 +424,13 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
             await page.touchscreen.tap(target.x,target.y);
             await page.waitForFunction(id=>document.querySelector('#composer-model-current')?.textContent.includes(id) &&
                 !document.querySelector('#composer-model-options'),{},nextModel);
+            await page.click('#composer-model-current');
+            await page.waitForFunction(()=>{const el=document.querySelector('#composer-model-options');return el&&getComputedStyle(el).transform==='none';});
+            await page.waitForFunction(id=>document.querySelector('#composer-model-options [aria-checked="true"]')?.textContent.trim()===id,{},nextModel);
+            assert.equal(await page.$$eval('#composer-model-options [aria-checked="true"]', rows=>rows.length),1);
+            await page.keyboard.press('Escape');
+            await page.waitForSelector('#composer-model-options',{hidden:true});
+            assert.equal(await page.evaluate(()=>document.activeElement?.id),'composer-model-current');
         };
         const workFor = text => core.store.db.prepare(`SELECT works.id,works.status,works.frozen_config_json
             FROM works JOIN messages ON works.user_message_id=messages.id WHERE messages.content=?`).get(text);
@@ -409,12 +527,14 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await page.$eval('.message-composer', form=>form.requestSubmit());
         assert.equal(posts.length,8);
         await page.click('#composer-model-current');
-        await page.click('#composer-model-options button:not([aria-pressed])');
+        await page.waitForFunction(()=>{const el=document.querySelector('#composer-model-options');return el&&getComputedStyle(el).transform==='none';});
+        await page.click('#composer-model-options .model-menu-default');
         await sendText('代理限流任务');
         await wait(()=>activeStreams.length===5,'work held for the proxy 429');
         assert.equal(provider.calls.at(-1).model,baseModel,'the explicit return to default is used');
         await page.waitForSelector('#quote-task',{visible:true});
-        await page.click('#quote-task');
+        await page.$eval('#quote-task', button=>button.click());
+        await page.waitForFunction(() => document.querySelector('#send')?.getAttribute('aria-label')==='发送追加指令');
         proxyRateLimited=true;
         const limitedResponse=page.waitForResponse(response=>response.url().endsWith('/steer')&&response.status()===429);
         await sendText('代理限流后仍待核对的追加');
@@ -442,10 +562,12 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         const chooseModel = async id => {
             await page.waitForSelector('#composer-model-current:not([disabled])');
             await page.click('#composer-model-current');
-            await page.waitForFunction(id=>[...document.querySelectorAll('#composer-model-options button[aria-pressed]')]
+            await page.waitForFunction(()=>{const el=document.querySelector('#composer-model-options');return el&&getComputedStyle(el).transform==='none';});
+            await page.waitForFunction(id=>[...document.querySelectorAll('#composer-model-options [role="menuitemradio"]:not(.model-menu-default)')]
                 .some(button=>button.textContent.trim()===id),{},id);
-            const target = await page.$$eval('#composer-model-options button[aria-pressed]', (buttons,id)=>{
+            const target = await page.$$eval('#composer-model-options [role="menuitemradio"]:not(.model-menu-default)', (buttons,id)=>{
                 const button=buttons.find(button=>button.textContent.trim()===id);
+                button.scrollIntoView({block:'nearest'});
                 const rect=button.getBoundingClientRect(),x=rect.left+rect.width/2,y=rect.top+rect.height/2;
                 return {x,y};
             },id);
@@ -455,7 +577,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         const image = (await require(BOX+'/node_modules/sharp')({
             create:{width:16,height:16,channels:3,background:'#ff0000'}
         }).png().toBuffer()).toString('base64');
-        const attachImage = () => page.$eval('.attachment-picker input',(input,image)=>{
+        const attachImage = () => page.$eval('#composer-image-picker',(input,image)=>{
             const bytes=Uint8Array.from(atob(image),ch=>ch.charCodeAt(0));
             const files=new DataTransfer();
             files.items.add(new File([bytes],'fixture.png',{type:'image/png'}));
@@ -536,6 +658,7 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         assert.equal(await page.$$eval('.pending-file',files=>files.length),1,'only the reusable upload is restored');
         assert.match(await page.$eval('#attachment-reselection-notice', el=>el.textContent),/1 个草稿附件未恢复，请重新选择/);
         await selectFiles([['local-only.txt','not uploaded']]);
+        await page.click(".pending-file:last-child .attachment-detail-toggle");
         await page.click('.pending-file:last-child [aria-label="移除附件"]');
         assert.equal(await page.$('#attachment-reselection-notice'),null);
         assert.equal(attachmentPosts.length,uploadsAfterRejection);

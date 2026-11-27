@@ -1,9 +1,11 @@
 :root {
  color-scheme: light;
- --paper:#fcfbf8; --gutter:#efeee9; --surface:#f2f1ec; --soft:#eae9e3; --ink:#232622;
- --muted:#62665f; --line:#dfdfd7; --edge:#c7c9c0; --accent:#255e50; --accent-soft:#e5eee8;
- --on-accent:#fff; --warning:#804b26; --warning-soft:#f5e9dc; --danger:#9b453b; --shade:#25282380;
- --focus:#286e60; --content:640px;
+ --paper:#fcfbf8; --gutter:#efefef; --surface:#f2f2f2; --soft:#e9e9e9; --ink:#242424;
+ --muted:#616161; --line:#dedede; --edge:#c7c7c7; --accent:#252525; --accent-soft:#e8e8e8;
+ --on-accent:#fff; --warning:#804b26; --warning-soft:#f5e9dc; --danger:#9b453b; --shade:#25252580;
+ --focus:#505050; --content:640px;
+ --selection-fill:#383838; --selection-ink:#fafafa; --selection-muted:#e3e3e3;
+ --choice-surface:#f2f2f2; --choice-border:#dedede;
  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
  font-synthesis:none; background:var(--gutter); color:var(--ink);
 }
@@ -11,6 +13,8 @@
  color-scheme:dark;
  --paper:#20211f; --gutter:#181917; --surface:#2a2c28; --soft:#32352f; --ink:#f0f1ec;
  --muted:#b1b6ab; --line:#373b35; --edge:#565d53; --accent:#a8d6c4; --accent-soft:#2c4037;
+ --selection-fill:#d8d8d8; --selection-ink:#232323; --selection-muted:#383838;
+ --choice-surface:#292929; --choice-border:#494949;
  --on-accent:#172c23; --warning:#edbf94; --warning-soft:#3a2e26; --danger:#ffb3a6; --shade:#000a; --focus:#a8d6c4;
 }
 * {box-sizing:border-box}
@@ -55,6 +59,14 @@ p {line-height:1.55}
 .topic-filters {display:grid; gap:8px; margin-bottom:12px}
 .agent-heading {display:flex; align-items:center; gap:10px; min-width:0}
 .agent-heading>div {flex:1; min-width:0}
+.agent-heading>.quiet-button {flex:none; align-self:end}
+.agent-creation-dialog {color:var(--ink); background:var(--paper); border:1px solid var(--edge); border-radius:18px; padding:20px; width:min(420px,calc(100vw - 24px)); max-height:85dvh}
+.agent-creation-dialog::backdrop {background:var(--shade)}
+.agent-creation-dialog form {display:grid; gap:8px}
+.agent-creation-dialog h2,.agent-creation-dialog p {margin:0 0 6px}
+.agent-creation-dialog label {margin-top:4px; color:var(--muted); font-size:.875rem}
+.agent-creation-dialog textarea {width:100%; padding:10px}
+.agent-creation-actions {display:flex; justify-content:flex-end; gap:8px; margin-top:8px}
 nav label,.settings label {font-size:.8rem; color:var(--muted); display:block; margin-bottom:4px}
 nav .topic-search {position:relative; display:flex; align-items:center; margin-bottom:0}
 .topic-search svg {position:absolute; left:12px; pointer-events:none}
@@ -62,12 +74,12 @@ nav .topic-search {position:relative; display:flex; align-items:center; margin-b
 .topic-list {list-style:none; padding:0; margin-block:0 14px}
 .topic-list li+li {margin-top:2px}
 .topic-list button {width:100%; min-width:0; display:flex; text-align:start; align-items:center; justify-content:space-between; gap:12px; padding:11px 12px; color:var(--ink); background:transparent}
-.topic-list button[aria-current="true"] {background:var(--surface)}
-.topic-list button:active {background:var(--soft)}
+.topic-list button:active:not([aria-current="true"]) {background:var(--choice-surface)}
+.topic-list button[aria-current="true"] {background:var(--selection-fill);color:var(--selection-ink)}
 .topic-list strong {display:block; font-size:.95rem; line-height:1.4; font-weight:600}
 .topic-list small {display:block; margin-top:3px}
 .topic-list svg {flex:none; color:var(--muted)}
-.topic-list [aria-current] svg {color:var(--accent)}
+.topic-list [aria-current="true"] :is(small,svg) {color:var(--selection-muted)}
 .topic-options,.shared-tools {border-top:1px solid var(--line); font-size:.87rem; color:var(--muted)}
 .topic-detail,.source-label,.source-progress {display:block; margin:8px 0; line-height:1.55}
 .empty,.history-progress {font-size:.875rem; color:var(--muted); margin-block:20px; text-align:center}
@@ -81,6 +93,7 @@ nav .topic-search {position:relative; display:flex; align-items:center; margin-b
 .message-author .agent-avatar {width:23px; height:23px; font-size:.7rem}
 .bubble {font-size:1rem; line-height:1.64; white-space:pre-wrap; overflow-wrap:anywhere; max-width:100%; min-width:0}
 .user .bubble {background:var(--surface); border-radius:19px 19px 5px 19px; padding:10px 14px; max-width:88%}
+:root[data-theme="light"] #history .message.user .bubble {background:#315cdf; color:#fff}
 .snapshot-message {border-inline-start:2px solid var(--edge); padding-inline-start:12px}
 .snapshot-message .bubble {font-size:.9rem; color:var(--muted)}
 .long-message {max-width:100%}
@@ -124,7 +137,7 @@ nav .topic-search {position:relative; display:flex; align-items:center; margin-b
 .desktop-relay>p {margin:5px 0; font-size:.875rem}
 .shell>footer {flex:none; max-height:50%; min-height:58px; overflow:auto; overscroll-behavior:contain; padding:0 max(14px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left)); border-top:1px solid var(--line); background:var(--paper)}
 /* The open picker extends above the scrollable composer into the history area. */
-.shell>footer:has(#composer-model-options) {overflow:visible; z-index:2}
+.shell>.chat-header:has(#composer-model-options) {position:relative; z-index:4}
 .shell>footer.is-work-view {min-height:0}
 footer>* {max-width:var(--content); margin-inline:auto}
 .composer-tools {display:flex; align-items:center; justify-content:flex-end; gap:4px}
@@ -167,10 +180,10 @@ footer>* {max-width:var(--content); margin-inline:auto}
 .settings details {margin-top:12px}
 .theme-settings {border:0; padding:0; display:flex; flex-wrap:wrap; gap:6px; margin-top:18px}
 .theme-settings legend {padding:0 0 6px; font-size:.82rem; color:var(--muted)}
-.theme-settings label {margin:0; position:relative; border:1px solid var(--line); border-radius:10px}
+.theme-settings label {margin:0;position:relative;border:1px solid var(--choice-border);border-radius:10px;background:var(--choice-surface);color:var(--ink)}
 .theme-settings input {position:absolute; opacity:0; inset:0; width:100%; height:100%; margin:0; cursor:pointer}
-.theme-settings label span {display:block; min-height:42px; padding:10px 13px; align-content:center}
-.theme-settings label:has(input:checked) {background:var(--accent-soft); color:var(--accent); border-color:var(--accent)}
+.theme-settings label span {display:block; min-height:44px; padding:10px 13px; align-content:center}
+.theme-settings label:has(input:checked) {background:var(--selection-fill);color:var(--selection-ink);border-color:var(--selection-fill)}
 .theme-settings label:has(input:focus-visible) {outline:2px solid var(--focus); outline-offset:2px}
 .device-actions {display:flex; flex-wrap:wrap; gap:8px; margin-top:16px}
 .device-actions button {font-size:.85rem; background:var(--surface); color:var(--ink)}
@@ -216,7 +229,7 @@ footer>* {max-width:var(--content); margin-inline:auto}
 .composer-model > button,.composer-model > span { display:block; max-width:100%; padding:7px 8px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; border-radius:8px; background:var(--accent-soft); color:var(--accent) }
 .composer-model-options { position:absolute; z-index:3; inset-inline-start:0; bottom:calc(100% + 6px); width:min(16rem,68vw); max-height:40vh; overflow:auto; padding:6px; border:1px solid var(--line); border-radius:10px; background:var(--surface); box-shadow:0 3px 14px #0003 }
 .composer-model-options button { display:block; width:100%; padding:7px 8px; text-align:start; overflow-wrap:anywhere; background:transparent; color:var(--ink) }
-.composer-model-options button[aria-pressed=true] { background:var(--accent-soft); color:var(--accent) }
+.composer-model-options button[aria-checked=true] { background:var(--accent-soft); color:var(--accent) }
 .composer-model-options p { margin:6px; overflow-wrap:anywhere }
 
 /* Voice controls and the reviewed dark chat background. */
@@ -253,15 +266,316 @@ footer>* {max-width:var(--content); margin-inline:auto}
 :root[data-theme="dark"] .voice-transcript-flight{color:#fff;text-shadow:0 1px 6px #000,0 0 3px #000}
 @media(prefers-reduced-motion:reduce){.voice-stage{animation:none}}
 
-.inline-agent-run {width:min(100%,362px);border:1px solid var(--edge);background:var(--surface);color:var(--ink);border-radius:16px;margin:0 0 12px auto;font-size:.8rem}
+.input-motion-setting{margin-top:14px}
+.input-motion-setting label{display:flex;align-items:center;gap:9px;min-height:44px;margin:0;cursor:pointer}
+.input-motion-setting input{
+ appearance:none;display:grid;align-items:center;place-items:center start;flex:0 0 36px;
+ width:36px;height:22px;margin:0;padding:3px;border:1px solid var(--choice-border);
+ border-radius:100px;background:var(--choice-surface);cursor:pointer;
+}
+.input-motion-setting input::before{
+ content:"";display:block;width:14px;height:14px;border-radius:50%;background:var(--muted);
+ transition:transform 150ms ease;
+}
+.input-motion-setting input:checked{background:var(--selection-fill);border-color:var(--selection-fill)}
+.input-motion-setting input:checked::before{background:var(--selection-ink);transform:translateX(14px)}
+@media (prefers-reduced-motion: reduce){.input-motion-setting input::before{transition:none}}
+@media (forced-colors:active){.input-motion-setting input{appearance:auto;width:18px;height:18px;flex-basis:auto}.input-motion-setting input::before{content:none}}
+.input-motion-setting small{display:block;color:var(--muted);font-size:.78rem}
+.keyboard-voice-stage{top:min(55dvh,calc(var(--visual-height,100dvh) * .53));--orb-size:clamp(104px,min(calc(var(--visual-height,100dvh) * .43),56vw),238px)}
+.keyboard-voice-stage .voice-stage-orb{position:relative;pointer-events:none}
+.keyboard-orb-phrase{position:absolute;left:14%;right:14%;top:36%;text-align:center;padding:.25em .45em;background:var(--orb-controls);border-radius:.65em;font-size:.85rem;line-height:1.25;font-weight:650;overflow-wrap:anywhere}
+
+.header-model {flex:0 1 auto;max-width:35%}
+.title-lines {min-width:0}
+.shell .message-composer .composer-plus {flex:0 0 44px;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--surface);color:var(--ink)}
+.composer-plus[aria-expanded="true"] svg {transform:rotate(45deg)}
+.composer-attach-menu {display:flex;gap:4px;width:max-content;border:1px solid var(--edge);background:var(--surface);padding:3px 7px;border-radius:24px;margin-bottom:6px}
+.composer-attach-menu button {background:transparent;color:var(--ink);display:flex;align-items:center;gap:6px;font-size:.81rem;padding:0 9px}
+.composer-attach-menu svg {width:17px;height:17px}
+.compact-attachments {display:flex;gap:4px;flex-wrap:wrap;max-height:min(136px,30dvh);overflow:auto;margin-bottom:4px}
+.compact-attachments .pending-file {padding:0;flex-wrap:wrap;gap:4px;min-width:0}
+.compact-attachments .attachment-detail-toggle {width:44px;flex:none;padding:0;display:grid;place-items:center;color:var(--accent);background:var(--soft)}
+.attachment-draft-detail {display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.attachment-draft-detail span {overflow-wrap:anywhere}
+.attachment-draft-detail button {min-height:44px}
+.inline-agent-run {width:min(100%,362px);border:4px solid #24252a;background:#2e2f35;color:#f3f4f8;border-radius:22px;margin:0 0 12px auto;font-size:.8rem}
 .inline-agent-run summary {display:flex;align-items:center;list-style:none;gap:7px;padding:0 10px;color:inherit;overflow-wrap:anywhere}
 .inline-agent-run summary::-webkit-details-marker {display:none}
 .inline-agent-run summary svg {margin-left:auto;width:16px;height:16px;flex:none}
 .inline-agent-run[open] summary svg {transform:rotate(90deg)}
-.inline-agent-run time {color:var(--muted);font-variant-numeric:tabular-nums}
-.inline-agent-run ol {margin:0;padding:0 14px 10px 30px;color:var(--muted)}
-.run-dot {width:7px;height:7px;flex:none;background:var(--muted);border-radius:50%}
-.inline-agent-run[data-running="true"] .run-dot {background:var(--accent)}
+.inline-agent-run time {color:#c2c6d1;font-variant-numeric:tabular-nums}
+.inline-agent-run ol {margin:0;padding:0 14px 10px 30px;color:#e0e3eb}
+.run-dot {width:7px;height:7px;flex:none;background:#aeb9d4;border-radius:50%}
+.inline-agent-run[data-running="true"] .run-dot {background:#b6c8ff}
+
+/* Light chrome remains quiet; only an available send action takes a solid fill. */
+:root[data-theme="light"] .chat-header .agent-avatar {
+ background:#efefef;
+ color:#343434;
+}
+:root[data-theme="light"] .header-model #composer-model-current {
+ background:transparent;
+ color:#343434;
+ border:1px solid #dedede;
+}
+:root[data-theme="light"] .header-model #composer-model-current[aria-expanded="true"] {
+ background:#efefef;
+ border-color:#c7c7c7;
+}
+:root[data-theme="light"] .shell .message-composer #voice-input {
+ color:#414141;
+ background:transparent;
+ border-color:#d0d0d0;
+}
+:root[data-theme="light"] .inline-agent-run {
+ background:#f2f2f2;
+ border:1px solid #dedede;
+ color:#343434;
+}
+:root[data-theme="light"] .inline-agent-run time,
+:root[data-theme="light"] .inline-agent-run ol {color:#616161}
+:root[data-theme="light"] .inline-agent-run .run-dot {background:#767676}
+:root[data-theme="light"] .inline-agent-run[data-running="true"] .run-dot {background:#343434}
+
+:root[data-theme="dark"] .header-model {
+ --model-picker-ink:var(--ink);
+ --model-picker-edge:#858585;
+ --model-picker-stroke:.5px;
+ color:var(--model-picker-ink);
+}
+:root[data-theme="dark"] .header-model #composer-model-current {
+ background:transparent;
+ color:inherit;
+ border:var(--model-picker-stroke) solid var(--model-picker-edge);
+ border-radius:50%;
+}
+:root[data-theme="dark"] .header-model #composer-model-options {
+ background:#202020;
+ color:inherit;
+ border:var(--model-picker-stroke) solid var(--model-picker-edge);
+}
+:root[data-theme="dark"] .header-model #composer-model-options button {
+ color:inherit;
+ border:var(--model-picker-stroke) solid transparent;
+}
+:root[data-theme="dark"] .header-model #composer-model-options button[aria-checked="true"] {
+ background:transparent;
+ border-color:var(--model-picker-edge);
+}
+:root[data-theme="dark"] .header-model button:focus-visible {
+ outline-color:var(--model-picker-ink);
+}
+
+.header-model #composer-model-options .model-menu-items button {
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:10px;
+}
+.header-model #composer-model-options .model-menu-items button:focus-visible {outline-offset:-3px}
+
+.model-menu-items {min-height:0;overflow:auto;overscroll-behavior:contain}
+.model-menu-search {display:flex;align-items:center;gap:6px;position:relative;margin:1px 1px 5px;padding-inline:8px;border-radius:10px;background:var(--soft);color:var(--muted)}
+.model-menu-search svg {width:16px;height:16px;flex:none}
+.header-model #composer-model-options .model-menu-search input {flex:1;width:0;min-height:44px;padding:0;background:transparent;border:0;border-radius:4px;color:var(--ink);font-size:16px}
+.model-menu-search input::-webkit-search-cancel-button {appearance:none}
+.header-model #composer-model-options .model-search-clear {display:grid;place-items:center;flex:0 0 36px;width:36px;min-height:44px;padding:0;border:0;color:inherit;background:transparent}
+:root[data-theme="dark"] .model-menu-search {background:#2b2b2b;color:var(--ink)}
+
+/* The trigger and card are two states of one surface, not a dropdown. */
+.model-picker-overlay {
+ --model-panel-max:min(461px,calc(var(--visual-height,100dvh) - 24px));
+ position:fixed;
+ inset:0;
+ height:var(--visual-height,100dvh);
+ z-index:12;
+ display:grid;
+ place-items:start center;
+ padding:12px 16px;
+ padding-top:max(12px,calc((var(--visual-height,100dvh) - var(--model-panel-max)) / 2));
+}
+.model-picker-scrim {position:absolute;inset:0;background:rgb(0 0 0 / .23)}
+:root[data-theme="dark"] .model-picker-scrim {background:rgb(0 0 0 / .52)}
+.header-model:has(.model-picker-overlay) #composer-model-current {opacity:0}
+.header-model #composer-model-options.model-morph-panel {
+ position:relative;
+ inset:auto;
+ width:min(100%,360px);
+ max-height:var(--model-panel-max);
+ padding:0;
+ border-radius:23px;
+ transform-origin:0 0;
+ background:var(--paper);
+ overflow:hidden;
+ box-shadow:0 18px 64px #0003;
+}
+:root[data-theme="dark"] .header-model #composer-model-options.model-morph-panel {background:#202020}
+.model-morph-content {
+ display:flex;
+ flex-direction:column;
+ max-height:var(--model-panel-max);
+ padding:8px 10px 10px;
+}
+.model-morph-header {flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding-left:9px}
+.model-morph-header strong {font-size:.95rem;font-weight:650}
+.header-model #composer-model-options .model-morph-close {
+ flex:0 0 44px;display:grid;place-items:center;width:44px;min-height:44px;padding:0;
+ border:0;background:transparent;color:inherit;
+}
+.model-morph-content .model-menu-search {flex:none;margin:0 3px 7px}
+.model-morph-content > [role="status"] {flex:none}
+.model-morph-content .model-menu-items {min-height:0;overflow:auto}
+
+.model-morph-content .model-menu-items {
+ display:flex;
+ flex-direction:column;
+ gap:6px;
+ padding:0 3px 3px;
+}
+.model-tile-row {
+ display:grid;
+ grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:6px;
+}
+.model-tile-row[data-capacity="3"] {grid-template-columns:repeat(3,minmax(0,1fr))}
+.header-model #composer-model-options .model-menu-items button {
+ min-width:0;
+ min-height:54px;
+ padding:7px 9px;
+ border:1px solid var(--line);
+ border-radius:11px;
+ background:var(--surface);
+ line-height:1.25;
+}
+.header-model #composer-model-options .model-menu-items > .model-menu-default {
+ width:100%;
+ min-height:44px;
+ flex:none;
+}
+.model-tile-name {min-width:0;overflow-wrap:anywhere}
+.header-model #composer-model-options .model-menu-items button[aria-checked="true"] {
+ background:var(--selection-fill);
+ color:var(--selection-ink);
+ border-color:var(--selection-fill);
+}
+:root[data-theme="dark"] .header-model #composer-model-options .model-menu-items button {
+ background:#292929;
+ border-color:#3a3a3a;
+}
+:root[data-theme="dark"] .header-model #composer-model-options .model-menu-items button[aria-checked="true"] {
+ background:var(--selection-fill);
+ color:var(--selection-ink);
+ border-color:var(--selection-fill);
+}
+
+.header-model:has(> #composer-model-current) {flex:0 0 44px;width:44px;max-width:44px}
+:root .header-model > #composer-model-current {
+ display:grid;
+ place-items:center;
+ width:44px;
+ min-width:44px;
+ height:44px;
+ min-height:44px;
+ padding:0;
+ border-radius:50%;
+}
+.header-model .model-brand-mark {width:20px;height:20px;display:block;object-fit:contain}
+.header-model img.model-brand-mark {filter:brightness(0)}
+:root[data-theme="dark"] .header-model img.model-brand-mark {filter:brightness(0) invert(.94)}
+.model-menu-search .model-search-symbol {
+ opacity:1;
+ transition:opacity 150ms ease, width 190ms ease, margin-inline-end 190ms ease;
+}
+.model-menu-search:focus-within .model-search-symbol {
+ opacity:0;
+ width:0;
+ margin-inline-end:-6px;
+}
+@media (prefers-reduced-motion:reduce) {
+ .model-menu-search .model-search-symbol {transition:none}
+}
+
+
+/* Selection contrast is shared with the model tiles, not with activity/status colors. */
+:is(#topic-toggle,#open-settings,#work-toggle:not([data-tone="attention"]))[aria-expanded="true"] {
+ background:var(--selection-fill);
+ color:var(--selection-ink);
+}
+:where(#conversation-navigation) select,
+:is(.agent-creation-dialog,.group-invitation,.shared-config) select {
+ background:var(--choice-surface);
+ border-color:var(--choice-border);
+}
+:where(#conversation-navigation,.agent-creation-dialog,.group-invitation,.shared-config) select option:checked {
+ background:var(--selection-fill);
+ color:var(--selection-ink);
+}
+#conversation-navigation :is(button,input,select):focus-visible,
+.settings :is(button,input,select):focus-visible,
+.agent-creation-dialog :is(button,input,select,textarea):focus-visible,
+.theme-settings label:has(input:focus-visible) {
+ outline-color:var(--selection-fill);
+}
+
+
+/* Ordinary actions in the secondary panels use neutral controls in dark mode. */
+:root[data-theme="dark"] :where(.settings,.agent-creation-dialog,.group-invitation,#conversation-work,.shared-directory,.shared-config) button:not(.icon-button) {
+ background:var(--choice-surface);
+ color:var(--ink);
+ border:1px solid var(--choice-border);
+}
+:root[data-theme="dark"] #conversation-work .execution-row button,
+.shared-directory button[data-all-delete] {
+ color:var(--danger);
+ border-color:var(--choice-border);
+ background:var(--choice-surface);
+}
+:root[data-theme="dark"] .shared-directory button[data-all-delete] {color:var(--danger)}
+.shared-config .conflict:not([hidden]) {background:var(--warning-soft);color:var(--warning)}
+.settings #pair-error {color:var(--danger)}
+#pair-code[aria-invalid="true"] {border-color:var(--danger)}
+#shared-directory-refresh:disabled::after {content:" · 正在载入"}
+
+:is(.connection-choice,.shared-tools,#conversation-work details,.shared-config details)>summary,
+:is(.review-state,.shared-directory [role="dialog"],.shared-config) label:has(input[type="checkbox"]) {
+ border-radius:10px;
+ padding-inline:10px;
+}
+:is(.review-state,.shared-directory [role="dialog"],.shared-config) label:has(input[type="checkbox"]) {
+ min-height:44px;
+ display:flex;
+ align-items:center;
+ gap:8px;
+}
+:is(.review-state,.shared-directory [role="dialog"],.shared-config) input[type="checkbox"] {
+ flex:none;
+ accent-color:var(--selection-fill);
+}
+:is(.review-state,.shared-directory [role="dialog"],.shared-config) label:has(input[type="checkbox"]:disabled) {
+ opacity:.55;
+}
+:is(.agent-creation-dialog,.group-invitation,.shared-config) select:disabled {
+ opacity:.55;
+ cursor:default;
+}
+
+:is(.agent-creation-dialog,.group-invitation,.shared-config) select:not([multiple],:disabled):has(option:checked:not([value=""],:disabled)),
+:is(.connection-choice,.shared-tools,#conversation-work details,.shared-config details)[open]>summary,
+:is(.review-state,.shared-directory [role="dialog"],.shared-config) label:has(input[type="checkbox"]:checked:not(:disabled)),
+:root :is(.shared-directory,.shared-config) .shared-panel-toggle[aria-expanded="true"],
+.compact-attachments .attachment-detail-toggle[aria-expanded="true"] {
+ background:var(--selection-fill);
+ color:var(--selection-ink);
+ border-color:var(--selection-fill);
+}
+:is(.connection-choice,.shared-tools,#conversation-work details,.shared-config details)[open]>summary::marker {
+ color:var(--selection-muted);
+}
+:is(.connection-choice,.shared-tools,#conversation-work details,.shared-config details)>summary {
+ -webkit-tap-highlight-color:transparent;
+}
+
 .work-reply {min-height:44px;max-width:100%;padding:0 12px;color:inherit;font:inherit;text-decoration:underline;background:transparent;border:0;cursor:pointer}
 .inline-agent-run .work-reply {margin-left:8px}
 #history .message[tabindex="-1"]:focus {outline:2px solid currentColor;outline-offset:-2px}

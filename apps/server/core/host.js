@@ -23,6 +23,7 @@ function startCoreHost({ app, chat, listenHost, serverKey, legacy, modelCatalog,
     const { CoreService } = require('./service');
     const speech = remote ? require('./localSpeech').localSpeechConfig(env) : null;
     const core = new CoreService({ directory, workspace: configuredWorkspace || 'personal', chat, modelCatalog,
+        defaultAgentModel: env.VCP_CORE_DEFAULT_AGENT_MODEL,
         ...(remote && { remoteConfig: { origin: remoteOrigin, hours, speech } }), ...adapter?.options });
     if (adapter) adapter.attach(core);
     if (remote) {

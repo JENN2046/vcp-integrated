@@ -125,6 +125,15 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
             message: { id: 'from-desktop', role: 'user', content: '把明天的拍摄安排整理一下：先拍产品主图，再拍细节，最后试一组上身图。', attachments: [] } });
         await desktop.close();
         await page.waitForFunction(() => document.querySelector('.live-message .bubble')?.textContent.includes('共用布光'));
+        const firstRun = '[data-run-id="' + first.serverSession.executionId + '"]';
+        await page.waitForSelector(firstRun + '[data-run-state="running"]');
+        await page.setOfflineMode(true);
+        await page.waitForSelector('.connection-banner', { visible:true });
+        await page.setOfflineMode(false);
+        await page.waitForFunction(selector => document.querySelector(selector)?.dataset.running === 'true' &&
+            !document.querySelector('.connection-banner'), {}, firstRun);
+        assert.deepEqual(composerPosts, []);
+        await shot(page, '02a-reconnected-same-run');
         await page.waitForSelector('#quote-task',{visible:true});
         assert.equal(await page.$eval('#send', button=>button.getAttribute('aria-label')),'发送新消息');
         assert.equal(await page.$$eval('#quote-task', rows=>rows.length),1);
@@ -175,7 +184,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.bringToFront();
         holdSteeringReceipt = false;
         await page.waitForFunction(() => !document.querySelector('#message-text').value &&
-            document.querySelector('#steering-delivery')?.textContent.includes('已送达'));
+            document.querySelector('#steering-delivery')?.textContent.includes('Core 已收到追加指令'));
         assert.ok(steeringReads >= 1);
         assert.equal(composerPosts.length, 1);
         await page.waitForSelector('#quote-task', { visible:true });
@@ -228,14 +237,14 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         holdNewRequestId=undefined;
         await page.bringToFront();
         await page.waitForFunction(()=>!document.querySelector('#message-text').value &&
-            document.querySelector('#steering-delivery')?.textContent.includes('已送达'));
+            document.querySelector('#steering-delivery')?.textContent.includes('Core 已收到追加指令'));
         t.diagnostic('A delayed first receipt with a stale read preserved the newer pending request after reopening; two POSTs.');
         assert.equal(core.store.work(first.serverSession.executionId).steering_count,2);
         assert.equal(await observer.$eval('#message-text',el=>el.value),quotedDraft);
         holdObserverReceipt=false;
         await observer.bringToFront();
         await observer.waitForFunction(()=>!document.querySelector('#message-text').value &&
-            document.querySelector('#steering-delivery')?.textContent.includes('已送达'));
+            document.querySelector('#steering-delivery')?.textContent.includes('Core 已收到追加指令'));
 
         const readAfterReload = async tab => {
             await tab.bringToFront();
@@ -271,6 +280,11 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         const finalText = '\n\n第一组｜白底产品主图\n先固定机位、白平衡和产品朝向，再补正面与侧面。\n\n第二组｜细节与功能\n保留原布光，拉近拍材质与缝线。两组都拍完后，再切换到上身布景。';
         finish(upstream[1], finalText);
         await page.waitForFunction(id => Boolean(document.querySelector('[data-message-id="' + id + '"] .bubble')?.textContent.includes('第二组')), {}, first.replyId);
+        await page.waitForSelector(firstRun + '[data-run-state="completed"]');
+        await page.click(firstRun + ' summary');
+        await page.waitForSelector(firstRun + ' .work-reply', {visible:true,timeout:2000});
+        await page.click(firstRun + ' .work-reply');
+        assert.equal(await page.evaluate(() => document.activeElement?.dataset.messageId), first.replyId);
         await page.reload({waitUntil:'domcontentloaded'});
         await page.waitForSelector('#task-quote[data-closed="true"]');
         assert.equal(await page.$eval('#message-text', el=>el.value),preservedDraft);
@@ -297,7 +311,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         assert.equal(await page.$eval('#message-text', el=>el.value),preservedDraft);
         const notes = path.join(f.root, '灯光记录.txt');
         await fs.writeFile(notes, '现场灯光记录：主灯柔光箱，左侧 45 度。');
-        const fileInput = await page.waitForSelector('.attachment-picker input');
+        const fileInput = await page.waitForSelector('#composer-file-picker');
         await fileInput.uploadFile(notes);
         await page.waitForSelector('#send:not([disabled])');
         await page.click('#send');

@@ -103,6 +103,7 @@ test('ordinary Core PWA image send commits its links with admission and never re
         await page.type('#pair-code',pair());
         await page.click('#pair-submit');
         await page.waitForSelector('#topic-select');
+        assert.equal(await page.$eval('#voice-input', el=>el.disabled),true);
         const base=key=>'/mobile/api/core/personal/'+key;
         const upload=(key,bytes,requestId)=>page.evaluate(async (base,data,size,hash,requestId)=>{
             const write=async (route,body,status)=>{
@@ -155,7 +156,7 @@ test('ordinary Core PWA image send commits its links with admission and never re
         };
         mainSend=base(main)+'/send';holdLookup=true;
         await page.select('#topic-select',main);
-        const picker=await page.waitForSelector('.attachment-picker input[type="file"]:not([disabled])');
+        const picker=await page.waitForSelector('#composer-image-picker:not([disabled])');
         await picker.uploadFile(picture);
         await page.waitForSelector('#send:not([disabled])');
         await page.$eval('.message-composer',form=>form.requestSubmit());

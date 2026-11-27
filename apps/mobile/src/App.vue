@@ -2,13 +2,15 @@
 import MobileIcon from './MobileIcon.vue';
 import VoiceOrb from './VoiceOrb.vue';
 import VoiceStage from './VoiceStage.vue';
+import {changedInputText} from './keyboardOrb.js';
 import {createVoiceDictation} from './voiceDictation.js';
 import {localSpeechRecognition} from './localSpeech.js';
+import {readVoiceDraft,writeVoiceDraft} from './voiceDraftStorage.js';
 import AgentAvatar from './AgentAvatar.vue';
 import DesktopRelayStatus from './DesktopRelayStatus.vue';
 import SharedAttachmentImage from './SharedAttachmentImage.vue';
-import DraftImageThumbnail from './DraftImageThumbnail.vue';
 import InlineAgentRun from './InlineAgentRun.vue';
+import ModelBrandMark from './ModelBrandMark.vue';
 import {ref,shallowReactive,computed,watch,onMounted,onUnmounted,nextTick} from 'vue';
 import TextPages from './TextPages.vue';
 import SharedConfigEditor from './SharedConfigEditor.vue';
@@ -92,6 +94,16 @@ let connectionInitialized=false;
 const pairingLinkOpen=ref(false), pairError=ref('');
 const paired=ref(false),pairCode=ref(''),topics=ref([]),selected=ref(''),agentId=ref(''),messages=ref([]),jobs=ref([]),busy=ref(true),notice=ref('正在连接…'),online=ref(false),history=ref(null);
 const historyAtEnd=ref(true);
+const composerMenu=ref(false),expandedDraftAttachment=ref(null),filePicker=ref(null),imagePicker=ref(null);
+watch([selected,paired,conversationPanel],()=>{
+ composerMenu.value=false;expandedDraftAttachment.value=null;
+});
+function pickComposerAttachment(kind){
+ const input=kind==='image'?imagePicker.value:filePicker.value;
+ if(!input||input.disabled)return;
+ input.click();
+ composerMenu.value=false;
+}
 const nearHistoryEnd=area=>!area||area.scrollHeight-area.scrollTop-area.clientHeight<48;
 function trackHistoryEnd(){historyAtEnd.value=nearHistoryEnd(history.value);}
 function returnToLatest(){
@@ -300,6 +312,7 @@ const currentTopic=computed(()=>{const topic=topics.value.find(t=>t.key===select
 function draftScope(){const topic=currentTopic.value;return paired.value&&validSessionRecovery(recoveryContext.value)&&topic?JSON.stringify([recoveryContext.value.entryId,recoveryContext.value.sessionMarker,ownerKey(topic),topic.topicId,topic.key]):'';}
 function switchDraft(next=draftScope()){
  if(next===composerScope)return;
+ resetVoice();
  if(composerScope&&!text.value&&!pendingFiles.value.length&&!composerDraft.value.submitted&&!composerDraft.value.coreSteering&&!composerDraft.value.nextModel&&!composerDraft.value.missingAttachments)drafts.delete(composerScope);
  composerScope=next;composerDraft.value=drafts.get(next)||{text:'',files:[],revision:0};
  steeringStorageError.value='';
@@ -338,7 +351,9 @@ function syncRejectedDraft(){
 const composerText=computed({get:()=>text.value,set:value=>{
  text.value=value;
  const draft=composerDraft.value;
- if(draft.taskQuote||!draft.rejected||draft.nextModel||draftLocalAttachmentCount(draft))rememberOrdinaryText(draft,composerScope);
+ const review=draft.voiceReview;
+ if(!value)delete draft.voiceReview;
+ if(review||draft.voiceDurable||draft.taskQuote||!draft.rejected||draft.nextModel||draftLocalAttachmentCount(draft))rememberOrdinaryText(draft,composerScope);
  else delete draft.ordinaryEditId;
 }});
 const ordinaryDraftPrefix='vcp.mobile.draft.v1:';
@@ -353,18 +368,47 @@ function storedOrdinaryText(scope){
   return item;
  }catch{return null;}
 }
+function ordinaryEditDelivered(scope,item){
+ return item?.quote&&(localStorage.getItem(steeringDeliveredEditKey(scope,item.editId))==='1'||
+     localStorage.getItem(steeringDeliveredEditPrefix+scope)===item.editId);
+}
 function readOrdinaryText(scope){
  try{
   const item=storedOrdinaryText(scope);
-  if(item?.quote&&(localStorage.getItem(steeringDeliveredEditKey(scope,item.editId))==='1'||
-     localStorage.getItem(steeringDeliveredEditPrefix+scope)===item.editId))return null;
-  return item;
+  return ordinaryEditDelivered(scope,item)?null:item;
  }catch{return null;}
 }
-function restoreOrdinaryText(draft,scope){
- if(draft.rejected||draft.revision||draft.coreSteering||draft.text)return;
- const saved=readOrdinaryText(scope);
- if(saved){draft.text=saved.text;draft.ordinaryEditId=saved.editId;}
+async function restoreOrdinaryText(draft,scope){
+ if(draft.revision||draft.coreSteering||draft.voiceLoaded)return;
+ const initial=readOrdinaryText(scope);
+ if(initial&&!draft.rejected&&!draft.text){
+  draft.text=initial.text;
+  draft.ordinaryEditId=initial.editId;
+ }
+ const stored=await readVoiceDraft(scope).catch(()=>null);
+ if(composerScope!==scope||composerDraft.value!==draft||draft.revision||draft.coreSteering)return;
+ draft.voiceLoaded=true;
+ const local=readOrdinaryText(scope);
+ const saved=stored&&(!local||stored.savedAt>=(local.savedAt||0))?stored:local;
+ if(!saved||!(stored||saved.voiceDurable||saved.voiceReview||saved.voicePreview))return;
+ if(saved.requestId&&(saved.requestId!==local?.requestId||saved.editId!==local.editId))return;
+ try{if(ordinaryEditDelivered(scope,saved))return;}catch{return;}
+ draft.voiceDurable=true;
+ draft.ordinaryEditId=saved.editId;
+ draft.text=saved.voicePreview?mergeVoiceText(saved.text,saved.voicePreview):saved.text;
+ draft.voiceReview=Boolean(draft.text&&(saved.voiceReview===true||(!saved.voicePreviewFinal&&draft.text!==saved.text)));
+ if(saved===stored&&saved.editId!==local?.editId){
+  draft.taskQuote=saved.quote;
+  draft.nextModel=saved.nextModel;
+  draft.restoredModel=Boolean(saved.nextModel);
+  draft.modelUnavailable=saved.modelUnavailable===true;
+  draft.missingAttachments=saved.localAttachments;
+ }
+ if(saved.voicePreview||saved.editId!==local?.editId){
+  draft.revision++;
+  rememberOrdinaryText(draft,scope);
+  if(saved.voicePreview)saveDraftEdit(draft);
+ }
 }
 function draftLocalAttachmentCount(draft){
  const prepared=draft.submitted?.prepared?draft.submitted.files:[];
@@ -375,17 +419,34 @@ function draftLocalAttachmentCount(draft){
  });
  return (draft.missingAttachments||0)+localOnly.length;
 }
+function persistVoiceDraft(draft,scope,record){
+ draft.voiceDurable=true;
+ draft.voiceLoaded=true;
+ const saving=writeVoiceDraft(scope,record).catch(()=>{
+  if(scope===composerScope)ordinaryDraftError.value='听写草稿暂无法持久保存，关闭页面前请检查存储。';
+ });
+ voiceDraftWrites.set(draft,saving);
+ void saving.then(()=>{if(voiceDraftWrites.get(draft)===saving)voiceDraftWrites.delete(draft);});
+ return saving;
+}
+const voiceDraftWrites=new WeakMap();
 function rememberOrdinaryText(draft,scope){
  if(!scope)return false;
+ const previous=storedOrdinaryText(scope);
+ const voiceDurable=draft.voiceDurable||previous?.voiceDurable;
+ const record={text:draft.text,editId:crypto.randomUUID(),savedAt:performance.timeOrigin+performance.now(),
+  ...(voiceDurable&&{voiceDurable:true}),
+  ...(draft.voicePreview&&{voicePreview:draft.voicePreview,...(draft.voicePreviewFinal&&{voicePreviewFinal:true})}),
+  ...(draft.voiceReview&&{voiceReview:true}),
+  ...(draft.taskQuote&&{quote:draft.taskQuote}),...(draft.nextModel&&{nextModel:draft.nextModel}),
+  ...(draft.nextModel&&draft.modelUnavailable&&{modelUnavailable:true})};
+ const localAttachments=draftLocalAttachmentCount(draft);
+ if(localAttachments)record.localAttachments=localAttachments;
+ if(voiceDurable)persistVoiceDraft(draft,scope,record);
  try{
-  const previous=storedOrdinaryText(scope);
-  const localAttachments=draftLocalAttachmentCount(draft);
-  if(draft.text||draft.taskQuote||draft.nextModel||localAttachments){
-   const editId=crypto.randomUUID();
-   localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({text:draft.text,editId,
-    ...(draft.taskQuote&&{quote:draft.taskQuote}),...(draft.nextModel&&{nextModel:draft.nextModel}),
-    ...(draft.nextModel&&draft.modelUnavailable&&{modelUnavailable:true}),...(localAttachments&&{localAttachments})}));
-   draft.ordinaryEditId=editId;
+  if(draft.text||draft.voicePreview||draft.taskQuote||draft.nextModel||localAttachments){
+   localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify(record));
+   draft.ordinaryEditId=record.editId;
   }else{
    localStorage.removeItem(ordinaryDraftPrefix+scope);
    delete draft.ordinaryEditId;
@@ -403,10 +464,11 @@ function markOrdinarySubmission(draft,scope,requestId){
  if(!saved||saved.editId!==draft.ordinaryEditId)return;
  // The durable submission owns its model and upload references from here.
  // Later edits keep their own draft ID and must survive this request's receipt.
- try{localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify({...saved,
-  requestId:draft.revision===draft.submitted.revision?requestId:undefined,
+ const record={...saved,requestId:draft.revision===draft.submitted.revision?requestId:undefined,
   nextModel:draft.nextModel,modelUnavailable:draft.nextModel&&draft.modelUnavailable||undefined,
-  localAttachments:draftLocalAttachmentCount(draft)||undefined}));}
+  localAttachments:draftLocalAttachmentCount(draft)||undefined};
+ if(draft.voiceDurable)persistVoiceDraft(draft,scope,record);
+ try{localStorage.setItem(ordinaryDraftPrefix+scope,JSON.stringify(record));}
  catch{ordinaryDraftError.value='草稿暂无法保存在此浏览器，刷新前请检查存储。';}
 }
 function forgetOrdinarySubmission(record,scope){
@@ -417,7 +479,10 @@ function forgetOrdinarySubmission(record,scope){
 }
 function confirmOrdinaryText(draft,record,scope){
  const saved=forgetOrdinarySubmission(record,scope);
- if(saved&&draft.ordinaryEditId===saved.editId){draft.text='';delete draft.ordinaryEditId;delete draft.missingAttachments;}
+ if(saved&&draft.ordinaryEditId===saved.editId){
+  draft.text='';delete draft.voiceReview;delete draft.ordinaryEditId;delete draft.missingAttachments;
+  if(draft.voiceDurable)rememberOrdinaryText(draft,scope);
+ }
 }
 watch(composerDraft,draft=>{
  ordinaryDraftError.value='';
@@ -452,7 +517,7 @@ function confirmDraft(record,context){
  confirmOrdinaryText(draft,record,context.draftScope);
  if(!sent||sent.requestId!==record.requestId){syncRejectedDraft();return;}
  draft.rejected=submissionStore.rejectedDraft(record);
- if(draft.revision===sent.revision&&draft.text===record.payload.text)draft.text='';
+ if(draft.revision===sent.revision&&draft.text===record.payload.text){draft.text='';delete draft.voiceReview;}
  draft.files=draft.files.filter(item=>!sent.files.includes(item));
  delete draft.submitted;
  if(context.draftScope!==composerScope&&!draft.text&&!draft.files.length)drafts.delete(context.draftScope);
@@ -549,7 +614,7 @@ function invalidateSession(){conversationPanel.value='';clearSharedObservers();s
 function captureContext(){if(!paired.value||!selected.value||!validSessionRecovery(recoveryContext.value))throw Object.assign(Error(recoveryMessages.SUBMISSION_RECOVERY_UNAVAILABLE),{code:'SUBMISSION_RECOVERY_UNAVAILABLE'});return {topicKey:selected.value,recovery:{...recoveryContext.value},generation,authEpoch,draftScope:draftScope()};}
 function sameView(context){return context.topicKey===selected.value&&context.generation===generation&&context.authEpoch===authEpoch&&context.recovery?.entryId===recoveryContext.value?.entryId&&context.recovery?.sessionMarker===recoveryContext.value?.sessionMarker;}
 function newSubmissionContext(){if(!loadRecovery())throw Error(recoveryError.value);const context=captureContext();if(!historyContextReady.value)throw Object.assign(Error('正在载入历史并核对上下文'),{code:'HISTORY_CONTEXT_LOADING'});if(!currentTopic.value)throw Object.assign(Error(recoveryMessages.SUBMISSION_TOPIC_UNAVAILABLE),{code:'SUBMISSION_TOPIC_UNAVAILABLE'});if(submissionStore.current({entryId:context.recovery.entryId,topicKey:context.topicKey}))throw Object.assign(Error(recoveryMessages.SUBMISSION_PENDING),{code:'SUBMISSION_PENDING'});return context;}
-const errors={CORE_MODEL_NOT_ALLOWED:'这个模型已不在 Core 允许的目录中，请重新选择',CORE_MODEL_CATALOG_UNAVAILABLE:'暂时无法读取 Core 模型目录',INVALID_PAIRING:'配对码无效、已使用或过期，请生成新码。',CORE_DATABASE_IDENTITY_MISMATCH:'此地址的 Core 数据库身份已变化，连接已暂停。请恢复原数据库。',SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保留；完成后请显式重试',SHARED_GROUP_EXECUTION_NOT_READY:'共享群聊暂为只读，发送接线尚未完成',SHARED_CONFIG_PENDING:'共享配置正在核对，请稍后显式发送',SHARED_CONFIG_CONFLICT:'共享配置存在冲突，请先选择采用的版本',SHARED_EXECUTION_PERMISSION_REQUIRED:'本会话尚未授予共享执行权限',ATTACHMENTS_NOT_ENABLED:'当前服务器尚未启用附件传输，已选择的文件和消息草稿仍保留',SHARED_ATTACHMENTS_NOT_READY:'共享附件发送尚未接通，原文件保留',HISTORY_CONTEXT_LOADING:'正在载入历史并核对上下文',DESKTOP_REFERENCE_CLIENT_UPGRADE_REQUIRED:'此历史包含桌面引用，请更新应用后重开',GROUP_MODE_REQUIRES_DESKTOP:'此群聊模式请在桌面执行',GROUP_MEMBER_UNAVAILABLE:'此成员配置暂不可用',DEPENDENCY_REVIEW_REQUIRED:'同一话题有待核对的执行，请先处理暂停任务',DESKTOP_CONTEXT_REQUIRED:'本轮上下文需要桌面专用内容，请在桌面继续',CONFIG_SNAPSHOT_CORRUPT:'执行配置校验失败，请在桌面重新发布',GROUP_CONTEXT_UNAVAILABLE:'有效上下文暂不可用',ATTACHMENT_BLOB_MISSING:'附件暂未同步，请等待电脑补齐',ATTACHMENT_BLOB_CORRUPT:'附件完整性校验失败，请重新同步',ATTACHMENT_TEXT_UNAVAILABLE:'此文件的文本尚不可用',ATTACHMENT_TYPE_REJECTED:'支持 PNG、JPEG、WebP、PDF 和 UTF-8 文本文件',ATTACHMENT_STORAGE_BUDGET:'附件空间已达到上限',ATTACHMENT_REQUEST_BUDGET:'附件请求过多，请稍后重试',MODEL_IMAGE_UNSUPPORTED:'当前模型不支持图片，请在电脑端选择支持图片的模型并发布配置',EXECUTION_CONFIG_REQUIRED:'请先在电脑端发布有效 Agent 配置',PAIR_REQUIRED:'请使用本入口的配对方式连接会话',HTTPS_REQUIRED:'当前入口尚未启用 HTTPS，不能提交 Key',SERVER_NOT_APPROVED:'此地址尚未由服务端批准，请使用已获授权的服务器',PROTECTED_HOST_NOT_READY:'安全链路或服务端接入尚未就绪，暂不接收访问凭据',AUTH_FAILED:'访问凭据不正确',AUTH_RATE_LIMIT:'尝试过于频繁，请稍后重试',AGENT_NOT_EXECUTABLE:'此 Agent 尚未配置服务端执行能力',EXECUTION_INTERRUPTED_REVIEW_REQUIRED:'执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑'};
+const errors={CORE_AGENT_INSTRUCTIONS_PLAIN_TEXT:'名称和简短指令请使用纯文本，去掉 VCP 模板标记。',CORE_MODEL_NOT_ALLOWED:'这个模型已不在 Core 允许的目录中，请重新选择',CORE_MODEL_CATALOG_UNAVAILABLE:'暂时无法读取 Core 模型目录',INVALID_PAIRING:'配对码无效、已使用或过期，请生成新码。',CORE_DATABASE_IDENTITY_MISMATCH:'此地址的 Core 数据库身份已变化，连接已暂停。请恢复原数据库。',SHARED_TOPIC_BUSY:'此话题正在另一端执行，草稿已保留；完成后请显式重试',SHARED_GROUP_EXECUTION_NOT_READY:'共享群聊暂为只读，发送接线尚未完成',SHARED_CONFIG_PENDING:'共享配置正在核对，请稍后显式发送',SHARED_CONFIG_CONFLICT:'共享配置存在冲突，请先选择采用的版本',SHARED_EXECUTION_PERMISSION_REQUIRED:'本会话尚未授予共享执行权限',ATTACHMENTS_NOT_ENABLED:'当前服务器尚未启用附件传输，已选择的文件和消息草稿仍保留',SHARED_ATTACHMENTS_NOT_READY:'共享附件发送尚未接通，原文件保留',HISTORY_CONTEXT_LOADING:'正在载入历史并核对上下文',DESKTOP_REFERENCE_CLIENT_UPGRADE_REQUIRED:'此历史包含桌面引用，请更新应用后重开',GROUP_MODE_REQUIRES_DESKTOP:'此群聊模式请在桌面执行',GROUP_MEMBER_UNAVAILABLE:'此成员配置暂不可用',DEPENDENCY_REVIEW_REQUIRED:'同一话题有待核对的执行，请先处理暂停任务',DESKTOP_CONTEXT_REQUIRED:'本轮上下文需要桌面专用内容，请在桌面继续',CONFIG_SNAPSHOT_CORRUPT:'执行配置校验失败，请在桌面重新发布',GROUP_CONTEXT_UNAVAILABLE:'有效上下文暂不可用',ATTACHMENT_BLOB_MISSING:'附件暂未同步，请等待电脑补齐',ATTACHMENT_BLOB_CORRUPT:'附件完整性校验失败，请重新同步',ATTACHMENT_TEXT_UNAVAILABLE:'此文件的文本尚不可用',ATTACHMENT_TYPE_REJECTED:'支持 PNG、JPEG、WebP、PDF 和 UTF-8 文本文件',ATTACHMENT_STORAGE_BUDGET:'附件空间已达到上限',ATTACHMENT_REQUEST_BUDGET:'附件请求过多，请稍后重试',MODEL_IMAGE_UNSUPPORTED:'当前模型不支持图片，请在电脑端选择支持图片的模型并发布配置',EXECUTION_CONFIG_REQUIRED:'请先在电脑端发布有效 Agent 配置',PAIR_REQUIRED:'请使用本入口的配对方式连接会话',HTTPS_REQUIRED:'当前入口尚未启用 HTTPS，不能提交 Key',SERVER_NOT_APPROVED:'此地址尚未由服务端批准，请使用已获授权的服务器',PROTECTED_HOST_NOT_READY:'安全链路或服务端接入尚未就绪，暂不接收访问凭据',AUTH_FAILED:'访问凭据不正确',AUTH_RATE_LIMIT:'尝试过于频繁，请稍后重试',AGENT_NOT_EXECUTABLE:'此 Agent 尚未配置服务端执行能力',EXECUTION_INTERRUPTED_REVIEW_REQUIRED:'执行曾被中断，需确认工具副作用后另行发起，系统不会自动重跑'};
 function noteConnectionFailure(error){
  if(!(error instanceof TypeError&&!error.status)&&![502,503,504].includes(error.status))return false;
  online.value=false;
@@ -584,6 +649,131 @@ async function api(route,body,requestHeaders={},signal,suppressPairRequired=fals
  }
  return result;
 }
+const coreAgentWorkspace=ref(''), canCreateAgent=ref(false);
+const agentCreationDialog=ref(null), creatingAgent=ref(false), agentCreationError=ref(''), agentCreationModels=ref([]);
+const agentCreationStorageBlocked=ref(false), agentCreationDefaultModel=ref(null), agentCreationModelsLoading=ref(false);
+const agentCreationDraft=ref({name:'', model:'', instructions:''}), pendingAgentCreation=ref(null);
+const agentCreationKey=computed(()=>canCreateAgent.value&&paired.value&&coreAgentWorkspace.value&&validSessionRecovery(recoveryContext.value)
+ ? 'vcp.mobile.agent-creation.v1:'+recoveryContext.value.entryId+':'+recoveryContext.value.sessionMarker : '');
+const agentCreationPath=()=> 'core/'+encodeURIComponent(coreAgentWorkspace.value)+'/agent-creation';
+
+function readAgentCreationPermission(snapshot){
+ coreAgentWorkspace.value=snapshot.server?.mode==='core'&&typeof snapshot.workspace==='string'?snapshot.workspace:'';
+ canCreateAgent.value=Boolean(coreAgentWorkspace.value&&snapshot.canCreateAgent===true);
+}
+watch(agentCreationKey,key=>{
+ agentCreationDialog.value?.close();
+ pendingAgentCreation.value=null;
+ agentCreationDraft.value={name:'',model:'',instructions:''};
+ agentCreationError.value='';
+ agentCreationStorageBlocked.value=false;
+ agentCreationModelsLoading.value=false;
+ if(!key)return;
+ try{
+  const raw=sessionStorage.getItem(key);
+  if(raw){
+   const {requestId,name,model,instructions}=JSON.parse(raw);
+   if(!/^[0-9a-f-]{36}$/.test(requestId)||[name,model,instructions].some(value=>typeof value!=='string'))throw Error();
+   pendingAgentCreation.value={requestId,name,model,instructions};
+   agentCreationDraft.value={name,model,instructions};
+  }
+ }catch{
+  agentCreationStorageBlocked.value=true;
+  agentCreationError.value='无法读取待确认的创建请求，请在助手列表核对结果。';
+ }
+});
+
+async function loadAgentCreationModels(key,{prefill=false}={}){
+ agentCreationModelsLoading.value=true;
+ agentCreationModels.value=[];
+ agentCreationDefaultModel.value=null;
+ try{
+  const {models,defaultModel}=await api(agentCreationPath()+'/models',undefined,{},AbortSignal.timeout(12000));
+  if(key!==agentCreationKey.value)return;
+  agentCreationModels.value=models;
+  agentCreationDefaultModel.value=models.includes(defaultModel)?defaultModel:null;
+  if(!models.includes(agentCreationDraft.value.model)){
+   agentCreationDraft.value.model=prefill?agentCreationDefaultModel.value||'':'';
+  }
+ }catch(error){
+  if(key===agentCreationKey.value&&!agentCreationError.value){
+   agentCreationError.value=errors[error.code]||'暂时无法读取 Core 模型目录。';
+  }
+ }finally{
+  if(key===agentCreationKey.value)agentCreationModelsLoading.value=false;
+ }
+}
+
+async function openAgentCreation(){
+ const key=agentCreationKey.value;
+ if(!key||creatingAgent.value)return;
+ agentCreationDialog.value.showModal();
+ if(pendingAgentCreation.value||agentCreationStorageBlocked.value)return;
+ agentCreationError.value='';
+ await loadAgentCreationModels(key,{prefill:!agentCreationDraft.value.name});
+}
+
+async function createCoreAgent(){
+ const key=agentCreationKey.value;
+ if(!key||creatingAgent.value||busy.value||agentCreationStorageBlocked.value)return;
+ const pending=pendingAgentCreation.value;
+ const {name,model,instructions}=agentCreationDraft.value;
+ if(!pending&&(!name.trim()||!agentCreationModels.value.includes(model)))return;
+ creatingAgent.value=true;
+ const body=pending||{requestId:crypto.randomUUID(),name:name.trim(),model,instructions:instructions.trim()};
+ const context=recoveryContext.value;
+ let received=false;
+ const timeout=()=>AbortSignal.timeout(20000);
+ agentCreationError.value='';
+ try{
+  // Retain the original request across a reload or lost response. Only a user
+  // action can send it again.
+  sessionStorage.setItem(key,JSON.stringify(body));
+  pendingAgentCreation.value=body;
+  const receipt=await api(agentCreationPath(),body,{
+   'X-NativeSync-Entry-Id':context.entryId,'X-NativeSync-Session-Marker':context.sessionMarker
+  },timeout(),true);
+  received=true;
+  if(key!==agentCreationKey.value)return;
+  const snapshot=await api('session',undefined,{},timeout(),true);
+  if(key!==agentCreationKey.value||snapshot.recovery?.sessionMarker!==context.sessionMarker)return;
+  const topic=snapshot.topics?.find(row=>row.key===receipt.key&&row.ownerId===receipt.agentId&&row.topicId===receipt.topicId);
+  if(!topic)throw Error('无法在当前助手列表中核对创建结果。');
+  await api('selection',{key:topic.key},{
+   'X-NativeSync-Entry-Id':context.entryId,'X-NativeSync-Session-Marker':context.sessionMarker
+  },timeout(),true);
+  if(key!==agentCreationKey.value)return;
+  directoryRequest++;
+  await setDirectory(snapshot,{adjustSelection:false});
+  sourceFilter.value='*';
+  agentId.value=ownerKey(topic);
+  selected.value=topic.key;
+  sessionStorage.removeItem(key);
+  pendingAgentCreation.value=null;
+  agentCreationDraft.value={name:'',model:'',instructions:''};
+  agentCreationDialog.value.close();
+  closePanel();
+  resetHistory();
+  await refresh();
+ }catch(error){
+  if(key!==agentCreationKey.value)return;
+  if(!pendingAgentCreation.value){
+   agentCreationError.value='无法保存待确认请求，创建尚未提交。';
+  }else if(!received&&['INVALID_CORE_AGENT_CREATION','CORE_AGENT_INSTRUCTIONS_PLAIN_TEXT','CORE_AGENT_MODEL_REQUIRED','CORE_MODEL_NOT_ALLOWED'].includes(error.code)){
+   sessionStorage.removeItem(key);
+   pendingAgentCreation.value=null;
+   if(['CORE_AGENT_MODEL_REQUIRED','CORE_MODEL_NOT_ALLOWED'].includes(error.code)){
+    agentCreationDraft.value.model='';
+    agentCreationError.value=errors.CORE_MODEL_NOT_ALLOWED;
+    await loadAgentCreationModels(key);
+   }else agentCreationError.value=errors[error.code]||'请检查助手名称和简短指令。';
+  }else{
+   agentCreationError.value=error.status===401||error.status===403?'此设备当前没有创建权限，请核对配对或授权。':
+    '创建结果待确认。请点「重试创建」继续原请求。';
+  }
+ }finally{creatingAgent.value=false;}
+}
+
 function cacheBinding(key=historyKey){return paired.value&&validSessionRecovery(recoveryContext.value)?historyCacheKey(recoveryContext.value,topics.value.find(t=>t.key===key)):'';}
 function resetHistory({remember=true}={}){clearSharedObservers();terminalCoreWorks.clear();if(remember&&baselineReady&&historyBinding&&historyBinding===cacheBinding())historyCache.put(historyBinding,historyRows,cursor);refreshing?.abort();refreshing=null;historyStart.value=0;historyProgress.value=null;expandedAttachmentText.value=new Set();historyContextReady.value=false;expandedLongText.value=new Set();executionPager.reset();jobsInfo.value=null;jobsError.value='';attachmentPager.reset();baselineReady=false;baselineRequestId='';switchDraft();closeNativeResult();closeAttachment();invitedAgent.value='';reviewChecks.value={};attachmentStates.value={};generation++;submissionNoticeHeld=false;historyKey='';historyBinding='';historyFromCache=false;cursor=0;historyRows=new Map();messages.value=[];jobs.value=[];recoveryDetail.value='';acceptedReceipt.value=null;loadRecovery();}
 async function setDirectory(result,{initial=false,selectedTopic=null,adjustSelection=true}={}){
@@ -621,6 +811,7 @@ async function refreshDirectory(force=false,{adjustSelection=true}={}){
   if(server.value?.mode==='core'){
    const snapshot=await readPairedSession();if(!current())return;
    if(snapshot.recovery?.sessionMarker!==recoveryContext.value?.sessionMarker){await session();return;}
+   readAgentCreationPermission(snapshot);
    await setDirectory({topics:snapshot.topics,agents:snapshot.agents});return;
   }
   const marker=await api('directory?kind=revision');if(!current())return;
@@ -642,6 +833,7 @@ async function session({startupSignal,alreadyLocked=false}={}){const epoch=authE
  const nextRecovery=validSessionRecovery(r.recovery)?{version:1,entryId:r.recovery.entryId,sessionMarker:r.recovery.sessionMarker}:null;
  if(nextRecovery?.entryId!==recoveryContext.value?.entryId||nextRecovery?.sessionMarker!==recoveryContext.value?.sessionMarker){authEpoch++;switchDraft('');clearSharedObservers();historyCache.clear();closeNativeResult();closeAttachment();submissionNoticeHeld=false;acceptedReceipt.value=null;recoveryDetail.value='';}
  sharedFeatures.value=Array.isArray(r.sharedFeatures)?r.sharedFeatures:[];recoveryContext.value=nextRecovery;sharedSpaces.value=(r.sharedPermissions||[]).filter(v=>v.endsWith(':read')).map(v=>({id:v.split(':')[1],config:r.sharedPermissions.includes(v.replace(/:read$/,':config'))}));paired.value=true;online.value=true;server.value=r.server||server.value;serverUrl.value=r.server?.serverUrl||serverUrl.value;
+ readAgentCreationPermission(r);
  directoryPaged=r.directory?.paged===true;
  const currentEpoch=authEpoch,result=directoryPaged?await readDirectoryPages(api,()=>currentEpoch===authEpoch):{topics:r.topics,agents:r.agents};
  if(!result||currentEpoch!==authEpoch)return;await setDirectory(result,{initial:true,selectedTopic:r.selectedTopic});loadRecovery();await refresh();
@@ -905,7 +1097,7 @@ const supportsModelSelection=computed(()=>server.value?.mode==='core'&&server.va
  currentTopic.value?.coreSingle&&currentTopic.value.ownerType==='agent');
 const shownModel=computed(()=>taskQuote.value?quotedWork.value?.model:
  composerDraft.value.nextModel||pendingSubmission.value?.payload.model||currentTopic.value?.model);
-watch([composerDraft,taskQuote],()=>{modelPicker.value=null;});
+watch([composerDraft,taskQuote,conversationPanel,settingsOpen],()=>{modelPicker.value=null;});
 async function readComposerModels(topic){
  const {models,purpose}=await api(corePath(topic)+'/models');
  if(!Array.isArray(models))throw Error('Invalid model catalog');
@@ -921,11 +1113,88 @@ watch([composerDraft,supportsModelSelection,historyContextReady],async ([draft,s
    draft.modelUnavailable=true;
  }catch{/* A failed catalog read cannot establish that the model is unavailable. Core still validates sends. */}
 });
+const modelPickerRoot=ref(null), modelPickerTrigger=ref(null), modelPickerSearch=ref(null);
+function modelPickerMotion(layer,done,opening){
+ const panel=layer.querySelector('#composer-model-options'),trigger=modelPickerTrigger.value;
+ if(!trigger||!panel||matchMedia('(prefers-reduced-motion: reduce)').matches){done();return;}
+ const from=trigger.getBoundingClientRect(),to=panel.getBoundingClientRect();
+ if(!from.width||!to.width||!from.height||!to.height){done();return;}
+ const compact={transform:`translate(${from.left-to.left}px,${from.top-to.top}px) scale(${from.width/to.width},${from.height/to.height})`,borderRadius:'999px'};
+ const expanded={transform:'none',borderRadius:'23px'};
+ const options={duration:opening?250:185,easing:opening?'cubic-bezier(.18,.82,.24,1)':'cubic-bezier(.4,0,.3,1)',fill:'both'};
+ const frame=panel.animate(opening?[compact,expanded]:[expanded,compact],options);
+ const content=panel.querySelector('.model-morph-content');
+ const fade=content.animate(opening?[{opacity:0},{opacity:0,offset:.30},{opacity:1}]:[{opacity:1},{opacity:0,offset:.45},{opacity:0}],options);
+ const scrim=layer.querySelector('.model-picker-scrim').animate(opening?[{opacity:0},{opacity:1}]:[{opacity:1},{opacity:0}],options);
+ frame.finished.catch(()=>{}).finally(()=>{
+  done();frame.cancel();fade.cancel();scrim.cancel();
+ });
+}
+const modelPickerQuery=computed(()=>modelPicker.value?.query.trim().toLowerCase()||'');
+const filteredPickerModels=computed(()=>{
+ const terms=modelPickerQuery.value.split(/\s+/u);
+ return (modelPicker.value?.models||[]).filter(id=>terms.every(term=>id.toLowerCase().includes(term)));
+});
+const modelTileRows=computed(()=>{
+ const rows=[];
+ for(const model of filteredPickerModels.value){
+  const capacity=Array.from(model).length<=14?3:2;
+  let row=rows.at(-1);
+  if(!row||row.capacity!==capacity||row.models.length===capacity){
+   row={capacity,models:[]};
+   rows.push(row);
+  }
+  row.models.push(model);
+ }
+ return rows;
+});
+function searchModelPickerOnEnter(event){
+ if(event.isComposing)return;
+ event.preventDefault();
+ if(modelPickerQuery.value&&filteredPickerModels.value.length===1)pickNextModel(filteredPickerModels.value[0]);
+ else focusModelPickerRow('first');
+}
+function clearModelPickerSearch(){
+ if(!modelPicker.value)return;
+ modelPicker.value.query='';
+ modelPickerSearch.value?.focus({preventScroll:true});
+}
+function closeModelPicker(restoreFocus=false){
+ modelPicker.value=null;
+ if(restoreFocus)modelPickerTrigger.value?.focus({preventScroll:true});
+}
+function dismissModelPickerOutside(event){
+ if(modelPicker.value&&!modelPickerRoot.value?.contains(event.target))closeModelPicker();
+}
+function modelPickerFocusLeft(event){
+ if(modelPicker.value&&!modelPickerRoot.value?.contains(event.relatedTarget))closeModelPicker();
+}
+function focusModelPickerRow(position='checked'){
+ const rows=[...modelPickerRoot.value?.querySelectorAll('[role="menuitemradio"]')||[]];
+ const row=position==='last'?rows.at(-1):position==='first'?rows[0]:rows.find(el=>el.getAttribute('aria-checked')==='true')||rows[0];
+ row?.focus();
+}
+function navigateModelPicker(event){
+ const keys=['ArrowDown','ArrowUp','Home','End'];
+ if(!keys.includes(event.key))return;
+ const rows=[...event.currentTarget.querySelectorAll('[role="menuitemradio"]')];
+ if(!rows.length)return;
+ event.preventDefault();
+ const index=rows.indexOf(document.activeElement);
+ const next=event.key==='Home'?0:event.key==='End'?rows.length-1:
+  event.key==='ArrowUp'?(index<0?rows.length-1:(index+rows.length-1)%rows.length):(index+1)%rows.length;
+ rows[next]?.focus();
+}
+async function openModelPickerFromKey(){
+ if(!modelPicker.value)await toggleModelPicker();
+ await nextTick();
+ if(modelPicker.value&&document.activeElement===modelPickerTrigger.value)focusModelPickerRow();
+}
 async function toggleModelPicker(){
  if(modelPicker.value){modelPicker.value=null;return;}
  if(!supportsModelSelection.value||!currentTopic.value?.executable||taskQuote.value)return;
  const context=captureContext(),topic=currentTopic.value;
- modelPicker.value={loading:true,models:[],error:''};
+ modelPicker.value={loading:true,models:[],error:'',query:''};
  const picker=modelPicker.value;
  try{
   const models=await readComposerModels(topic);
@@ -946,7 +1215,7 @@ function pickNextModel(model){
  delete draft.restoredModel;
  delete draft.modelUnavailable;
  rememberOrdinaryText(draft,composerScope);
- modelPicker.value=null;
+ closeModelPicker(true);
 }
 const quoteClosed=computed(()=>{
  const quote=taskQuote.value, state=quotedWork.value?.state;
@@ -977,9 +1246,17 @@ function clearTaskQuote(){
 const voice=ref({status:'idle',message:'',preview:''}),voiceDisclosure=ref(false),voiceLevel=ref(0);
 let voiceConsent=false;
 const voiceActive=computed(()=>voice.value.status!=='idle');
+const canPickComposerAttachment=computed(()=>Boolean(currentTopic.value?.attachmentsEnabled&&!taskQuote.value&&!voiceActive.value));
+const attachmentPickerDisabled=computed(()=>busy.value||newSubmissionBlocked.value||currentTopic.value?.executable===false);
+watch(canPickComposerAttachment,available=>{if(!available)composerMenu.value=false;});
 const appendVoice=(original,additional)=>original+(original&&additional&&!/\s$/u.test(original)?' ':'')+additional;
+function mergeVoiceText(original,preview){
+ if(original.length>=12000)return original;
+ const next=appendVoice(original,preview).slice(0,12000).replace(/[\uD800-\uDBFF]$/u,'');
+ return next.slice(original.length).trim()?next:original;
+}
 const displayedComposer=computed({
- get:()=>voiceActive.value&&voice.value.preview?appendVoice(composerText.value,voice.value.preview).slice(0,12000):composerText.value,
+ get:()=>voiceActive.value&&voice.value.preview?mergeVoiceText(composerText.value,voice.value.preview):composerText.value,
  set:value=>{if(!voiceActive.value)composerText.value=value;}
 });
 let voiceFlight=null;
@@ -1016,30 +1293,103 @@ watch(displayedComposer,(value,previous)=>{
  animateVoiceTranscript(after.slice(common).join(''));
 },{flush:'post'});
 watch(voiceActive,active=>{if(!active)clearVoiceFlight();});
-const voiceScope=computed(()=>{
- if(!browserOnline.value||!paired.value||!currentTopic.value||currentTopic.value.executable===false||settingsOpen.value||conversationPanel.value==='work'||navigationVisible.value||busy.value||newSubmissionBlocked.value)return '';
+const voiceBinding=computed(()=>{
  const scope=draftScope();
  return scope?JSON.stringify([scope,taskQuote.value?.id||null]):'';
 });
+const voiceScope=computed(()=>{
+ if(!browserOnline.value||!paired.value||!currentTopic.value||currentTopic.value.executable===false||settingsOpen.value||conversationPanel.value==='work'||navigationVisible.value||busy.value||newSubmissionBlocked.value)return '';
+ return voiceBinding.value;
+});
+const canEditComposer=computed(()=>Boolean(currentTopic.value&&(currentTopic.value.executable!==false||
+ (composerDraft.value.voiceReview&&currentTopic.value.unavailableReason==='HISTORY_CONTEXT_LOADING'&&composerScope===draftScope()))));
+const keyboardOrbPreference='vcp.mobile.keyboard-orb';
+const keyboardOrbEnabled=ref(false),keyboardOrbMode=ref(false),keyboardOrbPhrase=ref('');
+try{keyboardOrbEnabled.value=localStorage.getItem(keyboardOrbPreference)==='on';}catch{}
+function setKeyboardOrbEnabled(enabled){
+ keyboardOrbEnabled.value=enabled;
+ if(!enabled)clearKeyboardOrb();
+ try{localStorage.setItem(keyboardOrbPreference,enabled?'on':'off');}catch{}
+}
+
+let keyboardOrbBefore='',keyboardOrbBase='',keyboardOrbTimer,keyboardOrbRevision=0;
+function clearKeyboardOrb(){
+ if(!keyboardOrbMode.value)return;
+ keyboardOrbMode.value=false;
+ keyboardOrbPhrase.value='';
+ keyboardOrbBefore=keyboardOrbBase='';
+ keyboardOrbRevision++;
+ clearTimeout(keyboardOrbTimer);
+ clearVoiceFlight();
+}
+function beginKeyboardOrb(event){
+ const field=event.currentTarget;
+ if(!keyboardOrbEnabled.value||!voiceScope.value||!canEditComposer.value||voiceActive.value||document.hidden)return;
+ if(keyboardOrbMode.value&&keyboardOrbBefore===field.value)return;
+ clearKeyboardOrb();
+ keyboardOrbBefore=keyboardOrbBase=field.value;
+ keyboardOrbMode.value=true;
+}
+async function mirrorKeyboardOrb(event){
+ if(!keyboardOrbMode.value)return;
+ const field=event.currentTarget;
+ const before=keyboardOrbBefore;
+ keyboardOrbBefore=field.value;
+ if(before===field.value)return;
+ const change=changedInputText(before,field.value,event.inputType);
+ const revision=++keyboardOrbRevision;
+ clearTimeout(keyboardOrbTimer);
+ clearVoiceFlight();
+ if(change===null){keyboardOrbPhrase.value='';keyboardOrbBase=field.value;return;}
+ keyboardOrbPhrase.value=changedInputText(keyboardOrbBase,field.value)||'';
+ if(!keyboardOrbPhrase.value.trim())return;
+ keyboardOrbTimer=setTimeout(()=>{keyboardOrbPhrase.value='';},2000);
+ if(!change.trim())return;
+ await nextTick();
+ if(revision===keyboardOrbRevision&&keyboardOrbMode.value)animateVoiceTranscript(change);
+}
+watch(voiceScope,clearKeyboardOrb,{flush:'sync'});
+watch(voiceActive,active=>{if(active)clearKeyboardOrb();},{flush:'sync'});
 const recognitionConstructor=()=>server.value?.localSpeech ? localSpeechRecognition() : null;
 const dictation=createVoiceDictation({
  getRecognition:recognitionConstructor,
- getScope:()=>document.hidden?'':voiceScope.value,
+ getScope:()=>voiceBinding.value,
  update:state=>{voice.value=state;},
  onLevel:level=>{voiceLevel.value=Number.isFinite(level)?level:0;},
- commit:transcript=>{
-  const original=composerText.value;
-  let next=appendVoice(original,transcript);
-  if(next.length===original.length||original.length>=12000)return '草稿已满，未写入识别文字。';
-  const clipped=next.length>12000;
-  if(clipped)next=next.slice(0,12000).replace(/[\uD800-\uDBFF]$/u,'');
-  if(next.slice(original.length).trim())composerText.value=next;
-  return clipped?'草稿达到字数上限，部分语音未写入。':'';
+ checkpoint:(binding,preview,final)=>{
+  const [scope]=JSON.parse(binding);
+  const draft=drafts.get(scope);
+  if(!draft)return;
+  draft.voiceDurable=true;
+  draft.voicePreview=preview;
+  draft.voicePreviewFinal=final;
+  rememberOrdinaryText(draft,scope);
+  return voiceDraftWrites.get(draft);
+ },
+ settle:({scope:binding,text:transcript,review})=>{
+  const [scope]=JSON.parse(binding);
+  const draft=drafts.get(scope);
+  if(!draft||(!transcript&&!draft.voicePreview))return '';
+  delete draft.voicePreview;
+  delete draft.voicePreviewFinal;
+  const next=transcript?mergeVoiceText(draft.text,transcript):draft.text;
+  const appended=next.slice(draft.text.length).trim();
+  const full=transcript&&appendVoice(draft.text,transcript).length>12000;
+  if(appended){
+   draft.text=next;
+   draft.revision++;
+   if(review)draft.voiceReview=true;
+   saveDraftEdit(draft);
+  }
+  const saved=rememberOrdinaryText(draft,scope);
+  const message=!saved?ordinaryDraftError.value:full?
+   (appended?'草稿达到字数上限，部分语音未写入。':'草稿已满，未写入识别文字。'):'';
+  return voiceDraftWrites.get(draft)?.then(()=>message)||message;
  }
 });
 function toggleVoice(){
  if(voiceActive.value){dictation.stop();return;}
- if(!voiceScope.value)return;
+ if(!voiceScope.value||document.hidden)return;
  if(!server.value?.localSpeech){
   dictation.cancel('当前入口未启用本机语音识别。可以打字，或使用系统键盘听写。');
   return;
@@ -1053,24 +1403,34 @@ function allowVoice(){
  voiceConsent=true;voiceDisclosure.value=false;
  dictation.start();
 }
-function resetVoice(){voiceDisclosure.value=false;dictation.cancel();}
-function hideVoice(){if(document.hidden)resetVoice();}
-watch(voiceScope,()=>{
- if(!browserOnline.value&&voiceActive.value){
+function resetVoice(){clearKeyboardOrb();voiceDisclosure.value=false;dictation.cancel();}
+function suspendVoice(){
+ clearKeyboardOrb();
+ voiceDisclosure.value=false;
+ dictation.interrupt();
+}
+function hideVoice(){if(document.hidden)suspendVoice();}
+watch(voiceBinding,resetVoice,{flush:'sync'});
+watch([settingsOpen,navigationVisible,conversationPanel],()=>{
+ if(settingsOpen.value||navigationVisible.value||conversationPanel.value==='work')resetVoice();
+},{flush:'sync'});
+watch(browserOnline,online=>{
+ if(!online){
   voiceDisclosure.value=false;
-  dictation.cancel('连接已断开，原草稿已保留。可以继续打字。');
- }else resetVoice();
+  dictation.interrupt('连接已断开，原草稿已保留。可以继续打字。');
+ }
 },{flush:'sync'});
 onMounted(()=>{
  document.addEventListener('visibilitychange',hideVoice);
- window.addEventListener('pagehide',resetVoice);
+ window.addEventListener('pagehide',suspendVoice);
 });
 onUnmounted(()=>{
  document.removeEventListener('visibilitychange',hideVoice);
- window.removeEventListener('pagehide',resetVoice);
- resetVoice();
+ window.removeEventListener('pagehide',suspendVoice);
+ suspendVoice();
 });
 async function submitComposer(){
+ clearKeyboardOrb();
  if(voiceActive.value||busy.value||newSubmissionBlocked.value||currentTopic.value?.executable===false)return;
  if(taskQuote.value){
   if(!currentTopic.value?.executable||quoteSendBlocked.value)return;
@@ -1195,9 +1555,9 @@ async function confirmSteering(context,intent,receipt){
     draft.revision===intent.revision&&draft.text===intent.text;
    if(sent){draft.text='';delete draft.taskQuote;delete draft.ordinaryEditId;}
    delete draft.coreSteering;
-   draft.steeringDelivery='追加指令已送达';
+   draft.steeringDelivery='Core 已收到追加指令。是否采纳请查看原回复。';
    steeringStorageError.value='';
-  }catch{steeringStorageError.value='已核对送达，浏览器暂无法更新本地追加记录。';}
+  }catch{steeringStorageError.value='已核对 Core 收到追加指令，浏览器暂无法更新本地记录。';}
  };
  if(navigator.locks)await navigator.locks.request(key,settle);
  else settle();
@@ -1442,8 +1802,30 @@ onMounted(async()=>{
 onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport);window.removeEventListener('resize',resizeComposer);window.removeEventListener('offline',markOffline);prefersDark.removeEventListener('change',syncTheme);sharedObserver.close();clearTimeout(sharedRefreshTimer);refreshing?.abort();refreshing=null;clearInterval(timer);window.removeEventListener('hashchange',pairingHashChanged);window.removeEventListener('pagehide',clearTransientKey);window.removeEventListener('pageshow',pageShown);window.removeEventListener('storage',storageChanged);window.removeEventListener('online',reconnect);clearTransientKey();});
 </script>
 <template>
- <div ref="shell" class="shell" :style="viewportHeight ? {'--visual-height':viewportHeight+'px'} : null" @keydown.esc="conversationPanel && closePanel()">
-<dialog v-if="attachmentPreview" ref="attachmentDialog" id="attachment-viewer" class="attachment-viewer" aria-labelledby="attachment-title" @cancel.prevent="closeAttachment">
+ <div ref="shell" class="shell" :style="viewportHeight ? {'--visual-height':viewportHeight+'px'} : null" @pointerdown="dismissModelPickerOutside" @keydown.esc="modelPicker?closeModelPicker(true):composerMenu?composerMenu=false:conversationPanel&&closePanel()">
+<dialog ref="agentCreationDialog" class="agent-creation-dialog" aria-labelledby="agent-creation-title" @keydown.esc.stop @cancel="creatingAgent && $event.preventDefault()">
+   <form @submit.prevent="createCoreAgent">
+    <h2 id="agent-creation-title">新建助手</h2>
+    <label for="agent-creation-name">名称</label>
+    <input id="agent-creation-name" v-model="agentCreationDraft.name" maxlength="100" required autofocus :readonly="Boolean(pendingAgentCreation)||creatingAgent">
+    <label for="agent-creation-model">模型</label>
+    <select id="agent-creation-model" v-model="agentCreationDraft.model" required
+      :aria-busy="agentCreationModelsLoading||undefined" :disabled="agentCreationModelsLoading||Boolean(pendingAgentCreation)||creatingAgent">
+     <option value="" disabled>{{agentCreationModelsLoading?'正在读取模型…':'请选择模型'}}</option>
+     <option v-if="pendingAgentCreation&&agentCreationDraft.model&&!agentCreationModels.includes(agentCreationDraft.model)" :value="agentCreationDraft.model">{{agentCreationDraft.model}}</option>
+     <option v-for="model in agentCreationModels" :key="model" :value="model">{{model}}{{model===agentCreationDefaultModel?'（Core 默认）':''}}</option>
+    </select>
+    <label for="agent-creation-instructions">简短指令（可选）</label>
+    <textarea id="agent-creation-instructions" v-model="agentCreationDraft.instructions" maxlength="1000" rows="3" :readonly="Boolean(pendingAgentCreation)||creatingAgent"></textarea>
+    <p v-if="agentCreationError" role="alert">{{agentCreationError}}</p>
+    <p v-else-if="pendingAgentCreation&&!creatingAgent" role="status">创建结果待确认。</p>
+    <div class="agent-creation-actions">
+     <button class="quiet-button" type="button" :disabled="creatingAgent" @click="agentCreationDialog.close()">关闭</button>
+     <button type="submit" :disabled="creatingAgent||busy||!agentCreationKey||agentCreationStorageBlocked||!agentCreationDraft.name.trim()||(!pendingAgentCreation&&!agentCreationModels.includes(agentCreationDraft.model))">{{creatingAgent?'正在确认…':pendingAgentCreation?'重试创建':'创建'}}</button>
+    </div>
+   </form>
+ </dialog>
+ <dialog v-if="attachmentPreview" ref="attachmentDialog" id="attachment-viewer" class="attachment-viewer" aria-labelledby="attachment-title" @cancel.prevent="closeAttachment">
    <div class="attachment-viewer-heading"><strong id="attachment-title">{{attachmentPreview.name}}</strong><button id="attachment-close" @click="closeAttachment" autofocus>关闭</button></div>
    <p v-if="attachmentPreview.loading" role="status">正在读取附件…</p><p v-else-if="attachmentPreview.error" role="alert">{{attachmentPreview.error}}</p>
    <template v-else>
@@ -1462,6 +1844,46 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
       :aria-expanded="navigationVisible" aria-label="切换话题" @click="togglePanel('topics')"><MobileIcon name="menu"/></button>
     <div class="conversation-title">
      <AgentAvatar :src="currentTopic?.avatar||activeAgent?.avatar" :name="currentTopic?.agentName||activeAgent?.name"/>
+     <div v-if="supportsModelSelection && !navigationVisible && conversationPanel!=='work'" class="composer-model header-model" ref="modelPickerRoot" @focusout="modelPickerFocusLeft">
+      <span v-if="taskQuote" id="composer-model-current" :title="'追加沿用 · '+(shownModel||'原任务模型')"><span class="sr-only">追加沿用 · {{shownModel||'原任务模型'}}</span><ModelBrandMark :model="shownModel"/></span>
+      <button v-else id="composer-model-current" ref="modelPickerTrigger" type="button" aria-haspopup="dialog" aria-controls="composer-model-options" :aria-expanded="Boolean(modelPicker)" :title="shownModel||'Agent 默认'" @keydown.down.prevent="openModelPickerFromKey"
+        :disabled="busy||newSubmissionBlocked||!currentTopic?.executable" @click="toggleModelPicker">
+       <span class="sr-only">{{composerDraft.nextModel?'下一条模型：':pendingSubmission?.payload.model?'待确认模型：':'当前模型：'}}</span><span class="sr-only">{{shownModel||'Agent 默认'}}</span><ModelBrandMark :model="shownModel"/>
+      </button>
+      <Transition :css="false" @enter="(el,done)=>modelPickerMotion(el,done,true)" @leave="(el,done)=>modelPickerMotion(el,done,false)">
+       <div v-if="modelPicker" class="model-picker-overlay" @pointerdown.self.prevent="closeModelPicker(true)">
+        <div class="model-picker-scrim" aria-hidden="true" @pointerdown.prevent="closeModelPicker(true)"></div>
+        <div id="composer-model-options" class="composer-model-options model-morph-panel" role="dialog" aria-labelledby="model-morph-title">
+         <div class="model-morph-content">
+          <div class="model-morph-header">
+           <strong id="model-morph-title">选择模型</strong>
+           <button class="model-morph-close" type="button" aria-label="关闭模型选择" @click="closeModelPicker(true)"><MobileIcon name="close"/></button>
+          </div>
+       <div class="model-menu-search">
+        <MobileIcon name="search" class="model-search-symbol"/>
+        <input id="model-picker-search" ref="modelPickerSearch" v-model="modelPicker.query" type="search" aria-label="搜索模型"
+         placeholder="搜索模型" autocomplete="off" autocapitalize="none" spellcheck="false"
+         @keydown.down.prevent="focusModelPickerRow('first')" @keydown.enter="searchModelPickerOnEnter">
+        <button v-if="modelPicker.query" class="model-search-clear" type="button" aria-label="清空搜索"
+         @pointerdown.prevent @click="clearModelPickerSearch"><MobileIcon name="close"/></button>
+       </div>
+       <p v-if="modelPicker.loading" role="status">正在读取 Core 模型目录…</p>
+       <p v-else-if="modelPicker.error" role="status">{{modelPicker.error}}</p>
+       <p v-else-if="!modelPicker.models.length" role="status">Core 暂无可选模型</p>
+       <p v-else-if="modelPickerQuery&&!filteredPickerModels.length" role="status">没有匹配的模型</p>
+       <div class="model-menu-items" role="menu" aria-label="可选模型" @keydown="navigateModelPicker">
+        <button v-if="!modelPickerQuery" class="model-menu-default" type="button" role="menuitemradio"
+          :aria-checked="!composerDraft.nextModel" @click="pickNextModel(null)">Agent 默认</button>
+        <div v-for="row in modelTileRows" :key="row.models[0]" class="model-tile-row" :data-capacity="row.capacity" role="presentation">
+         <button v-for="model in row.models" :key="model" type="button" role="menuitemradio"
+          :aria-checked="composerDraft.nextModel===model" @click="pickNextModel(model)"><span class="model-tile-name">{{model}}</span></button>
+        </div>
+       </div>
+         </div>
+        </div>
+       </div>
+      </Transition>
+     </div>
      <div class="title-lines">
       <strong>{{ currentTopic?.topicName || '选择话题' }}</strong>
       <span class="title-meta"><span class="context-name">{{ currentTopic?.agentName || activeAgent?.name || 'VCP Mobile' }}</span><span v-if="!browserOnline||!online" class="connection offline">· 离线</span></span>
@@ -1475,7 +1897,7 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
    <h1 class="intro">{{paired?'设置':'连接你的会话'}}</h1>
    <p v-if="!paired">{{!server?'正在核对连接方式。':server?.mode==='core'||server?.credentialExchangeAllowed===false?'在电脑上生成手机配对码，即可在这里继续同一个话题。':'使用 VCPToolBox API Key 或一次性配对码连接。'}}</p>
    <form v-if="server && server.mode!=='core' && server.credentialExchangeAllowed!==false" @submit.prevent="connect">
-    <details :open="settingsOpen"><summary>连接设置</summary><label for="server-address">后端地址</label><input id="server-address" v-model="serverUrl" type="url" required @input="tested=false;accessKey=''" :disabled="busy">
+    <details class="connection-choice" :open="settingsOpen"><summary>连接设置</summary><label for="server-address">后端地址</label><input id="server-address" v-model="serverUrl" type="url" required @input="tested=false;accessKey=''" :disabled="busy">
     <button id="test-connection" type="button" @click="testConnection" :disabled="busy">测试连接</button>
     <p v-if="server" id="server-info">{{server.service}} · {{server.plugin}}<br>{{server.serverUrl||'尚未配置正式后端'}}</p></details>
     <p v-if="!keyAllowed" id="connection-blocker">{{server?.credentialExchangeAllowed===false?'请使用下方一次性配对入口。':'安全接入尚未确认，访问凭据输入暂不可用。'}}</p>
@@ -1484,7 +1906,7 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
    </form>
    <div v-if="paired" class="device-actions"><button id="disconnect" @click="disconnect" :disabled="busy">断开此设备</button><button id="close-settings" @click="settingsOpen=false">返回会话</button></div>
    <p v-if="paired" class="pair-help">临时断网会自动重连。此浏览器的配对保留期间，重新打开可直接进入。断开此设备、配对被撤销或清除浏览器数据后，需要重新配对。</p>
-   <details v-if="!paired" :open="pairingLinkOpen||server?.mode==='core'||server?.credentialExchangeAllowed===false">
+   <details v-if="!paired" class="connection-choice" :open="pairingLinkOpen||server?.mode==='core'||server?.credentialExchangeAllowed===false">
     <summary>使用一次性配对码</summary>
     <form @submit.prevent="pair">
      <p id="pair-help" class="pair-help">
@@ -1495,12 +1917,17 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
      <input id="pair-code" v-model="pairCode" type="password" autocomplete="off" required
        :aria-invalid="Boolean(pairError)" :aria-describedby="pairError?'pair-help pair-error':'pair-help'" @input="pairError=''">
      <p v-if="pairError" id="pair-error" class="pair-error" role="alert">{{pairError}}</p>
-     <button id="pair-submit" :disabled="busy">连接会话</button>
+     <button id="pair-submit" :aria-busy="busy||undefined" :disabled="busy">{{busy?'正在连接…':'连接会话'}}</button>
     </form>
    </details>
    <fieldset class="theme-settings"><legend>外观</legend><label v-for="(mode,index) in themeModes" :key="mode">
     <input type="radio" name="appearance" :value="mode" :checked="theme===mode" @change="applyTheme(mode)"><span>{{['跟随系统','浅色','深色'][index]}}</span>
    </label></fieldset>
+   <div class="input-motion-setting">
+    <label for="keyboard-orb-setting"><input id="keyboard-orb-setting" type="checkbox" role="switch" :checked="keyboardOrbEnabled"
+      aria-describedby="keyboard-orb-setting-help" @change="setKeyboardOrbEnabled($event.target.checked)">输入动效</label>
+    <small id="keyboard-orb-setting-help">开启后，键盘听写、打字和选词都可触发数字球。只在本设备生效。</small>
+   </div>
    <p v-if="recoveryRecords.length" id="saved-submissions">此设备保留 {{recoveryRecords.length}} 条待确认提交。重新连接后会核对原记录，不会自动重发。</p><p v-if="recoveryError" role="alert">{{recoveryError}}</p><p v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</p><p role="status">{{notice}}</p>
   </main>
   <template v-else>
@@ -1512,13 +1939,13 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
      <template v-if="sources.length>1"><label for="source-select">来源</label><select id="source-select" v-model="sourceFilter" @change="selectSource" :disabled="busy"><option value="*">全部已授权来源</option><option v-for="s in sources" :key="s.key" :value="s.key">{{s.label}}</option></select></template>
      <div class="agent-heading"><AgentAvatar :src="activeAgent?.avatar" :name="activeAgent?.name"/><div>
       <label for="agent-select">Agent / 群聊</label><select id="agent-select" v-model="agentId" @change="selectAgent" :disabled="busy"><option v-for="a in visibleAgents" :key="a.id" :value="a.id">{{a.name}}<template v-if="sourceFilter==='*'&&sources.length>1"> · {{sourceName(a)}}</template></option></select>
-     </div></div>
+     </div><button v-if="agentCreationKey" class="quiet-button" type="button" :disabled="busy" @click="openAgentCreation">{{pendingAgentCreation?'重试创建':'新建助手'}}</button></div>
      <label class="topic-search"><MobileIcon name="search"/><span class="sr-only">搜索当前 Agent 的话题</span><input id="topic-search" v-model="topicSearch" type="search" placeholder="搜索话题名称或 ID" maxlength="160"></label>
     </div>
     <ul v-if="searchedTopics.length" class="topic-list">
      <li v-for="t in searchedTopics.slice(0,topicLimit)" :key="t.key">
       <button type="button" :data-topic-key="t.key" :aria-current="t.key===selected?'true':undefined" :disabled="busy" @click="openTopic(t.key)">
-       <span><strong>{{t.topicName}}</strong><small>{{t.messageCount??0}} 条消息<template v-if="t.originLabel"> · {{t.originLabel}}</template></small></span><MobileIcon :name="t.key===selected?'check':'chevron'"/>
+       <span><strong>{{t.topicName}}</strong><small>{{t.messageCount??0}} 条消息<template v-if="t.originLabel"> · {{t.originLabel}}</template></small></span><MobileIcon v-if="t.key!==selected" name="chevron"/>
       </button>
      </li>
     </ul>
@@ -1610,21 +2037,6 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
       <MobileIcon name="reply"/><span>追加指令</span>
      </button>
      <div v-if="currentTopic?.ownerType==='group' && conversationPanel!=='work'" class="group-invitation"><label class="sr-only" for="group-invite">邀请成员发言</label><select id="group-invite" v-model="invitedAgent" :disabled="busy||newSubmissionBlocked||currentTopic.executable===false"><option value="">选择发言成员</option><option v-for="member in currentTopic.members||[]" :key="member.id" :value="member.id" :disabled="member.unavailable">{{member.name}}{{member.unavailable?' · 暂不可用':''}}</option></select><button @click="invite" :disabled="busy||newSubmissionBlocked||!invitedAgent||currentTopic.executable===false">邀请</button></div>
-     <div v-if="supportsModelSelection && conversationPanel!=='work'" class="composer-model">
-      <span v-if="taskQuote" id="composer-model-current">追加沿用 · {{shownModel||'原任务模型'}}</span>
-      <button v-else id="composer-model-current" type="button" :aria-expanded="Boolean(modelPicker)"
-        :disabled="busy||newSubmissionBlocked||!currentTopic?.executable" @click="toggleModelPicker">
-       {{composerDraft.nextModel?'下一条':pendingSubmission?.payload.model?'待确认':'当前模型'}} · {{shownModel||'Agent 默认'}}
-      </button>
-      <div v-if="modelPicker" id="composer-model-options" class="composer-model-options" aria-label="下一条消息的模型">
-       <p v-if="modelPicker.loading" role="status">正在读取 Core 模型目录…</p>
-       <p v-else-if="modelPicker.error" role="status">{{modelPicker.error}}</p>
-       <p v-else-if="!modelPicker.models.length" role="status">Core 暂无可选模型</p>
-       <button v-if="composerDraft.nextModel" type="button" @click="pickNextModel(null)">恢复 Agent 默认</button>
-       <button v-for="model in modelPicker.models" :key="model" type="button"
-         :aria-pressed="composerDraft.nextModel===model" @click="pickNextModel(model)">{{model}}</button>
-      </div>
-     </div>
      <button id="work-toggle" ref="workToggle" type="button" aria-controls="conversation-work"
        :aria-expanded="conversationPanel==='work'" :data-tone="workTone" @click="togglePanel('work')"><MobileIcon name="work"/><span>{{workButtonText}}</span></button>
     </div>
@@ -1632,20 +2044,19 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
     <p v-if="!taskQuote&&composerDraft.modelUnavailable" id="composer-model-unavailable" class="attachment-selection-notice" role="status">
      模型「{{composerDraft.nextModel}}」已不在 Core 允许的目录中，请重新选择。
     </p>
-    <div v-if="pendingFiles.length" class="pending-files">
+    <div v-if="pendingFiles.length" class="pending-files compact-attachments">
      <div v-for="(item,i) in pendingFiles" :key="i" class="pending-file">
-      <button v-if="draftPreviewKind(item.file)==='image'" type="button" class="pending-image"
-       :aria-label="'预览 '+item.file.name" @click="openDraftAttachment(item.file)">
-       <DraftImageThumbnail :file="item.file"/>
+      <button class="attachment-detail-toggle" type="button" :aria-label="'附件 '+(i+1)+' 详情'"
+        :aria-expanded="expandedDraftAttachment===item" @click="expandedDraftAttachment=expandedDraftAttachment===item?null:item">
+       <MobileIcon :name="draftPreviewKind(item.file)==='image'?'image':'file'"/>
       </button>
-      <MobileIcon v-else name="file"/>
-      <div class="pending-file-label">
-       <span>{{item.file?.name||'已上传附件 '+(i+1)}} · {{item.error||(item.progress===100?'已上传':item.progress>0?item.progress+'%':'待发送')}}</span>
+      <div v-if="expandedDraftAttachment===item" class="attachment-draft-detail">
+       <span>{{item.file?.name||'已上传附件 '+(i+1)}}<template v-if="item.error||item.progress"> · {{item.error||item.progress+'%'}}</template></span>
        <small v-if="!draftPreviewKind(item.file)">{{item.file?'不支持预览':'本机无原文件，无法预览'}}</small>
+       <button v-if="draftPreviewKind(item.file)" type="button" class="pending-preview"
+        :aria-label="'预览 '+item.file.name" @click="openDraftAttachment(item.file)">预览</button>
+       <button type="button" @click="removeDraftFile(i);expandedDraftAttachment=null" :disabled="busy" aria-label="移除附件"><MobileIcon name="close"/></button>
       </div>
-      <button v-if="draftPreviewKind(item.file)==='text'" type="button" class="pending-preview"
-       :aria-label="'预览 '+item.file.name" @click="openDraftAttachment(item.file)">预览</button>
-      <button type="button" @click="removeDraftFile(i)" :disabled="busy" aria-label="移除附件"><MobileIcon name="close"/></button>
      </div>
     </div>
     <ul v-if="composerDraft.fileRejections?.length" id="attachment-selection-notice" class="attachment-selection-notice" aria-label="未添加的附件" role="status">
@@ -1684,15 +2095,26 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
     <div v-else-if="voice.message" class="voice-feedback"><span role="status">{{voice.message}}</span>
      <button type="button" aria-label="关闭语音提示" @click="resetVoice">关闭</button>
     </div>
+    <VoiceStage v-if="keyboardOrbMode&&keyboardOrbPhrase.trim()" keyboard :phrase="keyboardOrbPhrase"/>
+    <small v-if="composerDraft.voiceReview&&text" id="voice-review" role="status">听写草稿 · 待校对</small>
+    <div v-if="composerMenu&&canPickComposerAttachment" class="composer-attach-menu" id="composer-attach-menu">
+     <button type="button" :disabled="attachmentPickerDisabled" @click="pickComposerAttachment('image')"><MobileIcon name="image"/>图片</button>
+     <button type="button" :disabled="attachmentPickerDisabled" @click="pickComposerAttachment('file')"><MobileIcon name="file"/>文件</button>
+    </div>
     <form class="message-composer" :class="{dictating:voiceActive}" @submit.prevent="submitComposer">
-     <label v-if="currentTopic?.attachmentsEnabled&&!taskQuote&&!voiceActive" class="attachment-picker" title="添加附件">
-      <MobileIcon name="plus"/><span class="sr-only">添加图片或文件</span>
-      <input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.md,.csv,.json" multiple @change="selectFiles" :disabled="busy||newSubmissionBlocked||currentTopic?.executable===false">
-     </label>
+     <template v-if="canPickComposerAttachment">
+      <input ref="imagePicker" id="composer-image-picker" type="file" accept=".png,.jpg,.jpeg,.webp" multiple hidden
+        :disabled="attachmentPickerDisabled" @change="selectFiles">
+      <input ref="filePicker" id="composer-file-picker" type="file" accept=".pdf,.txt,.md,.csv,.json" multiple hidden
+        :disabled="attachmentPickerDisabled" @change="selectFiles">
+      <button type="button" class="composer-plus" :aria-expanded="composerMenu" aria-controls="composer-attach-menu"
+        :aria-label="composerMenu?'收起附件菜单':'展开附件菜单'" :disabled="attachmentPickerDisabled"
+        @click="composerMenu=!composerMenu"><MobileIcon name="plus"/></button>
+     </template>
      <label class="sr-only" for="message-text">消息</label>
-     <textarea ref="composer" id="message-text" v-model="displayedComposer" :readonly="voiceActive" :aria-describedby="taskQuote?'task-quote':undefined" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):taskQuote?'补充给当前任务…':'输入消息…'" rows="1" maxlength="12000" :disabled="!currentTopic||currentTopic.executable===false"></textarea>
-     <button v-if="!voiceActive" id="voice-input" type="button" :disabled="!voiceScope" :aria-pressed="voiceActive"
-       aria-label="语音输入" title="语音输入" @click="toggleVoice"><VoiceOrb/></button>
+     <textarea ref="composer" id="message-text" v-model="displayedComposer" @focus="beginKeyboardOrb" @beforeinput="beginKeyboardOrb" @input="mirrorKeyboardOrb" @blur="clearKeyboardOrb" :readonly="voiceActive" :aria-describedby="taskQuote?'task-quote':undefined" :placeholder="currentTopic?.executable===false?(errors[currentTopic.unavailableReason]||'仅可阅读'):taskQuote?'补充给当前任务…':'输入消息…'" rows="1" maxlength="12000" :disabled="!canEditComposer"></textarea>
+     <button v-if="!voiceActive" id="voice-input" type="button" :disabled="!voiceScope||!server?.localSpeech" :aria-pressed="voiceActive"
+       :aria-label="server?.localSpeech?'语音输入':'语音识别未启用'" :title="server?.localSpeech?'语音输入':'语音识别未启用'" @click="toggleVoice"><VoiceOrb/></button>
      <button id="send" type="submit" :aria-label="taskQuote?'发送追加指令':'发送新消息'" :title="taskQuote?'发送追加指令':'发送新消息'" :disabled="voiceActive||!currentTopic||busy||newSubmissionBlocked||currentTopic?.executable===false||(taskQuote?quoteSendBlocked:composerDraft.modelUnavailable||(!text.trim()&&!pendingFiles.length))"><MobileIcon name="send"/></button>
     </form>
     <div v-show="visibleNotice||pairRecoveryNotice||pendingSubmission" class="send-state"><span v-if="visibleNotice" id="send-state" role="status">{{visibleNotice}}</span><span v-if="pairRecoveryNotice" role="status">{{pairRecoveryNotice}}</span><button id="retry-last" v-show="pendingSubmission" @click="retry" :disabled="busy||!pendingSubmission||Boolean(recoveryBlocker)">核对 / 同会话重试</button></div>

@@ -1,6 +1,6 @@
 'use strict';
 
-const { createHash } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const { failure } = require('./store');
 const { stable } = require('../Plugin/NativeSync/sync/protocol');
 const { ExecutionConfiguration } = require('./executionConfiguration');
@@ -107,6 +107,23 @@ class LocalWorkspace {
         if (!row || row.deleted) return config;
         const { unavailable, agentAlias, promptTemplate, ...value } = config;
         return { ...value, ...JSON.parse(row.configuration) };
+    }
+
+    createMobileAgent(subject, requestId, input, config) {
+        return this.store.command(subject.principal, requestId, { op: 'createAgent', ...input }, () => {
+            const agentId = 'mobile_' + randomUUID();
+            const topicId = 'default';
+            const key = localTopicKey('agent', agentId, topicId);
+            const { tavernRules, executionPolicy, ...agent } = config;
+            const definition = { name: '主要对话', config };
+            this.db.prepare("INSERT INTO core_owners (owner_type,id,configuration,version) VALUES('agent',?,?,1)")
+                .run(agentId, JSON.stringify(agent));
+            this.db.prepare(`INSERT INTO core_topics (id,owner_type,owner_id,native_topic,configuration,hash,version,origin_source)
+                VALUES(?,'agent',?,?,?,?,1,?)`)
+                .run(key, agentId, topicId, JSON.stringify(definition), signature(definition), subject.sourceId);
+            this.store.ensureConversation({ workspace: this.workspace, key, ownerId: agentId });
+            return { agentId, topicId, key };
+        });
     }
 
     async defineAgent(id, body, reauthorize) {
