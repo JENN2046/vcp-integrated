@@ -749,6 +749,11 @@ class CoreService {
                             }
                             mobilePreview = { workId: value.workId, text };
                         }
+                    } else if (actor.kind === 'mobile' && name === 'tool_display') {
+                        // The phone does not render native tool batches.
+                        return;
+                    } else if (actor.kind === 'mobile' && name === 'approval_requested') {
+                        write(name, { workId: value.workId, toolName: value.toolName });
                     } else {
                         if (name === 'work_state' && mobilePreview?.workId === value.workId &&
                             ['completed','failed','cancelled','review_required'].includes(value.status)) mobilePreview = undefined;

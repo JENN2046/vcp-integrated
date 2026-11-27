@@ -2,6 +2,7 @@
 import {computed,onUnmounted,ref,watch} from 'vue';
 import MobileIcon from './MobileIcon.vue';
 const props=defineProps({job:{type:Object,required:true},status:{type:String,required:true},tasks:Array,connected:Boolean});
+defineEmits(['open-work']);
 const title=computed(()=>props.connected?props.status:'连接中断 · 显示最近状态');
 const taskStates={accepted:'已接受',waiting:'等待中',running:'运行中',cancelling:'正在取消'};
 const now=ref(Date.now());
@@ -20,4 +21,5 @@ const elapsed=computed(()=>{
 <template><details class="inline-agent-run" :data-running="connected" :data-run-id="job.id" :data-run-state="job.state">
  <summary><span class="run-dot" aria-hidden="true"></span><strong>Agent Run</strong><span>{{title}}</span><time v-if="elapsed" :aria-label="'已用时间 '+elapsed">{{elapsed}}</time><MobileIcon name="chevron"/></summary>
  <ol><li>任务已记录</li><li v-if="job.state==='waiting_approval'">{{status}}</li><li v-for="task in tasks" :key="task.id">{{task.agent||'后台任务'}} · {{taskStates[task.state]}}</li></ol>
+ <button type="button" class="work-reply" @click="$emit('open-work')">查看任务详情</button>
 </details></template>

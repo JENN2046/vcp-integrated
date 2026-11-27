@@ -7,6 +7,7 @@ const path = require('node:path');
 const os = require('node:os');
 const https = require('node:https');
 const {createHash,X509Certificate} = require('node:crypto');
+const {setTimeout: delay} = require('node:timers/promises');
 const {execFileSync} = require('node:child_process');
 const {BOX,wait} = require('../native/fixtures/sharedSingleHarness.cjs');
 const {localProvider,host} = require('../native/fixtures/coreSingleHarness.cjs');
@@ -32,9 +33,24 @@ test('Core mobile only displays scoped native sticker assets from the original m
     chat.config.cachedEmojiLists = new Map([[pack,'静态.png|动图.gif']]);
     const manual='桌面正文 '+tag('动图.gif')+' 结束。';
     const native='模型正文 '+tag('静态.png')+' 结束。';
+    const hostPath=category+'/静态.png';
+    const nativeUrl=imageOrigin+'/pw='+imageKey+'/images/'+pack+'/静态.png';
+    const foreignSticker='https://foreign-sticker.invalid/images/'+encodeURIComponent(pack)+'/静态.png';
+    const streamed=['流式正文。 <','im','g src="',nativeUrl.slice(0,20),nativeUrl.slice(20),'" width="80"> ',
+        'ht',foreignSticker.slice(2,32),foreignSticker.slice(32),' ',hostPath.slice(0,18),hostPath.slice(18),' 结束。'];
+    const sentinels=[imageKey,imageOrigin,'foreign-sticker.invalid',root];
     const missing='缺图正文 '+tag('已移除.png')+tag('符号链接.png')+tag('静态.png','https://untrusted.invalid')+' 结束。';
-    provider.setReply((body,res)=>{
+    provider.setReply(async (body,res)=>{
         const value=JSON.stringify(body.messages.at(-1).content);
+        if(value.includes('流式')) {
+            res.writeHead(200,{'Content-Type':'text/event-stream'});
+            for(const content of streamed) {
+                res.write('data: '+JSON.stringify({choices:[{delta:{content}}]})+'\n\n');
+                await delay(120);
+            }
+            res.end('data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+            return;
+        }
         const content=value.includes('缺图')?missing:value.includes('纯文字')?'纯文字回复。':native;
         res.end(JSON.stringify({choices:[{message:{role:'assistant',content},finish_reason:'stop'}]}));
     });
@@ -62,7 +78,7 @@ test('Core mobile only displays scoped native sticker assets from the original m
     const define=async name=>{
         const key=localTopicKey('agent','fixture',name);
         await core.local.define(key,{ownerType:'agent',ownerId:'fixture',topicId:name,name,
-            config:{name:'Sticker fixture',model:'synthetic',systemPrompt:'原生可选素材：{{验收表情包}}',streamOutput:false}},()=>true);
+            config:{name:'Sticker fixture',model:'synthetic',systemPrompt:'原生可选素材：{{验收表情包}}',streamOutput:name==='stream'}},()=>true);
         return key;
     };
     function request(route,{token,body}={}){
@@ -74,7 +90,7 @@ test('Core mobile only displays scoped native sticker assets from the original m
         });
     }
     try{
-        const main=await define('main'), other=await define('other');
+        const main=await define('main'), other=await define('other'), stream=await define('stream');
         const pair=administer(env,['pair','desktop']);
         const desktop=await request('/core/api/pair',{body:{code:pair.pairingCode}});
         assert.equal(desktop.status,200);
@@ -126,6 +142,48 @@ test('Core mobile only displays scoped native sticker assets from the original m
         assert.equal(sends,before);
         assert.equal(core.store.db.prepare('select count(*) n from works').get().n,3);
         assert.equal(provider.calls.length,3);
+        const streamApi='/mobile/api/core/personal/'+stream;
+        await page.select('#topic-select',stream);
+        await page.waitForFunction(()=>!!document.querySelector('#history'));
+        const observe=async () => page.evaluate(base => {
+            window.stickerStreams ||= [];
+            const observation={wire:'', controller:new AbortController()};
+            window.stickerStreams.push(observation);
+            void (async () => {
+                const response=await fetch(base+'/observe',{signal:observation.controller.signal});
+                const reader=response.body.pipeThrough(new TextDecoderStream()).getReader();
+                for(;;) {
+                    const {value,done}=await reader.read();
+                    if(done)break;
+                    observation.wire+=value;
+                }
+            })().catch(()=>{});
+            return window.stickerStreams.length;
+        },streamApi);
+        await observe();
+        const streamAdmitted=await request('/core/api/personal/'+stream+'/send',{token,body:{requestId:'desktop-stream',text:'流式'}});
+        assert.equal(streamAdmitted.status,202);
+        await page.waitForFunction(()=>window.stickerStreams[0]?.wire.includes('流式正文'));
+        // Open another observer while the actual upstream is in flight.
+        await observe();
+        await page.waitForFunction(()=>window.stickerStreams[1]?.wire.includes('结束。'));
+        const wire=await page.evaluate(()=>window.stickerStreams.map(o=>{o.controller.abort();return o.wire;}));
+        assert.equal(wire.length,2);
+        for(const received of wire) {
+            assert.match(received,/event: work_preview/);
+            assert.match(received,/结束。/);
+            for(const secret of sentinels) assert.ok(!received.includes(secret), 'stream exposed a native reference');
+        }
+        await wait(()=>core.store.work(JSON.parse(streamAdmitted.bytes).id).status==='completed','stream finalized');
+        const streamHistory=await page.evaluate(async base=>Promise.all(['messages','changes?after=0'].map(async endpoint=>
+            (await fetch(base+'/'+endpoint)).text())),streamApi);
+        for(const raw of streamHistory) {
+            for(const secret of sentinels) assert.ok(!raw.includes(secret), 'history exposed a native reference');
+            assert.match(raw,/nativeStickerParts/);
+        }
+        await page.waitForFunction(()=>!!document.querySelector('#history img.native-sticker')?.naturalWidth);
+        assert.equal(await page.$('#history .inline-agent-run'),null);
+        assert.equal(await page.$('#history [data-live-work-id]'),null);
         assert.equal(projectPreview('正文 '+tag('静态.png').slice(0,-1)),'正文 ');
         assert.equal(projectPreview(native),'模型正文  结束。');
         t.diagnostic('Controlled provider fixture: real Core and Chromium read path, not proof of a live Agent selecting stickers.');

@@ -10,9 +10,20 @@ const types = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'i
 const imageTag = /<img\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi;
 const sourceAttribute = /(?:^|\s)src\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
 
-function displayText(value) {
-    // Image-server URL credentials never belong in the phone projection.
-    return value.replace(/\/pw=[^/\s"'<>]*/gi, '/pw=[已隐藏]');
+// Scan complete references before publishing any part of a streamed URL or path.
+const reference = /(?:https?:\/\/|file:\/\/|[A-Za-z]:[\\/]|\/)[^\s<>"'`()[\]，。；、！？]*/gi;
+const partialReference = /(?:https?:?|https?:\/|file:?|file:\/|[A-Za-z]:|\/)$/i;
+const nativeReference = /\/pw=|[\\/]images?[\\/][^\\/]*表情包[\\/]|(?:^|[\\/])[^\\/]*表情包[\\/][^\\/]+\.(?:png|jpe?g|gif|webp)(?:$|[?#])/i;
+const localPath = /^(?:file:|[A-Za-z]:[\\/]|\/(?:home|srv|tmp|var|opt|mnt|Users|storage|data|private|run|dev)\/)/i;
+
+function displayText(value, tail = false) {
+    const projected = value.replace(reference, (token, offset) => {
+        if (tail && offset + token.length === value.length) return '';
+        let decoded = token;
+        try { decoded = decodeURIComponent(token); } catch {}
+        return nativeReference.test(decoded) || localPath.test(decoded) ? unavailable : token;
+    });
+    return tail ? projected.replace(partialReference, '') : projected;
 }
 
 function pieces(content, preview = false) {
@@ -20,9 +31,10 @@ function pieces(content, preview = false) {
     let start = 0;
     let index = 0;
     function tailText(raw) {
-        // A streamed IMG can be split across chunks. Hide the partial tag until
-        // the original message has a stable reference to its native asset.
-        return displayText(raw.replace(/<img\b[^]*$/i, '').replace(preview ? /<(?:i(?:m)?)?$/i : /$^/, ''));
+        // Hide an unfinished IMG until the original message can own the asset.
+        const partialTag = /<img\b[^]*$/i.test(raw) || preview && /<(?:i(?:m)?)?$/i.test(raw);
+        if (partialTag) return displayText(raw.replace(/<img\b[^]*$|<(?:i(?:m)?)?$/i, ''));
+        return displayText(raw, preview);
     }
     for (const match of content.matchAll(imageTag)) {
         if (match.index > start) parts.push({ text: displayText(content.slice(start, match.index)) });
@@ -91,7 +103,7 @@ function sourceOptions(source) {
 }
 
 function projectMessage(message, source) {
-    if (typeof message.content !== 'string' || !/<img\b|\/pw=/i.test(message.content)) return message;
+    if (typeof message.content !== 'string') return message;
     const options = sourceOptions(source);
     const segments = pieces(message.content).map(part => part.text !== undefined ? part
         : { sticker: part.index < maxStickers && nativePath(part.src, options) ? part.index : null });

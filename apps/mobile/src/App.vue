@@ -607,6 +607,16 @@ function waitingForCoreReply(job){
  const preview=inlineLive.value.get(job.id);
  return replyInProgress.has(job.state)&&!checkingCoreWork(job)&&!preview?.text?.trim()&&!preview?.presentation;
 }
+async function openInlineRun(job){
+ if(job.topicKey!==selected.value)return;
+ const epoch=generation;
+ conversationPanel.value='work';
+ await nextTick();
+ if(epoch!==generation||conversationPanel.value!=='work')return;
+ const card=shell.value?.querySelector('[data-exec-id="'+CSS.escape(job.id)+'"]');
+ card?.focus({preventScroll:true});
+ card?.scrollIntoView({block:'nearest'});
+}
 function checkInlineWork(job){
  if(job.topicKey!==selected.value)return;
  if(needsReview(job))togglePanel('work');
@@ -2024,7 +2034,7 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
    <section ref="history" id="history" @scroll.passive="trackHistoryEnd" aria-label="聊天历史" :inert="navigationVisible || conversationPanel==='work'"><p v-if="historyProgress" class="history-progress" role="status">{{historyProgress.failed?'历史暂未加载完成，稍后重试':historyProgress.checking?'正在核对历史增量':'正在加载历史'}}<template v-if="historyProgress.total"> · {{historyProgress.loaded}} / {{historyProgress.total}}</template></p><button v-if="historyStart>0" class="earlier-messages" @click="showEarlierMessages">查看更早消息（还有 {{historyStart}} 条）</button><template v-for="m in visibleMessages" :key="m.id"><article class="message" :class="[m.role,{'snapshot-message':m.contextCompaction}]" :data-message-id="m.id" :tabindex="m.role==='assistant'?-1:undefined" :ref="m.role==='assistant'?el=>observeReplyElement(m.id,el):undefined"><div class="message-author" v-if="m.role!=='user'||m.name==='Flowlock'"><AgentAvatar v-if="m.role!=='user'&&!m.contextCompaction" :src="currentTopic?.ownerType==='group'?undefined:currentTopic?.avatar||activeAgent?.avatar" :name="m.name||currentTopic?.agentName"/><small>{{m.contextCompaction?'上下文快照':m.role==='user'?(m.name==='Flowlock'?'Flowlock':'你'):(m.name||currentTopic?.agentName||'Agent')}}</small></div><div v-if="m.nativeStickerParts?.length||(currentTopic?.coreSingle&&typeof m.content==='string'&&/<img\b|\/pw=/i.test(m.content))" class="bubble"><NativeStickerText :key="m.id+'/'+m.revision" :parts="m.nativeStickerParts" :fallback="m.content" :base="currentTopic?.coreSingle?'/mobile/api/'+corePath(currentTopic)+'/stickers/'+encodeURIComponent(m.id):''"/></div><div v-else-if="m.content?.length>128000" class="long-message"><button @click="toggleLongText(m)">{{expandedLongText.has(longTextKey(m))?'收起全文':'查看长文本'}} · {{m.content.length}} 字符</button><TextPages v-if="expandedLongText.has(longTextKey(m))" :text="m.content" class="bubble" style="max-height:60vh;overflow:auto"/></div><div v-else-if="m.content||!m.attachments?.length" class="bubble">{{typeof m.content==='string'?m.content:'此消息包含非文本内容，请在桌面查看'}}</div><details v-if="m.desktopReferences?.length" class="desktop-references"><summary>桌面活引用 {{m.desktopReferences.length}} 项 · 原件和提取文本未同步</summary><div v-for="r in m.desktopReferences" :key="r.id"><strong>{{r.name}}</strong><small>{{r.workspaceRef ? r.workspaceRef.alias+' / '+r.workspaceRef.relPath : r.target}} · 需在来源电脑核对</small></div></details><div v-if="m.attachments?.length" class="attachments"><div v-for="(a,index) in m.attachments" :key="a.id+'/'+index" class="attachment"><template v-if="attachmentStates[m.id+'/'+a.id]?.state==='available'"><SharedAttachmentImage v-if="currentTopic?.sharedSpaceId&&attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :key="generation+'/'+m.id+'/'+a.id" :url="attachmentUrl(m,a)" :alt="a.name||'图片附件'"></SharedAttachmentImage><img v-else-if="attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :src="attachmentUrl(m,a)" :alt="a.name||'图片附件'" loading="lazy"><button class="attachment-open" @click="openAttachment(m,a)"><MobileIcon name="file"/><span>{{a.name||'查看附件'}}</span><MobileIcon name="chevron"/></button><details v-if="a.extractedText" class="attachment-text" @toggle="toggleAttachmentText(m,a,index,$event)"><summary>查看文本</summary><TextPages v-if="expandedAttachmentText.has(attachmentTextKey(m,a,index))" :text="a.extractedText"/></details></template><span v-else>{{a.name||'附件'}} · {{attachmentStates[m.id+'/'+a.id]?.state==='unsupported'?'原件类型暂不支持，引用已保留':attachmentStates[m.id+'/'+a.id]?.state==='corrupt'?'完整性校验失败':'附件暂未同步或正在确认'}}</span></div></div></article>
     <template v-for="run in inlineRuns.get(m.id)" :key="run.id">
      <InlineAgentRun v-if="backgroundRunLabel(run)" :job="run" :status="backgroundRunLabel(run)" :tasks="backgroundTasks(run)"
-      :connected="!coreDisconnected"/>
+      :connected="!coreDisconnected" @open-work="openInlineRun(run)"/>
      <div v-if="checkingCoreWork(run)||needsWorkReplyLink(run)||(!backgroundRunLabel(run)&&waitingForCoreReply(run))"
       class="inline-reply-status" :data-reply-work-id="run.id">
       <button v-if="checkingCoreWork(run)" type="button" class="work-reply" @click="checkInlineWork(run)">核对任务</button>
@@ -2061,11 +2071,12 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
     <DesktopRelayStatus v-for="relay in desktopRelays" :key="relay.id" :relay="relay"/>
     <div v-if="jobsInfo && (jobs.length || !desktopRelays.length)" class="execution-pages"><small>本页 {{jobs.length}} 项 · 历史范围共 {{jobsInfo.total}} 项 · 待处理／核对范围 {{jobsInfo.attentionTotal}} 项</small><button v-if="jobsInfo.moreAttention" @click="nextExecutions('attention')" :disabled="busy">下一页待处理／核对</button><button v-if="jobsInfo.moreRecent" @click="nextExecutions('recent')" :disabled="busy">更早任务</button><button v-if="jobsInfo.historyPage" @click="latestExecutions" :disabled="busy">返回最新任务</button></div>
     <small v-if="jobs.length">{{online?'服务端任务记录':'最近已知状态，联网后重新核对'}}</small>
-    <article v-for="j in displayJobs" :key="j.id" class="execution-job" :data-exec-id="j.id" :data-state="j.state">
+    <article v-for="j in displayJobs" :key="j.id" class="execution-job" tabindex="-1" :data-exec-id="j.id" :data-state="j.state">
      <div class="execution-row"><span class="execution-label"><MobileIcon :name="j.state==='completed'?'check':'work'"/>{{executionLabel(j)}}<template v-if="j.steps?.length"> · {{j.steps.filter(s=>s.state==='completed').length}} / {{j.stepCount}} 位成员</template></span><template v-if="j.own && j.steps && supportsCancelRemaining">
       <button v-if="j.canCancelRemaining" :data-cancel-remaining-id="j.id" :disabled="!online" @click="cancelRemaining(j)">取消剩余接力</button>
      </template>
      <button v-else-if="j.own && ['queued','running','waiting_approval'].includes(j.state)" :data-cancel-id="j.id" @click="cancel(j.id)">{{j.steps?'中止本轮群聊':'请求取消本次回复'}}</button></div>
+     <p v-if="j.core&&j.state==='waiting_approval'" role="status">请在桌面审批面板处理此任务。</p>
      <div v-if="j.core && (workMessageNames.get(j.messageId)||workTime(j.createdAt))" class="work-meta">
       <span v-if="workMessageNames.get(j.messageId)">{{workMessageNames.get(j.messageId)}}</span><time v-if="workTime(j.createdAt)">{{workTime(j.createdAt)}}</time>
      </div>
