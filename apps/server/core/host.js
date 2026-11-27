@@ -1,6 +1,6 @@
 'use strict';
 
-function startCoreHost({ app, chat, listenHost, serverKey, legacy, modelCatalog, nativeStickers, env = process.env }) {
+function startCoreHost({ app, chat, listenHost, serverKey, legacy, modelCatalog, nativeStickers, diaryRecall, env = process.env }) {
     const directory = env.VCP_CORE_DATA_DIR, configuredWorkspace = env.VCP_CORE_WORKSPACE;
     if (!directory && !configuredWorkspace) return null;
     if (!directory || env.VCP_CORE_MODE && !['local', 'remote', 'shared'].includes(env.VCP_CORE_MODE)) {
@@ -22,7 +22,7 @@ function startCoreHost({ app, chat, listenHost, serverKey, legacy, modelCatalog,
     if (!local && (!configuredWorkspace || !adapter)) throw new Error('CORE_SHARED_AUTHORITY_UNAVAILABLE');
     const { CoreService } = require('./service');
     const speech = remote ? require('./localSpeech').localSpeechConfig(env) : null;
-    const core = new CoreService({ directory, workspace: configuredWorkspace || 'personal', chat, modelCatalog,
+    const core = new CoreService({ directory, workspace: configuredWorkspace || 'personal', chat, modelCatalog, diaryRecall,
         defaultAgentModel: env.VCP_CORE_DEFAULT_AGENT_MODEL,
         ...(remote && { remoteConfig: { origin: remoteOrigin, hours, speech }, nativeStickers }), ...adapter?.options });
     if (adapter) adapter.attach(core);

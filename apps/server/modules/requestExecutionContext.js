@@ -460,6 +460,7 @@ module.exports = {
     assertToolsAllowed, controlledToolWork, assertToolBatch, assertToolBoundary, executeControlledToolBatch, trackToolInvocation,
     settleToolPause: () => local.getStore()?.settleToolPause?.(),
     currentTopicSponsorCall, approvalOwner,
+    currentCoreDiaryRecall: () => local.getStore()?.coreDiaryRecall,
     currentCoreMemory: () => local.getStore()?.coreMemory,
     currentCoreGame: () => local.getStore()?.coreGame,
     currentCoreSponsor: () => local.getStore()?.coreSponsor,

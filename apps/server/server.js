@@ -1312,6 +1312,7 @@ async function initialize() {
     toolCallRecordStore.initialize();
     console.log('工具调用记录存储初始化完成。');
 
+    const diaryRecall = require('./core/nativeDiaryRecall').configuredDiaryRecall(process.env, knowledgeBaseManager);
     console.log('开始初始化向量数据库...');
     await knowledgeBaseManager.initialize(); // 在加载插件之前启动，确保服务就绪
     console.log('向量数据库初始化完成。');
@@ -1342,7 +1343,7 @@ async function initialize() {
     await pluginManager.initializeServices(app, adminPanelRoutes, __dirname);
     if (process.env.VCP_CORE_DATA_DIR || process.env.VCP_CORE_WORKSPACE) {
         coreHost = require('./core/host').startCoreHost({
-            app, chat: chatCompletionHandler, serverKey, modelCatalog: queryModelCatalog,
+            app, chat: chatCompletionHandler, serverKey, modelCatalog: queryModelCatalog, diaryRecall,
             nativeStickers: {
                 root: path.join(__dirname, 'image'),
                 origin: require('./core/nativeStickers').originForNativeImages(process.env),

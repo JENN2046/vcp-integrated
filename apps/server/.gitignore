@@ -23,3 +23,5 @@
 /Plugin/VCPBridgeServer/bridge-config.json
 /Plugin/VCPBridgeServer/profiles/
 /Plugin/WeatherReporter/weather_cache.json
+
+/Plugin/RAGDiaryPluginCore/

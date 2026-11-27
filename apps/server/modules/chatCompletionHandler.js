@@ -1272,6 +1272,13 @@ class ChatCompletionHandler {
 
       await writeDebugLog('LogOutputAfterProcessing', finalUpstreamBody);
 
+      // Keep request-local diary excerpts out of the conversation and context inspection store.
+      const diaryRecall = nativeContext.currentCoreDiaryRecall();
+      const diaryNote = diaryRecall && await diaryRecall(finalUpstreamBody.messages, abortController.signal);
+      const providerBody = diaryNote ? {
+        ...finalUpstreamBody,
+        messages: [finalUpstreamBody.messages[0], { role: 'system', content: diaryNote }, ...finalUpstreamBody.messages.slice(1)]
+      } : finalUpstreamBody;
       const requestFetchWithRetry = presence?.wrapFetch(fetchWithRetry) || fetchWithRetry;
 
       let firstAiAPIResponse = await requestFetchWithRetry(
@@ -1284,7 +1291,7 @@ class ChatCompletionHandler {
             ...(userAgent && { 'User-Agent': userAgent }),
             Accept: willStreamResponse ? 'text/event-stream' : acceptHeader || 'application/json',
           },
-          body: JSON.stringify(finalUpstreamBody),
+          body: JSON.stringify(providerBody),
           signal: abortController.signal,
         },
         {

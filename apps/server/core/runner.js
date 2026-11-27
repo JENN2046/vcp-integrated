@@ -6,11 +6,12 @@ const { failure } = require('./store');
 const { planGroup, buildGroupPacket } = require('./group');
 
 class CoreRunner {
-    constructor({ store, chat, resolveAcceptedTopic, buildPacket, allowedAgents, sponsor, send, automaticCompaction, isCompacting, attachments, desktopContext, memoryTool }) {
+    constructor({ store, chat, resolveAcceptedTopic, buildPacket, allowedAgents, sponsor, send, automaticCompaction, isCompacting, attachments, desktopContext, memoryTool, diaryRecall }) {
         this.store = store;
         this.chat = chat;
         this.attachments = attachments;
         this.desktopContext = desktopContext;
+        this.diaryRecall = diaryRecall;
         this.memoryTool = memoryTool;
         this.resolveAcceptedTopic = resolveAcceptedTopic;
         this.buildPacket = buildPacket;
@@ -155,6 +156,9 @@ class CoreRunner {
             const execute = (agent, turn) => native.runCoreTurn({
                 workId: id, signal, fence, observe,
                 ...(this.sponsor && !group && topic.actor?.kind === 'desktop' && !config.sponsoredByWorkId && { coreSponsor: (invocation, args) => this.sponsor(work, invocation, args) }),
+                ...(!group && !config.game && !config.sponsoredByWorkId && this.diaryRecall && {
+                    coreDiaryRecall: (messages, requestSignal) => this.diaryRecall(topic, messages, requestSignal, fence)
+                }),
                 coreMemory: (name, args, pluginConfig) => this.memoryTool(topic, name, args, pluginConfig),
                 ...(config.game && { coreGame: args => this.desktopContext.gameTool(topic, config.game, agent.name, args) }),
                 coreAA: {
