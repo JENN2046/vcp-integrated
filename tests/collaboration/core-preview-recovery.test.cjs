@@ -83,15 +83,18 @@ test('Core PWA retires each finished preview across a missed or late event', {ti
         const send = requestId => sender.call(route+'/send',{requestId,text:requestId},202);
         const first = await send('fixture-preview-first');
         await wait(() => streams.length===1,'first Work running');
-        const firstRun = '[data-run-id="'+first.id+'"]';
+        const firstRun = '[data-reply-work-id="'+first.id+'"]';
         const secondLabel = 'SECOND_WORK_LIVE';
         const liveText = text => page.waitForFunction(text =>
             Array.from(document.querySelectorAll('.live-message')).some(el=>el.textContent.includes(text)),{},text);
         const live = () => page.$$eval('.live-message',rows=>rows.map(row=>row.textContent));
         const settled = workId => core.store.work(workId).status==='completed';
+        await page.waitForFunction(sel=>document.querySelector(sel)?.textContent.includes('正在回复'),{},firstRun);
+        push('tool',{workId:first.id,pluginName:'Fixture tool',status:'dispatched'});
+        assert.equal(await page.$('.inline-agent-run'),null);
         push('work_preview',{workId:first.id,text:'FIRST_WORK_OLD_PREVIEW'});
         await liveText('FIRST_WORK_OLD_PREVIEW');
-        await page.waitForSelector(firstRun+'[data-run-state=running]');
+        await page.waitForSelector(firstRun,{hidden:true});
         // Match the handset: the observer misses the terminal event. The /works
         // snapshot sees completion before the message delta reaches this page.
         holdChanges=true;
@@ -102,11 +105,11 @@ test('Core PWA retires each finished preview across a missed or late event', {ti
         await wait(() => streams.length===2,'another Work remains in flight');
         push('work_preview',{workId:second.id,text:secondLabel});
         await liveText(secondLabel);
-        await page.waitForSelector(firstRun+'[data-run-state=completed]');
+        await page.waitForFunction(sel=>document.querySelector(sel)?.textContent.includes('核对任务'),{},firstRun);
         assert.deepEqual((await live()).map(text=>text.includes(secondLabel)),[true],
             'a completed snapshot must retire only that Work preview');
-        assert.match(await page.$eval(firstRun+' summary',el=>el.textContent),/正在同步回复/);
-        assert.equal(await page.$(firstRun+' .work-reply'),null);
+        assert.equal(await page.$('.inline-agent-run'),null);
+        await page.click(firstRun+' .work-reply');
 
         push('work_preview',{workId:first.id,text:'FIRST_WORK_LATE_PREVIEW'});
         push('delta',{workId:first.id,text:'FIRST_WORK_LATE_DELTA'});
@@ -116,7 +119,12 @@ test('Core PWA retires each finished preview across a missed or late event', {ti
             'late preview and delta must not resurrect the first Work');
 
         holdChanges=false;
-        await page.click(firstRun+' summary');
+        await page.waitForSelector('[data-message-id="'+firstReply+'"]');
+        await page.evaluate((reply,message)=>{
+            document.querySelector('[data-message-id="'+reply+'"]').style.marginTop='1200px';
+            document.querySelector('[data-message-id="'+message+'"]').scrollIntoView({block:'start',behavior:'instant'});
+        },firstReply,core.store.work(first.id).user_message_id);
+        await page.waitForFunction(sel=>document.querySelector(sel)?.textContent.includes('查看原回复'),{},firstRun);
         await page.waitForSelector(firstRun+' .work-reply',{visible:true});
         await page.click(firstRun+' .work-reply');
         assert.equal(await page.evaluate(()=>document.activeElement?.dataset.messageId),firstReply);
@@ -125,20 +133,33 @@ test('Core PWA retires each finished preview across a missed or late event', {ti
 
         // Invert the order for the second Work: the terminal event now arrives
         // while the /works snapshot still reports running.
+        const action='[data-run-id="'+second.id+'"]';
+        push('approval_requested',{workId:second.id,toolName:'Fixture approval'});
+        await page.waitForFunction(sel=>document.querySelector(sel)?.textContent.includes('等待桌面审批'),{},action);
+        push('approval_settled',{workId:second.id});
+        await page.waitForSelector(action,{hidden:true});
+        worksBeforeSecondFinal = await sender.call(route+'/works');
+        const task='fixture-native-task';
+        worksBeforeSecondFinal.works.find(work=>work.id===second.id).tasks=[{id:task,agent:'Fixture Agent',state:'running'}];
+        holdWorks=true;
+        push('native_task',{workId:second.id,taskId:task,state:'running'});
+        await page.waitForFunction(sel=>document.querySelector(sel)?.textContent.includes('后台任务进行中'),{},action);
+        holdWorks=false;
+        push('native_task',{workId:second.id,taskId:task,state:'completed'});
+        await page.waitForSelector(action,{hidden:true});
         worksBeforeSecondFinal = await sender.call(route+'/works');
         holdChanges=holdWorks=true;
         finish(1,'Original second reply.');
         await wait(() => settled(second.id),'second Work completed in Core');
         const secondReply = core.store.work(second.id).reply_message_id;
-        const secondRun = '[data-run-id="'+second.id+'"]';
+        const secondRun = '[data-reply-work-id="'+second.id+'"]';
         push('work_state',{workId:second.id,status:'completed',replyId:secondReply});
         push('work_preview',{workId:second.id,text:'SECOND_WORK_LATE_PREVIEW'});
-        await page.waitForSelector(secondRun+'[data-run-state=completed]');
-        assert.match(await page.$eval(secondRun+' summary',el=>el.textContent),/正在同步回复/);
+        await page.waitForFunction(sel=>document.querySelector(sel)?.textContent.includes('核对任务'),{},secondRun);
         assert.deepEqual(await live(),[]);
         holdChanges=holdWorks=false;
         await page.waitForSelector('[data-message-id="'+secondReply+'"]');
-        assert.equal(await page.$$eval('.live-message',rows=>rows.length),0);
+        assert.equal(await page.$$eval('.live-message,.inline-agent-run',rows=>rows.length),0);
         assert.equal(writes,0);
         assert.deepEqual(errors,[]);
     } finally {

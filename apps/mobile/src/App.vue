@@ -529,6 +529,33 @@ const workMessageNames=computed(()=>new Map(messages.value.map(message=>[message
  typeof message.content==='string'?message.content.slice(0,160).trim():'' ])));
 const hasWorkReply=job=>job.core&&job.state==='completed'&&workMessageNames.value.has(job.replyId);
 const workReplySyncing=job=>job.core&&job.state==='completed'&&Boolean(job.replyId)&&!hasWorkReply(job);
+const replyVisibility=shallowReactive(new Map());
+const replyElements=new Map();
+const renderedReplyIds=computed(()=>new Set(visibleMessages.value.filter(message=>message.role==='assistant').map(message=>message.id)));
+let replyObserver;
+watch(history,area=>{
+ replyObserver?.disconnect();
+ replyVisibility.clear();
+ replyObserver=area?new IntersectionObserver(entries=>{
+  if(history.value!==area)return;
+  for(const entry of entries){
+   const id=entry.target.dataset.messageId;
+   if(replyElements.get(id)===entry.target)replyVisibility.set(id,entry.isIntersecting);
+  }
+ },{root:area}):undefined;
+ if(replyObserver)for(const element of replyElements.values())replyObserver.observe(element);
+});
+onUnmounted(()=>replyObserver?.disconnect());
+function observeReplyElement(id,element){
+ const old=replyElements.get(id);
+ if(old===element)return;
+ if(old)replyObserver?.unobserve(old);
+ if(replyVisibility.has(id))replyVisibility.delete(id);
+ if(element){replyElements.set(id,element);replyObserver?.observe(element);}
+ else replyElements.delete(id);
+}
+const needsWorkReplyLink=job=>hasWorkReply(job)&&
+ (!renderedReplyIds.value.has(job.replyId)||replyVisibility.get(job.replyId)===false);
 function observedCoreWork(job){
  const terminal=terminalCoreWorks.get(job.id);
  return terminal?.status==='completed'
@@ -554,15 +581,37 @@ function workTime(createdAt){
 const displayJobs=computed(()=>jobs.value.map(job=>{try{if(job.topicKey!==selected.value)throw Error('NATIVE_TASK_TOPIC_MISMATCH');if(job.core)return {...observedCoreWork(job),nativeTasks:(job.tasks||[]).map(task=>({...task,nativeTaskId:task.id,agentBaseName:task.agent,resultRef:task.revision===1?task.id:null})),toolInvocations:(job.tools||[]).map(tool=>({invocationId:tool.id,pluginName:tool.name,state:tool.status}))};return {...job,...projectNativeWork(job)};}catch{return {...job,nativeTasks:[],toolInvocations:[],nativeTaskError:'原生任务关联暂不能核对，请刷新或在宿主检查。'};}}));
 const inlineRuns=computed(()=>{
  const byMessage=new Map();
- for(const job of jobs.value){
+ for(const job of displayJobs.value){
   if(!job.core||job.topicKey!==selected.value||!job.messageId)continue;
   if(!byMessage.has(job.messageId))byMessage.set(job.messageId,[]);
-  byMessage.get(job.messageId).push(observedCoreWork(job));
+  byMessage.get(job.messageId).push(job);
  }
  return byMessage;
 });
 const inlineLive=computed(()=>new Map(corePreviews.value.map(work=>[work.id,work])));
-const failedByMessage=computed(()=>new Map(jobs.value.filter(work=>work.core&&work.state==='failed'&&work.messageId)
+const replyInProgress=new Set(['queued','running','cancelling']);
+const backgroundInProgress=new Set(['accepted','waiting','running','cancelling']);
+const backgroundTasks=job=>(job.tasks||[]).filter(task=>backgroundInProgress.has(task.state));
+const backgroundRunLabel=job=>{
+ if(job.state==='waiting_approval'||(!terminalCoreStates.has(job.state)&&inlineLive.value.get(job.id)?.approval))return '等待桌面审批';
+ if(backgroundTasks(job).length)return '后台任务进行中';
+ return '';
+};
+const coreDisconnected=computed(()=>!online.value||!browserOnline.value||coreFeed.value==='paused');
+const coreReplyPreviews=computed(()=>corePreviews.value.filter(work=>work.text?.trim()||work.presentation));
+function checkingCoreWork(job){
+ return workReplySyncing(job)||needsReview(job)||(replyInProgress.has(job.state)&&coreDisconnected.value);
+}
+function waitingForCoreReply(job){
+ const preview=inlineLive.value.get(job.id);
+ return replyInProgress.has(job.state)&&!checkingCoreWork(job)&&!preview?.text?.trim()&&!preview?.presentation;
+}
+function checkInlineWork(job){
+ if(job.topicKey!==selected.value)return;
+ if(needsReview(job))togglePanel('work');
+ else void refresh();
+}
+const failedByMessage=computed(()=>new Map(jobs.value.filter(work=>work.core&&work.topicKey===selected.value&&work.state==='failed'&&work.messageId)
  .map(work=>[work.messageId,work])));
 watch([visibleSharedStreams,corePreviews,failedByMessage],async()=>{
  const area=history.value,key=selected.value,stick=nearHistoryEnd(area);
@@ -585,7 +634,7 @@ const workButtonText=computed(()=>{
  if(desktopRelays.value.some(r=>r.state==='awaiting_handoff'))return '等待桌面接管';
  if(desktopRelays.value.some(r=>r.state==='awaiting_continue'))return '等待桌面继续';
  if(desktopRelays.value.some(r=>r.state==='first_member'||r.state==='continuing'))return '桌面接力中';
- if(displayJobs.value.some(j=>['running','dispatched','continuing','queued','accepted','publishing'].includes(j.state)))return '任务进行中';
+ if(displayJobs.value.some(j=>j.core?backgroundRunLabel(j):['running','dispatched','continuing','queued','accepted','publishing'].includes(j.state)))return '任务进行中';
  return '任务状态';
 });
 const workTone=computed(()=>workButtonText.value==='任务状态'?'neutral':workButtonText.value==='任务进行中'||workButtonText.value==='桌面接力中'?'active':'attention');
@@ -1971,19 +2020,26 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
    <SharedConfigEditor v-if="currentTopic?.sharedSpaceId&&sharedSpaces.some(s=>s.id===currentTopic.sharedSpaceId&&s.config)" :key="currentTopic.sharedOwnerId" :topic="currentTopic" :context="recoveryContext" :api="api" />
    </details>
    </nav>
-   <section ref="history" id="history" @scroll.passive="trackHistoryEnd" aria-label="聊天历史" :inert="navigationVisible || conversationPanel==='work'"><p v-if="historyProgress" class="history-progress" role="status">{{historyProgress.failed?'历史暂未加载完成，稍后重试':historyProgress.checking?'正在核对历史增量':'正在加载历史'}}<template v-if="historyProgress.total"> · {{historyProgress.loaded}} / {{historyProgress.total}}</template></p><button v-if="historyStart>0" class="earlier-messages" @click="showEarlierMessages">查看更早消息（还有 {{historyStart}} 条）</button><template v-for="m in visibleMessages" :key="m.id"><article class="message" :class="[m.role,{'snapshot-message':m.contextCompaction}]" :data-message-id="m.id" :tabindex="m.role==='assistant'?-1:undefined"><div class="message-author" v-if="m.role!=='user'||m.name==='Flowlock'"><AgentAvatar v-if="m.role!=='user'&&!m.contextCompaction" :src="currentTopic?.ownerType==='group'?undefined:currentTopic?.avatar||activeAgent?.avatar" :name="m.name||currentTopic?.agentName"/><small>{{m.contextCompaction?'上下文快照':m.role==='user'?(m.name==='Flowlock'?'Flowlock':'你'):(m.name||currentTopic?.agentName||'Agent')}}</small></div><div v-if="m.content?.length>128000" class="long-message"><button @click="toggleLongText(m)">{{expandedLongText.has(longTextKey(m))?'收起全文':'查看长文本'}} · {{m.content.length}} 字符</button><TextPages v-if="expandedLongText.has(longTextKey(m))" :text="m.content" class="bubble" style="max-height:60vh;overflow:auto"/></div><div v-else-if="m.content||!m.attachments?.length" class="bubble">{{typeof m.content==='string'?m.content:'此消息包含非文本内容，请在桌面查看'}}</div><details v-if="m.desktopReferences?.length" class="desktop-references"><summary>桌面活引用 {{m.desktopReferences.length}} 项 · 原件和提取文本未同步</summary><div v-for="r in m.desktopReferences" :key="r.id"><strong>{{r.name}}</strong><small>{{r.workspaceRef ? r.workspaceRef.alias+' / '+r.workspaceRef.relPath : r.target}} · 需在来源电脑核对</small></div></details><div v-if="m.attachments?.length" class="attachments"><div v-for="(a,index) in m.attachments" :key="a.id+'/'+index" class="attachment"><template v-if="attachmentStates[m.id+'/'+a.id]?.state==='available'"><SharedAttachmentImage v-if="currentTopic?.sharedSpaceId&&attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :key="generation+'/'+m.id+'/'+a.id" :url="attachmentUrl(m,a)" :alt="a.name||'图片附件'"></SharedAttachmentImage><img v-else-if="attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :src="attachmentUrl(m,a)" :alt="a.name||'图片附件'" loading="lazy"><button class="attachment-open" @click="openAttachment(m,a)"><MobileIcon name="file"/><span>{{a.name||'查看附件'}}</span><MobileIcon name="chevron"/></button><details v-if="a.extractedText" class="attachment-text" @toggle="toggleAttachmentText(m,a,index,$event)"><summary>查看文本</summary><TextPages v-if="expandedAttachmentText.has(attachmentTextKey(m,a,index))" :text="a.extractedText"/></details></template><span v-else>{{a.name||'附件'}} · {{attachmentStates[m.id+'/'+a.id]?.state==='unsupported'?'原件类型暂不支持，引用已保留':attachmentStates[m.id+'/'+a.id]?.state==='corrupt'?'完整性校验失败':'附件暂未同步或正在确认'}}</span></div></div></article>
-    <InlineAgentRun v-for="run in inlineRuns.get(m.id)" :key="run.id" :job="run" :live="inlineLive.get(run.id)"
-      :connected="online&&browserOnline&&coreFeed==='live'" :has-reply="hasWorkReply(run)" :reply-syncing="workReplySyncing(run)" @open-reply="openWorkReply(run)"/>
+   <section ref="history" id="history" @scroll.passive="trackHistoryEnd" aria-label="聊天历史" :inert="navigationVisible || conversationPanel==='work'"><p v-if="historyProgress" class="history-progress" role="status">{{historyProgress.failed?'历史暂未加载完成，稍后重试':historyProgress.checking?'正在核对历史增量':'正在加载历史'}}<template v-if="historyProgress.total"> · {{historyProgress.loaded}} / {{historyProgress.total}}</template></p><button v-if="historyStart>0" class="earlier-messages" @click="showEarlierMessages">查看更早消息（还有 {{historyStart}} 条）</button><template v-for="m in visibleMessages" :key="m.id"><article class="message" :class="[m.role,{'snapshot-message':m.contextCompaction}]" :data-message-id="m.id" :tabindex="m.role==='assistant'?-1:undefined" :ref="m.role==='assistant'?el=>observeReplyElement(m.id,el):undefined"><div class="message-author" v-if="m.role!=='user'||m.name==='Flowlock'"><AgentAvatar v-if="m.role!=='user'&&!m.contextCompaction" :src="currentTopic?.ownerType==='group'?undefined:currentTopic?.avatar||activeAgent?.avatar" :name="m.name||currentTopic?.agentName"/><small>{{m.contextCompaction?'上下文快照':m.role==='user'?(m.name==='Flowlock'?'Flowlock':'你'):(m.name||currentTopic?.agentName||'Agent')}}</small></div><div v-if="m.content?.length>128000" class="long-message"><button @click="toggleLongText(m)">{{expandedLongText.has(longTextKey(m))?'收起全文':'查看长文本'}} · {{m.content.length}} 字符</button><TextPages v-if="expandedLongText.has(longTextKey(m))" :text="m.content" class="bubble" style="max-height:60vh;overflow:auto"/></div><div v-else-if="m.content||!m.attachments?.length" class="bubble">{{typeof m.content==='string'?m.content:'此消息包含非文本内容，请在桌面查看'}}</div><details v-if="m.desktopReferences?.length" class="desktop-references"><summary>桌面活引用 {{m.desktopReferences.length}} 项 · 原件和提取文本未同步</summary><div v-for="r in m.desktopReferences" :key="r.id"><strong>{{r.name}}</strong><small>{{r.workspaceRef ? r.workspaceRef.alias+' / '+r.workspaceRef.relPath : r.target}} · 需在来源电脑核对</small></div></details><div v-if="m.attachments?.length" class="attachments"><div v-for="(a,index) in m.attachments" :key="a.id+'/'+index" class="attachment"><template v-if="attachmentStates[m.id+'/'+a.id]?.state==='available'"><SharedAttachmentImage v-if="currentTopic?.sharedSpaceId&&attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :key="generation+'/'+m.id+'/'+a.id" :url="attachmentUrl(m,a)" :alt="a.name||'图片附件'"></SharedAttachmentImage><img v-else-if="attachmentStates[m.id+'/'+a.id]?.type?.startsWith('image/')" :src="attachmentUrl(m,a)" :alt="a.name||'图片附件'" loading="lazy"><button class="attachment-open" @click="openAttachment(m,a)"><MobileIcon name="file"/><span>{{a.name||'查看附件'}}</span><MobileIcon name="chevron"/></button><details v-if="a.extractedText" class="attachment-text" @toggle="toggleAttachmentText(m,a,index,$event)"><summary>查看文本</summary><TextPages v-if="expandedAttachmentText.has(attachmentTextKey(m,a,index))" :text="a.extractedText"/></details></template><span v-else>{{a.name||'附件'}} · {{attachmentStates[m.id+'/'+a.id]?.state==='unsupported'?'原件类型暂不支持，引用已保留':attachmentStates[m.id+'/'+a.id]?.state==='corrupt'?'完整性校验失败':'附件暂未同步或正在确认'}}</span></div></div></article>
+    <template v-for="run in inlineRuns.get(m.id)" :key="run.id">
+     <InlineAgentRun v-if="backgroundRunLabel(run)" :job="run" :status="backgroundRunLabel(run)" :tasks="backgroundTasks(run)"
+      :connected="!coreDisconnected"/>
+     <div v-if="checkingCoreWork(run)||needsWorkReplyLink(run)||(!backgroundRunLabel(run)&&waitingForCoreReply(run))"
+      class="inline-reply-status" :data-reply-work-id="run.id">
+      <button v-if="checkingCoreWork(run)" type="button" class="work-reply" @click="checkInlineWork(run)">核对任务</button>
+      <span v-else-if="!backgroundRunLabel(run)&&waitingForCoreReply(run)" role="status">正在回复</span>
+      <button v-if="needsWorkReplyLink(run)" type="button" class="work-reply" @click="openWorkReply(run)">查看原回复</button>
+     </div>
+    </template>
     <article v-if="failedByMessage.has(m.id)" class="failed-work" :data-failed-work="failedByMessage.get(m.id).id">
      <strong>任务执行失败</strong>
      <p>{{failedByMessage.get(m.id).errorCode==='UPSTREAM_ERROR'?'模型服务暂不可用。':'本次任务已停止。'}}请先核对任务状态，再决定是否发起新消息。</p>
      <button type="button" @click="togglePanel('work')">查看任务状态</button>
     </article>
    </template><p v-if="!messages.length&&!historyProgress&&!visibleSharedStreams.length" class="empty">{{currentTopic?.historyReady===false?'正在等待电脑同步所选历史，完成后即可接续。':currentTopic?.executable===false?'还没有消息。':'还没有消息，发送一条开始会话。'}}</p>
-   <section v-if="currentTopic?.coreSingle && corePreviews.length" aria-label="正在生成的共享回复">
-    <article v-for="work in corePreviews" :key="work.id" class="message assistant live-message">
+   <section v-if="currentTopic?.coreSingle && coreReplyPreviews.length" aria-label="正在回复">
+    <article v-for="work in coreReplyPreviews" :key="work.id" class="message assistant live-message" :data-live-work-id="work.id">
      <div class="message-author"><AgentAvatar :src="currentTopic?.avatar||activeAgent?.avatar" :name="work.speakerName||currentTopic?.agentName"/><small>{{work.speakerName||currentTopic?.agentName||'Agent'}}</small></div>
-     <div class="work-inline" :data-tone="work.approval?'attention':'active'"><MobileIcon :name="work.approval||work.tool?'tool':'work'"/><span>{{work.approval?'等待桌面审批 · '+work.approval:coreFeed!=='live'||!browserOnline?'最近收到的预览':work.tool?work.tool+' · '+(displayedToolStatus[work.toolStatus]||'工具状态待核对'):'正在生成回复'}}</span></div>
      <div v-if="work.text" class="bubble">{{work.text}}</div>
      <div v-if="work.presentation" class="bubble"><strong>{{work.presentation.title}}</strong><p>{{work.presentation.challenge}}</p></div>
     </article>

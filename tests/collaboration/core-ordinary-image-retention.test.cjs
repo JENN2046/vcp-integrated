@@ -199,11 +199,15 @@ test('ordinary Core PWA image send commits its links with admission and never re
         assert.equal(exact.executions[0].id,work.id);
         assert.equal(exact.executions[0].requestId,receipt.requestId);
         const final=core.store.work(work.id);
-        const run='[data-run-id="'+work.id+'"][data-run-state="completed"]';
+        const run='[data-reply-work-id="'+work.id+'"]';
         const image='[data-message-id="'+work.user_message_id+'"] .attachment-open';
-        await page.waitForSelector(run+' summary',{visible:true});
-        await page.click(run+' summary');
-        await page.waitForSelector(run+' .work-reply',{visible:true});
+        await page.waitForSelector('[data-message-id="'+final.reply_message_id+'"]');
+        assert.equal(await page.$('[data-run-id="'+work.id+'"]'),null);
+        await page.evaluate((replyId)=>{
+            document.querySelector('[data-message-id="'+replyId+'"]').style.marginTop='1400px';
+            document.getElementById('history').scrollTop=0;
+        },final.reply_message_id);
+        await page.waitForFunction(sel=>document.querySelector(sel)?.textContent.includes('查看原回复'),{},run);
         await page.click(run+' .work-reply');
         assert.equal(await page.evaluate(()=>document.activeElement?.dataset.messageId),final.reply_message_id);
         await page.waitForSelector(image,{visible:true});

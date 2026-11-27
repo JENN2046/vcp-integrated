@@ -125,13 +125,16 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
             message: { id: 'from-desktop', role: 'user', content: '把明天的拍摄安排整理一下：先拍产品主图，再拍细节，最后试一组上身图。', attachments: [] } });
         await desktop.close();
         await page.waitForFunction(() => document.querySelector('.live-message .bubble')?.textContent.includes('共用布光'));
-        const firstRun = '[data-run-id="' + first.serverSession.executionId + '"]';
-        await page.waitForSelector(firstRun + '[data-run-state="running"]');
+        const firstRun = '[data-reply-work-id="' + first.serverSession.executionId + '"]';
+        assert.equal(await page.$('[data-run-id="'+first.serverSession.executionId+'"]'),null);
+        // The SSE preview can arrive before /works ties the Work to its original message.
+        await page.waitForSelector('[data-exec-id="'+first.serverSession.executionId+'"][data-state="running"]');
         await page.setOfflineMode(true);
-        await page.waitForSelector('.connection-banner', { visible:true });
+        await page.waitForSelector('.connection-banner', {visible:true});
+        await page.waitForFunction(sel=>document.querySelector(sel)?.textContent.includes('核对任务'),{},firstRun);
         await page.setOfflineMode(false);
-        await page.waitForFunction(selector => document.querySelector(selector)?.dataset.running === 'true' &&
-            !document.querySelector('.connection-banner'), {}, firstRun);
+        await page.waitForSelector('.connection-banner', {hidden:true});
+        await page.waitForSelector('[data-live-work-id="'+first.serverSession.executionId+'"] .bubble');
         assert.deepEqual(composerPosts, []);
         await shot(page, '02a-reconnected-same-run');
         await page.waitForSelector('#quote-task',{visible:true});
@@ -280,9 +283,13 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         const finalText = '\n\n第一组｜白底产品主图\n先固定机位、白平衡和产品朝向，再补正面与侧面。\n\n第二组｜细节与功能\n保留原布光，拉近拍材质与缝线。两组都拍完后，再切换到上身布景。';
         finish(upstream[1], finalText);
         await page.waitForFunction(id => Boolean(document.querySelector('[data-message-id="' + id + '"] .bubble')?.textContent.includes('第二组')), {}, first.replyId);
-        await page.waitForSelector(firstRun + '[data-run-state="completed"]');
-        await page.click(firstRun + ' summary');
-        await page.waitForSelector(firstRun + ' .work-reply', {visible:true,timeout:2000});
+        assert.equal(await page.$('[data-run-id="'+first.serverSession.executionId+'"]'),null);
+        await page.evaluate((replyId)=>{
+            const reply=document.querySelector('[data-message-id="'+replyId+'"]');
+            reply.style.marginTop='1200px';
+            document.getElementById('history').scrollTop=0;
+        },first.replyId);
+        await page.waitForFunction(sel=>document.querySelector(sel)?.textContent.includes('查看原回复'),{},firstRun);
         await page.click(firstRun + ' .work-reply');
         assert.equal(await page.evaluate(() => document.activeElement?.dataset.messageId), first.replyId);
         await page.reload({waitUntil:'domcontentloaded'});

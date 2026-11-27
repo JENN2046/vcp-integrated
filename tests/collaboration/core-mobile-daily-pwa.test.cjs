@@ -265,12 +265,12 @@ test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scro
         await page.waitForFunction(() => document.querySelector('[data-state=failed]'));
         const failedInline = () => page.evaluate(id => document.querySelector('#history [data-failed-work="'+id+'"]')?.textContent.includes('执行失败') || false, failed);
         results.failureInHistory = await failedInline();
-        const runSelector = '#history [data-run-id="'+failed+'"]';
-        const linked = await page.$eval(runSelector,(run,messageId) => run.previousElementSibling?.dataset.messageId===messageId,
+        const failedSelector='#history [data-failed-work="'+failed+'"]';
+        await page.waitForSelector(failedSelector);
+        const linked=await page.$eval(failedSelector,(entry,messageId)=>entry.previousElementSibling?.dataset.messageId===messageId,
             core.store.work(failed).user_message_id);
         assert.equal(linked,true);
-        await page.click(runSelector+' summary');
-        assert.equal(await page.$eval(runSelector,run=>run.open&&run.dataset.runState==='failed'),true);
+        assert.equal(await page.$('#history [data-run-id="'+failed+'"]'),null);
         await page.setOfflineMode(true);
         await page.waitForSelector('.connection-banner', {visible:true});
         // Let the scheduled history poll fail while offline.
