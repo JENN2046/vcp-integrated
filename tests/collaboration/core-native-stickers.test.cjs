@@ -115,6 +115,11 @@ test('Core mobile only displays scoped native sticker assets from the original m
         const page=await browser.newPage();
         await page.setViewport({width:393,height:852,isMobile:true,hasTouch:true});
         await page.goto(origin+'/mobile/#pair='+administer(env,['pair','mobile']).pairingCode);
+        await page.waitForFunction(() => {
+            const code = document.querySelector('#pair-code');
+            const submit = document.querySelector('#pair-submit');
+            return Boolean(code?.value && submit && !submit.disabled);
+        });
         await page.click('#pair-submit');
         await page.waitForSelector('#topic-select');
         await page.select('#topic-select',main);
