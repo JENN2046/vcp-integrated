@@ -167,3 +167,83 @@ test('Core starts each native group member with a fresh sink', async t => {
     assert.equal(sinks.length, 2);
     assert.notEqual(sinks[0], sinks[1]);
 });
+
+test('Core uses native ordinary approval for approve, deny, expiry and Work cancellation', async t => {
+    const f = await fixture(t);
+    const provider = await localProvider(t);
+    const { chat, pluginManager } = host(provider);
+    const hub = require(BOX + '/WebSocketServer');
+    const Ws = require(BOX + '/node_modules/ws');
+    const server = http.createServer();
+    const key = 'isolated-core-approval-fixture';
+    hub.setPluginManager(pluginManager);
+    hub.initialize(server, { vcpKey: key });
+    pluginManager.setWebSocketServer(hub);
+    chat.config.webSocketServer = hub;
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const ws = new Ws('ws://127.0.0.1:' + server.address().port + '/VCPlog/VCP_Key=' + key);
+    t.after(async () => {
+        ws.terminate();
+        await hub.shutdown();
+        await new Promise(resolve => server.close(resolve));
+    });
+    await once(ws, 'open');
+
+    const tool = 'CoreOrdinaryApprovalFixture';
+    const settings = pluginManager.toolApprovalManager;
+    const originalConfig = settings.configPath;
+    settings.configPath = path.join(f.root, 'ordinary-approval.json');
+    const configure = async timeoutMinutes => {
+        await fs.writeFile(settings.configPath, JSON.stringify({ enabled: true, timeoutMinutes, approvalList: [tool] }));
+        settings.loadConfig();
+    };
+    await configure(0.1);
+    let invokes = 0;
+    pluginManager.plugins.set(tool, { name: tool, pluginType: 'hybridservice', communication: { protocol: 'direct' } });
+    pluginManager.serviceModules.set(tool, { module: { async processToolCall() { invokes++; return 'ordinary tool ran'; } } });
+    t.after(() => {
+        settings.configPath = originalConfig;
+        settings.loadConfig();
+        pluginManager.plugins.delete(tool);
+        pluginManager.serviceModules.delete(tool);
+    });
+    const frames = [];
+    ws.on('message', bytes => {
+        const frame = JSON.parse(bytes);
+        if (frame.type === 'tool_approval_request' && frame.data.toolName === tool) frames.push(frame.data);
+    });
+    const { core, route } = await mountCore(f, chat);
+    t.after(() => core.close());
+    let modelCalls = 0;
+    provider.setReply((_body, res) => reply(res, modelCalls++ === 0 ? command(tool) : 'Ordinary Work settled.'));
+    const phone = await f.phone();
+    const decide = (id, approved) => ws.send(JSON.stringify({
+        type: 'tool_approval_response', data: { requestId: id, approved }
+    }));
+    const ledger = workId => core.store.db.prepare('SELECT status FROM work_invocations WHERE work_id=?').all(workId);
+    const cases = ['approve', 'deny', 'expire', 'cancel'];
+    for (const action of cases) {
+        if (action === 'expire') await configure(0.02);
+        if (action === 'cancel') await configure(0.1);
+        modelCalls = 0;
+        const beforeInvokes = invokes;
+        const previousFrames = frames.length;
+        const admitted = await phone.call(route + '/send', { requestId: 'ordinary-' + action, text: action }, 202);
+        const id = admitted.workId;
+        await wait(() => frames.length === previousFrames + 1 && core.store.work(id)?.status === 'waiting_approval',
+            'published and durably waiting ' + action);
+        const challenge = frames.at(-1);
+        assert.equal(challenge.workId, id);
+        assert.deepEqual(ledger(id), []);
+        assert.equal(invokes, beforeInvokes);
+        if (action === 'approve' || action === 'deny') decide(challenge.requestId, action === 'approve');
+        if (action === 'cancel') await phone.call(route + '/works/' + id + '/cancel', { requestId: 'cancel-waiting-tool' });
+        await wait(() => core.store.work(id)?.status === (action === 'cancel' ? 'cancelled' : 'completed'), action + ' terminal');
+        assert.equal(pluginManager.pendingApprovals.has(challenge.requestId), false);
+        if (action === 'expire' || action === 'cancel') decide(challenge.requestId, true);
+        assert.deepEqual(ledger(id).map(row => row.status), action === 'approve' ? ['returned'] : []);
+        assert.equal(invokes, action === 'approve' ? beforeInvokes + 1 : beforeInvokes);
+    }
+    assert.equal(invokes, 1);
+});
