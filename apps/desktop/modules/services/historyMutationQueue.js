@@ -110,9 +110,11 @@ class HistoryMutationQueue {
             return JSON.parse(await handle.readFile('utf8'));
         } finally { await handle.close(); }
     }
-    async #authorize(d) {
-        conversationKey(d); this.#assertFence(d);
-        const type = d.itemType || 'agent', root = this.ownerDirectories[type];
+    async #ownerConfiguration(d) {
+        validateSegment(d.itemId);
+        const type = d.itemType || 'agent';
+        if (!['agent', 'group'].includes(type)) throw failure('INVALID_HISTORY_TYPE');
+        const root = this.ownerDirectories[type];
         if (!await this.#safeAncestors(root, [d.itemId])) throw failure('HISTORY_OWNER_MISSING');
         const other = this.ownerDirectories[type === 'agent' ? 'group' : 'agent'];
         // Both owner types share UserData. Ambiguous ownership must never authorize a second writer.
@@ -131,12 +133,43 @@ class HistoryMutationQueue {
             }
         }
         catch (error) { throw failure('HISTORY_OWNER_UNVERIFIED', 'denied', error); }
-        if (!config || typeof config !== 'object' || Array.isArray(config) || config._historyDeleting || !Array.isArray(config.topics)) throw failure('HISTORY_OWNER_UNVERIFIED');
+        if (!config || typeof config !== 'object' || Array.isArray(config) || !Array.isArray(config.topics)) throw failure('HISTORY_OWNER_UNVERIFIED');
         if (config.id !== undefined && config.id !== d.itemId) throw failure('HISTORY_OWNER_ID_MISMATCH');
         if (config._historyDeletedTopics !== undefined && (!Array.isArray(config._historyDeletedTopics) || config._historyDeletedTopics.some(id => typeof id !== 'string'))) throw failure('HISTORY_OWNER_UNVERIFIED');
-        if ((config._historyDeletedTopics || []).some(id => canonical(id) === canonical(d.topicId))) throw failure('HISTORY_TOPIC_DELETED');
         const ids = config.topics.map(t => validateSegment(t?.id));
         if (new Set(ids.map(canonical)).size !== ids.length) throw failure('HISTORY_DUPLICATE_TOPIC');
+        return config;
+    }
+    async readOwnerConfiguration(d) {
+        const config = await this.#ownerConfiguration(d);
+        if (config._historyDeleting) throw failure('HISTORY_OWNER_UNVERIFIED');
+        return config;
+    }
+    async readAgentTopicBackup(agentId) {
+        validateSegment(agentId);
+        const root = this.ownerDirectories.agent;
+        if (!await this.#safeAncestors(root, [agentId])) throw failure('HISTORY_OWNER_MISSING');
+        try { return await this.#strictJson(path.join(root, agentId, 'config.topic.backup.json')); }
+        catch (error) { if (error.code !== 'ENOENT') throw error; return null; }
+    }
+    async removeDeletedHistory(d) {
+        const topic = d.topicId !== undefined;
+        const key = topic ? this.#key(d) : this.#ownerKey(d);
+        if (this.#fences.get(key) !== 'pending') throw failure('HISTORY_DELETE_FENCE_REQUIRED');
+        const config = await this.#ownerConfiguration(d);
+        const marked = topic
+            ? config._historyDeletedTopics?.includes(d.topicId) && !config.topics.some(t => t.id === d.topicId)
+            : config._historyDeleting === true && config.topics.length === 0;
+        if (!marked) throw failure('HISTORY_DELETE_MARKER_REQUIRED');
+        const parts = topic ? [d.itemId, 'topics', d.topicId] : [d.itemId];
+        if (await this.#safeAncestors(this.userDataDir, parts)) await fs.remove(path.join(this.userDataDir, ...parts));
+    }
+    async #authorize(d) {
+        conversationKey(d); this.#assertFence(d);
+        const type = d.itemType || 'agent';
+        const config = await this.readOwnerConfiguration(d);
+        if ((config._historyDeletedTopics || []).some(id => canonical(id) === canonical(d.topicId))) throw failure('HISTORY_TOPIC_DELETED');
+        const ids = config.topics.map(t => t.id);
         if (SIDE_CHAT_CHILD_ID.test(d.topicId) && type === 'agent') {
             if (!await this.#safeAncestors(this.userDataDir, [d.itemId, 'topics', d.topicId])) throw failure('SIDE_CHAT_CHILD_DELETED');
             const marker = await this.#strictJson(path.join(path.dirname(this.getHistoryPath(d.itemId, d.topicId)), 'sidechat-child.json'));

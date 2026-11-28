@@ -737,7 +737,16 @@ function mutateGroupConfig(groupId, mutate, afterSave) {
         const configStat = await fs.lstat(path.join(groupPath, 'config.json'));
         if (!configStat.isFile() || configStat.isSymbolicLink() || configStat.nlink !== 1) throw new Error('Group config file identity is unverified');
         const current = await getAgentGroupConfig(groupId);
-        if (!current || current.error) throw new Error(current?.error || '群配置不存在');
+        if (!current) {
+            // The public getter hides deleted owners. Only a confirmed tombstone
+            // may reject the command without leaving the authority pending.
+            const stored = await fs.readJson(path.join(groupPath, 'config.json'));
+            if (stored?.id === groupId && stored._historyDeleting === true && Array.isArray(stored.topics) && !stored.topics.length) {
+                return { success: false, error: 'HISTORY_OWNER_DELETED' };
+            }
+            throw new Error('群配置不存在');
+        }
+        if (current.error) throw new Error(current.error);
         if (current._historyDeleting) throw new Error('Group history deletion is pending');
         if (current.id !== groupId || !Array.isArray(current.topics) ||
             current.topics.some(topic => !topic || typeof topic.id !== 'string' || !topic.id) ||
@@ -899,7 +908,7 @@ async function deleteAgentGroup(groupId) {
             }
             await lifecycle.changed();
             await lifecycle.destructive();
-            await fs.remove(path.join(mainAppPaths.USER_DATA_DIR, groupId));
+            await requireGroupHistoryQueue().removeDeletedHistory({ itemId: groupId, itemType: 'group' });
             return { success: true };
         });
     } catch (error) {
@@ -2443,7 +2452,6 @@ async function createNewTopicForGroup(groupId, topicName, onlyIfEmpty = false) {
 
 async function deleteGroupTopic(groupId, topicIdToDelete) {
     try {
-        let replacement;
         const result = await requireGroupHistoryQueue().deleteHistory(getGroupHistoryDescriptor(groupId, topicIdToDelete), async lifecycle => {
             await lifecycle.beforeConfigUpdate();
             const saved = await mutateGroupConfig(groupId, current => {
@@ -2453,20 +2461,19 @@ async function deleteGroupTopic(groupId, topicIdToDelete) {
                 }
                 const topics = current.topics.filter(topic => topic.id !== topicIdToDelete);
                 if (!topics.length) {
-                    replacement = { id: `group_topic_${crypto.randomUUID()}`, name: '主要群聊', createdAt: Date.now() };
-                    topics.push(replacement);
+                    topics.push({ id: `group_topic_${crypto.randomUUID()}`, name: '主要群聊', createdAt: Date.now(),
+                        _historyReplacementFor: topicIdToDelete });
                 }
                 return { ...current, topics, _historyDeletedTopics: [...new Set([...(current._historyDeletedTopics || []), topicIdToDelete])] };
             });
             if (!saved.success) throw new Error(saved.error);
             await lifecycle.changed();
             await lifecycle.destructive();
-            await fs.remove(path.join(mainAppPaths.USER_DATA_DIR, groupId, 'topics', topicIdToDelete));
+            await requireGroupHistoryQueue().removeDeletedHistory(getGroupHistoryDescriptor(groupId, topicIdToDelete));
             return { success: true, remainingTopics: saved.agentGroup.topics };
         });
-        // A prior failed delete may already have published the replacement identity.
-        // Initialize retained members after deletion, using no-replace semantics.
-        for (const topic of result.remainingTopics) await initializeGroupHistory(groupId, topic.id);
+        const replacement = result.remainingTopics.find(t => t._historyReplacementFor === topicIdToDelete);
+        if (replacement) await initializeGroupHistory(groupId, replacement.id);
         return result;
     } catch (error) {
         return { success: false, error: error.message };

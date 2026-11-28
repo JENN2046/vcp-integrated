@@ -1,0 +1,78 @@
+{
+  "base": "5a0969e796778e8636bcdbc36fb039653f289216",
+  "runtime": "Linux x64 / Node 24.22.1",
+  "historicalFailure": {
+    "test": "real process exit after deletion config update retains History and native delete-topic resumes cleanup",
+    "outcome": "Primary already omitted old_topic and contained its tombstone. Native IPC returned 未找到要删除的话题 ID: old_topic; the physical directory remained.",
+    "baselineTranscriptSha256": "8780e707d32377d34d5d192edb25b2c87274f5e0c9bc395d55d3399767cf66c8"
+  },
+  "fixture": "Real host handler functions called through an in-process IPC shell; fresh AgentConfigManager and HistoryMutationQueue in each worker; synthetic profiles; real OS SIGKILL and filesystem reads.",
+  "crashStages": [
+    "actual primary rename publishing both the membership removal and the existing topic tombstone, before owner lock release",
+    "owner config publication complete and lock released, before directory removal",
+    "during actual recursive removal of 2049 files",
+    "physical deletion complete, before returning the native IPC result"
+  ],
+  "partialDirectory": {
+    "before": 2049,
+    "afterSigkill": 1970,
+    "afterColdRetry": 0
+  },
+  "assertions": [
+    "Fresh process denies late writes against the tombstone. Two further independent cold processes repeat deletion successfully; deleted directory absent, unrelated History byte content preserved.",
+    "An unknown config lock after process exit remains untouched. Recovery after committed deletion needs no config rewrite when backup pruning is already complete. Other configuration writers still observe existing lock rules.",
+    "Last-topic replacement writes are no-replace, including an already accepted message. A group replacement published immediately before SIGKILL is initialized by the retry; an unrelated registered topic without a History file remains unchanged.",
+    "Concurrent sibling deletions preserve remaining backup members; foreign hard-linked backup rejected. Swapped UserData ancestor symlink rejected before recursive removal.",
+    "Failure removing a confirmed SideChat child prevents a success response; its existing marker enables cleanup on cold retry."
+  ],
+  "command": "node --test apps/desktop/tests/native-delete-recovery.test.cjs apps/desktop/tests/f06-host-lifecycle.test.cjs apps/desktop/tests/f06-group-history-lifecycle.test.js apps/desktop/tests/side-chat-delete-leftovers.test.mjs",
+  "suite": {
+    "tests": 45,
+    "pass": 45,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "transcriptSha256": "7172089b4c5de2964478cd02060f31ee584c7f2e3014a717406681d83a4e32e3",
+  "baselineNativeInterruption": {
+    "baseline": "5a0969e796778e8636bcdbc36fb039653f289216",
+    "workerKilled": "SIGKILL",
+    "publishedMembership": [
+      "sibling"
+    ],
+    "tombstone": false,
+    "coldReplay": {
+      "error": "未找到要删除的话题 ID: old_topic"
+    },
+    "remainingPhysicalRows": 1,
+    "transcriptSha256": "1faf068cbc4a9fb4d55349041e9a3062a276596cefab6c54467b4306d8b74541",
+    "method": "Exact git archive of 5a0969e, production native delete-topic handler, OS SIGKILL after config publication and before first physical unlink, new process retry."
+  },
+  "limits": [
+    "Legacy missing membership without a durable tombstone does not authorize deleting an orphan directory. Historical unmarked remnants require independent offline attribution.",
+    "A process interruption was exercised. No power-loss, Windows, macOS, or production data was used."
+  ],
+  "additionalHistoricalSuiteComparison": {
+    "testFiles": [
+      "f06-history-lifecycle.test.cjs",
+      "history-authority-close.test.cjs",
+      "history-authority-windows-path.test.cjs",
+      "history-mutation-queue.test.cjs",
+      "chat-history-mutation-authority.test.mjs"
+    ],
+    "baseline": {
+      "tests": 70,
+      "pass": 51,
+      "fail": 19
+    },
+    "candidate": {
+      "tests": 70,
+      "pass": 51,
+      "fail": 19
+    },
+    "newFailingNames": [],
+    "baselineTranscriptSha256": "39b969b8cffd2b2e9ed7f7acf3d5302da4422c6ebd71dba44b115ed0324a5a5f",
+    "candidateTranscriptSha256": "2519d53d204a7508449f57924943259e9c37eb692f82b8f8e1132aad86a63a56"
+  }
+}

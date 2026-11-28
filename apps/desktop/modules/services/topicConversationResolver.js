@@ -10,6 +10,8 @@ function createTopicConversationResolver({ agentDir, groupDir, userDataDir }) {
     async function validate(scope) {
         conversationKey(scope);
         const config = await fs.readJson(path.join(roots[scope.itemType], scope.itemId, 'config.json'));
+        if (config._historyDeleting) throw new Error('HISTORY_OWNER_DELETED');
+        if (config._historyDeletedTopics?.includes(scope.topicId)) throw new Error('HISTORY_TOPIC_DELETED');
         const topic = config.topics?.find(item => item.id === scope.topicId);
         if (!topic) throw new Error('目标话题不存在');
         if (scope.itemType === 'group' && config.mode === 'game') {

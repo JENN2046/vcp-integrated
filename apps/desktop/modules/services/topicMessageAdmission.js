@@ -23,6 +23,7 @@ class TopicMessageAdmission {
         this.commit = commit;
         this.advance = advance;
         this.verifyTerminal = verifyTerminal;
+        this.dispatchReceipts = new Map();
         this.validate = validate;
         this.store = store;
         this.publish = publish;
@@ -55,6 +56,18 @@ class TopicMessageAdmission {
             const saved = state?.entries;
             if (!Array.isArray(saved) || !Array.isArray(state.standaloneLeases)) {
                 throw new TypeError('Invalid admission store');
+            }
+            const receipts = state.dispatchReceipts ?? [];
+            if (!Array.isArray(receipts)) throw new TypeError('Invalid dispatch receipt journal');
+            this.dispatchReceipts.clear();
+            for (const receipt of receipts) {
+                conversationKey(receipt?.scope || {});
+                if (!/^[a-f0-9]{64}$/.test(receipt.key) || !/^[a-f0-9]{64}$/.test(receipt.fingerprint)
+                    || typeof receipt.entryId !== 'string' || !receipt.entryId
+                    || typeof receipt.messageId !== 'string' || !receipt.messageId || this.dispatchReceipts.has(receipt.key)) {
+                    throw new TypeError('Invalid or duplicate dispatch receipt');
+                }
+                this.dispatchReceipts.set(receipt.key, copy(receipt));
             }
             const leaseKeys = new Set();
             for (const lease of state.standaloneLeases) {
@@ -99,7 +112,7 @@ class TopicMessageAdmission {
                 });
             }
             if (state.standaloneLeases.length) {
-                await this.store.save(copy(this.entries), []);
+                await this.store.save(copy(this.entries), [], [...this.dispatchReceipts.values()]);
             }
             this.ready = true;
             this.notify();
@@ -121,8 +134,11 @@ class TopicMessageAdmission {
         return copy(this.entries.filter(entry => !key || conversationKey(entry.scope) === key));
     }
 
-    async save(next, standaloneLeases = this.standaloneLeases) {
-        await this.store.save(copy(next), copy(standaloneLeases));
+    async save(next, standaloneLeases = this.standaloneLeases, receipt = null) {
+        const receipts = [...this.dispatchReceipts.values()];
+        if (receipt) receipts.push(receipt);
+        await this.store.save(copy(next), copy(standaloneLeases), receipts);
+        if (receipt) this.dispatchReceipts.set(receipt.key, receipt);
         this.entries = next;
         this.standaloneLeases = standaloneLeases;
         this.notify();
@@ -265,7 +281,7 @@ class TopicMessageAdmission {
         }
         return null;
     }
-    submit({ scope, message, requestId, triggerPolicy = 'none', invitePrompt = '' }) {
+    submit({ scope, message, requestId, triggerPolicy = 'none', invitePrompt = '' }, dispatch = null) {
         return this.run(async () => {
             this.assertReady();
             conversationKey(scope);
@@ -273,11 +289,35 @@ class TopicMessageAdmission {
                 throw new TypeError('Message id and role required');
             }
             if (!['none', 'reply'].includes(triggerPolicy)) throw new TypeError('Invalid trigger policy');
+            await this.validate(copy(scope));
+            if (dispatch) {
+                if (!/^[a-f0-9]{64}$/.test(dispatch.key) || !/^[a-f0-9]{64}$/.test(dispatch.fingerprint)) {
+                    throw new TypeError('Invalid dispatch identity');
+                }
+                const receipt = this.dispatchReceipts.get(dispatch.key);
+                if (receipt) {
+                    if (receipt.fingerprint !== dispatch.fingerprint || conversationKey(receipt.scope) !== conversationKey(scope)) {
+                        throw new Error('TOPIC_REPLY_REQUEST_CONFLICT');
+                    }
+                    const entry = this.entries.find(item => item.entryId === receipt.entryId);
+                    return { success: true, accepted: true, replayed: true, queued: entry?.state === 'queued',
+                        ...(entry && { state: entry.state }), entryId: receipt.entryId, messageId: receipt.messageId };
+                }
+            }
             const existing = this.entries.find(entry =>
                 conversationKey(entry.scope) === conversationKey(scope)
                 && (entry.message.id === message.id || (requestId && entry.requestId === requestId)));
-            if (existing) return { success: true, queued: true, entryId: existing.entryId };
-            await this.validate(copy(scope));
+            if (existing) {
+                if (dispatch) {
+                    // A v1/v2 pending entry still carries the accepted sender, body and original IDs.
+                    if (!existing.message._metadata?.isPluginReply || existing.message.agentId !== message.agentId
+                        || existing.message.content !== message.content) throw new Error('TOPIC_REPLY_REQUEST_CONFLICT');
+                    await this.save(this.entries, this.standaloneLeases, {
+                        ...dispatch, scope: copy(scope), entryId: existing.entryId, messageId: existing.message.id,
+                    });
+                }
+                return { success: true, queued: true, entryId: existing.entryId, ...(dispatch && { messageId: existing.message.id }) };
+            }
             const activeSelfPost = scope.itemType === 'agent'
                 && message.role === 'assistant' && message.agentId === scope.itemId
                 && this.leases.has(conversationKey(scope));
@@ -290,7 +330,8 @@ class TopicMessageAdmission {
                 deferred: this.leases.has(conversationKey(scope))
                     || this.entries.some(item => conversationKey(item.scope) === conversationKey(scope)),
             };
-            await this.save([...this.entries, entry]);
+            const receipt = dispatch ? { ...dispatch, scope: copy(scope), entryId: entry.entryId, messageId: message.id } : null;
+            await this.save([...this.entries, entry], this.standaloneLeases, receipt);
             this.schedule(scope);
             return { success: true, queued: true, entryId: entry.entryId };
         });
@@ -428,11 +469,11 @@ class TopicMessageAdmission {
                 conversationKey(entry.scope) === key && entry.leaseToken === token
                     ? { ...entry, leaseToken: candidate.token } : entry);
             // Do not publish/wake during the tentative journal write.
-            await this.store.save(copy(next), copy(nextLeases));
+            await this.store.save(copy(next), copy(nextLeases), [...this.dispatchReceipts.values()]);
             const current = this.findWaitingHandoff(scope, handoffOwner);
             if (!current || current.token !== candidate.token) {
                 // Recovery is paused on restart even if this restoration itself fails.
-                await this.store.save(copy(previous), copy(previousLeases));
+                await this.store.save(copy(previous), copy(previousLeases), [...this.dispatchReceipts.values()]);
                 return { success: false, code: 'HANDOFF_CANCELLED' };
             }
             this.entries = next;
@@ -658,12 +699,18 @@ class TopicMessageAdmission {
             this.leases.set(key, token);
             // No generation/tool loop is executed under the admission lock.
             queueMicrotask(() => {
-                Promise.resolve().then(() => this.advance({
-                    scope: copy(scope), token, automatic,
-                    messageId: requested.message.id, invitePrompt: requested.invitePrompt,
-                    continuation: requested.kind === 'relay-continuation',
-                    relayFrom: handoverFrom,
-                })).catch(error => {
+                // Journal persistence above can overlap removal of the target. Check the
+                // same native authority once more before handing work to the executor.
+                Promise.resolve().then(async () => {
+                    await this.validate(copy(scope));
+                    if (this.closed || this.leases.get(key) !== token) return;
+                    return this.advance({
+                        scope: copy(scope), token, automatic,
+                        messageId: requested.message.id, invitePrompt: requested.invitePrompt,
+                        continuation: requested.kind === 'relay-continuation',
+                        relayFrom: handoverFrom,
+                    });
+                }).catch(error => {
                     this.run(async () => {
                         if (this.leases.get(key) !== token) return;
                         await this.save(this.entries.map(entry => entry.leaseToken === token
