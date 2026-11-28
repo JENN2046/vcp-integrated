@@ -48,8 +48,8 @@ test('native text diary reads honor identity, roots and live revocation while st
         diary.rememberBlock(oldBlock);
         assert.equal(diary.canRefresh(oldBlock), true);
         await grants(directory, 'workspace', {});
-        assert.equal(await processor.processContent(prompt), '');
         assert.throws(native.assertDispatch, { code: 'CORE_NATIVE_CAPABILITY_REVOKED' });
+        assert.equal(await processor.processContent(prompt), '');
     });
     await grants(directory, 'workspace', { 'agent-a': { diaries: ['Harbor'] } });
     assert.equal(await inTurn(create('agent-b'), () => processor.processContent(prompt)), '');
@@ -89,4 +89,36 @@ test('Core memory tools permit an explicitly granted peer and deny fallback afte
     await assert.rejects(run(() => core.memoryTool(origin, 'DeepMemo', { agentId: peer.id, keyword: 'marker' })),
         { code: 'CORE_NATIVE_CAPABILITY_DENIED' });
     assert.equal(f.calls(), 0);
+});
+
+
+test('Core dependency injection loads RAG without consulting execution bridges', async () => {
+    const { createDefaultDependencyBridgeRegistry } = require(BOX + '/modules/pluginBridgeRegistry');
+    const registry = createDefaultDependencyBridgeRegistry();
+    const manager = { index: 'fixture' };
+    const manifest = { name: 'RAGDiaryPlugin' };
+    await native.runCoreTurn({ workId: 'dependency-fixture' }, async () => {
+        const dependencies = await registry.buildDependencies(manifest, {}, {
+            vectorDBManager: manager,
+            getMessagePreprocessor() { return null; },
+            debugLog() {}
+        });
+        assert.equal(dependencies.vectorDBManager, manager);
+    });
+});
+
+test('native resource checks share a snapshot and refresh at the next dispatch', () => {
+    let reads = 0;
+    let grants = { diaries: ['Harbor'], TopicMemo: ['peer'] };
+    const authority = createWorkAuthority(() => { reads++; return grants; }, 'sandbox', 'agent-a', () => {});
+    assert.equal(authority.allows('TopicMemo', 'agent-a'), true);
+    assert.equal(authority.allows('DeepMemo', 'agent-a'), true);
+    assert.equal(reads, 0);
+    assert.equal(authority.allows('diaries', 'Harbor'), true);
+    assert.equal(authority.allows('TopicMemo', 'peer'), true);
+    assert.equal(authority.allows('TopicMemo', 'other'), false);
+    assert.equal(reads, 1);
+    grants = { diaries: ['Harbor'] };
+    assert.throws(() => authority.assertCurrent(), { code: 'CORE_NATIVE_CAPABILITY_REVOKED' });
+    assert.equal(reads, 2);
 });

@@ -835,7 +835,7 @@ async function processToolCall(args) {
         const temporaryToolsSystemPrompt = buildTemporaryToolsSystemPrompt(inject_tools);
 
         const link = await nativeExecution.acceptNativeTask({
-            pluginName: 'AgentAssistant', nativeTaskId: delegationId, agentBaseName: agentConfig.baseName,
+            pluginName: 'AgentAssistant', nativeTaskId: delegationId, agentBaseName: agentConfig.baseName, agentName: agentConfig.name,
         });
         if (link) identityOf(link.identity);
         activeDelegations.set(delegationId, {

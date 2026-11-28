@@ -75,9 +75,6 @@ test('ToolBox starts local Core without loading the sync runtime and a native to
     const memory = { key: mapTopic(descriptor).sharedId, workspace: 'personal', actor };
     const { createWorkAuthority } = require(BOX + '/core/nativeCapabilityGrants');
     const native = require(BOX + '/modules/requestExecutionContext');
-    await fs.writeFile(path.join(env.VCP_CORE_DATA_DIR, 'native-capability-grants.json'), JSON.stringify({
-        version: 1, workspace: 'personal', agents: { Agent: { TopicMemo: ['Agent'] } }
-    }), { mode: 0o600 });
     const memo = args => native.runCoreTurn({
         workId, signal: new AbortController().signal, fence() {},
         coreNativeAuthority: createWorkAuthority(core.readNativeGrants, 'personal', 'Agent', () => {})

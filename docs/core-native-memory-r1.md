@@ -4,7 +4,7 @@
 
 ## 作用域与配置
 
-Core 的配对权限决定设备可对哪个工作区执行、读取或配置。Agent 的原生能力由现有 Core 数据目录里的 `native-capability-grants.json` 补充；只有运营者有权维护这个授权文件。Agent 提示词、工具参数和设备的配置权限不能改写它。缺失、不可读或不匹配的文件使对应能力默认无授权。使用同目录普通文件原子替换以生效，无需重启；把目标从授权列表移除即撤权。
+Core 的配对权限决定设备可对哪个工作区执行、读取或配置。Core 数据目录中的 `native-capability-grants.json` 仅用于原生入口缺少的日记本授权和显式跨 Agent 历史读取。运营者可通过同目录普通文件原子替换授权，无需重启。同步检索共享一份授权快照，原生工具刷新或模型派发前重新核对已使用的授权。
 
 ```json
 {
@@ -14,9 +14,7 @@ Core 的配对权限决定设备可对哪个工作区执行、读取或配置。
     "sender-agent-id": {
       "diaries": ["FixtureDiary"],
       "TopicMemo": ["peer-agent-id"],
-      "DeepMemo": ["peer-agent-id"],
-      "TopicSponsor": ["local_0123456789abcdef"],
-      "AgentAssistant": ["FIXTURE_PEER"]
+      "DeepMemo": ["peer-agent-id"]
     },
     "aa:FIXTURE_PEER": {
       "diaries": ["FixtureDiary"]
@@ -25,10 +23,10 @@ Core 的配对权限决定设备可对哪个工作区执行、读取或配置。
 }
 ```
 
-- `diaries` 使用 ToolBox 中的日记本名，支持显式授权读取其他 Agent 的日记本。首轮、原生刷新、直接文本、AIMemo、ContextBridge、VRef 及原生查询按授权范围工作。文本文档缓存只在本次原生请求中复用；普通 ToolBox 查询缓存照原生规则使用。只有本轮原生格式化器生成的区块可被刷新，派发前清除输入中遗留的其他区块并复核本轮已访问的资源。
-- `TopicMemo`、`DeepMemo` 使用目标 Agent 的稳定 ID。名称只参与定位，匹配歧义时可使用稳定 ID。TopicMemo 的列表与正文查询以及 DeepMemo 的 CDS 检索均沿用原生工具及 Core 正式 History，Core Work 下拒绝旧分布式路径替代读取。设备对正式 History 的原有读取权限仍按设备授权判断。
-- `TopicSponsor` 使用 Core 规范话题 key。交付继续用原生 ReplyToTopic 寻址、设备执行权限、工作区、调用记录与幂等。目标 Work 派发前复核原发 Agent 的目标授权。
-- `AgentAssistant` 仍需通过原生 VCP 工具审批和 Core 现有委托白名单，目标以原生配置的稳定 `baseName` 授权。每个委托子轮复核原发 Agent 授权，任务结果从已记录原生任务读取。子轮的日记授权归独立的 `aa:<baseName>` 身份，避免继承父 Agent 的日记许可。没有本 Work 范围的旧归档占位符不触发裸文件查找。
+- `diaries` 使用 ToolBox 中的日记本名。原生日记没有绑定 Core Agent ID 的所有权字段，需要明确授权；显示名和占位符不创建授权。首轮、原生刷新、直接文本、AIMemo、ContextBridge、VRef 及原生查询按授权范围工作。文本文档缓存只在本次原生请求中复用；普通 ToolBox 查询缓存照原生规则使用。只有本轮原生格式化器生成的区块可被刷新，派发前清除输入中遗留的其他区块并复核本轮已访问的资源。
+- `TopicMemo`、`DeepMemo` 的显式跨 Agent 授权使用目标 Agent 的稳定 ID。执行 Agent 的自身 History 与 DeepMemo 读取当前群会话 History 沿用原有权限。名称只参与定位，匹配歧义时可使用稳定 ID。TopicMemo 的列表与正文查询以及 DeepMemo 的 CDS 检索均沿用原生工具及 Core 正式 History，Core Work 下拒绝旧分布式路径替代读取。设备对正式 History 的原有读取权限仍按设备授权判断。
+- `TopicSponsor` 沿用原生 ReplyToTopic 寻址、设备执行权限、工作区、调用记录与幂等。递送前复核合法来源和准确目标。
+- `AgentAssistant` 仍需通过原生 VCP 工具审批和 Core 现有委托白名单，原生配置解析委托目标，子轮复核同一委托许可与设备权限，任务结果从已记录原生任务读取。子轮的日记授权归独立的 `aa:<baseName>` 身份，避免继承父 Agent 的日记许可。没有本 Work 范围的旧归档占位符不触发裸文件查找。
 
 设备权限、Core Work 有效性、准确目标与原生审批同时成立才允许操作。已完成的结果和回执保持可审计。撤权后的新派发不会继续使用此前注入的日记或已读取的工具结果。
 

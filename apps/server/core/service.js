@@ -9,7 +9,7 @@ const { nativeGamePrompts, isCoreGame, gameDecision } = require('./game');
 const { CoreJev, configuredJev } = require('./jev');
 const { CoreCdsIndex } = require('./cdsIndex');
 const { CoreRunner } = require('./runner');
-const { createGrantReader, createWorkAuthority, denied } = require('./nativeCapabilityGrants');
+const { createGrantReader, denied } = require('./nativeCapabilityGrants');
 const native = require('../modules/requestExecutionContext');
 const { isCoreGroupMode } = require('./group');
 const { DesktopContext } = require('./desktopContext');
@@ -210,11 +210,6 @@ class CoreService {
         try {
             const actor = this.liveActor(work.principal);
             const topic = this.topic(actor, this.workspace, work.conversation_id, 'execute');
-            const config = work.frozen_config_json ? JSON.parse(work.frozen_config_json) : {};
-            if (config.sponsoredByWorkId) {
-                const grant = createWorkAuthority(this.readNativeGrants, this.workspace, config.sponsorAgentId, () => {});
-                if (!grant.allows('TopicSponsor', topic.key, { track: false })) return null;
-            }
             return { ...topic, actor };
         } catch (error) {
             if (error.status >= 400 && error.status < 500) return null;
@@ -393,18 +388,14 @@ class CoreService {
             }
             return topic;
         };
-        const authority = native.currentCoreNativeAuthority();
-        if (!authority) throw denied();
         const source = liveSource(), senderName = JSON.parse(work.frozen_config_json).name;
         const resolve = topic => this.local ? this.local.resolveSponsor(topic, senderName, args) : resolveDelivery(this.shared, topic.actor,
             this.shared.row(this.workspace, topic.key), senderName, args);
         const initial = resolve(source);
         const target = this.topic(source.actor, this.workspace, initial.target.id, 'execute');
-        authority.assert('TopicSponsor', target.key, { track: false });
         const config = await this.configuration(target);
         const verified = resolve(liveSource());
         if (!config || target.key !== verified.target.id) throw failure('TOPIC_SPONSOR_TARGET_CHANGED');
-        authority.assert('TopicSponsor', target.key, { track: false });
         const quote = formatTopicRiverQuote(args.river_context);
         const prefix = '[' + senderName + '的发言]';
         const message = quote ? args.message.trimEnd() : args.message;
@@ -412,7 +403,7 @@ class CoreService {
             args.source_topic_id && '[该发言发送自' + args.source_topic_id + '话题]'].filter(Boolean).join('\n\n');
         const operationId = 'sponsor_' + invocation.invocationId.replaceAll('-', '');
         const result = this.store.admit(target, work.principal, operationId, { text, source: work.id }, () => ({
-            config: { ...config, sponsoredByWorkId: work.id, sponsorAgentId: authority.agentId }, attachments: [], senderName, senderRole: 'assistant'
+            config: { ...config, sponsoredByWorkId: work.id }, attachments: [], senderName, senderRole: 'assistant'
         }));
         this.runner.publish(target.key, 'change_seq', { seq: result.seq });
         this.runner.wake();
@@ -436,9 +427,8 @@ class CoreService {
         return createHash('sha256').update(JSON.stringify([principal, topic.workspace, topic.key, id, head, hash])).digest('hex');
     }
 
-    memoryAgent(topic, query, authority, capability) {
+    memoryAgent(topic, actor, query, authority, capability) {
         if (typeof query !== 'string' || !query.trim() || query.length > 200) throw failure('INVALID_MEMORY_QUERY', 400);
-        const actor = this.liveActor(topic.actor.principal);
         const agents = this.local
             ? this.local.findAgents(query, this.historyDeleted)
             : this.shared.db.prepare(`SELECT * FROM shared_objects
@@ -469,6 +459,7 @@ class CoreService {
     async memoryTool(topic, name, args, config) {
         const authority = native.currentCoreNativeAuthority();
         if (!authority) throw denied();
+        authority.beginResourceRead();
         const caller = () => this.liveActor(topic.actor.principal);
         const actor = caller();
         const authorized = this.topic(actor, topic.workspace, topic.key, 'read');
@@ -478,23 +469,24 @@ class CoreService {
             const { processToolCall } = require(path.join(plugins, 'DeepMemo/DeepMemoService'));
             const query = args?.owner?.id ?? args?.owner?.ownerId ?? args?.agentId ?? args?.maid;
             const selected = query === undefined ? authorized : {
-                ...authorized, ownerType: 'agent', ownerId: this.memoryAgent(topic, query, authority, name).uuid
+                ...authorized, ownerType: 'agent', ownerId: this.memoryAgent(topic, actor, query, authority, name).uuid
             };
-            authority.assert(name, selected.ownerId);
+            if (selected.ownerType !== 'group') authority.assert(name, selected.ownerId);
             const result = await processToolCall(args, { vcpContext: {
                 agentId: selected.ownerId, ownerType: selected.ownerType, topicId: topic.key
             } }, { config, search: request => {
-                authority.assert(name, selected.ownerId);
-                return this.searchMemories(selected, caller(), request);
+                const currentActor = caller();
+                this.topic(currentActor, topic.workspace, topic.key, 'read');
+                return this.searchMemories(selected, currentActor, request);
             } });
             this.topic(caller(), topic.workspace, topic.key, 'read');
-            authority.assert(name, selected.ownerId);
+            authority.assertCurrent();
             return result;
         }
         const { processToolCall } = require(path.join(plugins, 'TopicMemo/TopicMemo'));
         const result = await processToolCall(args, null, {
             userName: '用户',
-            findAgent: query => this.memoryAgent(topic, query, authority, name),
+            findAgent: query => this.memoryAgent(topic, actor, query, authority, name),
             history: ({ agentId, topicId }) => {
                 authority.assert(name, agentId);
                 const owner = this.topic(caller(), topic.workspace, topicId, 'read');

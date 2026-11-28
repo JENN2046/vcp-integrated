@@ -645,10 +645,7 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
     f.shared.delegationAgents.add(name);
     pluginManager.plugins.set('AgentAssistant', { name: 'AgentAssistant', pluginType: 'hybridservice', communication: { protocol: 'direct' } });
     pluginManager.serviceModules.set('AgentAssistant', { module: assistant });
-    const { core, route, options } = await mountCore(f, chat);
-    const grantFile = path.join(options.directory, 'native-capability-grants.json');
-    await fs.writeFile(grantFile, JSON.stringify({ version: 1, workspace: 'sharedAB',
-        agents: { [f.owner.id]: { AgentAssistant: ['COREFIXTURE'] } } }), { mode: 0o600 });
+    const { core, route } = await mountCore(f, chat);
     const block = ['<<<[TOOL_REQUEST]>>>', 'tool_name:「始」AgentAssistant「末」,',
         'agent_name:「始」' + name + '「末」,', 'task_delegation:「始」true「末」,',
         'prompt:「始」Prepare the bounded report.「末」', '<<<[END_TOOL_REQUEST]>>>'].join('\n');
@@ -721,7 +718,7 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
             requestId: 'core-native-aa-revoked', text: 'Start a revocable delegation.'
         }, 202);
         await wait(() => activeChild, 'authorized child round reached the provider');
-        await fs.writeFile(grantFile, JSON.stringify({ version: 1, workspace: 'sharedAB', agents: {} }));
+        f.shared.delegationAgents.delete(name);
         complete(activeChild.body, activeChild.res, '[[Flowlock::Start]]\n[[Flowlock::NextHeartbeat::1]]');
         await wait(async () => {
             const { tasks } = await phone.call(route + '/works/' + revoking.id + '/tasks');
@@ -747,10 +744,7 @@ test('Core TopicSponsor delivers a canonical peer message without a desktop reci
     const destination = f.shared.create(f.actor('A'), { sharedSpaceId: 'sharedAB', opId: 'core-sponsor-peer-topic',
         kind: 'topic', localId: 'peer-topic', localParent: 'peer-agent', parentId: peer.id,
         config: { name: 'Peer destination' } }).object;
-    const { core, options } = await mountCore(f, chat);
-    const grantFile = path.join(options.directory, 'native-capability-grants.json');
-    await fs.writeFile(grantFile, JSON.stringify({ version: 1, workspace: 'sharedAB',
-        agents: { [f.owner.id]: { TopicSponsor: [destination.id] } } }), { mode: 0o600 });
+    const { core } = await mountCore(f, chat);
     try {
         const desktop = await f.desktop('A');
         const phone = await f.phone();
@@ -784,15 +778,15 @@ test('Core TopicSponsor delivers a canonical peer message without a desktop reci
         assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM journal').get().n, 0);
         assert.equal(f.calls(), 0);
 
-        await fs.writeFile(grantFile, JSON.stringify({ version: 1, workspace: 'sharedAB', agents: {} }));
+        provider.setReply((_body, response) => response.end(JSON.stringify({
+            choices: [{ message: { role: 'assistant',
+                content: block.replace(desktop.descriptor.topicId, 'other-source-topic') }, finish_reason: 'stop' }]
+        })));
         const reopened = await f.desktop('A');
         const rejected = await reopened.runtime.prepareSharedSend({ descriptor: reopened.descriptor, serverSession: true,
-            message: { id: 'core-sponsor-revoked', role: 'user', content: 'Do not deliver after revocation.', attachments: [] } });
-        await wait(() => {
-            const row = core.store.db.prepare("SELECT status FROM work_invocations WHERE work_id=? AND plugin_name='TopicSponsor'")
-                .get(rejected.serverSession.executionId);
-            return row && row.status !== 'dispatched';
-        }, 'revoked sponsor settles its attempted tool call');
+            message: { id: 'core-sponsor-spoof', role: 'user', content: 'Attempt delivery with an unrelated source.', attachments: [] } });
+        await wait(() => ['failed', 'review_required'].includes(core.store.work(rejected.serverSession.executionId)?.status),
+            'mismatched source cannot deliver');
         assert.equal(core.store.db.prepare('SELECT count(*) AS n FROM works WHERE conversation_id=?').get(destination.id).n, 1);
         await reopened.close();
     } finally {

@@ -16,16 +16,6 @@ class PluginDependencyBridgeRegistry {
 
     async buildDependencies(manifest, baseDependencies, context) {
         const dependencies = { ...baseDependencies };
-        const native = require('./requestExecutionContext');
-        if (native.isCoreTurn()) {
-            if (['TopicMemo', 'DeepMemo'].includes(plugin.name)) {
-                if (!context.executeCoreMemory) throw Error('CORE_NATIVE_CAPABILITY_DENIED');
-                return { result: await context.executeCoreMemory(toolArgs) };
-            }
-            if (plugin.name === 'TopicSponsor') {
-                return require('../Plugin/NativeSync/sync/sponsorExecutionBridge').executeCore(toolArgs, context);
-            }
-        }
         for (const bridge of this.bridges) {
             if (await bridge.canHandle(manifest, context)) {
                 await bridge.inject(manifest, dependencies, context);

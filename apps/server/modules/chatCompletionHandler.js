@@ -634,6 +634,7 @@ async function _refreshRagBlocksIfNeeded(messages, newContext, pluginManager, de
     return messages;
   }
 
+  diaryAuthority.assertCurrent();
   // 创建消息数组的深拷贝以安全地进行修改
   const newMessages = JSON.parse(JSON.stringify(messages));
   let hasRefreshed = false;
@@ -860,7 +861,9 @@ class ChatCompletionHandler {
     const id = body.requestId || body.messageId;
     let originalBody = nativeContext.prepareContinuationBody(body);
     if (diaryAuthority.isCoreTurn()) {
-      nativeContext.currentCoreNativeAuthority()?.blocks.clear();
+      const authority = nativeContext.currentCoreNativeAuthority();
+      authority?.beginResourceRead();
+      authority?.blocks.clear();
       originalBody = { ...originalBody, messages: diaryAuthority.stripOldBlocks(originalBody.messages) };
     }
     const presence = residentPresence.takeIntent(originalBody);

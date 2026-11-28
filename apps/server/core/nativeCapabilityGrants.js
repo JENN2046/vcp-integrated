@@ -41,18 +41,29 @@ function targets(grants, capability) {
 }
 
 function createWorkAuthority(readGrants, workspace, agentId, fence) {
-    const read = () => { fence(); return readGrants?.(workspace, agentId) ?? {}; };
+    let snapshot;
+    const read = () => readGrants?.(workspace, agentId) ?? {};
+    const ownsHistory = capability => capability === 'TopicMemo' || capability === 'DeepMemo';
     const used = new Map();
     return {
         workspace, agentId, blocks: new Set(),
+        // The resource read shares one snapshot until an asynchronous handoff or dispatch.
+        beginResourceRead() { snapshot = undefined; },
         allows(capability, names, { track = true } = {}) {
             const requested = Array.isArray(names) ? names : [names];
             if (!requested.length) return false;
-            const allowed = targets(read(), capability);
-            if (!requested.every(name => allowed.includes(name))) return false;
-            if (track) {
+            const restricted = ownsHistory(capability) ? requested.filter(name => name !== agentId) : requested;
+            if (restricted.length && snapshot === undefined) {
+                fence();
+                snapshot = read();
+            }
+            if (restricted.length) {
+                const allowed = targets(snapshot, capability);
+                if (!restricted.every(name => allowed.includes(name))) return false;
+            }
+            if (track && restricted.length) {
                 if (!used.has(capability)) used.set(capability, new Set());
-                for (const name of requested) used.get(capability).add(name);
+                for (const name of restricted) used.get(capability).add(name);
             }
             return true;
         },
@@ -61,9 +72,9 @@ function createWorkAuthority(readGrants, workspace, agentId, fence) {
         },
         assertCurrent() {
             if (!used.size) return;
-            const grants = read();
+            snapshot = read();
             for (const [capability, names] of used) {
-                const allowed = targets(grants, capability);
+                const allowed = targets(snapshot, capability);
                 if ([...names].some(name => !allowed.includes(name))) throw failure('CORE_NATIVE_CAPABILITY_REVOKED', 403);
             }
         }

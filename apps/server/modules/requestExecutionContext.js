@@ -358,7 +358,7 @@ async function confirmToolSettlement(bridge, event) {
     }
 }
 
-async function acceptNativeTask({ pluginName, nativeTaskId, agentBaseName }) {
+async function acceptNativeTask({ pluginName, nativeTaskId, agentBaseName, agentName }) {
     const context = local.getStore();
     if (context?.safeTools && (!context.delegation || pluginName !== 'AgentAssistant' ||
         !context.toolBatch?.dispatched || context.toolBatch.accepted)) throw toolError('CONTROLLED_TOOL_FORBIDDEN');
@@ -370,7 +370,7 @@ async function acceptNativeTask({ pluginName, nativeTaskId, agentBaseName }) {
     throwIfCancelled();
     const identity = Object.freeze({ ...context.invocation, pluginName, nativeTaskId, agentBaseName });
     if (context.delegation) context.toolBatch.accepted = true;
-    if (context.core) return context.coreAA.accept(identity);
+    if (context.core) return context.coreAA.accept(Object.freeze({ ...identity, agentName }));
     await context.bridge.onTaskAccepted(identity);
     // The child outlives the parent response. Each new model round still
     // passes through the original Work's request registry and dispatch fence.
