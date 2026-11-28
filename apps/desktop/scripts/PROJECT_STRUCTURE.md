@@ -1,6 +1,6 @@
 # VCPChat 项目文件目录结构
 
-> 自动生成于：2026-11-04 02:56:17  
+> 自动生成于：2026-11-26 03:35:05  
 
 > 项目根目录：`H:\VCP\VCPMain\VCPChat`  
 
@@ -10,24 +10,24 @@
 
 ## 文件统计
 
-- **总目录数**：244
-- **总文件数**：1722
-- **文件类型数**：21
+- **总目录数**：253
+- **总文件数**：1856
+- **文件类型数**：23
 
 | 类型 | 扩展名 | 数量 |
 | :--- | :--- | ---: |
-| JavaScript | `.js` | 1079 |
-| CSS | `.css` | 159 |
-| JSON | `.json` | 152 |
-| Rust | `.rs` | 115 |
-| Markdown | `.md` | 67 |
-| HTML | `.html` | 48 |
-| Python | `.py` | 28 |
-| JavaScript (CommonJS) | `.cjs` | 12 |
-| Batch Script | `.bat` | 9 |
+| JavaScript | `.js` | 1157 |
+| CSS | `.css` | 163 |
+| JSON | `.json` | 159 |
+| Rust | `.rs` | 137 |
+| Markdown | `.md` | 70 |
+| HTML | `.html` | 52 |
+| Python | `.py` | 30 |
+| JavaScript (CommonJS) | `.cjs` | 21 |
+| Batch Script | `.bat` | 10 |
+| .example | `.example` | 10 |
 | TOML | `.toml` | 8 |
 | Plain Text | `.txt` | 8 |
-| .example | `.example` | 8 |
 | VBScript | `.vbs` | 7 |
 | YAML | `.yml` | 6 |
 | .ini | `.ini` | 4 |
@@ -36,8 +36,10 @@
 | TypeScript (React) | `.tsx` | 2 |
 | Shell Script | `.sh` | 2 |
 | C# | `.cs` | 1 |
+| JavaScript (ESM) | `.mjs` | 1 |
+| SQL | `.sql` | 1 |
 | .lock | `.lock` | 1 |
-| **合计** | - | **1722** |
+| **合计** | - | **1856** |
 
 ## 目录结构树
 
@@ -492,6 +494,15 @@ VCPChat/
 ├── migration/
 │   ├── migrateAvatars.js
 │   └── 头像迁移脚本readme.md
+├── Mijiamodules/
+│   ├── capabilities.json
+│   ├── device-art.js
+│   ├── device-controls.js
+│   ├── mijia.css
+│   ├── mijia.html
+│   ├── mijia_bridge.py
+│   ├── panel.js
+│   └── window.js
 ├── modules/
 │   ├── assistant/
 │   │   └── assistant-rust-adapter.js
@@ -535,15 +546,19 @@ VCPChat/
 │   │   ├── contextCompactionPrompts.js
 │   │   ├── contextCompactionService.js
 │   │   ├── contextCompactionState.js
+│   │   ├── contextCompactionStream.js
 │   │   ├── mainChatStateAuthority.js
 │   │   ├── memoryChatRepository.js
 │   │   ├── sideChatSessionService.js
 │   │   ├── singleChatRequestOrchestrator.js
+│   │   ├── sleepStreamIdle.js
+│   │   ├── sleepStreamRequests.js
 │   │   ├── streamConsumerRegistry.js
 │   │   ├── streamCoordinator.js
 │   │   ├── streamSession.js
 │   │   ├── streamTransientHistory.js
 │   │   ├── surfaceConversation.js
+│   │   ├── topicAdmissionSingleChat.js
 │   │   └── vcpStreamBridge.js
 │   ├── deskpet/
 │   │   ├── wake/
@@ -593,6 +608,8 @@ VCPChat/
 │   │   ├── throwMotion.js
 │   │   ├── wander.js
 │   │   └── zipImport.js
+│   ├── diagnostics/
+│   │   └── bootProfile.js
 │   ├── emotion/
 │   │   ├── emotionDirector.js
 │   │   ├── emotionPrompt.js
@@ -643,6 +660,7 @@ VCPChat/
 │   │   ├── localSttHandlers.js
 │   │   ├── mainChatVoiceCoordinator.js
 │   │   ├── memoHandlers.js
+│   │   ├── mijiaHandlers.js
 │   │   ├── modelTrajectoryHandlers.js
 │   │   ├── musicHandlers.js
 │   │   ├── notesHandlers.js
@@ -705,6 +723,7 @@ VCPChat/
 │   │   │   └── thought-map-modal.js
 │   │   ├── agentEmotionFeed.js
 │   │   ├── animation.js
+│   │   ├── animationMountController.js
 │   │   ├── appFeatures.js
 │   │   ├── chartEmbedHost.js
 │   │   ├── chat-header-style.js
@@ -735,19 +754,28 @@ VCPChat/
 │   │   ├── mainChatSurfaceAdapter.js
 │   │   ├── mainChatThemeOwner.js
 │   │   ├── markdownCodeDomainScanner.js
+│   │   ├── markdownPolicy.js
+│   │   ├── mathRenderer.js
 │   │   ├── mediaLifecycle.js
 │   │   ├── messageContextMenu.js
+│   │   ├── messagePreviewText.js
 │   │   ├── messenger-presentation.js
 │   │   ├── middleClickHandler.js
 │   │   ├── model-picker-popup.js
 │   │   ├── nonStreamingEventConsumer.js
+│   │   ├── offscreenDomWindow.js
 │   │   ├── ownedPreloadSubscription.js
 │   │   ├── pretext-bridge.js
 │   │   ├── pretext.bundle.js
 │   │   ├── pretext.esm.js
 │   │   ├── projectForgeTopicSurface.js
+│   │   ├── proseLinks.js
 │   │   ├── renderDependencies.js
 │   │   ├── renderSessionAuthority.js
+│   │   ├── renderTemplateCompiler.js
+│   │   ├── renderWorker.js
+│   │   ├── renderWorkerClient.js
+│   │   ├── renderWorkerRuntime.js
 │   │   ├── sideChatSurfaceOwner.js
 │   │   ├── sideChatWiring.js
 │   │   ├── sidePaneCommands.js
@@ -755,11 +783,13 @@ VCPChat/
 │   │   ├── sidePaneLauncherWiring.js
 │   │   ├── sidePaneWiring.js
 │   │   ├── sidePaneWorkspaceServices.js
+│   │   ├── streamIslandGate.js
 │   │   ├── streamManager.js
 │   │   ├── streamProjectionRuntime.js
 │   │   ├── streamSpeech.js
 │   │   ├── streamSpeechOwner.js
 │   │   ├── streamStableBoundary.js
+│   │   ├── strictAnimationIsland.js
 │   │   ├── surfaceTaskOwner.js
 │   │   ├── toolBatchDomains.js
 │   │   ├── toolBatchRegions.js
@@ -768,8 +798,13 @@ VCPChat/
 │   │   ├── toolRequestMarkers.js
 │   │   ├── toolRequestScanner.js
 │   │   ├── toolResultRegions.js
+│   │   ├── toolReturnBoundary.js
+│   │   ├── topicAdmissionQueueView.js
 │   │   ├── topicSelectionReadiness.js
 │   │   ├── ttsSurfaceOwner.js
+│   │   ├── unsavedReplyRecovery.js
+│   │   ├── vcpDocumentScanner.js
+│   │   ├── vcpParseContext.js
 │   │   ├── visibilityOptimizer.js
 │   │   └── windowStreamRuntime.js
 │   ├── scriptorium/
@@ -817,6 +852,7 @@ VCPChat/
 │   │   ├── musicGrooveBus.js
 │   │   ├── networkNotesCacheStore.js
 │   │   ├── pdfAttachmentService.js
+│   │   ├── pdfRasterizer.js
 │   │   ├── pluginAgentOperationService.js
 │   │   ├── portraitOptimizer.js
 │   │   ├── preloadPaths.js
@@ -827,6 +863,15 @@ VCPChat/
 │   │   ├── senderTaskRegistry.js
 │   │   ├── sourceService.js
 │   │   ├── themePreviewVariables.js
+│   │   ├── toolLoopHandoff.js
+│   │   ├── topicAdmissionGroup.js
+│   │   ├── topicConversationResolver.js
+│   │   ├── topicGenerationLease.js
+│   │   ├── topicMessageAdmission.js
+│   │   ├── topicMessageAdmissionHost.js
+│   │   ├── topicMessageAdmissionStore.js
+│   │   ├── topicRiverQuote.js
+│   │   ├── topicSponsorDelivery.js
 │   │   ├── windowAppIds.js
 │   │   ├── windowPinService.js
 │   │   ├── windowService.js
@@ -850,6 +895,7 @@ VCPChat/
 │   │   │   ├── selection-assistant.js
 │   │   │   ├── server-connection.js
 │   │   │   ├── sidebar-surfaces.js
+│   │   │   ├── tts-cache-panel.js
 │   │   │   ├── user-identity.js
 │   │   │   ├── voice-settings.js
 │   │   │   └── workspace-management.js
@@ -1087,6 +1133,7 @@ VCPChat/
 │   │   │   └── sttWorker.js
 │   │   ├── audioRecorder.js
 │   │   ├── chatVoiceComposer.js
+│   │   ├── gsvPresets.js
 │   │   ├── passiveVoiceSentinel.js
 │   │   ├── speechDirectiveMatcher.js
 │   │   ├── voice-input-engine-adapter.js
@@ -1094,9 +1141,21 @@ VCPChat/
 │   │   ├── voiceComposerView.js
 │   │   ├── voiceWaveform.js
 │   │   └── wavAudioEncoder.js
+│   ├── warpedFieldAtlas/
+│   │   ├── renderer/
+│   │   │   ├── atlas-app.js
+│   │   │   ├── atlas.css
+│   │   │   ├── index.js
+│   │   │   ├── metric-slice.mjs
+│   │   │   ├── window.html
+│   │   │   └── window.js
+│   │   ├── feature.json
+│   │   ├── index.js
+│   │   └── preloadApi.js
 │   ├── agentMood.js
 │   ├── appFeatures.js
 │   ├── chatManager.js
+│   ├── chatRequestError.js
 │   ├── contextSanitizer.js
 │   ├── DASP.txt
 │   ├── diagnosticsSnapshot.js
@@ -1106,6 +1165,7 @@ VCPChat/
 │   ├── filterManager.js
 │   ├── global-settings-manager.js
 │   ├── hostHooks.js
+│   ├── image-viewer.css
 │   ├── image-viewer.html
 │   ├── image-viewer.js
 │   ├── inputEnhancer.js
@@ -1138,6 +1198,9 @@ VCPChat/
 │   └── webdavManager.js
 ├── Musicmodules/
 │   ├── music-stage/
+│   │   ├── assets/
+│   │   │   ├── coast-rock.js
+│   │   │   └── CREDITS.md
 │   │   ├── modes/
 │   │   │   ├── cadenza-manager.js
 │   │   │   ├── diorama-camera.js
@@ -1227,6 +1290,7 @@ VCPChat/
 │   │   ├── localStt.js
 │   │   ├── loom.js
 │   │   ├── memo.js
+│   │   ├── mijia.js
 │   │   ├── modelTrajectory.js
 │   │   ├── music.js
 │   │   ├── notes.js
@@ -1261,7 +1325,9 @@ VCPChat/
 │   ├── utility.js
 │   └── voice-input-capture.js
 ├── ProjectForgemodules/
+│   ├── projectforge-blueprint.js
 │   ├── projectforge-git.js
+│   ├── projectforge-layout.js
 │   ├── projectforge-sidetabs.js
 │   ├── projectforge-source.js
 │   ├── projectforge.css
@@ -1404,6 +1470,7 @@ VCPChat/
 │   │   ├── main.rs
 │   │   ├── protocol.rs
 │   │   ├── search.rs
+│   │   ├── startup.rs
 │   │   ├── storage.rs
 │   │   ├── sync.rs
 │   │   ├── sync_wire.rs
@@ -1430,12 +1497,34 @@ VCPChat/
 │   │   │   ├── python.rs
 │   │   │   ├── rust_lang.rs
 │   │   │   └── types.rs
+│   │   ├── commit_coordinator.rs
+│   │   ├── commit_journal.rs
 │   │   ├── component.rs
+│   │   ├── edit.rs
+│   │   ├── edit_pipeline.rs
+│   │   ├── edit_service.rs
+│   │   ├── edit_tickets.rs
+│   │   ├── elision.rs
+│   │   ├── file_commit.rs
+│   │   ├── file_replace.rs
+│   │   ├── file_service.rs
 │   │   ├── geo.rs
 │   │   ├── lang.rs
+│   │   ├── line_diff.rs
 │   │   ├── main.rs
+│   │   ├── project_path.rs
 │   │   ├── scan.rs
-│   │   └── symbols.rs
+│   │   ├── service.rs
+│   │   ├── service_config.rs
+│   │   ├── storage.rs
+│   │   ├── storage_schema.sql
+│   │   ├── symbol_address.rs
+│   │   ├── symbols.rs
+│   │   ├── text_snapshot.rs
+│   │   ├── todo_refs.rs
+│   │   ├── transport.rs
+│   │   ├── validation.rs
+│   │   └── validation_process.rs
 │   ├── bench.js
 │   ├── build-runtime.js
 │   └── Cargo.toml
@@ -1453,6 +1542,9 @@ VCPChat/
 │   ├── README.md
 │   ├── scriptorium-agent-port.js
 │   ├── scriptorium-async.js
+│   ├── scriptorium-board-html.js
+│   ├── scriptorium-board-lineage.js
+│   ├── scriptorium-board-model.js
 │   ├── scriptorium-board.js
 │   ├── scriptorium-deck-adapter.js
 │   ├── scriptorium-deck-editor.js
@@ -1501,6 +1593,7 @@ VCPChat/
 │   ├── scriptorium-svg-assets.js
 │   ├── scriptorium-table-view.css
 │   ├── scriptorium-table-view.js
+│   ├── scriptorium-text-fragment.js
 │   ├── scriptorium-text-view.js
 │   ├── scriptorium-visibility.js
 │   ├── scriptorium-web-page.js
@@ -1513,6 +1606,12 @@ VCPChat/
 │   ├── vdoc-hybrid-compiler.js
 │   ├── vdoc-style-library.js
 │   └── vdoc-svg-asset-library.js
+├── sovits5cppmanager/
+│   ├── app.js
+│   ├── index.html
+│   ├── README.md
+│   ├── server.js
+│   └── start.bat
 ├── SovitsTest/
 │   ├── get_models.py
 │   ├── GSVI.py
@@ -1701,6 +1800,22 @@ VCPChat/
 │   │   │   ├── LoomSkillService.js
 │   │   │   ├── plugin-manifest.json
 │   │   │   └── README.md
+│   │   ├── MacPowerShell/
+│   │   │   ├── gui/
+│   │   │   │   ├── PowerShellViewer.css
+│   │   │   │   ├── PowerShellViewer.html
+│   │   │   │   ├── PowerShellViewer.js
+│   │   │   │   └── preload.js
+│   │   │   ├── AdminConfirm.py
+│   │   │   ├── command-output-parser.js
+│   │   │   ├── commandCapture.js
+│   │   │   ├── commandRunStore.js
+│   │   │   ├── MacPowerShell.js
+│   │   │   ├── nativeHelperPath.js
+│   │   │   ├── plugin-manifest.json
+│   │   │   ├── terminalOutputSanitizer.js
+│   │   │   ├── test_interactive_sequence.js
+│   │   │   └── test_security_check.js
 │   │   ├── MediaShot/
 │   │   │   ├── media_shot.py
 │   │   │   ├── plugin-manifest.json
@@ -1725,29 +1840,55 @@ VCPChat/
 │   │   │   ├── command-output-parser.js
 │   │   │   ├── commandCapture.js
 │   │   │   ├── commandRunStore.js
+│   │   │   ├── commandSecurityCheck.js
 │   │   │   ├── nativeHelperPath.js
 │   │   │   ├── plugin-manifest.json
 │   │   │   ├── PowerShellExecutor.js
+│   │   │   ├── secretRedactor.js
 │   │   │   ├── terminalOutputSanitizer.js
+│   │   │   ├── test_approval_order.js
+│   │   │   ├── test_ast_idle.js
+│   │   │   ├── test_egress_refresh.js
 │   │   │   ├── test_interactive_sequence.js
 │   │   │   └── test_security_check.js
 │   │   ├── ProjectForge/
+│   │   │   ├── mcpbridge/
+│   │   │   │   ├── bridge.cjs
+│   │   │   │   ├── bridge.test.cjs
+│   │   │   │   ├── config.example.json
+│   │   │   │   ├── MCPPrompt.md
+│   │   │   │   ├── package-lock.json
+│   │   │   │   ├── package.json
+│   │   │   │   ├── README.md
+│   │   │   │   ├── search.cjs
+│   │   │   │   ├── search.test.cjs
+│   │   │   │   ├── server.cjs
+│   │   │   │   ├── tools.cjs
+│   │   │   │   └── topic.cjs
 │   │   │   ├── args.js
-│   │   │   ├── engine.js
+│   │   │   ├── bashRunner.js
 │   │   │   ├── evalProcess.js
 │   │   │   ├── evalRust.js
 │   │   │   ├── evalSymbol.js
 │   │   │   ├── evalWorker.cjs
 │   │   │   ├── evalWorker.py
+│   │   │   ├── exportReport.js
 │   │   │   ├── gui-revert-file.js
 │   │   │   ├── indexerClient.js
 │   │   │   ├── linkGraph.js
+│   │   │   ├── nativeEdit.js
+│   │   │   ├── nativeFiles.js
+│   │   │   ├── nativeService.js
 │   │   │   ├── plugin-manifest.json
 │   │   │   ├── ProjectForgeService.js
+│   │   │   ├── queryPrimitives.js
+│   │   │   ├── queryRunner.js
+│   │   │   ├── queryWorker.cjs
 │   │   │   ├── resolvers.js
-│   │   │   ├── store.js
+│   │   │   ├── rustStore.js
+│   │   │   ├── serviceClient.js
 │   │   │   ├── symbolResolver.js
-│   │   │   ├── tickets.js
+│   │   │   ├── validationWorker.cjs
 │   │   │   └── workspace.js
 │   │   ├── PromptSponsor/
 │   │   │   ├── .env.example
@@ -1805,10 +1946,14 @@ VCPChat/
 │   │   │   ├── plugin-manifest.json
 │   │   │   └── TopicMemo.js
 │   │   ├── TopicSponsor/
+│   │   │   ├── config.env.example
 │   │   │   ├── plugin-manifest.json
 │   │   │   ├── README.md
 │   │   │   ├── topicsponsor-service.js
 │   │   │   └── topicsponsor.js
+│   │   ├── VAbility/
+│   │   │   ├── plugin-manifest.json
+│   │   │   └── v-ability.js
 │   │   ├── VChatAutoTTS/
 │   │   │   ├── plugin.css
 │   │   │   ├── plugin.js
@@ -1823,6 +1968,9 @@ VCPChat/
 │   │   │   ├── run_alarm.py
 │   │   │   └── set_alarm.py
 │   │   ├── VCPEverything/
+│   │   │   ├── .env.example
+│   │   │   ├── local-search-controller-linux.js
+│   │   │   ├── local-search-controller-win.js
 │   │   │   ├── local-search-controller.js
 │   │   │   ├── plugin-manifest.json
 │   │   │   └── readme.md
@@ -1973,9 +2121,6 @@ VCPChat/
 │   ├── voicechat.css
 │   ├── voicechat.html
 │   └── voicechat.js
-├── WebIndexTTS2/
-│   ├── README.md
-│   └── server.js
 ├── backup.py
 ├── check_theme_wallpapers.bat
 ├── main.html
@@ -2020,5 +2165,5 @@ VCPChat/
   `.astro`, `.cache`, `.docusaurus`, `.git`, `.gradle`, `.hg`, `.hypothesis`, `.idea`, `.ipynb_checkpoints`, `.m2`, `.mypy_cache`, `.next`, `.nox`, `.nuxt`, `.output`, `.parcel-cache`, `.pnpm-store`, `.pyre`, `.pytest_cache`, `.ruff_cache`, `.svelte-kit`, `.svn`, `.temp`, `.tmp`, `.tox`, `.turbo`, `.venv`, `.virtualenv`, `.vite`, `.vs`, `.vscode`, `.webpack`, `.yarn`, `__pycache__`, `__tests__`, `appdata`, `arm64`, `artifacts`, `bin`, `bower_components`, `build`, `carthage`, `checkpoints`, `coverage`, `data_cache`, `debug`, `dist`, `doc`, `docs`, `documentation`, `env`, `example`, `examples`, `htmlcov`, `indexeddb`, `jspm_packages`, `local_storage`, `logs`, `models`, `node_modules`, `obj`, `out`, `output`, `packages`, `pip-wheel-metadata`, `pkg`, `pods`, `pretrained_models`, `project_structure.md`, `python_embedded`, `python_embeded`, `release`, `reports`, `screenshots`, `scripts`, `sessions`, `site-packages`, `storybook-static`, `target`, `temp`, `test`, `test-results`, `tests`, `tmp`, `user_data`, `userdata`, `vendor`, `venv`, `wheelhouse`, `x64`, `x86`, `开发文档`
 - **默认通配符排除**：
   `cmake-build-*`, `*.egg-info`, `*.dist-info`, `*.tmp`, `.DS_Store`, `Thumbs.db`, `desktop.ini`, `*.pyc`, `*.pyo`, `*.pyd`, `*.o`, `*.obj`, `*.class`, `*.tsbuildinfo`, `*.log`, `*.tmp`, `*.temp`, `*.swp`, `*.swo`, `*.bak`, `*~`, `*.suo`, `*.user`, `scripts`, `开发文档`, `doc`, `docs`, `documentation`, `test`, `tests`, `__tests__`, `example`, `examples`, `artifacts`, `screenshots`, `test-results`, `reports`, `models`, `checkpoints`, `pretrained_models`, `site-packages`, `python_embedded`, `python_embeded`, `PROJECT_STRUCTURE.md`
-- **.gitignore 生效规则**：共 58 条规则已并入跳过逻辑
+- **.gitignore 生效规则**：共 59 条规则已并入跳过逻辑
 </details>

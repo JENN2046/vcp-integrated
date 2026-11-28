@@ -192,7 +192,7 @@ test('未知命令和非法目标在写入前被拒绝', async t => {
         /白名单/
     );
     await assert.rejects(
-        service.processTopicCommand({ command: 'ReadTopicContent', maid: '..', topic_id: 'x' }),
+        service.processTopicCommand({ command: 'CheckTopicOwnership', maid: '..', topic_id: 'x' }),
         /非法/
     );
 
@@ -230,4 +230,78 @@ test('unique exact name outranks fuzzy matches and an explicit ID disambiguates 
     }, { requestId: 'id-priority' });
     assert.deepEqual((await agentConfigManager.readAgentConfig('agent-b')).topics.map(topic => topic.id), [byId.topic_id]);
     assert.equal((await agentConfigManager.readAgentConfig('agent-a')).topics.length, 2);
+});
+
+test('TopicSponsor discovery lists canonical identities and five newest topics without history reads', async t => {
+    const { service, agentConfigManager } = await fixture(t);
+    const topics = Array.from({ length: 8 }, (_, i) => ({
+        id: `topic_${i}`, name: `标题${i}`, createdAt: i, locked: true, unread: false,
+    }));
+    await agentConfigManager.writeAgentConfig('cat-id', { name: '猫娘小克', systemPrompt: 'secret', topics });
+    const groupRoot = path.join(service.appDataRoot, 'AgentGroups');
+    await fs.outputJson(path.join(groupRoot, 'group-id', 'config.json'),
+        { name: 'Nova讨论群', secret: 'hidden', topics: [...topics].reverse() });
+    const call = args => service.processTopicCommand(args);
+    const agents = await call({ command: 'ListAgents', maid: 'irrelevant' });
+    assert.ok(agents.agents.some(a => a.id === 'cat-id' && a.name === '猫娘小克'));
+    assert.equal(JSON.stringify(agents).includes('secret'), false);
+    const groups = await call({ command: 'ListGroups' });
+    assert.deepEqual(groups.groups, [{ id: 'group-id', name: 'Nova讨论群', type: 'group' }]);
+    for (const query of ['小克', 'cat-id', '猫娘小克']) {
+        const result = await call({ command: 'ListRecentTopics', query });
+        assert.equal(result.owner.id, 'cat-id');
+        assert.equal(result.total, 8);
+        assert.deepEqual(result.topics.map(topic => topic.topic_id), ['topic_7', 'topic_6', 'topic_5', 'topic_4', 'topic_3']);
+        assert.equal(result.topics[0].title, '标题7');
+    }
+    assert.equal((await call({ command: 'ListRecentTopics', query: 'nOvA' })).owner.type, 'group');
+    await agentConfigManager.writeAgentConfig('cat-test', { name: '小克测试版', topics: [] });
+    await assert.rejects(call({ command: 'ListRecentTopics', query: '小克' }),
+        error => ['猫娘小克', 'cat-id', '小克测试版', 'cat-test'].every(s => error.message.includes(s)));
+    await assert.rejects(call({ command: 'ListRecentTopics', query: 'unknown' }), /未找到/);
+    await assert.rejects(call({ command: 'ListRecentTopics', query: '../escape' }), /非法/);
+    assert.deepEqual((await call({ command: 'ListRecentTopics', query: 'cat-test' })).topics, []);
+    await fs.outputJson(path.join(groupRoot, 'same-name', 'config.json'), { name: '猫娘小克', topics: [] });
+    await assert.rejects(call({ command: 'ListRecentTopics', query: '猫娘小克' }), /不唯一/);
+    assert.equal((await call({ command: 'ListRecentTopics', query: '小克', target_type: 'group' })).owner.id, 'same-name');
+});
+
+test('retired TopicSponsor history commands direct callers to TopicMemo without reading any history', async t => {
+    const { service, historyMutationQueue } = await fixture(t);
+    historyMutationQueue.read = async () => assert.fail('retired reads must not load history');
+    for (const command of ['ReadTopicContent', 'ListUnlockedTopics', 'ReadUnlockedTopics']) {
+        await assert.rejects(service.processTopicCommand({ command, maid: '小娜', include_read: true }), /TopicMemo/);
+    }
+});
+
+test('legacy locked flag does not affect recent topics, unread status, or known-address replies', async t => {
+    const { service, agentId, agentConfigManager } = await fixture(t);
+    await agentConfigManager.updateAgentConfig(agentId, config => ({
+        ...config,
+        topics: config.topics.map(topic => ({ ...topic, locked: true, createdAt: Date.now() })),
+    }));
+    const recent = await service.processTopicCommand({ command: 'CheckNewTopics', maid: '小娜' });
+    assert.deepEqual(recent.topics.map(topic => topic.topic_id), ['existing-topic']);
+    assert.equal('locked' in recent.topics[0], false);
+    const reply = await service.processTopicCommand({
+        command: 'ReplyToTopic', topic_id: 'existing-topic', sender_name: '小娜', message: 'reply',
+    });
+    assert.equal(reply.topic_id, 'existing-topic');
+    const unread = await service.processTopicCommand({ command: 'CheckUnreadMessages', maid: '小娜' });
+    assert.equal(unread.has_unread, false);
+});
+
+test('ownership status still locates a unique group topic despite an unrelated tracing maid', async t => {
+    const { service, historyMutationQueue } = await fixture(t);
+    const groupId = 'group-test';
+    const topicId = 'topic_group_1';
+    await fs.outputJson(path.join(service.appDataRoot, 'AgentGroups', groupId, 'config.json'), {
+        name: '开发讨论组', topics: [{ id: topicId, name: '架构联调', _creator: { agentName: 'Kerr' } }],
+    });
+    await historyMutationQueue.replace({ itemType: 'group', itemId: groupId, topicId }, []);
+    const result = await service.processTopicCommand({
+        command: 'CheckTopicOwnership', maid: '小娜', topic_id: topicId, caller_name: 'Kerr',
+    });
+    assert.equal(result.is_owner, true);
+    assert.equal(result.owner_type, 'group');
 });

@@ -5,7 +5,7 @@
 import { handleSaveGlobalSettings } from './global-settings-manager.js';
 import { syncDependentRows } from './ui-system/settings/dependent-rows.js';
 import { assembleRequestMessages } from './chat/chatContextPipeline.js';
-import { shouldCompactContext } from './chat/contextCompactionService.js';
+import { shouldCompactContext, assertContextWithinLimit } from './chat/contextCompactionService.js';
 import { installAppFeatures } from './renderer/appFeatures.js';
 
 let eventListenersBound = false;
@@ -108,75 +108,11 @@ export function setupEventListeners(deps) {
             return;
         }
 
-        try {
-            let topicName = '未命名话题';
-            if (currentSelectedItem.config && currentSelectedItem.config.topics) {
-                const currentTopic = currentSelectedItem.config.topics.find(t => t.id === currentTopicId);
-                if (currentTopic) {
-                    topicName = currentTopic.name;
-                }
-            }
-
-            const chatMessagesDiv = document.getElementById('chatMessages');
-            if (!chatMessagesDiv) {
-                uiHelperFunctions.showToastNotification('错误：找不到聊天内容容器', 'error');
-                return;
-            }
-
-            const messageItems = chatMessagesDiv.querySelectorAll('.message-item');
-            if (messageItems.length === 0) {
-                uiHelperFunctions.showToastNotification('此话题没有可见的聊天内容可导出', 'info');
-                return;
-            }
-
-            let markdownContent = `# 话题: ${topicName}\n\n`;
-            let extractedCount = 0;
-
-            messageItems.forEach((item) => {
-                if (item.classList.contains('system') || item.classList.contains('thinking')) {
-                    return;
-                }
-
-                const senderElement = item.querySelector('.sender-name');
-                const contentElement = item.querySelector('.md-content');
-
-                if (senderElement && contentElement) {
-                    const sender = senderElement.textContent.trim().replace(':', '');
-                    // 克隆节点，移除思维链气泡后再取文本（<think> 已渲染为 DOM 节点）
-                    const contentClone = contentElement.cloneNode(true);
-                    contentClone.querySelectorAll('.vcp-thought-chain-bubble').forEach(el => el.remove());
-                    let content = contentClone.innerText || contentClone.textContent || "";
-                    // 兜底：仅清理起止标签分别独占一行的明文思维链。
-                    content = content.replace(/^[ \t]*\[--- VCP元思考链(?::\s*"[^"]*")?\s*---\][ \t]*\r?\n[\s\S]*?^[ \t]*\[--- 元思考链结束 ---\][ \t]*(?:\r?\n|$)/gm, '');
-                    content = content.replace(/^[ \t]*<think(?:ing)?>[ \t]*\r?\n[\s\S]*?^[ \t]*<\/think(?:ing)?>[ \t]*(?:\r?\n|$)/gim, '');
-                    content = content.trim();
-
-                    if (sender && content) {
-                        markdownContent += `**${sender}**: ${content}\n\n---\n\n`;
-                        extractedCount++;
-                    }
-                }
-            });
-
-            if (extractedCount === 0) {
-                uiHelperFunctions.showToastNotification('未能从当前话题中提取任何有效对话内容', 'warning');
-                return;
-            }
-
-            const result = await chatAPI.exportTopicAsMarkdown({
-                topicName: topicName,
-                markdownContent: markdownContent
-            });
-
-            if (result.success) {
-                uiHelperFunctions.showToastNotification(`话题 "${topicName}" 已成功导出到: ${result.path}`, 'success');
-            } else {
-                uiHelperFunctions.showToastNotification(`导出话题失败: ${result.error}`, 'error');
-            }
-        } catch (error) {
-            console.error('[快捷键] 导出话题时发生错误:', error);
-            uiHelperFunctions.showToastNotification(`导出话题时发生错误: ${error.message}`, 'error');
-        }
+        const config = currentSelectedItem.config || currentSelectedItem;
+        const topicName = config.topics?.find(topic => topic.id === currentTopicId)?.name || '未命名话题';
+        await topicListManager.handleExportTopic(
+            currentSelectedItem.id, currentSelectedItem.type, currentTopicId, topicName, config
+        );
     }
 
     /**
@@ -184,6 +120,52 @@ export function setupEventListeners(deps) {
      * @param {string} additionalPrompt - Additional prompt text from the input box.
      */
     async function handleContinueWriting(additionalPrompt = '') {
+        if (typeof chatAPI.topicAdmissionAcquire !== 'function') {
+            return handleContinueWritingOwned(additionalPrompt);
+        }
+        const selected = refs.currentSelectedItem.get();
+        const topicId = refs.currentTopicId.get();
+        if (!selected?.id || selected.type !== 'agent' || !topicId) return;
+        if (chatManager.isContextCompacting?.()) {
+            uiHelperFunctions.showToastNotification('上下文正在压缩，请稍候', 'warning');
+            return;
+        }
+        const scope = { itemType: 'agent', itemId: selected.id, topicId };
+        const token = `manual_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const acquired = await chatAPI.topicAdmissionAcquire(scope, token);
+        if (!acquired?.success) {
+            uiHelperFunctions.showToastNotification(`话题暂不可续写：${acquired?.error || acquired?.code || '占用中'}`, 'info');
+            return;
+        }
+        // Navigation during IPC must not transfer the lease to the new selection.
+        if (refs.currentSelectedItem.get()?.id !== scope.itemId || refs.currentTopicId.get() !== scope.topicId) {
+            await chatAPI.topicAdmissionRelease(scope, token, { saved: true });
+            return;
+        }
+        let dispatched = false;
+        let saved = false;
+        try {
+            const result = await handleContinueWritingOwned(additionalPrompt, token, () => { dispatched = true; });
+            saved = result?.nonStreamingSaved === true;
+        } catch (error) {
+            if (dispatched && !saved && typeof chatAPI.topicAdmissionUncertain === 'function') {
+                try {
+                    const reported = await chatAPI.topicAdmissionUncertain(scope, token, error.message);
+                    if (!reported?.success) console.error('[ContinueWriting] uncertainty journal failed', reported);
+                } catch (reportError) {
+                    console.error('[ContinueWriting] uncertainty journal failed', reportError);
+                }
+            }
+            throw error;
+        } finally {
+            if (!dispatched || saved) {
+                const released = await chatAPI.topicAdmissionRelease(scope, token, { saved: true });
+                if (!released?.success) console.error('[ContinueWriting] lease release failed', released);
+            }
+        }
+    }
+
+    async function handleContinueWritingOwned(additionalPrompt = '', admissionToken = null, onDispatch = () => {}) {
         if (chatManager.isContextCompacting?.()) {
             uiHelperFunctions.showToastNotification('上下文正在压缩，请稍候', 'warning');
             return;
@@ -239,6 +221,14 @@ export function setupEventListeners(deps) {
                 return;
             }
         }
+        if (globalSettings.enableContextCompaction === true) {
+            try {
+                assertContextWithinLimit(currentChatHistory, currentSelectedItem.config || currentSelectedItem, temporaryPrompt);
+            } catch (error) {
+                uiHelperFunctions.showToastNotification(`续写未发送：${error.message}`, 'error');
+                return;
+            }
+        }
 
         const thinkingMessageId = `regen_${Date.now()}`;
         const thinkingMessage = {
@@ -275,6 +265,7 @@ export function setupEventListeners(deps) {
             };
 
             const context = {
+                admissionToken,
                 agentId: currentSelectedItem.id,
                 agentName: currentSelectedItem.name || currentSelectedItem.id,
                 topicId: currentTopicId,
@@ -283,6 +274,7 @@ export function setupEventListeners(deps) {
                 avatarColor: (currentSelectedItem.config || currentSelectedItem)?.avatarCalculatedColor
             };
 
+            onDispatch();
             const vcpResponse = await chatAPI.sendToVCP(
                 globalSettings.vcpServerUrl,
                 globalSettings.vcpApiKey,
@@ -294,67 +286,85 @@ export function setupEventListeners(deps) {
             );
 
             if (!useStreaming) {
-                const { response, context } = vcpResponse;
-                const isForActiveChat = context && context.agentId === currentSelectedItem.id && context.topicId === currentTopicId;
-
-                if (isForActiveChat) {
-                    messageRenderer?.removeMessageById(thinkingMessage.id);
+                // Never use response-supplied context to choose the persistence target.
+                const response = vcpResponse?.response || vcpResponse;
+                if (response?.error) throw new Error(`VCP错误: ${response.error}`);
+                const choice = response?.choices?.[0];
+                if (!choice?.message || typeof choice.message.content !== 'string') {
+                    throw new Error('续写未返回完整 assistant 终稿');
                 }
-
-                if (response.error) {
-                    if (isForActiveChat && messageRenderer) {
-                        messageRenderer.renderMessage({ role: 'system', notice: 'error', content: `VCP错误: ${response.error}`, timestamp: Date.now() });
-                    }
-                    console.error(`[ContinueWriting] VCP Error:`, response.error);
-                } else if (response.choices && response.choices.length > 0) {
-                    const assistantMessageContent = response.choices[0].message.content;
-                    const assistantMessage = {
-                        role: 'assistant',
-                        name: context.agentName || context.agentId || 'AI',
-                        avatarUrl: currentSelectedItem.avatarUrl,
-                        avatarColor: (currentSelectedItem.config || currentSelectedItem)?.avatarCalculatedColor,
-                        content: assistantMessageContent,
-                        timestamp: Date.now(),
-                        id: response.id || `regen_nonstream_${Date.now()}`
-                    };
-
-                    const historyForSave = await chatAPI.getChatHistory(context.agentId, context.topicId);
-                    if (historyForSave && !historyForSave.error) {
-                        const finalHistory = historyForSave.filter(msg => msg.id !== thinkingMessage.id && !msg.isThinking);
-                        finalHistory.push(assistantMessage);
-                        await historyMutationAuthority.replace({
-                            itemId: context.agentId, itemType: 'agent', topicId: context.topicId,
-                            category: 'flowlock-non-stream-terminal',
-                        }, finalHistory);
-
-                        if (isForActiveChat) {
-                            currentChatHistory.length = 0;
-                            currentChatHistory.push(...finalHistory);
-                            messageRenderer?.renderMessage(assistantMessage);
-                            await chatManager.attemptTopicSummarizationIfNeeded();
+                const scope = { itemType: 'agent', itemId: currentSelectedItem.id, topicId: currentTopicId };
+                const assistantMessage = {
+                    role: 'assistant',
+                    name: context.agentName || context.agentId || 'AI',
+                    agentId: scope.itemId,
+                    avatarUrl: context.avatarUrl,
+                    avatarColor: context.avatarColor,
+                    content: choice.message.content,
+                    timestamp: Date.now(),
+                    id: thinkingMessage.id,
+                    admissionToken,
+                    admissionTerminal: true,
+                    isThinking: false,
+                    finishReason: choice.finish_reason || 'completed'
+                };
+                let finalHistory;
+                if (typeof chatAPI.topicAdmissionPersistAssistant === 'function') {
+                    const persisted = await chatAPI.topicAdmissionPersistAssistant(scope, assistantMessage);
+                    if (!persisted?.success) throw new Error(persisted?.error || '续写终稿保存失败');
+                    finalHistory = persisted.history;
+                } else {
+                    if (admissionToken) throw new Error('中央续写缺少原子终稿保存能力');
+                    // Legacy hosts only; never fall back after a rejected atomic commit.
+                    const latest = await chatAPI.getChatHistory(scope.itemId, scope.topicId);
+                    if (!Array.isArray(latest)) throw new Error('续写历史读取失败');
+                    finalHistory = latest.filter(msg => msg.id !== thinkingMessage.id);
+                    finalHistory.push(assistantMessage);
+                    await historyMutationAuthority.replace({
+                        ...scope, category: 'manual-continue-non-stream-terminal',
+                    }, finalHistory);
+                }
+                // UI failures cannot invalidate an already saved terminal.
+                try {
+                    if (refs.currentSelectedItem.get()?.id === scope.itemId
+                        && refs.currentTopicId.get() === scope.topicId) {
+                        if (Array.isArray(finalHistory)) {
+                            const activeHistory = refs.currentChatHistory.get();
+                            activeHistory.splice(0, activeHistory.length, ...finalHistory);
                         }
+                        messageRenderer?.removeMessageById(thinkingMessage.id);
+                        await messageRenderer?.renderMessage(assistantMessage);
+                        await chatManager.attemptTopicSummarizationIfNeeded();
                     }
+                } catch (uiError) {
+                    console.error('[ContinueWriting] post-commit UI failed', uiError);
                 }
-            } else {
-                if (vcpResponse && vcpResponse.streamError) {
-                    console.error("[ContinueWriting] Streaming setup failed:", vcpResponse.errorDetail || vcpResponse.error);
+                try { notifySendStateChanged?.(); } catch (uiError) {
+                    console.error('[ContinueWriting] post-commit state notification failed', uiError);
                 }
+                return { nonStreamingSaved: true };
             }
-
-            if (!useStreaming) {
-                notifySendStateChanged?.();
+            if (vcpResponse?.streamError) {
+                throw new Error(vcpResponse.error || '续写流式请求启动失败');
             }
         } catch (error) {
             console.error('[ContinueWriting] 续写时出错:', error);
-            messageRenderer?.removeMessageById(thinkingMessage.id);
-            messageRenderer?.renderMessage({ role: 'system', notice: 'error', content: `错误: ${error.message}`, timestamp: Date.now() });
-            if (currentSelectedItem.id && currentTopicId) {
-                await historyMutationAuthority.replace({
-                    itemId: currentSelectedItem.id, itemType: currentSelectedItem.type, topicId: currentTopicId,
-                    category: 'flowlock-failure-cleanup',
-                }, currentChatHistory.filter(msg => !msg.isThinking));
+            // The placeholder is local only; cleanup must not overwrite newer history.
+            const placeholderIndex = currentChatHistory.findIndex(msg => msg.id === thinkingMessage.id);
+            if (placeholderIndex >= 0) currentChatHistory.splice(placeholderIndex, 1);
+            try {
+                if (refs.currentSelectedItem.get()?.id === currentSelectedItem.id
+                    && refs.currentTopicId.get() === currentTopicId) {
+                    messageRenderer?.removeMessageById(thinkingMessage.id);
+                    await messageRenderer?.renderMessage({
+                        role: 'system', notice: 'error', content: `错误: ${error.message}`, timestamp: Date.now()
+                    });
+                }
+                notifySendStateChanged?.();
+            } catch (uiError) {
+                console.error('[ContinueWriting] failure UI failed', uiError);
             }
-            notifySendStateChanged?.();
+            throw error;
         }
     }
 
@@ -450,7 +460,9 @@ export function setupEventListeners(deps) {
             }
 
             const currentInputText = messageInput.value.trim();
-            await handleContinueWriting(currentInputText);
+            await handleContinueWriting(currentInputText).catch(error => {
+                console.error('[ContinueWriting] button request failed', error);
+            });
         }
     });
 
@@ -863,18 +875,6 @@ export function setupEventListeners(deps) {
         await chatManager.createNewTopicForItem(currentSelectedItem.id, currentSelectedItem.type);
     });
 
-    // 【新建话题】按钮右键菜单 - 创建未锁定话题
-    currentItemActionBtn.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-
-        const currentSelectedItem = refs.currentSelectedItem.get();
-        if (!currentSelectedItem.id || currentSelectedItem.type !== 'agent') {
-            return; // 仅对 Agent 显示右键菜单
-        }
-
-        showNewTopicButtonMenu(e, currentSelectedItem);
-    });
-
     const chatAgentPill = document.getElementById('chatAgentPill');
     if (chatAgentPill) {
         chatAgentPill.addEventListener('click', () => {
@@ -892,92 +892,6 @@ export function setupEventListeners(deps) {
         });
     }
 
-    /**
-     * 显示【新建话题】按钮的右键菜单
-     */
-    function showNewTopicButtonMenu(event, currentSelectedItem) {
-        // 移除已存在的菜单
-        const existingMenu = document.getElementById('newTopicContextMenu');
-        if (existingMenu) existingMenu.remove();
-
-        const menu = document.createElement('div');
-        menu.id = 'newTopicContextMenu';
-        menu.classList.add('context-menu');
-        menu.style.top = `${event.clientY}px`;
-        menu.style.left = `${event.clientX}px`;
-
-        // 点击外部关闭菜单
-        const closeMenu = (e) => {
-            if (!e || !menu.contains(e.target)) {
-                menu.remove();
-                document.removeEventListener('click', closeMenu, true);
-            }
-        };
-
-        // 新建无锁话题选项
-        const createUnlockedOption = document.createElement('div');
-        createUnlockedOption.classList.add('context-menu-item');
-        createUnlockedOption.innerHTML = `<i class="fas fa-unlock"></i> 新建无锁话题`;
-        createUnlockedOption.onclick = async () => {
-            closeMenu();
-            await createNewTopicWithLockStatus(currentSelectedItem, false);
-        };
-        menu.appendChild(createUnlockedOption);
-
-        document.body.appendChild(menu);
-
-        setOwnedTimeout(() => {
-            addListener(document, 'click', closeMenu, true);
-        }, 0);
-    }
-
-    /**
-     * 创建指定锁定状态的话题
-     * 通过扩展后端 API 来创建带指定锁定状态的话题，然后使用 chatManager 的标准流程切换到该话题
-     */
-    async function createNewTopicWithLockStatus(currentSelectedItem, locked = true) {
-        if (!currentSelectedItem.id) {
-            uiHelperFunctions.showToastNotification("请先选择一个Agent。", 'error');
-            return;
-        }
-
-        const newTopicName = `新话题 ${new Date().toLocaleTimeString([], {
-            hour: '2-digit', minute: '2-digit', second: '2-digit'
-        })}`;
-
-        try {
-            // 调用后端 API 创建话题，传入 locked 参数
-            const result = await chatAPI.createNewTopicForAgent(
-                currentSelectedItem.id,
-                newTopicName,
-                false, // isBranch
-                locked // 指定锁定状态
-            );
-
-            if (result && result.success && result.topicId) {
-                // 使用 chatManager 的 selectTopic 方法来切换到新创建的话题
-                // 这会触发所有必要的状态更新、UI刷新和文件监听器启动
-                if (chatManager && chatManager.selectTopic) {
-                    await chatManager.selectTopic(result.topicId);
-                }
-
-                // 关键修复：在切换话题后，强制刷新话题列表UI
-                if (topicListManager && topicListManager.loadTopicList) {
-                    await topicListManager.loadTopicList();
-                }
-
-                uiHelperFunctions.showToastNotification(
-                    locked ? '已创建新话题（已锁定）' : '已创建新话题（未锁定，AI可查看）',
-                    'success'
-                );
-            } else {
-                uiHelperFunctions.showToastNotification(`创建新话题失败: ${result ? result.error : '未知错误'}`, 'error');
-            }
-        } catch (error) {
-            console.error('创建话题时出错:', error);
-            uiHelperFunctions.showToastNotification(`创建话题时出错: ${error.message}`, 'error');
-        }
-    }
 
     /* Notification quick actions are owned by NextShell's
      * NotificationMenuController. Keeping a second document-level binding
@@ -1381,7 +1295,7 @@ export function setupEventListeners(deps) {
     }
 
     // 应用功能模块在主窗口这一侧的入口（feature.json 的 renderer）
-    installAppFeatures({ chatAPI, refs, itemListManager, chatManager, sendMessageBtn, globalSettingsBtn });
+    installAppFeatures({ chatAPI, messageRenderer, refs, itemListManager, chatManager, sendMessageBtn, globalSettingsBtn });
 
     // 语音聊天按钮事件处理
     const voiceChatBtn = document.getElementById('voiceChatBtn');
@@ -1445,7 +1359,9 @@ export function setupEventListeners(deps) {
                 return;
             }
             const currentInputText = messageInput ? messageInput.value.trim() : '';
-            handleContinueWriting(currentInputText);
+            void handleContinueWriting(currentInputText).catch(error => {
+                console.error('[ContinueWriting] shortcut request failed', error);
+            });
         }
 
         if ((e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
@@ -1462,39 +1378,13 @@ export function setupEventListeners(deps) {
                 return;
             }
 
-            // 检查是否按下 Shift 键
-            if (e.shiftKey) {
-                // Ctrl/Command + Shift + N: 创建未上锁的话题
-                console.log('[快捷键] 执行快速新建未上锁话题');
-                createNewTopicWithLockStatus(currentSelectedItem, false);
+            if (chatManager?.createNewTopicForItem) {
+                void chatManager.createNewTopicForItem(currentSelectedItem.id, currentSelectedItem.type);
             } else {
-                // Ctrl/Command + N: 创建普通话题（已上锁）
-                console.log('[快捷键] 执行快速新建话题');
-                if (chatManager && chatManager.createNewTopicForItem) {
-                    chatManager.createNewTopicForItem(currentSelectedItem.id, currentSelectedItem.type);
-                } else {
-                    uiHelperFunctions.showToastNotification('无法创建新话题：功能不可用', 'error');
-                }
+                uiHelperFunctions.showToastNotification('无法创建新话题：功能不可用', 'error');
             }
         }
     });
-
-    // 监听来自主进程的全局快捷键触发的创建未锁定话题事件
-    if (chatAPI?.onCreateUnlockedTopic) {
-        listenerOwner?.own(chatAPI.onCreateUnlockedTopic(() => {
-            console.log('[快捷键] 收到来自主进程的创建未锁定话题请求');
-            const currentSelectedItem = refs.currentSelectedItem.get();
-            if (!currentSelectedItem.id) {
-                uiHelperFunctions.showToastNotification('请先选择一个Agent', 'warning');
-                return;
-            }
-            if (currentSelectedItem.type !== 'agent') {
-                uiHelperFunctions.showToastNotification('此快捷键仅适用于Agent，不适用于群组', 'warning');
-                return;
-            }
-            createNewTopicWithLockStatus(currentSelectedItem, false);
-        }));
-    }
 
         setupCompleted = true;
     } finally {

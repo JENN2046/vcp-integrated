@@ -724,3 +724,58 @@ test('Core Flowlock schedules one native continuation after the initiating deskt
     assert.match(JSON.stringify(provider.calls[1].messages.at(-1)), /CORE_HEARTBEAT/);
     assert.equal((await phone.call(route + '/messages')).messages.length, 4);
 });
+
+test('Core never commits a client-owned FC response as its Work final', async t => {
+    const provider = await localProvider(t);
+    const { chat } = host(provider);
+    const f = await coreFixture(t, chat);
+    const phone = await f.mobile();
+    const call = { id: 'fixture_client_call', type: 'function',
+        function: { name: 'fixture_client_only', arguments: '{}' } };
+    provider.setReply((body, res) => {
+        const content = 'unfinished assistant prefix';
+        if (body.stream) {
+            const delta = { content, tool_calls: [{ index: 0, ...call }] };
+            res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+            res.end('data: ' + JSON.stringify({ choices: [{ index: 0, delta, finish_reason: 'tool_calls' }] }) + '\n\ndata: [DONE]\n\n');
+        } else {
+            res.end(JSON.stringify({ choices: [{ index: 0, message: { role: 'assistant', content, tool_calls: [call] }, finish_reason: 'tool_calls' }] }));
+        }
+    });
+    for (const streamOutput of [true, false]) {
+        const { key, route } = await f.define({ topicId: 'fc-' + streamOutput, config: { ...fixtureConfig, streamOutput } });
+        const { workId } = await phone.call(route + '/send', { requestId: 'client-fc-' + streamOutput, text: 'fixture input' }, 202);
+        await wait(() => f.core.store.work(workId).status === 'review_required', 'unsettled client FC');
+        assert.equal(f.core.store.work(workId).reply_message_id, null);
+        assert.equal(f.core.store.db.prepare("SELECT COUNT(*) AS n FROM messages WHERE conversation_id=? AND role='assistant'").get(key).n, 0);
+        assert.equal(f.core.store.db.prepare('SELECT COUNT(*) AS n FROM work_invocations WHERE work_id=?').get(workId).n, 0);
+    }
+    assert.equal(provider.calls.length, 2);
+});
+
+test('a provider-marked malformed FC cannot dispatch a Core tool or commit a reply', async t => {
+    const previous = process.env.VCP_FC_DEBUG;
+    process.env.VCP_FC_DEBUG = 'true';
+    t.after(() => {
+        if (previous === undefined) delete process.env.VCP_FC_DEBUG;
+        else process.env.VCP_FC_DEBUG = previous;
+    });
+    const provider = await localProvider(t);
+    const { chat } = host(provider);
+    const f = await coreFixture(t, chat);
+    const phone = await f.mobile();
+    const tool = { id: 'malformed-id', type: 'function',
+        function: { name: 'vcptools', arguments: JSON.stringify({ tool_name: 'Fixture' }) } };
+    provider.setReply((_body, res) => res.end(JSON.stringify({ choices: [{
+        index: 0, message: { role: 'assistant', content: 'unfinished', tool_calls: [tool] },
+        finish_reason: 'stop', native_finish_reason: 'MALFORMED_FUNCTION_CALL'
+    }] })));
+    const { key, route } = await f.define({ config: { ...fixtureConfig, streamOutput: false } });
+    const { workId } = await phone.call(route + '/send', { requestId: 'malformed-owned-fc', text: 'fixture input' }, 202);
+    await wait(() => f.core.store.work(workId).status === 'review_required', 'malformed native tool result');
+    assert.equal(provider.calls.length, 1);
+    assert.equal(provider.calls[0].tools[0].function.name, 'vcptools');
+    assert.equal(f.core.store.work(workId).reply_message_id, null);
+    assert.equal(f.core.store.db.prepare('SELECT COUNT(*) AS n FROM work_invocations WHERE work_id=?').get(workId).n, 0);
+    assert.equal(f.core.store.db.prepare("SELECT COUNT(*) AS n FROM messages WHERE conversation_id=? AND role='assistant'").get(key).n, 0);
+});

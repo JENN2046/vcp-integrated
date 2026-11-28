@@ -33,6 +33,7 @@ const DatabaseCoordinator = require('./modules/knowledgeBase/databaseCoordinator
 const KnowledgeBaseFileWatcher = require('./modules/knowledgeBase/fileWatcher');
 const IngestionPipeline = require('./modules/knowledgeBase/ingestionPipeline');
 const SearchService = require('./modules/knowledgeBase/searchService');
+const { gateFor: lightMemoGateFor } = require('./modules/knowledgeBase/lightMemoAdmission');
 const TagConsistencyService = require('./modules/knowledgeBase/tagConsistencyService');
 
 // 尝试加载 Rust Vexus 引擎
@@ -1627,6 +1628,15 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
             .filter(row => Number.isSafeInteger(row.id) && row.id > 0 && row.name);
     }
 
+    async readMetaStarPool(diaryNames, knownFingerprint = null) {
+        const runtime = this.nativeKnowledgeRuntime;
+        if (typeof runtime?.readMetaStarPool !== 'function') {
+            const error = new Error('NativeKnowledgeRuntime star-pool API unavailable; rebuild rust-vexus-lite');
+            error.code = 'NATIVE_STORAGE_ABI_UNAVAILABLE';
+            throw error;
+        }
+        return runtime.readMetaStarPool(this.dbPath, diaryNames, knownFingerprint);
+    }
     async hydrateChunksByIds(chunkIds) {
         if (!this.nativeKnowledgeRuntime
             || typeof this.nativeKnowledgeRuntime.hydrateChunksByIds !== 'function') {
@@ -1778,6 +1788,18 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
     // =========================================================================
 
     async executeLightMemoQuery(query, options = {}) {
+        const release = await lightMemoGateFor(this).acquire(options.signal);
+        try {
+            if (options.signal?.aborted) {
+                throw options.signal.reason || new Error('LIGHTMEMO_ABORTED');
+            }
+            return await this._executeLightMemoQueryAdmitted(query, options);
+        } finally {
+            release();
+        }
+    }
+
+    async _executeLightMemoQueryAdmitted(query, options = {}) {
         if (diaryAuthority.isCoreTurn()) {
             const scope = options.scope || {};
             const names = scope.exactDiaryNames?.length ? scope.exactDiaryNames : await this.listDistinctDiaries();
@@ -1798,20 +1820,46 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
         }
         const vector = query.vector instanceof Float32Array
             ? query.vector : new Float32Array(query.vector || []);
+        options = { ...options, engineMode: options.engineMode || 'rivermemo' };
         let prepared = null;
-        if (options.engineMode === 'rivermemo' || options.abMode === true) {
-            prepared = await this.prepareUnifiedMemoObservation(query, options);
-        }
+        let warpedPrepared = null;
         try {
+        if (options.abMode === true) {
+            prepared = await this.prepareUnifiedMemoObservation(query, {
+                ...options, tagRoutingMode: 'cosine'
+            });
+        }
+        if ((options.abMode === true && options.warpedAb === true)
+            || (options.abMode !== true && options.engineMode === 'rivermemo')) {
+            try {
+                warpedPrepared = await this.prepareUnifiedMemoObservation(query, {
+                    ...options, tagRoutingMode: 'warped_ags',
+                    warpedPreset: 'locked_2', warpedRadiusStrategy: 'epa_guided'
+                });
+            } catch (error) {
+                if (options.abMode === true || !/MEMO_ARTIFACT_UNAVAILABLE|TAGMEMO_ARTIFACT_UNAVAILABLE|MEMO_RUNTIME_UNAVAILABLE/.test(
+                    String(error.code || '') + ' ' + String(error.message || ''))) throw error;
+            }
+            if (prepared && warpedPrepared.artifact.artifactSig !== prepared.artifact.artifactSig) {
+                throw new Error('LIGHTMEMO_AB_ARTIFACT_CHANGED: retry with one active artifact');
+            }
+        }
         const raw = await runtime.executeLightMemoQuery(JSON.stringify({
             ...options,
             modelSig: this.config.modelSig,
-            artifactSig: prepared?.artifact?.artifactSig || '',
+            artifactSig: warpedPrepared?.artifact?.artifactSig || prepared?.artifact?.artifactSig || '',
             riverInput: prepared ? {
                 observationHandle: prepared.observationHandle,
                 query: { text: String(query.text || '') },
                 queryState: { queryId: prepared.observation?.queryId || null },
                 config: this.riverMemoEngine._nativeConfig(prepared.artifact, options)
+            } : null,
+            warpedRiverInput: warpedPrepared ? {
+                observationHandle: warpedPrepared.observationHandle,
+                query: { text: String(query.text || '') },
+                queryState: { queryId: warpedPrepared.observation?.queryId || null },
+                tagRouting: warpedPrepared.sourceObservationResult?.diagnostics?.nativePipeline?.tagRouting,
+                config: this.riverMemoEngine._nativeConfig(warpedPrepared.artifact, options)
             } : null
         }), vector);
         const result = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -1828,6 +1876,28 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
         result.tdbTopK = (result.tdbTopK || []).map(normalize);
         result.comparisonPool = (result.comparisonPool || []).map(normalize);
         if (Array.isArray(result.river?.results)) result.river.results = result.river.results.map(normalize);
+        result.warpedTopK = (result.warpedTopK || []).map(normalize);
+        if (Array.isArray(result.warpedRiver?.results)) {
+            result.warpedRiver.results = result.warpedRiver.results.map(normalize);
+        }
+        if (warpedPrepared) {
+            const source = warpedPrepared.sourceObservationResult;
+            result.warpedMemoObservation = {
+                artifactSig: warpedPrepared.artifact.artifactSig,
+                queryId: warpedPrepared.observation?.queryId ?? null,
+                queryTags: {
+                    requestedCoreTags: options.coreTags || [],
+                    matchedTags: source?.matchedTags,
+                    coreTagsMatched: source?.coreTagsMatched,
+                    sourceMode: source?.sourceMode
+                },
+                effectiveTagBoost: source?.effectiveTagBoost,
+                propagation: source?.propagation,
+                epa: source?.epa,
+                pyramid: source?.pyramid,
+                diagnostics: source?.diagnostics?.nativePipeline || null
+            };
+        }
         if (options.abMode === true && prepared) {
             const source = prepared.sourceObservationResult;
             result.memoObservation = {
@@ -1848,6 +1918,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
         }
         return result;
         } finally {
+            if (warpedPrepared) this.releaseMemoObservation?.(warpedPrepared);
             if (prepared) this.releaseMemoObservation?.(prepared);
         }
     }
@@ -2624,6 +2695,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
                 agentContext,
                 {
                     ...options,
+                    modelSig: this.config.modelSig,
                     artifact,
                     dbPath: this.dbPath,
                     hydrateChunksByIds: ids => this.hydrateChunksByIds(ids),

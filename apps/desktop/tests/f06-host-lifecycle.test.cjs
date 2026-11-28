@@ -61,13 +61,19 @@ async function fixture(t, { topics = [{ id: 'old_topic', name: 'Old topic' }], c
         ['electron', { ipcMain, dialog: {}, BrowserWindow: {} }], ['fs-extra', fse], ['path', path], ['crypto', crypto],
         ['url', require('node:url')], ['../services/historyMutationQueue', { HistoryMutationQueue, conversationKey: require('../modules/services/historyMutationQueue').conversationKey }],
         ['../utils/agentConfigManager', AgentConfigManager],
+        ['../utils/atomicReplace', require('../modules/utils/atomicReplace')],
+        ['../services/syncWriterBoundary', require('../modules/services/syncWriterBoundary')],
+        ['@vcp/core-rules/request-envelope', require('@vcp/core-rules/request-envelope')],
         ['../modelTrajectory', modelTrajectory], ['../agentMood', { getAgentMoodStore: () => null }], ['../hostHooks', { hostHooks }],
     ]);
     const side = loadHandler('modules/ipc/sideChatHandlers.js', new Map([...shared,
-        ['../utils/atomicReplace', require('../modules/utils/atomicReplace')], ['./applicationSender', require('../modules/ipc/applicationSender')],
+        ['./applicationSender', require('../modules/ipc/applicationSender')],
     ]));
     side.initialize({ USER_DATA_DIR: userDataDir, AGENT_DIR: agentDir, historyMutationQueue: queue, ipcMain, mainWindow });
     const group = loadHandler('Groupmodules/groupchat.js', new Map([
+        ['@vcp/core-rules/group/streamDelta', require('@vcp/core-rules/group/streamDelta')],
+        ['@vcp/core-rules/group/speaker', require('@vcp/core-rules/group/speaker')],
+        ['@vcp/core-rules/group/modelSelection', require('@vcp/core-rules/group/modelSelection')],
         ['electron', { ipcMain }], ['fs-extra', fse], ['node:fs/promises', fs], ['node:process', process], ['path', path], ['crypto', crypto],
         ['../modules/utils/atomicReplace', require('../modules/utils/atomicReplace')],
         ['../modules/utils/historyConfiguration', require('../modules/utils/historyConfiguration')],
@@ -371,7 +377,12 @@ test('TopicSponsor deleted request is denied in the same Service and after resta
     const nextManager = new AgentConfigManager(f.agentDir), nextQueue = new HistoryMutationQueue({ userDataDir: f.userDataDir }); t.after(() => nextQueue.dispose());
     const restarted = new PluginAgentOperationService({ agentDir: f.agentDir, userDataDir: f.userDataDir, agentConfigManager: nextManager, historyMutationQueue: nextQueue, appDataRoot: f.root, logger: quiet });
     const outcomes = await Promise.allSettled([f.service.processTopicCommand(args, context), restarted.processTopicCommand(args, context)]);
-    assert.ok(outcomes.every(outcome => outcome.status === 'rejected' && /HISTORY_TOPIC_DELETED/.test(outcome.reason.message)), 'cached success must not bypass a native deleted request');
+    const evidence = {
+        replay: outcomes.map(outcome => outcome.status === 'fulfilled' ? 'accepted' : outcome.reason.message),
+        topicPublishedAfterReplay: (await f.config()).topics.some(topic => topic.id === created.topic_id),
+        historyExistsAfterReplay: fsSync.existsSync(path.join(f.userDataDir, 'agent_a', 'topics', created.topic_id, 'history.json')),
+    };
+    assert.ok(outcomes.every(outcome => outcome.status === 'rejected' && /HISTORY_TOPIC_DELETED/.test(outcome.reason.message)), JSON.stringify(evidence));
     const config = await f.config(); assert.ok(config._historyDeletedTopics.includes(created.topic_id)); assert.equal(config.topics.some(topic => topic.id === created.topic_id), false);
     await assert.rejects(fs.lstat(path.dirname(f.queue.getHistoryPath('agent_a', created.topic_id))), { code: 'ENOENT' });
 });

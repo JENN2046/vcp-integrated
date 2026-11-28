@@ -134,6 +134,10 @@ NativeSync 是本项目早期跨端集成与执行连续性研究的基础。VCP
 | [vcp-core-v1-pilot-01](https://github.com/JENN2046/vcp-integrated/tree/vcp-core-v1-pilot-01) | 固定的独立本机候选 |
 | [codex/integration-main](https://github.com/JENN2046/vcp-integrated/tree/codex/integration-main) | 原 NativeSync 整合版历史基线 |
 
+## 上游继承候选
+
+本轮从集成基线 `5f40589` 接入 VCPToolBox `699ed4b` 和 VCPChat `6f77337`。原生 HTTP 接口保留客户端提供的工具及调用 ID；启用宿主原生 FC 时，ToolBox 在自己的工具循环内执行。正式会话仍由 Core 接纳 Work 和提交终稿。版本、PR 取舍和验收范围见[本轮记录](docs/upstream-convergence-r1.md)。
+
 ## 上游与许可
 
 桌面端基于 [VCPChat](https://github.com/lioensky/VCPChat)，服务端基于 [VCPToolBox](https://github.com/lioensky/VCPToolBox)。本仓保留原作者与贡献者署名、宿主许可及导入版本记录。使用和分发时请查阅各组件许可。

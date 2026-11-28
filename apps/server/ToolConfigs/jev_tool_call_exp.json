@@ -45,6 +45,10 @@
             "include_raw_content": "markdown"
           }
         },
+        "keenable": {
+          "plugin": "KeenableSearch",
+          "aliases": ["Keenable", "KeenableSearch"]
+        },
         "anysearch": {
           "plugin": "AnySearch",
           "aliases": ["anysearch", "any search"],
@@ -194,7 +198,7 @@
         },
         "music_controller": {
           "plugin": "MusicController",
-          "aliases": ["播放歌曲", "播放音乐", "点歌台", "点歌", "播放器", "musiccontroller", "VCP点歌台"],
+          "aliases": ["音乐播放", "播放歌曲", "播放音乐", "点歌台", "点歌", "播放器", "musiccontroller", "VCP点歌台"],
           "fixedArgs": {
             "command": "playSong"
           },

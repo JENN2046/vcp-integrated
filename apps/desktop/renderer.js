@@ -1,6 +1,5 @@
 import { createNativeHistoryRefresh } from './modules/chat/nativeHistoryRefresh.js';
 import { createNativeExecutionStatus } from './modules/renderer/nativeExecutionStatus.js';
-import { createTopicAdmissionQueueView } from './modules/renderer/topicAdmissionQueueView.js';
 import { prepareTopicAdmissionSingleChat } from './modules/chat/topicAdmissionSingleChat.js';
 import { createChatHistoryPersistence } from './modules/chat/chatHistoryPersistence.js';
 import { createChatHistoryMutationAuthority } from './modules/chat/chatHistoryMutationAuthority.js';
@@ -22,6 +21,7 @@ import { createMainChatThemeOwner } from './modules/renderer/mainChatThemeOwner.
 import { createMainChatSettingsPresentationOwner } from './modules/renderer/mainChatSettingsPresentationOwner.js';
 import { createMainChatAttachmentOwner } from './modules/renderer/mainChatAttachmentOwner.js';
 import { createMainChatSendOwner } from './modules/renderer/mainChatSendOwner.js';
+import { createTopicAdmissionQueueView } from './modules/renderer/topicAdmissionQueueView.js';
 import { createConversationTurnNavigator } from './modules/ui-system/conversation-turn-navigator.js';
 import { createChatBackToBottom } from './modules/ui-system/chat-back-to-bottom.js';
 import { createChatComposerInset } from './modules/ui-system/chat-composer-inset.js';
@@ -139,8 +139,7 @@ const {
     vcpLogConnectionStatusDiv, notificationsListUl, sidebarTabButtons,
     sidebarTabContents, tabContentTopics, tabContentSettings, topicSearchInput,
     leftSidebar, rightNotificationsSidebar, resizerLeft, resizerRight,
-    agentSearchInput, notificationTitleElement, digitalClockElement,
-    dateDisplayElement, toggleAssistantBtn, toggleSidebarModeBtn, openModelSelectBtn,
+    agentSearchInput, toggleAssistantBtn, toggleSidebarModeBtn, openModelSelectBtn,
     vcpSidePane, sidePaneTabs, sidePaneContentContainer,
     toggleSidePaneChatBtn, closeSidePaneBtn, addSidePaneChatBtn,
 } = createMainChatDomBindings(document);
@@ -217,6 +216,8 @@ let mainChatSurface = null;
 let mainChatAdapter = null;
 let nonStreamingEventConsumer = null;
 let mainChatEventBridge = null;
+const activeGroupQueueScopes = new Set();
+const toGroupQueueScopeKey = (groupId, topicId) => (groupId && topicId ? `${groupId}::${topicId}` : '');
 const ownedRendererSubscriptions = new Set();
 const mainChatDomListenerOwner = createDomListenerOwner();
 const topicListDomListenerOwner = createDomListenerOwner();
@@ -226,6 +227,8 @@ const mainChatAttachmentOwner = createMainChatAttachmentOwner({
     },
 });
 const mainChatSendOwner = createMainChatSendOwner({
+    hasDraft: () => ['agent', 'group'].includes(currentSelectedItemRef.get()?.type)
+        && Boolean(messageInput.value.trim() || mainChatAttachmentOwner.ref.get().length),
     button: sendMessageBtn,
     messagesRoot: chatMessagesDiv,
     historyRef: mainHistoryRef,
@@ -238,6 +241,8 @@ const mainChatSendOwner = createMainChatSendOwner({
     getChatManager: () => chatManager,
     messageRenderer,
     notify: (message, type) => uiHelperFunctions?.showToastNotification?.(message, type),
+    isGroupQueueActive: (groupId, topicId) => activeGroupQueueScopes.has(toGroupQueueScopeKey(groupId, topicId)),
+    clearGroupQueueActive: (groupId, topicId) => activeGroupQueueScopes.delete(toGroupQueueScopeKey(groupId, topicId)),
 });
 const mainChatSettingsPresentationOwner = createMainChatSettingsPresentationOwner({
     documentRef: document,
@@ -265,6 +270,7 @@ ownedRendererSubscriptions.add(topicListDomListenerOwner);
 ownedRendererSubscriptions.add(mainChatAttachmentOwner);
 ownedRendererSubscriptions.add(mainChatSendOwner);
 mainChatSendOwner.update();
+mainChatDomListenerOwner.add(messageInput, 'input', mainChatSendOwner.update);
 ownedRendererSubscriptions.add({
     async dispose() {
         const receipt = { promise: Promise.resolve() };
@@ -333,6 +339,7 @@ function createOwnedInternalChatRenderer({ root, mode = 'readonly', handleSendMe
         const key = id => `${surfacePretextPrefix}:${id}`;
         return Object.freeze({
             isReady: () => bridge.isReady?.() === true,
+            getMeasurementOptions: (...args) => bridge.getMeasurementOptions?.(...args),
             estimateHeight: (id, ...args) => bridge.estimateHeight?.(key(id), ...args),
             evict: id => bridge.evict?.(key(id)),
         });
@@ -607,6 +614,7 @@ mainChatSettingsPresentationOwner.configureStartup({
             settings: mainChatSettingsOwner,
             createInternalRenderer: createOwnedInternalChatRenderer,
             disposeCapabilities: async () => {
+                activeGroupQueueScopes.clear();
                 await mainChatEventBridge?.dispose?.();
                 mainChatEventBridge = null;
                 await nonStreamingEventConsumer?.dispose?.();
@@ -633,6 +641,12 @@ mainChatSettingsPresentationOwner.configureStartup({
             viewAuthority: { isCurrent: isContextForCurrentChat },
             disposeStream: (messageId, reason) => mainChatAdapter?.disposeStream?.(messageId, reason),
             streamProjection: streamManager,
+            onGroupQueueStateChange: ({ groupId, topicId, active }) => {
+                const key = toGroupQueueScopeKey(groupId, topicId);
+                if (!key) return;
+                if (active) activeGroupQueueScopes.add(key);
+                else activeGroupQueueScopes.delete(key);
+            },
             notifySendStateChanged: mainChatSendOwner.update,
         });
         releaseNextUiChatCapabilities = mainComposition.releaseCapabilities;
@@ -668,6 +682,7 @@ mainChatSettingsPresentationOwner.configureStartup({
             selectedItemRef: currentSelectedItemRef,
             nameObserveTarget: currentChatNameH3,
             sendMessageBtn,
+            chatManager,
         });
         ownedRendererSubscriptions.add({ dispose: () => composerModelSelect.dispose?.() });
     }
@@ -777,9 +792,25 @@ mainChatSettingsPresentationOwner.configureStartup({
                     ? { ...selectedItem, config: nextConfig }
                     : { ...selectedItem, ...nextConfig });
             }
-            if (document.getElementById('tabContentTopics').classList.contains('active')) {
-                await window.topicListManager.loadTopicList();
-                if (!lifecycle.isActive()) return;
+            const topicsTabEl = document.getElementById('tabContentTopics');
+            const existingRow = topicsTabEl?.querySelector?.(`.topic-item[data-item-type="group"][data-item-id="${groupId}"][data-topic-id="${topicId}"]`);
+            if (existingRow) {
+                if (existingRow.__topicData && typeof existingRow.__topicData === 'object') {
+                    existingRow.__topicData.name = newTitle;
+                }
+                const isInlineEditing = Boolean(existingRow.querySelector('.topic-title-edit-input'));
+                if (!isInlineEditing) {
+                    const titleEl = existingRow.querySelector('.topic-title-display, .topic-name');
+                    if (titleEl) titleEl.textContent = newTitle;
+                    const avatarEl = existingRow.querySelector('img.avatar');
+                    if (avatarEl && selectedItem.name) avatarEl.alt = `${selectedItem.name} - ${newTitle}`;
+                }
+            } else if (topicsTabEl && (topicsTabEl.classList.contains('active') || topicsTabEl.classList.contains('compact-drawer-open'))) {
+                const isDragging = Boolean(topicsTabEl.querySelector('.sortable-drag-topic, .sortable-chosen-topic'));
+                if (!isDragging) {
+                    await window.topicListManager?.loadTopicList?.();
+                    if (!lifecycle.isActive()) return;
+                }
             }
         },
     });
@@ -892,7 +923,7 @@ mainChatSettingsPresentationOwner.configureStartup({
             beginHistoryPersistence: context => nativeHistoryRefresh?.beginPersistence(context),
         });
         messageRenderer.setContextMenuDependencies({
-            compactContext: () => chatManager.compactContext(),
+            compactContext: options => chatManager.compactContext(options),
             isContextCompacting: () => chatManager.isContextCompacting(),
         });
         ownedRendererSubscriptions.add(chatManager);
@@ -1009,9 +1040,6 @@ mainChatSettingsPresentationOwner.configureStartup({
                     vcpSidePane,
                     resizerLeft: document.getElementById('resizerLeft'),
                     resizerRight: document.getElementById('resizerRight'),
-                    digitalClockElement: document.getElementById('digitalClock'),
-                    dateDisplayElement: document.getElementById('dateDisplay'),
-                    notificationTitleElement: document.getElementById('notificationTitle'),
                     sidebarTabButtons: sidebarTabButtons,
                     sidebarTabContents: sidebarTabContents,
                 }
@@ -1179,8 +1207,6 @@ mainChatSettingsPresentationOwner.configureStartup({
 
        // Emoticon URL fixer is now initialized within messageRenderer
         topicSelectionReadiness.setReady(true);
-
-        chatAPI.toggleSelectionListener(!!getGlobalSettings().assistantEnabled);
 
         const pendingTopicSelection = topicSelectionReadiness.takePending();
         if (pendingTopicSelection && chatManager) {

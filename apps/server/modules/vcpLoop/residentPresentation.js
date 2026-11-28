@@ -81,6 +81,12 @@ function hasResidentProposalSurface(messages) {
     && messages.some((message) => messageText(message).includes(RESIDENT_TOOL_NAME));
 }
 
+function hasResidentProposalIntent(toolCall) {
+  return toolCall?.name === RESIDENT_TOOL_NAME
+    && typeof toolCall.args?.operation === 'string'
+    && toolCall.args.operation.startsWith('PROPOSE_');
+}
+
 function isResidentProposalToolCall(toolCall) {
   return toolCall?.name === RESIDENT_TOOL_NAME
     && toolCall.archery === false
@@ -116,10 +122,7 @@ function frameResidentProposalTurn(content, ToolCallParser) {
   const residentCalls = toolCalls.filter(isResidentProposalToolCall);
   const exactStartMarker = ToolCallParser?.MARKERS?.START || '<<<[TOOL_REQUEST]>>>';
   const firstStartIndex = content.indexOf(exactStartMarker);
-  const residentProposalIntent = toolCalls.some((toolCall) =>
-    toolCall?.name === RESIDENT_TOOL_NAME
-      && typeof toolCall.args?.operation === 'string'
-      && toolCall.args.operation.startsWith('PROPOSE_'))
+  const residentProposalIntent = toolCalls.some(hasResidentProposalIntent)
     || (firstStartIndex >= 0
       && content.slice(firstStartIndex).includes(RESIDENT_TOOL_NAME)
       && /PROPOSE_(?:GOAL|TASK)_MUTATION/u.test(content.slice(firstStartIndex)));
@@ -285,6 +288,7 @@ module.exports = Object.freeze({
   frameResidentProposalTurn,
   hasResidentDiscoveryBootstrap,
   hasResidentProposalSurface,
+  hasResidentProposalIntent,
   isResidentProposalToolCall,
   residentProposalFailureCategory,
   openResidentPresentation,

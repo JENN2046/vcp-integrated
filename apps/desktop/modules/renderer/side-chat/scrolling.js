@@ -41,6 +41,40 @@ export function createSideChatScrolling({
         const onKeyDown = (event) => {
             if (['ArrowUp', 'PageUp', 'Home'].includes(event.key) && !event.target?.closest?.('textarea, input, [contenteditable="true"]')) escape();
         };
+        const IN_PLACE_EXPAND_IGNORE_SELECTOR = [
+            '.vcp-tool-result-delete-btn',
+            '.vcp-tool-result-toggle-btn',
+            '.vcp-code-copy-button',
+            '.vcp-code-sideview-button',
+            '.code-copy-btn',
+            '.mermaid-viewer-btn',
+            '.chat-avatar',
+            '.message-avatar'
+        ].join(', ');
+        const IN_PLACE_EXPAND_TARGET_SELECTOR = [
+            'button',
+            'summary',
+            'details',
+            '[role="button"]',
+            '[role="tab"]',
+            '[aria-expanded]',
+            '.vcp-tool-summary',
+            '.vcp-tool-result-header',
+            '.vcp-thought-chain-header',
+            '.vcp-tool-result-truncated-notice'
+        ].join(', ');
+        // 在已完成的消息里点展开类控件时让展开部分向下长，不再贴底把被点的控件推走；
+        // 明确不改变展开高度的动作按钮（复制代码、切换工具结果显隐等）不打断贴底。
+        const onInPlaceExpand = (event) => {
+            const target = event.target;
+            if (!target?.closest) return;
+            const messageItem = target.closest('.message-item');
+            if (!messageItem || messageItem.classList.contains('streaming') || messageItem.classList.contains('thinking')) return;
+            if (target.closest(IN_PLACE_EXPAND_IGNORE_SELECTOR)) return;
+            if (target.closest(IN_PLACE_EXPAND_TARGET_SELECTOR)) {
+                stickToBottom = false;
+            }
+        };
         let touchY = null;
         const onTouchStart = (event) => { touchY = event.touches?.[0]?.clientY ?? null; };
         const onTouchMove = (event) => {
@@ -51,12 +85,16 @@ export function createSideChatScrolling({
         root.addEventListener('scroll', onRootScroll, { passive: true });
         root.addEventListener('wheel', onWheel, { passive: true });
         root.addEventListener('keydown', onKeyDown);
+        root.addEventListener('pointerdown', onInPlaceExpand, { capture: true, passive: true });
+        root.addEventListener('click', onInPlaceExpand, { capture: true, passive: true });
         root.addEventListener('touchstart', onTouchStart, { passive: true });
         root.addEventListener('touchmove', onTouchMove, { passive: true });
         disposeCleanups.push(() => {
             root.removeEventListener('scroll', onRootScroll);
             root.removeEventListener('wheel', onWheel);
             root.removeEventListener('keydown', onKeyDown);
+            root.removeEventListener('pointerdown', onInPlaceExpand, { capture: true });
+            root.removeEventListener('click', onInPlaceExpand, { capture: true });
             root.removeEventListener('touchstart', onTouchStart);
             root.removeEventListener('touchmove', onTouchMove);
         });

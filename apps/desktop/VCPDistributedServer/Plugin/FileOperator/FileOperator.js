@@ -10,19 +10,27 @@ const { validateCode } = require('./CodeValidator');
 const fileKit = require('../../shared/fileKit');
 
 // Load environment variables with fallback chain: config.env → .env → defaults
+// 本插件以 direct 方式运行在宿主进程内，与其他插件共用 process.env，
+// 因此配置只解析给本插件读取，不写入 process.env。
+// 与原 dotenv.config() 一致，进程环境中已有的同名变量优先于文件中的值。
 const dotenv = require('dotenv');
 const configEnvPath = path.join(__dirname, 'config.env');
 const dotEnvPath = path.join(__dirname, '.env');
+let fileConfig = {};
 if (fsSync.existsSync(configEnvPath)) {
-  dotenv.config({ path: configEnvPath, quiet: true });
+  fileConfig = dotenv.parse(fsSync.readFileSync(configEnvPath));
 } else if (fsSync.existsSync(dotEnvPath)) {
-  dotenv.config({ path: dotEnvPath, quiet: true });
+  fileConfig = dotenv.parse(fsSync.readFileSync(dotEnvPath));
 }
 // If neither exists, all config falls back to code defaults below.
 
+function getConfigValue(key) {
+  return process.env[key] !== undefined ? process.env[key] : fileConfig[key];
+}
+
 // Configuration
 const CANVAS_DIRECTORY = path.join(__dirname, '..', '..', '..', 'AppData', 'Canvas');
-const ALLOWED_DIRECTORIES = (process.env.ALLOWED_DIRECTORIES || '')
+const ALLOWED_DIRECTORIES = (getConfigValue('ALLOWED_DIRECTORIES') || '')
   .split(',')
   .map(dir => dir.trim())
   .filter(dir => dir);
@@ -31,13 +39,13 @@ const ALLOWED_DIRECTORIES = (process.env.ALLOWED_DIRECTORIES || '')
 if (!ALLOWED_DIRECTORIES.includes(CANVAS_DIRECTORY)) {
   ALLOWED_DIRECTORIES.push(CANVAS_DIRECTORY);
 }
-const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE) || 20971520; // 20MB default
-const MAX_DIRECTORY_ITEMS = parseInt(process.env.MAX_DIRECTORY_ITEMS) || 1000;
-const MAX_SEARCH_RESULTS = parseInt(process.env.MAX_SEARCH_RESULTS) || 100;
-const DEFAULT_DOWNLOAD_DIR = (process.env.DEFAULT_DOWNLOAD_DIR || '').trim();
-const DEBUG_MODE = process.env.DEBUG_MODE === 'true';
-const ENABLE_RECURSIVE_OPERATIONS = process.env.ENABLE_RECURSIVE_OPERATIONS !== 'false';
-const ENABLE_HIDDEN_FILES = process.env.ENABLE_HIDDEN_FILES === 'true';
+const MAX_FILE_SIZE = parseInt(getConfigValue('MAX_FILE_SIZE')) || 20971520; // 20MB default
+const MAX_DIRECTORY_ITEMS = parseInt(getConfigValue('MAX_DIRECTORY_ITEMS')) || 1000;
+const MAX_SEARCH_RESULTS = parseInt(getConfigValue('MAX_SEARCH_RESULTS')) || 100;
+const DEFAULT_DOWNLOAD_DIR = (getConfigValue('DEFAULT_DOWNLOAD_DIR') || '').trim();
+const DEBUG_MODE = getConfigValue('DEBUG_MODE') === 'true';
+const ENABLE_RECURSIVE_OPERATIONS = getConfigValue('ENABLE_RECURSIVE_OPERATIONS') !== 'false';
+const ENABLE_HIDDEN_FILES = getConfigValue('ENABLE_HIDDEN_FILES') === 'true';
 
 // Utility functions
 function debugLog(message, data = null) {
@@ -107,7 +115,8 @@ function createLineEndingHelper(content) {
         };
       }
 
-      const normResult = normContent.replace(normSearch, normReplace);
+      // 使用函数替换，避免 replace 文本中的 $&、$$、$`、$' 被当作替换模式展开。
+      const normResult = normContent.replace(normSearch, () => normReplace);
 
       let result = normResult;
       if (lineEnding === '\r\n') {
@@ -308,49 +317,17 @@ function detectEncoding(buffer) {
   return { encoding: 'utf-8', bom: false, confidence: 'fallback' };
 }
 
-// Normalize user-provided paths before file operations.
-// This mirrors the server-side operator behavior and makes ApplyDiff more robust
-// for relative paths, accidental whitespace, and virtual-root style paths.
+// Normalize user-provided paths (including local file:// URLs) via shared fileKit.paths,
+// keeping relative roots, virtual root "/xxx", and KeyedLockQueue lock keys strictly consistent.
 function resolveAndNormalizePath(inputPath) {
-  if (!inputPath || typeof inputPath !== 'string') {
-    return inputPath;
-  }
-
-  const originalPath = inputPath.trim();
-
-  // Absolute paths should be preserved, only resolved/canonicalized.
-  if (path.isAbsolute(originalPath)) {
-    return path.resolve(originalPath);
-  }
-
-  // Sanitize each component of the path to remove accidental leading/trailing spaces.
-  const parts = originalPath.split(/[/\\]+/);
-  const trimmedParts = parts.map(part => part.trim());
-  const sanitizedPath = path.join(...trimmedParts);
-
-  // BASE_PATH: configurable project root for bare relative paths.
-  // Falls back to two levels up from this plugin's directory.
-  const BASE_PATH = process.env.BASE_PATH
-    ? path.resolve(process.env.BASE_PATH)
+  const basePath = getConfigValue('BASE_PATH')
+    ? path.resolve(getConfigValue('BASE_PATH'))
     : path.resolve(__dirname, '..', '..');
-
-  // Virtual root: map "/xxx" to FileOperator/xxx on platforms where it is not absolute.
-  if (originalPath.startsWith('/')) {
-    const relativePath = originalPath.slice(1);
-    return path.resolve(__dirname, relativePath);
-  }
-
-  const normalized = path.normalize(sanitizedPath);
-  const startsWithDot = normalized.startsWith(`.${path.sep}`);
-  const startsWithDotDot = normalized.startsWith(`..${path.sep}`);
-
-  if (!startsWithDot && !startsWithDotDot) {
-    // Treat plain relative paths like "foo/bar" as BASE_PATH relative.
-    return path.resolve(BASE_PATH, normalized);
-  }
-
-  // Treat explicit relative paths like "./foo" or "../foo" as FileOperator-relative.
-  return path.resolve(__dirname, normalized);
+  return fileKit.paths.resolveAndNormalizePath(inputPath, {
+    basePath,
+    relativeRoot: __dirname,
+    virtualRoot: __dirname,
+  });
 }
 
 function getParameterValue(parameters, ...candidateNames) {
@@ -1917,11 +1894,18 @@ function convertToVCPFormat(response) {
       contentArray.push({ type: 'text', text: (data.message || '操作成功完成') + mdDetails });
     }
 
+    // 避免 data.content（如多模态图片 Base64）在 result.content 与 result.details.content 中双份重复造成 200% 载荷膨胀
+    let sanitizedDetails = data;
+    if (data && typeof data === 'object' && !Array.isArray(data) && Object.prototype.hasOwnProperty.call(data, 'content')) {
+      sanitizedDetails = { ...data };
+      delete sanitizedDetails.content;
+    }
+
     return {
       status: 'success',
       result: {
         content: contentArray,
-        details: data
+        details: sanitizedDetails
       },
     };
   } else {

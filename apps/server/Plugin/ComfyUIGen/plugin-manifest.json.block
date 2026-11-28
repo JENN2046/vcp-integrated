@@ -1,0 +1,187 @@
+{
+  "manifestVersion": "1.0.0",
+  "name": "ComfyUIGen",
+  "displayName": "ComfyUI 图像生成器",
+  "version": "0.3.0",
+  "description": "通过 ComfyUI API 使用自定义工作流生成高质量图像。支持LoRA模型自动管理、质量增强词配置、多种工作流模板。已深度集成到 VCP ToolBox，提供可视化配置界面。",
+  "author": "niuniu",
+  "pluginType": "synchronous",
+  "entryPoint": {
+    "type": "nodejs",
+    "command": "node ComfyUIGen.js"
+  },
+  "communication": {
+    "protocol": "stdio",
+    "timeout": 7200000
+  },
+  "configSchema": {
+    "COMFYUI_BASE_URL": {
+      "type": "string",
+      "description": "ComfyUI服务器地址",
+      "default": "http://localhost:8188"
+    },
+    "COMFYUI_API_KEY": {
+      "type": "string",
+      "description": "ComfyUI API密钥（可选，本地部署通常不需要）",
+      "default": ""
+    },
+    "DEBUG_MODE": {
+      "type": "boolean",
+      "description": "是否启用调试模式，显示详细执行日志",
+      "default": false
+    },
+    "COMFYUI_MAX_WAIT_MINUTES": {
+      "type": "number",
+      "description": "ComfyUI 处于活跃排队或生图推进时的最大兜底等待分钟数（默认30分钟，长视频工作流可调至60-120，设为0则只要进程活跃永不超时）",
+      "default": 30
+    },
+    "USE_PUBLIC_URL": {
+      "type": "string",
+      "description": "（可选）是否使用公网地址返回图片/文件 URL：true=使用 VarHttpsUrl（不带端口，适用于反代），false=使用 VarHttpUrl:端口（局域网），默认 false",
+      "default": "false"
+    }
+  },
+  "capabilities": {
+    "invocationCommands": [
+      {
+        "commandIdentifier": "ComfyUIGenerateImage",
+        "description": "调用此工具通过 ComfyUI 生成或超分图像，支持配置默认值及单次调用参数覆盖。\n\n📋 **调用格式与覆盖规则**:\n- 单次调用参数优先于 comfyui-settings.json 默认值。\n- `workflow`: 支持 `AnimaEZGen`(极速直出)、`AnimaEnhanced`(4x超分+FaceDetailer面修)、`AnimeSharp`(免prompt纯图片超分，需传 `image` 与可选 `resize_scale`)、`qwen21gen`、`qwen21edit` 等。\n- `resize_scale`: 缩放倍率（AnimaEnhanced 默认 1，AnimeSharp 默认 2，可传 1.5、2、4 等正数）。\n- `face_prompt`: AnimaEnhanced 专用独立面部重绘提示词（默认 detailed glassy eyes, smooth porcelain skin）。\n- `lora_name`: 不传保留内置设置；传文件名替换 LoRA；显式传空字符串 \"\" 自动绕过并移除 LoraLoader。",
+        "example": "<<<[TOOL_REQUEST]>>>\nmaid:「始」CreativeAssistant「末」,\ntool_name:「始」ComfyUIGen「末」,\nworkflow:「始」AnimaEZGen「末」,\nprompt:「始」1girl, silver hair, blue eyes, cinematic anime illustration「末」,\nnegative_prompt:「始」bad hands, blurry「末」,\nwidth:「始」1024「末」,\nheight:「始」1024「末」,\nsteps:「始」24「末」,\ncfg:「始」4「末」,\nsampler:「始」euler_ancestral「末」,\nscheduler:「始」simple「末」,\nseed:「始」-1「末」,\nlora_name:「始」anima_rendering_detailer_base10.safetensors「末」,\nlora_strength:「始」0.4「末」,\nlora_clip_strength:「始」1.0「末」\n<<<[END_TOOL_REQUEST]>>>"
+      }
+    ]
+  },
+  "features": {
+    "loraManagement": {
+      "description": "自动从ComfyUI服务器加载可用LoRA模型，支持多LoRA组合",
+      "capabilities": [
+        "自动扫描ComfyUI服务器上的LoRA模型库",
+        "可视化LoRA选择和配置界面",
+        "独立设置每个LoRA的模型强度和CLIP强度",
+        "启用/禁用LoRA功能，支持LoRA组合预设",
+        "防重复添加机制，智能冲突检测"
+      ]
+    },
+    "qualityEnhancement": {
+      "description": "质量增强词系统，自动提升生成图像质量",
+      "capabilities": [
+        "预设质量增强关键词库",
+        "自动与用户提示词和LoRA标签智能组合",
+        "支持自定义质量标签和风格词",
+        "避免提示词冲突和重复的智能过滤"
+      ]
+    },
+    "workflowManagement": {
+      "description": "工作流模板管理系统",
+      "capabilities": [
+        "支持多种预设工作流模板",
+        "可视化工作流选择和预览",
+        "支持自定义工作流导入和验证",
+        "工作流参数自动映射和占位符替换"
+      ]
+    },
+    "parameterControl": {
+      "description": "全面的生成参数控制系统",
+      "capabilities": [
+        "采样器和调度器选择（20+选项）",
+        "图像尺寸和批次大小设置",
+        "CFG强度和去噪程度调节",
+        "种子控制和随机性管理",
+        "负面提示词管理"
+      ]
+    }
+  },
+  "systemIntegration": {
+    "vcpToolBox": {
+      "description": "深度集成VCP ToolBox配置系统",
+      "configFile": "comfyui-settings.json",
+      "autoSync": true,
+      "features": [
+        "实时配置同步和验证",
+        "可视化参数调节界面",
+        "连接状态实时监控",
+        "错误诊断和智能提示"
+      ]
+    },
+    "comfyuiServer": {
+      "description": "ComfyUI服务器自动发现和配置",
+      "features": [
+        "自动检测可用模型和LoRA列表",
+        "实时连接状态检查",
+        "API兼容性验证",
+        "工作流有效性检测"
+      ]
+    }
+  },
+  "changelog": {
+    "0.3.0": {
+      "date": "2025-08-04",
+      "changes": [
+        "新增：LoRA模型自动扫描和管理系统",
+        "新增：质量增强词智能配置功能",
+        "新增：多LoRA组合支持，独立强度控制",
+        "新增：可视化LoRA选择界面",
+        "优化：配置加载系统，支持复杂参数结构",
+        "优化：提示词智能组合机制，避免冲突",
+        "修复：配置同步和事件绑定问题",
+        "符合：VCP插件开发规范v1.0.0"
+      ]
+    },
+    "0.2.0": {
+      "date": "2024-12-XX",
+      "changes": [
+        "集成到VCP ToolBox配置系统",
+        "添加可视化配置面板",
+        "支持工作流模板管理"
+      ]
+    }
+  },
+  "compatibility": {
+    "vcpVersion": ">=1.0.0",
+    "nodeVersion": ">=14.0.0",
+    "comfyuiVersion": ">=0.3.0"
+  },
+  "jev": {
+    "schemaVersion": 1,
+    "enabled": true,
+    "category": "媒体娱乐",
+    "jevDescPrompt": "通过本地或远程 ComfyUI 运行自定义节点工作流，生成高质量二次元与写实插画。",
+    "jevPrompt": "用户要求使用 ComfyUI 生图时选择 ComfyUIGenerateImage。支持在 [] 中指定工作流模板名（如 [工作流:AnimaEZGen]）或 LoRA 权重；未指明工作流时沿用默认配置。",
+    "agentPrompt": "当需要调用 ComfyUI 运行高级生图工作流时，使用 {媒体娱乐} 中的 `ComfyUIGen`，提示词放入【主要内容】，工作流或负面词放入 []（如 [工作流:AnimaEZGen]、[负面:blurry]）：\nJEV:「始」请使用 {媒体娱乐} 中的 `ComfyUIGen`，生成插画【1girl, silver hair, blue eyes, cinematic anime】[工作流:AnimaEZGen]。「末」",
+    "defaultCommand": "ComfyUIGenerateImage",
+    "commands": [
+      {
+        "commandIdentifier": "ComfyUIGenerateImage",
+        "description": "调用 ComfyUI 工作流生成高质量图像",
+        "aliases": ["ComfyUI生图", "运行工作流", "工作流生图", "Comfy生图"],
+        "injectCommand": false,
+        "parameters": {
+          "prompt": {
+            "type": "text",
+            "required": true,
+            "source": "primary",
+            "maxLength": 1500,
+            "description": "详细正面提示词或英文标签"
+          },
+          "workflow": {
+            "type": "text",
+            "source": "constraints",
+            "prefixes": ["工作流", "模板", "workflow"],
+            "maxLength": 60
+          },
+          "negative_prompt": {
+            "type": "text",
+            "source": "constraints",
+            "prefixes": ["负面", "排除"],
+            "maxLength": 500
+          },
+          "lora_name": {
+            "type": "text",
+            "source": "constraints",
+            "prefixes": ["lora", "LoRA", "模型"],
+            "maxLength": 100
+          }
+        }
+      }
+    ]
+  }
+}

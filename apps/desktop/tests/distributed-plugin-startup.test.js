@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { createProfiler } = require('../modules/diagnostics/bootProfile');
 
 function createManager(manifests, modules = {}) {
     const events = [];
@@ -37,6 +38,9 @@ function createManager(manifests, modules = {}) {
             if (id === 'node-schedule') return {};
             if (id === '../modules/services/quitAdmission.cjs') return require('../modules/services/quitAdmission.cjs');
             if (id === 'dotenv') return { parse: () => ({}) };
+            if (id === '../modules/diagnostics/bootProfile') {
+                return createProfiler({ env: { VCP_BOOT_PROFILE: '0' } });
+            }
             events.push(`require:${path.basename(id)}`);
             const result = modules[path.basename(id)];
             if (result instanceof Error) throw result;

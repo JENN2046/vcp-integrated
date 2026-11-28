@@ -22,7 +22,7 @@ const recentResponsesRequests = new Map();
 /**
  * 将多模态 content 数组归一化为纯文本字符串
  */
-function normalizeTextContent(content) {
+function normalizeTextContent(content, geminiParts = false) {
     if (typeof content === 'string') {
         return content;
     }
@@ -31,6 +31,7 @@ function normalizeTextContent(content) {
         return content
             .map(item => {
                 if (typeof item === 'string') return item;
+                if (geminiParts && item?.type === undefined && item?.thought !== true && typeof item?.text === 'string') return item.text;
                 if (item && typeof item === 'object') {
                     if (item.type === 'text' && typeof item.text === 'string') return item.text;
                     if (item.type === 'input_text' && typeof item.text === 'string') return item.text;
@@ -166,11 +167,11 @@ function attachProtectedToolFields(chatBody, originalBody) {
     }
 
     const toolChoice = normalizeToolChoice(originalBody?.tool_choice, originalBody);
-    if (toolChoice !== undefined) {
+    if (toolChoice !== undefined && (tools.length > 0 || toolChoice === 'none')) {
         chatBody.tool_choice = toolChoice;
     }
 
-    if (typeof originalBody?.parallel_tool_calls === 'boolean') {
+    if (typeof originalBody?.parallel_tool_calls === 'boolean' && tools.length > 0) {
         chatBody.parallel_tool_calls = originalBody.parallel_tool_calls;
     }
 
@@ -324,7 +325,23 @@ function normalizeResponsesFunctionArguments(argumentsValue) {
 
 function normalizeResponsesFunctionOutput(output) {
     if (typeof output === 'string') return output;
-    return stableJsonStringify(output);
+    if (!Array.isArray(output) || !output.some(part => part?.type === 'input_image')) {
+        return stableJsonStringify(output);
+    }
+    return output.map(part => {
+        if (part?.type === 'input_image') {
+            return {
+                type: 'image_url',
+                image_url: { url: part.image_url, detail: part.detail }
+            };
+        }
+        return {
+            type: 'text',
+            text: part?.type === 'input_text' && typeof part.text === 'string'
+                ? part.text
+                : stableJsonStringify(part)
+        };
+    });
 }
 
 function extractEncryptedContentFromValue(value, seen = new Set()) {
@@ -599,7 +616,7 @@ function extractMessagesFromGeminiBody(body) {
     if (Array.isArray(body.contents)) {
         for (const content of body.contents) {
             const role = content.role === 'model' ? 'assistant' : normalizeMessageRole(content.role || 'user');
-            const text = normalizeTextContent(content.parts);
+            const text = normalizeTextContent(content.parts, true);
             if (role && text) {
                 messages.push({ role, content: text });
             }

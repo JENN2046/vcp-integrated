@@ -1,3 +1,4 @@
+const { normalizeVcpServerUrl, vcpChatUrl } = require('../utils/vcpServerRoutes');
 /**
  * modules/ipc/desktopHandlers.js
  * VCPdesktop IPC 处理模块
@@ -41,6 +42,7 @@ let vchatTaskWindow = null;
 let vchatPluginManagerWindow = null;
 let vchatProjectForgeWindow = null;
 let vchatGameWindow = null;
+let vchatMijiaWindow = null;
 
 // --- 收藏系统路径 - 使用项目根目录的 AppData ---
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
@@ -554,6 +556,7 @@ function createOrFocusChildWindow(existingWindow, options) {
         if (win === vchatPluginManagerWindow) vchatPluginManagerWindow = null;
         if (win === vchatProjectForgeWindow) vchatProjectForgeWindow = null;
         if (win === vchatGameWindow) vchatGameWindow = null;
+        if (win === vchatMijiaWindow) vchatMijiaWindow = null;
     });
 
     console.log(`[DesktopHandlers] Created child window: ${options.title}`);
@@ -725,22 +728,10 @@ function registerManagedWindows() {
         owner: 'desktopHandlers',
         getWindow: () => vchatTranslatorWindow,
         open: async () => {
-            let settings = {};
-            try {
-                const settingsPath = path.join(PROJECT_ROOT, 'AppData', 'settings.json');
-                if (await fs.pathExists(settingsPath)) {
-                    settings = await fs.readJson(settingsPath);
-                }
-            } catch (e) { /* ignore */ }
-
-            const vcpServerUrl = settings.vcpServerUrl || '';
-            const vcpApiKey = settings.vcpApiKey || '';
-
             vchatTranslatorWindow = createOrFocusChildWindow(vchatTranslatorWindow, {
                 width: 1000, height: 700, minWidth: 800, minHeight: 600,
                 title: 'Translator',
                 htmlPath: path.join(app.getAppPath(), 'Translatormodules', 'translator.html'),
-                queryParams: `vcpServerUrl=${encodeURIComponent(vcpServerUrl)}&vcpApiKey=${encodeURIComponent(vcpApiKey)}`,
             });
             return vchatTranslatorWindow;
         },
@@ -882,6 +873,8 @@ function resolveAppActionToAppId(appAction) {
             return WINDOW_APP_IDS.THEMES;
         case 'open-game-window':
             return WINDOW_APP_IDS.GAME;
+        case 'open-mijia-window':
+            return WINDOW_APP_IDS.MIJIA;
         case 'open-task-window':
             return WINDOW_APP_IDS.TASK;
         case 'open-plugin-manager-window':
@@ -1084,6 +1077,22 @@ function initialize(params) {
     CATALOG_PATH = path.join(DESKTOP_WIDGETS_DIR, 'CATALOG.md');
     registerManagedWindows();
     registerGameWindow();
+    require('./mijiaHandlers').initialize();
+    windowService.register(WINDOW_APP_IDS.MIJIA, {
+        owner: 'desktopHandlers',
+        getWindow: () => vchatMijiaWindow,
+        open: async () => {
+            if (vchatMijiaWindow && !vchatMijiaWindow.isDestroyed() && vchatMijiaWindow.isMinimized()) {
+                vchatMijiaWindow.restore();
+            }
+            vchatMijiaWindow = createOrFocusChildWindow(vchatMijiaWindow, {
+                width: 620, height: 660, minWidth: 340, minHeight: 400,
+                title: '米家 · VChat',
+                htmlPath: path.join(app.getAppPath(), 'Mijiamodules', 'mijia.html'),
+            });
+            return vchatMijiaWindow;
+        },
+    });
 
     if (!standaloneProcessCleanupRegistered) {
         app.once('will-quit', cleanupStandaloneAppProcesses);
@@ -1684,19 +1693,12 @@ function initialize(params) {
                 } catch (e) { /* ignore */ }
             }
 
-            // 从 vcpServerUrl 推导出 admin API base URL
-            let apiBaseUrl = '';
-            if (vcpServerUrl) {
-                try {
-                    const urlObj = new URL(vcpServerUrl);
-                    apiBaseUrl = `${urlObj.protocol}//${urlObj.host}`;
-                } catch (e) { /* ignore */ }
-            }
+            const apiBaseUrl = normalizeVcpServerUrl(vcpServerUrl);
 
             return {
                 success: true,
                 apiBaseUrl,
-                vcpServerUrl,
+                vcpChatUrl: apiBaseUrl ? vcpChatUrl(apiBaseUrl) : '',
                 vcpApiKey,
                 desktopWidgetModel,
                 username,

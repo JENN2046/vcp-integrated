@@ -134,7 +134,9 @@ function sanitizeFlowlockRequest(request) {
         createdAt: request.createdAt,
         heartbeatSeconds: Math.max(1, Math.min(86400, Number.parseInt(request.heartbeatSeconds, 10) || 5)),
         prompt: typeof request.prompt === 'string' ? request.prompt : '',
-        status: request.status
+        status: request.status,
+        idleOnly: request.idleOnly === true,
+        initialMessageId: request.initialMessageId,
     };
 }
 
@@ -172,9 +174,33 @@ function initialize(mainWindow, context) {
                     return { success: false, code: 'MANAGER_UNAVAILABLE', error: 'AgentConfigManager 未初始化。' };
                 }
 
+                const completingMessageId = typeof constraints.completingMessageId === 'string' && constraints.completingMessageId.trim()
+                    ? constraints.completingMessageId.trim()
+                    : null;
+                const activeSnapshot = vcpStreamTasks.snapshot();
+                const hasOtherActiveStreamForAgent = Array.isArray(activeSnapshot?.tasks)
+                    && activeSnapshot.tasks.some(task =>
+                        task?.agentId === agentId
+                        && !task?.isGroupMessage
+                        && (!completingMessageId || task.messageId !== completingMessageId)
+                    );
+                if (hasOtherActiveStreamForAgent) {
+                    return {
+                        success: false,
+                        code: 'AGENT_STREAM_ACTIVE',
+                        error: '目标 Agent 当前仍有正在执行的单聊流或工具循环，延后认领。'
+                    };
+                }
+
                 const config = await agentConfigManager.readAgentConfig(agentId);
                 const topics = Array.isArray(config.topics) ? config.topics : [];
-                const requestId = typeof constraints.requestId === 'string' ? constraints.requestId : null;
+                const requestId = typeof constraints.requestId === 'string' && constraints.requestId.trim()
+                    ? constraints.requestId.trim()
+                    : null;
+                const topicId = typeof constraints.topicId === 'string' && constraints.topicId.trim()
+                    ? constraints.topicId.trim()
+                    : null;
+                const strictConflict = constraints.strictConflict === true;
                 const createdAfter = Number.isFinite(constraints.createdAfter) ? constraints.createdAfter : null;
                 const candidates = [];
 
@@ -182,7 +208,9 @@ function initialize(mainWindow, context) {
                     const request = sanitizeFlowlockRequest(topic.flowlockRequest);
                     if (!request || request.status !== 'pending') continue;
                     if (request.requestedByAgentId !== agentId) continue;
+                    if (request.idleOnly && constraints.skipIdleOnly === true) continue;
                     if (requestId && request.requestId !== requestId) continue;
+                    if (topicId && topic.id !== topicId) continue;
                     if (createdAfter !== null && request.createdAt < createdAfter) continue;
 
                     const historyPath = path.join(USER_DATA_DIR, agentId, 'topics', topic.id, 'history.json');
@@ -203,13 +231,23 @@ function initialize(mainWindow, context) {
                         }));
                         continue;
                     }
+                    if (request.idleOnly) {
+                        const history = await historyMutationQueue.read({ itemId: agentId, itemType: 'agent', topicId: topic.id });
+                        const initialIndex = history.findIndex(message => message.id === request.initialMessageId);
+                        if (initialIndex < 0 || !history.slice(initialIndex + 1).some(message =>
+                            message.role === 'assistant' && message.admissionTerminal === true
+                            && message.agentId === agentId && !message.isThinking && !message.isPendingStream
+                            && message.finishReason !== 'error'
+                            && !/^\s*\[ERROR\]/i.test(typeof message.content === 'string' ? message.content : '')
+                        )) continue;
+                    }
                     candidates.push({ topic, request });
                 }
 
                 if (candidates.length === 0) {
                     return { success: false, code: 'NOT_FOUND', error: '没有符合约束的 pending Flowlock 请求。' };
                 }
-                if (candidates.length > 1) {
+                if (candidates.length > 1 && strictConflict && !requestId && !topicId) {
                     return {
                         success: false,
                         code: 'CONFLICT',
@@ -222,25 +260,49 @@ function initialize(mainWindow, context) {
                     };
                 }
 
-                const [{ topic, request }] = candidates;
+                candidates.sort((left, right) => {
+                    const leftTime = Number(left.request.createdAt || left.topic.createdAt || 0);
+                    const rightTime = Number(right.request.createdAt || right.topic.createdAt || 0);
+                    return rightTime - leftTime;
+                });
+
+                const [{ topic, request }, ...staleCandidates] = candidates;
+                const staleRequestIds = new Set(request.idleOnly ? [] : staleCandidates
+                    .filter(entry => !entry.request.idleOnly).map(entry => entry.request.requestId));
+                const now = Date.now();
                 let claimed = false;
                 await agentConfigManager.updateAgentConfig(agentId, existing => ({
                     ...existing,
                     topics: (existing.topics || []).map(item => {
-                        if (item.id !== topic.id) return item;
-                        const current = item.flowlockRequest;
-                        if (!current || current.requestId !== request.requestId || current.status !== 'pending') {
-                            return item;
-                        }
-                        claimed = true;
-                        return {
-                            ...item,
-                            flowlockRequest: {
-                                ...current,
-                                status: 'consumed',
-                                consumedAt: Date.now()
+                        if (item.id === topic.id) {
+                            const current = item.flowlockRequest;
+                            if (!current || current.requestId !== request.requestId || current.status !== 'pending') {
+                                return item;
                             }
-                        };
+                            claimed = true;
+                            return {
+                                ...item,
+                                flowlockRequest: {
+                                    ...current,
+                                    status: 'consumed',
+                                    consumedAt: now
+                                }
+                            };
+                        }
+                        if (!requestId && !topicId
+                            && item.flowlockRequest?.status === 'pending'
+                            && staleRequestIds.has(item.flowlockRequest.requestId)) {
+                            return {
+                                ...item,
+                                flowlockRequest: {
+                                    ...item.flowlockRequest,
+                                    status: 'superseded',
+                                    supersededByRequestId: request.requestId,
+                                    supersededAt: now
+                                }
+                            };
+                        }
+                        return item;
                     })
                 }));
 
@@ -257,7 +319,8 @@ function initialize(mainWindow, context) {
                         requestId: request.requestId,
                         heartbeatSeconds: request.heartbeatSeconds,
                         prompt: request.prompt,
-                        createdAt: request.createdAt
+                        createdAt: request.createdAt,
+                        ...(request.idleOnly ? { idleOnly: true } : {}),
                     }
                 };
             } catch (error) {

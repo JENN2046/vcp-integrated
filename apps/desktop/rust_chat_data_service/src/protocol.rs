@@ -38,7 +38,7 @@ use crate::{
     identity::{IdentityResolver, OwnerSelector, ResolvedOwner},
     ingest::{ReconcileStats, Reconciler, SnapshotStale},
     search::{MemorySearchRequest, MessageSearchRequest, SearchRuntime},
-    storage::{now_ms, Database, SyncTopicVersion},
+    storage::{now_ms, Database, OwnerHashMode, SyncTopicVersion},
     sync::{
         self, ManifestRequest, ManifestResponse, MessageDiffRequest, MessageDiffResponse,
         MessagesPullRequest, TopicDiffRequest, TopicDiffResponse,
@@ -270,6 +270,12 @@ struct ReconcileOwnersResponse {
     indexed_topics: usize,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SyncVersionResponse {
+    wire_version: &'static str,
+}
+
 pub fn router(state: AppState) -> Router {
     let protected = Router::new()
         .route("/v1/status", get(status))
@@ -288,6 +294,7 @@ pub fn router(state: AppState) -> Router {
 
     let sync_routes = Router::new()
         .route("/v1/reconcile", post(reconcile))
+        .route("/v3/sync/version", get(sync_version))
         .route("/v3/sync/manifest", post(sync_manifest))
         .route("/v3/sync/topic-diff", post(sync_topic_diff))
         .route("/v3/sync/message-diff", post(sync_message_diff))
@@ -302,10 +309,19 @@ pub fn router(state: AppState) -> Router {
         .layer(DefaultBodyLimit::disable())
         .layer(RequestBodyLimitLayer::new(34 * 1024 * 1024));
 
+    let sync_push_batch_route = Router::new()
+        .route(
+            "/v3/sync/messages/push-batch",
+            post(sync_messages_push_batch),
+        )
+        .route_layer(middleware::from_fn_with_state(state.clone(), authenticate))
+        .layer(DefaultBodyLimit::disable());
+
     Router::new()
         .route("/v1/health", get(health))
         .merge(protected)
         .merge(sync_routes)
+        .merge(sync_push_batch_route)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
@@ -862,8 +878,6 @@ fn validate_entities_pull_request(request: &sync::EntitiesPullRequest) -> Servic
 }
 
 // 消息拉取只保留流式端点，以 kind=topic、ok=false 隔离单 Topic 失败。
-const MAX_SYNC_FRAME_BYTES: usize = 32 * 1024 * 1024;
-
 async fn sync_messages_pull_stream(
     State(state): State<AppState>,
     Json(request): Json<MessagesPullRequest>,
@@ -910,6 +924,8 @@ async fn sync_messages_pull_stream(
     );
     Ok(response)
 }
+
+const MAX_SYNC_FRAME_BYTES: usize = 32 * 1024 * 1024;
 
 fn encode_pull_topic_frame_with_connection(
     database: &Database,
@@ -1044,6 +1060,12 @@ fn validate_pull_request(request: &MessagesPullRequest) -> ServiceResult<()> {
     Ok(())
 }
 
+async fn sync_version() -> Json<SyncVersionResponse> {
+    Json(SyncVersionResponse {
+        wire_version: "1.6",
+    })
+}
+
 async fn sync_messages_push(
     State(state): State<AppState>,
     Json(topic): Json<sync::MessagesPushTopic>,
@@ -1053,14 +1075,61 @@ async fn sync_messages_push(
             "sync push topicId is required".to_string(),
         ));
     }
-    let _guard = state.reconcile_lock.lock().await;
-    let result = sync::push_topic_messages(&state.reconciler, topic).await;
-    if let (Some(search), Some(commit)) = (&state.search, &result.ingest_commit) {
-        search
-            .apply_ingest_commit_if_initialized(commit)
-            .map_err(ServiceError::internal)?;
-    }
-    Ok(Json(result))
+    let mut results = commit_sync_push_batch(state, vec![topic]).await?;
+    results.pop().map(Json).ok_or_else(|| {
+        ServiceError::internal(anyhow::anyhow!("single-topic push result is missing"))
+    })
+}
+
+async fn sync_messages_push_batch(
+    State(state): State<AppState>,
+    Json(request): Json<sync::MessagesPushBatchRequest>,
+) -> ServiceResult<Json<sync::MessagesPushBatchResponse>> {
+    let results = commit_sync_push_batch(state, request.topics).await?;
+    Ok(Json(sync::MessagesPushBatchResponse { results }))
+}
+
+async fn commit_sync_push_batch(
+    state: AppState,
+    topics: Vec<sync::MessagesPushTopic>,
+) -> ServiceResult<Vec<sync::MessagesPushResult>> {
+    let guard = state.reconcile_lock.clone().lock_owned().await;
+    tokio::task::spawn_blocking(move || {
+        let _guard = guard;
+        let mut results = Vec::with_capacity(topics.len());
+        let mut commits = Vec::new();
+        let mut dirty_owners = HashSet::new();
+        for topic in topics {
+            let mut result = tokio::runtime::Handle::current().block_on(sync::push_topic_messages_with_owner_hash_mode(
+                &state.reconciler,
+                topic,
+                OwnerHashMode::Deferred,
+            ));
+            if let Some(commit) = result.ingest_commit.take() {
+                if commit.owner_hash_dirty {
+                    dirty_owners.insert(OwnerKey {
+                        owner_type: commit.topic.owner_type,
+                        owner_id: commit.topic.owner_id.clone(),
+                    });
+                }
+                commits.push(commit);
+            }
+            results.push(result);
+        }
+        for owner in dirty_owners {
+            state
+                .reconciler
+                .database()
+                .refresh_owner_content_hash(&owner)?;
+        }
+        if let Some(search) = &state.search {
+            search.apply_ingest_commits_if_initialized(&commits)?;
+        }
+        Ok::<_, anyhow::Error>(results)
+    })
+    .await
+    .map_err(ServiceError::internal)?
+    .map_err(ServiceError::internal)
 }
 
 async fn rebuild_search(

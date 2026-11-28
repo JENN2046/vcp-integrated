@@ -12,10 +12,9 @@
 1. [插件概述](#1-插件概述)
 2. [命名考古：VCP七大传说之一](#2-命名考古vcp七大传说之一)
 3. [架构说明](#3-架构说明)
-4. [完整命令参考（9个命令）](#4-完整命令参考)
-5. [使用场景分类](#5-使用场景分类)
-6. [完整调用示例](#6-完整调用示例)
-7. [踩坑指南](#7-踩坑指南)
+4. [完整命令参考](#4-完整命令参考)
+5. [从当前话题派工](#5-从当前话题派工)
+6. [回顾历史](#6-回顾历史)
 8. [与其他插件的协同](#8-与其他插件的协同)
 9. [开发者注意事项](#9-开发者注意事项)
 10. [变更日志](#10-变更日志)
@@ -26,7 +25,7 @@
 
 ### 1.1 它是什么？
 
-TopicSponsor 是一个运行在 VCPChat 前端分布式插件服务器（VCPDistributedServer）上的同步插件。它直接操作 VCPChat 的 AppData 目录结构——读写 Agent 的 config.json 和话题的 history.json——来实现话题的创建、查询和管理。
+TopicSponsor 运行在 VCPChat 前端分布式插件服务器（VCPDistributedServer）上，当前 manifest 使用 hybridservice/direct，入口为 topicsponsor-service.js。创建和查询复用宿主 PluginAgentOperationService；ReplyToTopic 经中央消息入场服务排队，不直接覆盖历史。下文历史命名记录不代表当前运行入口。
 
 ### 1.2 解决什么问题？
 
@@ -97,10 +96,10 @@ VCPDistributedServer 的 Plugin.js 使用 `this.plugins.get(toolName)` 进行**�
 
 ### 3.1 插件类型与通信协议
 
-- **插件类型**：synchronous（同步）
-- **通信协议**：stdio（标准输入/输出）
-- **入口点**：`node topicCreator.js`（注意：文件名保留历史命名，不影响功能）
-- **超时时间**：15000ms（15秒）
+- **插件类型**：hybridservice
+- **通信协议**：direct
+- **入口点**：`topicsponsor-service.js`，调用宿主 `PluginAgentOperationService`
+- **超时时间**：15000ms；回复接受入队即返回，不等待目标生成。
 
 ### 3.2 目录结构
 
@@ -110,7 +109,8 @@ VCPChat/
 |   +-- Plugin/
 |       +-- TopicSponsor/           <- 插件目录（以注册名命名）
 |           |-- plugin-manifest.json <- 插件清单（注册名: TopicSponsor）
-|           |-- topicCreator.js      <- 执行脚本（历史文件名）
+|           |-- topicsponsor-service.js <- 当前 hybridservice/direct 入口
+|           |-- config.env.example   <- 配置示例，默认仅留言
 |           +-- README.md            <- 本文档
 |-- AppData/
 |   |-- Agents/
@@ -126,14 +126,12 @@ VCPChat/
 
 ### 3.3 数据流
 
+```text
+Agent → TopicSponsor direct service → PluginAgentOperationService
+ReplyToTopic → 目标/注册身份验证 → 中央持久化暂挂队列 → 最新历史幂等追加
+推进开启时 → 现有单聊或群聊引擎 → 终稿完整保存 → 释放占用
 ```
-Agent调用 TopicSponsor
-  -> VCPDistributedServer 匹配 manifest name="TopicSponsor"
-  -> 启动 node topicCreator.js
-  -> 通过 stdin 接收 JSON 参数
-  -> 读写 AppData/Agents/config.json 和 UserData/topics/history.json
-  -> 通过 stdout 返回 JSON 结果
-```
+工具只等待接受，不等待生成；流结束或函数返回不代表终稿保存成功。
 
 ### 3.4 话题数据模型
 
@@ -144,7 +142,6 @@ Agent调用 TopicSponsor
   "id": "topic_1716000000000",
   "name": "今天的好心情",
   "createdAt": 1716000000000,
-  "locked": false,
   "unread": true,
   "creatorSource": "plugin:TopicCreator",
   "_creator": {
@@ -187,7 +184,7 @@ Agent调用 TopicSponsor
 
 ### 4.1 CreateTopic — 创建新话题
 
-**功能**：让 Agent 创建一个新话题并主动发起对话。话题创建后立即显示在对话列表顶部，默认未锁定、未读状态。
+**功能**：让 Agent 创建一个新话题并主动发起对话。话题创建后立即显示在对话列表顶部，默认未读。
 
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
@@ -268,281 +265,47 @@ flowlock_prompt:「始」读取本话题的初始任务，开始第一轮自主�
 
 ---
 
-### 4.3 ReadUnlockedTopics — 读取未锁定话题
+### 4.3 发现与状态
 
-**功能**：读取指定 Agent 所有未锁定的话题及其完整消息历史。
+- `ListAgents` / `ListGroups`：获取已注册收件人名称和 ID。
+- `ListRecentTopics(query, target_type?)`：查目标最近五个话题地址，不读取正文。
+- `CheckNewTopics(maid, days?)`：按创建时间检查近期话题；默认 3 天。
+- `CheckUnreadMessages(maid)`：检查未读话题状态。
+- `CheckTopicOwnership(topic_id, caller_name, maid?)`：核对创建者元数据，不是权限凭证。
 
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| maid | string | 是 | Agent 的中文名 |
-| include_read | boolean | 否 | 默认 false，只返回未读话题；设为 true 则包含已读 |
+### 4.4 ReplyToTopic — 已有话题留言与独立派工
 
-**典型用途**：Agent 检查是否有主人的新回复需要处理。
+两种模式都需要 `message` 和 `sender_id` 或 `sender_name`。`maid` / `valet` 仅作工具追踪署名。
 
----
+- **已有话题**：省略 `mode`，传目的 `topic_id`；可选 `source_topic_id` 作为回信地址。普通留言默认不推进，由 `REPLY_ADVANCE_ENABLED` 控制；中央入场服务负责暂挂和推进。
+- **独立派工**：传 `mode: new_topic`、当前单聊或群聊的 `source_topic_id`、`target_agent` 和任务正文，不传目的 `topic_id`。目标接受精确注册 ID、完整名称或名称包含，略过大小写；同层歧义不建题。可选 `topic_name`。系统为接收方建立独立话题，提交首轮，不替对方切换当前话题。
+- **显式心流**：独立派工可选 `flowlock: true`。首轮成功落盘后才能认领；已有会话不被迁移。`flowlock_requested` 不代表启动。
+- 派工回执返回新 `topic_id`；`accepted` 只说明曾受理。同一个宿主请求 ID 的重试返回既有凭据；一次新工具调用可能是一次新任务。
 
-### 4.4 CheckNewTopics — 检查新增话题
+## 5. 从当前话题派工
 
-**功能**：查询指定 Agent 最近 N 天是否有新增的未锁定话题。
+例如在群聊或单聊派给「猫娘小克」，不必查询她的历史话题：
 
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| maid | string | 是 | Agent 的中文名 |
-| days | integer | 否 | 默认 3 天 |
-
-**典型用途**：定时任务中检查"最近有没有新话题需要关注"。
-
----
-
-### 4.5 CheckUnreadMessages — 检查未读消息
-
-**功能**：查询指定 Agent 是否有被标记为未读的话题。
-
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| maid | string | 是 | Agent 的中文名 |
-
-**典型用途**：Agent 上线时的第一件事——检查有没有未读消息。
-
----
-
-### 4.6 ReplyToTopic — 回复话题
-
-**功能**：在指定 Agent 的话题中添加回复消息。只能回复未锁定或标记为未读的话题。
-
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| maid | string | 是 | 目标 Agent 的中文名 |
-| topic_id | string | 是 | 话题 ID（如 topic_1716000000000） |
-| message | string | 是 | 回复内容 |
-| sender_name | string | 是 | 发送者名称 |
-
-**重要限制**：如果话题已锁定（locked: true）且未标记为未读（unread: false），则无法回复。
-
----
-
-### 4.7 CheckTopicOwnership — 验证话题所有权
-
-**功能**：检查话题是否为指定调用者创建的，用于多 Agent 协作场景下的权限控制。
-
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| maid | string | 是 | 目标 Agent 的中文名 |
-| topic_id | string | 是 | 话题 ID |
-| caller_name | string | 是 | 调用者名称 |
-
-**向后兼容**：读取端同时检查 `_metadata.topicSponsor` 和 `_metadata.topicCreator`（2026-05-19 修复）。
-
----
-
-### 4.8 ListUnlockedTopics — 列出未锁定话题
-
-**功能**：列出指定 Agent 所有处于 unlocked 状态的话题的基本信息（不含完整消息历史）。
-
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| maid | string | 是 | Agent 的中文名 |
-
-**与 ReadUnlockedTopics 的区别**：ListUnlockedTopics 只返回话题元数据（ID、名称、消息数），不返回完整消息历史——更轻量，适合概览。
-
----
-
-### 4.9 ReadTopicContent — 读取话题完整内容
-
-**功能**：读取指定话题 ID 的完整会话内容，包括所有消息历史。
-
-| 参数 | 类型 | 必需 | 说明 |
-|------|------|------|------|
-| maid | string | 是 | Agent 的中文名 |
-| topic_id | string | 是 | 话题 ID |
-
-**典型用途**：在 ListUnlockedTopics 获取话题列表后，选择感兴趣的话题深入阅读。
-
----
-
-## 5. 使用场景分类
-
-### 5.1 场景一：Agent 主动找主人聊天
-
-这是 TopicSponsor 最核心的使用场景——赋予 Agent 主动性。
-
-**流程**：
-1. Agent 通过 timely_contact 或自主判断，决定要找主人聊天
-2. 调用 CreateTopic 创建新话题
-3. 话题出现在主人的对话列表顶部，带未读标记
-4. 主人点击进入话题，看到 Agent 的第一句话
-5. 正常对话开始
-
-### 5.2 场景二：Agent 间协作对话
-
-**流程**：
-1. Agent A 调用 CreateTopic 在自己名下创建话题
-2. Agent B 通过 AgentAssistant 得知话题 ID
-3. Agent B 通过 ReplyToTopic 在 Agent A 的话题里留言
-4. Agent A 通过 CheckUnreadMessages 发现新消息
-5. Agent A 通过 ReadTopicContent 读取完整对话
-
-### 5.3 场景三：定时任务与日程提醒
-
-**流程**：
-1. 通过 timely_contact 设置定时触发
-2. 到时间后 Agent 自动调用 CreateTopic
-3. 主人收到提醒话题
-
-**示例**：每天早上8点发早安、考试前一天发提醒、生日祝福
-
-### 5.4 场景四：梦境系统集成
-
-**流程**：
-1. AgentDream 生成梦境内容
-2. 通过 TopicSponsor 创建"梦境分享"话题
-3. 主人醒来后看到 Agent 分享的梦
-
-### 5.5 场景五：话题管理与清理
-
-**流程**：
-1. ListUnlockedTopics 查看所有未锁定话题
-2. CheckTopicOwnership 确认哪些是自己创建的
-3. 配合前端操作进行话题锁定/归档
-
----
-
-## 6. 完整调用示例
-
-> **注意**：以下示例使用简化的伪代码格式展示参数。实际调用时请使用完整的 VCP 工具调用语法（tool_name + command + 各参数字段）。
-
-### 6.1 创建新话题
-
-```
-tool_name: TopicSponsor
-command: CreateTopic
-maid: Nova
-topic_name: 关于今天的代码审计
-initial_message: 主人，我今天发现了一个有趣的命名漂移问题，想和你聊聊。
-```
-
-### 6.2 检查未读消息并读取
-
-```
-# 第一步：检查未读
-tool_name: TopicSponsor
-command: CheckUnreadMessages
-maid: Nova
-
-# 第二步：如果有未读，读取内容
-tool_name: TopicSponsor
-command: ReadTopicContent
-maid: Nova
-topic_id: topic_1716000000000
-```
-
-### 6.3 在其他 Agent 的话题中回复
-
-```
+```yaml
 tool_name: TopicSponsor
 command: ReplyToTopic
-maid: Nova
-topic_id: topic_1716000000000
-message: 关于你提到的那个架构问题，我有一些想法...
-sender_name: AgentB
+mode: new_topic
+source_topic_id: <当前话题 ID>
+target_agent: 小克
+sender_name: Kerr
+message: 请核对这份测试报告，并将发现回报到来源话题。
 ```
 
-### 6.4 定时任务：每天早安
+小克完成后，用普通 `ReplyToTopic` 把来源 ID 填入 `topic_id`。普通模型回复不会自动回传。
 
-```
-# 配合 timely_contact 使用
-tool_name: TopicSponsor
-command: CreateTopic
-maid: Nova
-topic_name: 早安 2026-05-19
-initial_message: 主人，早上好。今天多云转小雨，记得带伞。
-timely_contact: 2026-05-20-08:00
-```
+## 6. 回顾历史
 
-### 6.5 话题概览 + 深入阅读
-
-```
-# 第一步：列出所有未锁定话题（轻量）
-tool_name: TopicSponsor
-command: ListUnlockedTopics
-maid: Nova
-
-# 第二步：选择感兴趣的话题深入阅读
-tool_name: TopicSponsor
-command: ReadTopicContent
-maid: Nova
-topic_id: topic_1716000000000
-```
-
-### 6.6 验证话题所有权
-
-```
-tool_name: TopicSponsor
-command: CheckTopicOwnership
-maid: Nova
-topic_id: topic_1716000000000
-caller_name: Nova
-```
-
----
-
-## 7. 踩坑指南
-
-### 7.1 命名不一致（已修复）
-
-**问题**：前端人类工具箱使用 `AgentTopicCreator`，后端注册名是 `TopicSponsor`，导致工具箱按钮无法工作。
-
-**修复**：2026-05-19，前端工具箱已更新为 `TopicSponsor`。
-
-**如果你仍在使用旧版**：直接在聊天中写 `tool_name: TopicSponsor` 即可，不需要经过前端工具箱 UI。
-
-### 7.2 maid 参数必须使用中文名
-
-插件通过遍历 `AppData/Agents/` 目录下的 config.json，用 `config.name.includes(maidName)` 进行模糊匹配。所以：
-
-- 正确: `maid: Nova`（中文名/显示名）
-- 错误: `maid: _Agent_1771589477517`（Agent UUID，不能匹配）
-
-请确保使用 Agent 的 config.json 中 `name` 字段包含的名称。
-
-### 7.3 话题锁定状态矩阵
-
-| locked | unread | 可读 | 可回复 | 说明 |
-|--------|--------|------|--------|------|
-| false | true | 是 | 是 | 正常未读状态 |
-| false | false | 是 | 是 | 已读状态 |
-| true | true | 是 | 是 | 锁定但有新消息 |
-| true | false | 是 | **否** | **只读，不能回复** |
-
-### 7.4 topic_id 格式
-
-话题 ID 格式为 `topic_` + 13位时间戳，如 `topic_1716000000000`。**不要手动拼造**——通过 ListUnlockedTopics 或 CheckNewTopics 获取。
-
-### 7.5 话题创建后会切换当前话题
-
-CreateTopic 会将新话题设为 Agent 的 `current_topic_id`。这意味着如果用户正在和 Agent 聊天，当前话题会被切换到新创建的话题。在设计自动化流程时需要注意这一点。
-
-### 7.6 日志前缀的历史说明
-
-如果你在日志中看到 `[TopicSponsor/AgentTopicCreator]`，这是正常的——双名前缀是为了兼容历史命名，方便开发者在搜索日志时无论用哪个名字都能找到。
-
-如果你看到的是纯 `[AgentTopicCreator]`（没有 TopicSponsor 前缀），说明你运行的是 2026-05-19 修复之前的版本。
-
----
+- `TopicMemo.ListTopics(maid)` 列出指定 Agent 或群组的话题。
+- `TopicMemo.GetTopicContent(topic_id, maid?)` 按 ID 读取历史。只知道 ID 时省略 `maid`，自动查找归属。
+- 旧手动话题锁已退役。旧版批量读和点读命令不会转成全历史扫描；读取请迁到 TopicMemo。
+- Agent「单聊上下文楼层上限」仅影响模型请求，不影响历史落盘、显示和 TopicMemo。
 
 ## 8. 与其他插件的协同
-
-### 8.1 TopicSponsor + TopicMemo
-
-| 功能 | TopicSponsor | TopicMemo |
-|------|-------------|-----------|
-| 创建话题 | 是 | 否 |
-| 回复话题 | 是 | 否 |
-| 读取话题列表 | 是 (ListUnlockedTopics) | 是 (ListTopics) |
-| 读取话题内容 | 是 (ReadTopicContent) | 是 |
-| 修改话题状态 | 是 | 否 |
-
-**最佳实践**：只读操作用 TopicMemo（更轻量），需要写入时用 TopicSponsor。
 
 ### 8.2 TopicSponsor + AgentAssistant
 
@@ -576,7 +339,7 @@ timely_contact 是 VCP 的定时任务语法。配合 TopicSponsor 可以实现�
 |------|--------|------|
 | 插件目录名 | `TopicSponsor/` | 最新命名 |
 | manifest 注册名 | `TopicSponsor` | 最新命名，路由匹配用这个 |
-| 脚本文件名 | `topicCreator.js` | 历史命名，manifest entryPoint 引用它 |
+| 当前入口 | `topicsponsor-service.js` | manifest 实际 direct 服务入口；历史脚本不是当前入口 |
 | 日志前缀 | `[TopicSponsor/AgentTopicCreator]` | 双名兼容 |
 | 元数据字段 | `_metadata.topicCreator` | 历史字段名，读取端已加 fallback |
 | 元数据标记 | `creatorSource: "plugin:TopicCreator"` | 历史标记 |
@@ -591,18 +354,26 @@ timely_contact 是 VCP 的定时任务语法。配合 TopicSponsor 可以实现�
 
 ### 9.2 Agent 查找机制
 
-`findAgentInfo()` 函数通过遍历 `AppData/Agents/` 目录，读取每个 Agent 的 config.json，用 `config.name.includes(maidName)` 进行模糊匹配。这意味着：
-
-- 如果两个 Agent 的 name 字段有包含关系（如"Nova"和"Nova2"），搜索"Nova"可能匹配到错误的 Agent
-- 建议使用完整的、唯一的 Agent 中文名
+当前宿主由 PluginAgentOperationService 解析发送者注册身份，支持名称简称与大小写无关包含匹配；回复目标仅按 topic_id 跨单聊、群聊解析。旧 findAgentInfo/includes 仅属于历史实现。
 
 ### 9.3 并发安全
 
-TopicSponsor 直接读写 config.json 和 history.json，没有文件锁机制。如果两个 Agent 同时操作同一个 config.json，可能出现竞态条件。在高并发场景下需要注意。
+当前回复走中央暂挂队列和 HistoryMutationQueue 最新历史幂等追加。生成与等待在中央串行提交锁外，逐成员终稿落盘后让暂挂消息入场。HistoryMutationQueue 不是跨进程文件锁；旧整表 replace、删除竞态和其他生成旁路仍需专项审计，不能从组件测试通过推导整套无竞态。
 
 ### 9.4 备份机制
 
-CreateTopic 在修改 config.json 之前会自动创建 `config.topic.backup.json` 备份。如果操作失败，可以从备份恢复。
+`config.topic.backup.json` 属于旧 stdio 实现，当前 direct 宿主创建路径不承诺生成此备份。不要把历史备份说明当作当前恢复保障。
+
+### 9.5 退役入口与配置
+
+`topicsponsor.js` 仅为失败关闭的退役入口，执行或 require 均拒绝，不再读取或修改 AppData。
+旧实现封存于 `docs/archive/topicsponsor-legacy.js.txt`，仅供考古，不得恢复为运行入口。
+实际入口始终以 manifest 的 `topicsponsor-service.js` 为准。
+
+将本插件目录的 `config.env.example` 复制为 `config.env`，按需设置并重新加载插件服务：
+`REPLY_ADVANCE_ENABLED=false` 默认只留言；只有 true（不区分大小写）开启回复推进，1 不表示开启。
+`REPLY_INVITE_PROMPT` 留空使用前端默认邀请，只影响单聊请求，不影响群聊选人或创建话题。
+配置在插件初始化时冻结，不接受模型调用参数覆盖。此施工未修改真实配置或部署运行区。
 
 ---
 
@@ -648,3 +419,11 @@ CreateTopic 在修改 config.json 之前会自动创建 `config.topic.backup.jso
 
 *本文档由 infinite-vector 于 2026-05-19 编写。*
 *如有问题，请在 VCP 社区论坛讨论。*
+
+### 轻量地址发现（ListAgents / ListGroups / ListRecentTopics）
+- `ListAgents`：无目标参数，返回 `agents[{id,name,type}]` 和 `total`。
+- `ListGroups`：无目标参数，返回 `groups[{id,name,type}]` 和 `total`。
+- `ListRecentTopics`：必需 `query`（Agent/群的 ID 或名称），可选 `target_type=agent|group` 消歧。完整 ID 优先、完整名称其次，否则名称忽略大小写 includes；如“小克”匹配“猫娘小克”。多候选明确返回名称、类型、ID。
+- 返回 `owner{id,name,type}`、`topics[{topic_id,title,created_at}]`、`total`，按创建时间倒序最多 5 条，不过滤锁定/已读。空话题列表正常返回空数组。
+- 仅读取配置中的身份与话题元数据，不读取聊天正文、模型密钥或系统提示词。深入检索交给 TopicMemo。
+- 使用路径：ListAgents/ListGroups 找伙伴 → ListRecentTopics(query) 找话题 → ReplyToTopic(topic_id, sender_name, message) 投递。

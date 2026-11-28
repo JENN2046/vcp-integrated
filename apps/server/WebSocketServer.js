@@ -1,8 +1,9 @@
-// WebSocketServer.js
+﻿// WebSocketServer.js
 const WebSocket = require('ws');
 const url = require('url');
 const fs = require('fs').promises;
 const path = require('path');
+const { resultPath, writeJson } = require('./modules/asyncResultStore');
 const { syncDistributedMusicDiary } = require('./modules/distributedMusicDiarySync');
 const vcpLogReplayManager = require('./modules/vcpLogReplayManager');
 const { createHash } = require('node:crypto');
@@ -218,7 +219,11 @@ function initialize(httpServer, config) {
         console.warn('[WebSocketServer] VCP_Key not set. WebSocket connections will not be authenticated if default path is used.');
     }
 
-    wssInstance = new WebSocket.Server({ noServer: true });
+    const configuredMaxPayloadMB = Number(process.env.WEBSOCKET_MAX_PAYLOAD_MB);
+    const maxPayloadBytes = (Number.isFinite(configuredMaxPayloadMB) && configuredMaxPayloadMB > 0
+        ? configuredMaxPayloadMB
+        : 256) * 1024 * 1024;
+    wssInstance = new WebSocket.Server({ noServer: true, maxPayload: maxPayloadBytes });
 
     upgradeHandler = (request, socket, head) => {
         if (isDraining) {
@@ -394,6 +399,11 @@ function initialize(httpServer, config) {
     httpServer.on('upgrade', upgradeHandler);
 
     wssInstance.on('connection', (ws, request) => {
+        ws.isAlive = true;
+        ws.on('pong', () => {
+            ws.isAlive = true;
+        });
+
         if (serverConfig.debugMode) {
             console.log(`[WebSocketServer] Client ${ws.clientId} connected.`);
         }
@@ -420,6 +430,7 @@ function initialize(httpServer, config) {
         // 可以根据 ws.clientType 或其他标识符发送不同的欢迎消息
 
         ws.on('message', async (message) => {
+            ws.isAlive = true;
             const messageString = message.toString();
             let failureCode = 'WS_JSON_PARSE_FAILED';
             
@@ -572,8 +583,10 @@ function initialize(httpServer, config) {
 
         ws.on('close', () => {
             if (ws.clientType === 'DistributedServer') {
-                if (pluginManager) {
-                    pluginManager.unregisterAllDistributedTools(ws.serverId);
+                try {
+                    pluginManager?.unregisterAllDistributedTools(ws.serverId);
+                } catch (error) {
+                    console.error(`[WebSocketServer] Failed to unregister distributed tools for ${ws.serverId}:`, error);
                 }
                 rejectPendingToolRequestsForServer(ws.serverId);
                 distributedServers.delete(ws.serverId);
@@ -628,25 +641,62 @@ function initialize(httpServer, config) {
     // Ordinary clients need traffic comfortably before a possible 60s idle limit.
     // Never ping an admitted native session here: its pong deadline belongs above.
     if (serverConfig.heartbeatEnabled) {
+        const { heartbeatIntervalMs } = config ?? {};
+        const intervalMs = typeof heartbeatIntervalMs === 'string' ? Number(heartbeatIntervalMs) : heartbeatIntervalMs;
+        // Node uses a 1 ms delay for values outside the timer's supported range.
+        const effectiveHeartbeatIntervalMs = Number.isInteger(intervalMs) && intervalMs >= 1 && intervalMs <= 2_147_483_647
+            ? intervalMs
+            : WEBSOCKET_HEARTBEAT_INTERVAL_MS;
+
         ordinaryHeartbeatInterval = setInterval(() => {
             if (!wssInstance || isDraining) return;
             let pingedClientCount = 0;
+            let terminatedClientCount = 0;
             wssInstance.clients.forEach(client => {
                 if (client.readyState !== WebSocket.OPEN) return;
                 if (require('./modules/nativeConversationWebSocket').isNativeConversationConnection(client)) return;
+
+                if (client.isAlive !== false) {
+                    client.isAlive = false;
+                    try {
+                        client.ping();
+                        pingedClientCount++;
+                        return;
+                    } catch (error) {
+                        console.warn(`[WebSocketServer] Heartbeat ping failed for client ${client.clientId || 'unknown'}: ${error.message}`);
+                    }
+                } else {
+                    writeLog(`Client ${client.clientId || 'unknown'} (${client.clientType || 'unknown'}) missed heartbeat response; terminating stale connection.`);
+                }
+
+                if (client.isAlive !== false) {
+                    client.isAlive = false;
+                    try {
+                        client.ping();
+                        pingedClientCount++;
+                        return;
+                    } catch (error) {
+                        console.warn(`[WebSocketServer] Heartbeat ping failed for client ${client.clientId || 'unknown'}: ${error.message}`);
+                    }
+                } else {
+                    writeLog(`Client ${client.clientId || 'unknown'} (${client.clientType || 'unknown'}) missed heartbeat response; terminating stale connection.`);
+                }
+
                 try {
-                    client.ping();
-                    pingedClientCount++;
+                    client.terminate();
+                    terminatedClientCount++;
                 } catch (error) {
-                    console.warn(`[WebSocketServer] Heartbeat ping failed for client ${client.clientId || 'unknown'}: ${error.message}`);
+                    console.warn(`[WebSocketServer] Failed to terminate stale client ${client.clientId || 'unknown'}: ${error.message}`);
                 }
             });
-            if (serverConfig.debugMode && pingedClientCount > 0) {
-                console.log(`[WebSocketServer] Sent heartbeat ping to ${pingedClientCount} ordinary client(s).`);
+
+            if (serverConfig.debugMode && (pingedClientCount > 0 || terminatedClientCount > 0)) {
+                console.log(`[WebSocketServer] Heartbeat sweep: pinged=${pingedClientCount}, terminated=${terminatedClientCount}.`);
             }
-        }, WEBSOCKET_HEARTBEAT_INTERVAL_MS);
+        }, effectiveHeartbeatIntervalMs);
         ordinaryHeartbeatInterval.unref();
-        console.log(`[WebSocketServer] Protocol heartbeat enabled (ordinary: ${WEBSOCKET_HEARTBEAT_INTERVAL_MS / 1000}s; native: ${NATIVE_WEBSOCKET_HEARTBEAT_INTERVAL_MS / 1000}s).`);
+
+        console.log(`[WebSocketServer] Protocol heartbeat enabled (interval: ${effectiveHeartbeatIntervalMs / 1000}s).`);
     }
 
     if (serverConfig.debugMode) {
@@ -1034,7 +1084,7 @@ async function executeDistributedTool(serverIdOrName, toolName, toolArgs, timeou
     signal?.throwIfAborted();
     // 优先从插件 manifest 获取超时设置
     const plugin = pluginManager.getPlugin(toolName);
-    const defaultTimeout = plugin?.communication?.timeout || 60000;
+    const defaultTimeout = plugin?.communication?.timeout || 180000;
     const effectiveTimeout = timeout ?? defaultTimeout;
 
     let targetServerId = serverIdOrName;
@@ -1106,13 +1156,81 @@ async function executeDistributedTool(serverIdOrName, toolName, toolArgs, timeou
     });
 }
 
+function normalizeIpForLookup(ip) {
+    if (typeof ip !== 'string') return ip;
+    const trimmed = ip.trim();
+    const v4 = trimmed.startsWith('::ffff:') ? trimmed.slice(7) : trimmed;
+    return v4 === '::1' ? '127.0.0.1' : v4;
+}
+
+// 按节点 report_ip 自报的 publicIP / localIPs 查找所有当前处于 OPEN 状态的节点 serverId（最新连接排最前）
+function findServersByReportedIp(ip) {
+    const normalizedIp = normalizeIpForLookup(ip);
+    if (!normalizedIp) return [];
+    const list = [];
+    for (const [serverId, ipInfo] of distributedServerIPs.entries()) {
+        const serverEntry = distributedServers.get(serverId);
+        if (!serverEntry || !serverEntry.ws || serverEntry.ws.readyState !== WebSocket.OPEN) {
+            continue;
+        }
+        const publicMatched = ipInfo.publicIP && (
+            ipInfo.publicIP === ip ||
+            normalizeIpForLookup(ipInfo.publicIP) === normalizedIp
+        );
+        const localMatched = Array.isArray(ipInfo.localIPs) && ipInfo.localIPs.some(
+            candidate => candidate === ip || normalizeIpForLookup(candidate) === normalizedIp
+        );
+        if (publicMatched || localMatched) {
+            list.push(serverId);
+        }
+    }
+    return list.reverse();
+}
+
+function hasDuplicateOpenServerName(targetName) {
+    if (!targetName) return false;
+    let count = 0;
+    for (const [, info] of distributedServers.entries()) {
+        if (info.ws && info.ws.readyState === WebSocket.OPEN && info.serverName === targetName) {
+            count++;
+            if (count > 1) return true;
+        }
+    }
+    return false;
+}
+
 function findServerByIp(ip) {
-   for (const [serverId, ipInfo] of distributedServerIPs.entries()) {
-       if (ipInfo.publicIP === ip || (ipInfo.localIPs && ipInfo.localIPs.includes(ip))) {
-           return ipInfo.serverName || serverId;
-       }
-   }
-   return null;
+    const byReported = findServersByReportedIp(ip);
+    if (byReported.length === 1) {
+        const matchedServerId = byReported[0];
+        const ipInfo = distributedServerIPs.get(matchedServerId) || {};
+        const candidateName = ipInfo.serverName || distributedServers.get(matchedServerId)?.serverName;
+        // 若存在多台在线客户端共用同一默认 serverName，返回唯一 serverId 以防 executeDistributedTool 按名错打到第一台节点
+        if (candidateName && !hasDuplicateOpenServerName(candidateName)) {
+            return candidateName;
+        }
+        return matchedServerId;
+    }
+    // 多台在线节点自报同一公网/局域网 IP，或请求经隧道/反代（如 127.0.0.1）未命中自报地址时，
+    // 绝不将传输跳连接 IP 直接视作机器身份，统一返回 null 交由超栈层对 SHA-256 附件做零信任验真。
+    return null;
+}
+
+// 按节点 WebSocket 连接的真实来源 IP 找已连接的节点（最近连接排最前，减少重连半开旧连接带来的超时等待）
+function findServersByConnectionIp(ip) {
+    const normalizedIp = normalizeIpForLookup(ip);
+    if (!normalizedIp) return [];
+    const list = [];
+    for (const [serverId, info] of distributedServers.entries()) {
+        if (
+            info.ws &&
+            info.ws.readyState === WebSocket.OPEN &&
+            normalizeIpForLookup(info.ws.clientIp) === normalizedIp
+        ) {
+            list.push(serverId);
+        }
+    }
+    return list.reverse();
 }
 
 function getDistributedServerSnapshot() {
@@ -1204,6 +1322,8 @@ module.exports = {
     bindDistributedTool,
     handleDistributedServerMessage,
     findServerByIp,
+    findServersByReportedIp,
+    findServersByConnectionIp,
     getDistributedServerSnapshot,
     formatDistributedServerListForPrompt,
     shutdown,

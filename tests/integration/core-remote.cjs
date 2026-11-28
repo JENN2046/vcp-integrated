@@ -17,6 +17,7 @@ exports.create = async (out, cert) => {
     const physical = process.env.VCP_TEST_CORE_PHONE === '1';
     const browser = process.env.VCP_TEST_CORE_BROWSER === '1';
     const interactive = physical || browser;
+    const expectedWorks = physical && browser ? 3 : 2;
     const image = path.join(out, 'red.png');
     await require('../../apps/server/node_modules/sharp')({ create: { width: 224, height: 224, channels: 3, background: '#ff0000' } }).png().toFile(image);
     const tokens = {};
@@ -134,6 +135,9 @@ exports.create = async (out, cert) => {
         await waitUntil(() => service.calls.length === 1, 'ToolBox dispatched remote Core Work');
         const work = (await call(desktop + '/works', { token: tokens.A })).data.works[0];
         assert.equal(work.status, 'running');
+        await waitUntil(() => A.events.some(({ event, data }) => event === 'ipc-result' &&
+            data?.channel === 'native-sync:prepare-send' && data.success === true),
+            'desktop admission receipt returned');
         await stop('A');
         await stop('B');
         const stream = observe(mobile + '/observe', reader.cookie, body =>
@@ -165,7 +169,7 @@ exports.create = async (out, cert) => {
         }
         const before = await waitUntil(async () => {
             const messages = await read();
-            return messages.length === 4 && messages;
+            return messages.length === expectedWorks * 2 && messages;
         }, 'mobile followup formally completed', 90000);
         if (browser) await waitUntil(() => fs.existsSync(path.join(out, 'pwa-proof.json')), 'PWA rendered the formal followup', 30000);
         assert.deepEqual(before.slice(0, 2), first);
@@ -184,17 +188,37 @@ exports.create = async (out, cert) => {
         await waitUntil(async () => (await evalJs(B, "document.querySelector('#chatMessages')?.innerText || ''")).includes(before[2].content),
             'new desktop loaded server directory and shared history');
         await picture(B, 'core-remote-cold');
+        const readyEvents = () => B.events.filter(event => event.event === 'renderer-ready').length;
+        const previousReady = readyEvents();
+        await evalJs(B, 'setTimeout(() => location.reload(), 0); true');
+        await waitUntil(() => readyEvents() > previousReady, 'same Electron window reloaded');
+        await click(B, '#agentList > li .agent-name', 'Synthetic local');
+        await waitUntil(async () => (await evalJs(B, "document.querySelector('#chatMessages')?.innerText || ''")).includes(before[2].content),
+            'reloaded renderer reads the same Core conversation');
+        assert.deepEqual(await read(), before);
+        // A began with an empty native History; B began without a native topic.
+        // Remote submission, restart and cold read must leave both local histories empty.
+        const desktopNativeHistoryRows = {};
+        for (const role of ['A', 'B']) {
+            const history = path.join(out, 'profile-' + role, 'UserData', descriptor.itemId,
+                'topics', descriptor.topicId, 'history.json');
+            if (role === 'A') assert.ok(fs.existsSync(history), 'original native History must survive');
+            const rows = fs.existsSync(history) ? JSON.parse(fs.readFileSync(history, 'utf8')) : [];
+            assert.deepEqual(rows, [], 'unexpected local History in profile ' + role);
+            desktopNativeHistoryRows[role] = rows.length;
+        }
         const db = new DatabaseSync(path.join(out,'core/core.sqlite'), { readOnly: true });
         try {
             const works = db.prepare('SELECT principal,status FROM works ORDER BY rowid').all();
-            assert.equal(works.length, 2);
+            assert.equal(works.length, expectedWorks);
             assert.ok(works[0].principal.startsWith('desktop:'));
-            assert.ok(works[1].principal.startsWith('mobile:'));
+            assert.ok(works.slice(1).every(work => work.principal.startsWith('mobile:')));
+            assert.equal(new Set(works.map(work => work.principal)).size, expectedWorks);
             assert.ok(works.every(item => item.status === 'completed'));
         } finally { db.close(); }
         assert.equal(fs.existsSync(path.join(out, 'data/central.sqlite')), false);
         assert.equal(fs.existsSync(path.join(out, 'runtime-box/Plugin/NativeSync/plugin-manifest.json')), false);
-        assert.equal(service.calls.length, 2);
+        assert.equal(service.calls.length, expectedWorks);
         if (provider) {
             assert.ok(service.calls.every(row => row.imageParts === 1 && row.status === 200));
             assert.ok(before.filter(row => row.role === 'assistant').every(row => /red/i.test(row.content)));
@@ -226,7 +250,7 @@ exports.create = async (out, cert) => {
         assert.equal(administer(context.env, ['revoke', sessionB.data.deviceId]).revoked, true);
         assert.equal((await call('/core/api/session', { token: tokens.B })).status, 401);
         result.core = { provider: provider ? model : 'synthetic', physicalAndroid: physical, browserPwa: browser, desktopExitedDuringWork: true,
-            mobileContinuation: true, mobileSseTerminal: true, deviceRevocation: true, attachmentHash: imageHash, formalMessages: before.length, authenticatedDesktopColdReadback: true,
+            mobileContinuation: true, mobileSseTerminal: true, deviceRevocation: true, attachmentHash: imageHash, formalMessages: before.length, authenticatedDesktopColdReadback: true, rendererReloadReadback: true, desktopNativeHistoryRows,
             historyAndAttachmentUnchangedAfterRestart: true, unauthenticatedRejected: true, readOnlyMutationRejected: true,
             definitionTombstoneAndReplay: true, restart, webBundle: checkPage };
     };

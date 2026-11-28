@@ -13,8 +13,27 @@
   "communication": {
     "protocol": "direct"
   },
+  "configSchema": {
+    "REPLY_ADVANCE_ENABLED": "boolean",
+    "REPLY_INVITE_PROMPT": "string"
+  },
   "capabilities": {
     "invocationCommands": [
+      {
+        "command": "ListAgents",
+        "commandIdentifier": "ListAgents",
+        "description": "列出所有注册 Agent 的完整 name、id 和 type，只读地址簿，无需目标参数。"
+      },
+      {
+        "command": "ListGroups",
+        "commandIdentifier": "ListGroups",
+        "description": "列出所有群的 name、id 和 type，只读地址簿，无需目标参数。"
+      },
+      {
+        "command": "ListRecentTopics",
+        "commandIdentifier": "ListRecentTopics",
+        "description": "查询 Agent 或群最新创建的5个话题，只返回标题和地址，不检索正文。必需 query：真实ID或名称；优先完整ID、完整名称，否则忽略大小写包含匹配（小克可匹配猫娘小克）。多候选列出完整名称、类型、ID，不猜测；可选 target_type=agent|group 消歧。返回 owner、topics[{topic_id,title,created_at}]、total，按创建时间倒序，不过滤 locked/unread。找到topic_id后用ReplyToTopic留言；深入内容检索使用TopicMemo。"
+      },
       {
         "command": "CreateTopic",
         "commandIdentifier": "CreateTopic",
@@ -26,14 +45,9 @@
         "description": "功能: 创建带持久化 Flowlock 请求的新话题。请求不会在工具执行时直接启动，而是在当前 assistant 最终回复完整落盘后由前端原子认领并交接该 Agent 的唯一 Session。\n\n参数: maid、topic_name、initial_message 必需；flowlock_heartbeat 可选（1-86400 秒，默认 5）；flowlock_prompt 可选。\n\n调用格式:\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」TopicSponsor「末」,\ncommand:「始」CreateFlowlockTopic「末」,\nmaid:「始」Nova「末」,\ntopic_name:「始」自主工作区「末」,\ninitial_message:「始」请执行连续自检任务。[[Flowlock::Start]]「末」,\nflowlock_heartbeat:「始」5「末」,\nflowlock_prompt:「始」读取初始任务并开始第一轮。「末」\n<<<[END_TOOL_REQUEST]>>>"
       },
       {
-        "command": "ReadUnlockedTopics",
-        "commandIdentifier": "ReadUnlockedTopics",
-        "description": "功能: 读取指定Agent所有未锁定的话题及其消息历史。\n\n**参数说明:**\n1. `tool_name`: 「始」TopicSponsor「末」 (必需)\n2. `command`: 「始」ReadUnlockedTopics「末」 (必需)\n3. `maid`: 「始」目标Agent的中文名「末」 (必需)\n4. `include_read`: 「始」true「末」 或 「始」false「末」 (可选, 默认false - 只返回未读话题)\n\n**调用格式:**\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」TopicSponsor「末」,\ncommand:「始」ReadUnlockedTopics「末」,\nmaid:「始」HANNA「末」,\ninclude_read:「始」false「末」\n<<<[END_TOOL_REQUEST]>>>"
-      },
-      {
         "command": "CheckNewTopics",
         "commandIdentifier": "CheckNewTopics",
-        "description": "功能: 查询指定Agent最近几日是否有新增未锁定话题。\n\n**参数说明:**\n1. `tool_name`: 「始」TopicSponsor「末」 (必需)\n2. `command`: 「始」CheckNewTopics「末」 (必需)\n3. `maid`: 「始」目标Agent的中文名「末」 (必需)\n4. `days`: 「始」3「末」 (可选, 默认3天)\n\n**调用格式:**\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」TopicSponsor「末」,\ncommand:「始」CheckNewTopics「末」,\nmaid:「始」HANNA「末」,\ndays:「始」7「末」\n<<<[END_TOOL_REQUEST]>>>"
+        "description": "查询指定 Agent 或群组最近几日的新话题，仅返回元数据。maid 为目标名称或 ID，days 默认 3。回顾全部历史请使用 TopicMemo.ListTopics。"
       },
       {
         "command": "CheckUnreadMessages",
@@ -43,22 +57,12 @@
       {
         "command": "ReplyToTopic",
         "commandIdentifier": "ReplyToTopic",
-        "description": "功能: 在指定Agent的话题中添加回复消息。只能回复未锁定或标记为未读的话题。\n\n**参数说明:**\n1. `tool_name`: 「始」TopicSponsor「末」 (必需)\n2. `command`: 「始」ReplyToTopic「末」 (必需)\n3. `maid`: 「始」目标Agent的中文名「末」 (必需)\n4. `topic_id`: 「始」话题ID「末」 (必需)\n5. `message`: 「始」回复内容「末」 (必需)\n6. `sender_name`: 「始」发送者名称「末」 (必需)\n\n**调用格式:**\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」TopicSponsor「末」,\ncommand:「始」ReplyToTopic「末」,\nmaid:「始」HANNA「末」,\ntopic_id:「始」topic_1234567890「末」,\nmessage:「始」这是一条回复消息「末」,\nsender_name:「始」系统助手「末」\n<<<[END_TOOL_REQUEST]>>>"
+        "description": "从当前单聊或群聊发起独立 Agent 子任务，或向已有话题留言。\n\n两种模式都需要 message 及 sender_id（精确注册 ID）或 sender_name（注册名，支持简称）。maid/valet 只作追踪署名。需携带最近对话时，可选 `river`: 「始」last:5「末」（`last:N`，N 为正整数，通常用 5）；不需要时省略。TopicSponsor 只使用此模式；附件仅保留 URL，由接收 Agent 按需读取。\n\n回复已有话题：省略 mode，传目的 topic_id，自动跨 Agent/Group 查找。source_topic_id 可选，仅提供回信地址。默认只留言，宿主启用 REPLY_ADVANCE_ENABLED 才请求推进。公共投递不适用于游戏话题。\n\n派工：传 mode=new_topic、source_topic_id（当前单聊或群聊 ID）、target_agent（注册 ID、完整名称或正向名称包含，如小克匹配猫娘小克）、message；可选 topic_name。不要传目的 topic_id，也无需查询对方旧话题。默认请求推进首轮，不切换对方当前话题。可选 flowlock=true：首轮成功落盘后才允许空闲认领，不接管已有心流；flowlock_requested 仅表示已请求。\n\n回执返回目的 topic_id；派工 accepted 表示曾受理，不表示首轮已启动或已完成。需要回报时，用普通 ReplyToTopic，把来源地址作为目的 topic_id。普通回答不自动回传。"
       },
       {
         "command": "CheckTopicOwnership",
         "commandIdentifier": "CheckTopicOwnership",
-        "description": "功能: 检查话题是否为当前调用者创建的，用于验证操作权限。\n\n**参数说明:**\n1. `tool_name`: 「始」TopicSponsor「末」 (必需)\n2. `command`: 「始」CheckTopicOwnership「末」 (必需)\n3. `maid`: 「始」目标Agent的中文名「末」 (必需)\n4. `topic_id`: 「始」话题ID「末」 (必需)\n5. `caller_name`: 「始」调用者名称「末」 (必需)\n\n**调用格式:**\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」TopicSponsor「末」,\ncommand:「始」CheckTopicOwnership「末」,\nmaid:「始」HANNA「末」,\ntopic_id:「始」topic_1234567890「末」,\ncaller_name:「始」HANNA「末」\n<<<[END_TOOL_REQUEST]>>>"
-      },
-      {
-        "command": "ListUnlockedTopics",
-        "commandIdentifier": "ListUnlockedTopics",
-        "description": "功能: 查询指定Agent是否有处于unlocked状态的话题，并列出这些话题的基本信息。\n\n**参数说明:**\n1. `tool_name`: 「始」TopicSponsor「末」 (必需)\n2. `command`: 「始」ListUnlockedTopics「末」 (必需)\n3. `maid`: 「始」目标Agent的中文名「末」 (必需)\n\n**调用格式:**\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」TopicSponsor「末」,\ncommand:「始」ListUnlockedTopics「末」,\nmaid:「始」HANNA「末」\n<<<[END_TOOL_REQUEST]>>>"
-      },
-      {
-        "command": "ReadTopicContent",
-        "commandIdentifier": "ReadTopicContent",
-        "description": "功能: 读取指定话题ID的完整会话内容，包括所有消息历史。\n\n**参数说明:**\n1. `tool_name`: 「始」TopicSponsor「末」 (必需)\n2. `command`: 「始」ReadTopicContent「末」 (必需)\n3. `maid`: 「始」目标Agent的中文名「末」 (必需)\n4. `topic_id`: 「始」话题ID「末」 (必需)\n\n**调用格式:**\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」TopicSponsor「末」,\ncommand:「始」ReadTopicContent「末」,\nmaid:「始」HANNA「末」,\ntopic_id:「始」topic_1234567890「末」\n<<<[END_TOOL_REQUEST]>>>"
+        "description": "功能: 检查单聊或群聊话题是否为当前调用者创建的，用于验证操作权限。\n\n**参数说明:**\n1. `tool_name`: 「始」TopicSponsor「末」 (必需)\n2. `command`: 「始」CheckTopicOwnership「末」 (必需)\n3. `topic_id`: 「始」话题ID「末」 (必需)\n4. `caller_name`: 「始」调用者名称「末」 (必需)\n5. `maid`: 「始」目标Agent或群组的名称/ID「末」 (可选，省略时按 topic_id 全域自动寻址)\n\n**调用格式:**\n<<<[TOOL_REQUEST]>>>\ntool_name:「始」TopicSponsor「末」,\ncommand:「始」CheckTopicOwnership「末」,\ntopic_id:「始」topic_1234567890「末」,\ncaller_name:「始」HANNA「末」\n<<<[END_TOOL_REQUEST]>>>"
       }
     ]
   },
@@ -66,34 +70,15 @@
     "schemaVersion": 1,
     "enabled": true,
     "category": "便利操作",
-    "jevDescPrompt": "检查伙伴的未读聊天话题、列出未锁定话题列表或读取指定未锁定话题的完整消息记录。",
-    "jevPrompt": "用户希望检查是否有未读消息或未读话题时选择 CheckUnreadMessages；希望列出所有未锁定话题元数据列表时选择 ListUnlockedTopics；希望按话题 ID 读取某个未锁定话题的完整对话内容时选择 ReadTopicContent。未明确指定时默认 ListUnlockedTopics。",
-    "agentPrompt": "当需要检查未读话题、查看未锁定话题列表或读取其他伙伴话题内容时，使用 {便利操作} 中的 `TopicSponsor`：\nJEV:「始」请使用 {便利操作} 中的 `TopicSponsor`，列出未锁定话题。「末」",
-    "defaultCommand": "ListUnlockedTopics",
+    "jevDescPrompt": "检查伙伴的未读话题状态。",
+    "jevPrompt": "检查未读话题时使用 CheckUnreadMessages。查询历史话题或读取历史正文请使用 TopicMemo。",
+    "agentPrompt": "查询伙伴未读状态时使用 TopicSponsor；历史列表和正文使用 TopicMemo。",
+    "defaultCommand": "CheckUnreadMessages",
     "commands": [
-      {
-        "commandIdentifier": "ListUnlockedTopics",
-        "description": "列出指定伙伴的所有未锁定话题基本信息",
-        "aliases": ["未锁定话题", "列出未锁定话题", "查看话题列表"]
-      },
       {
         "commandIdentifier": "CheckUnreadMessages",
         "description": "检查指定伙伴是否有未读话题",
         "aliases": ["未读话题", "检查未读", "查看未读消息"]
-      },
-      {
-        "commandIdentifier": "ReadTopicContent",
-        "description": "读取指定未锁定话题的完整对话记录",
-        "aliases": ["读取话题内容", "查看话题内容", "读取对话"],
-        "parameters": {
-          "topic_id": {
-            "type": "text",
-            "required": true,
-            "source": "primary",
-            "maxLength": 60,
-            "description": "待读取的未锁定话题 ID"
-          }
-        }
       }
     ]
   }

@@ -1,4 +1,26 @@
-# 同一 Work 的实体端联验
+# 隔离 Core 的 Electron 与 PWA 联验
+
+在已安装依赖并完成移动页面、Electron preload、Linux CDS 与 Vexus 构建的候选工作树中使用 Node 24、Xvfb 和 Chromium。以下两个命令在各自的终端运行。将第二条的路径替换为第一条打印的 `Isolated integration evidence` 目录下的 `core-remote`。如 Xvfb 或 Chromium 位于非标准位置，分别设置 `XVFB_BIN` 和 `CHROME_BIN`。
+
+```sh
+VCP_TEST_CORE_BROWSER=1 node tests/integration/run.cjs core-remote
+node tests/hardware/core-pwa-clients.mjs browser /path/to/vcp-integration-RUN/core-remote
+```
+
+三端联验额外使用一台已授权、已解锁、当前允许占用前台的 Android 真机。需要 Android 36 SDK、build-tools 35.0.0、JDK 和 ADB，多台设备时用 `ANDROID_SERIAL` 指定本次设备。若指定设备上已有 `dev.nativesync.qa.send`，驱动会保留该安装并退出。
+
+```sh
+VCP_TEST_CORE_BROWSER=1 VCP_TEST_CORE_PHONE=1 node tests/integration/run.cjs core-remote
+node tests/hardware/core-pwa-clients.mjs browser-phone /path/to/vcp-integration-RUN/core-remote
+```
+
+服务仅监听回环。手机使用临时 WebView，信任本次隔离服务的证书，通过 USB reverse 加载同一 PWA；电脑使用全新的 Chromium Profile，各端分别配对。Electron 收到桌面受理回执后退出。PWA 同时核对在途 Work、发送各自的续轮并读取正式消息。双 PWA 模式还逐项比较 Work 和消息 ID。模型响应来自本机合成 Provider。
+
+`pwa-proof.json` 保存实际页面观察，`evidence.json` 保存 Electron、Core、附件及重启核对结果。计算机和手机上的临时浏览器 Profile、测试 APK 和本轮创建的 ADB 转发由驱动收尾。仅在模拟器上使用 `browser-phone` 不能作为实体设备证明。
+
+## 历史 Shared 验收说明
+
+### 同一 Work 的实体端联验
 
 此入口使用真实 ToolBox、真实 VCPChat 和只在回环监听的合成 Provider。用各端独立的测试 Profile 和一次性只读手机会话。设备在线、认证和手工观察需要现场确认。
 

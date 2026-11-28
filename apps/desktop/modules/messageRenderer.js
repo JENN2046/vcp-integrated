@@ -1,3 +1,4 @@
+import { renderHostedAssistantSegments } from './renderer/hostedToolCallRendering.js';
 import { extractTopicRiverQuote, renderTopicRiverQuote } from './renderer/topicRiverQuote.mjs';
 import { sanitizeToolDataHtml } from './renderer/toolDataHtml.js';
 import { stripToolBatches, collectToolBatchRanges } from './renderer/toolBatchRegions.js';
@@ -4221,9 +4222,10 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
     const isActiveStreamRequest = message.role === 'assistant'
         && typeof streamManager.isMessageActive === 'function'
         && streamManager.isMessageActive(message.id);
-    const messageTextIsEmpty = message.content === null
+    const hostedSegments = message.role === 'assistant' && Array.isArray(message.assistantSegments) ? message.assistantSegments : null;
+    const messageTextIsEmpty = !hostedSegments && (message.content === null
         || message.content === undefined
-        || (typeof message.content === 'string' && message.content.trim() === '');
+        || (typeof message.content === 'string' && message.content.trim() === ''));
 
     if (message.isThinking || (isActiveStreamRequest && messageTextIsEmpty)) {
         contentDiv.innerHTML = `<span class="thinking-indicator">${message.content || '思考中'}<span class="thinking-indicator-dots">...</span></span>`;
@@ -4250,7 +4252,7 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
 
         if (message.role === 'user') {
             textToRender = prepareUserMessageText(textToRender);
-        } else if (message.role === 'assistant') {
+        } else if (message.role === 'assistant' && !hostedSegments) {
             textToRender = processAssistantScopedHtmlContent(textToRender, scopeId, messageItem);
         }
 
@@ -4272,17 +4274,17 @@ async function renderMessage(message, isInitialLoad = false, appendToDom = true,
         // 核心修复：将正则规则应用移出 preprocessFullContent，以避免在流式传输的块上执行
         // 这样可以确保正则表达式在完整的消息内容上运行
         const agentConfigForRegex = currentSelectedItem?.config || currentSelectedItem;
-        if (agentConfigForRegex?.stripRegexes && Array.isArray(agentConfigForRegex.stripRegexes)) {
-            textToRender = applyFrontendRegexRules(textToRender, agentConfigForRegex.stripRegexes, message.role, depth);
-        }
+        const applyDisplayRules = source => Array.isArray(agentConfigForRegex?.stripRegexes)
+            ? applyFrontendRegexRules(source, agentConfigForRegex.stripRegexes, message.role, depth) : source;
+        if (!hostedSegments) textToRender = applyDisplayRules(textToRender);
         // --- 正则规则应用结束 ---
 
-        let rawHtml = renderMarkdownToHtml(textToRender, {
-            message,
-            settings: globalSettings,
-            messageRole: message.role,
-            depth
-        });
+        const templateOptions = { message, settings: globalSettings, messageRole: message.role, depth };
+        let rawHtml = hostedSegments
+            ? renderHostedAssistantSegments(hostedSegments, source => renderMarkdownToHtml(
+                applyDisplayRules(processAssistantScopedHtmlContent(source, scopeId, messageItem)), templateOptions
+            ), messageItem.ownerDocument)
+            : renderMarkdownToHtml(textToRender, templateOptions);
 
         // 修复：清理 Markdown 解析器可能生成的损坏的 SVG viewBox 属性
         // 错误 "Unexpected end of attribute" 表明 viewBox 的值不完整, 例如 "0 "

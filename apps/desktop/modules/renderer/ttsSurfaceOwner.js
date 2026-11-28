@@ -24,12 +24,12 @@ export function createTtsSurfaceOwner({
     let playing = false;
     let currentMessageId = null;
     let sessionId = -1;
+    let stoppedSessionId = -1;
     let mounted = false;
     let disposed = false;
     let generation = 0;
     const unsubscribers = [];
     const activeWork = new Set();
-
     const setIndicator = (messageId, active) => {
         if (messageId && typeof updateSpeakingIndicator === 'function') {
             updateSpeakingIndicator(messageId, active);
@@ -38,7 +38,7 @@ export function createTtsSurfaceOwner({
 
     const stopPlayback = () => {
         generation += 1;
-        sessionId += 1;
+        stoppedSessionId = sessionId;
         queue = [];
         playing = false;
         streamDecodeTail = Promise.resolve();
@@ -169,18 +169,16 @@ export function createTtsSurfaceOwner({
             streaming = false,
             playbackRate = 1
         }) => {
-            if (disposed || incomingSession < sessionId) return;
+            if (disposed || incomingSession < sessionId || incomingSession <= stoppedSessionId) return;
             if (incomingSession > sessionId) {
                 stopPlayback();
                 sessionId = incomingSession;
             }
             if (!ensureAudioContext()) return;
-            if (streaming) {
-                scheduleStreamingChunk({ audioData, msgId, playbackRate }, generation);
-                return;
-            }
-            queue.push({ audioData, msgId, playbackRate });
-            void processQueue();
+            // 同一会话可能混发 streaming(网络SSE) 与整段(缓存命中/本地SoVITS)块；
+            // 两种都排进同一条音频时钟，避免整段块 start(0) 抢跑叠音。
+            void streaming;
+            scheduleStreamingChunk({ audioData, msgId, playbackRate }, generation);
         }));
         unsubscribers.push(subscribeStop(() => stopPlayback()));
     };

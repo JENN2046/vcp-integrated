@@ -1,0 +1,128 @@
+{
+  "baseline": "5f40589303011c83a3e9d90bbef6819f628484f3",
+  "platform": "linux-x64",
+  "node": "24.22.1",
+  "compiled": [
+    "sandbox preloads",
+    "mobile PWA",
+    "CDS",
+    "voice input engine",
+    "ProjectForge indexer",
+    "CodeSearcher",
+    "Vexus N-API addon",
+    "AdminPanel-Vue"
+  ],
+  "suites": {
+    "native": {
+      "tests": 100,
+      "pass": 99,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 1,
+      "localTranscriptSha256": "b8af92f4cfdd6b45fb2b7100ae68d0678da30cdfc088e33e6410b85104729f9c"
+    },
+    "collaboration": {
+      "tests": 14,
+      "pass": 14,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "localTranscriptSha256": "8fcf5f9d7a6fc542cebce9ebfb3766f1acdc1472a7330b4c1792d4fdb61c25ad"
+    },
+    "upstreamServer": {
+      "tests": 515,
+      "pass": 514,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 1,
+      "todo": 0,
+      "localTranscriptSha256": "f448075060469282e0cd97f4f82dbdf5016d5daae4ec782798d57fe1e24ab338"
+    },
+    "fcAndBudget": {
+      "tests": 52,
+      "pass": 52,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "localTranscriptSha256": "3dd90cc6a72b1a50b36f7e5a8f401690d636becdde85b33fe5006fff3c19102f"
+    },
+    "handoffAndMalformedRecovery": {
+      "tests": 40,
+      "pass": 40,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "localTranscriptSha256": "efcd32596429e12b334fa49dfe3ad47319849f949a28e82de751caf15c8299a7"
+    },
+    "distributedAndNativeFiles": {
+      "tests": 10,
+      "pass": 10,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "localTranscriptSha256": "8fc06523fd8ed89ac56d73b96a0475d42c117b3f4eb910bf4c692d02ac72ec7d"
+    },
+    "projectForgeMcp": {
+      "tests": 21,
+      "pass": 21,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "localTranscriptSha256": "1c728be6b308a8d7836746b5280d3c90bdc096e0d5492f4e039656511ffc33f7"
+    },
+    "voiceAdapter": {
+      "tests": 12,
+      "pass": 12,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "localTranscriptSha256": "91f640f85d1893b1261ec21afe11fd572e047d65d4f5748bbc05bc2039e31655"
+    }
+  },
+  "httpToolHandoff": {
+    "transport": "authenticated localhost HTTP /v1/chat/completions",
+    "formats": [
+      "JSON",
+      "SSE"
+    ],
+    "requestsAtProvider": 4,
+    "clientResult": 5,
+    "clientToolTerminal": "tool_calls",
+    "followupTerminal": "stop",
+    "sseDoneFramesPerResponse": 1,
+    "overBudgetJsonStatus": 400,
+    "overBudgetStreamTerminal": "vcp_incomplete",
+    "overBudgetProviderCalls": 0
+  },
+  "coreUnhandledClientTool": {
+    "formats": [
+      "JSON",
+      "SSE"
+    ],
+    "workDisposition": "review_required",
+    "newAssistantMessages": 0,
+    "dispatchedTools": 0
+  },
+  "incrementalCds": {
+    "unchangedTopicHistoryReads": 0,
+    "singleEditTopicHistoryReads": 1,
+    "singleDeletionTopicHistoryReads": 1
+  },
+  "backup": {
+    "candidateReplayedOriginalAdmission": true,
+    "restoredBaselineReopenedWithOriginalFacts": true,
+    "sqliteIntegrityChecks": [
+      "ok",
+      "ok"
+    ]
+  },
+  "upstreamSkip": "Optional read-only smoke test against an existing operator VectorStore; synthetic native star-pool verification is in server-runtime.json.",
+  "deviceEvidence": "three-clients.json"
+}

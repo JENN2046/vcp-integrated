@@ -55,12 +55,13 @@ function langOf(filePath) {
     if (isBinaryPath(filePath)) return 'binary';
     return SUPPORTED_EXT.get(path.extname(String(filePath || '')).toLowerCase()) || null;
 }
+function resolveNativePath(filePath) {
+    return path.resolve(filePath).replace(/([\\/])app\.asar(?=[\\/]|$)/, '$1app.asar.unpacked');
+}
+
 function resolveDefaultBinaryPath(platform = process.platform, arch = process.arch) {
     const name = platform === 'win32' ? 'projectforge_indexer.exe' : 'projectforge_indexer';
-    let dir = path.join(__dirname, 'bin', `${platform}-${arch}`);
-    const marker = `${path.sep}app.asar${path.sep}`;
-    if (dir.includes(marker)) dir = dir.replace(marker, `${path.sep}app.asar.unpacked${path.sep}`);
-    return path.join(dir, name);
+    return resolveNativePath(path.join(__dirname, 'bin', `${platform}-${arch}`, name));
 }
 
 class IndexerError extends Error {
@@ -290,6 +291,12 @@ class IndexerClient {
         this.cache.clear();
         const child = this.child;
         if (!child) return;
+        // 子进程已退出时 'exit' 不会再触发，直接返回避免 await exited 永久挂起。
+        if (child.exitCode !== null || child.signalCode !== null) {
+            this.child = null;
+            try { child.stdin.end(); } catch (_e) { /* ignore */ }
+            return;
+        }
         const exited = new Promise(resolve => child.once('exit', resolve));
         try { child.stdin.write(`${JSON.stringify({ id: 0, method: 'shutdown' })}\n`); child.stdin.end(); } catch (_e) { /* ignore */ }
         const timer = setTimeout(() => { try { child.kill(); } catch (_e) { /* ignore */ } }, 2000);
@@ -299,4 +306,4 @@ class IndexerClient {
     }
 }
 
-module.exports = { IndexerClient, IndexerError, langOf, resolveDefaultBinaryPath, PROTOCOL_VERSION };
+module.exports = { IndexerClient, IndexerError, langOf, resolveDefaultBinaryPath, resolveNativePath, PROTOCOL_VERSION };

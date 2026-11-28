@@ -37,26 +37,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const agents = {};
             const groups = {};
 
-            // If combinedItemOrder doesn't exist, build it from existing directories
-            let combinedItemOrder = settings.combinedItemOrder;
-            if (!combinedItemOrder || !Array.isArray(combinedItemOrder)) {
-                combinedItemOrder = [];
-
-                // Scan Agents directory
-                const agentDirs = await window.api.listDir(`${AppDataPath}Agents`);
-                if (agentDirs && Array.isArray(agentDirs)) {
-                    for (const agentId of agentDirs) {
-                        combinedItemOrder.push({ type: 'agent', id: agentId });
-                    }
-                }
-
-                // Scan AgentGroups directory
-                const groupDirs = await window.api.listDir(`${AppDataPath}AgentGroups`);
-                if (groupDirs && Array.isArray(groupDirs)) {
-                    for (const groupId of groupDirs) {
-                        combinedItemOrder.push({ type: 'group', id: groupId });
-                    }
-                }
+            // 与主程序侧栏一致：combinedItemOrder 只记录用户拖动过的顺序，
+            // 新装或新建后未拖动的 Agent/群组不在其中，仍要从目录补全
+            const savedOrder = Array.isArray(settings.combinedItemOrder) ? settings.combinedItemOrder : [];
+            const scannedItems = [];
+            for (const [type, dir] of [['agent', 'Agents'], ['group', 'AgentGroups']]) {
+                const ids = await window.api.listDir(`${AppDataPath}${dir}`);
+                if (Array.isArray(ids)) ids.forEach(id => scannedItems.push({ type, id }));
+            }
+            const scannedKeys = new Set(scannedItems.map(item => `${item.type}_${item.id}`));
+            const placedKeys = new Set();
+            const combinedItemOrder = [];
+            for (const item of [...savedOrder, ...scannedItems]) {
+                const key = `${item?.type}_${item?.id}`;
+                if (!scannedKeys.has(key) || placedKeys.has(key)) continue;
+                placedKeys.add(key);
+                combinedItemOrder.push({ type: item.type, id: item.id });
             }
 
             for (const item of combinedItemOrder) {
@@ -84,7 +80,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Update settings with the combinedItemOrder if it was constructed
+            // 从未拖动过时，主程序按名称排列
+            if (savedOrder.length === 0) {
+                const nameOf = item => (item.type === 'agent' ? agents[item.id] : groups[item.id])?.name || '';
+                combinedItemOrder.sort((a, b) => nameOf(a).localeCompare(nameOf(b), 'zh-Hans-CN'));
+            }
+            // 仅用于本窗口显示，不写回 settings.json
             settings.combinedItemOrder = combinedItemOrder;
 
             allSettings = settings;
@@ -138,11 +139,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 groupsListEl.appendChild(listItem);
             }
             
-            listItem.addEventListener('click', () => handleSidebarClick(itemData));
+            listItem.addEventListener('click', () => handleSidebarClick(itemData, item.type));
         });
     }
 
-    function handleSidebarClick(itemData) {
+    function handleSidebarClick(itemData, itemType) {
         switchTab('chat-history');
         chatHistoryEl.innerHTML = '';
         jsonEditorEl.innerHTML = '';
@@ -154,23 +155,88 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // topics 数组的顺序就是主程序侧栏的顺序（新话题在前，拖动后保存），照原样显示。
+        // 话题很多时在主程序侧栏里拖动不便，这里可以在当前视图中拖动或置顶/置底。
+        const toolbar = document.createElement('div');
+        toolbar.classList.add('topic-order-toolbar');
+        const status = document.createElement('span');
+        status.classList.add('topic-order-status');
+        status.textContent = 'Drag topics or use Top / Bottom to reorder this view.';
+        const makeButton = (label, className) => {
+            const button = document.createElement('button');
+            button.textContent = label;
+            button.className = className;
+            return button;
+        };
+        const revertButton = makeButton('Reset View', 'action-button topic-order-revert');
+        toolbar.append(status, revertButton);
+
         const topicsList = document.createElement('ul');
         topicsList.classList.add('topics-list');
-        
-        // Sort topics by createdAt timestamp, newest first
-        const sortedTopics = [...itemData.topics].sort((a, b) => b.createdAt - a.createdAt);
 
-        sortedTopics.forEach(topic => {
-            const topicItem = document.createElement('li');
-            topicItem.textContent = `${topic.name} (${topic.id})`;
-            topicItem.addEventListener('click', (e) => {
-                e.stopPropagation();
-                loadChatHistory(itemData.id, topic.id);
+        const topicById = new Map(itemData.topics.map(topic => [topic.id, topic]));
+        const savedOrder = itemData.topics.map(topic => topic.id);
+        let order = [...savedOrder];
+        let draggedId = null;
+
+        const moveTopic = (id, toIndex) => {
+            const from = order.indexOf(id);
+            if (from === -1) return;
+            order.splice(from, 1);
+            order.splice(Math.max(0, Math.min(toIndex, order.length)), 0, id);
+            renderTopics();
+        };
+
+        function renderTopics() {
+            topicsList.innerHTML = '';
+            order.forEach(id => {
+                const topic = topicById.get(id);
+                const topicItem = document.createElement('li');
+                topicItem.dataset.topicId = id;
+                topicItem.draggable = true;
+                const label = document.createElement('span');
+                label.classList.add('topic-label');
+                label.textContent = `${topic.name} (${topic.id})`;
+                const topButton = makeButton('Top', 'topic-move-button topic-move-top');
+                const bottomButton = makeButton('Bottom', 'topic-move-button topic-move-bottom');
+                topButton.addEventListener('click', e => { e.stopPropagation(); moveTopic(id, 0); });
+                bottomButton.addEventListener('click', e => { e.stopPropagation(); moveTopic(id, order.length); });
+                topicItem.append(label, topButton, bottomButton);
+                topicItem.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    loadChatHistory(itemData.id, topic.id);
+                });
+                topicItem.addEventListener('dragstart', e => {
+                    draggedId = id;
+                    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+                });
+                topicItem.addEventListener('dragover', e => {
+                    if (draggedId && draggedId !== id) e.preventDefault();
+                });
+                topicItem.addEventListener('drop', e => {
+                    e.preventDefault();
+                    if (!draggedId || draggedId === id) return;
+                    const rect = topicItem.getBoundingClientRect();
+                    const after = e.clientY > rect.top + rect.height / 2;
+                    const source = draggedId;
+                    draggedId = null;
+                    order.splice(order.indexOf(source), 1);
+                    order.splice(order.indexOf(id) + (after ? 1 : 0), 0, source);
+                    renderTopics();
+                });
+                topicItem.addEventListener('dragend', () => { draggedId = null; });
+                topicsList.appendChild(topicItem);
             });
-            topicsList.appendChild(topicItem);
-        });
+            const changed = order.some((id, index) => id !== savedOrder[index]);
+            revertButton.disabled = !changed;
+        }
 
-        chatHistoryEl.appendChild(topicsList);
+        revertButton.addEventListener('click', () => {
+            order = [...savedOrder];
+            renderTopics();
+        });
+        renderTopics();
+        chatHistoryEl.append(toolbar, topicsList);
     }
 
     async function loadChatHistory(itemId, topicId) {

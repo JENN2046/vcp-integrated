@@ -126,9 +126,21 @@ async function click(client, selector, name) {
 const { createHash } = require('node:crypto');
 const picture = (client, file) => client.command('picture', path.join(out, file+'.png'));
 const sha = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+function checkoutIdentity() {
+    const git = args => execFileSync('git', args, { cwd: candidate, encoding: 'utf8' });
+    const commit = git(['rev-parse', 'HEAD']).trim();
+    const inputs = ['apps', 'packages', 'scripts', 'tests'];
+    return {
+        commit,
+        inputTrees: Object.fromEntries(inputs.map(dir => [dir, git(['rev-parse', commit + ':' + dir]).trim()])),
+        inputChanges: git(['status', '--porcelain=v1', '--untracked-files=all', '--', ...inputs]).split('\n').filter(Boolean),
+    };
+}
+
 async function runCase(root, mode) {
     out = path.join(root, mode);
     fs.mkdirSync(out, { mode: 0o700 });
+    const checkoutAtStart = checkoutIdentity();
     const coreRemote = mode === 'core-remote';
     const nativeDesktop = mode === 'desktop-stream-close' ? require('../desktop-stream-close/fixture.cjs').create() : null;
     cert = path.join(out, 'loopback-cert.pem');
@@ -164,6 +176,23 @@ async function runCase(root, mode) {
         }, role+' C1 CDS', 9000);
         assert.equal(cds.sha256, sha(path.join(host, 'modules/services/chatDataService/bin/linux-x64/vcp_chat_data_service')));
         result[role]={electron:desktopRequire('electron/package.json').version,sandbox:true,cds,profileDigest:createHash('sha256').update(profiles[profileRole]).digest('hex')};
+        if (coreRemote) {
+            const files = await client.command('loaded-sources', {
+                main: ['apps/desktop/main.js', 'apps/desktop/modules/services/localCoreRuntime.js'],
+                renderer: ['apps/desktop/renderer.js', 'apps/desktop/modules/messageRenderer.js'],
+            });
+            assert.deepEqual(files.main.map(row => row.file).sort(), [
+                'apps/desktop/main.js', 'apps/desktop/modules/services/localCoreRuntime.js'
+            ]);
+            assert.deepEqual(files.renderer.map(row => row.file).sort(), [
+                'apps/desktop/modules/messageRenderer.js', 'apps/desktop/renderer.js'
+            ]);
+            assert(files.preloadArtifact.matchedDebuggerSource, 'chat preload source parsed by Electron');
+            for (const row of [...files.main, ...files.renderer, files.preloadArtifact]) {
+                assert.equal(row.sha256, sha(path.join(candidate, row.file)), row.file);
+            }
+            (result.desktopLoads ||= []).push({ role, ...files });
+        }
         await client.command('trace');
         return client;
     };
@@ -246,6 +275,7 @@ async function runCase(root, mode) {
                 assert.equal(result.provider.filter(call => call.case === 'fixtureError').length, 0);
             } catch (error) { result.failures.push(error.stack); }
         }
+        result.checkout = { atStart: checkoutAtStart, atEnd: checkoutIdentity() };
         fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify(result,null,2)+'\n');
         for (const name of ['runtime-box','node_modules']) fs.rmSync(path.join(out, name), { recursive: true, force: true });
         assert.deepEqual(result.failures,[]);

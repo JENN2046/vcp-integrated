@@ -24,9 +24,14 @@ test('authorized Core memory reads project inserts, edits and deletes into the n
         core.store.insertMessage({ id: 'bridge_after', key: topic.key, role: 'user', content: '明天继续记录' });
     });
     const search = (query, options = {}) => mobile.call(route + '/memories', { query, windowBefore: 1, windowAfter: 1, ...options });
+    const sibling = await f.define({ topicId: 'sibling', config: { name: 'Fixture Agent', model: 'synthetic', systemPrompt: 'Isolated input' } });
+    const histories = t.mock.method(core.store, 'cdsHistory');
     const first = await search('{红外光谱|长江大桥:2},[晚霞]');
     assert.deepEqual(first.windows[0].messages.map(message => message.msgId), ['bridge_before', 'bridge_target', 'bridge_after']);
+    assert.deepEqual(histories.mock.calls.map(call => call.arguments[0]).sort(), [key, sibling.key].sort());
+    histories.mock.resetCalls();
     assert.equal((await search('红外光谱', { excludeCurrentTopic: true })).windows.length, 0);
+    assert.equal(histories.mock.callCount(), 0);
     await mobile.call(route.replace('/personal/', '/foreign/') + '/memories', { query: '红外光谱' }, 403);
 
     const { createCoreMemory } = require(CHAT + '/modules/services/nativeSync/coreMemory');
@@ -36,6 +41,9 @@ test('authorized Core memory reads project inserts, edits and deletes into the n
     memo.initialize({ services: { coreMemory: adapter } });
     const input = { maid: 'Fixture Agent', command: 'GetTopicContent', topic_id: key };
     assert.match(await memo.processToolCall(input), /红外光谱/);
+    assert.match(await memo.processToolCall({ ...input, command: 'ListTopics' }), new RegExp(key));
+    assert.match(await memo.processToolCall({ ...input, command: 'OutlineTopic' }), /红外光谱/);
+    assert.match(await memo.processToolCall({ ...input, command: 'SearchTopic', query: '红外光谱' }), /红外光谱/);
     const deep = require(CHAT + '/VCPDistributedServer/Plugin/DeepMemo/DeepMemoService');
     deep.initialize({ config: { DeepMemoExcludeCurrentTopic: false }, services: { coreMemory: adapter } });
     const context = { vcpContext: { agentId: descriptor.itemId, topicId: descriptor.topicId } };
@@ -60,11 +68,15 @@ test('authorized Core memory reads project inserts, edits and deletes into the n
     const mapping = desktop.runtime.coreSingle.mapping(descriptor);
     const messageRoute = desktop.runtime.coreSingle.route(mapping, 'messages/bridge_target');
     await desktop.runtime.send(messageRoute, { body: { requestId: 'cds-edit-target', revision: 1, text: '修改为自然语言处理' } });
+    histories.mock.resetCalls();
     assert.equal((await search('红外光谱')).windows.length, 0);
+    assert.deepEqual(histories.mock.calls.map(call => call.arguments[0]), [key]);
     assert.equal((await search('自然语言处理')).windows.length, 1);
     assert.match(await memo.processToolCall(input), /自然语言处理/);
     await desktop.runtime.send(messageRoute, { body: { requestId: 'cds-remove-target', revision: 2, remove: true } });
+    histories.mock.resetCalls();
     assert.equal((await search('自然语言处理')).windows.length, 0);
+    assert.deepEqual(histories.mock.calls.map(call => call.arguments[0]), [key]);
     assert.doesNotMatch(await memo.processToolCall(input), /自然语言处理/);
     const filename = path.join(desktop.data, 'UserData', descriptor.itemId,
         'topics', descriptor.topicId, 'history.json');

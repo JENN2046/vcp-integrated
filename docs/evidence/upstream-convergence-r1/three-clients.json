@@ -1,0 +1,162 @@
+{
+  "date": "2026-11-28",
+  "integrationBase": "5f40589303011c83a3e9d90bbef6819f628484f3",
+  "components": [
+    "Linux Electron",
+    "Linux Chromium PWA",
+    "Redmi Android WebView PWA"
+  ],
+  "provider": "synthetic local HTTP endpoint, real ToolBox and isolated Core",
+  "procedure": "tests/hardware/core-pwa-clients.mjs browser-phone with VCP_TEST_CORE_BROWSER=1 and VCP_TEST_CORE_PHONE=1",
+  "electronVersion": "44.9.3",
+  "electronSandbox": true,
+  "origin": "https://127.0.0.1:28765",
+  "topic": "local_7e3237f6bf0bebe37b5fe449cff5f3cd4e5bdeff537f670ecebef85e2d761743",
+  "workObservedRunningAfterElectronExit": "86d2612c-5792-45af-b61a-b5dcc00593d2",
+  "observers": [
+    {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36",
+      "secureContext": true,
+      "runningWorkIds": [
+        "86d2612c-5792-45af-b61a-b5dcc00593d2"
+      ]
+    },
+    {
+      "userAgent": "Mozilla/5.0 (Linux; Android 16; 2602BRT18C Build/BP2A.250605.031.A3; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/157.0.8103.50 Mobile Safari/537.36",
+      "secureContext": true,
+      "runningWorkIds": [
+        "86d2612c-5792-45af-b61a-b5dcc00593d2"
+      ]
+    }
+  ],
+  "finalWorksInBothPwas": [
+    {
+      "id": "9dd65c66-f909-4279-b7ca-fb757d885d6a",
+      "status": "completed"
+    },
+    {
+      "id": "36412341-6704-4065-a3a9-0dd2d0f6ed64",
+      "status": "completed"
+    },
+    {
+      "id": "86d2612c-5792-45af-b61a-b5dcc00593d2",
+      "status": "completed"
+    }
+  ],
+  "formalMessageIdsInBothPwas": [
+    "39d2e644-9183-4e7a-8cd8-edc5be3e4e7a",
+    "reply_86d2612c-5792-45af-b61a-b5dcc00593d2",
+    "3640b6ae-766d-4a93-9580-d1fccde3da3d",
+    "reply_36412341-6704-4065-a3a9-0dd2d0f6ed64",
+    "dcfb5e46-cd54-429f-98b4-a19f2542e681",
+    "reply_9dd65c66-f909-4279-b7ca-fb757d885d6a"
+  ],
+  "distinctSubmitters": 3,
+  "core": {
+    "provider": "synthetic",
+    "physicalAndroid": true,
+    "browserPwa": true,
+    "desktopExitedDuringWork": true,
+    "mobileContinuation": true,
+    "mobileSseTerminal": true,
+    "deviceRevocation": true,
+    "attachmentHash": "01f4236cd231e3935c2f3780c2288f532da550eda7333454b05402fde0d0102b",
+    "formalMessages": 6,
+    "authenticatedDesktopColdReadback": true,
+    "rendererReloadReadback": true,
+    "historyAndAttachmentUnchangedAfterRestart": true,
+    "unauthenticatedRejected": true,
+    "readOnlyMutationRejected": true,
+    "definitionTombstoneAndReplay": true,
+    "restart": {
+      "code": 0,
+      "signal": null
+    },
+    "nativeSyncLoaded": false
+  },
+  "exits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "loadedBackendSourceHashes": [
+    {
+      "file": "apps/server/core/host.js",
+      "sha256": "ea0729192c6a7096c468bad859176a3d37a4a991d88168b2a9fc4dc6939cb358"
+    },
+    {
+      "file": "apps/server/core/localWorkspace.js",
+      "sha256": "baa71c86f308cabcd59aae96a57a6b38846c2b5487d54fc3d7ea4836b6ef740e"
+    },
+    {
+      "file": "apps/server/core/service.js",
+      "sha256": "36339beaa91a9a8f2235b8139427be089ed3e36976ea0b2611afc11f2e9dc95a"
+    },
+    {
+      "file": "apps/server/core/runner.js",
+      "sha256": "765fe05dd428b656770461b918d5592f9d13b0799b17f5d62c0f552ed465bbac"
+    },
+    {
+      "file": "apps/server/core/store.js",
+      "sha256": "03018577afaef8a734071721cc3bd7fdeea987c885dc889974ff9618e096d405"
+    },
+    {
+      "file": "apps/server/server.js",
+      "sha256": "934f418c4994c31331f9cf7121b240c792b2161f58a2265a745da2c75aba74a1"
+    },
+    {
+      "file": "apps/server/Plugin.js",
+      "sha256": "c2d1f8c0108c0791b7884e87c1d8108a5aa063e29eb85a3d9be8473d192c1635"
+    },
+    {
+      "file": "apps/server/WebSocketServer.js",
+      "sha256": "e42201275ded01de2281aad241b1f1fc45c52d7b4502e3d2743582d6d5ad1f83"
+    },
+    {
+      "file": "apps/server/modules/requestExecutionContext.js",
+      "sha256": "7e0c0a3f62b0ec18ede9c8a8db7e32efc83d2549d5ea21a45c2c9223b575c2d9"
+    },
+    {
+      "file": "apps/server/modules/chatCompletionHandler.js",
+      "sha256": "6af1731e40201a9baa498e90d3c3b1415aa2a9b930d5c5a4961ebdffa98da544"
+    },
+    {
+      "file": "apps/server/Plugin/NativeSync/mobile/effectiveContext.js",
+      "sha256": "537a2c00f7c6400324bb9f4a0ddfac09eb79c862b751b9803846342e9b0f704b"
+    },
+    {
+      "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+      "sha256": "6629a7b07f4004b0a9f3b645f58ef4efc5d50177079bdad261519c474a238aca"
+    },
+    {
+      "file": "apps/server/modules/handlers/streamHandler.js",
+      "sha256": "27639f801061bcb09cdcdbbdf7d4ce89ba9994da412943329f77ad2b470fec8b"
+    },
+    {
+      "file": "apps/server/modules/handlers/nonStreamHandler.js",
+      "sha256": "02cb978df9a2ee8f289199040c6a9b77d616fee9825ce5fc0e72b549137d0229"
+    },
+    {
+      "file": "apps/server/modules/pluginBridgeRegistry.js",
+      "sha256": "56e5ca1e84e717325d94b9930c9f8f02a051835ce647e8ca6da333cfa8bf75d0"
+    },
+    {
+      "file": "apps/server/modules/toolCallRecordStore.js",
+      "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+    }
+  ],
+  "deviceCleanup": {
+    "testPackageAbsent": true,
+    "adbForwardCount": 0,
+    "adbReverseCount": 0
+  }
+}

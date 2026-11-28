@@ -1,0 +1,86 @@
+{
+  "date": "2026-11-28",
+  "upstreamToolBox": "699ed4b3a0c0b08124cb8f8cf14f7e154f00af24",
+  "targetedSuites": [
+    {
+      "files": [
+        "preprocessingAbortAndReplayGuard",
+        "tavernInteractionCompletion",
+        "dynamicFoldFallback",
+        "imageFileServerShutdown"
+      ],
+      "scope": "candidate server in isolated test directory; includes host listener SIGINT / SIGTERM shutdown, synthetic preprocessor inputs and controlled filesystem for Tavern settlement",
+      "tests": 35,
+      "passed": 35,
+      "transcriptSha256": "e6f6660934cb0b212bb384c1443b972488a297ec18222b13ecd50cf905687047"
+    },
+    {
+      "files": [
+        "imageFileServerShutdown"
+      ],
+      "scope": "independent native VTrade Store and four cjs dependencies from fixed ToolBox tree, newly created temporary data directory; real lock acquisition, SIGINT/SIGTERM cleanup, reopening the store and port",
+      "tests": 4,
+      "passed": 4,
+      "externalSourceGitBlobs": {
+        "Plugin/VTrade/core/store.cjs": "d4280c58b4f4ba54f6f2ba37130b2edc8e1aeaf5",
+        "Plugin/VTrade/core/engine.cjs": "3d40da02b175020fddc8a470fec2a100a88800d9",
+        "Plugin/VTrade/core/slots.cjs": "89284ce90a09a5375cb7dc27660cc8ec8b953fed",
+        "Plugin/VTrade/core/builtins.cjs": "45e697b59535246def33abde5944b81e809b8aec",
+        "Plugin/VTrade/core/data.cjs": "f032935a9e56a15fd82929a0ac70c6219300928f"
+      },
+      "transcriptSha256": "55774bf9f38103bca3d1c448a238d8ee5c11192a629eef5eff6a1616a03266b8"
+    },
+    {
+      "files": [
+        "kbmAuditRegression",
+        "kbmVectorRepairBackoff",
+        "adminRagMaintenanceRoutes",
+        "toolExecutorErrorResult",
+        "gptImageGenBaseUrl",
+        "pluginPublicUrl",
+        "bilibiliShortUrl"
+      ],
+      "tests": 31,
+      "passed": 31,
+      "transcriptSha256": "c02cbd4d19c4ec181142a8498edddb0a1a14764be0242aa839bb55ea5289d26c"
+    },
+    {
+      "files": [
+        "test_bilibili_content_selection",
+        "test_bilibili_video_info",
+        "test_bilibili_danmaku"
+      ],
+      "tests": 18,
+      "passed": 18,
+      "transcriptSha256": "39c8308cee59d71afc9cac40ff09b10f48236b61b2ff68a7069dc2b77ee16618"
+    }
+  ],
+  "electronReload": {
+    "scenario": "Frozen three-client candidate. Electron B cold read and same-window renderer reload after backend restart, verified cross-device messages and no additional provider call.",
+    "electron": "44.9.3",
+    "rendererReloadReadback": true,
+    "providerCalls": 3,
+    "failures": [],
+    "exits": {
+      "A": {
+        "code": 0,
+        "signal": null
+      },
+      "B": {
+        "code": 0,
+        "signal": null
+      },
+      "backend": {
+        "code": 0,
+        "signal": null
+      }
+    },
+    "transcriptSha256": "a7550302e772067d008dafc645473c8b1e8a8d975df448d097ac379957d21d5d"
+  },
+  "threeClientRawReceiptHashes": {
+    "evidence.json": "a7550302e772067d008dafc645473c8b1e8a8d975df448d097ac379957d21d5d",
+    "pwa-proof.json": "aafb1159403e5ac295ed68286f0b784973ab96a87feeae9bc980391eb92073ad"
+  },
+  "threeClientEvidence": "three-clients.json",
+  "threeClientEvidenceSha256": "22bb680c94480460bef614e7e5ae4be21c04ba281d438a3e945966f97539719f"
+}

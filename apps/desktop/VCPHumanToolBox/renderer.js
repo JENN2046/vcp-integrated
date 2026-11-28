@@ -84,9 +84,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (settings.vcpServerUrl) {
             try {
-                const url = new URL(settings.vcpServerUrl);
-                url.pathname = '/v1/human/tool';
-                VCP_SERVER_URL = url.toString();
+                VCP_SERVER_URL = globalThis.vcpServerRoutes.vcpServerEndpoint(settings.vcpServerUrl, 'humanTool');
             } catch (e) {
                 console.error("Invalid vcpServerUrl in settings:", settings.vcpServerUrl);
             }
@@ -333,6 +331,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     function restoreFormState(toolName) {
         const state = formStateCache.get(toolName);
         if (!state) return;
+        // 先恢复操作并重建参数，避免下拉框已恢复为 A/B，但仍使用 query 的表单。
+        const commandSelect = toolForm.querySelector('#command-select');
+        if (commandSelect && state.command !== undefined && commandSelect.value !== state.command) {
+            commandSelect.value = state.command;
+            commandSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
         const inputs = toolForm.querySelectorAll('input, textarea, select');
         inputs.forEach(el => {
             if (!el.name) return;
@@ -556,7 +560,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.name = param.name;
-            checkbox.checked = param.default || false;
+            checkbox.checked = param.default === true || param.default === 'true';
+            checkbox.defaultChecked = checkbox.checked;
             
             const checkboxText = document.createElement('span');
             checkboxText.textContent = param.description || param.name;
@@ -620,11 +625,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (param.name === 'maid' && !input.value) input.value = USER_NAME;
             }
             if (param.required) input.required = true;
-        } else if (param.type !== 'checkbox_group') {
-            const hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.name = param.name;
-            paramGroup.appendChild(hiddenInput);}
+        }
 
         paramGroup.appendChild(label);
         paramGroup.appendChild(input);
@@ -818,7 +819,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 { role: 'user', content: text }
             ];
             
-            const chatUrl = VCP_SERVER_URL.replace('/v1/human/tool', '/v1/chat/completions');
+            const chatUrl = globalThis.vcpServerRoutes.vcpChatUrl(settings.vcpServerUrl);
             const response = await fetch(chatUrl, {
                 method: 'POST',
                 headers: {
@@ -1023,6 +1024,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
+        // FormData 不包含未勾选项；必须显式提交 false，不能让后端回退到默认开启。
+        // 直接读取复选框，不按名称查找，避免同名字段遮蔽真实控件。
+        toolForm.querySelectorAll('input[type="checkbox"]:not([data-checkbox-group])').forEach(input => {
+            if (input.name && !input.disabled) args[input.name] = input.checked;
+        });
+
         const requiresExplicitScope = toolName === 'LightMemo'
             && args.command === 'memory_ab';
 
@@ -1075,8 +1082,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 url: VCP_SERVER_URL,
                 apiKey: VCP_API_KEY,
                 toolName: finalToolName,
-                userName: USER_NAME,
-                args: args
+                args
             });
 
             clearInterval(timerInterval);

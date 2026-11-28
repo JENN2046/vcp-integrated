@@ -14,6 +14,7 @@ dayjs.extend(timezone);
 const DEFAULT_TIMEZONE = process.env.DEFAULT_TIMEZONE || 'Asia/Shanghai';
 const fs = require('fs').promises; // fs.promises for async operations
 const path = require('path');
+const { taskPath, writeJson, createCallbackHandler } = require('./modules/asyncResultStore');
 const { Writable } = require('stream');
 const fsSync = require('fs'); // Renamed to fsSync for clarity with fs.promises
 
@@ -137,7 +138,7 @@ const TEMP_BLOCK_DURATION = 30 * 60 * 1000; // 封禁30分钟（错误凭据触�
 const NO_CREDENTIAL_BLOCK_DURATION = 15 * 60 * 1000; // 封禁15分钟（无凭据DDoS触发）
 
 const ChatCompletionHandler = require('./modules/chatCompletionHandler.js');
-const ToolCallParser = require('./modules/vcpLoop/toolCallParser.js');
+const { normalizeHumanToolRequest } = require('./modules/humanToolRequest.js');
 
 const activeRequests = new Map(); // 新增：用于存储活动中的请求，以便中止
 
@@ -249,7 +250,7 @@ function destroyIdleSockets() {
     console.log(`[Server] Destroyed ${destroyedCount} idle socket(s).`);
 }
 
-async function closeHttpServerGracefully() {
+async function closeHttpServerGracefully(maxWaitMs = 5000) {
     if (!server || typeof server.close !== 'function') {
         return;
     }
@@ -259,6 +260,19 @@ async function closeHttpServerGracefully() {
     destroyIdleSockets();
 
     await new Promise((resolve) => {
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve();
+        };
+        const timer = setTimeout(() => {
+            console.warn(`[Server] server.close() still waiting on ${activeHttpRequests.size} active HTTP socket(s) after ${maxWaitMs}ms; proceeding to request drain/abort phase.`);
+            finish();
+        }, maxWaitMs);
+        if (typeof timer.unref === 'function') timer.unref();
+
         try {
             server.close((error) => {
                 if (error) {
@@ -266,11 +280,11 @@ async function closeHttpServerGracefully() {
                 } else {
                     console.log('[Server] HTTP server stopped accepting new connections.');
                 }
-                resolve();
+                finish();
             });
         } catch (error) {
             console.error('[Server] Failed to invoke server.close():', error);
-            resolve();
+            finish();
         }
     });
 }
@@ -350,15 +364,63 @@ async function abortAllActiveRequests(reason = '服务器正在关闭') {
     }
 }
 
-// 新增：定时清理 activeRequests 防止内存泄漏
+// 活跃请求（流式与非流式多轮工具循环共用）超时配置：
+// ActiveRequestIdleTimeoutMs：无推进空闲超时（默认 30 分钟；上游流输出或工具循环推进时自动续期）
+// ActiveRequestMaxLifetimeMs：单请求跨所有循环轮次的总寿命硬上限（默认 120 分钟；防止异常循环无限驻留）
+const ACTIVE_REQUEST_IDLE_TIMEOUT_MS = Math.max(
+    60 * 1000,
+    parseInt(process.env.ActiveRequestIdleTimeoutMs, 10) || 30 * 60 * 1000
+);
+const ACTIVE_REQUEST_MAX_LIFETIME_MS = Math.max(
+    ACTIVE_REQUEST_IDLE_TIMEOUT_MS,
+    parseInt(process.env.ActiveRequestMaxLifetimeMs, 10) || 120 * 60 * 1000
+);
+
+// 定时清理 activeRequests 防止内存泄漏，同时兼顾长耗时多轮工具活跃续期与总寿命硬上限
 setInterval(() => {
     const now = Date.now();
     for (const [id, context] of activeRequests.entries()) {
-        // 30分钟超时
-        if (now - (context.timestamp || 0) > 30 * 60 * 1000) {
-            console.log(`[Request Cleanup] Aborting and removing timed-out request: ${id}`);
-            if (context.abortController) {
+        const createdAt = context.timestamp || now;
+        const lastActivityAt = context.lastActivityAt || createdAt;
+        const totalElapsedMs = now - createdAt;
+        const idleElapsedMs = now - lastActivityAt;
+        const isMaxLifetimeExceeded = totalElapsedMs > ACTIVE_REQUEST_MAX_LIFETIME_MS;
+        const isIdleTimedOut = idleElapsedMs > ACTIVE_REQUEST_IDLE_TIMEOUT_MS;
+
+        if (isMaxLifetimeExceeded || isIdleTimedOut) {
+            const reason = isMaxLifetimeExceeded
+                ? `request_max_lifetime_timeout (${Math.round(totalElapsedMs / 60000)}min > ${Math.round(ACTIVE_REQUEST_MAX_LIFETIME_MS / 60000)}min)`
+                : `request_idle_timeout (idle ${Math.round(idleElapsedMs / 60000)}min > ${Math.round(ACTIVE_REQUEST_IDLE_TIMEOUT_MS / 60000)}min)`;
+            console.log(`[Request Cleanup] Aborting and removing timed-out request: ${id} [${reason}]`);
+            context.aborted = true;
+            context.abortReason = reason;
+            if (context.abortController && !context.abortController.signal.aborted) {
                 context.abortController.abort();
+            }
+            if (context.res && !context.res.writableEnded && !context.res.destroyed) {
+                try {
+                    if (context.res.headersSent && String(context.res.getHeader('Content-Type') || '').includes('text/event-stream')) {
+                        const timeoutNotice = isMaxLifetimeExceeded
+                            ? `\n\n> [!WARNING]\n> **请求总时长已达硬上限 (${Math.round(ACTIVE_REQUEST_MAX_LIFETIME_MS / 60000)} 分钟)，流已安全中止**。\n`
+                            : `\n\n> [!WARNING]\n> **请求连续空闲超过 ${Math.round(ACTIVE_REQUEST_IDLE_TIMEOUT_MS / 60000)} 分钟无推进，流已安全中止**。\n`;
+                        context.res.write(`data: ${JSON.stringify({
+                            id: `chatcmpl-VCP-request-timeout-${now}`,
+                            object: 'chat.completion.chunk',
+                            created: Math.floor(now / 1000),
+                            model: context.req?.body?.model || 'unknown',
+                            choices: [{ index: 0, delta: { content: timeoutNotice }, finish_reason: 'stop' }]
+                        })}\n\n`);
+                        context.res.write('data: [DONE]\n\n');
+                        context.res.end();
+                    } else if (!context.res.headersSent) {
+                        context.res.status(504).json({
+                            error: 'Gateway Timeout',
+                            message: `Request timed out: ${reason}`
+                        });
+                    }
+                } catch {
+                    try { context.res.destroy(); } catch { /* ignore */ }
+                }
             }
             activeRequests.delete(id);
         }
@@ -864,6 +926,14 @@ app.use('/AdminPanel', (req, res) => {
 // Image server logic is now handled by the ImageServer plugin.
 
 
+// The scoped read credential terminates at this route; leave the global API guard unchanged.
+require('./routes/memorySearch').mountMemorySearch(app, {
+    grants: process.env.MEMORY_READ_GRANTS,
+    ranking: process.env.MEMORY_SEARCH_RANKING,
+    serverKey,
+    getBridge: () => pluginManager.messagePreprocessors.get('RAGDiaryPlugin')?.getContextBridge()
+});
+
 // General API authentication (Bearer token) - This was the original one, now adminAuth handles its paths
 app.use((req, res, next) => {
     // Skip bearer token check for admin panel API and static files, as they use basic auth or no auth
@@ -882,13 +952,11 @@ app.use((req, res, next) => {
         return next();
     }
 
-    // Skip bearer token check for plugin callbacks
-    if (req.path.startsWith('/plugin-callback')) {
-        return next();
-    }
+    // ChannelHub authenticates its own event ingress. Ordinary async callbacks use the host key.
+    if (req.method === 'POST' && /^\/plugin-callback\/ChannelHub\/events\/?$/i.test(req.path)) return next();
 
     const authHeader = req.headers.authorization;
-    if (!authHeader || authHeader !== `Bearer ${serverKey}`) {
+    if (!serverKey || !authHeader || authHeader !== `Bearer ${serverKey}`) {
         return res.status(401).json({ error: 'Unauthorized (Bearer token required)' });
     }
     next();
@@ -962,7 +1030,7 @@ app.post('/v1/schedule_task', async (req, res) => {
         // 确保目录存在
         await fs.mkdir(VCP_TIMED_CONTACTS_DIR, { recursive: true });
 
-        const taskFilePath = path.join(VCP_TIMED_CONTACTS_DIR, `${task_id}.json`);
+        const taskFilePath = taskPath(VCP_TIMED_CONTACTS_DIR, task_id);
 
         const scheduledTimeWithOffset = formatToLocalDateTimeWithOffset(targetDate);
 
@@ -973,7 +1041,7 @@ app.post('/v1/schedule_task', async (req, res) => {
             requestor: `Plugin: ${tool_call.tool_name}`,
         };
 
-        await fs.writeFile(taskFilePath, JSON.stringify(taskData, null, 2));
+        await writeJson(VCP_TIMED_CONTACTS_DIR, taskFilePath, taskData);
         if (DEBUG_MODE) console.log(`[Server] 已通过API创建新的定时任务文件: ${taskFilePath}`);
 
         // 返回成功的响应，插件可以基于此生成最终的用户回执
@@ -988,7 +1056,7 @@ app.post('/v1/schedule_task', async (req, res) => {
 
     } catch (error) {
         console.error(`[Server] 通过API创建定时任务文件时出错:`, error);
-        res.status(500).json({ status: "error", error: "在服务器上保存定时任务时发生内部错误。" });
+        res.status(error.code === 'UNSAFE_PATH' ? 400 : 500).json({ status: "error", error: error.code === 'UNSAFE_PATH' ? "无效的 task_id 或任务文件路径。" : "在服务器上保存定时任务时发生内部错误。" });
     }
 });
 
@@ -1005,13 +1073,30 @@ app.get('/admin_api/server/lifecycle', (req, res) => {
 app.post('/v1/interrupt', (req, res) => {
     const id = req.body.requestId || req.body.messageId; // 兼容 requestId 和 messageId
     if (!id) {
-        return res.status(400).json({ error: 'requestId or messageId is required.' });
+        return res.status(400).json({ success: false, error: 'requestId or messageId is required.' });
     }
 
     const context = activeRequests.get(id);
+    if (Object.prototype.hasOwnProperty.call(req.body, 'action')) {
+        const { action } = req.body;
+        if (!['prepare_handoff', 'cancel_handoff'].includes(action)) {
+            return res.status(400).json({ success: false, code: 'INVALID_ACTION' });
+        }
+        if (!context || context.res?.writableEnded || context.res?.destroyed) {
+            return res.status(404).json({ success: false, code: 'REQUEST_NOT_FOUND' });
+        }
+        if (context.aborted || context.abortController?.signal.aborted || !context.handoffGate) {
+            return res.status(409).json({ success: false, code: 'REQUEST_STOPPED' });
+        }
+        const receipt = context.handoffGate.control(req.body);
+        if (receipt.success && !receipt.duplicate && action === 'prepare_handoff') {
+            console.log(`[Handoff] READY received: requestId=${id}, handoffId=${req.body.handoffId}, revision=${req.body.revision}. 已登记预约，当前工具继续执行。`);
+        }
+        return res.status(receipt.success ? 200 : 409).json(receipt);
+    }
     if (!context || context.res.writableEnded || context.res.destroyed) {
         console.log(`[Interrupt] Received stop signal for non-existent or completed ID: ${id}`);
-        return res.status(404).json({ status: 'error', message: `Request ${id} not found or already completed.` });
+        return res.status(404).json({ success: false, status: 'error', code: 'REQUEST_NOT_FOUND', message: `Request ${id} not found or already completed.` });
     }
 
     if (!context.aborted && !context.abortController?.signal.aborted) {
@@ -1061,7 +1146,7 @@ app.post('/v1/interrupt', (req, res) => {
         if (activeRequests.get(id) === context) activeRequests.delete(id);
     }, 1000);
 
-    res.status(200).json({ status: 'success', message: `Interrupt signal sent for request ${id}.` });
+    res.status(200).json({ success: true, status: 'success', message: `Interrupt signal sent for request ${id}.` });
 });
 
 
@@ -1147,30 +1232,14 @@ app.use(protocolBridge);
 // Generic native channel; existing Bearer authentication remains upstream.
 require('./modules/nativeConversationTransport').registerNativeConversationRoute(app, pluginManager);
 
-// 新增：人类直接调用工具的端点
-require('./modules/nativeConversationTransport').registerNativeConversationRoute(app, pluginManager);
-
+// 人类或外部 harness 直接调用工具：兼容原有文本块及 JSON 函数调用。
 app.post('/v1/human/tool', async (req, res) => {
     try {
-        const requestBody = req.body;
-        if (typeof requestBody !== 'string' || !requestBody.trim()) {
-            return res.status(400).json({ error: 'Request body must be a non-empty plain text.' });
+        const { name: requestedToolName, args: parsedToolArgs, error } =
+            normalizeHumanToolRequest(req.body, req.is('application/json'));
+        if (error) {
+            return res.status(400).json({ error });
         }
-
-        const extractedToolBlock = ToolCallParser.extractNextToolBlock(requestBody);
-
-        if (!extractedToolBlock) {
-            return res.status(400).json({ error: 'Malformed request: Missing TOOL_REQUEST markers.' });
-        }
-
-        const parsedToolCall = ToolCallParser.parseBlock(extractedToolBlock.blockContent);
-
-        if (!parsedToolCall || !parsedToolCall.name) {
-            return res.status(400).json({ error: 'Malformed request: tool_name not found within the request block.' });
-        }
-
-        const requestedToolName = parsedToolCall.name;
-        const parsedToolArgs = parsedToolCall.args || {};
 
         if (DEBUG_MODE) {
             console.log(`[Human Tool Exec] Received tool call for: ${requestedToolName}`, parsedToolArgs);
@@ -1247,63 +1316,16 @@ const forumApiRoutes = require('./routes/forumApi');
 // 新增：异步插件回调路由
 const VCP_ASYNC_RESULTS_DIR = path.join(__dirname, 'VCPAsyncResults');
 
-async function ensureAsyncResultsDir() {
-    try {
-        await fs.mkdir(VCP_ASYNC_RESULTS_DIR, { recursive: true });
-    } catch (error) {
-        console.error(`[ServerSetup] 创建 VCPAsyncResults 目录失败: ${VCP_ASYNC_RESULTS_DIR}`, error);
-    }
-}
-
-app.post('/plugin-callback/:pluginName/:taskId', async (req, res, next) => {
-    // Match Express's default case-insensitive routing: ChannelHub owns event
-    // admission, including failures, and these requests are not async results.
-    if (/^ChannelHub$/i.test(req.params.pluginName) && /^events$/i.test(req.params.taskId)) return next();
-    const { pluginName, taskId } = req.params;
-    const callbackData = req.body; // 这是插件回调时发送的 JSON 数据
-
-    if (DEBUG_MODE) {
-        console.log(`[Server] Received callback for plugin: ${pluginName}, taskId: ${taskId}`);
-        console.log(`[Server] Callback data:`, JSON.stringify(callbackData, null, 2));
-    }
-
-    // 1. Save callback data to a file
-    await ensureAsyncResultsDir();
-    const resultFilePath = path.join(VCP_ASYNC_RESULTS_DIR, `${pluginName}-${taskId}.json`);
-    try {
-        await fs.writeFile(resultFilePath, JSON.stringify(callbackData, null, 2), 'utf-8');
-        if (DEBUG_MODE) console.log(`[Server Callback] Saved async result for ${pluginName}-${taskId} to ${resultFilePath}`);
-    } catch (fileError) {
-        console.error(`[Server Callback] Error saving async result file for ${pluginName}-${taskId}:`, fileError);
-        // Continue with WebSocket push even if file saving fails for now
-    }
-
-    const pluginManifest = pluginManager.getPlugin(pluginName);
-
-    if (!pluginManifest) {
-        console.error(`[Server Callback] Plugin manifest not found for: ${pluginName}`);
-        // Still attempt to acknowledge the callback if possible, but log error
-        return res.status(404).json({ status: "error", message: "Plugin not found, but callback noted." });
-    }
-
-    // 2. WebSocket push (existing logic)
-    if (pluginManifest.webSocketPush && pluginManifest.webSocketPush.enabled) {
-        const targetClientType = pluginManifest.webSocketPush.targetClientType || null;
-        const wsMessage = {
-            type: pluginManifest.webSocketPush.messageType || 'plugin_callback_notification',
-            data: callbackData
-        };
-        webSocketServer.broadcast(wsMessage, targetClientType);
-        if (DEBUG_MODE) {
-            console.log(`[Server Callback] WebSocket push for ${pluginName} (taskId: ${taskId}) processed. Message:`, JSON.stringify(wsMessage, null, 2));
-        }
-    } else if (DEBUG_MODE) {
-        console.log(`[Server Callback] WebSocket push not configured or disabled for plugin: ${pluginName}`);
-    }
-
-    res.status(200).json({ status: "success", message: "Callback received and processed" });
+const receiveAsyncResult = createCallbackHandler({
+    root: VCP_ASYNC_RESULTS_DIR,
+    pluginManager,
+    broadcast: (message, target) => webSocketServer.broadcast(message, target),
+    debug: DEBUG_MODE
 });
-
+app.post('/plugin-callback/:pluginName/:taskId', (req, res, next) => {
+    if (/^ChannelHub$/i.test(req.params.pluginName) && /^events$/i.test(req.params.taskId)) return next();
+    return receiveAsyncResult(req, res);
+});
 
 async function initialize() {
     console.log('开始初始化工具调用记录存储...');
@@ -1590,6 +1612,19 @@ async function gracefulShutdown(exitCode = 0, reason = 'signal') {
                 console.log(`[Server][ShutdownTrace] Phase 4/10 - abort skipped, no remaining active requests`);
             }
 
+            if (activeHttpRequests.size > 0) {
+                console.warn(`[Server] Destroying ${activeHttpRequests.size} remaining active HTTP socket(s) after drain phase.`);
+                for (const socket of activeHttpRequests) {
+                    try {
+                        if (!socket.destroyed) socket.destroy();
+                    } catch (err) {
+                        console.error('[Server] Failed to destroy remaining socket:', err.message);
+                    }
+                }
+                activeHttpRequests.clear();
+            }
+            destroyIdleSockets();
+
             serverLifecycleState = SERVER_LIFECYCLE.SHUTTING_DOWN;
             console.log(`[Server][ShutdownTrace] Phase 5/10 - lifecycle switched to SHUTTING_DOWN`);
 
@@ -1615,7 +1650,19 @@ async function gracefulShutdown(exitCode = 0, reason = 'signal') {
 
             if (pluginManager) {
                 console.log(`[Server][ShutdownTrace] Phase 8/10 - pluginManager.shutdownAllPlugins start`);
-                await pluginManager.shutdownAllPlugins();
+                let pluginShutdownTimer = null;
+                await Promise.race([
+                    pluginManager.shutdownAllPlugins(),
+                    new Promise((resolve) => {
+                        pluginShutdownTimer = setTimeout(() => {
+                            console.warn('[Server] pluginManager.shutdownAllPlugins timed out after 10000ms; continuing to Phase 9.');
+                            resolve();
+                        }, 10000);
+                        if (typeof pluginShutdownTimer.unref === 'function') pluginShutdownTimer.unref();
+                    })
+                ]).finally(() => {
+                    if (pluginShutdownTimer) clearTimeout(pluginShutdownTimer);
+                });
                 console.log(`[Server][ShutdownTrace] Phase 8/10 - pluginManager.shutdownAllPlugins done`);
             } else {
                 console.log(`[Server][ShutdownTrace] Phase 8/10 - pluginManager shutdown skipped`);

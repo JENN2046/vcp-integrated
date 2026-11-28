@@ -17,6 +17,8 @@ function parseArgs(argv) {
         const arg = argv[index];
         if (arg === '--debug') {
             options.release = false;
+        } else if (arg === '--locked') {
+            options.locked = true;
         } else if (arg === '--target') {
             options.target = argv[++index] || fail('--target requires a Rust target triple');
         } else if (!options.pluginDir) {
@@ -29,7 +31,7 @@ function parseArgs(argv) {
     }
 
     if (!options.pluginDir || !options.binaryName) {
-        fail('usage: node scripts/build_rust_plugin.js <plugin-dir> <binary-name> [--target <triple>] [--debug]');
+        fail('usage: node scripts/build_rust_plugin.js <plugin-dir> <binary-name> [--target <triple>] [--debug] [--locked]');
     }
     return options;
 }
@@ -63,6 +65,7 @@ function main() {
     const target = options.target || getHostTriple();
     const profile = options.release ? 'release' : 'debug';
     const cargoArgs = ['build', '--manifest-path', manifestPath];
+    if (options.locked) cargoArgs.push('--locked');
     if (options.release) cargoArgs.push('--release');
     if (options.target) cargoArgs.push('--target', options.target);
 

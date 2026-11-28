@@ -522,7 +522,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Step 3: Restore the protected ```html blocks.
     if (htmlBlockMap.size > 0) {
       for (const [placeholder, block] of htmlBlockMap.entries()) {
-        processed = processed.replace(placeholder, block);
+        processed = processed.replace(placeholder, () => block);
       }
     }
 
@@ -733,19 +733,111 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  const NOTE_IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|svg|bmp|ico|avif)(?:[?#].*)?$/i;
+  const NOTE_IMAGE_PATH_RE = /\/(?:images|image|comfyuigen|attachments)\//i;
+
+  function isNoteImageUrl(rawUrl) {
+    if (typeof rawUrl !== "string") return false;
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return false;
+    if (/^data:image\//i.test(trimmed)) return true;
+    try {
+      const parsed = new URL(trimmed, window.location.href);
+      const fullPath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      return (
+        NOTE_IMAGE_EXT_RE.test(parsed.pathname) ||
+        NOTE_IMAGE_EXT_RE.test(fullPath) ||
+        NOTE_IMAGE_PATH_RE.test(parsed.pathname)
+      );
+    } catch {
+      return NOTE_IMAGE_EXT_RE.test(trimmed) || NOTE_IMAGE_PATH_RE.test(trimmed);
+    }
+  }
+
+  function openNoteImageInViewer(targetSrc, preferredTitle = "") {
+    if (!targetSrc) return;
+    const seen = new Set();
+    const gallery = [];
+    previewContentDiv.querySelectorAll("img, a[href]").forEach((node) => {
+      let src = "";
+      let title = "";
+      if (node.tagName === "IMG") {
+        src = (node.getAttribute("src") || node.src || "").trim();
+        title = (node.getAttribute("alt") || "").trim();
+      } else if (node.tagName === "A") {
+        const href = (node.getAttribute("href") || "").trim();
+        if (isNoteImageUrl(href)) {
+          src = node.href || href;
+          const linkText = (node.textContent || "").trim();
+          title = linkText && linkText !== href ? linkText : "";
+        }
+      }
+      if (!src || seen.has(src)) return;
+      seen.add(src);
+      gallery.push({ src, title: title || "图片预览" });
+    });
+
+    let index = gallery.findIndex((item) => item.src === targetSrc);
+    const title = preferredTitle || (index >= 0 ? gallery[index].title : "图片预览");
+    if (index < 0) {
+      gallery.push({ src: targetSrc, title });
+      index = gallery.length - 1;
+    }
+
+    const detectedTheme = document.body.classList.contains("light-theme")
+      ? "light"
+      : "dark";
+
+    if (api && api.openImageViewer) {
+      api.openImageViewer({
+        src: targetSrc,
+        title,
+        theme: detectedTheme,
+        ...(gallery.length > 1 ? { gallery, index } : {}),
+      });
+    } else if (api && api.openImageInNewWindow) {
+      api.openImageInNewWindow(targetSrc, title);
+    } else {
+      console.error("Image viewer API is not available.");
+    }
+  }
+
   function makeImagesClickable() {
     previewContentDiv.querySelectorAll("img").forEach((img) => {
-      img.style.cursor = "pointer";
+      img.style.cursor = "zoom-in";
       img.addEventListener("click", (e) => {
         e.preventDefault();
-        const imageUrl = img.getAttribute("src");
+        e.stopPropagation();
+        const imageUrl = img.src || img.getAttribute("src");
         const imageTitle = img.getAttribute("alt") || "图片预览";
-        if (api && api.openImageInNewWindow) {
-          api.openImageInNewWindow(imageUrl, imageTitle);
-        } else {
-          console.error("Image viewer API is not available.");
-        }
+        openNoteImageInViewer(imageUrl, imageTitle);
       });
+    });
+
+    previewContentDiv.querySelectorAll("a[href]").forEach((anchor) => {
+      const rawHref = (anchor.getAttribute("href") || "").trim();
+      if (!rawHref || rawHref.startsWith("#")) return;
+      const resolvedHref = anchor.href || rawHref;
+
+      if (isNoteImageUrl(rawHref) || isNoteImageUrl(resolvedHref)) {
+        anchor.style.cursor = "zoom-in";
+        anchor.title = anchor.title || "点击在独立图片视窗中查看";
+        anchor.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const linkText = (anchor.textContent || "").trim();
+          const title = linkText && linkText !== rawHref ? linkText : "画室图片预览";
+          openNoteImageInViewer(resolvedHref, title);
+        });
+      } else if (/^(?:https?:|file:|magnet:)/i.test(rawHref)) {
+        anchor.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (api && api.sendOpenExternalLink) {
+            api.sendOpenExternalLink(resolvedHref);
+          }
+        });
+      }
     });
   }
 
@@ -1374,11 +1466,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     editorFindNext.disabled = total === 0;
   }
 
-  function collectEditorSearchMatches(query) {
+  function collectEditorSearchMatches(query, preserveIndex = false) {
     editorSearchMatches = [];
-    editorSearchIndex = -1;
+    if (!preserveIndex) {
+      editorSearchIndex = -1;
+    }
 
     if (!query) {
+      editorSearchIndex = -1;
       updateEditorFindStatus();
       return;
     }
@@ -1394,6 +1489,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       editorSearchMatches.push(matchIndex);
       fromIndex = matchIndex + Math.max(lowerQuery.length, 1);
+    }
+
+    if (editorSearchIndex >= editorSearchMatches.length) {
+      editorSearchIndex = editorSearchMatches.length > 0 ? 0 : -1;
     }
 
     updateEditorFindStatus();
@@ -1426,6 +1525,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (focusEditor) {
       noteContentInput.focus();
       noteContentInput.setSelectionRange(matchStart, matchEnd);
+    } else {
+      noteContentInput.setSelectionRange(matchStart, matchEnd);
     }
 
     updateEditorFindStatus();
@@ -1433,27 +1534,50 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function findEditorMatch(direction = 1) {
     const query = editorFindInput.value;
-    collectEditorSearchMatches(query);
+    if (!query) return;
+
+    const prevIndex = editorSearchIndex;
+    collectEditorSearchMatches(query, true);
 
     if (editorSearchMatches.length === 0) return;
 
     const selectionStart = noteContentInput.selectionStart;
-    if (direction >= 0) {
-      const nextIndex = editorSearchMatches.findIndex(
-        (matchIndex) =>
-          matchIndex >= selectionStart + (editorSearchIndex >= 0 ? 1 : 0)
-      );
-      selectEditorSearchMatch(nextIndex === -1 ? 0 : nextIndex);
-    } else {
-      let previousIndex = editorSearchMatches.length - 1;
-      for (let i = editorSearchMatches.length - 1; i >= 0; i--) {
-        if (editorSearchMatches[i] < selectionStart) {
-          previousIndex = i;
-          break;
-        }
+    let targetIndex;
+
+    // 如果当前选区正好对应上次选中的匹配项，按顺序循环切换到下一个或上一个
+    if (
+      prevIndex >= 0 &&
+      prevIndex < editorSearchMatches.length &&
+      editorSearchMatches[prevIndex] === selectionStart
+    ) {
+      if (direction >= 0) {
+        targetIndex = (prevIndex + 1) % editorSearchMatches.length;
+      } else {
+        targetIndex =
+          (prevIndex - 1 + editorSearchMatches.length) %
+          editorSearchMatches.length;
       }
-      selectEditorSearchMatch(previousIndex);
+    } else {
+      // 否则（光标被手动移动，或初次搜索），基于当前光标位置选择最近的匹配项
+      if (direction >= 0) {
+        const found = editorSearchMatches.findIndex(
+          (matchIndex) => matchIndex >= selectionStart
+        );
+        targetIndex = found === -1 ? 0 : found;
+      } else {
+        let found = -1;
+        for (let i = editorSearchMatches.length - 1; i >= 0; i--) {
+          if (editorSearchMatches[i] < selectionStart) {
+            found = i;
+            break;
+          }
+        }
+        targetIndex =
+          found === -1 ? editorSearchMatches.length - 1 : found;
+      }
     }
+
+    selectEditorSearchMatch(targetIndex);
   }
 
   function openEditorFindBar() {
