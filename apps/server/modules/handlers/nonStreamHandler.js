@@ -13,7 +13,7 @@ const {
   isResidentProposalToolCall,
   residentProposalFailureCategory
 } = require('../vcpLoop/residentPresentation.js');
-const { NATIVE_CALL_ID, isMalformedFunctionCall, entriesOf, admitNativeCalls, rejectionNotice, buildNativeToolMessages } = require('../nativeToolLoop');
+const { NATIVE_CALL_ID, isMalformedFunctionCall, entriesOf, admitNativeCalls, rejectionNotice, prepareNativeToolMessages } = require('../nativeToolLoop');
 
 const {
   buildClientVisibleContent,
@@ -522,7 +522,7 @@ class NonStreamHandler {
           }
           currentMessagesForNonStreamLoop.push(...assistantMessages);
 
-          if (ownedCalls) currentMessagesForNonStreamLoop.push(...buildNativeToolMessages(nativeCalls, archeryGroups));
+          if (ownedCalls) currentMessagesForNonStreamLoop.push(...await prepareNativeToolMessages(nativeCalls, archeryGroups, maybeTranslateToolPayloadMedia));
           else currentMessagesForNonStreamLoop.push(await buildToolPayloadMessage(archeryGroups));
 
           if (archeryStatusSummaryItems.length > 0) {
@@ -686,7 +686,7 @@ class NonStreamHandler {
           })),
           ...archeryGroups
         ];
-        if (ownedCalls) currentMessagesForNonStreamLoop.push(...buildNativeToolMessages(nativeCalls, modelResultGroups));
+        if (ownedCalls) currentMessagesForNonStreamLoop.push(...await prepareNativeToolMessages(nativeCalls, modelResultGroups, maybeTranslateToolPayloadMedia));
         else currentMessagesForNonStreamLoop.push(await buildToolPayloadMessage(modelResultGroups, maybeTranslateToolPayloadMedia));
 
         const loopBudgetNotice = checkLoopBudget(currentMessagesForNonStreamLoop);

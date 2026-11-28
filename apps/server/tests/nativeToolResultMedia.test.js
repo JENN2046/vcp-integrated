@@ -2,6 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { Readable } = require('node:stream');
+const StreamHandler = require('../modules/handlers/streamHandler');
+const NonStreamHandler = require('../modules/handlers/nonStreamHandler');
+const ToolCallParser = require('../modules/vcpLoop/toolCallParser');
 const { projectToolBatchForUpstream } = require('../modules/toolResultBatch');
 
 const call = id => ({ id, type: 'function', function: { name: 'demo', arguments: '{}' } });
@@ -65,3 +69,100 @@ test('role divider leaves the native call and result envelopes opaque', () => {
     assert.deepEqual(divided, messages);
     assert.equal(projectToolBatchForUpstream({ messages: divided }).messages[2].role, 'user');
 });
+
+function providerResponse(stream, message, finishReason) {
+    const choice = { index: 0, [stream ? 'delta' : 'message']: message, finish_reason: finishReason };
+    const json = JSON.stringify({ choices: [choice] });
+    return stream
+        ? { ok: true, body: Readable.from(['data: ' + json + '\n\ndata: [DONE]\n\n']) }
+        : { ok: true, arrayBuffer: async () => Buffer.from(json) };
+}
+
+for (const stream of [false, true]) {
+    for (const mode of ['force-text', 'vision', 'MediaPlus']) {
+        for (const archeryOnly of [false, true]) {
+            test(`native FC media: stream=${stream}, ${mode}, archeryOnly=${archeryOnly}`, async () => {
+                // The mixed batch collects normal receipts before Archery receipts,
+                // even though the model requested the Archery call first.
+                const ids = ['first', 'second'];
+                const calls = ids.map((id, index) => ({
+                    id, type: 'function', ...(stream && { index }),
+                    function: { name: 'vcptools', arguments: JSON.stringify({
+                        tool_name: 'FixtureImage', slot: id, ...(archeryOnly || index === 0 ? { archery: 'no_reply' } : {})
+                    }) }
+                }));
+                const images = ids.map(id => image('https://example.test/' + id + '.png', 'high'));
+                const visible = ids.map((id, i) => [{ type: 'text', text: 'visible-' + id }, images[i]]);
+                const receipts = ids.map((id, i) => ({
+                    success: true, recordId: 'record-' + id, raw: { result: 'raw-' + id },
+                    content: [{ type: 'text', text: 'original-' + id }],
+                    contentForAI: visible[i], approvalFeedbackContent: visible[i]
+                }));
+                const originals = structuredClone(receipts);
+                const dispatched = [];
+                const translated = [];
+                const requests = [];
+                const client = [];
+                function execute(call) {
+                    dispatched.push(call.args.slot);
+                    return receipts[ids.indexOf(call.args.slot)];
+                }
+                const config = { fixture: true };
+                const ctx = {
+                    originalBody: { model: 'fixture', messages: [] }, abortController: new AbortController(),
+                    ownsNativeVcpTools: true, ToolCallParser, SHOW_VCP_OUTPUT: true, isToolResultError: () => false,
+                    shouldProcessMedia: mode === 'MediaPlus', shouldProcessMediaPlus: mode === 'MediaPlus',
+                    isTextOnlyForceTranslateModel: mode === 'force-text', requestPreprocessorConfig: config,
+                    pluginManager: {
+                        messagePreprocessors: new Map([['ImageProcessor', {}]]),
+                        async executeMessagePreprocessor(name, [message], suppliedConfig) {
+                            assert.equal(name, 'ImageProcessor');
+                            assert.equal(suppliedConfig, config);
+                            const part = message.content.find(part => part.type === 'image_url');
+                            translated.push(part.image_url.url);
+                            part.type = 'text';
+                            part.text = 'description-' + part.image_url.url.split('/').pop();
+                            delete part.image_url;
+                            return [message];
+                        }
+                    },
+                    toolExecutor: { execute, executeAll: async calls => calls.map(execute) },
+                    async fetchWithRetry(_url, options) {
+                        requests.push(JSON.parse(options.body));
+                        return providerResponse(stream, { role: 'assistant', content: 'finished' }, 'stop');
+                    }
+                };
+                const res = { write: chunk => client.push(String(chunk)), end(chunk) {
+                    if (chunk) this.write(chunk);
+                    this.writableEnded = true;
+                }, send(chunk) { this.end(chunk); } };
+                const Handler = stream ? StreamHandler : NonStreamHandler;
+                await new Handler(ctx).handle({}, res, providerResponse(stream, { role: 'assistant', content: null, tool_calls: calls }, 'tool_calls'));
+
+                assert.deepEqual(dispatched.sort(), ids);
+                assert.deepEqual(receipts, originals);
+                assert.equal(requests.length, 1);
+                assert.deepEqual(translated.sort(), mode === 'vision' ? [] : images.map(part => part.image_url.url));
+                const messages = requests[0].messages;
+                const tools = messages.filter(message => message.role === 'tool');
+                assert.deepEqual(tools.map(message => message.tool_call_id), ids);
+                for (const [i, message] of tools.entries()) {
+                    assert.ok(message.content.includes('visible-' + ids[i]));
+                    assert.ok(!message.content.includes(ids[1-i]));
+                    assert.equal(message.content.includes('description-' + ids[i] + '.png'), mode !== 'vision');
+                }
+                const media = messages.filter(message => message.role === 'user');
+                if (mode === 'force-text') assert.deepEqual(media, []);
+                else {
+                    assert.equal(media.length, 1);
+                    assert.deepEqual(media[0].content.filter(part => part.type === 'image_url'), images);
+                    assert.deepEqual(media[0].content.filter(part => part.type === 'text').map(part => part.text),
+                        ids.map(id => 'Tool result "' + id + '" — image attachment(s):'));
+                }
+                assert.equal(client.join('').includes('raw-second'), !archeryOnly);
+                assert.doesNotMatch(client.join(''), /raw-first|description-/);
+                assert.match(client.join(''), /finished/);
+            });
+        }
+    }
+}

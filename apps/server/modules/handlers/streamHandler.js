@@ -6,7 +6,7 @@ const contextBudget = require('../contextBudget.js');
 const finalContextStore = require('../finalContextStore.js');
 const roleDivider = require('../roleDivider.js');
 const { formatToolResultBatch, projectToolBatchForUpstream, buildToolPayloadMessage } = require('../toolResultBatch.js');
-const { NATIVE_CALL_ID, isMalformedFunctionCall, collectStreamToolCalls, admitNativeCalls, rejectionNotice, buildNativeToolMessages } = require('../nativeToolLoop');
+const { NATIVE_CALL_ID, isMalformedFunctionCall, collectStreamToolCalls, admitNativeCalls, rejectionNotice, prepareNativeToolMessages } = require('../nativeToolLoop');
 
 const {
   extractReasoningText,
@@ -1122,7 +1122,7 @@ class StreamHandler {
 
       // 处理纯 Archery 的错误或用户审核留言；成功留言不改变工具成功状态。
       if (normalCalls.length === 0 && archeryErrorContents.length > 0) {
-        if (nativeTurn) currentMessagesForLoop.push(...buildNativeToolMessages(nativeTurn.calls, archeryGroups));
+        if (nativeTurn) currentMessagesForLoop.push(...await prepareNativeToolMessages(nativeTurn.calls, archeryGroups, maybeTranslateToolPayloadMedia));
         else currentMessagesForLoop.push(await buildToolPayloadMessage(archeryGroups));
 
         if (!sink.isClosed()) {
@@ -1301,7 +1301,7 @@ class StreamHandler {
         })),
         ...archeryGroups
       ];
-      if (nativeTurn) currentMessagesForLoop.push(...buildNativeToolMessages(nativeTurn.calls, modelResultGroups));
+      if (nativeTurn) currentMessagesForLoop.push(...await prepareNativeToolMessages(nativeTurn.calls, modelResultGroups, maybeTranslateToolPayloadMedia));
       else currentMessagesForLoop.push(await buildToolPayloadMessage(modelResultGroups, maybeTranslateToolPayloadMedia));
 
       if (!sink.isClosed()) {

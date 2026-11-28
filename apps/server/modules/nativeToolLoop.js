@@ -141,4 +141,13 @@ function buildNativeToolMessages(calls, groups) {
     });
 }
 
-module.exports = { NATIVE_CALL_ID, isMalformedFunctionCall, entriesOf, admitNativeCalls, rejectionNotice, collectStreamToolCalls, normalizeNativeVcpCalls, buildNativeToolMessages };
+// Translate each model-visible receipt separately so descriptions keep their call ID.
+async function prepareNativeToolMessages(calls, groups, translateMedia) {
+    const translated = [];
+    for (const { callId, parts } of groups) {
+        translated.push({ callId, parts: await translateMedia(parts) });
+    }
+    return buildNativeToolMessages(calls, translated);
+}
+
+module.exports = { NATIVE_CALL_ID, isMalformedFunctionCall, entriesOf, admitNativeCalls, rejectionNotice, collectStreamToolCalls, normalizeNativeVcpCalls, buildNativeToolMessages, prepareNativeToolMessages };
