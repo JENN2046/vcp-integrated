@@ -7,7 +7,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
-const { BOX } = require('./fixtures/sharedSingleHarness.cjs');
+const { BOX, localProvider, host } = require('./fixtures/coreSingleHarness.cjs');
+const { localTopicKey } = require(BOX + '/core/localWorkspace');
 const { CoreStore } = require(BOX + '/core/store');
 const { CentralStore } = require(BOX + '/Plugin/NativeSync/sync/centralStore');
 const { AttachmentStore } = require(BOX + '/Plugin/NativeSync/mobile/attachments');
@@ -18,11 +19,11 @@ test('offline migration reconciles native order, central commits and both CDS de
     const source = path.join(root, 'fixture');
     const target = path.join(root, 'core');
     fs.mkdirSync(source);
-    const topic = { ownerType: 'agent', ownerId: 'agentA', topicId: 'topicA', key: 'sharedTopic', history: 'history.json' };
-    const second = { ownerType: 'agent', ownerId: 'agentA', topicId: 'topicB', key: 'deletedTopic', history: 'second.json' };
+    const topic = { ownerType: 'agent', ownerId: 'agentA', topicId: 'topicA', key: localTopicKey('agent', 'agentA', 'topicA'), history: 'history.json' };
+    const second = { ownerType: 'agent', ownerId: 'agentA', topicId: 'topicB', key: localTopicKey('agent', 'agentA', 'topicB'), history: 'second.json' };
     const msg = (id, content = id, rest = {}) => ({ id, content, role: 'user', timestamp: 100, ...rest });
     const bytes = Buffer.from('附件原始字节\n');
-    const manifest = { workspace: 'dev', central: 'central.sqlite', cds: 'cds.sqlite', topics: [topic, second] };
+    const manifest = { workspace: 'dev', authority: 'local', central: 'central.sqlite', cds: 'cds.sqlite', topics: [topic, second] };
     fs.writeFileSync(path.join(source, 'manifest.json'), JSON.stringify(manifest));
     fs.writeFileSync(path.join(source, 'history.json'), JSON.stringify([
         msg('original', '原始正文', { timestamp: 200, customExtension: { score: 1 },
@@ -91,39 +92,33 @@ test('offline migration reconciles native order, central commits and both CDS de
     assert.deepEqual(attachment.locate(topic.key, 'original', 'file').bytes, bytes);
 });
 
-test('an imported regular group becomes Core-owned after verifying the isolated central history head', async t => {
-    const { backup } = require('node:sqlite');
-    const { fixture } = require('./fixtures/sharedSingleHarness.cjs');
-    const { localProvider, host, mountCore } = require('./fixtures/coreSingleHarness.cjs');
+test('a registered Core group reads imported native history from its existing database', async t => {
+    const { CoreService } = require(BOX + '/core/service');
     const { importHistory } = require(BOX + '/core/importHistory');
-    const f = await fixture(t);
-    const actor = f.actor('A');
-    const owner = f.shared.create(actor, { sharedSpaceId: 'sharedAB', opId: 'migration-group',
-        kind: 'group', localId: 'old-group', config: { name: 'Old group', mode: 'sequential', members: [f.owner.id] } }).object;
-    const topic = f.shared.create(actor, { sharedSpaceId: 'sharedAB', opId: 'migration-topic',
-        kind: 'topic', parentId: owner.id, localId: 'old-topic', localParent: 'old-group', config: { name: 'Old topic' } }).object;
-    assert.equal(topic.coreGroup, undefined);
-    const old = { id: 'legacy-fixture', role: 'user', content: 'Existing shared history', timestamp: 100 };
-    f.store.apply({ ...topic.topic, msgId: old.id, deviceId: 'fixture',
-        opId: 'legacy-commit', action: 'upsert', baseHash: null, message: old }, { sharedSpace: 'sharedAB' });
-    const source = path.join(f.root, 'isolated-snapshot');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vcp-core-group-import-'));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    const source = path.join(root, 'snapshot');
+    const target = path.join(root, 'core');
     fs.mkdirSync(source);
+    const topic = { ownerType: 'group', ownerId: 'groupA', topicId: 'topicA',
+        key: localTopicKey('group', 'groupA', 'topicA'), history: 'history.json' };
+    const old = { id: 'native-fixture', role: 'user', content: 'Existing group history', timestamp: 100 };
+    fs.writeFileSync(path.join(source, 'history.json'), JSON.stringify([old]));
     fs.writeFileSync(path.join(source, 'manifest.json'), JSON.stringify({
-        workspace: 'sharedAB', central: 'snapshot.sqlite', topics: [{ ...topic.topic, key: topic.id }]
+        authority: 'local', workspace: 'personal', topics: [topic]
     }));
-    await backup(f.store.db, path.join(source, 'snapshot.sqlite'));
-    importHistory(source, f.root + '-core');
+    assert.equal(importHistory(source, target).messages, 1);
     const { chat } = host(await localProvider(t));
-    const { core } = await mountCore(f, chat);
-    t.after(() => core.close());
-    const current = f.shared.get(actor, 'sharedAB', topic.id);
-    assert.equal(current.coreGroup, true);
-    const desktop = await f.desktop('B');
-    const local = desktop.runtime.localFor(topic.id);
-    const read = await desktop.runtime.coreSingle.history({ itemType: 'group', itemId: local.localParent, topicId: local.localId });
-    assert.equal(read.history[0].id, old.id);
-    assert.equal(read.history[0].content, old.content);
-    const phone = await f.phone();
-    await phone.call('/conversations/' + topic.id + '/messages', { requestId: 'deny-old-group', text: 'blocked' }, 409);
-    assert.equal(f.store.db.prepare('SELECT count(*) n FROM journal').get().n, 1);
+    const core = new CoreService({ directory: target, workspace: 'personal', chat });
+    try {
+        await core.local.define(topic.key, { ...topic, name: 'Old topic', config: {
+            group: { name: 'Old group', mode: 'sequential', members: ['agentA'] },
+            agents: [{ id: 'agentA', name: 'Agent', model: 'synthetic', systemPrompt: 'Fixture' }]
+        } }, () => true);
+        const conversation = core.topic(core.local.actor, 'personal', topic.key);
+        assert.deepEqual(core.store.snapshot(conversation.key, Number.MAX_SAFE_INTEGER, 5)
+            .map(({ id, role, content, timestamp }) => ({ id, role, content, timestamp })), [old]);
+    } finally {
+        await core.close();
+    }
 });

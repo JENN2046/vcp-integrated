@@ -4,7 +4,6 @@ if (process.env.NS_CORE_TEST_IMAGE) dialog.showOpenDialog = async () => ({ cance
 const hooks = require('./electron-fixture-hooks.cjs').get();
 const { isLoopback, restrictNodeNetwork } = require('./restrict-network.cjs');
 restrictNodeNetwork();
-if (process.env.NS_METER_PREFIX) require('./meter.cjs');
 const restrictSession = session => {
     session.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, ({ url }, done) => {
         const target = new URL(url);
@@ -22,9 +21,6 @@ const path = require('node:path');
 if (process.env.NS_DESKTOP_STREAM_CLOSE === '1') {
     require('../desktop-stream-close/observe.cjs').install(ipcMain, process.env.NS_HOST, log);
 }
-const compactionRace = process.env.NS_COMPACTION_HISTORY_RACE === '1'
-    ? require('../compact-e2e/history-race.cjs').install(process.env.VCPCHAT_APP_DATA_DIR, log) : null;
-const compactionObservation = compactionRace || process.env.NS_COMPACTION_FALLBACK_FIXTURE === '1';
 app.setAppPath(process.env.NS_HOST);
 const Module = require('node:module');
 const loadedMainEsm = new Map();
@@ -38,45 +34,6 @@ Module.registerHooks?.({
         return loaded;
     },
 });
-const load = Module._load;
-const instrumented = new WeakSet();
-Module._load = function (request, parent, ...rest) {
-    const module = load.call(this, request, parent, ...rest);
-    if (!module || typeof module !== 'object' || instrumented.has(module)) return module;
-    if (typeof module.createNativeSyncRuntime === 'function') {
-        instrumented.add(module);
-        const factory = module.createNativeSyncRuntime;
-        module.createNativeSyncRuntime = async function (...args) {
-            log('runtime-factory-start');
-            const result = await factory.apply(this, args);
-            log('runtime-factory-end', { ready:result?.ready, startupError:result?.startupError, readOnly:result?.readOnly });
-            if (result?.close) {
-                const close = result.close.bind(result);
-                result.close = function (...closeArgs) {
-                    let admissionCode;
-                    if (process.env.NS_CHECK_QUIT_ADMISSION === '1') {
-                        try { require(path.join(process.env.NS_HOST, 'modules/services/quitAdmission.cjs')).assertOpen(); }
-                        catch (error) { admissionCode = error.code; }
-                    }
-                    log('runtime-close-start', { admissionCode });
-                    const pending = close(...closeArgs);
-                    Promise.resolve(pending).then(() => log('runtime-close-end'), error => log('runtime-close-error',{code:error?.code}));
-                    return pending;
-                };
-            }
-            return result;
-        };
-    }
-    if (typeof module.SharedRuntime?.open === 'function') {
-        instrumented.add(module);
-        const open = module.SharedRuntime.open;
-        module.SharedRuntime.open = async function (...args) {
-            try { return await open.apply(this, args); }
-            catch (error) { log('runtime-open-failure', { code:error.code, stack:error.stack }); throw error; }
-        };
-    }
-    return module;
-};
 app.on('certificate-error', (event, _contents, raw, _error, certificate, callback) => {
     const origin = new URL(raw);
     const fingerprint = new crypto.X509Certificate(certificate.data).fingerprint256;
@@ -98,7 +55,7 @@ ipcMain.handle = (channel, fn) => {
             log('desktop-input', {id:args[0]?.message?.id,localOnly:args[0]?.localOnly===true,serverSession:args[0]?.serverSession===true});
         }
         const invoke = () => fn.call(this, event, ...args);
-        const result = compactionRace ? compactionRace(channel, args, invoke) : invoke();
+        const result = invoke();
         if (detailed && /^(native-sync:|native-history:(?:terminal|messages)$|topic-execution:authority|save-avatar$|save-agent-config$|save-agent-group-avatar$|save-agent-group-config$)/.test(channel)) {
             return Promise.resolve(result).then(value => {
                 log('ipc-result', {channel, code:value?.code, error:value?.error, handled:value?.handled,
@@ -106,9 +63,6 @@ ipcMain.handle = (channel, fn) => {
                     ...(value?.authoritativeReply && { authoritativeReply: {
                         state: value.authoritativeReply.state, seq: value.authoritativeReply.seq,
                     } }),
-                    ...(compactionObservation && channel.startsWith('native-sync:compact-') && {
-                        recovered:value?.recovered, intentId:value?.id, checkpointId:value?.messageId,
-                    }),
                     refreshError:value?.refreshError, extrasError:value?.extrasError, sharedVersion:value?.sharedVersion, avatarResult:value?.avatarResult, kind:value?.kind, ready:value?.shared?.ready, replyId:value?.replyId });
                 return value;
             });
@@ -191,22 +145,7 @@ input.on('line', async line => {
                 mobile.destroy();
             }
         }
-        if (action === 'dismiss-compaction-diagnostic' && compactionRace) {
-            const viewer = BrowserWindow.getAllWindows().find(candidate => {
-                const url = new URL(candidate.webContents.getURL() || 'about:blank');
-                return url.pathname.endsWith('/text-viewer.html') &&
-                    url.searchParams.get('title') === '上下文压缩失败：模型返回原文';
-            });
-            if (viewer?.isVisible()) {
-                const line = await viewer.webContents.executeJavaScript(
-                    "document.body.innerText.split('\\n').find(line => line.includes('HISTORY_IDENTITY_CHANGED'))");
-                if (line) {
-                    viewer.close();
-                    win.focus();
-                    result = line;
-                }
-            }
-        }
+
         if (action === 'eval') {
             if (!win) throw Error('Main window unavailable');
             result = await win.webContents.executeJavaScript(script, true);

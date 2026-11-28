@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 const { DatabaseSync } = require('node:sqlite');
-const { coreInput, contract } = require('./service.cjs');
+const { coreInput, completeText } = require('./service.cjs');
 
 module.exports = async ({ clients: { A }, out, result, service, click, evalJs, waitUntil, start, stop, picture }) => {
     const topic = service.topics.preSubmit.id;
@@ -48,7 +48,7 @@ module.exports = async ({ clients: { A }, out, result, service, click, evalJs, w
         await waitUntil(() => database.prepare('SELECT status FROM works WHERE id=?').get(work.id)?.status === 'completed',
             'Core settles without a desktop observer');
         const messages = database.prepare('SELECT id,role,content FROM messages WHERE conversation_id=? ORDER BY ordinal').all(topic);
-        assert.deepEqual(messages.map(row => row.content), [coreInput, contract.completeText]);
+        assert.deepEqual(messages.map(row => row.content), [coreInput, completeText]);
         result.core = { id: work.id, completedWithoutDesktop: true, messages };
     } finally {
         database.close();
@@ -76,7 +76,7 @@ module.exports = async ({ clients: { A }, out, result, service, click, evalJs, w
     const text = () => evalJs(reopened, 'document.querySelector("#chatMessages")?.innerText || ""');
     await waitUntil(async () => {
         const visible = await text();
-        return visible.includes(coreInput) && visible.includes(contract.completeText);
+        return visible.includes(coreInput) && visible.includes(completeText);
     }, 'cold desktop renders the persisted Core history');
     assert.equal(service.calls.filter(call => call.case === 'coreRC').length, 1);
     result.core.coldReadback = true;

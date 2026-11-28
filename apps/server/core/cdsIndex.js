@@ -42,31 +42,55 @@ class CoreCdsIndex {
         return this.lifecycle.client;
     }
 
-    search(topic, rows, request) {
+    search(topic, readTopics, request) {
         if (this.closing) throw failure('HOST_DRAINING', 503);
         const task = this.tail.then(async () => {
             const client = await this.client();
+            if (this.indexedBy !== client) {
+                this.applied.clear();
+                this.indexedBy = client;
+            }
             const owner = topic.ownerId;
             const ownerDir = topic.ownerType === 'agent' ? 'Agents' : 'AgentGroups';
-            const current = hash(JSON.stringify(rows));
-            if (this.applied.get(owner) !== current) {
-                // CDS expects native input files. This separate root contains
-                // disposable search inputs, never desktop History or Core storage.
-                const configPath = path.join(this.root, ownerDir, owner, 'config.json');
-                await writeProjection(configPath, { id: owner, name: owner, topics: rows.map(({ id, name }) => ({ id, name })) });
-                for (const { id, messages } of rows) {
-                    await writeProjection(path.join(this.root, 'UserData', owner, 'topics', id, 'history.json'), messages);
-                }
-                const directory = path.join(this.root, 'UserData', owner, 'topics');
-                const active = new Set(rows.map(row => row.id));
-                for (const item of await fs.readdir(directory, { withFileTypes: true }).catch(error => {
-                    if (error.code === 'ENOENT') return [];
+            const configPath = path.join(this.root, ownerDir, owner, 'config.json');
+            const directory = path.join(this.root, 'UserData', owner, 'topics');
+            const rows = readTopics();
+            const topics = rows.map(({ id, name }) => ({ id, name }));
+            const config = hash(JSON.stringify(topics));
+            const previous = this.applied.get(owner);
+            const changed = rows.filter(row => previous?.ownerType !== topic.ownerType || previous.sequences.get(row.id) !== row.sequence);
+            const layoutChanged = previous?.ownerType !== topic.ownerType || previous.config !== config;
+            if (changed.length || layoutChanged) {
+                // Read all affected topics before yielding to filesystem work. Their sequences
+                // and messages come from the same synchronous pass over Core's authority.
+                const histories = changed.map(row => ({ id: row.id, messages: row.readMessages() }));
+                try {
+                    if (layoutChanged) await writeProjection(configPath, { id: owner, name: owner, topics });
+                    for (const { id, messages } of histories) {
+                        const filename = path.join(directory, id, 'history.json');
+                        await writeProjection(filename, messages);
+                        if (!layoutChanged) {
+                            const result = await client.ingestHistoryPath(filename, 'core', { timeoutMs: 300000 });
+                            if (!result.accepted) throw failure('CORE_CDS_INGEST_INCOMPLETE', 503);
+                        }
+                    }
+                    if (layoutChanged) {
+                        const active = new Set(topics.map(row => row.id));
+                        const entries = await fs.readdir(directory, { withFileTypes: true }).catch(error => {
+                            if (error.code === 'ENOENT') return [];
+                            throw error;
+                        });
+                        for (const item of entries) {
+                            if (item.isDirectory() && !active.has(item.name)) await fs.rm(path.join(directory, item.name), { recursive: true });
+                        }
+                        await client.reconcile({ timeoutMs: 300000 });
+                    }
+                    this.applied.set(owner, { ownerType: topic.ownerType, config, sequences: new Map(rows.map(row => [row.id, row.sequence])) });
+                } catch (error) {
+                    // Retry from the current authoritative snapshot after any partial ingest.
+                    this.applied.delete(owner);
                     throw error;
-                })) {
-                    if (item.isDirectory() && !active.has(item.name)) await fs.rm(path.join(directory, item.name), { recursive: true });
                 }
-                await client.reconcile({ timeoutMs: 300000 });
-                this.applied.set(owner, current);
             }
             return client.searchMemories({ ...request, ownerType: topic.ownerType, ownerId: owner, currentTopicId: topic.key });
         });

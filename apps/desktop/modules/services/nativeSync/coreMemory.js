@@ -3,9 +3,16 @@
 const path = require('node:path');
 const { ownedJson } = require('./sharedLocal');
 const { fail } = require('./protocol');
-const { runtimeForRoot } = require('./sharedHost');
 
 function createCoreMemory(root, getLocalCore) {
+    async function checkOfflineAuthority() {
+        if (await ownedJson(root, path.join(root, '.vcp-core', 'profile.json'), { optional: true })) {
+            throw fail('CORE_HISTORY_OFFLINE_UNAVAILABLE');
+        }
+        const connection = await ownedJson(root, path.join(root, '.native-sync', 'connection.json'), { optional: true });
+        if (connection) throw fail('SHARED_AUTHORITY_UNAVAILABLE');
+    }
+
     async function resolve(ownerType, ownerId, topicId) {
         if (!topicId) return null;
         const local = getLocalCore?.()?.runtime;
@@ -17,35 +24,8 @@ function createCoreMemory(root, getLocalCore) {
             await local.define(descriptor);
             return { client, runtime: local, mapping: client.mapping(descriptor) };
         }
-        if (await ownedJson(root, path.join(root, '.vcp-core', 'profile.json'), { optional: true })) {
-            throw fail('CORE_HISTORY_OFFLINE_UNAVAILABLE');
-        }
-        const runtime = runtimeForRoot(root);
-        const client = runtime?.coreSingle;
-        if (!client) {
-            const directory = path.join(root, '.native-sync');
-            const connection = await ownedJson(root, path.join(directory, 'connection.json'), { optional: true });
-            const workspace = connection?.sharedSpaceId;
-            if (!/^[a-zA-Z0-9_-]{1,96}$/.test(workspace || '')) return null;
-            const state = await ownedJson(root, path.join(directory, 'shared', workspace, 'registry.json'), { optional: true });
-            if (!state?.coreSingle) return null;
-            for (const [key, binding] of Object.entries(state.locals)) {
-                const object = state.objects[key];
-                const parent = object && state.locals[object.parentId];
-                if (binding.kind !== 'topic' || !parent || parent.kind !== ownerType) continue;
-                if (ownerType === 'group' && !object.coreGroup) continue;
-                if (key === topicId || binding.localId === topicId && parent.localId === ownerId) {
-                    throw fail('CORE_HISTORY_OFFLINE_UNAVAILABLE');
-                }
-            }
-            return null;
-        }
-        const mapping = runtime.mappings().find(({ local, shared, sharedId }) =>
-            local.itemType === ownerType && (
-                local.itemId === ownerId && local.topicId === topicId ||
-                (shared.itemId === ownerId || ownerType === 'group') && sharedId === topicId
-            ));
-        return mapping && client.owns(mapping.local) ? { client, runtime, mapping: client.mapping(mapping.local) } : null;
+        await checkOfflineAuthority();
+        return null;
     }
 
     return {
@@ -57,9 +37,7 @@ function createCoreMemory(root, getLocalCore) {
                     '/memo-agent?' + new URLSearchParams({ name }));
                 return agent;
             }
-            if (await ownedJson(root, path.join(root, '.vcp-core', 'profile.json'), { optional: true })) {
-                throw fail('CORE_HISTORY_OFFLINE_UNAVAILABLE');
-            }
+            await checkOfflineAuthority();
             return undefined;
         },
         async search(request) {

@@ -75,4 +75,6 @@ function createTopicSponsorDelivery({ admission, resolver, findAgent, getPolicy 
     };
 }
 
-module.exports = { createTopicSponsorDelivery, DEFAULT_INVITE };
+const nativeSyncRouteId = randomUUID();
+
+module.exports = { createTopicSponsorDelivery, DEFAULT_INVITE, nativeSyncRouteId };

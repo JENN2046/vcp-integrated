@@ -18,4 +18,4 @@ Linux 构建清单共 32 项，SHA-256 为 `192d91c81238d7eb95182df4149e40d5c0bb
 
 **截图**　[Linux 丢回执后重开](linux/linux-group-ack-reopened.png) · [Windows 在线收到丙](windows/07-group-C-online-terminal.png) · [手机群聊冷开](android/09-group-cold.png) · [手机删除后正常续发并冷开](android/16-single-cold.png)
 
-在仓库根目录可运行 `python3 tests/release-a2a13b53555c/verify-release.py docs/evidence/release-a2a13b53555c` 重算三端和回退比对。原虚拟机已正常关机，测试后端已停止，手机切回机主，保留隔离用户、Firefox PWA 和该用户的限期测试 CA。本批 Windows 差分盘、冷备份和固定构建检出保留供复查。[完整运行入口](../../../tests/release-a2a13b53555c/README.md)
+在仓库根目录可运行 `python3 tests/release-a2a13b53555c/verify-release.py docs/evidence/release-a2a13b53555c` 重算三端和回退比对。原虚拟机已正常关机，测试后端已停止，手机切回机主，保留隔离用户、Firefox PWA 和该用户的限期测试 CA。本批 Windows 差分盘、冷备份和固定构建检出保留供复查。[完整运行入口](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/release-a2a13b53555c/README.md)

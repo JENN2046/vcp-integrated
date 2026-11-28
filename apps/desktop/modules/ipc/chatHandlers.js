@@ -440,9 +440,6 @@ function initialize(mainWindow, context) {
     });
 
     ipcMain.handle('save-agent-topic-title', async (event, agentId, topicId, newTitle, options) => {
-        const shared=historyMutationQueue?.syncPolicy?.sharedExecution?.runtime;
-        shared?.assertNativeMutation('agent',agentId,topicId);
-        if(shared?.nativeObject('agent',agentId)){try{return await shared.renameNativeTopic({itemType:'agent',itemId:agentId,topicId},newTitle,options);}catch(e){return {success:false,error:e.code||'SHARED_CONFIG_CONFLICT'};}}
         if (!topicId || !newTitle) return { error: "保存话题标题失败: topicId 或 newTitle 未提供。" };
         try {
             const core = historyMutationQueue?.coreClient;
@@ -473,14 +470,10 @@ function initialize(mainWindow, context) {
     });
 
     ipcMain.handle('regenerate-agent-topic-title', async (event, agentId, topicId) => {
-        historyMutationQueue?.syncPolicy?.sharedExecution?.runtime?.assertNativeMutation('agent',agentId,topicId);
         if (!agentId || !topicId) {
             return { success: false, error: 'Agent ID 或话题 ID 不能为空。' };
         }
         try {
-            const shared=historyMutationQueue?.syncPolicy?.sharedExecution?.runtime;
-            const titleContext=shared?.nativeObject('agent',agentId)?await shared.nativeDeletionContext({itemType:'agent',itemId:agentId,topicId}):null;
-            if(titleContext?.pendingMode)throw Error('SHARED_DIRECTORY_PENDING');
             const agentConfig = agentConfigManager
                 ? await agentConfigManager.readAgentConfig(agentId)
                 : await fs.readJson(path.join(AGENT_DIR, agentId, 'config.json'));
@@ -491,7 +484,7 @@ function initialize(mainWindow, context) {
 
             const historyFile = path.join(USER_DATA_DIR, agentId, 'topics', topicId, 'history.json');
             const descriptor = { itemType: 'agent', itemId: agentId, topicId };
-            const core = historyMutationQueue?.coreClient || shared?.coreSingle;
+            const core = historyMutationQueue?.coreClient;
             const history = core?.owns(descriptor) ? (await core.history(descriptor)).history
                 : await fs.pathExists(historyFile) ? await fs.readJson(historyFile) : [];
             const effectiveMessageCount = Array.isArray(history)
@@ -521,7 +514,6 @@ function initialize(mainWindow, context) {
                 return { success: false, error: 'AI 未能生成有效的话题标题。' };
             }
 
-            if(titleContext){const saved=await shared.renameNativeTopic({itemType:'agent',itemId:agentId,topicId},newTitle,titleContext);return {...saved,newTitle,sourceMessageCount:Math.min(effectiveMessageCount,topicTitleManager.MIN_MESSAGES_FOR_SUMMARY)};}
             let savedTopics = null;
             if (agentConfigManager) {
                 await agentConfigManager.updateAgentConfig(agentId, existingConfig => {
@@ -628,9 +620,7 @@ function initialize(mainWindow, context) {
     });
 
     const createNativeAgentTopic=async (event, agentId, topicName, isBranch = false, locked = true, onlyIfEmpty = false) => {
-        const shared = historyMutationQueue?.syncPolicy?.sharedExecution?.runtime;
         try {
-            shared?.assertNativeMutation('agent',agentId,undefined);
             const core = historyMutationQueue?.coreClient;
             core?.assertCanConfigure();
             const newTopicId = `topic_${Date.now()}_${crypto.randomUUID()}`;
@@ -665,11 +655,6 @@ function initialize(mainWindow, context) {
                     return { ...existingConfig, topics: [newTopic, ...(existingConfig.topics || [])] };
                 });
                 if (existingTopicsOnSave) return { success: true, topics: existingTopicsOnSave };
-                // The shared discovery path must bind this new native topic
-                // before the guarded History queue may initialize its file.
-                if (shared?.ready&&!shared.closed) {
-                    await shared.tick({ forceLocal: true, skipExecution: true, skipAttachments: true });
-                }
                 const updatedConfig = await agentConfigManager.readAgentConfig(agentId);
 
                 await core?.defineTopic({ itemId: agentId, itemType: 'agent', topicId: newTopicId });
@@ -1044,31 +1029,6 @@ function initialize(mainWindow, context) {
 
         let streamTask = null;
         let streamTaskDetached = false;
-        let regeneration = false;
-        let regenerationTimeout;
-        let readPausedMessage;
-        // A dropped transport or a pause frame is only a hint. Confirm the
-        // exact generation and its already-projected Journal row before showing it.
-        const recoverToolPause = async () => {
-            const message = await readPausedMessage?.().catch(error => {
-                console.warn('[NativeSync] Could not confirm paused generation:', error.code || error.name);
-                return null;
-            });
-            if (!message) return null;
-            if (message.awaitingNativeTask && message.requestId === messageId) {
-                trajectoryCall.finish({ aborted: true });
-                if (modelConfig.stream === true) sendStreamPayload({
-                    type: 'end', messageId, context, modelFinishReason: 'interrupted', awaitingNativeTask: true,
-                });
-                return { awaitingNativeTask: true, context };
-            }
-            trajectoryCall.finish({ aborted: true });
-            if (modelConfig.stream === true) sendStreamPayload({
-                type: 'end', messageId, context, aborted: true, modelFinishReason: 'interrupted',
-                pausedWorkMessage: message,
-            });
-            return { pausedWorkMessage: message, context };
-        };
         let trajectoryCall = null; // 侧栏「调用轨迹」的记录句柄；记录器自己吞掉一切异常
         const finishStreamTask = () => {
             if (!streamTask) return;
@@ -1082,7 +1042,6 @@ function initialize(mainWindow, context) {
                 hostHooks.emit('chat:stream-payload', aborted ? { ...payload, type: 'end', aborted: true } : payload);
             }
             if (aborted || event.sender.isDestroyed()) return false;
-            if ((regeneration || context?.sharedRegeneration === true) && payload.type !== 'ephemeral_presentation') return false;
             try {
                 event.sender.send(streamChannel, { ...payload, streamOperationId });
                 return true;
@@ -1167,7 +1126,6 @@ function initialize(mainWindow, context) {
                 settings = await fs.readJson(settingsPath);
             }
 
-            if(historyMutationQueue.syncPolicy?.sharedExecution)settings={...settings,...historyMutationQueue.syncPolicy.sharedExecution.policy(context,messageId)};
 
             // **强制检查和切换URL**
             if (settings.enableVcpToolInjection === true) {
@@ -1361,25 +1319,17 @@ function initialize(mainWindow, context) {
                 return { error: `请求体序列化失败: ${serializeError.message}` };
             }
 
-            const sharedRequest=await require('../services/topicExecutionAuthority').prepareNativeRequest({authority:topicExecutionAuthority,queue:historyMutationQueue,context:buildRequestContext(context,messageId),body:requestBody});
-            if(sharedRequest)serializedBody=JSON.stringify(sharedRequest.body);
-            regeneration = sharedRequest?.regeneration === true;
-            if (context?.sharedRegeneration === true && !regeneration) {
+            await require('../services/topicExecutionAuthority').prepareNativeRequest({
+                authority: topicExecutionAuthority, context: buildRequestContext(context, messageId)
+            });
+            if (context?.sharedRegeneration === true) {
                 throw Object.assign(new Error('SHARED_REGENERATION_ADMISSION_REQUIRED'), { code: 'SHARED_REGENERATION_ADMISSION_REQUIRED' });
             }
-            if (regeneration) {
-                streamTask ||= vcpStreamTasks.begin(event.sender, messageId, 'chat:regeneration', {
-                    cancelOnNavigation: true,
-                });
-                regenerationTimeout = setTimeout(() => streamTask?.controller.abort(), 900000);
-            }
-            readPausedMessage = sharedRequest?.readPausedMessage;
             const requestBodyDeadline=Date.now()+900000;
             const responsePromise = fetch(finalVcpUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(sharedRequest?.headers||{}),
                     'Authorization': `Bearer ${vcpApiKey}`
                 },
                 body: serializedBody,
@@ -1412,11 +1362,6 @@ function initialize(mainWindow, context) {
                     }
                 } catch (e) { /* Not JSON, use raw text */ }
 
-                if (response.status === 409 && errorData.nativeSync?.code === 'WORK_SAFE_TOOL_BOUNDARY' &&
-                    errorData.nativeSync.requestId === messageId) {
-                    const pause = await recoverToolPause();
-                    if (pause) return pause;
-                }
                 // 🔧 改进错误消息构造，防止 [object Object]
                 let errorMessage = '';
                 if (errorData.message && typeof errorData.message === 'string') {
@@ -1457,7 +1402,6 @@ function initialize(mainWindow, context) {
                     sendStreamPayload(errorPayload);
                     // 为函数返回值构造统一的 errorDetail.message
                     const finalErrorMessageForReturn = `VCP请求失败: ${response.status} - ${errorMessage}`;
-                    return { streamError: true, ...(regeneration && { errorCode: errorData?.error?.code || 'UPSTREAM_HTTP_ERROR' }), error: `VCP请求失败 (${response.status})`, errorDetail: { message: finalErrorMessageForReturn, originalData: errorData } };
                 }
                 const err = new Error(errorMessageToPropagate);
                 err.details = errorData;
@@ -1476,12 +1420,8 @@ function initialize(mainWindow, context) {
 
                 async function processStream() {
                     let bodyReachedEOF = false;
-                    let regenerationText = '';
-                    let regenerationBytes = 0;
-                    let regenerationFinish;
                     try {
                         const { createSseDecoder } = await import('../chat/sseProtocol.mjs');
-                        const normalizeChunk = regeneration && (await import('../chat/contentRuntime.js')).normalizeStreamChunk;
                         const protocol = createSseDecoder({
                             onData(parsedChunk) {
                                 const presentation = takeResidentPresentationFromChunk(parsedChunk, residentPresentationChannel);
@@ -1490,12 +1430,10 @@ function initialize(mainWindow, context) {
                                     return;
                                 }
                                 trajectoryCall.chunk(parsedChunk);
-                                if (regeneration) regenerationText += normalizeChunk(parsedChunk);
                                 sendStreamPayload({ type: 'data', chunk: parsedChunk, messageId, context });
                             },
                             onDone(terminal) {
                                 const interrupted = terminal.finishReason === 'interrupted';
-                                regenerationFinish = terminal.finishReason;
                                 trajectoryCall.finish({ aborted: interrupted });
                                 sendStreamPayload({
                                     type: 'end', messageId, context, modelFinishReason: terminal.finishReason,
@@ -1506,30 +1444,14 @@ function initialize(mainWindow, context) {
                         while (true) {
                             const result = await reader.read(); bodyReachedEOF = result.done;
                             if (result.value) {
-                                if (regeneration && (regenerationBytes += result.value.byteLength) > 32 * 1024 * 1024) {
-                                    throw Object.assign(new Error('RESPONSE_BODY_TOO_LARGE'), { code: 'RESPONSE_BODY_TOO_LARGE' });
-                                }
                                 protocol.push(result.value);
                             }
                             if (result.done) { protocol.finish(); break; }
                             if (protocol.done) break;
                         }
-                        // Regeneration publishes only a complete reply through the
-                        // shared terminal authority. Its transport is never a
-                        // normal visible stream or a separate History writer.
-                        if (regeneration) {
-                            const completion = { choices: [{
-                                message: { role: 'assistant', content: regenerationText },
-                                finish_reason: regenerationFinish,
-                            }] };
-                            (await import('../chat/boundedResponse.mjs')).validateCompletion(completion);
-                            return { response: completion, context };
-                        }
                     } catch (streamError) {
-                        if (readPausedMessage && await recoverToolPause()) return;
                         trajectoryCall.finish({ error: streamError, aborted: streamError?.name === 'AbortError' || streamTask?.controller.signal.aborted === true });
                         sendStreamPayload({ type: 'error', error: streamError.message, code: streamError.code || 'STREAM_READ_ERROR', messageId, context });
-                        if (regeneration) return { streamError: true, errorCode: streamError.code || 'STREAM_READ_ERROR', context };
                     } finally {
                         finishStreamTask();
                         const reportCancelFailure = error => {
@@ -1546,7 +1468,6 @@ function initialize(mainWindow, context) {
                     }
                 }
 
-                if (regeneration) return await processStream();
 
                 // IPC returns when streaming starts; the detached reader owns
                 // terminal delivery and response cleanup.
@@ -1585,10 +1506,6 @@ function initialize(mainWindow, context) {
             }
 
         } catch (error) {
-            if (readPausedMessage) {
-                const pause = await recoverToolPause();
-                if (pause) return pause;
-            }
             console.error('VCP请求错误 (catch block):', error);
             trajectoryCall?.finish({ error, aborted: error?.name === 'AbortError' || streamTask?.controller.signal.aborted === true });
             if (!isGroupCall && modelConfig.stream !== true) {
@@ -1602,7 +1519,6 @@ function initialize(mainWindow, context) {
             }
             return {error:`VCP请求错误: ${error.message}`,errorCode:error.code||'NETWORK_UNAVAILABLE',context};
         } finally {
-            clearTimeout(regenerationTimeout);
             if (!streamTaskDetached) finishStreamTask();
         }
     });

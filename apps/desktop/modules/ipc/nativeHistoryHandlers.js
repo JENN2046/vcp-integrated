@@ -3,7 +3,7 @@ const { authorityForQueue } = require('../services/historyAuthority');
 const { mergeTerminal } = require('../services/nativeSync/mergeTerminal');
 function initialize({ ipcMain, historyMutationQueue: queue }) {
     const core = d => {
-        const client = queue.coreClient || queue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
+        const client = queue.coreClient;
         return client?.owns(d) ? client : null;
     };
     ipcMain.handle('native-history:status', () => queue.syncPolicy?.diagnostics() || { enabled: false });
@@ -11,7 +11,7 @@ function initialize({ ipcMain, historyMutationQueue: queue }) {
         const d = {itemId,itemType,topicId};
         const client = core(d);
         if (!client && !queue.isSyncEnabled(d)) return {handled:false};
-        try { if(client)return await client.mutate(d,intent);if(queue.syncPolicy?.sharedExecution)return await queue.syncPolicy.sharedExecution.commit(d,intent);return {...await queue.commitMessages(d,intent),handled:true}; }
+        try { if(client)return await client.mutate(d,intent);return {...await queue.commitMessages(d,intent),handled:true}; }
         catch (error) { return {handled:true,success:false,error:error.code||'HISTORY_MESSAGE_COMMIT_FAILED',localState:error.code==='HISTORY_COMMIT_OUTCOME_UNKNOWN'?'unknown':'failed',...(error.commitId?{commitId:error.commitId}:{})}; }
     });
     ipcMain.handle('native-history:retry-local', async (_event,itemId,itemType,topicId,commitId) => {
@@ -25,15 +25,9 @@ function initialize({ ipcMain, historyMutationQueue: queue }) {
             const d = { itemId, itemType, topicId };
             const client = core(d);
             if (client) return await client.history(d);
-            if (queue.syncPolicy?.isRecoveryFence) {
-                const { CoreSingleClient } = require('../services/nativeSync/coreSingleClient');
-                const cached = await CoreSingleClient.offlineHistory(queue, d);
-                if (cached) return cached;
-            }
             if (!queue.isSyncEnabled(d)) return { syncEnabled: false };
             const read = async () => {
                 if (!queue.isSyncEnabled(d)) return { syncEnabled: false };
-                await queue.syncPolicy?.sharedExecution?.waitProjection?.(d);
                 return queue.readSnapshot(d);
             };
             const authority = authorityForQueue(queue);
@@ -48,7 +42,6 @@ function initialize({ ipcMain, historyMutationQueue: queue }) {
         if (!queue.isSyncEnabled(d)) return { handled: false };
         try {
             if (!['completed','stop'].includes(projected?.finishReason) || projected?.error || projected?.nativeFailure) throw Object.assign(new Error('NATIVE_TERMINAL_REVIEW_REQUIRED'), {code:'NATIVE_TERMINAL_REVIEW_REQUIRED'});
-            if(queue.syncPolicy?.sharedExecution)return await queue.syncPolicy.sharedExecution.terminal(d,projected);
             const causal=context.nativeCausalContext;
             if(causal&&(causal.version!==1||typeof causal.known!=='boolean'||!Array.isArray(causal.dependsOnMessageIds)||causal.dependsOnMessageIds.length>1000||causal.dependsOnMessageIds.some(id=>typeof id!=='string'||!id||id.length>512||id===projected.messageId)))throw Object.assign(Error('INVALID_TERMINAL_CAUSAL_CONTEXT'),{code:'INVALID_TERMINAL_CAUSAL_CONTEXT'});
             // Completion-time visible history can contain unrelated transient

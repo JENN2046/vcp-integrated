@@ -178,7 +178,6 @@ class PluginAgentOperationService {
         logger = console,
         idempotencyTtlMs = 10 * 60 * 1000,
         topicDelivery = null,
-        sharedTopicDelivery = null,
         assertLocalOwner = null,
     } = {}) {
         if (!agentDir || !userDataDir || !agentConfigManager || !historyMutationQueue) {
@@ -193,7 +192,6 @@ class PluginAgentOperationService {
         this.logger = logger;
         this.idempotencyTtlMs = idempotencyTtlMs;
         this.topicDelivery = topicDelivery;
-        this.sharedTopicDelivery = sharedTopicDelivery;
         this.assertLocalOwner = assertLocalOwner;
         this.completedRequests = new Map();
         this.runningRequests = new Map();
@@ -727,8 +725,7 @@ class PluginAgentOperationService {
         const command = args.command || args.tool_name;
         this.assertCommand('topic', command);
         if (command === 'ReplyToTopic' && Object.hasOwn(args, '_nativeSyncTopicSponsor')) {
-            if (!this.sharedTopicDelivery) throw new Error('SHARED_NATIVE_ROUTE_REQUIRED');
-            return this.sharedTopicDelivery(args, executionContext);
+            throw new Error('SHARED_NATIVE_ROUTE_REQUIRED');
         }
         const requestId = executionContext.requestId || executionContext.vcpContext?.requestId;
         const mutating = ['CreateTopic', 'CreateFlowlockTopic', 'ReplyToTopic'].includes(command);

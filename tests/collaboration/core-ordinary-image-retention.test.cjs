@@ -8,7 +8,7 @@ const path = require('node:path');
 const https = require('node:https');
 const {createHash,X509Certificate} = require('node:crypto');
 const {execFileSync} = require('node:child_process');
-const {BOX,wait} = require('../native/fixtures/sharedSingleHarness.cjs');
+const {BOX,wait} = require('../native/fixtures/coreSingleHarness.cjs');
 const {localProvider,host} = require('../native/fixtures/coreSingleHarness.cjs');
 
 test('ordinary Core PWA image send commits its links with admission and never resends after a lost receipt', {timeout:45000}, async t => {

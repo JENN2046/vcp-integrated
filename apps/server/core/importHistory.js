@@ -180,8 +180,8 @@ function importHistory(root, destination) {
     if (!outside(relative) || !outside(reverse)) throw new Error('Migration destination must be separate from the source snapshot');
     const manifest = readJson(under(root, path.join(root, 'manifest.json')));
     if (!manifest.workspace || !Array.isArray(manifest.topics) || !manifest.topics.length) throw new Error('Invalid migration manifest');
-    if (manifest.authority !== undefined && manifest.authority !== 'local') throw new Error('Unsupported history import authority');
-    const localKey = manifest.authority === 'local' ? require('./localWorkspace').localTopicKey : null;
+    if (manifest.authority !== 'local') throw new Error('Unsupported history import authority');
+    const { localTopicKey } = require('./localWorkspace');
     const open = file => file && new DatabaseSync(under(root, path.resolve(root, file)), { readOnly: true });
     const central = open(manifest.central);
     let cds, store;
@@ -189,8 +189,7 @@ function importHistory(root, destination) {
         cds = open(manifest.cds);
         const plans = manifest.topics.map(topic => {
             identity({ ...topic, msgId: 'migration' });
-            if (localKey && topic.key !== localKey(...tuple(topic))) throw new Error('Invalid personal Core topic key');
-            if (typeof topic.key !== 'string' || !topic.key) throw new Error('Missing target Core topic ID');
+            if (topic.key !== localTopicKey(...tuple(topic))) throw new Error('Invalid personal Core topic key');
             const plan = collect(root, central, cds, topic);
             for (const entry of plan.entries) {
                 if (!entry.deleted) entry.files = (entry.message?.attachments || []).map(ref => attachmentSource(root, topic, entry, ref));
@@ -201,7 +200,7 @@ function importHistory(root, destination) {
             new Set(plans.map(plan => JSON.stringify(tuple(plan.topic)))).size !== plans.length) {
             throw new Error('Duplicate conversation in migration manifest');
         }
-        const fingerprint = sha256(stable({ workspace: manifest.workspace, ...(localKey && { authority: 'local' }), plans: plans.map(plan => ({
+        const fingerprint = sha256(stable({ workspace: manifest.workspace, authority: 'local', plans: plans.map(plan => ({
             ...plan, entries: plan.entries.map(({ files, ...entry }) => ({ ...entry,
                 ...(files && { fileDigests: files.map(file => file.digest) }) }))
         })) }));
@@ -253,10 +252,8 @@ function importHistory(root, destination) {
                         files += portable.length;
                     }
                 }
-                if (localKey) {
-                    store.db.prepare("INSERT INTO core_metadata VALUES('authority','local')").run();
-                    store.db.prepare("INSERT INTO core_metadata VALUES('local_workspace',?)").run(manifest.workspace);
-                }
+                store.db.prepare("INSERT INTO core_metadata VALUES('authority','local')").run();
+                store.db.prepare("INSERT INTO core_metadata VALUES('local_workspace',?)").run(manifest.workspace);
                 const stats = { fingerprint, conversations: plans.length, messages, deleted, attachments: files };
                 store.db.prepare("INSERT INTO core_metadata VALUES('history_import',?)").run(JSON.stringify(stats));
                 return stats;

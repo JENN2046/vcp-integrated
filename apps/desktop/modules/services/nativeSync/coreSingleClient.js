@@ -4,8 +4,6 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { randomUUID, createHash } = require('node:crypto');
 const { fail, stable } = require('./protocol');
-const { syncHeaders } = require('./syncRequest');
-const { sourceRoute } = require('./connection');
 const { ownedJson } = require('./sharedLocal');
 const { fieldsFrom, projectDesktopReferences } = require('./metadata');
 const { durableJson } = require('./durableJson');
@@ -15,57 +13,10 @@ const projectionFile = (directory, sharedId) => path.join(directory, 'core-singl
 const active = new Set(['queued', 'running', 'waiting_approval', 'cancelling']);
 
 class CoreSingleClient {
-    static async offlineHistory(queue, descriptor) {
-        const policy = queue.syncPolicy;
-        if (!['group','agent'].includes(descriptor.itemType) || !policy?.isRecoveryFence ||
-            policy.diagnostics?.().degraded !== 'NETWORK_UNAVAILABLE' ||
-            !/^[a-zA-Z0-9_-]{1,96}$/.test(policy.sharedSpaceId || '')) return null;
-        const root = path.dirname(queue.userDataDir);
-        const directory = path.join(root, '.native-sync', 'shared', policy.sharedSpaceId);
-        const state = await ownedJson(root, path.join(directory, 'registry.json'), { optional: true });
-        if (!state?.coreSingle) return null;
-        const owner = Object.entries(state.locals).find(([id, binding]) =>
-            binding.kind === descriptor.itemType && binding.localId === descriptor.itemId && !binding.hidden &&
-            !binding.aliasOf && state.objects[id] && !state.objects[id].deleted);
-        const topic = owner && Object.entries(state.locals).find(([id, binding]) =>
-            binding.kind === 'topic' && binding.localParent === descriptor.itemId && binding.localId === descriptor.topicId &&
-            !binding.hidden && !binding.aliasOf && !state.objects[id]?.deleted && state.objects[id]?.parentId === owner[0]);
-        if (!topic || descriptor.itemType === 'group' && !state.objects[topic[0]].coreGroup) return null;
-        const cached = await ownedJson(root, projectionFile(directory, topic[0]), { optional: true });
-        if (!cached && descriptor.itemType === 'group') throw fail('CORE_HISTORY_OFFLINE_UNAVAILABLE');
-        return cached && { ...cached, syncEnabled: true, core: true, offline: true, revision: queue.revision(cached.history) };
-    }
-
     constructor(runtime) {
         this.runtime = runtime;
         this.previews = new Map();
         this.histories = new Map();
-    }
-
-    owns(descriptor) {
-        const r = this.runtime;
-        if (!r.capabilities?.spaces?.some(workspace => workspace.id === r.connection.sharedSpaceId && workspace.coreSingle === true)) return false;
-        if ((descriptor?.itemType || 'agent') === 'agent') return true;
-        if (descriptor.itemType !== 'group') return false;
-        const mapping = r.mappings().find(({ local, shared }) => [local, shared].some(scope =>
-            scope.itemType === 'group' && scope.itemId === descriptor.itemId && scope.topicId === descriptor.topicId));
-        return Boolean(mapping && r.state.objects[mapping.sharedId]?.coreGroup);
-    }
-
-    mapping(descriptor) {
-        const r = this.runtime;
-        r.assertSharedAccess();
-        const mapping = r.mappings().find(({ local }) => local.itemType === (descriptor.itemType || 'agent') &&
-            local.itemId === descriptor.itemId && local.topicId === descriptor.topicId);
-        if (!mapping) throw fail('SHARED_LOCAL_MAPPING_REQUIRED');
-        if (!r.isLocalVisible(mapping.sharedId)) throw fail('SHARED_LOCAL_REMOVED');
-        r.matching.assert([mapping.sharedId, r.state.objects[mapping.sharedId].parentId]);
-        return mapping;
-    }
-
-    route(mapping, resource) {
-        const ids = [this.runtime.connection.sharedSpaceId, mapping.sharedId].map(encodeURIComponent);
-        return '/api/plugins/NativeSync/core/' + ids.join('/') + '/' + resource;
     }
 
     file(mapping, name) {
@@ -159,16 +110,6 @@ class CoreSingleClient {
         if (finished.hash !== hash) throw fail('ATTACHMENT_HASH_MISMATCH');
         if (finished.parseError) throw fail(finished.parseError);
         return response.uploadId;
-    }
-
-    async announceResources() {
-        const r = this.runtime;
-        const space = r.capabilities?.spaces?.find(item => item.id === r.connection.sharedSpaceId);
-        if (!space?.coreResources) return;
-        const { nativeSyncRouteId } = require('./sharedTopicSponsor');
-        await r.send('/api/plugins/NativeSync/core/' + encodeURIComponent(space.id) + '/resource-node', {
-            body: { routeHash: digest(nativeSyncRouteId) }
-        });
     }
 
     async send(descriptor, message) {
@@ -442,16 +383,11 @@ class CoreSingleClient {
         const r = this.runtime;
         const run = async () => {
             const { consumeSharedEvents } = await import('./sharedEventClient.mjs');
-            const c = r.connection;
             const route = this.route(mapping, 'observe');
-            const url = r.observeRequest ? null : c.url + sourceRoute(c, route);
             const signal = r.accessController ? AbortSignal.any([controller.signal, r.accessController.signal]) : controller.signal;
             while (!signal.aborted && !r.closed) {
                 try {
-                    const response = r.observeRequest ? await r.observeRequest(route, signal) : await fetch(url, { headers: {
-                        ...syncHeaders(c), Authorization: 'Bearer ' + c.token,
-                        'X-NativeSync-Capabilities': 'shared-space-v1'
-                    }, signal, redirect: 'error', cache: 'no-store' });
+                    const response = await r.observeRequest(route, signal);
                     await consumeSharedEvents(response, (data, type) => this.onEvent(mapping, data, type), { signal, envelope: true });
                 } catch (error) {
                     if (error.code === 'SHARED_EVENT_PERMISSION_REQUIRED' || signal.aborted) break;

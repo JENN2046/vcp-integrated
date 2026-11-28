@@ -2,20 +2,17 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const http = require('node:http');
+const os = require('node:os');
 const https = require('node:https');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { createHash, X509Certificate } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
-const { fixture, wait, BOX } = require('../native/fixtures/sharedSingleHarness.cjs');
-const { localProvider, host, mountCore, setStream } = require('../native/fixtures/coreSingleHarness.cjs');
+const { BOX, coreFixture, localProvider, host, wait } = require('../native/fixtures/coreSingleHarness.cjs');
 
 test('Core PWA retires each finished preview across a missed or late event', {timeout:30000}, async t => {
-    const f = await fixture(t);
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'core-preview-'));
     const provider = await localProvider(t);
-    setStream(f,true);
-    const { core, route } = await mountCore(f,host(provider).chat);
     const streams = [];
     provider.setReply((_body,res) => {
         res.writeHead(200,{'Content-Type':'text/event-stream'});
@@ -25,14 +22,14 @@ test('Core PWA retires each finished preview across a missed or late event', {ti
     const finish = (index,text) => streams[index].end('data: '+JSON.stringify({
         choices:[{delta:{content:text},finish_reason:'stop'}]
     })+'\n\ndata: [DONE]\n\n');
-    const key = path.join(f.root,'preview.key'), cert = path.join(f.root,'preview.pem');
-    execFileSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=localhost'],{stdio:'ignore'});
+    const key = path.join(root,'preview.key'), cert = path.join(root,'preview.pem');
+    execFileSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=localhost','-addext','subjectAltName=IP:127.0.0.1'],{stdio:'ignore'});
     const certificate = await fs.readFile(cert);
     const spki = createHash('sha256').update(new X509Certificate(certificate).publicKey.export({type:'spki',format:'der'})).digest('base64');
     let feed, holdChanges = false, holdWorks = false, worksBeforeSecondFinal, writes = 0;
     const proxy = https.createServer({key:await fs.readFile(key),cert:certificate},(req,res) => {
         const request = new URL(req.url,'https://localhost');
-        if (req.method==='POST' && /\/(?:send|steer)$/.test(request.pathname)) writes++;
+        if (!req.headers['x-fixture-command'] && req.method==='POST' && /\/(?:send|steer)$/.test(request.pathname)) writes++;
         if (request.pathname.endsWith('/observe')) {
             // The real snapshots advance independently of this controlled SSE feed.
             feed = res;
@@ -46,8 +43,8 @@ test('Core PWA retires each finished preview across a missed or late event', {ti
         if (holdWorks && request.pathname.endsWith('/works')) {
             return res.writeHead(200,{'Content-Type':'application/json'}).end(JSON.stringify(worksBeforeSecondFinal));
         }
-        const forward = http.request(f.url+req.url,{method:req.method,headers:{
-            ...req.headers,'x-forwarded-proto':'https',origin:'https://synthetic-shared.invalid'
+        const forward = https.request(f.endpoint + req.url, { ca: f.certificate, method: req.method, headers: {
+            ...req.headers, origin
         }}, response => {
             res.writeHead(response.statusCode,response.headers);
             response.pipe(res);
@@ -59,12 +56,16 @@ test('Core PWA retires each finished preview across a missed or late event', {ti
     await new Promise(resolve => proxy.listen(0,'127.0.0.1',resolve));
     const push = (event,data) => feed.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     const origin = 'https://127.0.0.1:'+proxy.address().port;
-    const grant = f.portal.createPairing({scopeMode:'shared',sharedSpaceId:'sharedAB',permissions:['read']});
+    const f = await coreFixture(t, host(provider).chat, { root, origin, proxyCertificate: certificate });
+    const { core } = f;
+    const { route, key: topicId } = await f.define({ config: { name: 'Fixture Agent', model: 'synthetic',
+        systemPrompt: 'Isolated fixture.', streamOutput: true } });
+    const grant = core.remote.sessions.createCode(['shared:personal:read']);
     let browser;
     try {
         browser = await require(BOX+'/node_modules/puppeteer').launch({
             executablePath:process.env.CHROME_BIN||'/opt/google/chrome/chrome',headless:true,
-            userDataDir:path.join(f.root,'preview-browser'),
+            userDataDir:path.join(root,'preview-browser'),
             args:['--ignore-certificate-errors-spki-list='+spki,'--disable-background-networking','--no-first-run',
                 '--no-proxy-server','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1']
         });
@@ -75,11 +76,15 @@ test('Core PWA retires each finished preview across a missed or late event', {ti
         await page.goto(origin+'/mobile/',{waitUntil:'domcontentloaded'});
         await page.waitForSelector('#pair-code',{visible:true});
         await page.type('#pair-code',grant.pairingCode);
+        await page.waitForSelector('#pair-submit:not([disabled])');
+        const paired = page.waitForResponse(response => response.url().endsWith('/api/pair'));
         await page.click('#pair-submit');
+        const pairReply = await paired;
+        assert.equal(pairReply.status(), 200, await pairReply.text());
         await page.waitForSelector('#topic-select');
-        await page.select('#topic-select',f.topic.id);
+        await page.select('#topic-select',topicId);
         await wait(() => feed,'PWA observation feed');
-        const sender = await f.phone();
+        const sender = await f.mobile();
         const send = requestId => sender.call(route+'/send',{requestId,text:requestId},202);
         const first = await send('fixture-preview-first');
         await wait(() => streams.length===1,'first Work running');
@@ -166,7 +171,5 @@ test('Core PWA retires each finished preview across a missed or late event', {ti
         await browser?.close();
         proxy.closeAllConnections();
         await new Promise(resolve => proxy.close(resolve));
-        await core.close();
-        await fs.rm(f.root+'-core',{recursive:true,force:true});
     }
 });

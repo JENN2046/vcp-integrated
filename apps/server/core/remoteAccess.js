@@ -5,7 +5,7 @@ const path = require('node:path');
 const { PairedSessions, protectedHttps } = require('../Plugin/NativeSync/mobile/pairedSessions');
 const { entryId, sessionMarker } = require('../Plugin/NativeSync/mobile/submissionRecovery');
 const { failure } = require('./store');
-const { createLocalSpeech, denySpeechUpgrade } = require('./localSpeech');
+const { createLocalSpeech, denySpeechUpgrade } = require('../modules/speech/localSpeech');
 
 function remoteOrigin(value) {
     const url = new URL(value);

@@ -8,18 +8,20 @@ const http = require('node:http');
 const https = require('node:https');
 const { createHash, X509Certificate } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
-const { fixture, wait, BOX } = require('../native/fixtures/sharedSingleHarness.cjs');
-const { localProvider, host, mountCore, setStream } = require('../native/fixtures/coreSingleHarness.cjs');
+const os = require('node:os');
+const { wait, BOX, localProvider, host } = require('../native/fixtures/coreSingleHarness.cjs');
+const { CoreService } = require(BOX + '/core/service');
+const { localTopicKey } = require(BOX + '/core/localWorkspace');
+const express = require(BOX + '/node_modules/express');
 
 test('Core single chat PWA shows live output, steers the current work, accepts a new message, and recovers on reconnect', { timeout: 45000 }, async t => {
-    const f = await fixture(t, {attachments:true});
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'core-steering-pwa-'));
     const evidence = process.env.VCP_MOBILE_UI_EVIDENCE;
     if (evidence) await fs.mkdir(evidence, {recursive:true});
     const shot = async (page, name) => {
         if (evidence) await page.screenshot({path:path.join(evidence, name + '.png')});
     };
     const provider = await localProvider(t);
-    setStream(f, true);
     const { chat, pluginManager } = host(provider);
     const toolName = 'FixtureLightingNotes';
     let toolRuns = 0;
@@ -28,7 +30,6 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         processToolCall: async () => { toolRuns++; return {status:'success', result:'fixture lighting notes returned'}; }
     }});
     t.after(() => { pluginManager.serviceModules.delete(toolName); pluginManager.plugins.delete(toolName); });
-    const { core } = await mountCore(f, chat);
     const upstream = [];
     provider.setReply((_body, res) => {
         upstream.push(res);
@@ -43,13 +44,12 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         choices: [{ delta: { content }, finish_reason: 'stop' }]
     }) + '\n\ndata: [DONE]\n\n');
     const composerPosts = [];
-    let proxy, browser, steeringFault, holdSteeringReceipt = false;
+    let core, backend, backendUrl, origin, proxy, browser, steeringFault, holdSteeringReceipt = false;
     let steeringReads = 0, heldSteering, issuedRejection;
     let holdObserverReceipt = true, holdStaleReceipt = true, holdNewRequestId;
     try {
-        const grant = f.portal.createPairing({ scopeMode: 'shared', sharedSpaceId: 'sharedAB', permissions: ['read','execute'] });
-        const cert = path.join(f.root, 'core-pwa-cert.pem');
-        const key = path.join(f.root, 'core-pwa-key.pem');
+        const cert = path.join(root, 'core-pwa-cert.pem');
+        const key = path.join(root, 'core-pwa-key.pem');
         execFileSync('openssl', ['req','-x509','-newkey','rsa:2048','-nodes','-keyout',key,'-out',cert,'-days','1','-subj','/CN=localhost'], { stdio: 'ignore' });
         const certificate = await fs.readFile(cert);
         const spki = createHash('sha256').update(new X509Certificate(certificate).publicKey.export({ type: 'spki', format: 'der' })).digest('base64');
@@ -79,8 +79,8 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
                     return res.writeHead(503, { 'Content-Type':'application/json' }).end('{}');
                 }
             }
-            const forward = http.request(f.url + req.url, { method: req.method, headers: {
-                ...req.headers, 'x-forwarded-proto': 'https', origin: 'https://synthetic-shared.invalid'
+            const forward = http.request(backendUrl + req.url, { method: req.method, headers: {
+                ...req.headers, 'x-forwarded-proto': 'https', origin
             } }, response => {
                 res.writeHead(response.statusCode, response.headers);
                 if (fault !== 'after') return response.pipe(res);
@@ -99,9 +99,29 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
             } else req.pipe(forward);
         });
         await new Promise(resolve => proxy.listen(0, '127.0.0.1', resolve));
+        origin = 'https://127.0.0.1:' + proxy.address().port;
+        core = new CoreService({ directory: path.join(root, 'core'), workspace: 'personal', chat,
+            remoteConfig: { origin, hours: 8 } });
+        const definition = { ownerType: 'agent', ownerId: 'fixture', topicId: 'lighting', name: 'Lighting',
+            config: { name: 'Fixture', systemPrompt: 'Isolated fixture.', model: 'synthetic', streamOutput: true } };
+        const topicId = localTopicKey(definition.ownerType, definition.ownerId, definition.topicId);
+        await core.local.define(topicId, definition, () => true);
+        const actor = core.local.actor;
+        const topic = core.topic(actor, 'personal', topicId, 'execute');
+        const startWork = async (requestId, text) => {
+            const work = await core.send(topic, actor.principal, { requestId, text }, () => {}, actor);
+            return work.workId;
+        };
+        const app = express();
+        app.set('trust proxy', 'loopback');
+        app.use('/mobile', core.remote.router('mobile'));
+        backend = http.createServer(app);
+        await new Promise(resolve => backend.listen(0, '127.0.0.1', resolve));
+        backendUrl = 'http://127.0.0.1:' + backend.address().port;
+        const grant = core.remote.sessions.createCode(['shared:personal:read', 'shared:personal:execute']);
         browser = await require(BOX + '/node_modules/puppeteer').launch({
             executablePath: process.env.CHROME_BIN || '/opt/google/chrome/chrome', headless: true,
-            userDataDir: path.join(f.root, 'core-pwa-browser'),
+            userDataDir: path.join(root, 'core-pwa-browser'),
             args: ['--ignore-certificate-errors-spki-list=' + spki, '--disable-background-networking', '--no-first-run',
                 '--no-proxy-server', '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1']
         });
@@ -117,24 +137,21 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.waitForSelector('#pair-submit:not([disabled])');
         await page.click('#pair-submit');
         await page.waitForSelector('#topic-select');
-        await page.select('#topic-select', f.topic.id);
+        await page.select('#topic-select', topicId);
         await page.waitForFunction(key => document.querySelector('#topic-select')?.value === key &&
-            !document.querySelector('#message-text')?.disabled, {}, f.topic.id);
-        const desktop = await f.desktop('A');
-        const first = await desktop.runtime.prepareSharedSend({ descriptor: desktop.descriptor, serverSession: true,
-            message: { id: 'from-desktop', role: 'user', content: '把明天的拍摄安排整理一下：先拍产品主图，再拍细节，最后试一组上身图。', attachments: [] } });
-        await desktop.close();
+            !document.querySelector('#message-text')?.disabled, {}, topicId);
+        const firstWork = await startWork('from-desktop', '把明天的拍摄安排整理一下：先拍产品主图，再拍细节，最后试一组上身图。');
         await page.waitForFunction(() => document.querySelector('.live-message .bubble')?.textContent.includes('共用布光'));
-        const firstRun = '[data-reply-work-id="' + first.serverSession.executionId + '"]';
-        assert.equal(await page.$('[data-run-id="'+first.serverSession.executionId+'"]'),null);
+        const firstRun = '[data-reply-work-id="' + firstWork + '"]';
+        assert.equal(await page.$('[data-run-id="'+firstWork+'"]'),null);
         // The SSE preview can arrive before /works ties the Work to its original message.
-        await page.waitForSelector('[data-exec-id="'+first.serverSession.executionId+'"][data-state="running"]');
+        await page.waitForSelector('[data-exec-id="'+firstWork+'"][data-state="running"]');
         await page.setOfflineMode(true);
         await page.waitForSelector('.connection-banner', {visible:true});
         await page.waitForFunction(sel=>document.querySelector(sel)?.textContent.includes('核对任务'),{},firstRun);
         await page.setOfflineMode(false);
         await page.waitForSelector('.connection-banner', {hidden:true});
-        await page.waitForSelector('[data-live-work-id="'+first.serverSession.executionId+'"] .bubble');
+        await page.waitForSelector('[data-live-work-id="'+firstWork+'"] .bubble');
         assert.deepEqual(composerPosts, []);
         await shot(page, '02a-reconnected-same-run');
         await page.waitForSelector('#quote-task',{visible:true});
@@ -169,7 +186,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         holdSteeringReceipt = true;
         await page.click('#send');
         await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
-        assert.equal(core.store.work(first.serverSession.executionId).steering_count, 1);
+        assert.equal(core.store.work(firstWork).steering_count, 1);
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForFunction(text => document.querySelector('#message-text')?.value === text,{},quotedDraft);
         const observer=await browser.newPage();
@@ -197,7 +214,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         holdSteeringReceipt = true;
         await page.$eval('.message-composer', form => form.requestSubmit());
         await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认'));
-        await wait(()=>composerPosts.length===2 && core.store.work(first.serverSession.executionId).steering_count===2,
+        await wait(()=>composerPosts.length===2 && core.store.work(firstWork).steering_count===2,
             'second request accepted with its receipt withheld');
         const newer = await page.evaluate(key=>localStorage.getItem(key),snapshot.key);
         holdNewRequestId = JSON.parse(newer).intent.requestId;
@@ -242,7 +259,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.waitForFunction(()=>!document.querySelector('#message-text').value &&
             document.querySelector('#steering-delivery')?.textContent.includes('Core 已收到追加指令'));
         t.diagnostic('A delayed first receipt with a stale read preserved the newer pending request after reopening; two POSTs.');
-        assert.equal(core.store.work(first.serverSession.executionId).steering_count,2);
+        assert.equal(core.store.work(firstWork).steering_count,2);
         assert.equal(await observer.$eval('#message-text',el=>el.value),quotedDraft);
         holdObserverReceipt=false;
         await observer.bringToFront();
@@ -275,23 +292,25 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await wait(() => upstream.length === 2, 'steering reached provider for same work');
         assert.match(JSON.stringify(provider.calls[1].messages), /请把白底主图放在第一组/);
         assert.equal(composerPosts.length,2);
-        assert.ok(composerPosts[0].endsWith('/works/'+first.serverSession.executionId+'/steer'));
+        assert.ok(composerPosts[0].endsWith('/works/'+firstWork+'/steer'));
         await page.waitForSelector('#quote-task',{visible:true});
         await page.click('#quote-task');
         const preservedDraft = '附上现场灯光记录。';
         await page.type('#message-text', preservedDraft);
         const finalText = '\n\n第一组｜白底产品主图\n先固定机位、白平衡和产品朝向，再补正面与侧面。\n\n第二组｜细节与功能\n保留原布光，拉近拍材质与缝线。两组都拍完后，再切换到上身布景。';
         finish(upstream[1], finalText);
-        await page.waitForFunction(id => Boolean(document.querySelector('[data-message-id="' + id + '"] .bubble')?.textContent.includes('第二组')), {}, first.replyId);
-        assert.equal(await page.$('[data-run-id="'+first.serverSession.executionId+'"]'),null);
+        await wait(() => core.store.work(firstWork).status === 'completed', 'steered Work completed');
+        const firstReplyId = core.store.work(firstWork).reply_message_id;
+        await page.waitForFunction(id => Boolean(document.querySelector('[data-message-id="' + id + '"] .bubble')?.textContent.includes('第二组')), {}, firstReplyId);
+        assert.equal(await page.$('[data-run-id="'+firstWork+'"]'),null);
         await page.evaluate((replyId)=>{
             const reply=document.querySelector('[data-message-id="'+replyId+'"]');
             reply.style.marginTop='1200px';
             document.getElementById('history').scrollTop=0;
-        },first.replyId);
+        },firstReplyId);
         await page.waitForFunction(sel=>document.querySelector(sel)?.textContent.includes('查看原回复'),{},firstRun);
         await page.click(firstRun + ' .work-reply');
-        assert.equal(await page.evaluate(() => document.activeElement?.dataset.messageId), first.replyId);
+        assert.equal(await page.evaluate(() => document.activeElement?.dataset.messageId), firstReplyId);
         await page.reload({waitUntil:'domcontentloaded'});
         await page.waitForSelector('#task-quote[data-closed="true"]');
         assert.equal(await page.$eval('#message-text', el=>el.value),preservedDraft);
@@ -316,7 +335,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.waitForFunction(()=>document.querySelector('[data-message-id]'));
         await shot(page,'04-core-dark-chat');
         assert.equal(await page.$eval('#message-text', el=>el.value),preservedDraft);
-        const notes = path.join(f.root, '灯光记录.txt');
+        const notes = path.join(root, '灯光记录.txt');
         await fs.writeFile(notes, '现场灯光记录：主灯柔光箱，左侧 45 度。');
         const fileInput = await page.waitForSelector('#composer-file-picker');
         await fileInput.uploadFile(notes);
@@ -352,12 +371,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         assert.equal(composerPosts.length,3);
         assert.ok(composerPosts[2].endsWith('/send'));
         assert.equal(upstream.length,4,'reconnect and reload must not create another execution');
-        const nextDesktop = await f.desktop('A');
-        const startWork = async (id, content) => nextDesktop.runtime.prepareSharedSend({
-            descriptor: nextDesktop.descriptor, serverSession: true,
-            message: { id, role:'user', content, attachments:[] }
-        });
-        const ending = await startWork('ending-between-click-and-core', 'Work ending during steering POST');
+        const endingWork = await startWork('ending-between-click-and-core', 'Work ending during steering POST');
         await wait(() => upstream.length === 5, 'Work for explicit rejection running');
         await page.waitForSelector('#quote-task', { visible:true });
         await page.click('#quote-task');
@@ -369,11 +383,11 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.type('#message-text', '，后来编辑保留');
         const retained = '应保留的追加草稿，后来编辑保留';
         finish(upstream[4], 'Work closed before processing steering');
-        await wait(() => core.store.work(ending.serverSession.executionId).status === 'completed', 'Work closed');
+        await wait(() => core.store.work(endingWork).status === 'completed', 'Work closed');
         heldSteering();
         await page.waitForFunction(() => document.querySelector('#steering-delivery')?.textContent.includes('已拒绝'), {timeout:5000});
         assert.equal(issuedRejection,409);
-        assert.equal(core.store.work(ending.serverSession.executionId).steering_count,0);
+        assert.equal(core.store.work(endingWork).steering_count,0);
         assert.equal(await page.$eval('#message-text', el=>el.value),retained);
         assert.ok(await page.evaluate(text=>Object.keys(localStorage).some(key=>
             key.startsWith('vcp.mobile.draft.v1:')&&JSON.parse(localStorage.getItem(key))?.text===text),retained));
@@ -390,13 +404,14 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         finish(upstream[5], 'New message reply');
         await page.waitForFunction(() => [...document.querySelectorAll('#history .bubble')].some(row=>row.textContent.includes('New message reply')));
 
-        const limited = await startWork('steering-limit-mobile', 'Work for the ninth steering attempt');
-        const limitedWork = limited.serverSession.executionId;
+        const limitedWork = await startWork('steering-limit-mobile', 'Work for the ninth steering attempt');
         await wait(() => upstream.length === 7, 'Work for steering limit running');
-        const phone = await f.phone();
-        const steer = '/core/sharedAB/' + f.topic.id + '/works/' + limitedWork + '/steer';
+        const steer = '/mobile/api/core/personal/' + topicId + '/works/' + limitedWork + '/steer';
         for (let i = 1; i <= 8; i++) {
-            await phone.call(steer, { requestId:'limit-fixture-000'+i, text:'Existing steering '+i }, 202);
+            const status = await page.evaluate(async (route, body) => (await fetch(route, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+            })).status, steer, { requestId:'limit-fixture-000'+i, text:'Existing steering '+i });
+            assert.equal(status, 202);
         }
         await page.waitForSelector('#quote-task', {visible:true});
         await page.click('#quote-task');
@@ -411,7 +426,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.waitForSelector('#quote-exit-rejected',{visible:true,timeout:5000});
         assert.equal(await page.$eval('#message-text', el=>el.value),'第九次追加草稿');
         assert.equal(core.store.work(limitedWork).steering_count,8);
-        assert.equal(composerPosts.length,6,'the ninth attempt must not be replayed');
+        assert.equal(composerPosts.length,14,'the ninth attempt must not be replayed');
         t.diagnostic('Core WORK_STEERING_LIMIT HTTP 429 on the ninth attempt released the quote lock; eight additions and one denied PWA POST.');
         await page.click('#quote-exit-rejected');
         await page.$eval('#message-text', el=>{el.value='';el.dispatchEvent(new Event('input',{bubbles:true}));});
@@ -420,7 +435,7 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         finish(upstream[7],'Limited work finished');
         await wait(() => core.store.work(limitedWork).status==='completed','Limited work completed');
 
-        const before = await startWork('before-steering-disconnect', 'Work A for unsent steering');
+        const beforeWork = await startWork('before-steering-disconnect', 'Work A for unsent steering');
         await wait(() => upstream.length === 9, 'Work A running');
         await page.waitForSelector('#quote-task', { visible:true });
         await page.click('#quote-task');
@@ -429,9 +444,9 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.waitForSelector('#task-quote');
         await page.waitForSelector('#send:not([disabled])');
         await page.$eval('.message-composer', form => form.requestSubmit());
-        await wait(() => composerPosts.length === 7, 'steering POST interrupted before reaching Core');
+        await wait(() => composerPosts.length === 15, 'steering POST interrupted before reaching Core');
         await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认'), { timeout: 5000 });
-        assert.equal(core.store.work(before.serverSession.executionId).steering_count, 0);
+        assert.equal(core.store.work(beforeWork).steering_count, 0);
         await page.reload({ waitUntil:'domcontentloaded' });
         await page.waitForFunction(() => document.querySelector('#message-text')?.value === '未到达 Core 的追加');
         await page.type('#message-text', '，后来编辑');
@@ -439,8 +454,8 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         await page.waitForSelector('.connection-banner', { visible:true });
         await page.setOfflineMode(false);
         finish(upstream[8], 'Work A finished');
-        await wait(() => core.store.work(before.serverSession.executionId).status === 'completed', 'Work A completed');
-        const next = await startWork('replacement-work-b', 'Work B in same topic');
+        await wait(() => core.store.work(beforeWork).status === 'completed', 'Work A completed');
+        const nextWork = await startWork('replacement-work-b', 'Work B in same topic');
         await wait(() => upstream.length === 10, 'Work B running');
         await page.waitForFunction(() => document.querySelector('#task-quote')?.textContent.includes('尚未确认') &&
             document.querySelector('#message-text')?.value === '未到达 Core 的追加，后来编辑' &&
@@ -449,16 +464,16 @@ test('Core single chat PWA shows live output, steers the current work, accepts a
         assert.equal(await page.$('#quote-task'), null);
         assert.equal(await page.$('#steering-remove-local'), null, 'a valid unknown intent is never offered as a corrupt record');
         await page.$eval('.message-composer', form => form.requestSubmit());
-        assert.equal(composerPosts.length, 7, 'recovery never POSTs, including after the task ends and a new one starts');
-        assert.ok(composerPosts[6].endsWith('/works/' + before.serverSession.executionId + '/steer'));
-        assert.equal(core.store.work(next.serverSession.executionId).steering_count, 0);
+        assert.equal(composerPosts.length, 15, 'recovery never POSTs, including after the task ends and a new one starts');
+        assert.ok(composerPosts[14].endsWith('/works/' + beforeWork + '/steer'));
+        assert.equal(core.store.work(nextWork).steering_count, 0);
         finish(upstream[9], 'Work B finished');
-        await nextDesktop.close();
         assert.deepEqual(errors, []);
     } finally {
         await browser?.close();
         if (proxy) await close(proxy);
-        await core.close();
-        await fs.rm(f.root + '-core', { recursive: true, force: true });
+        if (backend) await close(backend);
+        await core?.close();
+        await fs.rm(root, { recursive: true, force: true });
     }
 });

@@ -17,7 +17,7 @@
 
 共享提交的重放使用同一请求 ID，确认仍指向同一已完成 Work，账本、handler 和 Provider 收包保持一致。每条路径观察到两次真实模型请求，第二次派发前已读到甲保存的回复。
 
-[基线收包摘要](before.json) · [候选收包摘要](after.json) · [合成输入](../../../tests/speaker-semantics/input.json)
+[基线收包摘要](before.json) · [候选收包摘要](after.json) · [合成输入](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/speaker-semantics/input.json)
 
 ## 复跑
 

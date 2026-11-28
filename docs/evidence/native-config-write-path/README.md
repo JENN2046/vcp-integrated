@@ -26,4 +26,4 @@ NS_CONFIG_BASELINE=0 node \
 
 候选截图依次展示 [本机表单保存](./local-native-config-saved.png)、[共享表单合并保存名称和头像](./native-name-avatar-one-save.png)、[版本冲突保留草稿](./quick-name-conflict.png)和[重放后恢复](./quick-name-recovered.png)。丢回执期间，B 后台投影与 A 待确认状态独立推进。两次运行的中间采样点可能分别落在 B 的原生文件写入和投影账本更新之间。重放后，两端磁盘和账本均确认到中央版本 2。
 
-另用真实回环配置接口返回正文与 hash 不匹配的合成 GET。原生 Agent 表单返回 `SHARED_CONFIG_RESPONSE_INVALID`，没有发起配置 POST，没有进入本机保存分支，Agent 文件和中央对象保持原值。[原生入口回归](../../../tests/native/native-config-save-receipts.test.cjs)
+另用真实回环配置接口返回正文与 hash 不匹配的合成 GET。原生 Agent 表单返回 `SHARED_CONFIG_RESPONSE_INVALID`，没有发起配置 POST，没有进入本机保存分支，Agent 文件和中央对象保持原值。[原生入口回归](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/native/native-config-save-receipts.test.cjs)

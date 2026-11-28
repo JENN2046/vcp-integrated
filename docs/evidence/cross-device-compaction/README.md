@@ -23,6 +23,6 @@ A 在原生桌面菜单中生成共享检查点后正常退出。B 用自己的�
 
 单独修复了一个桌面时序问题。B 在启动期间读取共享 History，偶尔正碰上宿主切换 History 写入权限。一次实测中磁盘已有检查点，界面等了 30 秒也没有显示；另一次已显示正式回复，界面仍报 `HISTORY_AUTHORITY_PENDING`。共享快照的只读 IPC 现在等待正在进行的权限切换结束，再通过原入口核对投影和读取权限。权限切换失败或应用正在关闭时，读取仍会失败。最终两轮都在 B 重开后直接核对了检查点、B 输入和正式回复的 DOM ID。[改前读失败回执](desktop-history-read.json) · [改后恢复画面](desktop/B-recovered-original-work.png)
 
-服务端另用两个有时差的检查点和一次旧消息编辑做了对照。基线选中了较早发布的摘要；候选按发布顺序选中最后一个，编辑过的旧 ID 也留在已压缩范围内。新输入即使显示时间较早，仍能连同检查点后的正式回复进入后续请求。[基线请求](pair/server-clock-baseline.json) · [候选请求](pair/server-clock-candidate.json) · [回归用例](../../../tests/native/shared-session.test.cjs)
+服务端另用两个有时差的检查点和一次旧消息编辑做了对照。基线选中了较早发布的摘要；候选按发布顺序选中最后一个，编辑过的旧 ID 也留在已压缩范围内。新输入即使显示时间较早，仍能连同检查点后的正式回复进入后续请求。[基线请求](pair/server-clock-baseline.json) · [候选请求](pair/server-clock-candidate.json) · [回归用例](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/native/shared-session.test.cjs)
 
 原生套件 228/228、协作套件 53/53、桌面压缩相关 66/66、History 权威与读取回归 27/27。终版同端压缩与重开用例、带附件的原生与共享请求对照也通过。两次中间同端运行曾分别报 `SOURCE_PATH_ALIAS` 和 `SHARED_COMPACTION_SUPERSEDED`；终版同端用例未复现这两项，原因未单独归定。

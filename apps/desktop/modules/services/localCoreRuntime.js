@@ -12,7 +12,7 @@ const { fail } = require('./nativeSync/protocol');
 const { DesktopAttachments } = require('./nativeSync/attachments');
 const { extractAgentDTO } = require('../../VCPDistributedServer/Plugin/VCPMobileSync/dto/agent.dto');
 const { extractGroupDTO } = require('../../VCPDistributedServer/Plugin/VCPMobileSync/dto/group.dto');
-const { projectRules } = require('./nativeSync/sharedHost');
+const { projectRules } = require('./nativeSync/executionConfigs');
 
 function mapTopic(descriptor) {
     const { itemType = 'agent', itemId, topicId } = descriptor;
@@ -47,7 +47,7 @@ class LocalCoreClient extends CoreSingleClient {
     }
 
     async announceResources() {
-        const { nativeSyncRouteId } = require('./nativeSync/sharedTopicSponsor');
+        const { nativeSyncRouteId } = require('./topicSponsorDelivery');
         await this.runtime.send(this.runtime.base + '/' + encodeURIComponent(this.runtime.workspace) + '/resource-node', {
             body: { routeHash: createHash('sha256').update(nativeSyncRouteId).digest('hex') }
         });
@@ -363,7 +363,7 @@ async function openLocalCore({ queue, appDataRoot, workspace, readSettings, read
     });
     let queries;
     try {
-        queries = ipcMain && registerNativeSyncQueries({ ipcMain, getRuntime: () => runtime, getMainWindow, queue });
+        queries = ipcMain && registerNativeSyncQueries({ ipcMain, getRuntime: () => runtime, getMainWindow });
     } catch (error) {
         delete queue.coreClient;
         queue.configureSync(previousPolicy);

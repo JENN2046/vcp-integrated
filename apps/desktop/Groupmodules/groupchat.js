@@ -5,7 +5,6 @@ const nativeFs = require('node:fs/promises');
 const path = require('path');
 const { ipcMain } = require('electron');
 const crypto = require('crypto');
-const sharedGroup = require('../modules/services/nativeSync/sharedGroup');
 const { withTopicGenerationLease } = require('../modules/services/topicGenerationLease');
 const { replaceFile } = require('../modules/utils/atomicReplace');
 const { protectHistoryConfiguration } = require('../modules/utils/historyConfiguration');
@@ -286,17 +285,13 @@ function getGroupHistoryDescriptor(groupId, topicId) {
 }
 
 async function assertNativeGroupTopic(groupId, topicId, groupConfig, groupHistoryPath) {
-    // Frozen execution config owns generation; native config owns topic membership.
-    const nativeTopicConfig = sharedGroup.current()
-        ? await fs.readJson(path.join(mainAppPaths.AGENT_GROUPS_DIR, groupId, 'config.json')) : groupConfig;
-    if (nativeTopicConfig._historyDeleting || !nativeTopicConfig.topics?.some(topic => topic.id === topicId)
+    if (groupConfig._historyDeleting || !groupConfig.topics?.some(topic => topic.id === topicId)
         || !await fs.pathExists(groupHistoryPath)) {
         throw new Error('目标群聊话题或历史已不存在');
     }
 }
 
 async function readLatestGroupHistory(groupId, topicId) {
-    if(sharedGroup.current())return sharedGroup.history(groupId,topicId,[]);
     if (groupHistoryMutationQueue) {
         return groupHistoryMutationQueue.read(getGroupHistoryDescriptor(groupId, topicId));
     }
@@ -311,12 +306,10 @@ function requireGroupHistoryQueue() {
 async function initializeGroupHistory(groupId, topicId) {
     const queue = requireGroupHistoryQueue();
     const descriptor = getGroupHistoryDescriptor(groupId, topicId);
-    if (queue.syncPolicy?.sharedExecution?.runtime?.coreSingle?.owns(descriptor)) return { success: true };
     return queue.initializeIfMissing(descriptor, []);
 }
 
 async function appendGroupHistoryMessage(groupId, topicId, message) {
-    if(sharedGroup.current())return sharedGroup.append(groupId,topicId,message);
     requireGroupHistoryQueue();
     const nativeIntent = { source: 'group-append', known: true, causalContextIds: [] };
     const result = await groupHistoryMutationQueue.mutate(
@@ -470,7 +463,7 @@ async function getGroupSessionWatcher(groupId, topicId) {
 async function getVcpGlobalSettings() {
     if (mainAppPaths.SETTINGS_FILE && await fs.pathExists(mainAppPaths.SETTINGS_FILE)) {
         try {
-            const settings = sharedGroup.policy(await fs.readJson(mainAppPaths.SETTINGS_FILE));
+            const settings = await fs.readJson(mainAppPaths.SETTINGS_FILE);
             return {
                 vcpUrl: settings.vcpServerUrl,
                 vcpApiKey: settings.vcpApiKey,
@@ -589,11 +582,6 @@ async function createAgentGroup(groupName, initialConfig = {}) {
         const groupId = `${baseName}_${crypto.randomUUID()}`;
         const groupDir = path.join(mainAppPaths.AGENT_GROUPS_DIR, groupId);
 
-        const shared = requireGroupHistoryQueue().syncPolicy?.sharedExecution?.runtime;
-        if (shared) {
-            if (!shared.ready || shared.closed) throw new Error('SHARED_STARTUP_PENDING');
-            shared.assertNativeMutation('group', groupId);
-        }
         await fs.mkdir(groupDir);
 
         const defaultConfig = {
@@ -640,8 +628,6 @@ async function createAgentGroup(groupName, initialConfig = {}) {
             throw new Error('Invalid or duplicate group topic identity');
         }
         await replaceFile(path.join(groupDir, 'config.json'), JSON.stringify(configToSave, null, 2));
-        // Discovery needs the saved group config to bind its topics before History opens them.
-        if (shared) await shared.tick({ forceLocal: true, skipExecution: true, skipAttachments: true });
         for (const topic of topics) await initializeGroupHistory(groupId, topic.id);
 
         console.log(`[GroupChat] AgentGroup created: ${groupName} (ID: ${groupId})`);
@@ -705,7 +691,6 @@ async function versionedGroupAvatarUrl(groupDir, avatarFile) {
  * @returns {Promise<object|null>} - 群组配置对象，或 null (如果未找到)
  */
 async function getAgentGroupConfig(groupId) {
-    const frozen=sharedGroup.groupConfig(groupId);if(frozen)return frozen;
     if (!mainAppPaths.AGENT_GROUPS_DIR) return null;
     try {
         const groupDir = path.join(mainAppPaths.AGENT_GROUPS_DIR, groupId);
@@ -963,13 +948,12 @@ async function handleGroupChatMessage(groupId, topicId, userMessage, sendStreamC
     await assertNativeGroupTopic(groupId, topicId, groupConfig, groupHistoryPath);
     let groupHistory = await fs.readJson(groupHistoryPath);
 
-    groupHistory = await sharedGroup.history(groupId,topicId,groupHistory);
     const globalVcpSettings = await getVcpGlobalSettings();
     const userNameForMessage = userMessage.name || globalVcpSettings.userName || '用户';
 
     // VCPChatTarven (高级回复) - 收集生效的群聊规则
     const conversationSnapshot = await require('../modules/services/conversationContext').resolve({ type: 'group', id: groupId });
-    const tavernRules = sharedGroup.rules(() => conversationSnapshot.rules);
+    const tavernRules = conversationSnapshot.rules;
 
 
 
@@ -1109,7 +1093,7 @@ async function handleGroupChatMessage(groupId, topicId, userMessage, sendStreamC
     let agentsToRespond = [];
     const modeHandler = CHAT_MODES[groupConfig.mode];
     if (modeHandler) {
-        agentsToRespond = sharedGroup.speakers() || modeHandler.determineSpeakers(activeMembers, groupHistory, groupConfig, userMessageEntry, queueContext);
+        agentsToRespond = modeHandler.determineSpeakers(activeMembers, groupHistory, groupConfig, userMessageEntry, queueContext);
     } else {
         console.warn(`[GroupChat] 未知的群聊模式: ${groupConfig.mode}，不自动响应。`);
         agentsToRespond = [];
@@ -1137,7 +1121,7 @@ async function handleGroupChatMessage(groupId, topicId, userMessage, sendStreamC
             const agentId = agentConfig.id;
         const agentName = agentConfig.name || agentId; // 修复：如果名称丢失，回退到 agentId
         // 为每个Agent的响应生成唯一ID
-        const messageIdForAgentResponse = sharedGroup.replyId(agentId, `msg_group_${userMessage.id}_${agentId}_${Date.now()}`);
+        const messageIdForAgentResponse = `msg_group_${userMessage.id}_${agentId}_${Date.now()}`;
 
         // 重新从文件读取最新的历史记录，确保获取到上一个Agent的发言
         // 注意：如果Agent非常多且发言很快，频繁读写文件可能会有性能影响，
@@ -1147,7 +1131,7 @@ async function handleGroupChatMessage(groupId, topicId, userMessage, sendStreamC
         // 当前的 groupHistory 是在函数开始时加载的，并在用户发言后追加了用户消息。
         // 我们将在每个 AI 发言后，将 AI 的回复也追加到这个内存中的 groupHistory，并写回文件。
 
-        const admission = sharedGroup.current() ? null : groupTopicAdmission;
+        const admission = groupTopicAdmission;
         const admissionScope = getGroupHistoryDescriptor(groupId, topicId);
         while (run.barrier) await run.barrier;
         const admissionToken = run.token || crypto.randomUUID();
@@ -1272,7 +1256,6 @@ ${canvasData.errors || 'No errors'}
                 }
             }
 
-            textForAIContext = sharedGroup.contextText(contextHistoryForAgent,msg,textForAIContext,agentConfig,userMessageEntry.id);
             const contentWithSpeakerTag = withGroupSpeaker(textForAIContext, speakerName);
             const vcpMessageContent = [{ type: 'text', text: contentWithSpeakerTag }];
 
@@ -1478,7 +1461,7 @@ ${canvasData.errors || 'No errors'}
             let response;
             try {
                 admissionDispatched = true;
-                response = await sharedGroup.send(fetch,resolveGroupChatUrl(globalVcpSettings.vcpUrl, globalVcpSettings.enableVcpToolInjection), {
+                response = await fetch(resolveGroupChatUrl(globalVcpSettings.vcpUrl, globalVcpSettings.enableVcpToolInjection), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1737,7 +1720,6 @@ ${canvasData.errors || 'No errors'}
 
     // 总结话题的逻辑现在移到函数末尾，无论是否有AI自动回复，都可能触发
     // （例如，用户发了多条消息，即使在邀请模式下没有AI回复，也可能达到总结条件）
-    if(sharedGroup.current())return; // Shared turn does not dispatch a background title-model call.
     const finalGroupConfigForSummary = await getAgentGroupConfig(groupId);
     const finalGroupHistoryPathForSummary = path.join(mainAppPaths.USER_DATA_DIR, groupId, 'topics', topicId, 'history.json');
     let finalGroupHistoryForSummary = [];
@@ -1763,7 +1745,7 @@ ${canvasData.errors || 'No errors'}
  */
 async function handleInviteAgentToSpeak(groupId, topicId, invitedAgentId, sendStreamChunkToRenderer, getAgentConfigById, options = {}) {
     const admissionQueueContext = createGroupQueueContext(groupId, topicId);
-    const admission = sharedGroup.current() ? null : groupTopicAdmission;
+    const admission = groupTopicAdmission;
     const config = admission ? await getAgentGroupConfig(groupId) : null;
     if (!admission || config?.mode === 'game') {
         return handleInviteAgentToSpeakOwned(groupId, topicId, invitedAgentId, sendStreamChunkToRenderer, getAgentConfigById, options);
@@ -1818,14 +1800,13 @@ async function handleInviteAgentToSpeakOwned(groupId, topicId, invitedAgentId, s
     await assertNativeGroupTopic(groupId, topicId, groupConfig, groupHistoryPath);
     let groupHistory = await fs.readJson(groupHistoryPath);
 
-    groupHistory = await sharedGroup.history(groupId,topicId,groupHistory);
     const globalVcpSettings = await getVcpGlobalSettings();
     const agentName = agentConfig.name || invitedAgentId; // 修复：如果名称丢失，回退到 invitedAgentId
-    const messageIdForAgentResponse = sharedGroup.replyId(invitedAgentId, `msg_group_invited_${groupId}_${topicId}_${invitedAgentId}_${Date.now()}`);
+    const messageIdForAgentResponse = `msg_group_invited_${groupId}_${topicId}_${invitedAgentId}_${Date.now()}`;
 
     // VCPChatTarven (高级回复) - 收集生效的群聊规则
     const conversationSnapshot = await require('../modules/services/conversationContext').resolve({ type: 'group', id: groupId });
-    const tavernRulesInvite = sharedGroup.rules(() => conversationSnapshot.rules);
+    const tavernRulesInvite = conversationSnapshot.rules;
 
     // 1. 构建 SystemPrompt
     let combinedSystemPrompt = agentConfig.systemPrompt || `你是${agentName}。`;
@@ -1931,7 +1912,6 @@ ${canvasData.errors || 'No errors'}
             }
         }
 
-        textForAIContext = sharedGroup.contextText(contextHistoryForAgent,msg,textForAIContext,agentConfig);
         const contentWithSpeakerTag = withGroupSpeaker(textForAIContext, speakerName);
         const vcpMessageContent = [{ type: 'text', text: contentWithSpeakerTag }];
 
@@ -2145,7 +2125,7 @@ ${canvasData.errors || 'No errors'}
         let response;
         try {
             options.admissionLifecycle?.dispatched();
-            response = await sharedGroup.send(fetch,resolveGroupChatUrl(globalVcpSettings.vcpUrl, globalVcpSettings.enableVcpToolInjection), {
+            response = await fetch(resolveGroupChatUrl(globalVcpSettings.vcpUrl, globalVcpSettings.enableVcpToolInjection), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2353,7 +2333,6 @@ ${canvasData.errors || 'No errors'}
     if (gameRequest || options.skipSummary === true || queueContext.isAborted()) return;
 
     // 邀请发言后也尝试总结话题
-    if(sharedGroup.current())return; // Shared turn does not dispatch a background title-model call.
     const finalGroupConfigForSummary = await getAgentGroupConfig(groupId);
     const finalGroupHistoryPathForSummary = path.join(mainAppPaths.USER_DATA_DIR, groupId, 'topics', topicId, 'history.json');
     let finalGroupHistoryForSummary = [];
@@ -2455,8 +2434,6 @@ async function createNewTopicForGroup(groupId, topicName, onlyIfEmpty = false) {
             return { ...current, topics: [acceptedTopic, ...topics] };
         });
         if (!result.success) return { success: false, error: result.error };
-        const shared=require('../modules/services/nativeSync/sharedHost').runtimeForRoot(mainAppPaths.APP_DATA_ROOT_IN_PROJECT);
-        if(shared?.ready&&!shared.closed)await shared.tick({forceLocal:true,skipExecution:true,skipAttachments:true});
         await initializeGroupHistory(groupId, acceptedTopic.id);
         return { success: true, topicId: acceptedTopic.id, topicName: acceptedTopic.name, topics: result.agentGroup.topics };
     } catch (error) {
@@ -2502,9 +2479,6 @@ async function regenerateGroupTopicTitle(groupId, topicId) {
     }
 
     try {
-        const shared=require('../modules/services/nativeSync/sharedHost').runtimeForRoot(mainAppPaths.APP_DATA_ROOT_IN_PROJECT);
-        const titleContext=shared?.nativeObject('group',groupId)?await shared.nativeDeletionContext({itemType:'group',itemId:groupId,topicId}):null;
-        if(titleContext?.pendingMode)throw Error('SHARED_DIRECTORY_PENDING');
         const groupConfig = await getAgentGroupConfig(groupId);
         const topic = groupConfig?.topics?.find(candidate => candidate.id === topicId);
         if (!topic) {
@@ -2512,7 +2486,7 @@ async function regenerateGroupTopicTitle(groupId, topicId) {
         }
 
         const descriptor = { itemType: 'group', itemId: groupId, topicId };
-        const core = groupHistoryMutationQueue?.coreClient || shared?.coreSingle;
+        const core = groupHistoryMutationQueue?.coreClient;
         const groupHistory = core?.owns(descriptor) ? (await core.history(descriptor)).history : await getGroupChatHistory(groupId, topicId);
         const effectiveMessageCount = Array.isArray(groupHistory)
             ? groupHistory.filter(message => message && message.role !== 'system' && message.isThinking !== true).length
@@ -2531,7 +2505,7 @@ async function regenerateGroupTopicTitle(groupId, topicId) {
             return { success: false, error: 'AI 未能生成有效的话题标题。' };
         }
 
-        const saveResult = titleContext?await shared.renameNativeTopic({itemType:'group',itemId:groupId,topicId},newTitle,titleContext):await saveGroupTopicTitle(groupId, topicId, newTitle);
+        const saveResult = await saveGroupTopicTitle(groupId, topicId, newTitle);
         if (!saveResult.success) return saveResult;
 
         return {
@@ -2590,7 +2564,7 @@ async function redoGroupChatMessage(groupId, topicId, messageIdToDelete, agentId
     if (groupConfig?.mode === 'game') {
         throw new Error('已提交游戏事件不能通过聊天redo删除或重演。');
     }
-    const admission = sharedGroup.current() ? null : groupTopicAdmission;
+    const admission = groupTopicAdmission;
     const scope = getGroupHistoryDescriptor(groupId, topicId);
     const operation = async lifecycle => {
         if (queueContext.isAborted()) return;
@@ -2655,18 +2629,7 @@ async function interruptGroupRequest(messageId) {
  * 中止指定群组话题的整组发言队列。
  * 当前活动请求会被取消，尚未启动的模式发言者会由队列上下文阻止调度。
  */
-function requireLocalJevAdmission(groupId) {
-    // Shared turns must enter through their existing accepted-native owner.
-    // JEV has no shared native-turn admission contract; do not start its local orchestrator.
-    if (groupHistoryMutationQueue?.syncPolicy?.sharedExecution?.runtime?.nativeObject('group', groupId)) {
-        throw Object.assign(new Error('当前共享群聊尚不支持 JEV 原生执行，请使用已支持的共享群聊模式。'), {
-            code: 'SHARED_NATIVE_ADMISSION_REQUIRED'
-        });
-    }
-}
-
 async function startJevGroupChat(groupId, topicId, sendStreamChunkToRenderer) {
-    requireLocalJevAdmission(groupId);
     const groupConfig = await getAgentGroupConfig(groupId);
     if (!groupConfig || groupConfig.mode !== 'jev') {
         return { success: false, error: '当前群组未启用 JEV 群聊模式。' };
@@ -2681,7 +2644,6 @@ async function startJevGroupChat(groupId, topicId, sendStreamChunkToRenderer) {
 }
 
 async function continueJevGroupChat(groupId, topicId, sendStreamChunkToRenderer) {
-    requireLocalJevAdmission(groupId);
     const groupConfig = await getAgentGroupConfig(groupId);
     if (!groupConfig || groupConfig.mode !== 'jev') {
         return { success: false, error: '当前群组未启用 JEV 群聊模式。' };
@@ -2700,7 +2662,6 @@ async function continueJevGroupChat(groupId, topicId, sendStreamChunkToRenderer)
 }
 
 async function enqueueJevGroupAgent(groupId, topicId, agentId, sendStreamChunkToRenderer) {
-    requireLocalJevAdmission(groupId);
     const groupConfig = await getAgentGroupConfig(groupId);
     if (!groupConfig || groupConfig.mode !== 'jev') {
         return { success: false, error: '当前群组未启用 JEV 群聊模式。' };
@@ -2795,11 +2756,10 @@ module.exports = {
     getAgentGroupConfig,
     saveAgentGroupConfig,
     deleteAgentGroup,
-    groupMemberHandoff: (payload, notify, lookup) => sharedGroup.action(groupHistoryMutationQueue,payload,notify,lookup,handleGroupChatMessage),
-    handleGroupChatMessage: (...args) => sharedGroup.wrap(groupHistoryMutationQueue,'message',handleGroupChatMessage)(...args),
-    handleInviteAgentToSpeak: (...args) => sharedGroup.wrap(groupHistoryMutationQueue,'invite',handleInviteAgentToSpeak)(...args),
+    handleGroupChatMessage,
+    handleInviteAgentToSpeak,
     appendGroupHistoryMessage, // Game runtime publishes committed public events only.
-    redoGroupChatMessage: (...args) => sharedGroup.wrap(groupHistoryMutationQueue,'regenerate',redoGroupChatMessage,handleInviteAgentToSpeak)(...args),
+    redoGroupChatMessage,
     interruptGroupRequest,
     interruptGroupChatQueue,
     startJevGroupChat,

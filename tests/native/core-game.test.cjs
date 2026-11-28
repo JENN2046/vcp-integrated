@@ -2,16 +2,15 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { BOX, CHAT, fixture, wait } = require('./fixtures/sharedSingleHarness.cjs');
-const { host, localProvider, mountCore } = require('./fixtures/coreSingleHarness.cjs');
+const { BOX, CHAT, coreFixture, host, localProvider, wait } = require('./fixtures/coreSingleHarness.cjs');
 
 test('Dou Dizhu owns its live match and submits only public history through Core', async t => {
-    const f = await fixture(t);
     const provider = await localProvider(t);
     const { chat, pluginManager } = host(provider);
     const { GameService } = require(CHAT + '/modules/services/gameService');
     const { GameRuntime } = require(CHAT + '/modules/game/gameRuntime');
-    const game = new GameService({ appDataRoot: f.root, integer: () => 0 });
+    const root = await require('node:fs/promises').mkdtemp(require('node:path').join(require('node:os').tmpdir(), 'core-game-'));
+    const game = new GameService({ appDataRoot: root, integer: () => 0 });
     const controller = require(CHAT + '/VCPDistributedServer/Plugin/GameController/GameControllerService');
     controller.initialize({ services: { gameService: game } });
     t.after(() => controller.cleanup());
@@ -24,7 +23,7 @@ test('Dou Dizhu owns its live match and submits only public history through Core
     await new Promise(resolve => wsServer.listen(0, '127.0.0.1', resolve));
     chat.config.webSocketServer = webSockets;
     const url = 'ws://127.0.0.1:' + wsServer.address().port + '/vcp-distributed-server/VCP_Key=core-game-fixture';
-    const { nativeSyncRouteId } = require(CHAT + '/modules/services/nativeSync/sharedTopicSponsor');
+    const { nativeSyncRouteId } = require(CHAT + '/modules/services/topicSponsorDelivery');
     const manifest = require(CHAT + '/VCPDistributedServer/Plugin/GameController/plugin-manifest.json');
     const socket = new WebSocket(url);
     t.after(async () => {
@@ -49,22 +48,20 @@ test('Dou Dizhu owns its live match and submits only public history through Core
     socket.send(JSON.stringify({ type: 'register_tools', data: { nativeSyncRouteId, tools: [manifest] } }));
     const routeHash = require('node:crypto').createHash('sha256').update(nativeSyncRouteId).digest('hex');
     await wait(() => webSockets.bindDistributedTool('GameController', routeHash), 'game runtime is registered on native WS');
-    const { core } = await mountCore(f, chat, { gameEnabled: true });
-    t.after(() => core.close());
-    const actor = f.actor('A');
-    const create = (opId, kind, localId, config, extra = {}) => f.shared.create(actor,
-        { sharedSpaceId: 'sharedAB', opId, kind, localId, config, ...extra }).object;
-    const other = create('game-other-member', 'agent', 'other', { name: 'Right Seat', model: 'synthetic', systemPrompt: 'Right seat' });
-    const group = create('game-owner', 'group', 'ddz', { mode: 'game', name: 'Dou Dizhu', members: [f.owner.id, other.id],
-        modeSettings: { game: { gameTypeId: 'doudizhu' } } });
-    const topic = create('game-topic', 'topic', 'ddzTopic', { name: 'Table' }, { parentId: group.id, localParent: 'ddz' });
-    assert.equal(topic.coreGroup, true);
-    const desktop = await f.desktop('A');
-    const local = desktop.runtime.localFor(topic.id);
-    const descriptor = { itemType: 'group', itemId: local.localParent, topicId: local.localId };
-    const locals = new Map([[desktop.runtime.localFor(f.owner.id).localId, 'Synthetic shared'],
-        [desktop.runtime.localFor(other.id).localId, 'Right Seat']]);
-    const coreClient = desktop.runtime.coreSingle;
+    const f = await coreFixture(t, chat, { root, gameEnabled: true });
+    const { core } = f;
+    const seatAgents = [
+        { id: 'left', name: 'Left Seat', model: 'synthetic', systemPrompt: 'Left seat' },
+        { id: 'right', name: 'Right Seat', model: 'synthetic', systemPrompt: 'Right seat' }
+    ];
+    const enrollment = await f.pair('desktop', ['read','execute','config']);
+    const actor = core.remote.live('desktop:' + enrollment.deviceId, 'execute');
+    const { route, descriptor } = await f.define({ actor, ownerType: 'group', ownerId: 'ddz', name: 'Table', config: {
+        group: { mode: 'game', name: 'Dou Dizhu', members: seatAgents.map(agent => agent.id),
+            modeSettings: { game: { gameTypeId: 'doudizhu' } } }, agents: seatAgents
+    } });
+    const locals = new Map(seatAgents.map(agent => [agent.id, agent.name]));
+    const { runtime: { coreSingle: coreClient } } = await f.desktop('A', enrollment);
     const localGame = { mode: 'game', id: descriptor.itemId, topics: [{ id: descriptor.topicId }] };
     const runtime = new GameRuntime({
         gameService: game,
@@ -98,7 +95,7 @@ test('Dou Dizhu owns its live match and submits only public history through Core
         if (/你的手牌/.test(last)) {
             const revision = Number(context.match(/revision：`(\d+)`/)[1]);
             const decisionId = table.matchId + ':' + revision;
-            const maid = /Synthetic shared（你）/.test(context) ? 'Synthetic shared' : 'Right Seat';
+            const maid = /Left Seat（你）/.test(context) ? 'Left Seat' : 'Right Seat';
             const args = { command: 'SubmitAction', matchId: table.matchId, decisionId, revision,
                 maid, submissionId: 'core-' + revision, action: 'pass' };
             content = ['<<<[TOOL_REQUEST]>>>', 'tool_name:「始」GameController「末」,',
@@ -111,15 +108,14 @@ test('Dou Dizhu owns its live match and submits only public history through Core
     await runtime.continue(table.matchId);
     assert.equal(runtime.getState(table.matchId).status, 'waiting-human');
     assert.equal(bound.length, 2);
-    assert.equal(bound[0].args.maid, 'Synthetic shared');
+    assert.equal(bound[0].args.maid, 'Left Seat');
     assert.equal(bound[1].args.maid, 'Right Seat');
     assert.equal((await game.getObservation(table.matchId, 0)).turn, 0);
-    const history = (await coreClient.history(descriptor)).history;
+    const { history } = await coreClient.history(descriptor);
     assert.equal(history.length, 5);
     assert.ok(history.every(message => message.gameEvent && message.role === 'user'));
     assert.doesNotMatch(JSON.stringify(history), /你的手牌|private tool reasoning/);
     assert.equal(core.store.db.prepare("SELECT count(*) AS n FROM work_invocations WHERE status='returned'").get().n, 2);
-    const phone = await f.phone();
-    await phone.call('/core/sharedAB/' + topic.id + '/messages', undefined, 403);
-    assert.equal(f.store.db.prepare('SELECT count(*) n FROM journal').get().n, 0);
+    const phone = await f.mobile();
+    await phone.call(route + '/messages', undefined, 403);
 });

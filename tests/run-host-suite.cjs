@@ -8,6 +8,12 @@ const path = require('node:path');
 function runSuite(suite, args) {
     if (!['native', 'collaboration'].includes(suite)) throw Error('Expected native or collaboration');
     const testDir = path.join(__dirname, suite);
+    const separator = args.indexOf('--');
+    const testFiles = separator < 0 ? null : args.slice(separator + 1);
+    if (testFiles && (!testFiles.length || testFiles.some(file => path.basename(file) !== file || !file.endsWith('.test.cjs')))) {
+        throw Error('Supply test basenames after --');
+    }
+    const nodeArgs = separator < 0 ? args : args.slice(0, separator);
     const root = path.resolve(__dirname, '..');
     const source = path.join(root, 'apps/server');
     const run = fs.mkdtempSync(path.join(os.tmpdir(), 'vcp-'+suite+'-'));
@@ -41,9 +47,9 @@ function runSuite(suite, args) {
         fs.writeFileSync(path.join(server, 'config/tool-call-records.config.json'), JSON.stringify({
             enabled: true, captureMultimodal: false, autoCleanupEnabled: false,
         }));
-        const tests = fs.readdirSync(testDir).filter(file => file.endsWith('.test.cjs')).sort()
+        const tests = (testFiles || fs.readdirSync(testDir).filter(file => file.endsWith('.test.cjs')).sort())
             .map(file => path.join(testDir, file));
-        const result = spawnSync(process.execPath, ['--require', path.join(__dirname, 'collaboration/fixtures/loopback.cjs'), '--test', '--test-concurrency=1', ...args, ...tests], {
+        const result = spawnSync(process.execPath, ['--require', path.join(__dirname, 'collaboration/fixtures/loopback.cjs'), '--test', '--test-concurrency=1', ...nodeArgs, ...tests], {
             cwd: run,
             stdio: 'inherit',
             env: {

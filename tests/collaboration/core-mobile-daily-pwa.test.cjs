@@ -8,7 +8,7 @@ const path = require('node:path');
 const https = require('node:https');
 const { createHash, X509Certificate } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
-const { wait, BOX } = require('../native/fixtures/sharedSingleHarness.cjs');
+const { wait, BOX } = require('../native/fixtures/coreSingleHarness.cjs');
 const { localProvider, host } = require('../native/fixtures/coreSingleHarness.cjs');
 
 test('Pilot mobile PWA handles attachments, failed Work, reconnect, drafts, scroll, pairing and one-message model selection', { timeout: 65000 }, async t => {

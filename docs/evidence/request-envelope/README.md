@@ -12,7 +12,7 @@
 
 ## 实测结果
 
-- 两轮使用同一份[合成输入](../../../tests/context-chain/input.json)，包括四条 History 种子、一个检查点、一份 22 字节附件和三条酒馆规则。实际运行 Linux 沙箱 Electron、VCPToolBox、CDS 和仅监听回环地址的合成 Provider。桌面通过发送按钮，worker 通过共享 HTTP 准入运行。
+- 两轮使用同一份[合成输入](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/context-chain/input.json)，包括四条 History 种子、一个检查点、一份 22 字节附件和三条酒馆规则。实际运行 Linux 沙箱 Electron、VCPToolBox、CDS 和仅监听回环地址的合成 Provider。桌面通过发送按钮，worker 通过共享 HTTP 准入运行。
 - 每轮各捕获一份桌面和一份共享的完整 Handler 请求，以及对应 Provider 实收 body。逐条验证四个时间戳绑定识别持久消息、索引和实际发送文本的哈希。对比脚本只归一每轮生成的请求和共享对象 ID、桌面发送时间、合成 Profile 路径及其派生哈希。两条路径各自的 Handler 与 Provider 请求前后完全一致。[基线回执](before.json) · [候选回执](after.json)
 - 两轮各重放一次原共享请求。重放返回原来的完成 Work，Work、Journal、Handler 和 Provider 快照保持一致，累计一次派发、一次 Provider 调用和六条 Journal 记录。
 - 批次中原生套件通过 255 项、跳过 6 项。独立目录离线安装 `npm pack` 产物通过。

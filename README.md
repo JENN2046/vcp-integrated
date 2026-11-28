@@ -46,7 +46,7 @@ flowchart TB
 - **持续执行与多端连续性**：桌面退出后，已受理 Work 可继续执行；设备重新连接后读取正式消息与附件，并可在权限范围内追问或追加指令。
 - **统一会话与生命周期**：单聊、常规群聊、JEV 动态仲裁及斗地主公开会话已接入 Core。Agent 配置和话题删除保留删除墓碑，防止旧 ID 被静默复用。
 - **原生能力继承**：复用 ToolBox 工具管线、AgentAssistant、TopicSponsor、单聊 Flowlock、上下文压缩、服务端 Agent 提示词别名，以及 Canvas、Workspace、活引用等资源接入。
-- **记忆与检索**：复用 CDS/Tantivy、DeepMemo 带权查询和相邻消息窗口、TopicMemo 授权历史读取。检索前更新索引，已删除话题不再作为正式历史返回。
+- **记忆与检索**：ToolBox 运行原生日记检索及工具刷新。Core 按话题变更序号更新 CDS/Tantivy 的可重建投影，支持 DeepMemo 带权查询、相邻消息窗口及 TopicMemo 授权历史读取。
 - **身份与数据连续性**：远程设备独立配对、权限检查及撤销；客户端绑定数据库 `storageId`，拒绝同址误接其他数据库。备份恢复保留原有消息、Work、附件和删除事实。
 - **执行恢复边界**：请求重试核对原 Work；已确认事实可读回，副作用未知的执行保留待核对，不承诺所有工具均可自动重放。
 
@@ -74,9 +74,8 @@ npm run build
 | --- | --- |
 | `local` | ToolBox 与桌面在同一台设备；通过认证回环访问 Core。 |
 | `remote` | 一个持续在线的 Core，多个已配对桌面和手机通过受信任的 HTTPS 入口接入。 |
-| `shared` | 保留的旧 NativeSync 共享模式，仅用于既有消费者，不是新 Core 的运行前提。 |
 
-新试用建议从空的独立 Core 数据目录和桌面 Profile 开始。
+本机与远程使用相同内核及数据格式。新试用请使用空的独立 Core 数据目录和桌面 Profile。
 
 - **本机模式**：[独立本机 Core 启动说明](docs/evidence/core-closeout/README.md#pilot-启动与产物)，并参考 [当前数据库身份绑定说明](docs/core-pilot-01-r.md#数据库身份备份与恢复)。
 - **远程模式**：[完整部署、HTTPS 与设备配对说明](docs/core-pilot-01-r.md)。使用独立设备凭据，远程 Core 不接受 ToolBox Key 冒充设备。
@@ -86,7 +85,7 @@ npm run build
 
 ## 验证记录
 
-Pilot 01-R 已完成以下验证：
+下表记录 Pilot 01-R 的历史验收。本轮瘦身候选的验证范围见[现行架构](docs/ARCHITECTURE.md#当前纠偏路线与已知缺口)。
 
 | 场景 | 已有证据 |
 | --- | --- |
@@ -103,23 +102,20 @@ Pilot 01-R 已完成以下验证：
 
 | 命令 | 用途 |
 | --- | --- |
-| `node tests/integration/run.cjs core-local` | 独立本机 Core 与真实桌面联验 |
-| `node tests/integration/run.cjs core-remote` | 独立远程 Core 与设备接入联验 |
-| `VCP_TEST_CORE_RISK=1 node tests/integration/run.cjs core-remote` | 删除、数据库身份及备份恢复专项 |
-| `npm run test:native` | 原生宿主集成回归 |
-| `npm run test:collaboration` | 多端协作与浏览器回归 |
-| `npm run test:integration` | 隔离端到端回归 |
-| `npm run test:wire` | 旧 VCPMobileSync 协议及写入边界回归 |
+| `npm run test:native` | 默认原生回归，覆盖独立 Core、ToolBox 及桌面共用逻辑 |
+| `CHROME_BIN=/path/to/chrome npm run test:collaboration` | 默认协作回归，使用 Chromium 验证原生执行、设备接入与 PWA |
+| `npm run test:integration` | Linux 上独立本机与远程 Core 的 Electron 联验 |
+| `VCP_TEST_CORE_RISK=1 npm run test:integration -- core-remote` | 远程删除、数据库身份及备份恢复专项 |
 
-可通过 `XVFB_BIN` 和 `CHROME_BIN` 指定测试可执行文件路径。[完整验证记录](docs/evidence)
+原生与协作套件可通过 `--test-name-pattern` 筛选，也可用 `npm run test:native -- -- core-group.test.cjs` 指定单个文件。集成测试可用 `XVFB_BIN` 指定 Xvfb。旧 Shared、VCPMobileSync wire 和旧普通工具组装场景在归档基线 `032ad5f` 复现，历史文档中的命令对应其原版本。见[历史档案](docs/archive/README.md)。
 
 ## 从 NativeSync 到 VCP Core
 
 NativeSync 是本项目早期跨端集成与执行连续性研究的基础。VCP Core 吸收了其中成熟的设备接入、请求身份、工具回执、附件及恢复能力，将正式会话权威和执行生命周期收归服务端。
 
-新本机与远程模式均不需要加载 NativeSync 同步服务，也不依靠旧客户端双向 History 同步、执行接管或终稿补交。旧插件和 VCPMobileSync wire 接口在当前基线仍作为过渡兼容保留，不应理解为新 Core 的客户端执行协议。主线已确定退出旧 shared 模式；具体收口状态见[现行架构](docs/ARCHITECTURE.md)。
+当前源码已退出 Shared 模式、旧设备授权适配、双向 History 同步、客户端接管和终稿补交。旧运行环境继续使用归档版本。原有数据目录与旧安装包均应独立保留。
 
-已有历史须通过离线迁移导入，不会自动接管。跨话题重复消息 ID、无法定位的附件及非文本内联部件仍有明确导入限制。旧版与新 Core 不应同时写入同一正式工作空间。
+既有独立 Core 数据目录可在核对工作空间及数据库身份后接续。对原生桌面 History 使用已有离线导入入口；跨话题重复消息 ID、无法定位的附件及非文本内联部件仍有明确导入限制。回退前请停机备份完整目录，并在独立副本中验证。 [数据库、备份与恢复](docs/core-pilot-01-r.md#数据库身份备份与恢复)
 
 ## 开发方向
 

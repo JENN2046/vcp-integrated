@@ -4,7 +4,7 @@
 
 ## 从物理 History 到实际请求
 
-对照使用真实 Linux Electron 普通单聊、真实 ToolBox 的共享 HTTP 准入和 worker，以及同一个回环合成 Provider。改前使用独立检出的 `f73493e` 产品源码，改后使用当前分叉。每侧从新 Profile 或新数据库开始。两条路径使用相同的四条种子消息及时间、Agent 名称、系统提示、模型和参数，三条酒馆规则分别追加系统后缀、用户后缀和插入 depth=1 消息。相同的 22 字节 UTF-8 文本文件附在检查点之后的旧用户消息上。桌面 FileManager 存文件，共享端完成上传、校验、claim 和消息关联，读取的字节 SHA-256 均为 `ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b`。[固定输入](../../../tests/context-chain/input.json)
+对照使用真实 Linux Electron 普通单聊、真实 ToolBox 的共享 HTTP 准入和 worker，以及同一个回环合成 Provider。改前使用独立检出的 `f73493e` 产品源码，改后使用当前分叉。每侧从新 Profile 或新数据库开始。两条路径使用相同的四条种子消息及时间、Agent 名称、系统提示、模型和参数，三条酒馆规则分别追加系统后缀、用户后缀和插入 depth=1 消息。相同的 22 字节 UTF-8 文本文件附在检查点之后的旧用户消息上。桌面 FileManager 存文件，共享端完成上传、校验、claim 和消息关联，读取的字节 SHA-256 均为 `ffab1c37dc2bc342afc7335048ae30f8874555457c3aa65537baa7fd03a9ae2b`。[固定输入](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/context-chain/input.json)
 
 | 步骤 | 普通原生单聊 | 共享 worker |
 |---|---|---|

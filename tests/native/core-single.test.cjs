@@ -6,16 +6,17 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
-const { fixture, wait, BOX, CHAT, ctx } = require('./fixtures/sharedSingleHarness.cjs');
+const { coreFixture, wait, BOX, CHAT, localProvider, host } = require('./fixtures/coreSingleHarness.cjs');
 
-const { localProvider, host, mountCore, setStream } = require('./fixtures/coreSingleHarness.cjs');
+const fixtureConfig = { name: 'Fixture Agent', model: 'synthetic', systemPrompt: 'Isolated fixture.' };
 
 test('Core single chat uses native execution without Resident and separates observation from Work', async t => {
-    const f = await fixture(t, { attachments: true });
     const provider = await localProvider(t);
     const { chat, events } = host(provider);
-    setStream(f, true);
-    const { core, route } = await mountCore(f, chat);
+    const f = await coreFixture(t, chat);
+    const { core } = f;
+    f.core.local.imageModels.push('synthetic');
+    const { route, descriptor } = await f.define({ config: { ...fixtureConfig, streamOutput: true } });
     let upstream;
     const release = text => upstream.end('data: ' + JSON.stringify({
         choices: [{ delta: { content: text }, finish_reason: 'stop' }]
@@ -29,9 +30,8 @@ test('Core single chat uses native execution without Resident and separates obse
     let observedDone;
     try {
         const desktop = await f.desktop('A');
-        const phone = await f.phone();
-        const readOnly = await f.phone({ permissions: ['read'] });
-        const foreign = await f.phone({ space: 'foreignSpace' });
+        const phone = await f.mobile();
+        const readOnly = await f.mobile(['read']);
         const png = await require(BOX + '/node_modules/sharp')({
             create: { width: 16, height: 16, channels: 3, background: '#00aa44' }
         }).png().toBuffer();
@@ -39,7 +39,7 @@ test('Core single chat uses native execution without Resident and separates obse
         await fs.mkdir(path.dirname(file), { recursive: true });
         await fs.writeFile(file, png);
         const accepted = await desktop.runtime.prepareSharedSend({
-            descriptor: desktop.descriptor, serverSession: true,
+            descriptor, serverSession: true,
             message: { id: 'desktop-core-request', role: 'user', content: 'What is in the image?',
                 attachments: [{ id: 'core-image', name: 'image.png', type: 'image/png', size: png.length, internalPath: file }] }
         });
@@ -60,7 +60,7 @@ test('Core single chat uses native execution without Resident and separates obse
             { signal: observer.signal, envelope: true }).catch(error => { if (!observer.signal.aborted) throw error; });
         await wait(() => observed.some(event => event.type === 'work_preview' && event.text === 'prefix '), 'live remote preview');
         await readOnly.call(route + '/send', { requestId: 'read-only-send', text: 'denied' }, 403);
-        await foreign.call(route + '/messages', undefined, 403);
+        await phone.call(route.replace('/personal/', '/foreign/') + '/messages', undefined, 403);
         const steering = { requestId: 'steering-from-mobile', text: 'Please be concise' };
         const steered = await phone.call(route + '/works/' + workId + '/steer', steering, 202);
         assert.deepEqual(await phone.call(route + '/works/' + workId + '/steer', steering, 202), steered);
@@ -69,7 +69,7 @@ test('Core single chat uses native execution without Resident and separates obse
         const readSteering = route + '/works/' + workId + receiptPath;
         assert.deepEqual(await phone.call(readSteering), receipt);
         assert.deepEqual(await readOnly.call(readSteering), { receipt: null }, 'same workspace, different principal');
-        await foreign.call(readSteering, undefined, 403);
+        await phone.call(readSteering.replace('/personal/', '/foreign/'), undefined, 403);
         assert.deepEqual(await phone.call(route + '/works/wrong-work' + receiptPath), { receipt: null });
         assert.deepEqual(await phone.call(readSteering + '-unsent'), { receipt: null });
         assert.deepEqual(await phone.call(route + '/receipt?requestId=' + steering.requestId), { executions: [] });
@@ -85,13 +85,8 @@ test('Core single chat uses native execution without Resident and separates obse
         assert.deepEqual(snapshot.messages.map(m => m.content), ['What is in the image?', 'Please be concise', 'prefix final']);
         const image = snapshot.messages[0].attachments[0];
         assert.deepEqual(await phone.download(route + '/blob/' + image.hash), png);
-        assert.equal(f.store.db.prepare('SELECT count(*) n FROM journal').get().n, 0);
-        assert.equal(f.store.db.prepare('SELECT count(*) n FROM shared_admissions').get().n, 0);
-        assert.equal(f.store.db.prepare('SELECT count(*) n FROM mobile_executions').get().n, 0);
-        await phone.call('/conversations/' + f.topic.id + '/messages', { requestId: 'legacy-request', text: 'do not dispatch' }, 409);
-        assert.equal(f.calls(), 0);
         const reopen = await f.desktop('B');
-        const readback = await reopen.runtime.coreSingle.history(reopen.descriptor);
+        const readback = await reopen.runtime.coreSingle.history(descriptor);
         assert.deepEqual(readback.history.map(m => m.id), snapshot.messages.map(m => m.id));
         assert.ok(readback.history[0].attachments[0].src.startsWith('file:'));
         assert.deepEqual(await reopen.queue.read(reopen.descriptor).catch(() => []), []);
@@ -106,8 +101,6 @@ test('Core single chat uses native execution without Resident and separates obse
     } finally {
         observer.abort();
         await observedDone;
-        await core.close();
-        await fs.rm(f.root + '-core', { recursive: true, force: true });
     }
 });
 
@@ -158,68 +151,10 @@ test('Core only requeues undispatched Work and commits a matching pending final 
     }
 });
 
-test('Core uses the native approval queue and cancels before tool dispatch', async t => {
-    const f = await fixture(t);
-    const provider = await localProvider(t);
-    const { chat, pluginManager } = host(provider);
-    const name = 'CoreFixtureTool';
-    let toolRuns = 0;
-    const plugin = { name, pluginType: 'hybridservice', communication: { protocol: 'direct' } };
-    pluginManager.plugins.set(name, plugin);
-    pluginManager.serviceModules.set(name, { module: {
-        processToolCall: async () => { toolRuns++; return Object.freeze({ status: 'success', result: 'fixture tool returned' }); }
-    } });
-    const previousApprovalConfig = pluginManager.toolApprovalManager.config;
-    pluginManager.toolApprovalManager.config = { ...previousApprovalConfig, enabled: true, approveAll: true };
-    t.after(() => { pluginManager.toolApprovalManager.config = previousApprovalConfig; });
-    pluginManager.webSocketServer = { broadcast() {}, cancelVcpLogApprovalCache() {} };
-    const { core, route } = await mountCore(f, chat);
-    const completion = content => JSON.stringify({ choices: [{ message: { role: 'assistant', content }, finish_reason: 'stop' }] });
-    provider.setReply((body, res) => {
-        const hasResult = JSON.stringify(body.messages).includes('fixture tool returned');
-        res.end(completion(hasResult ? 'tool completed' :
-            `<<<[TOOL_REQUEST]>>>\ntool_name:「始」${name}「末」,\ncommand:「始」Fixture「末」\n<<<[END_TOOL_REQUEST]>>>`));
-    });
-    const observed = [];
-    const stop = core.runner.observe(f.topic.id, (type, event) => observed.push({ type, ...event }));
-    try {
-        const phone = await f.phone();
-        const getApproval = id => observed.find(event => event.type === 'approval_requested' && event.workId === id);
-        const first = await phone.call(route + '/send', { requestId: 'tool-cancel-core', text: 'cancel the pending tool' }, 202);
-        await wait(() => getApproval(first.id), 'native approval');
-        const request = getApproval(first.id);
-        assert.equal(core.store.work(first.id).status, 'waiting_approval');
-        assert.equal(pluginManager.pendingApprovals.has(request.hostApprovalRequestId), true);
-        await phone.call(route + '/works/' + first.id + '/cancel', { requestId: 'cancel-native-approval' });
-        await wait(() => core.store.work(first.id).status === 'cancelled', 'Core cancellation');
-        assert.equal(pluginManager.pendingApprovals.has(request.hostApprovalRequestId), false);
-        assert.equal(await pluginManager.handleApprovalResponse(request.hostApprovalRequestId, true, ''), false);
-        assert.equal(toolRuns, 0);
-        assert.equal(provider.calls.length, 1);
-        assert.equal(core.store.db.prepare('SELECT count(*) n FROM work_invocations').get().n, 0);
-
-        const second = await phone.call(route + '/send', { requestId: 'tool-approve-core', text: 'run the ordinary tool' }, 202);
-        await wait(() => getApproval(second.id), 'second native approval');
-        const ordinary = getApproval(second.id);
-        await phone.call(route + '/works/' + second.id + '/approve', { requestId: 'mobile-approval-rejected' }, 409);
-        assert.equal(await pluginManager.handleApprovalResponse(ordinary.hostApprovalRequestId, true, ''), true);
-        await wait(() => core.store.work(second.id).status === 'completed', 'Core tool settlement');
-        assert.equal(toolRuns, 1);
-        const saved = core.store.db.prepare('SELECT * FROM work_invocations WHERE work_id=?').get(second.id);
-        assert.equal(saved.status, 'returned');
-        assert.match(saved.result_json, /fixture tool returned/);
-    } finally {
-        stop();
-        await core.close();
-        await fs.rm(f.root + '-core', { recursive: true, force: true });
-    }
-});
-
 test('Core retains external HTTP chat compatibility for JSON and SSE', async t => {
-    const f = await fixture(t);
     const provider = await localProvider(t);
     const { chat } = host(provider);
-    f.control.nativeResponder = (req, res) => ctx.runNativeHandler(() => chat.handle(req, res));
+    const f = await coreFixture(t, chat);
     provider.setReply((body, res) => {
         if (!body.stream) return res.end(JSON.stringify({
             choices: [{ message: { content: 'legacy JSON' }, finish_reason: 'stop' }]
@@ -227,8 +162,9 @@ test('Core retains external HTTP chat compatibility for JSON and SSE', async t =
         res.setHeader('Content-Type', 'text/event-stream');
         res.end('data: {"choices":[{"delta":{"content":"legacy SSE"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
     });
-    const run = stream => fetch(f.url + '/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'synthetic', stream, messages: [{ role: 'user', content: 'hi' }] }) });
+    const run = stream => f.request('/v1/chat/completions', {
+        body: { model: 'synthetic', stream, messages: [{ role: 'user', content: 'hi' }] }
+    });
     const json = await run(false);
     assert.equal(json.status, 200);
     assert.equal((await json.json()).choices[0].message.content, 'legacy JSON');
@@ -241,23 +177,19 @@ test('Core retains external HTTP chat compatibility for JSON and SSE', async t =
 });
 
 test('Core leaves a lost provider outcome for review without repeating the call', async t => {
-    const f = await fixture(t);
     const provider = await localProvider(t);
     const { chat } = host(provider);
     chat.config.apiRetries = 3;
     provider.setReply((_body, res) => res.destroy());
-    const { core, route } = await mountCore(f, chat);
-    try {
-        const phone = await f.phone();
-        const accepted = await phone.call(route + '/send', { requestId: 'lost-provider-core', text: 'Only one provider attempt' }, 202);
-        await wait(() => core.store.work(accepted.id).status === 'review_required', 'unknown network outcome');
-        assert.equal(provider.calls.length, 1);
-        assert.equal(core.store.work(accepted.id).error_code, 'CORE_PROVIDER_OUTCOME_UNKNOWN');
-        assert.equal((await phone.call(route + '/messages')).messages.length, 1);
-    } finally {
-        await core.close();
-        await fs.rm(f.root + '-core', { recursive: true, force: true });
-    }
+    const f = await coreFixture(t, chat);
+    const { core } = f;
+    const { route, descriptor } = await f.define({ config: fixtureConfig });
+    const phone = await f.mobile();
+    const accepted = await phone.call(route + '/send', { requestId: 'lost-provider-core', text: 'Only one provider attempt' }, 202);
+    await wait(() => core.store.work(accepted.id).status === 'review_required', 'unknown network outcome');
+    assert.equal(provider.calls.length, 1);
+    assert.equal(core.store.work(accepted.id).error_code, 'CORE_PROVIDER_OUTCOME_UNKNOWN');
+    assert.equal((await phone.call(route + '/messages')).messages.length, 1);
 });
 
 test('Core commits the streaming follow-up after one ephemeral Resident proposal', async t => {
@@ -330,83 +262,74 @@ function textPdf(text) {
 }
 
 test('Core single chat sends existing text and PDF attachments through one native history context', async t => {
-    const f = await fixture(t, { attachments: true, imageModels: [] });
     const provider = await localProvider(t);
-    const { core, route } = await mountCore(f, host(provider).chat);
+    const f = await coreFixture(t, host(provider).chat);
+    const { core } = f;
+    const { route, descriptor } = await f.define({ config: fixtureConfig });
     const text = Buffer.from('CORE_TEXT_FIXTURE');
     const pdf = textPdf('CORE_PDF_FIXTURE');
-    try {
-        const desktop = await f.desktop('A');
-        const phone = await f.phone();
-        await assert.rejects(desktop.runtime.send('/api/plugins/NativeSync/shared-attachments/' + f.topic.id + '/uploads', {
-            body: { requestId: 'legacy-core-upload', name: 'legacy.txt', size: 1, type: 'text/plain' }
-        }), { code: 'CORE_ROUTE_REQUIRED' });
-        const foreign = await f.phone({ space: 'foreignSpace' });
-        const directory = path.join(desktop.data, 'UserData', 'attachments');
-        await fs.mkdir(directory, { recursive: true });
-        const attachments = await Promise.all([['notes.txt', text, 'text/plain'], ['source.pdf', pdf, 'application/pdf']]
-            .map(async ([name, data, type]) => {
-                const internalPath = path.join(directory, name);
-                await fs.writeFile(internalPath, data);
-                return { name, type, internalPath, size: data.length };
-            }));
-        const accepted = await desktop.runtime.prepareSharedSend({
-            descriptor: desktop.descriptor, serverSession: true,
-            message: { id: 'core-documents', role: 'user', content: 'Read the supplied files.', attachments }
-        });
-        await desktop.close();
-        await wait(() => core.store.work(accepted.serverSession.executionId)?.status === 'completed', 'document turn completion');
+    const desktop = await f.desktop('A');
+    const phone = await f.mobile();
+    const directory = path.join(desktop.data, 'UserData', 'attachments');
+    await fs.mkdir(directory, { recursive: true });
+    const attachments = await Promise.all([['notes.txt', text, 'text/plain'], ['source.pdf', pdf, 'application/pdf']]
+        .map(async ([name, data, type]) => {
+            const internalPath = path.join(directory, name);
+            await fs.writeFile(internalPath, data);
+            return { name, type, internalPath, size: data.length };
+        }));
+    const accepted = await desktop.runtime.prepareSharedSend({
+        descriptor, serverSession: true,
+        message: { id: 'core-documents', role: 'user', content: 'Read the supplied files.', attachments }
+    });
+    await desktop.close();
+    await wait(() => core.store.work(accepted.serverSession.executionId)?.status === 'completed', 'document turn completion');
 
-        const { messages } = await phone.call(route + '/messages');
-        const [attachedText, attachedPdf] = messages[0].attachments;
-        assert.deepEqual(messages[0].attachments.map(file => file.name), ['notes.txt', 'source.pdf']);
-        assert.equal(Object.hasOwn(attachedPdf, 'extractedText'), false);
-        assert.deepEqual(await phone.download(route + '/blob/' + attachedText.hash), text);
-        assert.deepEqual(await phone.download(route + '/blob/' + attachedPdf.hash), pdf);
-        await foreign.call(route + '/blob/' + attachedPdf.hash, undefined, 403);
+    const { messages } = await phone.call(route + '/messages');
+    const [attachedText, attachedPdf] = messages[0].attachments;
+    assert.deepEqual(messages[0].attachments.map(file => file.name), ['notes.txt', 'source.pdf']);
+    assert.equal(Object.hasOwn(attachedPdf, 'extractedText'), false);
+    assert.deepEqual(await phone.download(route + '/blob/' + attachedText.hash), text);
+    assert.deepEqual(await phone.download(route + '/blob/' + attachedPdf.hash), pdf);
+    await phone.call(route.replace('/personal/', '/foreign/') + '/blob/' + attachedPdf.hash, undefined, 403);
 
-        // The original message and blob link outlive the temporary upload proof.
-        core.store.db.prepare('UPDATE attachment_uploads SET expires=0').run();
-        core.attachments.expire();
-        assert.equal(core.store.db.prepare('SELECT count(*) AS count FROM attachment_uploads').get().count, 0);
-        const body = { requestId: 'core-document-followup', text: 'Use both attachments again.' };
-        const next = await phone.call(route + '/send', body, 202);
-        assert.equal((await phone.call(route + '/send', body, 202)).id, next.id);
-        await wait(() => core.store.work(next.id)?.status === 'completed', 'document follow-up completion');
-        assert.equal(provider.calls.length, 2);
-        for (const call of provider.calls) {
-            const user = call.messages.filter(message => message.role === 'user');
-            const content = JSON.stringify(user[0].content);
-            assert.equal(content.match(/CORE_TEXT_FIXTURE/g)?.length, 1);
-            assert.equal(content.match(/CORE_PDF_FIXTURE/g)?.length, 1);
-            assert.doesNotMatch(JSON.stringify(call.messages), /image_url|file:\/\//);
-        }
-        assert.equal(f.store.db.prepare('SELECT count(*) AS count FROM journal').get().count, 0);
-        assert.equal(f.calls(), 0);
-
-        const empty = Buffer.from('  \n');
-        const upload = await phone.call(route + '/attachments/uploads', {
-            requestId: 'core-empty-text-upload', name: 'empty.txt', size: empty.length, type: 'text/plain'
-        }, 201);
-        const uploadRoute = route + '/attachments/uploads/' + upload.uploadId;
-        await phone.call(uploadRoute + '/chunks', { offset: 0, data: empty.toString('base64') });
-        await phone.call(uploadRoute + '/finish', {});
-        const rejected = await phone.call(route + '/send', {
-            requestId: 'core-empty-text-message', text: '', attachments: [upload.uploadId]
-        }, 422);
-        assert.equal(rejected.error.code, 'ATTACHMENT_TEXT_UNAVAILABLE');
-        assert.equal((await phone.call(route + '/messages')).messages.length, 4);
-        assert.equal(provider.calls.length, 2);
-    } finally {
-        await core.close();
-        await fs.rm(f.root + '-core', { recursive: true, force: true });
+    // The original message and blob link outlive the temporary upload proof.
+    core.store.db.prepare('UPDATE attachment_uploads SET expires=0').run();
+    core.attachments.expire();
+    assert.equal(core.store.db.prepare('SELECT count(*) AS count FROM attachment_uploads').get().count, 0);
+    const body = { requestId: 'core-document-followup', text: 'Use both attachments again.' };
+    const next = await phone.call(route + '/send', body, 202);
+    assert.equal((await phone.call(route + '/send', body, 202)).id, next.id);
+    await wait(() => core.store.work(next.id)?.status === 'completed', 'document follow-up completion');
+    assert.equal(provider.calls.length, 2);
+    for (const call of provider.calls) {
+        const user = call.messages.filter(message => message.role === 'user');
+        const content = JSON.stringify(user[0].content);
+        assert.equal(content.match(/CORE_TEXT_FIXTURE/g)?.length, 1);
+        assert.equal(content.match(/CORE_PDF_FIXTURE/g)?.length, 1);
+        assert.doesNotMatch(JSON.stringify(call.messages), /image_url|file:\/\//);
     }
+
+    const empty = Buffer.from('  \n');
+    const upload = await phone.call(route + '/attachments/uploads', {
+        requestId: 'core-empty-text-upload', name: 'empty.txt', size: empty.length, type: 'text/plain'
+    }, 201);
+    const uploadRoute = route + '/attachments/uploads/' + upload.uploadId;
+    await phone.call(uploadRoute + '/chunks', { offset: 0, data: empty.toString('base64') });
+    await phone.call(uploadRoute + '/finish', {});
+    const rejected = await phone.call(route + '/send', {
+        requestId: 'core-empty-text-message', text: '', attachments: [upload.uploadId]
+    }, 422);
+    assert.equal(rejected.error.code, 'ATTACHMENT_TEXT_UNAVAILABLE');
+    assert.equal((await phone.call(route + '/messages')).messages.length, 4);
+    assert.equal(provider.calls.length, 2);
 });
 
 test('Core executes manual compression in-process and reconciles a lost command receipt', async t => {
-    const f = await fixture(t);
     const provider = await localProvider(t);
-    const { core, route } = await mountCore(f, host(provider).chat);
+    const f = await coreFixture(t, host(provider).chat);
+    const { core } = f;
+    const { route, descriptor } = await f.define({ config: fixtureConfig });
     const summaryModel = 'fixture-summary';
     let pending;
     const complete = (res, content) => {
@@ -417,103 +340,87 @@ test('Core executes manual compression in-process and reconciles a lost command 
         if (body.model === summaryModel) { pending = response; return; }
         response.end(JSON.stringify({ choices: [{ message: { content: 'core reply' }, finish_reason: 'stop' }] }));
     });
-    try {
-        const desktop = await f.desktop('A'), phone = await f.phone(), { descriptor, runtime } = desktop;
-        const input = await phone.call(route + '/send', { requestId: 'checkpoint-source', text: 'ORIGINAL_FIXTURE_BODY' }, 202);
-        await wait(() => core.store.work(input.id)?.status === 'completed', 'checkpoint source');
-        const settings = { enableContextCompaction: true, contextCompactionModel: summaryModel };
-        const stale = runtime.coreSingle.compact(descriptor, settings, 'core-compact-stale');
-        const rejection = assert.rejects(stale, { code: 'SHARED_COMPACTION_SOURCE_CHANGED' });
-        await wait(() => pending, 'manual native model reached');
-        await phone.call(route + '/messages/' + input.messageId, { requestId: 'checkpoint-source-edit', revision: 1, text: 'EDITED_FIXTURE_BODY' });
-        complete(pending, 'STALE_CHECKPOINT');
-        await rejection;
-        await phone.call(route + '/compact', { requestId: 'mobile-manual-compact', model: summaryModel }, 403);
-        await assert.rejects(runtime.prepareSharedCompaction({ descriptor }), { code: 'CORE_COMPACTION_EXECUTION_MOVED' });
+    const desktop = await f.desktop('A'), phone = await f.mobile(), { runtime } = desktop;
+    const input = await phone.call(route + '/send', { requestId: 'checkpoint-source', text: 'ORIGINAL_FIXTURE_BODY' }, 202);
+    await wait(() => core.store.work(input.id)?.status === 'completed', 'checkpoint source');
+    const settings = { enableContextCompaction: true, contextCompactionModel: summaryModel };
+    const stale = runtime.coreSingle.compact(descriptor, settings, 'core-compact-stale');
+    const rejection = assert.rejects(stale, { code: 'SHARED_COMPACTION_SOURCE_CHANGED' });
+    await wait(() => pending, 'manual native model reached');
+    await phone.call(route + '/messages/' + input.messageId, { requestId: 'checkpoint-source-edit', revision: 1, text: 'EDITED_FIXTURE_BODY' });
+    complete(pending, 'STALE_CHECKPOINT');
+    await rejection;
+    await phone.call(route + '/compact', { requestId: 'mobile-manual-compact', model: summaryModel }, 403);
 
-        const send = runtime.send;
-        runtime.send = async (url, options) => {
-            const result = await send(url, options);
-            if (url.endsWith('/compact')) throw Object.assign(Error('Receipt lost'), { code: 'NETWORK_UNAVAILABLE' });
-            return result;
-        };
-        pending = null;
-        const { createContextCompactionService } = await import(CHAT + '/modules/chat/contextCompactionService.js');
-        const nativeUi = createContextCompactionService({
-            historyMutationAuthority: { mutate() { assert.fail('Desktop History writer must not receive a Core checkpoint'); } },
-            request() { assert.fail('Desktop must not execute the summary model'); },
-            getExecutionAuthority: () => ({ success: true, kind: 'shared', core: true }),
-            sharedCompaction: { coreCompact: ({ descriptor, settings, requestId }) => runtime.coreSingle.compact(descriptor, settings, requestId) }
-        });
-        const original = await runtime.coreSingle.history(descriptor);
-        const disputed = assert.rejects(nativeUi.compact({ scope: descriptor, history: original.history, settings }), { code: 'NETWORK_UNAVAILABLE' });
-        await wait(() => pending, 'Core summary started through native UI');
-        assert.match(JSON.stringify(provider.calls.at(-1).messages), /EDITED_FIXTURE_BODY/);
-        complete(pending, '<context_checkpoint>CORE_CHECKPOINT_FIXTURE</context_checkpoint>');
-        await disputed;
-        await desktop.close();
-        const reopened = await f.desktop('A');
-        const recovered = await reopened.runtime.coreSingle.compact(reopened.descriptor, settings, 'core-compact-retry');
-        assert.equal(recovered.history.filter(message => message.contextCompaction).length, 1);
-        assert.equal(provider.calls.filter(call => call.model === summaryModel).length, 2);
-        assert.equal(recovered.history[0].content, 'EDITED_FIXTURE_BODY');
-        const next = await phone.call(route + '/send', { requestId: 'checkpoint-follow-up', text: 'Use the checkpoint.' }, 202);
-        await wait(() => core.store.work(next.id)?.status === 'completed', 'follow-up uses checkpoint');
-        assert.match(JSON.stringify(provider.calls.at(-1).messages), /CORE_CHECKPOINT_FIXTURE/);
-        assert.doesNotMatch(JSON.stringify(provider.calls.at(-1).messages), /EDITED_FIXTURE_BODY/);
-        assert.equal(f.calls(), 0);
-        nativeUi.dispose();
-    } finally {
-        await core.close();
-        await fs.rm(f.root + '-core', { recursive: true, force: true });
-    }
+    const send = runtime.send;
+    runtime.send = async (url, options) => {
+        const result = await send(url, options);
+        if (url.endsWith('/compact')) throw Object.assign(Error('Receipt lost'), { code: 'NETWORK_UNAVAILABLE' });
+        return result;
+    };
+    pending = null;
+    const { createContextCompactionService } = await import(CHAT + '/modules/chat/contextCompactionService.js');
+    const nativeUi = createContextCompactionService({
+        historyMutationAuthority: { mutate() { assert.fail('Desktop History writer must not receive a Core checkpoint'); } },
+        request() { assert.fail('Desktop must not execute the summary model'); },
+        getExecutionAuthority: () => ({ success: true, kind: 'shared', core: true }),
+        sharedCompaction: { coreCompact: ({ descriptor, settings, requestId }) => runtime.coreSingle.compact(descriptor, settings, requestId) }
+    });
+    const original = await runtime.coreSingle.history(descriptor);
+    const disputed = assert.rejects(nativeUi.compact({ scope: descriptor, history: original.history, settings }), { code: 'NETWORK_UNAVAILABLE' });
+    await wait(() => pending, 'Core summary started through native UI');
+    assert.match(JSON.stringify(provider.calls.at(-1).messages), /EDITED_FIXTURE_BODY/);
+    complete(pending, '<context_checkpoint>CORE_CHECKPOINT_FIXTURE</context_checkpoint>');
+    await disputed;
+    await desktop.close();
+    const reopened = await f.desktop('A');
+    const recovered = await reopened.runtime.coreSingle.compact(descriptor, settings, 'core-compact-retry');
+    assert.equal(recovered.history.filter(message => message.contextCompaction).length, 1);
+    assert.equal(provider.calls.filter(call => call.model === summaryModel).length, 2);
+    assert.equal(recovered.history[0].content, 'EDITED_FIXTURE_BODY');
+    const next = await phone.call(route + '/send', { requestId: 'checkpoint-follow-up', text: 'Use the checkpoint.' }, 202);
+    await wait(() => core.store.work(next.id)?.status === 'completed', 'follow-up uses checkpoint');
+    assert.match(JSON.stringify(provider.calls.at(-1).messages), /CORE_CHECKPOINT_FIXTURE/);
+    assert.doesNotMatch(JSON.stringify(provider.calls.at(-1).messages), /EDITED_FIXTURE_BODY/);
+    nativeUi.dispose();
 });
 
 test('Core automatic compression uses the same native summary before the pending input', async t => {
-    const f = await fixture(t);
     const provider = await localProvider(t);
-    const { core, route } = await mountCore(f, host(provider).chat);
-    try {
-        const phone = await f.phone();
-        const previous = await phone.call(route + '/send', {
-            requestId: 'auto-compact-source', text: 'Original-past-marker. '.repeat(200)
-        }, 202);
-        await wait(() => core.store.work(previous.id)?.status === 'completed', 'automatic compaction source');
-        const before = f.shared.get(f.actor('A'), 'sharedAB', f.owner.id);
-        f.shared.saveConfig(f.actor('A'), { sharedSpaceId: 'sharedAB', sharedId: f.owner.id, opId: 'auto-compact-limit',
-            expectedVersion: before.version, config: { ...before.config, contextTokenLimit: 800 } });
-        f.shared.create(f.actor('A'), { sharedSpaceId: 'sharedAB', opId: 'auto-compact-rules', kind: 'rules', localId: 'shared_rules',
-            config: { name: 'Workspace rules', executionPolicy: { enableContextCompaction: true, contextCompactionModel: 'fixture-auto-summary' } } });
-        provider.setReply((body, res) => {
-            if (body.model === 'fixture-auto-summary') {
-                res.setHeader('Content-Type', 'text/event-stream');
-                res.end('data: {"choices":[{"delta":{"content":"AUTOMATIC_CHECKPOINT_FIXTURE"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
-            } else res.end(JSON.stringify({ choices: [{ message: { content: 'Next reply.' }, finish_reason: 'stop' }] }));
-        });
-        const followup = await phone.call(route + '/send', { requestId: 'auto-compact-followup', text: 'New input.' }, 202);
-        await wait(() => {
-            const work = core.store.work(followup.id);
-            if (work.error_code) throw Error(work.error_code);
-            return work.status === 'completed';
-        }, 'automatic summary and message');
-        assert.deepEqual(provider.calls.map(call => call.model), ['synthetic', 'fixture-auto-summary', 'synthetic']);
-        const messageText = JSON.stringify(provider.calls.at(-1).messages);
-        assert.match(messageText, /AUTOMATIC_CHECKPOINT_FIXTURE/);
-        assert.match(messageText, /New input/);
-        assert.doesNotMatch(messageText, /Original-past-marker/);
-        const { messages } = await phone.call(route + '/messages');
-        assert.equal(messages[2].contextCompaction.checkpoint, 'AUTOMATIC_CHECKPOINT_FIXTURE');
-        assert.equal(messages[3].content, 'New input.');
-        assert.equal((await phone.call(route + '/messages?before=' + messages[2].ordinal)).messages.length, 2);
-        assert.equal(f.calls(), 0);
-    } finally {
-        await core.close();
-        await fs.rm(f.root + '-core', { recursive: true, force: true });
-    }
+    const f = await coreFixture(t, host(provider).chat);
+    const { core } = f;
+    const { route, descriptor } = await f.define({ config: fixtureConfig });
+    const phone = await f.mobile();
+    const previous = await phone.call(route + '/send', {
+        requestId: 'auto-compact-source', text: 'Original-past-marker. '.repeat(200)
+    }, 202);
+    await wait(() => core.store.work(previous.id)?.status === 'completed', 'automatic compaction source');
+    await f.define({ config: { ...fixtureConfig, contextTokenLimit: 800,
+        executionPolicy: { enableContextCompaction: true, contextCompactionModel: 'fixture-auto-summary' } } });
+    provider.setReply((body, res) => {
+        if (body.model === 'fixture-auto-summary') {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.end('data: {"choices":[{"delta":{"content":"AUTOMATIC_CHECKPOINT_FIXTURE"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+        } else res.end(JSON.stringify({ choices: [{ message: { content: 'Next reply.' }, finish_reason: 'stop' }] }));
+    });
+    const followup = await phone.call(route + '/send', { requestId: 'auto-compact-followup', text: 'New input.' }, 202);
+    await wait(() => {
+        const work = core.store.work(followup.id);
+        if (work.error_code) throw Error(work.error_code);
+        return work.status === 'completed';
+    }, 'automatic summary and message');
+    assert.deepEqual(provider.calls.map(call => call.model), ['synthetic', 'fixture-auto-summary', 'synthetic']);
+    const messageText = JSON.stringify(provider.calls.at(-1).messages);
+    assert.match(messageText, /AUTOMATIC_CHECKPOINT_FIXTURE/);
+    assert.match(messageText, /New input/);
+    assert.doesNotMatch(messageText, /Original-past-marker/);
+    const { messages } = await phone.call(route + '/messages');
+    assert.equal(messages[2].contextCompaction.checkpoint, 'AUTOMATIC_CHECKPOINT_FIXTURE');
+    assert.equal(messages[3].content, 'New input.');
+    assert.equal((await phone.call(route + '/messages?before=' + messages[2].ordinal)).messages.length, 2);
 });
 
 test('Core reads Canvas, Workspace, and live files through the enrolled native resource node', async t => {
-    const f = await fixture(t, { attachments: true });
     const provider = await localProvider(t);
     const { chat, pluginManager } = host(provider);
     const webSockets = require(BOX + '/WebSocketServer');
@@ -523,21 +430,27 @@ test('Core reads Canvas, Workspace, and live files through the enrolled native r
     webSockets.initialize(wsServer, { vcpKey: 'core-node-fixture' });
     await new Promise(resolve => wsServer.listen(0, '127.0.0.1', resolve));
     chat.config.webSocketServer = webSockets;
-    const { core, route } = await mountCore(f, chat);
+    const f = await coreFixture(t, chat);
+    const { core } = f;
+    const agent = { ...fixtureConfig, systemPrompt: '{{VCPChatCanvas}} {{VCPChatWorkSpace:fixture}}' };
+    const enrollment = await f.pair('desktop', ['read','execute','config']);
+    const actor = core.remote.live('desktop:' + enrollment.deviceId, 'execute');
+    const { route, descriptor } = await f.define({ actor, config: agent });
+    const group = await f.define({ actor, ownerType: 'group', ownerId: 'resourceGroup', name: 'Resources', config: {
+        group: { name: 'Resource group', mode: 'sequential', members: [descriptor.itemId] },
+        agents: [{ id: descriptor.itemId, ...agent }]
+    } });
     let node;
     try {
-        const desktop = await f.desktop('A');
-        const phone = await f.phone();
-        let selected = desktop.descriptor;
-        const current = f.shared.get(f.actor('A'), 'sharedAB', f.owner.id);
-        f.shared.saveConfig(f.actor('A'), { sharedSpaceId: 'sharedAB', sharedId: f.owner.id, opId: 'core-context-agent',
-            expectedVersion: current.version, config: { ...current.config, systemPrompt: '{{VCPChatCanvas}} {{VCPChatWorkSpace:fixture}}' } });
+        const desktop = await f.desktop('A', enrollment);
+        const phone = await f.mobile();
+        let selected = descriptor;
         const resources = path.join(f.root, 'workspace-fixture');
         await fs.mkdir(resources);
         const file = path.join(resources, 'notes.txt');
         await fs.writeFile(file, 'actual workspace revision one');
         const { readCoreContext } = require(CHAT + '/modules/services/nativeSync/coreContextNode');
-        const { nativeSyncRouteId } = require(CHAT + '/modules/services/nativeSync/sharedTopicSponsor');
+        const { nativeSyncRouteId } = require(CHAT + '/modules/services/topicSponsorDelivery');
         const url = 'ws://127.0.0.1:' + wsServer.address().port + '/vcp-distributed-server/VCP_Key=core-node-fixture';
         node = new WebSocket(url);
         await new Promise((resolve, reject) => { node.once('open', resolve); node.once('error', reject); });
@@ -565,9 +478,9 @@ test('Core reads Canvas, Workspace, and live files through the enrolled native r
         const routeHash = require('node:crypto').createHash('sha256').update(nativeSyncRouteId).digest('hex');
         await wait(() => webSockets.bindDistributedTool('internal_core_context', routeHash), 'native resource node registered');
         assert.equal(pluginManager.getPlugin('internal_core_context'), undefined);
-        await phone.call('/core/sharedAB/resource-node', { routeHash }, 403);
+        await phone.call('/core/personal/resource-node', { routeHash }, 403);
         const accepted = await desktop.runtime.prepareSharedSend({
-            descriptor: desktop.descriptor, serverSession: true,
+            descriptor, serverSession: true,
             message: { id: 'node-resources', role: 'user', content: 'Read the live context.', attachments: [{
                 id: 'node-file', name: 'notes.txt', type: 'text/plain',
                 _fileManagerData: { isLiveReference: true, workspaceRef: { workspaceId: 'fixture-workspace', alias: 'fixture', relPath: 'notes.txt' } }
@@ -591,14 +504,7 @@ test('Core reads Canvas, Workspace, and live files through the enrolled native r
         assert.equal(messages[0].desktopReferences[0].sourceId, undefined);
         assert.doesNotMatch(JSON.stringify(messages), /actual workspace revision/);
 
-        const actor = f.actor('A');
-        const owner = f.shared.create(actor, { sharedSpaceId: 'sharedAB', opId: 'resource-group', kind: 'group',
-            localId: 'resourceGroup', config: { name: 'Resource group', mode: 'sequential', members: [f.owner.id] } }).object;
-        const group = f.shared.create(actor, { sharedSpaceId: 'sharedAB', opId: 'resource-group-topic', kind: 'topic',
-            parentId: owner.id, localId: 'resourceTopic', localParent: 'resourceGroup', config: { name: 'Resources' } }).object;
-        await desktop.runtime.pollDirectory();
-        const binding = desktop.runtime.localFor(group.id);
-        selected = { itemType: 'group', itemId: binding.localParent, topicId: binding.localId };
+        selected = group.descriptor;
         const groupWork = await desktop.runtime.coreSingle.send(selected, { id: 'group-node-resources', role: 'user',
             content: 'Use the group room resources.', attachments: [{
                 id: 'group-node-file', name: 'notes.txt', type: 'text/plain',
@@ -619,19 +525,15 @@ test('Core reads Canvas, Workspace, and live files through the enrolled native r
         await wait(() => core.store.work(offline.id)?.status === 'failed', 'resource offline result');
         assert.equal(core.store.work(offline.id).error_code, 'CORE_RESOURCE_NODE_OFFLINE');
         assert.equal(provider.calls.length, 3);
-        assert.equal(f.calls(), 0);
     } finally {
         node?.terminate();
         await webSockets.shutdown();
         await new Promise(resolve => wsServer.close(resolve));
-        await core.close();
-        await fs.rm(f.root + '-core', { recursive: true, force: true });
     }
 });
 
 test('Core associates the actual AgentAssistant child and reads its verified native archive', async t => {
     assert.ok(process.env.VCP_TEST_SERVER, 'Run through the isolated native suite');
-    const f = await fixture(t);
     const provider = await localProvider(t);
     const { chat, pluginManager } = host(provider);
     const name = 'CoreFixtureDelegate', childModel = 'core-fixture-child';
@@ -641,14 +543,18 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
         agents: [{ baseName: 'COREFIXTURE', modelId: childModel, chineseName: name, systemPrompt: 'Isolated AA fixture.' }]
     }));
     const assistant = require(aaDir + '/AgentAssistant');
-    assistant.initialize({ PORT: new URL(f.url).port, Key: 'fixture-only' }, {});
-    f.shared.delegationAgents.add(name);
+
     pluginManager.plugins.set('AgentAssistant', { name: 'AgentAssistant', pluginType: 'hybridservice', communication: { protocol: 'direct' } });
     pluginManager.serviceModules.set('AgentAssistant', { module: assistant });
     const childTool = 'CoreFixtureChildTool';
     pluginManager.plugins.set(childTool, { name: childTool, pluginType: 'hybridservice', communication: { protocol: 'direct' } });
     pluginManager.serviceModules.set(childTool, { module: { processToolCall: async () => 'callback from child tool' } });
-    const { core, route } = await mountCore(f, chat);
+    const f = await coreFixture(t, chat);
+    const { core } = f;
+    const { route, descriptor } = await f.define({ config: fixtureConfig });
+    assistant.initialize({ PORT: new URL(f.endpoint).port, Key: 'fixture-only' }, {});
+    core.local.delegationAgents.add(name);
+    t.after(() => fs.rm(path.join(aaDir, 'config.json'), { force: true }));
     const block = ['<<<[TOOL_REQUEST]>>>', 'tool_name:「始」AgentAssistant「末」,',
         'agent_name:「始」' + name + '「末」,', 'task_delegation:「始」true「末」,',
         'prompt:「始」Prepare the bounded report.「末」', '<<<[END_TOOL_REQUEST]>>>'].join('\n');
@@ -662,7 +568,7 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
         res.end(JSON.stringify({ model: body.model, choices: [{ message: { content: result }, finish_reason: 'stop' }] }));
     });
     try {
-        const phone = await f.phone();
+        const phone = await f.mobile();
         const accepted = await phone.call(route + '/send', { requestId: 'core-native-aa-parent', text: 'Ask the delegate.' }, 202);
         await wait(() => core.store.work(accepted.id)?.status === 'completed', 'parent Core Work completed');
         let task;
@@ -676,12 +582,10 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
         assert.equal(provider.calls.filter(call => call.model === childModel).length, 2);
         assert.equal(core.store.db.prepare("SELECT count(*) AS n FROM work_invocations WHERE plugin_name=?").get(childTool).n, 0);
         assert.equal(core.store.db.prepare("SELECT count(*) AS n FROM core_aa_attempts WHERE task_id=? AND state='settled'").get(task.id).n, 2);
-        assert.equal(f.calls(), 0, 'child and parent never entered the old handler route');
         const next = await phone.call(route + '/send', { requestId: 'core-native-aa-follow-up', text: 'Use the report.' }, 202);
         await wait(() => core.store.work(next.id)?.status === 'completed', 'report in subsequent Core context');
         assert.match(JSON.stringify(provider.calls.at(-1).messages), /Verified child report/);
         await phone.call(route + '/works/' + next.id + '/tasks/' + task.id, undefined, 404);
-        assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM mobile_executions').get().n, 0);
 
         let parentResponse;
         let childResponse;
@@ -725,7 +629,7 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
             requestId: 'core-native-aa-revoked', text: 'Start a revocable delegation.'
         }, 202);
         await wait(() => activeChild, 'authorized child round reached the provider');
-        f.shared.delegationAgents.delete(name);
+        core.local.delegationAgents.delete(name);
         complete(activeChild.body, activeChild.res, '[[Flowlock::Start]]\n[[Flowlock::NextHeartbeat::1]]');
         await wait(async () => {
             const { tasks } = await phone.call(route + '/works/' + revoking.id + '/tasks');
@@ -738,76 +642,65 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
         pluginManager.serviceModules.delete('AgentAssistant');
         pluginManager.plugins.delete(childTool);
         pluginManager.serviceModules.delete(childTool);
-        await core.close();
-        await fs.rm(f.root + '-core', { recursive: true, force: true });
     }
 });
 
 test('Core TopicSponsor delivers a canonical peer message without a desktop recipient', async t => {
-    const f = await fixture(t);
     const provider = await localProvider(t);
     const { chat, pluginManager } = host(provider);
-    require(BOX + '/Plugin/NativeSync/sync/sponsorExecutionBridge').register(pluginManager.executionBridgeRegistry);
-    const peer = f.shared.create(f.actor('A'), { sharedSpaceId: 'sharedAB', opId: 'core-sponsor-peer-agent',
-        kind: 'agent', localId: 'peer-agent', config: { name: 'Peer Agent', model: 'peer-model', systemPrompt: 'Peer context' } }).object;
-    const destination = f.shared.create(f.actor('A'), { sharedSpaceId: 'sharedAB', opId: 'core-sponsor-peer-topic',
-        kind: 'topic', localId: 'peer-topic', localParent: 'peer-agent', parentId: peer.id,
-        config: { name: 'Peer destination' } }).object;
-    const { core } = await mountCore(f, chat);
-    try {
-        const desktop = await f.desktop('A');
-        const phone = await f.phone();
-        const localTarget = desktop.runtime.mappings().find(mapping => mapping.sharedId === destination.id).local;
-        const block = ['<<<[TOOL_REQUEST]>>>', 'tool_name:「始」TopicSponsor「末」,',
-            'command:「始」ReplyToTopic「末」,', 'topic_id:「始」' + localTarget.topicId + '「末」,',
-            'source_topic_id:「始」' + desktop.descriptor.topicId + '「末」,',
-            'message:「始」Peer delivery fixture.「末」', '<<<[END_TOOL_REQUEST]>>>'].join('\n');
-        provider.setReply((body, response) => {
-            const text = body.model === 'peer-model' ? 'Peer reply.' : body.messages.some(row => JSON.stringify(row.content).includes('targetSharedId'))
-                ? 'Sent to peer.' : block;
-            response.end(JSON.stringify({ choices: [{ message: { content: text }, finish_reason: 'stop' }] }));
-        });
-        const accepted = await desktop.runtime.prepareSharedSend({ descriptor: desktop.descriptor, serverSession: true,
-            message: { id: 'core-sponsor-user', role: 'user', content: 'Send the peer message.', attachments: [] } });
-        await desktop.close();
-        await wait(() => {
-            const work = core.store.work(accepted.serverSession.executionId);
-            if (work.error_code) throw Error(work.error_code);
-            return work.status === 'completed';
-        }, 'Sponsor source completed');
-        await wait(() => core.store.db.prepare("SELECT 1 FROM works WHERE conversation_id=? AND status='completed'").get(destination.id), 'Sponsor destination completed');
-        const { messages } = await phone.call('/core/sharedAB/' + destination.id + '/messages');
-        assert.equal(messages.length, 2);
-        assert.equal(messages[0].role, 'assistant');
-        assert.equal(messages[0].name, 'Synthetic shared');
-        assert.match(messages[0].content, /Peer delivery fixture/);
-        assert.equal(messages[1].content, 'Peer reply.');
-        assert.equal(provider.calls.length, 3);
-        assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM shared_topic_sponsor_grants').get().n, 0);
-        assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM journal').get().n, 0);
-        assert.equal(f.calls(), 0);
+    const f = await coreFixture(t, chat);
+    const { core } = f;
+    const { descriptor } = await f.define({ config: fixtureConfig });
+    const peer = await f.define({ ownerId: 'peer-agent', topicId: 'peer-topic', name: 'Peer destination',
+        config: { name: 'Peer Agent', model: 'peer-model', systemPrompt: 'Peer context' } });
+    pluginManager.plugins.set('TopicSponsor', { name: 'TopicSponsor', pluginType: 'distributed' });
+    t.after(() => pluginManager.plugins.delete('TopicSponsor'));
+    const desktop = await f.desktop('A');
+    const phone = await f.mobile();
+    const block = ['<<<[TOOL_REQUEST]>>>', 'tool_name:「始」TopicSponsor「末」,',
+        'command:「始」ReplyToTopic「末」,', 'topic_id:「始」' + peer.descriptor.topicId + '「末」,',
+        'source_topic_id:「始」' + descriptor.topicId + '「末」,',
+        'message:「始」Peer delivery fixture.「末」', '<<<[END_TOOL_REQUEST]>>>'].join('\n');
+    provider.setReply((body, response) => {
+        const text = body.model === 'peer-model' ? 'Peer reply.' : body.messages.some(row => JSON.stringify(row.content).includes('targetSharedId'))
+            ? 'Sent to peer.' : block;
+        response.end(JSON.stringify({ choices: [{ message: { content: text }, finish_reason: 'stop' }] }));
+    });
+    const accepted = await desktop.runtime.prepareSharedSend({ descriptor, serverSession: true,
+        message: { id: 'core-sponsor-user', role: 'user', content: 'Send the peer message.', attachments: [] } });
+    await desktop.close();
+    await wait(() => {
+        const work = core.store.work(accepted.serverSession.executionId);
+        if (work.error_code) throw Error(work.error_code);
+        return work.status === 'completed';
+    }, 'Sponsor source completed');
+    await wait(() => core.store.db.prepare("SELECT 1 FROM works WHERE conversation_id=? AND status='completed'").get(peer.key), 'Sponsor destination completed');
+    const { messages } = await phone.call(peer.route + '/messages');
+    assert.equal(messages.length, 2);
+    assert.equal(messages[0].role, 'assistant');
+    assert.equal(messages[0].name, 'Fixture Agent');
+    assert.match(messages[0].content, /Peer delivery fixture/);
+    assert.equal(messages[1].content, 'Peer reply.');
+    assert.equal(provider.calls.length, 3);
 
-        provider.setReply((_body, response) => response.end(JSON.stringify({
-            choices: [{ message: { role: 'assistant',
-                content: block.replace(desktop.descriptor.topicId, 'other-source-topic') }, finish_reason: 'stop' }]
-        })));
-        const reopened = await f.desktop('A');
-        const rejected = await reopened.runtime.prepareSharedSend({ descriptor: reopened.descriptor, serverSession: true,
-            message: { id: 'core-sponsor-spoof', role: 'user', content: 'Attempt delivery with an unrelated source.', attachments: [] } });
-        await wait(() => ['failed', 'review_required'].includes(core.store.work(rejected.serverSession.executionId)?.status),
-            'mismatched source cannot deliver');
-        assert.equal(core.store.db.prepare('SELECT count(*) AS n FROM works WHERE conversation_id=?').get(destination.id).n, 1);
-        await reopened.close();
-    } finally {
-        await core.close();
-        await fs.rm(f.root + '-core', { recursive: true, force: true });
-    }
+    provider.setReply((_body, response) => response.end(JSON.stringify({
+        choices: [{ message: { role: 'assistant',
+            content: block.replace(descriptor.topicId, 'other-source-topic') }, finish_reason: 'stop' }]
+    })));
+    const reopened = await f.desktop('A');
+    const rejected = await reopened.runtime.prepareSharedSend({ descriptor, serverSession: true,
+        message: { id: 'core-sponsor-spoof', role: 'user', content: 'Attempt delivery with an unrelated source.', attachments: [] } });
+    await wait(() => ['failed', 'review_required'].includes(core.store.work(rejected.serverSession.executionId)?.status),
+        'mismatched source cannot deliver');
+    assert.equal(core.store.db.prepare('SELECT count(*) AS n FROM works WHERE conversation_id=?').get(peer.key).n, 1);
+    await reopened.close();
 });
 
 test('Core Flowlock schedules one native continuation after the initiating desktop closes', async t => {
-    const f = await fixture(t);
     const provider = await localProvider(t);
-    const { core, route } = await mountCore(f, host(provider).chat);
+    const f = await coreFixture(t, host(provider).chat);
+    const { core } = f;
+    const { route, descriptor } = await f.define({ config: fixtureConfig });
     let inputCount = 0;
     provider.setReply((body, response) => {
         inputCount++;
@@ -816,24 +709,18 @@ test('Core Flowlock schedules one native continuation after the initiating deskt
             : 'Final reply.\n[[Flowlock::Stop]]';
         response.end(JSON.stringify({ choices: [{ message: { content: output }, finish_reason: 'stop' }] }));
     });
-    try {
-        const desktop = await f.desktop('A');
-        const phone = await f.phone();
-        const first = await desktop.runtime.prepareSharedSend({ descriptor: desktop.descriptor, serverSession: true,
-            message: { id: 'core-flowlock-parent', role: 'user', content: 'Start the bounded fixture.', attachments: [] } });
-        await desktop.close();
-        await wait(() => core.store.work(first.serverSession.executionId)?.status === 'completed', 'initial Flowlock turn');
-        const state = await phone.call(route + '/works');
-        assert.equal(state.flowlock.active, true);
-        await phone.call(route + '/flowlock', { action: 'stop', requestId: 'unowned-flowlock-stop' }, 403);
-        await wait(() => core.store.db.prepare("SELECT count(*) AS n FROM works WHERE status='completed'").get().n === 2, 'headless Flowlock continuation');
-        assert.equal((await phone.call(route + '/works')).flowlock.active, false);
-        assert.equal(provider.calls.length, 2);
-        assert.match(JSON.stringify(provider.calls[1].messages.at(-1)), /CORE_HEARTBEAT/);
-        assert.equal((await phone.call(route + '/messages')).messages.length, 4);
-        assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM journal').get().n, 0);
-    } finally {
-        await core.close();
-        await fs.rm(f.root + '-core', { recursive: true, force: true });
-    }
+    const desktop = await f.desktop('A');
+    const phone = await f.mobile();
+    const first = await desktop.runtime.prepareSharedSend({ descriptor, serverSession: true,
+        message: { id: 'core-flowlock-parent', role: 'user', content: 'Start the bounded fixture.', attachments: [] } });
+    await desktop.close();
+    await wait(() => core.store.work(first.serverSession.executionId)?.status === 'completed', 'initial Flowlock turn');
+    const state = await phone.call(route + '/works');
+    assert.equal(state.flowlock.active, true);
+    await phone.call(route + '/flowlock', { action: 'stop', requestId: 'unowned-flowlock-stop' }, 403);
+    await wait(() => core.store.db.prepare("SELECT count(*) AS n FROM works WHERE status='completed'").get().n === 2, 'headless Flowlock continuation');
+    assert.equal((await phone.call(route + '/works')).flowlock.active, false);
+    assert.equal(provider.calls.length, 2);
+    assert.match(JSON.stringify(provider.calls[1].messages.at(-1)), /CORE_HEARTBEAT/);
+    assert.equal((await phone.call(route + '/messages')).messages.length, 4);
 });

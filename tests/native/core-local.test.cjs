@@ -5,7 +5,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const { BOX, CHAT, wait } = require('./fixtures/sharedSingleHarness.cjs');
+const { BOX, CHAT, wait } = require('./fixtures/coreSingleHarness.cjs');
 const { host, localProvider } = require('./fixtures/coreSingleHarness.cjs');
 
 test('ToolBox starts local Core without loading the sync runtime and a native topic sends and reopens', async t => {

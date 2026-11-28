@@ -1,6 +1,6 @@
 # 共享群聊取消剩余接力的独立环境验收
 
-使用真实 VCPToolBox、构建后 PWA 和两个独立的 Chrome 设备会话。模型端走本机回环 SSE，使用固定的 A → B → C 成员顺序。每位成员的请求按其系统提示中的合成标记在 Provider 端独立计数。数据库通过只读连接核对，执行、历史和接力命令均由实际宿主处理。复跑方式见 [测试入口](../../../../tests/group-relay/README.md)。
+使用真实 VCPToolBox、构建后 PWA 和两个独立的 Chrome 设备会话。模型端走本机回环 SSE，使用固定的 A → B → C 成员顺序。每位成员的请求按其系统提示中的合成标记在 Provider 端独立计数。数据库通过只读连接核对，执行、历史和接力命令均由实际宿主处理。复跑方式见 [测试入口](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/group-relay/README.md)。
 
 | 场景 | 实际结果 | 回执 |
 | --- | --- | --- |

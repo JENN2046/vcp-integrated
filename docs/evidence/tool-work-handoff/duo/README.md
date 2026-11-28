@@ -43,4 +43,4 @@ node tests/integration/run.cjs tool-handoff-stream
 
 `safe-tools-v1` 在接纳新 Work 时根据桌面声明的 `shared-controlled-tool-pair-v1` 冻结至多两个调用。旧 Work 和未协商的工作仍只允许一个工具。输入来自同一个模型响应，两个不同的名单内插件按原解析顺序逐一派发。每项沿用原生审批和调用身份。两份回执都归档且账本确认后，下一次模型派发前暂停。B 的后继代仍为文本生成；本批没有启用跨多个模型轮次的工具规划、嵌套调用、AgentAssistant 或群聊移交。
 
-冻结版本的原生套件 276 项通过，6 项因未提供旧压缩数据而跳过；协作套件 60 项全部通过。[原生批次预检](../../../../tests/native/tool-batch-preflight.test.cjs) · [凭证与协商验证](../../../../tests/native/shared-tool-boundary.test.cjs)
+冻结版本的原生套件 276 项通过，6 项因未提供旧压缩数据而跳过；协作套件 60 项全部通过。[原生批次预检](../../../../tests/native/tool-batch-preflight.test.cjs) · [凭证与协商验证](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/native/shared-tool-boundary.test.cjs)
