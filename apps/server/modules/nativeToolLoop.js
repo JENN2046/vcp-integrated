@@ -3,6 +3,7 @@
 const NATIVE_CALL_ID = Symbol('vcpNativeCallId');
 
 const { randomUUID } = require('node:crypto');
+const { isDeepStrictEqual } = require('node:util');
 const record = value => value != null && typeof value === 'object' && !Array.isArray(value);
 function isMalformedFunctionCall(choice) {
     return [choice?.native_finish_reason, choice?.finish_reason]
@@ -31,6 +32,10 @@ function collectStreamToolCalls(frames) {
             for (const key of ['type', 'id']) if (part[key] != null) {
                 if (slot[key] !== undefined && slot[key] !== part[key]) slot.error = 'fragment_conflict';
                 slot[key] = part[key];
+            }
+            if (Object.hasOwn(part, 'extra_content')) {
+                if (!Object.hasOwn(slot, 'extra_content')) slot.extra_content = part.extra_content;
+                else if (!isDeepStrictEqual(slot.extra_content, part.extra_content)) slot.error = 'fragment_conflict';
             }
             for (const key of ['name', 'arguments']) {
                 const value = key === 'arguments' ? fn?.arguments ?? fn?.args : fn?.name;
@@ -62,7 +67,7 @@ function admitNativeCalls(input, knownTool = () => false) {
         }
         let id = p.id;
         if (typeof id !== 'string' || !id.trim() || used.has(id)) do { id = `call_${randomUUID()}`; } while (reserved.has(id) || used.has(id));
-        const call = { ...(p.extra_content ? { extra_content: p.extra_content } : {}), id, type:'function', function:{ name:'vcptools', arguments:wire } };
+        const call = { ...(Object.hasOwn(p, 'extra_content') ? { extra_content: p.extra_content } : {}), id, type:'function', function:{ name:'vcptools', arguments:wire } };
         const item = normalizeNativeVcpCalls([call]);
         if (!item) { reject('invalid_target'); continue; }
         used.add(id); calls.push(call); normalized.push(item[0]);

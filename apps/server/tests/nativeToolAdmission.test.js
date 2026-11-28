@@ -23,3 +23,39 @@ test('legacy string fragments, object singleton and missing ID',()=>{
  assert.equal(admitNativeCalls(entries).normalized[0].name,'JEV');
  assert.ok(admitNativeCalls(entriesOf({tool_calls:f('vcptools',{tool_name:'Demo'})})).calls[0].id);
 });
+test('streamed metadata stays with its indexed call and matches non-stream admission', () => {
+    const signature = '  opaque+/=\n' + '签'.repeat(4096);
+    const extra = { vendor: { flags: [1, null] }, google: { thought_signature: signature } };
+    const other = { google: { thought_signature: 'second' } };
+    const first = { ...f('vcptools', '{"tool_name":"Demo"}', 'first'), extra_content: extra };
+    const second = { ...f('vcptools', '{"tool_name":"Demo"}', 'second'), extra_content: other };
+    const entries = collectStreamToolCalls([
+        frame({ tool_calls: [{ index: 7, ...second }, { index: 2, extra_content: extra }] }),
+        frame({ tool_calls: [{ index: 2, ...first, extra_content: { google: extra.google, vendor: extra.vendor } }] })
+    ]);
+    const streamed = admitNativeCalls(entries);
+    assert.deepEqual(streamed.calls, [first, second].map(call => ({ ...call, type: 'function' })));
+    assert.deepEqual(streamed, admitNativeCalls([first, second]));
+});
+
+test('conflicting extra_content rejects only that call and keeps the first value', () => {
+    const call = f('vcptools', '{"tool_name":"Demo"}', 'conflict');
+    const original = { google: { thought_signature: 'one' } };
+    const entries = collectStreamToolCalls([
+        frame({ tool_calls: [{ index: 0, ...call, extra_content: original }] }),
+        frame({ tool_calls: [{ index: 0, extra_content: { google: { thought_signature: 'two' } } },
+            { index: 1, ...call, id: 'valid' }] })
+    ]);
+    assert.deepEqual(entries[0].extra_content, original);
+    const batch = admitNativeCalls(entries);
+    assert.deepEqual(batch.rejected, ['0:fragment_conflict']);
+    assert.deepEqual(batch.calls.map(entry => entry.id), ['valid']);
+    assert.equal(Object.hasOwn(batch.calls[0], 'extra_content'), false);
+});
+
+test('explicit null metadata remains distinct from an omitted field', () => {
+    const call = { ...f('vcptools', '{"tool_name":"Demo"}', 'single'), extra_content: null };
+    const entries = collectStreamToolCalls([frame({ tool_calls: [{ index: 0, ...call }] })]);
+    assert.deepEqual(admitNativeCalls(entries).calls[0], { ...call, type: 'function' });
+    assert.deepEqual(admitNativeCalls(entries), admitNativeCalls([call]));
+});
