@@ -6,6 +6,7 @@ mod identity;
 mod ingest;
 mod protocol;
 mod search;
+mod startup;
 mod storage;
 mod sync;
 mod sync_wire;
@@ -107,7 +108,9 @@ async fn run() -> Result<()> {
     let auth_token = generate_auth_token();
 
     let database_open_started = Instant::now();
+    startup::progress("database_open");
     let database = Database::open(&config.database_path)?;
+    startup::progress("database_ready");
     let database_open_ms = database_open_started.elapsed().as_millis();
     let startup_state = database.startup_state();
     tracing::info!(
@@ -132,6 +135,7 @@ async fn run() -> Result<()> {
 
     let cancellation = CancellationToken::new();
     let reconcile_lock = Arc::new(Mutex::new(()));
+    startup::progress("watcher_start");
     let watcher_started = Instant::now();
     let watcher_runtime = if config.notify_enabled {
         Some(WatcherRuntime::start(
@@ -144,6 +148,7 @@ async fn run() -> Result<()> {
         None
     };
     let watcher_start_ms = watcher_started.elapsed().as_millis();
+    startup::progress("watcher_ready");
     let watcher_metrics = watcher_runtime
         .as_ref()
         .map(|runtime| runtime.metrics.clone());

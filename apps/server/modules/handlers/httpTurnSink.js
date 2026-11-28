@@ -154,6 +154,37 @@ class HttpTurnSink {
         }
         return;
       }
+      if (error.name === 'ContextBudgetExceededError') {
+        // 预算检查拦下的请求：没有发往上游，明确告诉客户端原因和数字。
+        if (!res.headersSent) {
+          if (isOriginalRequestStreaming) {
+            res.status(200);
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            try {
+              res.write(`data: ${JSON.stringify({
+                id: `chatcmpl-VCP-context-budget-${Date.now()}`,
+                object: 'chat.completion.chunk',
+                created: Math.floor(Date.now() / 1000),
+                model: originalBody.model || 'unknown',
+                vcp_incomplete: true,
+                vcp_context_budget: error.budget,
+                choices: [{ index: 0, delta: { content: `[ERROR] ${error.message}` }, finish_reason: 'stop' }],
+              })}\n\n`);
+              res.write('data: [DONE]\n\n', () => res.end());
+            } catch (writeError) {
+              if (!res.writableEnded && !res.destroyed) { try { res.end(); } catch (_) {} }
+            }
+          } else {
+            res.status(400).json({
+              error: { message: error.message, type: 'invalid_request_error', code: 'context_length_exceeded' },
+              vcp_context_budget: error.budget
+            });
+          }
+        }
+        return;
+      }
       // Only log full stack trace for non-abort errors
       console.error('处理请求或转发时出错:', error.message, error.stack);
 

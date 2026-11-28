@@ -76,7 +76,7 @@ app.on('web-contents-created', (_event, contents) => {
     contents.on('console-message', (_event, details, legacyMessage) => {
         const level = details?.level ?? details;
         const message = details?.message ?? legacyMessage;
-        if (detailed && message && (level === 'error' || level === 3)) log('renderer-console', {message,level});
+        if (message && (level === 'error' || level === 3)) log('renderer-console', {message,level});
     });
     const send = contents.send.bind(contents);
     contents.send = (channel, ...args) => {

@@ -1,4 +1,5 @@
 import '../tavernRulesEngine.js';
+import { expandHostedHistoryMessage } from './hostedToolHistory.js';
 import { stripHiddenToolResults } from '../renderer/toolResultRegions.js';
 import { effectiveContextHistory, isContextCheckpoint } from './contextCompactionState.js';
 import { attachTimestampMetadata } from './historyWindow/requestMetadata.mjs';
@@ -166,7 +167,7 @@ async function readAttachmentFrames(electronAPI, attachment, data) {
     }
 }
 
-async function buildDefaultMessageContent({ message, electronAPI, omitInlineTextFilePath = false }) {
+async function buildDefaultMessageContent({ message, electronAPI, omitInlineTextFilePath = false, includeAttachmentFrames = true }) {
     const originalParts = normalizeContentParts(message?.content);
     let text = stripHiddenToolResults(originalParts.filter(part => part?.type === 'text').map(part => normalizeText(part.text)).join('\n'));
     const attachments = Array.isArray(message?.attachments) ? message.attachments : [];
@@ -176,6 +177,7 @@ async function buildDefaultMessageContent({ message, electronAPI, omitInlineText
         const data = getAttachmentData(attachment);
         const liveText = await refreshLiveReferenceText(electronAPI, attachment, data);
         text = appendAttachmentContext(text, attachment, data, liveText, omitInlineTextFilePath);
+        if (!includeAttachmentFrames) continue;
         const framePayload = await readAttachmentFrames(electronAPI, attachment, data);
         if (!framePayload) continue;
 
@@ -286,6 +288,22 @@ async function expandWorkspacePlaceholdersInPrompt(electronAPI, text, snapshot =
 }
 
 // The entry point is intentionally mode-independent: intent chooses history, not prompt bytes.
+export function normalizeAgentContextWindowSize(value) {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value !== 'number' && typeof value !== 'string') return null;
+    const size = Number(value);
+    return Number.isInteger(size) && size >= 1 && size <= 10000 ? size : null;
+}
+
+function selectAgentContextHistory(history, agentConfig) {
+    const size = normalizeAgentContextWindowSize(agentConfig.contextMessageWindowSize);
+    if (size === null || history.length <= size) return history;
+    let start = history.length - size;
+    // A tool-result suffix cannot be sent without the assistant call that precedes it.
+    while (start < history.length && (history[start].role === 'tool' || history[start].tool_call_id)) start++;
+    return history.slice(start);
+}
+
 async function assembleRequestMessages({
     electronAPI, tavernEngine = null, agentConfig = {}, history,
     context = {}, currentUserMessageId, currentUserMessage = null,
@@ -299,7 +317,7 @@ async function assembleRequestMessages({
     if (!context.agentId) throw new Error('Context assembly requires agentId');
     if (temporaryPrompt && temporaryPrompt.trim()) {
         currentUserMessage = { role: 'user', content: temporaryPrompt };
-        history = [...history, currentUserMessage];
+
     }
         let snapshot = conversationSnapshot;
         if (snapshot === undefined && typeof electronAPI.resolveConversationContext === 'function') {
@@ -314,7 +332,9 @@ async function assembleRequestMessages({
             ? tavernRules
             : snapshot ? (Array.isArray(snapshot.rules) ? snapshot.rules : []) : await loadTavernRules(electronAPI);
         const contentBuilder = buildMessageContent || buildDefaultMessageContent;
-        const effectiveHistory = effectiveContextHistory(history);
+        const retainedHistory = selectAgentContextHistory(effectiveContextHistory(history), agentConfig);
+        const outboundHistory = retainedHistory.flatMap(expandHostedHistoryMessage);
+        const effectiveHistory = temporaryPrompt?.trim() ? [...outboundHistory, currentUserMessage] : outboundHistory;
         const agentName = agentConfig.name || context.agentName || context.agentId;
         const baseSystemPrompt = normalizeText(agentConfig.systemPrompt)
             .replace(/\{\{AgentName\}\}/g, agentName);
@@ -373,7 +393,8 @@ async function assembleRequestMessages({
 
             messages.push(attachTimestampMetadata({
                 role: historyMessage.role,
-                content,
+                content: historyMessage.role === 'assistant' && historyMessage.tool_calls?.length
+                    && content.every(part => part.type === 'text' && !part.text?.trim()) ? null : content,
                 ...(isContextCheckpoint(historyMessage) ? { __vcpContextCheckpoint: true } : {}),
                 ...(historyMessage.name ? { name: historyMessage.name } : {}),
                 ...(historyMessage.tool_calls ? { tool_calls: historyMessage.tool_calls } : {}),
@@ -386,7 +407,7 @@ async function assembleRequestMessages({
         }
 
         const messagesForVCP = applyContextRules(messages, rules, engine);
-        return { messagesForVCP, conversationSnapshot: snapshot };
+        return { messagesForVCP, conversationSnapshot: snapshot, retainedHistory };
 }
 
 function buildConversationSystemPrefix(agentConfig, topicId, includeHistoryPath = true) {

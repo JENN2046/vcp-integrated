@@ -72,6 +72,9 @@ if (!process.argv.includes('--mobile')) {
     run(path.join(desktop,'scripts/build-portable-agent-owner.cjs'), [desktop], desktop);
     run(path.join(desktop,'scripts/build-sandbox-preloads.cjs'), [desktop], desktop);
     run(path.join(desktop,'rust_chat_data_service/build-runtime.js'), [], desktop);
+    run(path.join(desktop,'rust_voice_input_engine/build-runtime.js'), [], desktop);
+    run(path.join(desktop,'rust_projectforge_indexer/build-runtime.js'), [], desktop);
+    run(path.join(server,'scripts/build_rust_plugin.js'), ['../desktop/VCPDistributedServer/Plugin/CodeSearcher', 'CodeSearcher', '--locked'], server);
     if (process.platform !== 'linux' || process.arch !== 'x64') {
         throw Error('The integrated server build currently targets Linux x64 GNU. Build the desktop separately on its target OS.');
     }

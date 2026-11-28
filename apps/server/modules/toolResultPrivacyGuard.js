@@ -142,7 +142,7 @@ function maskString(text, config) {
 
 function sanitizeValue(value, config, depth, seen, keyHint = '') {
     if (depth > config.maxDepth) {
-        return value;
+        return config.mask;
     }
 
     if (typeof value === 'string') {

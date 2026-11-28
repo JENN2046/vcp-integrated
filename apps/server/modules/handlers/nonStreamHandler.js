@@ -1,15 +1,20 @@
 const HttpTurnSink = require('./httpTurnSink');
 // modules/handlers/nonStreamHandler.js
 const vcpInfoHandler = require('../../vcpInfoHandler.js');
+const contextBudget = require('../contextBudget.js');
+const finalContextStore = require('../finalContextStore.js');
 const roleDivider = require('../roleDivider.js');
 const { formatToolResultBatch, projectToolBatchForUpstream, buildToolPayloadMessage } = require('../toolResultBatch.js');
 const {
   frameResidentProposalTurn,
   openResidentPresentation,
   hasResidentProposalSurface,
+  hasResidentProposalIntent,
   isResidentProposalToolCall,
   residentProposalFailureCategory
 } = require('../vcpLoop/residentPresentation.js');
+const { NATIVE_CALL_ID, entriesOf, admitNativeCalls, rejectionNotice, buildNativeToolMessages } = require('../nativeToolLoop');
+
 const {
   buildClientVisibleContent,
   removeReasoningFields,
@@ -64,11 +69,23 @@ function parseNonStreamResponse(rawResponseText) {
   }
 }
 
+function hasNativeToolCallPayload(message) {
+  return (
+    (message?.tool_calls != null && (Array.isArray(message.tool_calls) ? message.tool_calls.length > 0 : typeof message.tool_calls === 'object')) ||
+    Boolean(message?.function_call && typeof message.function_call === 'object')
+  );
+}
+
 function isCompleteNonStreamResponse(readResult) {
   const { parsedJson, message, choice } = parseNonStreamResponse(readResult.text);
-  return readResult.response.ok && !readResult.semanticRetryExhausted &&
-    !!parsedJson && !parsedJson.error && !!message &&
-    hasVisibleContent(message.content) && choice?.finish_reason === 'stop';
+  if (!readResult.response.ok || readResult.semanticRetryExhausted || !parsedJson || parsedJson.error || !message) {
+    return false;
+  }
+  if (hasNativeToolCallPayload(message) &&
+      ['tool_calls', 'function_call', 'stop'].includes(choice?.finish_reason)) {
+    return true;
+  }
+  return hasVisibleContent(message.content) && choice?.finish_reason === 'stop';
 }
 
 function isReasoningOnlyNonStreamResponse(rawResponseText) {
@@ -83,7 +100,8 @@ async function readNonStreamResponseWithSemanticRetry({
   retries = 3,
   delay = 1000,
   debugMode = false,
-  label = 'non_stream'
+  label = 'non_stream',
+  timelineTrace
 }) {
   const maxAttempts = Math.max(Number.isFinite(Number(retries)) && Number(retries) > 0 ? Math.floor(Number(retries)) : 1, 1);
   let response = initialResponse;
@@ -95,7 +113,18 @@ async function readNonStreamResponseWithSemanticRetry({
       response = await fetchResponse(attempt);
     }
 
-    const arrayBuffer = await response.arrayBuffer();
+    const upstreamAttempt = timelineTrace?.responses.get(response);
+    timelineTrace?.emit('upstream_body_read_started', { attempt: upstreamAttempt });
+    let arrayBuffer;
+    try {
+      arrayBuffer = await response.arrayBuffer();
+      timelineTrace?.emit('upstream_body_read_finished', { attempt: upstreamAttempt });
+    } catch (error) {
+      const code = error?.code;
+      const errorCode = typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(code) ? code : undefined;
+      timelineTrace?.emit('upstream_body_read_failed', { attempt: upstreamAttempt, errorCode });
+      throw error;
+    }
     responseText = Buffer.from(arrayBuffer).toString('utf-8');
 
     if (!response.ok || !isReasoningOnlyNonStreamResponse(responseText)) {
@@ -165,6 +194,7 @@ class NonStreamHandler {
       roleDividerSwitches,
       roleDividerScanSwitches,
       roleDividerRemoveDisabledTags,
+      touchRequestActivity,
       toolExecutor,
       ToolCallParser,
       abortController,
@@ -172,6 +202,8 @@ class NonStreamHandler {
       clientIp,
       _refreshRagBlocksIfNeeded,
       fetchWithRetry,
+      budgetGuard,
+      timelineTrace,
       vcpToolUseForbidden,
       apiConnectionTimeoutMs,
       semanticModelFallbackCandidates,
@@ -256,7 +288,7 @@ class NonStreamHandler {
         body: JSON.stringify(projectToolBatchForUpstream(body)),
         signal: abortController.signal,
       },
-      { retries: apiRetries, delay: apiRetryDelay, debugMode: DEBUG_MODE, connectionTimeout: apiConnectionTimeoutMs, modelFallbackCandidates: semanticModelFallbackCandidates }
+      { retries: apiRetries, delay: apiRetryDelay, debugMode: DEBUG_MODE, connectionTimeout: apiConnectionTimeoutMs, modelFallbackCandidates: semanticModelFallbackCandidates, timelineTrace }
     );
 
     const firstReadResult = await readNonStreamResponseWithSemanticRetry({
@@ -265,10 +297,49 @@ class NonStreamHandler {
       retries: apiRetries,
       delay: apiRetryDelay,
       debugMode: DEBUG_MODE,
-      label: 'initial'
+      label: 'initial',
+      timelineTrace
     });
     firstAiAPIResponse = firstReadResult.response;
     const aiResponseText = firstReadResult.text;
+    const noteUpstreamUsage = (responseText, isInitial = false) => {
+      try {
+        const usage = JSON.parse(responseText)?.usage;
+        if (isInitial) finalContextStore.recordUpstreamUsage(originalBody.requestId || originalBody.messageId, usage);
+        budgetGuard?.noteUsage(usage, isInitial ? firstAiAPIResponse?.vcpAttemptModel : undefined);
+      } catch (_) { /* 非 JSON 响应没有 usage，面板保留本地估算 */ }
+    };
+    noteUpstreamUsage(aiResponseText, true);
+
+    /**
+     * 工具循环每次再发上游之前的预算检查。超预算时先压缩本轮之前的工具结果，
+     * 仍然超则返回说明文字（调用方把它交给客户端并退出循环）；可以发送时返回 null。
+     */
+    const checkLoopBudget = (messages) => {
+      if (!budgetGuard?.active) return null;
+      const build = () => projectToolBatchForUpstream({ ...originalBody, messages, stream: false });
+      let body = build();
+      let check = budgetGuard.check(body, 'tool_loop', { silent: budgetGuard.enforcing });
+      if (check.over && budgetGuard.enforcing) {
+        let roundStartIndex = messages.length;
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i]?.role === 'assistant') { roundStartIndex = i; break; }
+        }
+        const slimmed = contextBudget.slimToFit(messages, roundStartIndex, () => budgetGuard.check(build(), 'tool_loop', { silent: true }).over);
+        if (slimmed > 0) {
+          body = build();
+          const before = check.estimated;
+          check = budgetGuard.check(body, 'tool_loop', { silent: true });
+          console.warn(`[ContextBudget] 工具循环超预算，已压缩 ${slimmed} 条较早的工具结果: ${before} -> ${check.estimated} / ${check.limit}`);
+        }
+      }
+      if (check.over && budgetGuard.enforcing) {
+        console.warn(`[ContextBudget] 工具循环已停止: estimated=${check.estimated} limit=${check.limit}`);
+        return `\n\n> [!WARNING]\n> ${contextBudget.exceededMessage(check, 'tool_loop', budgetGuard.breakdown(body))}\n`;
+      }
+      budgetGuard.noteRequest(body);
+      return null;
+    };
     let chatLogs = [];
     let oneRingAssistantTurnParts = [];
     let validUpstreamTurns = isCompleteNonStreamResponse(firstReadResult);
@@ -312,6 +383,8 @@ class NonStreamHandler {
     const maxRecursion = maxVCPLoopNonStream || 5;
     let conversationHistoryForClient = [];
     let currentAIContentForLoop = fullContentFromAI;
+    let currentParsedResponse = initParsedResponse;
+    let nativeTerminalResponse = null;
     require('../requestExecutionContext').checkpointAssistant(currentAIContentForLoop);
     let currentMessagesForNonStreamLoop = originalBody.messages ? JSON.parse(JSON.stringify(originalBody.messages)) : [];
 
@@ -328,17 +401,25 @@ class NonStreamHandler {
         if (DEBUG_MODE) console.log('[VCP NonStream Loop] Abort detected, exiting loop.');
         break;
       }
+      touchRequestActivity?.();
 
       let anyToolProcessedInCurrentIteration = false;
       const residentFrame = residentProposalFramingActive
         ? frameResidentProposalTurn(currentAIContentForLoop, ToolCallParser)
         : { kind: 'NONE', clientContent: currentAIContentForClient, loopContent: currentAIContentForLoop };
-      if (residentFrame.kind !== 'NONE') sink.disableReplay();
+      const nativeMessage = currentParsedResponse.message;
+      const hasNativeCall = hasNativeToolCallPayload(nativeMessage);
+      const batch = hasNativeCall && (residentProposalFramingActive || this.context.ownsNativeVcpTools)
+        ? admitNativeCalls(entriesOf(nativeMessage), name => (!this.context.ownsNativeVcpTools && name === 'AGENTSOSResident') || !!pluginManager?.getPlugin?.(name))
+        : null;
+      const unframedProposal = batch?.normalized.some(hasResidentProposalIntent)
+        || (hasNativeCall && residentFrame.kind !== 'NONE');
+      if (residentFrame.kind !== 'NONE' || unframedProposal) sink.disableReplay();
       if (
-        residentFrame.kind === 'INVALID'
+        unframedProposal || residentFrame.kind === 'INVALID'
         || (residentFrame.kind === 'RESIDENT_PROPOSAL' && residentProposalExecuted)
       ) {
-        if (residentFrame.clientContent) conversationHistoryForClient.push(residentFrame.clientContent);
+        if (!unframedProposal && residentFrame.clientContent) conversationHistoryForClient.push(residentFrame.clientContent);
         conversationHistoryForClient.push('\n[AGENTSOSResident PROPOSAL_SEQUENCE_REJECTED]\n');
         break;
       }
@@ -348,29 +429,66 @@ class NonStreamHandler {
       }
       conversationHistoryForClient.push(currentAIContentForClient);
 
-      const toolCalls = vcpToolUseForbidden ? [] : ToolCallParser.parse(currentAIContentForLoop);
+      let nativeCalls = null;
+      let ownedCalls = null;
+      if (validUpstreamTurns && hasNativeCall) {
+        if (!this.context.ownsNativeVcpTools) {
+          nativeTerminalResponse = currentParsedResponse.parsedJson;
+          completed = !require('../requestExecutionContext').isCoreTurn();
+          break;
+        }
+        const notice = rejectionNotice(batch, originalBody);
+        if (notice) conversationHistoryForClient.push(notice);
+        if (!vcpToolUseForbidden && batch.calls.length) {
+          nativeCalls = batch.calls;
+          ownedCalls = batch.normalized;
+        } else if (vcpToolUseForbidden || !ToolCallParser.endsWithCompleteToolRequest?.(currentAIContentForLoop)) {
+          completed = false;
+          break;
+        }
+      }
+      const toolCalls = vcpToolUseForbidden ? [] : ownedCalls ?? ToolCallParser.parse(currentAIContentForLoop);
+      const makeAssistantMessage = () => {
+        if (!ownedCalls) return { role: 'assistant', content: currentAIContentForLoop };
+        const { content, reasoning_content, reasoning_details } = nativeMessage;
+        return {
+          role: 'assistant',
+          content: content ?? null,
+          tool_calls: nativeCalls,
+          ...(reasoning_content != null ? { reasoning_content } : {}),
+          ...(reasoning_details != null ? { reasoning_details } : {})
+        };
+      };
       require('../requestExecutionContext').assertToolBatch(toolCalls);
       const residentProposalCalls = toolCalls.filter(isResidentProposalToolCall);
 
       if (toolCalls.length > 0) {
+        const expandedCalls = await (toolExecutor.expandCalls?.(toolCalls) ?? toolCalls);
+        if (abortController?.signal.aborted || sink.isClosed()) break;
+        require('../requestExecutionContext').assertToolBatch(expandedCalls);
+        if (expandedCalls.some(hasResidentProposalIntent) && residentFrame.kind !== 'RESIDENT_PROPOSAL') {
+          sink.disableReplay();
+          conversationHistoryForClient.push('\n[AGENTSOSResident PROPOSAL_SEQUENCE_REJECTED]\n');
+          break;
+        }
         anyToolProcessedInCurrentIteration = true;
-        const { normal: normalCalls, archery: archeryCalls } = ToolCallParser.separate(toolCalls);
-        const archeryErrorContents = [];
+        const { normal: normalCalls, archery: archeryCalls } = ToolCallParser.separate(expandedCalls);
+        const archeryReceiptGroups = [];
         const archeryStatusSummaryItems = [];
         const visibleToolResults = [];
 
         // 执行 Archery 调用
-        const archeryLogs = await Promise.all(archeryCalls.map(async toolCall => {
+        const archeryLogs = await Promise.all(archeryCalls.map(async (toolCall, index) => {
           try {
             const result = await toolExecutor.execute(toolCall, clientIp, currentMessagesForNonStreamLoop);
             const isError = !result.success || (result.raw && this.context.isToolResultError(result.raw));
 
             if (isError) {
               archeryStatusSummaryItems.push(`${toolCall.name} 调用失败${result.recordId ? ` (记录ID: ${result.recordId})` : ''}`);
-              archeryErrorContents.push({
+              archeryReceiptGroups[index] = { name: toolCall.name, callId: toolCall[NATIVE_CALL_ID], parts: [{
                 type: 'text',
                 text: `[异步工具 "${toolCall.name}" 返回了错误，请注意]:\n${result.content[0].text}`
-              });
+              }] };
               const forceThisOne = !shouldShowVCP && toolCall.markHistory;
               if ((shouldShowVCP || forceThisOne) && (isError || forceThisOne)) {
                 const vcpText = vcpInfoHandler.streamVcpInfo(null, originalBody.model, toolCall.name, result.success ? 'success' : 'error', result.raw || result.error, abortController);
@@ -378,7 +496,7 @@ class NonStreamHandler {
               }
             } else if (result.approvalFeedbackContent?.length) {
               // 用户明确输入的审核留言优先于 archery 静默；业务成功状态保持不变。
-              archeryErrorContents.push(...result.approvalFeedbackContent);
+              archeryReceiptGroups[index] = { name: toolCall.name, callId: toolCall[NATIVE_CALL_ID], parts: result.approvalFeedbackContent };
             }
             return { tool: toolCall, result: result.content };
           } catch (e) {
@@ -387,10 +505,12 @@ class NonStreamHandler {
           }
         }));
         if (sink.isClosed() || abortController?.signal.aborted) break;
+        const archeryGroups = archeryReceiptGroups.filter(Boolean);
+        const archeryErrorContents = archeryGroups.flatMap(group => group.parts);
 
         // 处理纯 Archery 的错误或用户审核留言。
         if (normalCalls.length === 0 && archeryErrorContents.length > 0) {
-          let assistantMessages = [{ role: 'assistant', content: currentAIContentForLoop }];
+          let assistantMessages = [makeAssistantMessage()];
           if (enableRoleDivider && enableRoleDividerInLoop) {
             assistantMessages = roleDivider.process(assistantMessages, {
               ignoreList: roleDividerIgnoreList,
@@ -402,13 +522,19 @@ class NonStreamHandler {
           }
           currentMessagesForNonStreamLoop.push(...assistantMessages);
 
-          currentMessagesForNonStreamLoop.push(buildToolPayloadMessage(archeryErrorContents));
+          if (ownedCalls) currentMessagesForNonStreamLoop.push(...buildNativeToolMessages(nativeCalls, archeryGroups));
+          else currentMessagesForNonStreamLoop.push(await buildToolPayloadMessage(archeryGroups));
 
           if (archeryStatusSummaryItems.length > 0) {
             visibleToolResults.push(`\n[本轮工具调用摘要:]\n${archeryStatusSummaryItems.join('；')}。\n[本轮工具调用摘要结束]\n`);
           }
           conversationHistoryForClient.push(formatToolResultBatch(visibleToolResults, enableRoleDivider));
 
+          const archeryBudgetNotice = checkLoopBudget(currentMessagesForNonStreamLoop);
+          if (archeryBudgetNotice) {
+            conversationHistoryForClient.push(archeryBudgetNotice);
+            break;
+          }
           const recursionBody = { ...originalBody, messages: currentMessagesForNonStreamLoop, stream: false };
           if (sink.isClosed() || abortController?.signal.aborted) break;
           const recursionReadResult = await readNonStreamResponseWithSemanticRetry({
@@ -416,7 +542,8 @@ class NonStreamHandler {
             retries: apiRetries,
             delay: apiRetryDelay,
             debugMode: DEBUG_MODE,
-            label: `archery_error_depth_${recursionDepth}`
+            label: `archery_error_depth_${recursionDepth}`,
+            timelineTrace
           });
           const recursionAiResponse = recursionReadResult.response;
 
@@ -426,7 +553,9 @@ class NonStreamHandler {
             });
             validUpstreamTurns = validUpstreamTurns && isCompleteNonStreamResponse(recursionReadResult);
             const recursionText = recursionReadResult.text;
+            noteUpstreamUsage(recursionText);
             const recursionParsedResponse = extractedResponse(recursionText);
+            currentParsedResponse = recursionParsedResponse;
             const recursionMessage = recursionParsedResponse.message;
             if (recursionMessage) {
               currentAIContentForLoop = '\n' + extractVisibleContent(recursionMessage);
@@ -458,7 +587,7 @@ class NonStreamHandler {
         }
 
         // 执行普通调用
-        let assistantMessages = [{ role: 'assistant', content: currentAIContentForLoop }];
+        let assistantMessages = [makeAssistantMessage()];
         if (enableRoleDivider && enableRoleDividerInLoop) {
           assistantMessages = roleDivider.process(assistantMessages, {
             ignoreList: roleDividerIgnoreList,
@@ -500,8 +629,6 @@ class NonStreamHandler {
           }
           return logs;
         })();
-        const toolResultsForRAG = toolResults.flatMap(result => result.content);
-        if (archeryErrorContents.length > 0) toolResultsForRAG.push(...archeryErrorContents);
 
         // VCP 信息展示 - 批量包裹为单个 USER 角色
         const toolStatusSummaryItems = [...archeryStatusSummaryItems];
@@ -538,24 +665,35 @@ class NonStreamHandler {
         }
         conversationHistoryForClient.push(formatToolResultBatch(visibleToolResults, enableRoleDivider));
 
-        const toolResultsTextForRAG = JSON.stringify(toolResultsForRAG, (k, v) =>
-          (k === 'url' || k === 'image_url') && typeof v === 'string' && v.startsWith('data:') ? "[Omitted]" : v
-        );
-
+        // RAG 保留原表示，与发给模型的内容块分开。
         if (RAGMemoRefresh) {
+          const toolResultsTextForRAG = JSON.stringify([
+            ...toolResults.flatMap(result => result.content), ...archeryErrorContents
+          ], (k, v) =>
+            (k === 'url' || k === 'image_url') && typeof v === 'string' && v.startsWith('data:') ? "[Omitted]" : v
+          );
           currentMessagesForNonStreamLoop = await _refreshRagBlocksIfNeeded(currentMessagesForNonStreamLoop, {
             lastAiMessage: currentAIContentForLoop,
             toolResultsText: toolResultsTextForRAG
           }, pluginManager, DEBUG_MODE);
         }
 
-        const toolPayload = buildToolPayloadMessage([
-          ...toolResults.flatMap(result => result.contentForAI ?? result.content),
-          ...archeryErrorContents
-        ]);
-        toolPayload.content = await maybeTranslateToolPayloadMedia(toolPayload.content);
-        currentMessagesForNonStreamLoop.push(toolPayload);
+        const modelResultGroups = [
+          ...toolResults.map((result, index) => ({
+            name: normalCalls[index]?.name,
+            callId: normalCalls[index]?.[NATIVE_CALL_ID],
+            parts: result.contentForAI ?? result.content
+          })),
+          ...archeryGroups
+        ];
+        if (ownedCalls) currentMessagesForNonStreamLoop.push(...buildNativeToolMessages(nativeCalls, modelResultGroups));
+        else currentMessagesForNonStreamLoop.push(await buildToolPayloadMessage(modelResultGroups, maybeTranslateToolPayloadMedia));
 
+        const loopBudgetNotice = checkLoopBudget(currentMessagesForNonStreamLoop);
+        if (loopBudgetNotice) {
+          conversationHistoryForClient.push(loopBudgetNotice);
+          break;
+        }
         const recursionBody = { ...originalBody, messages: currentMessagesForNonStreamLoop, stream: false };
         if (sink.isClosed() || abortController?.signal.aborted) break;
         const recursionReadResult = await readNonStreamResponseWithSemanticRetry({
@@ -563,7 +701,8 @@ class NonStreamHandler {
           retries: apiRetries,
           delay: apiRetryDelay,
           debugMode: DEBUG_MODE,
-          label: `tool_loop_depth_${recursionDepth}`
+          label: `tool_loop_depth_${recursionDepth}`,
+          timelineTrace
         });
         const recursionAiResponse = recursionReadResult.response;
 
@@ -574,7 +713,9 @@ class NonStreamHandler {
         });
         validUpstreamTurns = validUpstreamTurns && isCompleteNonStreamResponse(recursionReadResult);
         const recursionText = recursionReadResult.text;
+        noteUpstreamUsage(recursionText);
         const recursionParsedResponse = extractedResponse(recursionText);
+        currentParsedResponse = recursionParsedResponse;
         const recursionMessage = recursionParsedResponse.message;
         if (recursionMessage) {
           currentAIContentForLoop = '\n' + extractVisibleContent(recursionMessage);
@@ -606,17 +747,30 @@ class NonStreamHandler {
     const finalContentForClient = conversationHistoryForClient.join('');
     let finalJsonResponse;
     try {
-      finalJsonResponse = JSON.parse(aiResponseText);
-      if (!finalJsonResponse.choices?.[0]?.message) {
+      finalJsonResponse = nativeTerminalResponse || JSON.parse(aiResponseText);
+
+      const choice0 = finalJsonResponse.choices?.[0];
+      const msg0 = choice0?.message;
+      const preserveNativeToolTurn = nativeTerminalResponse !== null;
+
+      if (!msg0) {
         finalJsonResponse.choices = [{ message: { content: finalContentForClient } }];
       } else {
-        finalJsonResponse.choices[0].message.content = finalContentForClient;
+        if (!preserveNativeToolTurn) {
+          delete msg0.tool_calls;
+          delete msg0.function_call;
+        }
+        if (!preserveNativeToolTurn || finalContentForClient.trim().length > 0 || msg0.content !== null) {
+          msg0.content = finalContentForClient;
+        }
         if (reasoningToContentEnabled) {
           removeReasoningFields(finalJsonResponse.choices[0].message);
           removeReasoningFields(finalJsonResponse.choices[0]);
         }
       }
-      finalJsonResponse.choices[0].finish_reason = recursionDepth >= maxRecursion ? 'length' : 'stop';
+      if (!preserveNativeToolTurn) {
+        finalJsonResponse.choices[0].finish_reason = recursionDepth >= maxRecursion ? 'length' : 'stop';
+      }
     } catch (e) {
       finalJsonResponse = {
         choices: [{ index: 0, message: { role: 'assistant', content: finalContentForClient }, finish_reason: recursionDepth >= maxRecursion ? 'length' : 'stop' }]

@@ -24,7 +24,10 @@ test('only outbound conversational display names are omitted from the packet', (
 
 test('semantic River projects existing speaker names without guessing them from the text', async () => {
     const registry = {};
-    const embeddings = { getBatchEmbeddingsCached: async texts => texts.map(() => [1,0]) };
+    const embeddings = {
+        sanitizeForEmbedding: text => text,
+        getSingleEmbeddingCached: async () => [1,0]
+    };
     const executor = new ToolExecutor({pluginManager:{executionBridgeRegistry:registry,messagePreprocessors:new Map([['RAGDiaryPlugin',embeddings]])}});
     const stop = Error('end of synthetic preparation');
     let rows;

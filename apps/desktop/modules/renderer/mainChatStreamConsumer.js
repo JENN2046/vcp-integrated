@@ -1,5 +1,6 @@
 import { normalizeStreamChunk } from '../chat/contentRuntime.js';
 import { collectToolBatchRanges } from './toolBatchRegions.js';
+import { createNativeToolCallStream } from '../chat/nativeToolCallStream.js';
 
 const terminalTypes = new Set(['completed', 'failed', 'cancelled', 'discarded']);
 
@@ -13,7 +14,7 @@ const buildMessage = event => {
         admissionToken: context.admissionToken,
         avatarUrl: context.avatarUrl,
         avatarColor: context.avatarColor,
-        content: event.type === 'agent_thinking' ? '思考中...' : '',
+        content: event.type === 'agent_thinking' ? '思考中' : '',
         timestamp: Date.now(),
         isThinking: event.type === 'agent_thinking',
         isGroupMessage: context.isGroupMessage || false,
@@ -32,7 +33,6 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
     let preparedType = null;
     const projection = capabilities.resolveProjection?.(messageId) || null;
     let accumulatedText = '';
-    let checkedBoundaryCount = 0;
     let budgetInterruptRequested = false;
     const reportError = (...args) => { try { capabilities.reportError?.(...args); } catch { /* diagnostics cannot own persistence */ } };
     const setPersistenceState = (...args) => {
@@ -40,17 +40,61 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
         catch (error) { reportError('[MainChatStreamConsumer] persistence indicator failed', error); }
     };
 
+    const nativeCalls = createNativeToolCallStream();
+    let checkedBoundaryCount = 0;
+    let active = true;
+    let checkingDemand = false;
+    let demandVersion = 0;
+    let demandTimer = null;
+    let lastDemandCheck = -Infinity;
+
+    function deactivate() {
+        active = false;
+        clearTimeout(demandTimer);
+        demandTimer = null;
+    }
+
+    function checkDemand() {
+        if (!active || checkingDemand || demandTimer !== null || !capabilities.onStreamContextGrowth) return;
+        const delay = 100 - (Date.now() - lastDemandCheck);
+        if (delay > 0) {
+            demandTimer = setTimeout(() => {
+                demandTimer = null;
+                checkDemand();
+            }, delay);
+            return;
+        }
+        lastDemandCheck = Date.now();
+        checkingDemand = true;
+        const version = demandVersion;
+        Promise.resolve().then(() => {
+            if (!active) return;
+            return capabilities.onStreamContextGrowth({
+                messageId, context, text: accumulatedText, isActive: () => active,
+            });
+        }).catch(error => capabilities.reportError?.('[ContextCompaction] Ready check failed', error))
+            .finally(() => {
+                checkingDemand = false;
+                if (active && demandVersion !== version) checkDemand();
+            });
+    }
+
+    function markBatch(chunk, part) {
+        if (typeof part !== 'string' || !/^chatcmpl-vcp-batch-\d+$/.test(chunk?.id || '')) return part;
+        const [batch] = collectToolBatchRanges(part);
+        return batch?.closed && !part.slice(0, batch.start).trim() && !part.slice(batch.end).trim()
+            ? { text: part, toolReturnBoundary: true } : part;
+    }
+
     return Object.freeze({
         surfaceGeneration: capabilities.getSurfaceGeneration?.(),
         normalizeChunk(chunk) {
-            const text = normalizeStreamChunk(chunk);
-            // Without role dividers ToolBox sends its entire result batch in
-            // one native SSE packet. Ordinary assistant text is not a receipt.
-            if (!/^chatcmpl-vcp-batch-\d+$/.test(chunk?.id || '')) return text;
-            const [batch] = collectToolBatchRanges(text);
-            if (!batch?.closed || text.slice(0, batch.start).trim() || text.slice(batch.end).trim()) return text;
-            return { text, toolReturnBoundary: true };
+            return markBatch(chunk, normalizeStreamChunk(chunk));
         },
+        normalizeChunks(chunk) {
+            return nativeCalls.push(chunk).map(part => markBatch(chunk, part));
+        },
+        flushChunks: nativeCalls.flush,
         async prepare(event) {
             context = { ...context, ...(event.context || {}) };
             if (preparedType === null) {
@@ -60,13 +104,19 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
         },
         consume(event) {
             const terminal = terminalTypes.has(event.type);
+            if (terminal) deactivate();
             if (projection?.suppressed) {
                 if (terminal) projection.settle?.({ event, finalized: event.outcome?.persistence?.value, context, messageId });
                 return;
             }
+            if (event.type === 'hosted_tool_calls') {
+                (projection?.append || capabilities.append)(messageId, { vcpHostedToolCalls: event.tool_calls }, context, operationId);
+            }
             if (event.type === 'chunk') {
                 (projection?.append || capabilities.append)(messageId, event.text, context, operationId);
                 accumulatedText += event.text;
+                demandVersion += 1;
+                checkDemand();
                 if (!context.isGroupMessage && !context.groupId) {
                     const boundaries = accumulatedText.match(/^[ \t]*<<<\[END_ROLE_DIVIDE_USER\]>>>[ \t]*(?=\r?$)/gm) || [];
                     if (event.toolReturnBoundary || boundaries.length > checkedBoundaryCount) {
@@ -94,6 +144,7 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
             capabilities.onSettled?.({ event: settledEvent, finalized, context, messageId });
         },
         async persist(value) {
+            deactivate();
             if (projection?.suppressed) return null;
             const terminal = value.terminal || {};
             if (terminal.phase === 'projection') {
@@ -107,7 +158,8 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
                 return null;
             }
             const pausedMessage = terminal.pausedWorkMessage;
-            const receivedText = pausedMessage ? pausedMessage.content : terminal.fullResponse || value.snapshot?.text || '';
+            const assistantSegments = pausedMessage ? null : value.snapshot?.assistantSegments;
+            const receivedText = pausedMessage ? pausedMessage.content : assistantSegments ? value.snapshot.text : terminal.fullResponse || value.snapshot?.text || '';
             let fullResponse = receivedText;
             const error = terminal.error?.message || terminal.error || '';
             if (terminal.finishReason === 'length') {
@@ -128,7 +180,9 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
                 messageId,
                 finishReason,
                 terminal.context || context,
-                { fullResponse, error, streamOperationId: operationId, ...(pausedMessage && { authoritativeContent: true }) },
+                { fullResponse, error, streamOperationId: operationId, usage: terminal.kind === 'completed' ? terminal.usage : undefined,
+                    ...(pausedMessage && { authoritativeContent: true }),
+                    ...(assistantSegments ? { assistantSegments } : {}) },
             );
             if (!projected) throw new Error(`Stream terminal projection failed: ${messageId}`);
             } catch (error) { releasePersistence?.(true); throw error; }
@@ -169,6 +223,6 @@ export function createMainChatStreamConsumer(initialEvent, capabilities) {
             }
             return finalized;
         },
-        dispose() { projection?.release?.(); },
+        dispose() { deactivate(); projection?.release?.(); },
     });
 }

@@ -15,30 +15,7 @@ const settingsManager = (() => {
      * @returns {string} The completed URL.
      */
     function completeVcpUrl(url) {
-        if (!url) return '';
-        let trimmedUrl = url.trim();
-        if (trimmedUrl === '') return '';
-
-        // If it doesn't have a protocol, add http://
-        if (!/^https?:\/\//i.test(trimmedUrl)) {
-            trimmedUrl = 'http://' + trimmedUrl;
-        }
-
-        try {
-            const urlObject = new URL(trimmedUrl);
-            const requiredPath = '/v1/chat/completions';
-
-            // For any other case (e.g., root path '/', or some other path),
-            // we set the path to the required one.
-            urlObject.pathname = requiredPath;
-            return urlObject.toString();
-
-        } catch (e) {
-            // If URL parsing fails, it's likely an invalid URL.
-            // We return the original input for the user to see and correct.
-            console.warn(`Could not parse and complete URL: ${url}`, e);
-            return url;
-        }
+        return globalThis.vcpServerRoutes.normalizeVcpServerUrl(url) || String(url ?? '').trim();
     }
 
     // --- Private Variables ---
@@ -388,10 +365,12 @@ const settingsManager = (() => {
 
         if (agentModelInput) agentModelInput.value = agentConfig.model || '';
         if (agentTemperatureInput) agentTemperatureInput.value = agentConfig.temperature === null ? '' : (agentConfig.temperature !== undefined ? agentConfig.temperature : 0.7);
-        if (agentContextTokenLimitInput) agentContextTokenLimitInput.value = agentConfig.contextTokenLimit === null ? '' : (agentConfig.contextTokenLimit !== undefined ? agentConfig.contextTokenLimit : 4000);
-        if (agentMaxOutputTokensInput) agentMaxOutputTokensInput.value = agentConfig.maxOutputTokens === null ? '' : (agentConfig.maxOutputTokens !== undefined ? agentConfig.maxOutputTokens : 1000);
+        if (agentContextTokenLimitInput) agentContextTokenLimitInput.value = agentConfig.contextTokenLimit === null ? '' : (agentConfig.contextTokenLimit ?? '');
+        if (agentMaxOutputTokensInput) agentMaxOutputTokensInput.value = agentConfig.maxOutputTokens === null ? '' : (agentConfig.maxOutputTokens ?? '');
         if (agentTopPInput) agentTopPInput.value = agentConfig.top_p === null ? '' : (agentConfig.top_p !== undefined ? agentConfig.top_p : '');
         if (agentTopKInput) agentTopKInput.value = agentConfig.top_k === null ? '' : (agentConfig.top_k !== undefined ? agentConfig.top_k : '');
+        const windowSizeInput = getAgentControl('agentContextMessageWindowSize');
+        if (windowSizeInput) windowSizeInput.value = agentConfig.contextMessageWindowSize ?? '';
 
         const streamOutput = agentConfig.streamOutput !== undefined ? agentConfig.streamOutput : true;
         const streamOutputTrue = getAgentControl('agentStreamOutputTrue');
@@ -577,6 +556,7 @@ const settingsManager = (() => {
             model: resolvedModel || 'gemini-pro',
             temperature: parseOptionalNumberInput(agentTemperatureInput, Number.parseFloat),
             contextTokenLimit: parseOptionalNumberInput(agentContextTokenLimitInput, value => Number.parseInt(value, 10)),
+            contextMessageWindowSize: parseOptionalNumberInput(getAgentControl('agentContextMessageWindowSize'), Number),
             maxOutputTokens: parseOptionalNumberInput(agentMaxOutputTokensInput, value => Number.parseInt(value, 10)),
             top_p: parseOptionalNumberInput(agentTopPInput, Number.parseFloat),
             top_k: parseOptionalNumberInput(agentTopKInput, value => Number.parseInt(value, 10)),
@@ -642,6 +622,16 @@ const settingsManager = (() => {
             uiHelper.showToastNotification("Agent名称不能为空！", 'error');
             reportSettingsSaveResult(agentSettingsForm, false, 'missing-name');
             return { success: false, error: 'missing-name' };
+        }
+
+        const windowSizeInput = getAgentControl('agentContextMessageWindowSize');
+        const windowSize = newConfig.contextMessageWindowSize;
+        if (windowSizeInput?.validity?.badInput
+            || (windowSize !== null && (!Number.isInteger(windowSize) || windowSize < 1 || windowSize > 10000))) {
+            uiHelper.showToastNotification('单聊上下文楼层上限必须留空，或填写 1 到 10000 的整数。', 'error');
+            windowSizeInput?.focus?.();
+            reportSettingsSaveResult(agentSettingsForm, false, 'invalid-context-message-window-size');
+            return { success: false, error: 'invalid-context-message-window-size' };
         }
 
         const croppedFile = mainRendererFunctions.getCroppedFile('agent');
@@ -987,6 +977,12 @@ const settingsManager = (() => {
     async function populateTtsModels(currentPrimaryVoice, currentSecondaryVoice) {
         if (!agentTtsVoicePrimarySelect || !agentTtsVoiceSecondarySelect) return;
 
+        const populateToken = agentSettingsPopulateToken;
+        const primarySelect = agentTtsVoicePrimarySelect;
+        const secondarySelect = agentTtsVoiceSecondarySelect;
+        const isCurrent = () => populateToken === agentSettingsPopulateToken
+            && primarySelect === agentTtsVoicePrimarySelect
+            && secondarySelect === agentTtsVoiceSecondarySelect;
         ensureThemedTtsSelects();
         const globalSettings = getGlobalSettings();
         const isNetworkMode = globalSettings.voiceMode === 'network';
@@ -1004,6 +1000,10 @@ const settingsManager = (() => {
                 ));
             if (!sameStructure) select.replaceChildren(...options);
             select.value = selectedValue || '';
+            // Property writes do not trigger MutationObserver or change.
+            // Refresh presentation only; loading an Agent must not dirty its form.
+            const EventCtor = select.ownerDocument?.defaultView?.CustomEvent ?? CustomEvent;
+            select.dispatchEvent(new EventCtor('vcp-uiux-sync', { bubbles: true }));
         };
 
         try {
@@ -1012,6 +1012,7 @@ const settingsManager = (() => {
             // Both local and network modes use the upstream TTS capability.
             // The retired WebIndexTTS2 catalog is no longer part of the runtime.
             const models = await electronAPI.sovitsGetModels();
+            if (!isCurrent()) return;
             if (Array.isArray(models)) {
                 optionList = models;
             } else if (models && typeof models === 'object') {
@@ -1087,7 +1088,7 @@ const settingsManager = (() => {
             const primaryOptions = createOptionGroups('不使用语音', currentPrimaryVoice);
             const secondaryOptions = createOptionGroups('不使用', currentSecondaryVoice);
             if (optionList.length === 0) {
-                const emptyLabel = isNetworkMode ? '未找到 MiMo 音色' : '未找到模型,请启动Sovits';
+                const emptyLabel = isNetworkMode ? '未找到 MiMo 音色' : '暂无预设，请在 sovits5cppmanager 创建';
                 primaryOptions.push(createOption('', emptyLabel, { disabled: true }));
                 secondaryOptions.push(createOption('', emptyLabel, { disabled: true }));
             }
@@ -1095,6 +1096,7 @@ const settingsManager = (() => {
             commitOptions(agentTtsVoiceSecondarySelect, secondaryOptions, currentSecondaryVoice);
             ensureThemedTtsSelects();
         } catch (error) {
+            if (!isCurrent()) return;
             console.error('Failed to get TTS models:', error);
             const errorLabel = isNetworkMode ? '获取网络音色失败' : '获取模型失败';
             const primaryErrorOption = document.createElement('option');
@@ -1108,7 +1110,7 @@ const settingsManager = (() => {
             commitOptions(agentTtsVoicePrimarySelect, [primaryErrorOption]);
             commitOptions(agentTtsVoiceSecondarySelect, [secondaryErrorOption]);
             ensureThemedTtsSelects();
-            uiHelper.showToastNotification(isNetworkMode ? '获取网络音色失败' : '获取Sovits语音模型失败', 'error');
+            uiHelper.showToastNotification(isNetworkMode ? '获取网络音色失败' : '读取 GSV 本地声音预设失败', 'error');
         }
     }
 
@@ -1499,8 +1501,8 @@ const settingsManager = (() => {
             const vcpServerUrlInput = document.getElementById('vcpServerUrl');
             if (vcpServerUrlInput) {
                 vcpServerUrlInput.addEventListener('blur', () => {
-                    const completedUrl = completeVcpUrl(vcpServerUrlInput.value);
-                    vcpServerUrlInput.value = completedUrl;
+                    const rootUrl = completeVcpUrl(vcpServerUrlInput.value);
+                    vcpServerUrlInput.value = rootUrl;
                 });
             }
         },
@@ -2408,6 +2410,7 @@ function resolveRegexSlots() {
                 agentNameInput,
                 agentTemperatureInput,
                 agentContextTokenLimitInput,
+                getAgentControl('agentContextMessageWindowSize'),
                 agentMaxOutputTokensInput,
                 agentTopPInput,
                 agentTopKInput,

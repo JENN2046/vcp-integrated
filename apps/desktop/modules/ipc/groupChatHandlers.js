@@ -1,3 +1,4 @@
+const { vcpServerEndpoint } = require('../utils/vcpServerRoutes');
 // modules/ipc/groupChatHandlers.js
 const { ipcMain } = require('electron');
 const path = require('path');
@@ -74,11 +75,18 @@ function initialize(mainWindow, context) {
         return { error: `Agent config for ${agentId} not found.` };
     };
 
+    const notifyGroupTopicUpdated = payload => {
+        if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+            mainWindow.webContents.send('vcp-group-topic-updated', payload);
+        }
+    };
+
     groupChat.initializeRuntimeServices({
         historyMutationQueue,
         topicAdmission,
         jevService,
-        getAgentConfigById
+        getAgentConfigById,
+        notifyTopicUpdated: notifyGroupTopicUpdated
     });
 
     if (gameService) {
@@ -279,7 +287,7 @@ function initialize(mainWindow, context) {
             return { success: true, localState:result.localState,history:result.history,...(result.sync ? { sync: result.sync, revision: result.revision } : {}) };
         } catch (error) {
             console.error(`[Main IPC] 保存群组 ${groupId} 话题 ${topicId} 聊天历史失败:`, error);
-            return { success: false, error: error.message };
+            return { success: false, error: error.message, code: error.code };
         }
     });
 
@@ -333,7 +341,8 @@ function initialize(mainWindow, context) {
                 );
             }
 
-            await groupChat.handleInviteAgentToSpeak(groupId, topicId, invitedAgentId, sendStreamChunkToRenderer, getAgentConfigById);
+            const result = await groupChat.handleInviteAgentToSpeak(groupId, topicId, invitedAgentId, sendStreamChunkToRenderer, getAgentConfigById);
+            if (result?.error) return { success: false, error: result.error, status: result.status };
             return { success: true, message: "Agent invitation processing started." };
         } catch (error) {
             console.error(`[Main IPC] Error in inviteAgentToSpeak handler for Group ${groupId}, Agent ${invitedAgentId}:`, error);

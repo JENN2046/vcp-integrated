@@ -17,6 +17,8 @@ AppData/LoomApps/*
 node_modules/
 /node_modules
 
+/artifacts
+
 .env
 !audio_engine/.env
 
@@ -112,3 +114,4 @@ coverage.xml
 /modules/renderer/toolBatchRegions.js
 /modules/renderer/toolResultRegions.js
 /modules/renderer/markdownCodeDomainScanner.js
+/VCPDistributedServer/Plugin/CodeSearcher/CodeSearcher-*

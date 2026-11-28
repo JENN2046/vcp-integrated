@@ -29,6 +29,7 @@ function setup() {
         ['electron', { ipcMain, dialog: {}, BrowserWindow: {} }],
         ['fs-extra', fse], ['path', path], ['crypto', require('node:crypto')],
         ['../services/senderTaskRegistry', require('../modules/services/senderTaskRegistry.js')],
+        ['../services/toolLoopHandoff', require('../modules/services/toolLoopHandoff.js')],
         ['../contextSanitizer', require('../modules/contextSanitizer.js')],
         ['../vcpClient', require('../modules/vcpClient.js')],
         ['../modelTrajectory', require('../modules/modelTrajectory.js')],
@@ -37,6 +38,7 @@ function setup() {
         ['../services/historyMutationQueue', { HistoryMutationQueue }], ['./workspaceHandlers', {}], ['./sideChatHandlers', sideChatHandlers],
         // 桌宠没打开时这些钩子全是空操作，用真实模块。
         ['../hostHooks', require('../modules/hostHooks.js')],
+        ['../chatRequestError', require('../modules/chatRequestError.js')],
     ]);
     vm.runInNewContext('(function(require,module,exports){' + source + '\n})', { console: { log() {}, warn() {}, error() {} }, TextDecoder, URL, fetch, AbortSignal })(
         name => { assert.ok(dependencies.has(name), 'unreviewed fixture dependency: ' + name); return dependencies.get(name); }, module, module.exports);

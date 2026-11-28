@@ -103,3 +103,73 @@ test('a deleted side chat child topic is not recreated by a late save', async t 
     await queue.replace(descriptor(), [{ id: 'first' }]);
     assert.deepEqual(await queue.read(descriptor()), [{ id: 'first' }]);
 });
+test('existing-only mutation queued after deletion cannot resurrect the topic', async t => {
+    const queue = await fixture(t);
+    const scope = descriptor();
+    await queue.replace(scope, [{ id: 'original' }]);
+    let unblock;
+    const gate = new Promise(resolve => { unblock = resolve; });
+    const blocker = queue.run(scope, () => gate);
+    const directory = path.dirname(queue.getHistoryPath(scope.itemId, scope.topicId));
+    const deletion = queue.run(scope, () => fs.remove(directory));
+    let transformed = false;
+    const late = queue.mutate(scope, history => {
+        transformed = true;
+        return [...history, { id: 'late' }];
+    }, { requireExisting: true });
+    const rejected = assert.rejects(late, /HISTORY_DELETED/);
+    unblock();
+    await blocker;
+    await deletion;
+    await rejected;
+    assert.equal(transformed, false);
+    assert.equal(await fs.pathExists(directory), false);
+    // Creation remains explicit through the existing default contract.
+    await queue.replace(scope, [{ id: 'new' }]);
+    await queue.mutate(scope, history => [...history, { id: 'next' }], { requireExisting: true });
+    assert.deepEqual((await queue.read(scope)).map(message => message.id), ['new', 'next']);
+});
+
+test('existing-only mutation rechecks after asynchronous transform without creating directories', async t => {
+    const queue = await fixture(t);
+    const scope = descriptor();
+    await queue.replace(scope, [{ id: 'original' }]);
+    const directory = path.dirname(queue.getHistoryPath(scope.itemId, scope.topicId));
+    await assert.rejects(queue.mutate(scope, async history => {
+        await fs.remove(directory);
+        return [...history, { id: 'late' }];
+    }, { requireExisting: true }), /HISTORY_DELETED/);
+    assert.equal(await fs.pathExists(directory), false);
+});
+test('existing-only replacement queued after deletion cannot recreate history', async t => {
+    const queue = await fixture(t);
+    const scope = descriptor();
+    await queue.replace(scope, [{ id: 'original' }]);
+    const directory = path.dirname(queue.getHistoryPath(scope.itemId, scope.topicId));
+    const deletion = queue.run(scope, () => fs.remove(directory));
+    const late = queue.replace(scope, [{ id: 'late terminal' }], { requireExisting: true });
+    const rejected = assert.rejects(late, /HISTORY_DELETED/);
+    await deletion;
+    await rejected;
+    assert.equal(await fs.pathExists(directory), false);
+});
+
+test('topic activity comes from persisted conversation timestamps, including old files and deletions', async t => {
+    const queue = await fixture(t);
+    const target = descriptor();
+    const events = [];
+    queue.onActivity = event => events.push(event);
+    const iso = '2024-08-10T11:00:00.000Z';
+    const history = [{ role: 'assistant', timestamp: iso }, { role: 'user', timestamp: 10 },
+        { role: 'system', timestamp: Date.now() }, { role: 'assistant', isThinking: true, timestamp: Date.now() }];
+    await fs.outputJson(queue.getHistoryPath(target.itemId, target.topicId), history);
+    const read = () => queue.getActivityTimes(target.itemId, [target.topicId, 'empty']);
+    assert.deepEqual(await read(), [[target.topicId, Date.parse(iso)], ['empty', 0]]);
+    assert.equal(events.length, 0);
+    await queue.replace(target, [{ role: 'user', timestamp: 10 }]);
+    assert.equal(events.at(-1).time, 10);
+    assert.deepEqual(await read(), [[target.topicId, 10], ['empty', 0]]);
+    await queue.replace(target, []);
+    assert.equal(events.at(-1).time, 0);
+    await assert.rejects(() => queue.getActivityTimes(target.itemId, ['../invalid']));
+});

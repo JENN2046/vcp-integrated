@@ -3,7 +3,8 @@ const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
 const { pathToFileURL } = require('url');
-const { getEmbeddingsBatch, cosineSimilarity } = require('../../EmbeddingUtils');
+const { cosineSimilarity } = require('../../EmbeddingUtils');
+const { findLastRealUserMessage } = require('../messageProcessor');
 const toolCallRecordStore = require('../toolCallRecordStore');
 const jevRiverReranker = require('../jevRiverReranker'); // river semantic:N 的级联第二阶段
 const jevToolCallExp = require('../jevToolCallExp');
@@ -39,6 +40,10 @@ function residentProposalFailureFor(error) {
   }
   return 'PROPOSAL_EXECUTION_FAILED';
 }
+const { NATIVE_CALL_ID } = require('../nativeToolLoop');
+
+ 
+const JEV_PLANNING_ERROR = Symbol('jevPlanningError');
 
 /**
  * 提取消息的纯文本字符串
@@ -129,21 +134,10 @@ class ToolExecutor {
       return null;
     }
 
-    // 定位最后一条"真实"用户消息（排除工具回包和系统注入）
-    const lastUserIndex = contextMessages.findLastIndex(msg => {
-      if (msg.role !== 'user') return false;
-      const content = getMessageTextContent(msg);
-      return !content.startsWith('<!-- VCP_TOOL_PAYLOAD -->') &&
-        !content.startsWith('[系统提示:]') &&
-        !content.startsWith('[系统邀请指令:]');
+    const { index: lastUserIndex, sanitizedContent: userContent } = findLastRealUserMessage(contextMessages, {
+      sanitize: ragPlugin.sanitizeForEmbedding.bind(ragPlugin)
     });
-
-    if (lastUserIndex === -1) {
-      console.warn('[VRef] 未找到可用的 user 消息，跳过 vref。');
-      return null;
-    }
-
-    const rawUserContent = getMessageTextContent(contextMessages[lastUserIndex]);
+    if (lastUserIndex === -1) return null;
 
     // 向前搜索最近一条 AI 回复，作为上下文的另一半
     let rawAiContent = '';
@@ -155,17 +149,17 @@ class ToolExecutor {
     }
 
     // 清洗文本（去除 RAG 块、系统标记等噪声）
-    const userContent = ragPlugin.sanitizeForEmbedding(rawUserContent, 'user');
+
     const aiContent = rawAiContent
       ? ragPlugin.sanitizeForEmbedding(rawAiContent, 'assistant')
       : '';
 
     // 仅从缓存获取向量 — 如果本轮 RAG 已执行过，这些向量必然已在缓存中
     const userVector = userContent
-      ? ragPlugin._getEmbeddingFromCacheOnly(userContent)
+      ? ragPlugin._getEmbeddingFromCacheOnly(userContent, 'user')
       : null;
     const aiVector = aiContent
-      ? ragPlugin._getEmbeddingFromCacheOnly(aiContent)
+      ? ragPlugin._getEmbeddingFromCacheOnly(aiContent, 'assistant')
       : null;
 
     if (!userVector && !aiVector) {
@@ -248,6 +242,28 @@ class ToolExecutor {
       });
   }
 
+  // Expand before the loop splits normal/archery calls, so each real call
+  // reaches the same executor and receipt pipeline as a direct VCP request.
+  async expandCalls(toolCalls) {
+    if (!toolCalls.some(call => jevToolCallExp.isVirtualToolName(call.name))) return toolCalls;
+
+    const groups = await Promise.all(toolCalls.map(async call => {
+      if (!jevToolCallExp.isVirtualToolName(call.name)) return [call];
+      try {
+        const planned = await jevToolCallExp.plan(call.args?.expression, call);
+        if (planned.length > 0 && call[NATIVE_CALL_ID]) {
+          return planned.map(child => ({ ...child, [NATIVE_CALL_ID]: call[NATIVE_CALL_ID] }));
+        }
+        return planned.length > 0 ? planned : [
+          { ...call, [JEV_PLANNING_ERROR]: 'JEV 没有生成可执行的真实工具调用。' }
+        ];
+      } catch (error) {
+        return [{ ...call, [JEV_PLANNING_ERROR]: `JEV 规划错误: ${error.message}` }];
+      }
+    }));
+    return groups.flat();
+  }
+
   /**
    * 执行单个工具调用
    * @returns {Promise<{success: boolean, content: Array, contentForAI?: Array, error?: string, raw?: any}>}
@@ -264,42 +280,11 @@ class ToolExecutor {
     if (controlledDelegation) this.pluginManager.assertControlledDirectTool(name, { requireLoaded: true });
     const residentProposalCall = isResidentProposalCall(toolCall);
 
-    // === JEV 实验性虚拟工具展开 ===
-    // JEV 本身不是插件。规划器仅生成白名单真实工具调用，随后递归进入
-    // 本执行链，使验证码、人工审核、工具记录、隐私过滤与分布式桥保持生效。
+    if (toolCall[JEV_PLANNING_ERROR]) {
+      return this._createErrorResult(name, toolCall[JEV_PLANNING_ERROR]);
+    }
     if (jevToolCallExp.isVirtualToolName(name)) {
-      try {
-        // 传入完整虚拟调用，使规划器在展开后保留通用调用协议：
-        // timely_contact/tool_password 参数及 archery/ink/river/vref 元数据。
-        const expandedCalls = await jevToolCallExp.plan(args?.expression, toolCall);
-        if (expandedCalls.length === 0) {
-          return this._createErrorResult(name, 'JEV 没有生成可执行的真实工具调用。');
-        }
-
-        const expandedResults = await this.executeAll(expandedCalls, clientIp, contextMessages);
-        if (expandedResults.length === 1) return expandedResults[0];
-
-        const successful = expandedResults.filter(result => result?.success);
-        const contentForAI = expandedResults.some(result => result?.contentForAI)
-          ? expandedResults.flatMap(result => result?.contentForAI ?? result?.content ?? [])
-          : undefined;
-        return {
-          success: successful.length === expandedResults.length,
-          content: expandedResults.flatMap(result => Array.isArray(result?.content) ? result.content : []),
-          ...(contentForAI ? { contentForAI } : {}),
-          raw: {
-            status: successful.length === expandedResults.length ? 'success' : 'partial',
-            virtualTool: 'JEV',
-            expandedTools: expandedCalls.map(call => call.name),
-            results: expandedResults.map(result => result?.raw ?? {
-              success: result?.success,
-              error: result?.error
-            })
-          }
-        };
-      } catch (error) {
-        return this._createErrorResult(name, `JEV 规划错误: ${error.message}`);
-      }
+      return this._createErrorResult(name, 'JEV 虚拟调用必须先由工具循环展开。');
     }
 
     // === river 上下文注入 ===
@@ -357,41 +342,28 @@ class ToolExecutor {
       
       // 3. 尝试语义检索，失败则优雅回退到 last:N（保证工具调用不会因向量化失败而中断）
       try {
-        // 优先走 RAGDiaryPlugin 缓存通道：本轮对话的消息向量大概率已被 RAG 流程缓存，
-        // 复用缓存可避免重复 API 调用。仅当 ragPlugin 不可用时回退到 EmbeddingUtils 独立通道。
         const ragPlugin = this.pluginManager?.messagePreprocessors?.get('RAGDiaryPlugin');
-        
-        let queryVec = null;
-        let messageVectors = [];
-        
-        if (ragPlugin && typeof ragPlugin.getBatchEmbeddingsCached === 'function') {
-          // 走 RAGDiaryPlugin 缓存通道：逐条查缓存，未命中的批量发 API
-          const allTexts = [
-            queryText.slice(0, 1000),
-            ...textMessages.map(m => m.text.slice(0, 1000))
-          ];
-          const allVectors = await ragPlugin.getBatchEmbeddingsCached(allTexts);
-          queryVec = allVectors[0];
-          messageVectors = allVectors.slice(1);
-        } else {
-          // 回退：ragPlugin 不可用时，走 EmbeddingUtils 独立通道
-          const embeddingConfig = {
-            apiKey: process.env.API_KEY,
-            apiUrl: process.env.API_URL,
-            model: process.env.WhitelistEmbeddingModel || 'google/gemini-embedding-001'
-          };
-          const allTexts = [
-            queryText.slice(0, 1000),
-            ...textMessages.map(m => m.text.slice(0, 1000))
-          ];
-          const allVectors = await getEmbeddingsBatch(allTexts, embeddingConfig);
-          queryVec = allVectors[0];
-          messageVectors = allVectors.slice(1);
+        if (typeof ragPlugin?.getSingleEmbeddingCached !== 'function' ||
+            typeof ragPlugin?.sanitizeForEmbedding !== 'function') {
+          throw new Error('Shared context embedding service unavailable');
         }
-        
-        if (!queryVec) {
-          throw new Error('Query embedding returned null');
-        }
+
+        const queryVec = await ragPlugin.getSingleEmbeddingCached(queryText.slice(0, 1000));
+        if (!queryVec) throw new Error('Query embedding returned null');
+
+        // Bound concurrent cache misses for long histories; each block still shares RAG single-flight.
+        const messageVectors = new Array(textMessages.length);
+        let cursor = 0;
+        await Promise.all(Array.from({ length: Math.min(8, textMessages.length) }, async () => {
+          while (cursor < textMessages.length) {
+            const i = cursor++;
+            const { text, role } = textMessages[i];
+            const contextRole = role === 'user' || role === 'assistant' ? role : 'tool';
+            messageVectors[i] = await ragPlugin.getSingleEmbeddingCached(
+              ragPlugin.sanitizeForEmbedding(text, role), { contextRole }
+            );
+          }
+        }));
         
         // 4. 计算余弦相似度并排序
         const scored = textMessages.map((m, i) => ({
@@ -740,10 +712,28 @@ class ToolExecutor {
       }
     }
 
+    let contentForAI;
+    const errorResult = parsedPayload?.result;
+    if (errorResult && typeof errorResult === 'object') {
+      const richContent = Array.isArray(errorResult) ? errorResult : (errorResult.data?.content || errorResult.content);
+      if (Array.isArray(richContent) && richContent.length > 0) {
+        contentForAI = richContent;
+      } else {
+        contentForAI = [{ type: 'text', text: JSON.stringify(errorResult, null, 2) }];
+      }
+      const feedbackNote = typeof parsedPayload?.__vcpApprovalFeedback === 'string'
+        ? parsedPayload.__vcpApprovalFeedback.trim()
+        : '';
+      if (feedbackNote && !contentForAI.some(part => part?.type === 'text' && typeof part.text === 'string' && part.text.includes(feedbackNote))) {
+        contentForAI = [{ type: 'text', text: `【用户审核留言：已允许工具 "${toolName}" 调用】\n${feedbackNote}` }, ...contentForAI];
+      }
+    }
+
     return {
       success: false,
       error: message,
       content: [{ type: 'text', text: `[错误] ${displayText}` }],
+      ...(contentForAI ? { contentForAI } : {}),
       ...(parsedPayload ? { raw: parsedPayload } : {})
     };
   }
@@ -892,7 +882,10 @@ class ToolExecutor {
 
   async _verifyAuth(args) {
     const realCode = await this.getRealAuthCode(this.debugMode);
-    const provided = args.tool_password;
+    const rawProvided = args.tool_password;
+    const provided = typeof rawProvided === 'number' && Number.isFinite(rawProvided)
+      ? String(rawProvided)
+      : rawProvided;
     delete args.tool_password;
 
     if (!realCode || provided !== realCode) {

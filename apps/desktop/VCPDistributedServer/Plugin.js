@@ -5,6 +5,7 @@ const { spawn } = require('child_process');
 const schedule = require('node-schedule');
 const dotenv = require('dotenv');
 const quitAdmission = require('../modules/services/quitAdmission.cjs');
+const bootProfile = require('../modules/diagnostics/bootProfile');
 
 const PLUGIN_DIR = path.join(__dirname, 'Plugin');
 const manifestFileName = 'plugin-manifest.json';
@@ -252,10 +253,59 @@ class PluginManager {
                 detached: process.platform !== 'win32'
             });
 
-            let outputBuffer = '';
+            const outputChunks = [];
             let errorOutput = '';
             let initialResponseSent = false;
             const timeoutDuration = plugin.entryPoint?.timeout || plugin.communication?.timeout || (isAsyncPlugin ? 1800000 : 60000);
+
+            const extractFirstStatusJsonString = (text) => {
+                if (!text || typeof text !== 'string') return null;
+                const len = text.length;
+                let searchFrom = 0;
+                while (searchFrom < len) {
+                    const startIdx = text.indexOf('{', searchFrom);
+                    if (startIdx === -1) return null;
+                    let depth = 0;
+                    let inString = false;
+                    let escape = false;
+                    let endIdx = -1;
+                    for (let i = startIdx; i < len; i++) {
+                        const ch = text.charCodeAt(i);
+                        if (inString) {
+                            if (escape) escape = false;
+                            else if (ch === 92) escape = true;
+                            else if (ch === 34) inString = false;
+                            continue;
+                        }
+                        if (ch === 34) inString = true;
+                        else if (ch === 123) depth++;
+                        else if (ch === 125) {
+                            depth--;
+                            if (depth === 0) {
+                                endIdx = i;
+                                break;
+                            }
+                        }
+                    }
+                    if (endIdx === -1) {
+                        const nextBrace = text.indexOf('{', startIdx + 1);
+                        if (nextBrace === -1) return null;
+                        searchFrom = startIdx + 1;
+                        continue;
+                    }
+                    const candidate = text.slice(startIdx, endIdx + 1);
+                    try {
+                        const parsed = JSON.parse(candidate);
+                        if (parsed && typeof parsed === 'object' && (parsed.status === 'success' || parsed.status === 'error')) {
+                            return candidate;
+                        }
+                    } catch {
+                        // continue scanning
+                    }
+                    searchFrom = startIdx + 1;
+                }
+                return null;
+            };
 
             const timeoutId = setTimeout(() => {
                 if (!initialResponseSent) {
@@ -268,21 +318,15 @@ class PluginManager {
             pluginProcess.stdout.on('data', (data) => {
                 if (isAsyncPlugin && initialResponseSent) return;
 
-                outputBuffer += data;
+                outputChunks.push(data);
 
-                // 异步插件早期返回逻辑
-                if (isAsyncPlugin) {
-                    try {
-                        const potentialJsonMatch = outputBuffer.match(/(\{[\s\S]*?\})(?:\s|$)/);
-                        if (potentialJsonMatch && potentialJsonMatch[1]) {
-                            const parsedOutput = JSON.parse(potentialJsonMatch[1]);
-                            if (parsedOutput && (parsedOutput.status === "success" || parsedOutput.status === "error")) {
-                                initialResponseSent = true;
-                                resolve(outputBuffer.trim());
-                            }
-                        }
-                    } catch (e) {
-                        // Incomplete JSON, wait for more data
+                // 异步插件早期返回逻辑：仅在分块含 '}' 时用线性括号平衡扫描器提取首包
+                if (isAsyncPlugin && data.includes('}')) {
+                    const matchedJsonStr = extractFirstStatusJsonString(outputChunks.join(''));
+                    if (matchedJsonStr) {
+                        initialResponseSent = true;
+                        outputChunks.length = 0;
+                        resolve(matchedJsonStr);
                     }
                 }
             });
@@ -304,6 +348,9 @@ class PluginManager {
                     return;
                 }
 
+                const finalStdout = outputChunks.join('').trim();
+                outputChunks.length = 0;
+
                 if (code !== 0 && signal !== 'SIGKILL' && signal !== 'SIGTERM') {
                     const errMsg = `Plugin ${pluginName} exited with code ${code}. Stderr: ${errorOutput.trim()}`;
                     console.error(`[DistPluginManager] ${errMsg}`);
@@ -312,7 +359,7 @@ class PluginManager {
                     if (errorOutput.trim() && this.debugMode) {
                         console.warn(`[DistPluginManager] Plugin ${pluginName} produced stderr: ${errorOutput.trim()}`);
                     }
-                    if (!initialResponseSent) resolve(outputBuffer.trim());
+                    if (!initialResponseSent) resolve(finalStdout);
                 }
             });
 
@@ -329,6 +376,7 @@ class PluginManager {
             return;
         }
         console.log('[DistPluginManager] Initializing service plugins...');
+        let profileOrder = 0;
         for (const [name, manifest] of this.plugins) {
             if (!['service', 'hybridservice'].includes(manifest.pluginType)
                 || !manifest.entryPoint.script || manifest.communication?.protocol !== 'direct') continue;
@@ -337,7 +385,11 @@ class PluginManager {
             await new Promise(resolve => setImmediate(resolve));
             if (shouldStop()) return;
             try {
-                const serviceData = { manifest, module: require(path.join(manifest.basePath, manifest.entryPoint.script)) };
+                const profileLabel = `${++profileOrder}:${name}`;
+                const serviceData = { manifest, module: bootProfile.measureSync(
+                    `${profileLabel}:require`,
+                    () => require(path.join(manifest.basePath, manifest.entryPoint.script))
+                ) };
                 // An upstream MobileSync build with its own physical History writer
                 // cannot safely share this host's AppData, regardless of its wire version.
                 if (name === 'VCPMobileSync' &&
@@ -352,14 +404,14 @@ class PluginManager {
                 await new Promise(resolve => setImmediate(resolve));
                 if (shouldStop()) return;
                 if (serviceData.module && typeof serviceData.module.initialize === 'function') {
-                    await serviceData.module.initialize({
+                    await bootProfile.measureAsync(`${profileLabel}:initialize`, () => serviceData.module.initialize({
                         app,
                         adminApiRouter,
                         projectBasePath,
                         config: pluginConfig,
                         services,
                         logger: console
-                    });
+                    }));
                 }
 
                 await new Promise(resolve => setImmediate(resolve));
@@ -369,13 +421,15 @@ class PluginManager {
                     // 服务插件允许在路由开放前执行异步准备（例如 VCPMobileSync
                     // 等待 VCP-CDS reconcile）。必须等待其完成，否则 HTTP 服务可能
                     // 已开始监听，但插件路由尚未挂载，客户端会在启动窗口收到 404。
-                    await serviceData.module.registerRoutes(app, pluginConfig, projectBasePath, services);
+                    await bootProfile.measureAsync(`${profileLabel}:registerRoutes`,
+                        () => serviceData.module.registerRoutes(app, pluginConfig, projectBasePath, services));
                 }
             } catch (e) {
                 console.error(`[DistPluginManager] Error initializing service plugin ${name}:`, e);
             }
         }
         console.log('[DistPluginManager] Service plugins initialized.');
+        bootProfile.report('service-plugins-settled');
     }
 
     _logStaticPluginSkip(pluginName, reason) {

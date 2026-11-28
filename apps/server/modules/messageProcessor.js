@@ -1,7 +1,10 @@
+const { projectContextEmbeddingInput } = require('./contextEmbeddingInput');
 // modules/messageProcessor.js
 const fsSync = require('fs');
 const fs = fsSync.promises;
 const path = require('path');
+const { resultPath } = require('./asyncResultStore');
+const { assertSafePath } = require('./safeFilePath');
 
 const warnedMissingVarTarKeys = new Set();
 let cachedExampleVarTarKeys = null;
@@ -187,6 +190,23 @@ function stripSystemNotificationBlocks(text) {
     return text.replace(/\[系统通知[:：]?\][\s\S]*?\[系统通知结束\]/g, '').trim();
 }
 
+const VCP_META_THINKING_V3_LINE_REGEX = /^\$\$(?:势陷\[∂[^\r\n]+ (?:∧|⋈|⊗_H) ∇[^\r\n]+\]_φ(?:\s*(?:↦|⊢|⇝)\s*思奇\s*σ_∞\([^\r\n]+ ⊖ φ(?:\s*\|\s*ℳ)?\))?|思奇\s*σ_∞\([^\r\n]+ ⊖ φ(?:\s*\|\s*ℳ)?\))(?:\s*∥\s*⊘\((?:r_⊥(?:\s*≫\s*0)?(?:\s*⊕\s*∂_2)?|∂_2)\))?\s*→_\{(?:τ,x|τ↺|τ↗|τ⇄)\}\s*\?(?:\^\{-1\})?\$\$$/;
+
+/**
+ * 识别元思考 V3 独立裸奔注入消息：
+ * 1) 优先检查非枚举标记 __vcpMetaThinkingV3__；
+ * 2) 兜底按纯公式形态匹配，避免中间预处理器浅拷贝/JSON深拷贝导致标记丢失。
+ */
+function isMetaThinkingV3Message(message) {
+    if (!message) return false;
+    if (message.__vcpMetaThinkingV3__) return true;
+    if (message.role !== 'user') return false;
+    const raw = extractTextFromMessageContent(message.content);
+    if (!raw || !raw.includes('$$')) return false;
+    const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    return lines.length > 0 && lines.every(line => VCP_META_THINKING_V3_LINE_REGEX.test(line));
+}
+
 function findLastRealUserMessage(messages, options = {}) {
     if (!Array.isArray(messages)) {
         return { index: -1, rawContent: '', sanitizedContent: '' };
@@ -198,9 +218,15 @@ function findLastRealUserMessage(messages, options = {}) {
     const skipSystemInvitation = options.skipSystemInvitation !== false;
     const skipToolPayload = options.skipToolPayload !== false;
 
+    let fallbackFormulaCandidate = null;
+
     for (let index = messages.length - 1; index >= 0; index--) {
         const message = messages[index];
-        if (!message || message.role !== 'user') continue;
+        // 若已在最新轮捕获到无标记纯公式用户发言，遇 assistant 即达轮次边界，不得越轮回退到旧轮用户发言
+        if (fallbackFormulaCandidate && message && message.role === 'assistant') {
+            return fallbackFormulaCandidate;
+        }
+        if (!message || message.role !== 'user' || message.__vcpMetaThinkingV3__) continue;
 
         const rawContent = extractTextFromMessageContent(message.content);
         if (!rawContent || !rawContent.trim()) continue;
@@ -229,18 +255,39 @@ function findLastRealUserMessage(messages, options = {}) {
             continue;
         }
 
-        return {
+        const candidate = {
             index,
             message,
             rawContent,
             sanitizedContent: sanitizedContent.trim()
         };
+
+        // 无显式 __vcpMetaThinkingV3__ 标记但匹配纯公式形态：
+        // 若前方存在其它真实 user 消息，则视为经浅/深拷贝丢失标记的 V3 注入块而跳过；
+        // 若全会话仅此一条 user 消息（用户自己直接复制发送纯公式），则回退保留为用户真实发言。
+        if (isMetaThinkingV3Message(message)) {
+            if (!fallbackFormulaCandidate) {
+                fallbackFormulaCandidate = candidate;
+            }
+            continue;
+        }
+
+        return candidate;
     }
 
-    return { index: -1, rawContent: '', sanitizedContent: '' };
+    return fallbackFormulaCandidate || { index: -1, rawContent: '', sanitizedContent: '' };
+}
+
+function throwIfContextAborted(context) {
+    if (context?.signal?.aborted) {
+        const abortErr = new Error('Message preprocessing aborted');
+        abortErr.name = 'AbortError';
+        throw abortErr;
+    }
 }
 
 async function resolveAllVariables(text, model, role, context, processingStack = new Set()) {
+    throwIfContextAborted(context);
     if (text == null) return '';
     let processedText = String(text);
 
@@ -283,7 +330,7 @@ async function resolveAllVariables(text, model, role, context, processingStack =
                 if (processingStack.has(alias)) {
                     console.error(`[AgentManager] Circular dependency detected! Stack: [${[...processingStack].join(' -> ')} -> ${alias}]`);
                     const errorMessage = `[Error: Circular agent reference detected for '${alias}']`;
-                    processedText = processedText.replaceAll(`{{${alias}}}`, errorMessage).replaceAll(`{{agent:${alias}}}`, errorMessage);
+                    processedText = processedText.replaceAll(`{{${alias}}}`, () => errorMessage).replaceAll(`{{agent:${alias}}}`, () => errorMessage);
                     continue;
                 }
 
@@ -293,10 +340,9 @@ async function resolveAllVariables(text, model, role, context, processingStack =
                 const resolvedAgentContent = await resolveAllVariables(agentContent, model, role, context, processingStack);
                 processingStack.delete(alias);
 
-                // 替换两种可能的Agent占位符格式
-                processedText = processedText.replaceAll(`{{${alias}}}`, resolvedAgentContent);
-                processedText = processedText.replaceAll(`{{agent:${alias}}}`, resolvedAgentContent);
-
+                // 替换两种可能的Agent占位符格式（使用函数替换防止 $` / $$ 展开）
+                processedText = processedText.replaceAll(`{{${alias}}}`, () => resolvedAgentContent);
+                processedText = processedText.replaceAll(`{{agent:${alias}}}`, () => resolvedAgentContent);
                 // 标记此 Agent 已被展开，后续消息中的任何 Agent 占位符都将被忽略
                 context.expandedAgentName = alias;
             }
@@ -321,19 +367,24 @@ async function resolveAllVariables(text, model, role, context, processingStack =
                 if (processingStack.has(stackKey)) {
                     const errorMessage = `[Error: Circular toolbox reference detected for '${alias}']`;
                     processedText = processedText
-                        .replaceAll(`{{${alias}}}`, errorMessage)
-                        .replaceAll(`{{toolbox:${alias}}}`, errorMessage);
+                        .replaceAll(`{{${alias}}}`, () => errorMessage)
+                        .replaceAll(`{{toolbox:${alias}}}`, () => errorMessage);
                     continue;
                 }
 
+                throwIfContextAborted(context);
                 processingStack.add(stackKey);
-                const foldObj = await toolboxManager.getFoldObject(alias);
-                const expandedText = await resolveDynamicFoldProtocol(
-                    foldObj,
-                    context,
-                    `{{${alias}}}`
-                );
-                processingStack.delete(stackKey);
+                let expandedText;
+                try {
+                    const foldObj = await toolboxManager.getFoldObject(alias);
+                    expandedText = await resolveDynamicFoldProtocol(
+                        foldObj,
+                        context,
+                        `{{${alias}}}`
+                    );
+                } finally {
+                    processingStack.delete(stackKey);
+                }
 
                 processedText = replaceFirstAliasPlaceholder(processedText, alias, expandedText, 'toolbox');
 
@@ -406,23 +457,60 @@ function resolveStaticFoldFull(foldObj) {
         .join('\n\n---\n\n');
 }
 
+function appendDynamicFoldHiddenHint(content, hiddenBlocksCount) {
+    if (hiddenBlocksCount > 0 && content) {
+        return `${content}\n\n*(提示：当前上下文中还隐藏收纳了另外 ${hiddenBlocksCount} 个工具模块分组，您可以通过明确提问或强调相关语境来获得展开。)*`;
+    }
+    return content;
+}
+
+function buildDynamicFoldFallback(foldObj, normalizedBlocks) {
+    const nonEmptyBlocks = normalizedBlocks.filter(block => Boolean(block.content));
+    if (nonEmptyBlocks.length === 0) {
+        return { content: '', hiddenCount: 0 };
+    }
+
+    const minThreshold = nonEmptyBlocks.reduce((min, block) => Math.min(min, block.threshold), Infinity);
+    if (foldObj.dynamic_fold_strategy === 'toolbox_block_similarity') {
+        // 块级策略兜底：按原顺序保留全部最低阈值/常驻块（threshold <= max(0, minThreshold)），
+        // 避免同阈值区块被倒序覆盖或漏掉文件开头的 0.0 常驻说明。
+        const fallbackCutoff = Math.max(0, minThreshold);
+        const fallbackBlocks = nonEmptyBlocks.filter(block => block.threshold <= fallbackCutoff);
+        return {
+            content: fallbackBlocks.map(block => block.content).join('\n\n---\n\n'),
+            hiddenCount: nonEmptyBlocks.length - fallbackBlocks.length
+        };
+    }
+
+    // 分级单块策略兜底：按阈值升序且同阈值保持原序，优先取首个最低阈值块。
+    const sortedAsc = [...nonEmptyBlocks].sort((a, b) => {
+        if (a.threshold !== b.threshold) return a.threshold - b.threshold;
+        return a._originalIndex - b._originalIndex;
+    });
+    return {
+        content: sortedAsc[0]?.content || '',
+        hiddenCount: 0
+    };
+}
+
 // 🌟 新增：动态折叠协议处理器
 async function resolveDynamicFoldProtocol(foldObj, context, placeholderKey) {
     if (!foldObj || !foldObj.vcp_dynamic_fold || !Array.isArray(foldObj.fold_blocks) || foldObj.fold_blocks.length === 0) {
         return `[无效的动态折叠数据结构: ${placeholderKey}]`;
     }
 
-    const blocks = foldObj.fold_blocks
-        .filter(block => block && typeof block.content === 'string');
-    const blocksByThreshold = [...blocks].sort((a, b) => (b.threshold || 0) - (a.threshold || 0));
-    const fallbackBlock = [...blocksByThreshold].reverse().find(block => block.content)
-        || { threshold: 0.0, content: '' };
+    const blocks = getNormalizedFoldBlocks(foldObj);
+    const blocksByThreshold = [...blocks].sort((a, b) => {
+        if (b.threshold !== a.threshold) return b.threshold - a.threshold;
+        return a._originalIndex - b._originalIndex;
+    });
+    const fallback = buildDynamicFoldFallback(foldObj, blocks);
 
     try {
-        const ragPlugin = context.pluginManager.messagePreprocessors?.get('RAGDiaryPlugin');
+        const ragPlugin = context?.pluginManager?.messagePreprocessors?.get('RAGDiaryPlugin');
         if (!ragPlugin || typeof ragPlugin.getSingleEmbeddingCached !== 'function') {
-            if (context.DEBUG_MODE) console.log(`[DynamicFold] RAGDiaryPlugin 不可用，返回基础内容 (${placeholderKey})`);
-            return fallbackBlock.content;
+            if (context?.DEBUG_MODE) console.log(`[DynamicFold] RAGDiaryPlugin 不可用，返回基础内容 (${placeholderKey})`);
+            return appendDynamicFoldHiddenHint(fallback.content, fallback.hiddenCount);
         }
 
         const contextMessages = context.messages || [];
@@ -443,7 +531,7 @@ async function resolveDynamicFoldProtocol(foldObj, context, placeholderKey) {
 
         if (!userContent) {
             if (context.DEBUG_MODE) console.log(`[DynamicFold] 未找到 User 文本消息，返回基础内容 (${placeholderKey})`);
-            return fallbackBlock.content;
+            return appendDynamicFoldHiddenHint(fallback.content, fallback.hiddenCount);
         }
 
         if (typeof ragPlugin.sanitizeForEmbedding === 'function') {
@@ -484,8 +572,9 @@ async function resolveDynamicFoldProtocol(foldObj, context, placeholderKey) {
         // DynamicFold 专用向量获取：精确缓存 → 高阈值 fuzzy 缓存 → Embedding API。
         // 这里常在 RAGDiaryPlugin 主链路之后运行，AI 文本可能只有极小差异；
         // 先 fuzzy 复用可避免动态折叠再次向量化同一段 AI 输出。
-        const getDynamicFoldEmbedding = async (text, label = 'unknown') => {
-            if (!text || typeof text !== 'string' || !text.trim()) return null;
+        const getDynamicFoldEmbedding = async (sanitized, contextRole) => {
+            const text = projectContextEmbeddingInput(sanitized, contextRole);
+            if (!text) return null;
 
             if (typeof ragPlugin._getEmbeddingFromCacheOnly === 'function') {
                 const exact = ragPlugin._getEmbeddingFromCacheOnly(text);
@@ -498,7 +587,7 @@ async function resolveDynamicFoldProtocol(foldObj, context, placeholderKey) {
                 if (fuzzy && fuzzy.vector) {
                     if (context.DEBUG_MODE) {
                         console.log(
-                            `[DynamicFold] Fuzzy embedding cache hit (${label}): ` +
+                            `[DynamicFold] Fuzzy embedding cache hit (${contextRole}): ` +
                             `sim=${fuzzy.similarity.toFixed(4)}, len=${text.length}/${fuzzy.length}`
                         );
                     }
@@ -506,18 +595,19 @@ async function resolveDynamicFoldProtocol(foldObj, context, placeholderKey) {
                 }
             }
 
-            return await ragPlugin.getSingleEmbeddingCached(text);
+            throwIfContextAborted(context);
+            return await ragPlugin.getSingleEmbeddingCached(text, { signal: context?.signal });
         };
 
         const [uVec, aVec] = await Promise.all([
-            userContent ? getDynamicFoldEmbedding(userContent, 'user_context') : Promise.resolve(null),
-            aiContent ? getDynamicFoldEmbedding(aiContent, 'assistant_context') : Promise.resolve(null)
+            getDynamicFoldEmbedding(userContent, 'user'),
+            getDynamicFoldEmbedding(aiContent, 'assistant')
         ]);
 
         const userVector = ragPlugin._getWeightedAverageVector([uVec, aVec], mainWeights);
         if (!userVector) {
             if (context.DEBUG_MODE) console.log(`[DynamicFold] 获取用户上下文向量失败，返回基础内容 (${placeholderKey})`);
-            return fallbackBlock.content;
+            return appendDynamicFoldHiddenHint(fallback.content, fallback.hiddenCount);
         }
 
         const vectorCache = new Map();
@@ -527,13 +617,14 @@ async function resolveDynamicFoldProtocol(foldObj, context, placeholderKey) {
             if (vectorCache.has(key)) return vectorCache.get(key);
 
             let descVector = null;
+            throwIfContextAborted(context);
             if (ragPlugin.vectorDBManager && typeof ragPlugin.vectorDBManager.getPluginDescriptionVector === 'function') {
                 descVector = await ragPlugin.vectorDBManager.getPluginDescriptionVector(
                     key,
-                    ragPlugin.getSingleEmbeddingCached.bind(ragPlugin)
+                    descText => ragPlugin.getSingleEmbeddingCached(descText, { signal: context?.signal })
                 );
             } else {
-                descVector = await ragPlugin.getSingleEmbeddingCached(key);
+                descVector = await ragPlugin.getSingleEmbeddingCached(key, { signal: context?.signal });
             }
             vectorCache.set(key, descVector);
             return descVector;
@@ -583,7 +674,7 @@ async function resolveDynamicFoldProtocol(foldObj, context, placeholderKey) {
                     return block.content;
                 }
             }
-            return fallbackBlock.content;
+            return fallback.content;
         }
 
         const getThreshold = (block) => Number.isFinite(Number(block.threshold)) ? Number(block.threshold) : 0;
@@ -659,6 +750,7 @@ async function resolveDynamicFoldProtocol(foldObj, context, placeholderKey) {
                         description: item.entry.description,
                         content: item.entry.content
                     })),
+                    signal: context?.signal,
                     debug: Boolean(context.DEBUG_MODE),
                     placeholderKey
                 });
@@ -680,6 +772,10 @@ async function resolveDynamicFoldProtocol(foldObj, context, placeholderKey) {
                     console.log(`[DynamicFold] ${placeholderKey} Jev 二次过滤未生效: ${decision.reason}`);
                 }
             } catch (e) {
+                if (e?.name === 'AbortError' || context?.signal?.aborted) {
+                    throwIfContextAborted(context);
+                    throw e;
+                }
                 droppedEntryIndices.clear();
                 if (context.DEBUG_MODE) {
                     console.log(`[DynamicFold] ${placeholderKey} Jev 二次过滤异常，保留 embedding 结果: ${e && e.message}`);
@@ -694,17 +790,18 @@ async function resolveDynamicFoldProtocol(foldObj, context, placeholderKey) {
 
         let combinedContent = keptContents.filter(Boolean).join('\n\n---\n\n');
         if (!combinedContent) {
-            combinedContent = fallbackBlock.content;
+            combinedContent = fallback.content;
+            hiddenBlocksCount = fallback.hiddenCount;
         }
 
-        if (hiddenBlocksCount > 0) {
-            combinedContent += `\n\n*(提示：当前上下文中还隐藏收纳了另外 ${hiddenBlocksCount} 个工具模块分组，您可以通过明确提问或强调相关语境来获得展开。)*`;
-        }
-
-        return combinedContent;
+        return appendDynamicFoldHiddenHint(combinedContent, hiddenBlocksCount);
     } catch (e) {
+        if (e?.name === 'AbortError' || context?.signal?.aborted) {
+            throwIfContextAborted(context);
+            throw e;
+        }
         console.error(`[DynamicFold] 处理动态折叠时发生异常 (${placeholderKey}):`, e.message);
-        return fallbackBlock.content;
+        return appendDynamicFoldHiddenHint(fallback.content, fallback.hiddenCount);
     }
 }
 
@@ -724,9 +821,8 @@ function applySingleDetectorRule(text, rule) {
         }
     }
 
-    return text.replaceAll(rule.detector, rule.output);
+    return text.replaceAll(rule.detector, () => rule.output);
 }
-
 function applyDetectorRules(text, role, context = {}) {
     const { detectors = [], superDetectors = [] } = context;
     if (text == null) return '';
@@ -753,6 +849,13 @@ function applyDetectorsToMessages(messages, context = {}) {
 
     return messages.map((message) => {
         const newMessage = JSON.parse(JSON.stringify(message));
+        if (message && message.__vcpMetaThinkingV3__) {
+            Object.defineProperty(newMessage, '__vcpMetaThinkingV3__', {
+                value: true,
+                enumerable: false,
+                configurable: true
+            });
+        }
 
         if (typeof newMessage.content === 'string') {
             newMessage.content = applyDetectorRules(newMessage.content, newMessage.role, context);
@@ -914,11 +1017,10 @@ async function replaceOtherVariables(text, model, role, context) {
                 }
             }
 
-            // 对当前文本中所有匹配的占位符进行替换
+            // 对当前文本中所有匹配的占位符进行替换（使用函数替换防止 $` / $$ 展开）
             const placeholderRegExp = new RegExp(placeholder.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g');
-            processedText = processedText.replace(placeholderRegExp, replacementText);
+            processedText = processedText.replace(placeholderRegExp, () => replacementText);
         }
-
         // === {{SarPromptAll}} 批量模型匹配注入 ===
         if (processedText.includes('{{SarPromptAll}}')) {
             const allPrompts = sarPromptManager.getAllPrompts();
@@ -945,7 +1047,7 @@ async function replaceOtherVariables(text, model, role, context) {
             }
 
             const sarAllText = matchedContents.join('\n');
-            processedText = processedText.replace(/\{\{SarPromptAll\}\}/g, sarAllText);
+            processedText = processedText.replace(/\{\{SarPromptAll\}\}/g, () => sarAllText);
         }
     }
 
@@ -959,13 +1061,14 @@ async function replaceOtherVariables(text, model, role, context) {
                         const fileContent = await tvsManager.getContent(value);
                         // 检查内容是否表示错误
                         if (fileContent.startsWith('[变量文件') || fileContent.startsWith('[处理变量文件')) {
-                            processedText = processedText.replaceAll(placeholder, fileContent);
+                            processedText = processedText.replaceAll(placeholder, () => fileContent);
                         } else {
                             const resolvedContent = await replaceOtherVariables(fileContent, model, role, context);
-                            processedText = processedText.replaceAll(placeholder, resolvedContent);
+                            processedText = processedText.replaceAll(placeholder, () => resolvedContent);
                         }
                     } else {
-                        processedText = processedText.replaceAll(placeholder, value || `[未配置 ${envKey}]`);
+                        const fallbackVal = value || `[未配置 ${envKey}]`;
+                        processedText = processedText.replaceAll(placeholder, () => fallbackVal);
                     }
                 }
             }
@@ -1103,11 +1206,13 @@ async function replaceOtherVariables(text, model, role, context) {
         }
 
         if (process.env.PORT) {
-            processedText = processedText.replaceAll('{{Port}}', process.env.PORT);
+            const portVal = String(process.env.PORT);
+            processedText = processedText.replaceAll('{{Port}}', () => portVal);
         }
         const effectiveImageKey = pluginManager.getResolvedPluginConfigValue('ImageServer', 'Image_Key');
         if (processedText && typeof processedText === 'string' && effectiveImageKey) {
-            processedText = processedText.replaceAll('{{Image_Key}}', effectiveImageKey);
+            const keyVal = String(effectiveImageKey);
+            processedText = processedText.replaceAll('{{Image_Key}}', () => keyVal);
         } else if (processedText && typeof processedText === 'string' && processedText.includes('{{Image_Key}}')) {
             if (DEBUG_MODE) console.warn('[replaceOtherVariables] {{Image_Key}} placeholder found in text, but ImageServer plugin or its Image_Key is not resolved. Placeholder will not be replaced.');
         }
@@ -1134,8 +1239,9 @@ async function replaceOtherVariables(text, model, role, context) {
 
         promises.push(
             (async () => {
-                const resultFilePath = path.join(VCP_ASYNC_RESULTS_DIR, `${pluginName}-${requestId}.json`);
                 try {
+                    const resultFilePath = resultPath(VCP_ASYNC_RESULTS_DIR, pluginName, requestId);
+                    await assertSafePath(VCP_ASYNC_RESULTS_DIR, resultFilePath);
                     const fileContent = await fs.readFile(resultFilePath, 'utf-8');
                     const callbackData = JSON.parse(fileContent);
                     let replacementText = `[任务 ${pluginName} (ID: ${requestId}) 已完成]`;
@@ -1146,13 +1252,15 @@ async function replaceOtherVariables(text, model, role, context) {
                     } else if (callbackData && callbackData.status === 'Failed') {
                         replacementText = `任务 ${pluginName} (ID: ${requestId}) 处理失败。原因: ${callbackData.reason || JSON.stringify(callbackData.data || callbackData.error || callbackData)}`;
                     }
-                    tempAsyncProcessedText = tempAsyncProcessedText.replace(placeholder, replacementText);
+                    tempAsyncProcessedText = tempAsyncProcessedText.replace(placeholder, () => replacementText);
                 } catch (error) {
                     if (error.code === 'ENOENT') {
-                        tempAsyncProcessedText = tempAsyncProcessedText.replace(placeholder, `[任务 ${pluginName} (ID: ${requestId}) 结果待更新...]`);
+                        const pendingMsg = `[任务 ${pluginName} (ID: ${requestId}) 结果待更新...]`;
+                        tempAsyncProcessedText = tempAsyncProcessedText.replace(placeholder, () => pendingMsg);
                     } else {
                         console.error(`[replaceOtherVariables] Error processing async placeholder ${placeholder}:`, error);
-                        tempAsyncProcessedText = tempAsyncProcessedText.replace(placeholder, `[获取任务 ${pluginName} (ID: ${requestId}) 结果时出错]`);
+                        const errMsg = `[获取任务 ${pluginName} (ID: ${requestId}) 结果时出错]`;
+                        tempAsyncProcessedText = tempAsyncProcessedText.replace(placeholder, () => errMsg);
                     }
                 }
             })()
@@ -1185,9 +1293,10 @@ async function replacePriorityVariables(text, context, role) {
         const emojiName = emojiMatch[1];
         const emojiList = cachedEmojiLists.get(emojiName);
         const promptEmojiList = formatEmojiListForPrompt(emojiList);
+        const emojiReplacement = promptEmojiList || `[${emojiName}列表不可用]`;
         processedText = processedText.replaceAll(
             placeholder,
-            promptEmojiList || `[${emojiName}列表不可用]`
+            () => emojiReplacement
         );
     }
 
@@ -1211,6 +1320,10 @@ module.exports = {
     extractTextFromMessageContent,
     isSystemNotificationText,
     isBetaSystemUserText,
+    isMetaThinkingV3Message,
     stripSystemNotificationBlocks,
-    findLastRealUserMessage
+    findLastRealUserMessage,
+    resolveDynamicFoldProtocol,
+    resolveStaticFoldLite,
+    resolveStaticFoldFull
 };

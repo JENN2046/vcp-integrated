@@ -1,5 +1,8 @@
 'use strict';
 
+const { guardMarkdownDataImagesForUpstream } = require('./markdownDataImageGuard.js');
+const { projectNativeToolResultMedia } = require('./nativeToolResultMedia.js');
+
 let lastTimestampMs = 0;
 const START_PREFIX = '<<<[VCP_TOOL_BATCH_START:';
 const END_PREFIX = '<<<[VCP_TOOL_BATCH_END:';
@@ -41,9 +44,7 @@ function formatToolResultBatch(parts, enableRoleDivider = true) {
         timestamp = formatBatchTimestamp(new Date(lastTimestampMs));
         start = `${START_PREFIX}${timestamp}]>>>`;
         end = `${END_PREFIX}${timestamp}]>>>`;
-    } while (body.includes(start) || body.includes(end) ||
-        body.includes(`【工具返回批次开始｜时间：${timestamp}】`) ||
-        body.includes(`【工具返回批次结束｜时间：${timestamp}】`));
+    } while (body.includes(start) || body.includes(end));
     const batch = `\n${start}\n${body}\n${end}\n`;
     return enableRoleDivider
         ? `\n<<<[ROLE_DIVIDE_USER]>>>\n${batch}\n<<<[END_ROLE_DIVIDE_USER]>>>\n`
@@ -51,17 +52,12 @@ function formatToolResultBatch(parts, enableRoleDivider = true) {
 }
 
 /** A fresh scanner per call; quoted batches are opaque, never recursively parsed. */
-function createBatchStartScanner(includeProjected = false) {
-    const rawPattern = `${START_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(${timestampPattern})\\]>>>`;
-    return new RegExp(includeProjected
-        ? `${rawPattern}|【工具返回批次开始｜时间：(${timestampPattern})】`
-        : rawPattern, 'g');
+function createBatchStartScanner() {
+    return new RegExp(`${START_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(${timestampPattern})\\]>>>`, 'g');
 }
 
 function findBatchEnd(text, match) {
-    const marker = match[2]
-        ? `【工具返回批次结束｜时间：${match[2]}】`
-        : `${END_PREFIX}${match[1]}]>>>`;
+    const marker = `${END_PREFIX}${match[1]}]>>>`;
     const index = text.indexOf(marker, match.index + match[0].length);
     return index === -1 ? text.length : index + marker.length;
 }
@@ -108,19 +104,30 @@ function projectBatchWrapperText(text, role) {
     return text;
 }
 
-const displayNameRoles = new Set(['system', 'developer', 'user', 'assistant']);
+const DISPLAY_NAME_ROLES = new Set(['system', 'developer', 'user', 'assistant']);
 
-/** Request-only projection. Native tool/function names are protocol fields. */
+/** Request-only projection. Preserve native tool/function names and internal history. */
 function projectToolBatchForUpstream(body) {
     if (!body || !Array.isArray(body.messages)) return body;
+    const projected = guardMarkdownDataImagesForUpstream(projectBatchWrappersForUpstream(body));
+    let changed = false;
+    const messages = projected.messages.map(message => {
+        if (!message || !DISPLAY_NAME_ROLES.has(message.role) || !Object.hasOwn(message, 'name')) {
+            return message;
+        }
+        const outboundMessage = { ...message };
+        delete outboundMessage.name;
+        changed = true;
+        return outboundMessage;
+    });
+    return projectNativeToolResultMedia(changed ? { ...projected, messages } : projected);
+}
+
+function projectBatchWrappersForUpstream(body) {
     return {
         ...body,
         messages: body.messages.map(message => {
             if (!message) return message;
-            if (displayNameRoles.has(message.role) && Object.hasOwn(message, 'name')) {
-                message = { ...message };
-                delete message.name;
-            }
             const content = message.content;
             if (typeof content === 'string') {
                 const projected = projectBatchWrapperText(content, message.role);
@@ -141,15 +148,27 @@ function projectToolBatchForUpstream(body) {
     };
 }
 
-function buildToolPayloadMessage(parts) {
+async function buildToolPayloadMessage(groups, translateMedia) {
     const header = '<!-- VCP_TOOL_PAYLOAD -->\nResults:';
-    // Preserve file text verbatim, including actual JSON documents. Only the
-    // transport envelope changes; multimodal receipts keep their original parts.
-    if (parts.every(part => part?.type === 'text' && typeof part.text === 'string')) {
-        const text = parts.map(part => part.text).join('\n\n');
-        return { role: 'user', content: text ? `${header} ${text}` : header };
+    const footer = '<!-- VCP_TOOL_PAYLOAD_END -->';
+    const label = (group, index) => `[${index + 1}] ${String(group.name || '工具').replace(/[\r\n]+/g, ' ')}`;
+    const plainText = groups.every(group =>
+        group.parts.every(part => part?.type === 'text' && typeof part.text === 'string'));
+    if (plainText) {
+        const sections = groups.map((group, index) => {
+            const text = group.parts.map(part => part.text).join('\n\n');
+            return groups.length > 1 ? `${label(group, index)}\n${text}` : text;
+        });
+        const text = sections.join('\n\n');
+        const separator = groups.length > 1 ? '\n' : ' ';
+        return { role: 'user', content: `${header}${text ? separator + text : ''}\n${footer}` };
     }
-    return { role: 'user', content: [{ type: 'text', text: header }, ...parts] };
+    const parts = [{ type: 'text', text: header }, ...groups.flatMap((group, index) =>
+        groups.length > 1 ? [{ type: 'text', text: label(group, index) }, ...group.parts] : group.parts)];
+    const translated = translateMedia ? await translateMedia(parts) : parts;
+    return { role: 'user', content: [...translated, { type: 'text', text: footer }] };
 }
 
-module.exports = { formatToolResultBatch, createBatchStartScanner, findBatchEnd, projectToolBatchForUpstream, buildToolPayloadMessage };
+module.exports = {
+    formatToolResultBatch, createBatchStartScanner, findBatchEnd, projectToolBatchForUpstream, buildToolPayloadMessage
+};

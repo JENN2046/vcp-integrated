@@ -278,10 +278,19 @@ export interface FinalContextSnapshot {
     totalTextTokenCount?: number;
     totalAttachmentTokenCount?: number;
     totalTokenCount: number;
+    toolsTokenCount?: number;
+    upstreamUsage?: FinalContextUpstreamUsage | null;
     tokenMethod?: string;
     roleCounts: Record<string, number>;
     blocks: FinalContextBlockSummary[];
   };
+}
+
+export interface FinalContextUpstreamUsage {
+  promptTokens: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  cachedTokens?: number;
 }
 
 export interface FinalContextListItem {
@@ -295,6 +304,8 @@ export interface FinalContextListItem {
     totalTokenCount: number;
     totalTextTokenCount?: number;
     totalAttachmentTokenCount?: number;
+    toolsTokenCount?: number;
+    upstreamUsage?: FinalContextUpstreamUsage | null;
     tokenMethod?: string | null;
     roleCounts: Record<string, number>;
   };
@@ -419,6 +430,8 @@ export interface OneRingMemoStatusResponse {
   status: OneRingMemoGenerationStatus;
 }
 
+export type BridgeTriState = 'inherit' | 'true' | 'false';
+
 export interface BridgeHijackConfig {
   port: number;
   upstreamUrl: string;
@@ -430,6 +443,8 @@ export interface BridgeHijackConfig {
   modelMap: Record<string, string>;
   debugMode: boolean;
   defaultProfile: string;
+  stripClientTools: boolean;
+  filterHostedVcptools: boolean;
 }
 
 export interface BridgeProfile {
@@ -438,6 +453,8 @@ export interface BridgeProfile {
   systemPrompt: string;
   hijackMode: 'off' | 'replace' | 'prepend' | 'append' | 'merge';
   modelOverride: string;
+  stripClientTools?: BridgeTriState | boolean;
+  filterHostedVcptools?: BridgeTriState | boolean;
   description: string;
 }
 

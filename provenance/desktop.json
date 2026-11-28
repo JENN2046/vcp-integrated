@@ -2,16 +2,27 @@
   "component": "apps/desktop",
   "upstream": {
     "repository": "https://github.com/lioensky/VCPChat",
-    "hostBaselineCommit": "2fa73d1171e1ee25e220a0905f16dec557f7eb90",
+    "hostBaselineCommit": "2fc8fc985a6184f1e8163a41a4b5611a70cd249f",
     "license": "CC-BY-NC-SA-4.0",
-    "licenseFile": "apps/desktop/LICENSE"
+    "licenseFile": "apps/desktop/LICENSE",
+    "convergenceTargetCommit": "6f77337c42d1b7fdee00fc4ac6c75b3600177c1d",
+    "hostBaselineBasis": "Git merge-base of the historical downstream VCPChat fork and the official convergence target."
   },
   "downstream": {
     "repository": "https://github.com/JENN2046/NativeSync",
     "commit": "7fb8bdbd494a7e5bee2a604b1025857b031f7d02",
     "candidateId": "NS-NATIVE-OPS-d5a7f9b15f35",
     "candidateManifestSHA256": "8a02e5f541872ae3777c26ef253e414de8d2c6072d685447f7a24ad8e09047db",
-    "frozenManifestSHA256": "278f30b1a13c67d89acb2e149830e2ff5fe632cfbc042cb336add01792b451be"
+    "frozenManifestSHA256": "278f30b1a13c67d89acb2e149830e2ff5fe632cfbc042cb336add01792b451be",
+    "historicalHostFork": {
+      "repository": "https://github.com/JENN2046/VCPChat",
+      "commit": "b4d5b55842cc7a68b6cc28eaedfc468dace9afc8"
+    },
+    "previouslyReportedHostBaseline": {
+      "repository": "https://github.com/JENN2046/NativeSync",
+      "commit": "2fa73d1171e1ee25e220a0905f16dec557f7eb90",
+      "role": "Historical NativeSync revision incorrectly attributed to the upstream host in the original import record."
+    }
   },
   "import": {
     "fileCount": 3734,
@@ -64,5 +75,185 @@
     "path": "AppData/VCPChatTarven.official.json",
     "gitBlob": "060e5d208212b9341af2f5ac6e3d84dbfb12d4d2",
     "use": "Static test fixture independent of the operator profile"
+  },
+  "convergence": {
+    "integratedBase": "5f40589303011c83a3e9d90bbef6819f628484f3",
+    "basis": "Compare official fork point 2fc8fc98 to target 6f77337, then compare those paths to the integrated baseline and candidate file bytes. Stable paths outside this delta retain the historical import provenance. Git blob equality describes packaged source, not runtime coverage.",
+    "diffCounts": {
+      "changedAtUpstream": 648,
+      "sameBlobAsTarget": 486,
+      "candidateDiffersFromBoth": 85,
+      "retainedIntegratedBaseline": 37,
+      "notPresentAtTargetPath": 35,
+      "removedAsUpstream": 5,
+      "stillPresentAfterUpstreamRemoval": 0
+    },
+    "retainedBaseline": {
+      "formalExecution": {
+        "reason": "The integrated desktop routes formal sends, interrupts, admission and follow-ups through authenticated Core. The overlapping upstream owner starts or resumes work in a renderer or local admission service. The native-only paths remain in the host.",
+        "paths": [
+          "main.js",
+          "Groupmodules/groupchat.js",
+          "Groupmodules/grouprenderer.js",
+          "modules/chatManager.js",
+          "modules/renderer/mainChatSendOwner.js",
+          "modules/renderer/mainChatSurfaceAdapter.js",
+          "modules/renderer/topicAdmissionQueueView.js",
+          "modules/services/pluginAgentOperationService.js",
+          "modules/services/topicMessageAdmission.js",
+          "modules/services/topicMessageAdmissionHost.js",
+          "modules/services/topicSponsorDelivery.js",
+          "Flowlockmodules/flowlock-integration.js"
+        ]
+      },
+      "formalHistory": {
+        "reason": "The integrated save, edit, delete and recovery paths retain version checks, durable admission and ownership of formal configuration/history. The upstream interfaces over these files also allow direct native history or local config writes.",
+        "paths": [
+          "modules/chat/chatHistoryMutationAuthority.js",
+          "modules/chat/chatHistoryPersistence.js",
+          "modules/chat/chatRepository.js",
+          "modules/ipc/agentHandlers.js",
+          "modules/renderer/messageContextMenu.js",
+          "modules/services/historyMutationQueue.js",
+          "modules/utils/agentConfigManager.js",
+          "preloads/api/chat.js",
+          "preloads/api/groupChat.js"
+        ]
+      },
+      "sharedRules": {
+        "reason": "The integrated host resolves these functions from its shared native rule packages. Replacing their entry points with independent upstream copies would split the desktop and server semantics.",
+        "paths": [
+          "modules/contextSanitizer.js",
+          "Groupmodules/groupChatUrl.js",
+          "modules/chat/contextCompactionState.js"
+        ]
+      },
+      "viewAndSettings": {
+        "reason": "The integrated animation scope distinguishes examples from executable animation blocks, while the fallback model help text describes its retryable-error condition. These overlapping versions were retained.",
+        "paths": [
+          "modules/renderer/animation.js",
+          "modules/settings/schema/advanced-features.js"
+        ]
+      },
+      "tests": {
+        "reason": "Integrated fixture assertions retain the existing renderer, execution-owner and History contracts. These baseline tests did not take all upstream changes; exact paths are listed.",
+        "paths": [
+          "tests/chat-context-pipeline.test.mjs",
+          "tests/chat-manager-selection-race.test.js",
+          "tests/context-compaction-stream.test.mjs",
+          "tests/group-jev-integration-contract.test.js",
+          "tests/main-chat-response-body.test.mjs",
+          "tests/main-chat-surface-adapter.test.mjs",
+          "tests/message-edit-watcher-failure.test.js",
+          "tests/message-regeneration-stream-animation.test.js",
+          "tests/terminal-handlers.test.js",
+          "tests/topic-list-load-robustness.test.js",
+          "tests/topic-list-virtualization.test.js"
+        ]
+      }
+    },
+    "upstreamRemovedButRetained": [],
+    "upstreamPathsMissingOrRelocated": {
+      "workflows": [
+        ".github/workflows/chat_kernel_ui.yml",
+        ".github/workflows/side_pane_windows.yml"
+      ],
+      "profileResources": [
+        "AppData/VCPChatTarven.official.json"
+      ],
+      "sharedRuleLocation": [
+        "Flowlockmodules/flowlock-protocol.js"
+      ],
+      "upstreamLocalConfigSurface": [
+        "VCPDistributedServer/Plugin/MacPowerShell/config.env",
+        "VCPDistributedServer/Plugin/ProjectForge/config.env",
+        "VCPDistributedServer/Plugin/TopicSponsor/config.env.example",
+        "VCPDistributedServer/Plugin/VCPEverything/.env.example"
+      ],
+      "blockedManifests": [
+        "VCPDistributedServer/Plugin/MacPowerShell/plugin-manifest.json",
+        "VCPDistributedServer/Plugin/VAbility/plugin-manifest.json"
+      ],
+      "platformBuilds": [
+        "VCPDistributedServer/Plugin/ProjectForge/bin/win32-x64/projectforge_indexer.exe",
+        "audio_engine/audio_server.exe",
+        "modules/services/chatDataService/bin/win32-x64/vcp_chat_data_service.exe"
+      ],
+      "generatedUpstreamEvidence": [
+        "artifacts/diorama/chorus.png",
+        "artifacts/diorama/english-phrase.png",
+        "artifacts/diorama/event-meteor.png",
+        "artifacts/diorama/event-pigeons.png",
+        "artifacts/diorama/event-rabbit.png",
+        "artifacts/diorama/event-whale.png",
+        "artifacts/diorama/finale-moon.png",
+        "artifacts/diorama/instrumental.png",
+        "artifacts/diorama/light.png",
+        "artifacts/diorama/motion-off.png",
+        "artifacts/diorama/opening.png",
+        "artifacts/diorama/platform.png",
+        "artifacts/diorama/pre.png",
+        "artifacts/diorama/reflection-off.png",
+        "artifacts/diorama/return.png",
+        "artifacts/diorama/themesEva-dark.png",
+        "artifacts/diorama/themesEva-light.png",
+        "artifacts/diorama/themes纸墨与机芯-dark.png",
+        "artifacts/diorama/themes纸墨与机芯-light.png",
+        "artifacts/diorama/themes酸性玄武-dark.png",
+        "artifacts/diorama/themes酸性玄武-light.png",
+        "artifacts/diorama/verse.png"
+      ]
+    },
+    "pathNotes": {
+      "blockedManifests": "Corresponding .block source is present; these plugins remain disabled by default.",
+      "sharedRuleLocation": "Both the main renderer and the worker load modules/chat/historyWindow/flowlockProtocol.js.",
+      "profileResources": "The import historically excludes AppData from the shipped source; the existing official test fixture pin above remains historical. This candidate did not migrate a user profile or validate installation of the newer official preset.",
+      "workflows": "Monorepo execution is governed by its root workflow directory. Upstream .github/workflows/side_pane_e2e.yml schedules a daily 03:17 UTC job. The separate upstream workflows were not activated or run as candidate CI.",
+      "platformBuilds": "Do not import precompiled Windows native executables. Linux x64 CDS, ProjectForge and CodeSearcher built locally from source; Windows and macOS packages were not tested here.",
+      "generatedUpstreamEvidence": "Snapshots of upstream tests do not constitute evidence for this build.",
+      "upstreamLocalConfigSurface": "Do not stage per-host env files. Standalone integration of these example settings was not verified."
+    },
+    "openPullRequests": [
+      {
+        "number": 340,
+        "head": "3a4e4cb11f3d36b7dd5f7720099474069c60771c",
+        "decision": "excluded",
+        "reason": "rewriteServerFileKeyInUrl compares hostname without scheme and port. Key rotation can redirect a current fileKey to a different origin."
+      },
+      {
+        "number": 382,
+        "head": "be978a7d6f61456ec53cec8a6fa86c79a5d431e5",
+        "decision": "included",
+        "reason": "Replays nonoverlapping typed settings changes through the existing save coordinator. 39 settings bridge assertions passed."
+      },
+      {
+        "number": 383,
+        "head": "2c187c938a2f3997e418f695ae723badb98adbd1",
+        "decision": "deferred",
+        "reason": "Independent Pele/Mermaid repair and model-list refresh change unreleased renderer behavior across the same FC/markup paths. No combined acceptance run for that change."
+      }
+    ],
+    "isolatedLinuxEvidence": {
+      "preloads": "4 sandbox bundles",
+      "cds": "82 locked release Rust tests; 6 startup progress frames, authenticated history-authority handshake, search inserts, edits and removals through Core.",
+      "topicMemo": "ListTopics, OutlineTopic, SearchTopic and GetTopicContent exercised with official synthetic Core history; offline fallback to a stale local file was rejected.",
+      "desktopFunctionCalling": "46 native FC/history/renderer/stream/usage and context-budget tests passed. 65 auxiliary desktop tests passed.",
+      "projectForge": "Rust owns the database and edit operations. The real service passed five protocol/lifecycle, snapshot, durable edit and todo cases. electron-builder FileMatcher accepted the 31 ProjectForge JS, MCP, worker and Linux binary paths for both files and asarUnpack. This is file-selection evidence; a Windows/macOS installer was not built.",
+      "codeSearcher": "Built from the pinned native Rust source using the desktop and integrated build entry points.",
+      "optionalMobileSync": "Capture the pre-merge physical History hash inside host queue mutation; 37 native plugin tests with synthetic data passed.",
+      "topicSponsor": "Existing native delivery and service routing: 22 passed. New upstream ReplyToTopic mode=new_topic: five candidate tests fail (INVALID_HISTORY_ID at the native resolver). The upstream implementation creates local Agent configuration, local History and a native admission. The integrated branch retains its formally authorized target and execution-owner checks; the new task mode has not been inherited."
+    },
+    "limitations": [
+      "Native topic dispatch and native History paths covered by retainedBaseline retain the integrated semantics; not every upstream-only client queue and task-claim behavior is available for formal Core sessions.",
+      "No production, complete private profile, Windows/macOS installer, microphone or speaker acceptance was performed as part of this desktop source convergence.",
+      "Upstream issue-level physical recovery cases: stale native group reordering clears the deletion marker; interrupted native topic deletion cannot resume; TopicSponsor replay re-creates the deleted topic and History. Formal Core deletion uses its own authority. Non-stream group previews still omit the members. In this package layout the group depth function reference passed after removing the old TODO."
+    ],
+    "topicSponsorTaskDispatch": {
+      "authority": "apps/desktop/modules/services/topicExecutionAuthority.js classify() identifies a configured Core owner before it allows native local execution; bound-but-offline profiles fail closed. apps/desktop/main.js wires assertLocal for admission, target resolution and owner creation.",
+      "currentCore": "apps/server/modules/pluginBridgeRegistry.js rejects ReplyToTopic mode=new_topic for Core execution. The existing Core delivery in apps/server/core/service.js verifies an already dispatched invocation and an existing authorized destination.",
+      "upstream": "At 6f77337, modules/services/pluginAgentOperationService.js prepareDispatchTopic() uses AgentConfigManager.runAgentOperation to create a native configuration and physical History. modules/services/topicSponsorDelivery.js then uses local admission.submit. These are native Profile owners; the candidate lacks this operation for a formal Core target.",
+      "evidence": "tests/topic-sponsor-task-dispatch.test.cjs failed five isolated native cases: dispatch from single source, dispatch from group source, repeat after target creation before entry, invalid or ambiguous destination, and idle-only Flowlock task dispatch. tests/topic-sponsor-delivery.test.cjs and tests/topic-sponsor-service-routing.test.cjs passed 22 existing cases.",
+      "followUp": "STABILITY-R1 should keep source and destination authorization, tombstones and idempotent identity in view when assessing new-task ownership. No formal new-topic support is claimed. A separately isolated native-only Profile may use a future host-native implementation once writer ownership and replay are verified."
+    }
   }
 }

@@ -1,0 +1,120 @@
+{
+  "baseline": "5f40589303011c83a3e9d90bbef6819f628484f3",
+  "toolboxMain": "699ed4b3a0c0b08124cb8f8cf14f7e154f00af24",
+  "environment": {
+    "runtime": "Node 24.22.1, Linux x64 GNU, Rust 1.89.0",
+    "host": "Fresh ToolBox process on loopback, separate unprivileged test UID, local synthetic provider, embeddings and PCM. Registered test manifests only inside the isolated server.",
+    "build": [
+      "npm ci --install-links=false",
+      "bash scripts/build-vexus.sh",
+      "npm --prefix AdminPanel-Vue run build"
+    ],
+    "vexusAbi": 2,
+    "vexusCapability": "river.warped-production.v1",
+    "addonSha256": "e09fff849410e21f9325e23e2b69f49f1fba2b6114e33a35daede490446c09c1"
+  },
+  "formalMemory": {
+    "input": "49 synthetic notes, 16 tags, 8-dimensional synthetic embeddings",
+    "pipeline": [
+      "Rust ingest and training",
+      "native joint River retrieval",
+      "MetaThinkingV3.8 star-pool computation",
+      "tool result refresh",
+      "Core final message commit"
+    ],
+    "observed": [
+      {
+        "case": "allowed",
+        "workId": "254b925e-5dce-4344-80dd-430c358fb2b5",
+        "state": "completed",
+        "modelTurnsWithDiaryMarker": [
+          true,
+          true
+        ],
+        "formalMessageCount": 2
+      },
+      {
+        "case": "ungranted same prompt",
+        "workId": "4652e8ad-fa87-4416-80ed-01455ddb3909",
+        "state": "completed",
+        "modelTurnsWithDiaryMarker": [
+          false,
+          false
+        ],
+        "formalMessageCount": 2
+      }
+    ],
+    "nativeRuntimeLog": {
+      "diary": "Lighthouse",
+      "returned": 7,
+      "jointUsed": true,
+      "metaThinkingPoolRows": 49
+    }
+  },
+  "toolboxOwnedFC": {
+    "entry": "POST /v1/chat/completions",
+    "upstreamTool": "vcptools",
+    "isolatedSetting": "VCP_FC_DEBUG=true",
+    "normalCase": "Registered VCPSleep executed as a native stdio process. Both JSON and SSE follow-ups received the same tool_call_id and native completion text.",
+    "residentCases": "An unframed native proposal and a mixed text proposal + native call were rejected in both transports. Each reached the fixture provider exactly once. An ordinary FC in the same Resident-enabled context executed normally.",
+    "sseTerminals": "Each of the three streams ended with exactly one stop and one [DONE]."
+  },
+  "tdb": {
+    "dependency": "triviumdb 0.9.3",
+    "library": "FixtureKnowledge",
+    "indexedFiles": 1,
+    "indexedChunks": 1,
+    "proof": "Native watcher and scan indexed a cold-knowledge document. Its distinctive text reached the synthetic provider through [[FixtureKnowledge知识库]]."
+  },
+  "asynchronousPlugin": {
+    "plugin": "MimoDubbing 1.2.0",
+    "taskId": "0b44ec34-4311-407f-a0cd-1683a471d509",
+    "callback": "Succeed",
+    "artifact": "Mono PCM WAV, 24000 Hz, 1200 samples",
+    "scope": "Native async ToolBox plugin and authenticated host callback. Audio provider generated synthetic samples."
+  },
+  "upgradeRollback": {
+    "method": "The baseline built a new KBM index. After stopping it, the complete index directory was backed up. The candidate opened a copy of that backup and recovered the Aurora diary marker through HTTP. The baseline then opened a separate restored copy and recovered the same marker.",
+    "sqliteQuickCheck": "ok on backup, upgraded copy and restored copy",
+    "unchangedRowsAndSha256": {
+      "files": [
+        49,
+        "d73043eed3a0fbacad4d5ec09a29afa37030e1b7e1a8271274bf5f475c1a3c0b"
+      ],
+      "chunks": [
+        49,
+        "823c23d77d96595188325148823b124964d581a03fcb028e21a944713efb71d3"
+      ],
+      "tags": [
+        16,
+        "84668727980f5844090117702ca1d663ef51e4e25416a3dae004c3a3f3484a2d"
+      ]
+    },
+    "rowHashMethod": "SHA256 over UTF-8 Python tuple repr for SELECT * ORDER BY id, in row order."
+  },
+  "tests": [
+    {
+      "suite": "core-native-execution + core-native-capabilities",
+      "passed": 11,
+      "failed": 0,
+      "coverage": "WebSocket dispatch and unknown outcome, native Archery/stdio, ordinary approval/deny/expiry/cancel, fresh group sinks, independent AA child ledger and diary grants."
+    },
+    {
+      "suite": "approvalFeedbackPassthrough + dynamicFoldFallback",
+      "passed": 24,
+      "failed": 0
+    },
+    {
+      "suite": "metaThinkingV3 + metaStarPoolNative + tdbKnowledge085",
+      "passed": 90,
+      "failed": 0,
+      "skipped": 1,
+      "skipReason": "Upstream optional read-only smoke test for an existing personal star-pool database. A separate synthetic native run is recorded above."
+    }
+  ],
+  "limits": [
+    "The model, embeddings and audio endpoints served synthetic loopback inputs. No live provider performance or audio quality claim.",
+    "Core memory tests used explicit grants in a disposable workspace. No production human approval or Resident provider-seal credentials were used.",
+    "Host initialization reports missing generated emoji lists on a clean fixture with EmojiListGenerator disabled."
+  ]
+}

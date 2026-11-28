@@ -2,9 +2,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const pluginManager = require('../../apps/server/Plugin');
-const fileResolver = require('../../apps/server/FileFetcherServer');
-const native = require('../../apps/server/modules/requestExecutionContext');
+const { BOX } = require('./fixtures/coreSingleHarness.cjs');
+const pluginManager = require(BOX+'/Plugin');
+const fileResolver = require(BOX+'/FileFetcherServer');
+const native = require(BOX+'/modules/requestExecutionContext');
 
 test('Core asks for trusted approval without resolving legacy file references', async t => {
     const plugin = 'FixtureApprovalPreview';

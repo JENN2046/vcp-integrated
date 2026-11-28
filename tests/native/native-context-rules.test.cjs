@@ -27,10 +27,9 @@ test('sandbox browser scripts are byte-identical to the installed shared rules',
 test('group depth follows speaker history and the invitation while preserving timestamped source rows', async t => {
     const native = desktopRequire('./Groupmodules/groupContextWindow');
     const worker = require(path.join(serverRules, 'Groupmodules/groupContextWindow'));
-    await t.test('server and desktop export the identical group context function reference',
-        { todo: 'Known baseline group depth function-reference failure' }, () => {
-            assert.equal(worker.applyGroupContextRules, native.applyGroupContextRules);
-        });
+    await t.test('server and desktop export the identical group context function reference', () => {
+        assert.equal(worker.applyGroupContextRules, native.applyGroupContextRules);
+    });
     const engine = desktopRequire('@vcp/core-rules/tavern');
     const rules = [{ type: 'context_inject', scope: 'group', enabled: true, role: 'user', depth: 2, content: 'context', wrap: false }];
     const make = (role, text) => ({ role, content: [{ type: 'text', text }] });

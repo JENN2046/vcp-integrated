@@ -22,7 +22,7 @@ async function jsonBody(req) {
     for await (const chunk of req) chunks.push(chunk);
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function start({ out, candidate, cert, key, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, coreRemote }) {
+async function start({ out, candidate, cert, key, trace, waitUntil, mode, httpsPort = 0, handleFixtureRequest, coreRemote, enforceBudget = false }) {
     const sourceApp = path.join(candidate, 'apps/server');
     const box = path.join(out, 'runtime-box');
     fs.mkdirSync(box);
@@ -36,6 +36,7 @@ async function start({ out, candidate, cert, key, trace, waitUntil, mode, httpsP
         const rel = entry.slice('apps/server/'.length);
         if (excluded.test(rel)) continue;
         if (rel.startsWith('Plugin/') && !rel.startsWith('Plugin/NativeSync/') &&
+            rel !== 'Plugin/RAGDiaryPlugin/MessageContentUtils.js' &&
             !/^Plugin\/(?:VCPSleep|AgentAssistant)\/(?!plugin-manifest)/.test(rel)) continue;
         const file = path.join(sourceApp, rel);
         if (!fs.existsSync(file) || !fs.lstatSync(file).isFile()) continue;
@@ -151,6 +152,7 @@ async function start({ out, candidate, cert, key, trace, waitUntil, mode, httpsP
                 VCP_CORE_DATA_DIR: path.join(out, 'core'), VCP_CORE_MODE: mode === 'core-remote' ? 'remote' : 'local',
                 ...(coreRemote && { VCP_CORE_REMOTE_ORIGIN: 'https://127.0.0.1:' + proxyPort,
                     VCP_CORE_IMAGE_MODELS: JSON.stringify([coreRemote.model]) }),
+                ...(enforceBudget && { ContextBudgetGuard: 'enforce' }),
                 PATH:'/usr/bin:/bin',HOME:out,LANG:'C.UTF-8',TZ:'UTC',NS_LOADED_REPORT:path.join(out,'backend-loaded.json'),
                 PORT:String(backendPort),VCP_LOCAL_LISTEN_HOST:'127.0.0.1',Key:auth,API_Key:'synthetic-provider',VCP_Key:'synthetic-sponsor-ws',
                 API_URL:'http://127.0.0.1:'+providerPort,ApiRetries:'1',MaxVCPLoopNonStream:'4',MaxVCPLoopStream:'4',

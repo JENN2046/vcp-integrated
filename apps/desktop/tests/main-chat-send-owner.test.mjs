@@ -164,3 +164,128 @@ test('spinning compaction button cancels instead of sending or interrupting anot
     assert.equal(sendButton.attributes['aria-busy'], 'false');
     assert.equal(sendButton.classList.contains('context-compacting'), false);
 });
+
+test('active reply with a draft sends to admission instead of interrupting; empty draft restores stop', async () => {
+    let draft = true;
+    const calls = [];
+    const sendButton = button();
+    const owner = createMainChatSendOwner({
+        button: sendButton,
+        messagesRoot: { querySelector: () => ({ isConnected: true, classList: { contains: () => true } }) },
+        historyRef: ref([{ id: 'active', role: 'assistant', isThinking: true }]),
+        selectedItemRef: ref({ id: 'a', type: 'agent' }),
+        topicIdRef: ref('topic'),
+        streamProjection: {},
+        chatAPI: {},
+        hasDraft: () => draft,
+        getChatManager: () => ({ handleSendMessage: async () => calls.push('send') }),
+        interruptHandler: { interrupt: async id => { calls.push(['interrupt', id]); return { success: true }; } },
+    });
+    owner.update();
+    assert.equal(sendButton.dataset.mode, 'send');
+    await owner.handleAction();
+    assert.deepEqual(calls, ['send']);
+    draft = false;
+    owner.update();
+    assert.equal(sendButton.dataset.mode, 'interrupt');
+    await owner.handleAction();
+    assert.deepEqual(calls, ['send', ['interrupt', 'active']]);
+});
+
+test('user Stop freezes the active scope and never waits for cancellation disk ACK before local fallback', async () => {
+    const events = [];
+    let finishCancellation;
+    const selected = ref({ id: 'a', type: 'agent' });
+    const topic = ref('t');
+    const message = { id: 'active', role: 'assistant', isThinking: true,
+        agentId: 'a', topicId: 't', context: { agentId: 'a', topicId: 't' } };
+    const owner = createMainChatSendOwner({
+        button: button(),
+        messagesRoot: { querySelector: () => ({ isConnected: true, classList: { contains: () => true } }) },
+        historyRef: ref([message]), selectedItemRef: selected, topicIdRef: topic,
+        streamProjection: {},
+        chatAPI: { topicAdmissionCancelPending(scope) {
+            events.push(['cancel-pending', scope]);
+            return new Promise(resolve => { finishCancellation = resolve; });
+        } },
+        getChatManager: () => ({ cancelStreamAdmissionRelay: id => events.push(['cancel-relay', id]) }),
+        interruptHandler: { async interrupt(id) {
+            events.push(['interrupt', id]);
+            selected.set({ id: 'b', type: 'agent' }); topic.set('other');
+            return { success: false, error: 'offline' };
+        } },
+        getAdapter: () => ({ async cancelStream(id) { events.push(['local', id]); return { kind: 'cancelled' }; } }),
+        notify: () => {},
+    });
+    assert.equal(await owner.interrupt(), true);
+    assert.deepEqual(events, [
+        ['cancel-relay', 'active'],
+        ['cancel-pending', { itemType: 'agent', itemId: 'a', topicId: 't' }],
+        ['interrupt', 'active'],
+        ['local', 'active'],
+    ]);
+    finishCancellation({ success: true });
+    await Promise.resolve();
+    owner.dispose();
+});
+
+
+test('idle long histories use one DOM fallback query, active runtime uses none', () => {
+    let queries = 0;
+    let active = false;
+    const history = Array.from({ length: 300 }, (_, index) => ({
+        id: `m-${index}`, role: index % 2 ? 'assistant' : 'user', content: 'history',
+    }));
+    const owner = createMainChatSendOwner({
+        button: button(),
+        messagesRoot: { querySelector() { queries++; return null; } },
+        historyRef: ref(history),
+        selectedItemRef: ref({ id: 'a', type: 'agent' }),
+        topicIdRef: ref('t'),
+        streamProjection: {
+            getActiveStreamingMessageId: () => active ? 'm-299' : null,
+            getActiveStreamingContext: () => active ? { agentId: 'a', topicId: 't' } : null,
+        },
+        getChatManager: () => null,
+    });
+    owner.update();
+    assert.equal(queries, 1);
+    active = true;
+    owner.update();
+    assert.equal(queries, 1);
+    assert.equal(owner.getInterruptibleMessage().id, 'm-299');
+    owner.dispose();
+});
+test('composer rail follows the visible stream, not drafts, stale bubbles or background terminals', () => {
+    const send = button();
+    const classes = new Set();
+    send.closest = () => ({ classList: {
+        toggle: (name, on) => on ? classes.add(name) : classes.delete(name),
+        remove: name => classes.delete(name),
+    } });
+    const topic = ref('A');
+    const live = new Set(['A', 'B']);
+    const owner = createMainChatSendOwner({
+        button: send, topicIdRef: topic, selectedItemRef: ref({ id: 'agent', type: 'agent' }),
+        historyRef: ref([{ id: 'stale', role: 'assistant', isThinking: true }]),
+        messagesRoot: { querySelector: () => ({ isConnected: true, classList: { contains: () => true } }) },
+        streamProjection: {
+            getActiveStreamingMessageId: () => live.has(topic.get()) ? topic.get() : null,
+            getActiveStreamingContext: () => ({ agentId: 'agent', topicId: topic.get() }),
+        },
+        hasDraft: () => true, getChatManager: () => null,
+    });
+    const check = expected => {
+        owner.update();
+        assert.equal(classes.has('has-streaming-reply'), expected);
+        assert.equal(send.dataset.mode, 'send');
+    };
+    check(true);
+    topic.set('idle'); check(false);
+    topic.set('B'); check(true);
+    live.delete('A'); check(true);
+    topic.set('A'); check(false);
+    topic.set('B'); check(true);
+    owner.dispose();
+    assert.equal(classes.size, 0);
+});

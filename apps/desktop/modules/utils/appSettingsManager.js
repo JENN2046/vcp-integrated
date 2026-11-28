@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { EventEmitter } = require('events');
 const { normalizePromptSettings } = require('../services/workspacePromptPlaceholders');
 const { replaceFile } = require('./atomicReplace');
+const { normalizeVcpServerUrl } = require('./vcpServerRoutes');
 
 class SettingsValidator {
     static validate(settings, defaultSettings) {
@@ -30,6 +31,8 @@ class SettingsValidator {
                 validated[key] = null;
             }
         }
+
+        validated.vcpServerUrl = normalizeVcpServerUrl(validated.vcpServerUrl);
 
         // 数值范围检查
         if (validated.sidebarWidth < 100 || validated.sidebarWidth > 800) {
@@ -242,10 +245,13 @@ class SettingsValidator {
     }
 }
 
+const SESSION_KEYS = Object.freeze(['lastOpenItemId', 'lastOpenItemType', 'lastOpenTopicId']);
+
 class SettingsManager extends EventEmitter {
     constructor(settingsPath) {
         super();
         this.settingsPath = settingsPath;
+        this.sessionPath = path.join(path.dirname(settingsPath), 'session.json');
         this.queue = [];
         this.processing = false;
         this.cache = null;
@@ -369,6 +375,7 @@ class SettingsManager extends EventEmitter {
             musicInfoInjectionEnabled: true,
             enableDistributedServerLogs: false,
             enableVcpToolInjection: false,
+            enableThoughtChainInjection: false,
             ragOverlaySettings: {
                 enabled: true,
                 passThrough: true,
@@ -433,10 +440,50 @@ class SettingsManager extends EventEmitter {
         if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
             throw new TypeError('Settings root must be an object.');
         }
+        if (typeof settings.vcpServerUrl === 'string') {
+            settings.vcpServerUrl = normalizeVcpServerUrl(settings.vcpServerUrl) || settings.vcpServerUrl;
+        }
         if (settings.topicSummaryModel === undefined || settings.topicSummaryModel === null) {
             settings.topicSummaryModel = this.defaultSettings.topicSummaryModel;
         }
         return settings;
+    }
+
+    async readSessionState() {
+        try {
+            return JSON.parse(await fs.readFile(this.sessionPath, 'utf8'));
+        } catch {
+            return null;
+        }
+    }
+
+    async writeSessionState(sessionData) {
+        if (!sessionData || typeof sessionData !== 'object') return;
+        try {
+            await replaceFile(this.sessionPath, `${JSON.stringify(sessionData, null, 2)}\n`);
+        } catch (err) {
+            console.warn('[SettingsManager] Failed to persist session.json:', err.message);
+        }
+    }
+
+    // Called under the settings lock. Do not read/rotate durable settings or publish a workspace event.
+    async persistSessionOperations(ops) {
+        if (!Array.isArray(ops) || !ops.length || ops.some(op =>
+            op?.op !== 'set' || !Array.isArray(op.path) || op.path.length !== 1 ||
+            !SESSION_KEYS.includes(op.path[0]) || !(typeof op.value === 'string' || op.value === null))) {
+            throw new TypeError('Invalid session-only operation');
+        }
+        let state;
+        try {
+            state = JSON.parse(await fs.readFile(this.sessionPath, 'utf8'));
+            if (!state || typeof state !== 'object' || Array.isArray(state)) throw new TypeError('Invalid session state');
+        } catch (error) {
+            if (error.code !== 'ENOENT') throw error;
+            state = {};
+        }
+        for (const op of ops) state[op.path[0]] = op.value;
+        await replaceFile(this.sessionPath, `${JSON.stringify(state, null, 2)}\n`);
+        this.clearCache();
     }
 
     // Any parseable backup is a real earlier config; always better than defaults.
@@ -453,6 +500,12 @@ class SettingsManager extends EventEmitter {
                 return { ...this.cache };
             }
             const settings = this.parseSettings(await fs.readFile(this.settingsPath, 'utf8'));
+            const session = await this.readSessionState();
+            if (session && typeof session === 'object') {
+                for (const key of SESSION_KEYS) {
+                    if (key in session) settings[key] = session[key];
+                }
+            }
             this.cache = settings;
             this.cacheTimestamp = stats ? stats.mtimeMs : Date.now();
             return { ...settings };
@@ -460,10 +513,21 @@ class SettingsManager extends EventEmitter {
             const recovered = await this.readBackup();
             if (recovered) {
                 console.warn(`Settings unreadable (${error.code || error.message}); recovered from backup.`);
+                const session = await this.readSessionState();
+                if (session && typeof session === 'object') {
+                    for (const key of SESSION_KEYS) {
+                        if (key in session) recovered[key] = session[key];
+                    }
+                }
                 return { ...recovered };
             }
             // Read-only callers may display defaults; updates are guarded by readForUpdate().
-            if (error.code === 'ENOENT') return { ...this.defaultSettings };
+            if (error.code === 'ENOENT') {
+                const settings = { ...this.defaultSettings };
+                const session = await this.readSessionState();
+                for (const key of SESSION_KEYS) if (session && Object.hasOwn(session, key)) settings[key] = session[key];
+                return settings;
+            }
             console.error('Error reading settings and no valid backup:', error);
             throw new Error(`Settings file corrupted and no valid backup found: ${error.message}`);
         }
@@ -472,21 +536,61 @@ class SettingsManager extends EventEmitter {
     // Called under the settings lock. Never hands defaults to an updater unless this is a true first run.
     async readForUpdate() {
         let mainError;
-        try { return this.parseSettings(await fs.readFile(this.settingsPath, 'utf8')); }
+        let base = null;
+        try { base = this.parseSettings(await fs.readFile(this.settingsPath, 'utf8')); }
         catch (error) { mainError = error; }
-        const recovered = await this.readBackup();
-        if (recovered) return recovered;
-        const missing = mainError.code === 'ENOENT';
-        if (missing && !await fs.pathExists(this.backupPath)) return { ...this.defaultSettings };
-        const refused = new Error(missing
-            ? '主配置缺失且备份不可用，拒绝基于默认设置写入。'
-            : `主配置损坏且无有效备份，拒绝覆盖：${mainError.message}`);
-        refused.code = missing ? 'SETTINGS_MISSING' : 'SETTINGS_CORRUPT';
-        throw refused;
+        if (!base) {
+            const recovered = await this.readBackup();
+            if (recovered) {
+                console.warn(`[SettingsManager] Durable update using backup; main read failed (${mainError?.code || mainError?.name || 'unknown'}).`);
+                base = recovered;
+            } else {
+                const missing = mainError?.code === 'ENOENT';
+                if (missing && !await fs.pathExists(this.backupPath)) {
+                    base = { ...this.defaultSettings };
+                } else {
+                    const refused = new Error(missing
+                        ? '主配置缺失且备份不可用，拒绝基于默认设置写入。'
+                        : `主配置损坏且无有效备份，拒绝覆盖：${mainError?.message}`);
+                    refused.code = missing ? 'SETTINGS_MISSING' : 'SETTINGS_CORRUPT';
+                    throw refused;
+                }
+            }
+        }
+        const session = await this.readSessionState();
+        if (session && typeof session === 'object') {
+            for (const key of SESSION_KEYS) {
+                if (key in session) base[key] = session[key];
+            }
+        }
+        return base;
     }
 
     async writeSettings(settings) {
         const { validated } = SettingsValidator.validate(settings, this.defaultSettings);
+
+        // 分离会话瞬态状态（写入独立 session.json，避免高频写入污染 settings.json 及 CAS 版本）
+        const currentSession = (await this.readSessionState()) || {};
+        const sessionPayload = { ...currentSession };
+        let sessionChanged = false;
+        for (const key of SESSION_KEYS) {
+            if (key in validated && validated[key] !== undefined) {
+                if (sessionPayload[key] !== validated[key]) {
+                    sessionPayload[key] = validated[key];
+                    sessionChanged = true;
+                }
+            }
+        }
+        if (sessionChanged || !await fs.pathExists(this.sessionPath)) {
+            await this.writeSessionState(sessionPayload);
+        }
+
+        // 仅将持久偏好设置写入 settings.json
+        const durableSettings = { ...validated };
+        for (const key of SESSION_KEYS) {
+            delete durableSettings[key];
+        }
+
         // Back up the exact previous bytes, but only if they still parse:
         // a corrupt main file must never replace a valid backup.
         const previous = await fs.readFile(this.settingsPath, 'utf8').catch(() => null);
@@ -496,7 +600,7 @@ class SettingsManager extends EventEmitter {
             if (valid) await replaceFile(this.backupPath, previous);
         }
         // Single rename over the target: old bytes or complete new bytes, never a missing file.
-        await replaceFile(this.settingsPath, `${JSON.stringify(validated, null, 2)}\n`);
+        await replaceFile(this.settingsPath, `${JSON.stringify(durableSettings, null, 2)}\n`);
 
         this.cache = { ...validated };
         this.cacheTimestamp = Date.now();
@@ -527,6 +631,11 @@ class SettingsManager extends EventEmitter {
 
         try {
             lockToken = await this.acquireLock();
+            if (options.sessionOnly === true) {
+                await this.persistSessionOperations(updater?.__vcpSettingsOps);
+                resolve({ success: true, status: 'success', sessionOnly: true });
+                return;
+            }
 
             // CAS must compare against the bytes currently protected by this
             // lock, never a renderer/process cache that may be stale.
@@ -581,12 +690,17 @@ class SettingsManager extends EventEmitter {
     }
 
     getRevision(settings) {
+        const durable = { ...(settings || {}) };
+        for (const key of SESSION_KEYS) {
+            delete durable[key];
+        }
+        delete durable.__vcpSettingsRevision;
         const stable = value => {
             if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`;
             if (value && typeof value === 'object') return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}`;
             return JSON.stringify(value);
         };
-        return crypto.createHash('sha256').update(stable(settings || {})).digest('hex');
+        return crypto.createHash('sha256').update(stable(durable)).digest('hex');
     }
 
     mergePatch(current, patch) {
@@ -651,11 +765,34 @@ class SettingsManager extends EventEmitter {
         }, 5000);
     }
 
+    _resolveWatchDir(dirPath) {
+        try {
+            if (typeof nodeFs.realpathSync?.native === 'function') {
+                return nodeFs.realpathSync.native(dirPath);
+            }
+            if (typeof nodeFs.realpathSync === 'function') {
+                return nodeFs.realpathSync(dirPath);
+            }
+        } catch {
+            // Fall back to the original path if canonical resolution fails.
+        }
+        return dirPath;
+    }
+
     startExternalWatcher() {
         if (this.externalWatcher || !nodeFs.watch) return;
         try {
-            this.externalWatcher = nodeFs.watch(path.dirname(this.settingsPath), (_event, filename) => {
-                if (filename && String(filename) !== path.basename(this.settingsPath)) return;
+            const watchDir = this._resolveWatchDir(path.dirname(this.settingsPath));
+            const targetBase = process.platform === 'win32'
+                ? path.basename(this.settingsPath).toLowerCase()
+                : path.basename(this.settingsPath);
+            const watcher = nodeFs.watch(watchDir, (_event, filename) => {
+                if (filename) {
+                    const normalized = process.platform === 'win32'
+                        ? String(filename).toLowerCase()
+                        : String(filename);
+                    if (normalized !== targetBase) return;
+                }
                 clearTimeout(this.externalWatchTimer);
                 this.externalWatchTimer = setTimeout(async () => {
                     try {
@@ -675,6 +812,10 @@ class SettingsManager extends EventEmitter {
                     }
                 }, 80);
             });
+            watcher.on?.('error', (error) => {
+                this.emit('settings-external-error', error);
+            });
+            this.externalWatcher = watcher;
         } catch (error) {
             console.warn('Unable to watch settings file:', error?.message || error);
         }
@@ -683,8 +824,17 @@ class SettingsManager extends EventEmitter {
     stopExternalWatcher() {
         clearTimeout(this.externalWatchTimer);
         this.externalWatchTimer = null;
-        this.externalWatcher?.close?.();
-        this.externalWatcher = null;
+        if (this.externalWatcher) {
+            try {
+                this.externalWatcher.removeAllListeners?.('change');
+                this.externalWatcher.removeAllListeners?.('error');
+                this.externalWatcher.on?.('error', () => {});
+                this.externalWatcher.close?.();
+            } catch {
+                // Ignore watcher close failures during teardown.
+            }
+            this.externalWatcher = null;
+        }
     }
 
     // 自动备份机制

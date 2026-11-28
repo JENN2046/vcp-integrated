@@ -117,7 +117,8 @@ async function initApp() {
             alert('请先在主设置中配置 VCP 服务器 URL');
             return;
         }
-        serverBaseUrl = settings.vcpServerUrl.replace(/\/v1\/chat\/completions\/?$/, '');
+        serverBaseUrl = globalThis.vcpServerRoutes.normalizeVcpServerUrl(settings.vcpServerUrl);
+        if (!serverBaseUrl) throw new Error('Invalid VCP server address');
         if (!serverBaseUrl.endsWith('/')) serverBaseUrl += '/';
 
         // 2. 读取论坛配置获取 Auth
@@ -904,9 +905,166 @@ function updateEditorPreviewToggle(isCollapsed = editorContainer.classList.conta
     togglePreviewBtn.setAttribute('aria-expanded', String(!isCollapsed));
 }
 
+const MEMO_IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|svg|bmp|ico|avif)(?:[?#].*)?$/i;
+const MEMO_IMAGE_PATH_RE = /\/(?:images|image|comfyuigen|attachments)\//i;
+
+function isMemoImageUrl(rawUrl) {
+    if (typeof rawUrl !== 'string') return false;
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return false;
+    if (/^data:image\//i.test(trimmed)) return true;
+    try {
+        const parsed = new URL(trimmed, window.location.href);
+        const fullPath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+        return MEMO_IMAGE_EXT_RE.test(parsed.pathname) || MEMO_IMAGE_EXT_RE.test(fullPath) || MEMO_IMAGE_PATH_RE.test(parsed.pathname);
+    } catch {
+        return MEMO_IMAGE_EXT_RE.test(trimmed) || MEMO_IMAGE_PATH_RE.test(trimmed);
+    }
+}
+
+function extractImageTitleFromUrl(rawUrl, fallback = '画室图片预览') {
+    if (typeof rawUrl !== 'string' || !rawUrl.trim()) return fallback;
+    try {
+        const parsed = new URL(rawUrl, window.location.href);
+        const seg = parsed.pathname.split('/').filter(Boolean).pop();
+        return seg ? decodeURIComponent(seg) : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function collectPreviewImageGallery(container) {
+    if (!container) return [];
+    const seen = new Set();
+    const gallery = [];
+    const memoBaseTitle = (editorTitleInput?.value || currentMemo?.file || '画室图片预览').trim();
+
+    container.querySelectorAll('img, a[href]').forEach((node) => {
+        let src = '';
+        let title = '';
+        if (node.tagName === 'IMG') {
+            src = (node.getAttribute('src') || node.src || '').trim();
+            title = (node.getAttribute('alt') || node.getAttribute('title') || '').trim();
+        } else if (node.tagName === 'A') {
+            const href = (node.getAttribute('href') || '').trim();
+            if (isMemoImageUrl(href)) {
+                src = node.href || href;
+                const linkText = (node.textContent || '').trim();
+                title = (linkText && linkText !== href && !/^https?:\/\//i.test(linkText))
+                    ? linkText
+                    : '';
+            }
+        }
+        if (!src || seen.has(src)) return;
+        seen.add(src);
+        gallery.push({
+            src,
+            title: title || `${memoBaseTitle} · ${extractImageTitleFromUrl(src, `图片 ${gallery.length + 1}`)}`
+        });
+    });
+
+    return gallery;
+}
+
+function openMemoImageInViewer(targetSrc, preferredTitle = '') {
+    if (!targetSrc) return;
+    const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+    const gallery = collectPreviewImageGallery(editorPreview);
+    let index = gallery.findIndex(item => item.src === targetSrc);
+    const title = preferredTitle || (index >= 0 ? gallery[index].title : extractImageTitleFromUrl(targetSrc, editorTitleInput?.value || '图片预览'));
+
+    if (index < 0) {
+        gallery.push({ src: targetSrc, title });
+        index = gallery.length - 1;
+    }
+
+    if (api?.openImageViewer) {
+        api.openImageViewer({
+            src: targetSrc,
+            title,
+            theme: currentTheme,
+            ...(gallery.length > 1 ? { gallery, index } : {})
+        });
+    } else if (api?.openImageInNewWindow) {
+        api.openImageInNewWindow(targetSrc, title);
+    }
+}
+
+function decorateMemoPreviewMedia(container) {
+    if (!container) return;
+    container.querySelectorAll('img').forEach((img) => {
+        if (img.src && img.src.includes('\\')) {
+            img.src = img.src.replace(/\\/g, '/');
+        }
+        img.classList.add('memo-preview-image');
+        if (!img.title) {
+            img.title = '点击在独立图片视窗中查看';
+        }
+    });
+
+    container.querySelectorAll('a[href]').forEach((anchor) => {
+        const rawHref = (anchor.getAttribute('href') || '').trim();
+        if (!rawHref) return;
+        if (isMemoImageUrl(rawHref)) {
+            anchor.classList.add('memo-image-link');
+            anchor.dataset.memoImageUrl = anchor.href || rawHref;
+            if (!anchor.title) {
+                anchor.title = '点击在独立图片视窗中查看（支持缩放、标注与多图切换）';
+            }
+        } else if (/^(?:https?:|file:|magnet:)/i.test(rawHref)) {
+            anchor.classList.add('memo-external-link');
+            if (!anchor.title) {
+                anchor.title = '点击在外部浏览器中打开';
+            }
+        }
+    });
+}
+
+function bindEditorPreviewNavigationGuard() {
+    if (!editorPreview || editorPreview.dataset.navGuardBound === 'true') return;
+    editorPreview.dataset.navGuardBound = 'true';
+
+    editorPreview.addEventListener('click', (e) => {
+        const img = e.target.closest('img');
+        if (img && editorPreview.contains(img)) {
+            e.preventDefault();
+            e.stopPropagation();
+            const src = img.src || img.getAttribute('src');
+            const title = (img.getAttribute('alt') || img.getAttribute('title') || '').trim();
+            openMemoImageInViewer(src, title);
+            return;
+        }
+
+        const anchor = e.target.closest('a[href]');
+        if (anchor && editorPreview.contains(anchor)) {
+            const rawHref = (anchor.getAttribute('href') || '').trim();
+            if (!rawHref || rawHref.startsWith('#')) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const resolvedHref = anchor.href || rawHref;
+            if (isMemoImageUrl(rawHref) || isMemoImageUrl(resolvedHref)) {
+                const linkText = (anchor.textContent || '').trim();
+                const customTitle = (linkText && linkText !== rawHref && !/^https?:\/\//i.test(linkText)) ? linkText : '';
+                openMemoImageInViewer(resolvedHref, customTitle);
+                return;
+            }
+
+            if (api?.sendOpenExternalLink) {
+                api.sendOpenExternalLink(resolvedHref);
+            } else {
+                window.open(resolvedHref, '_blank', 'noopener,noreferrer');
+            }
+        }
+    });
+}
+
 function renderPreview(content) {
+    bindEditorPreviewNavigationGuard();
     if (window.marked) {
         editorPreview.innerHTML = marked.parse(content);
+        decorateMemoPreviewMedia(editorPreview);
 
         // Pretext 高度测算
         if (window.pretextBridge && window.pretextBridge.isReady() && currentMemo) {
@@ -1049,35 +1207,14 @@ async function handleCreateMemo() {
 
     try {
         const settings = await api.loadSettings();
-        if (!settings?.vcpApiKey) throw new Error('API Key 未配置');
-
-        // 构造 TOOL_REQUEST（可选字段仅在有值时加入）
-        let toolFields = `maid:「始」${maid}「末」,
-tool_name:「始」DailyNote「末」,
-command:「始」create「末」,
-Date:「始」${date}「末」,`;
-
-        if (folder) {
-            toolFields += `\nfolder:「始」${folder}「末」,`;
-        }
-        if (fileName) {
-            toolFields += `\nfileName:「始」${fileName}「末」,`;
-        }
-        if (tags) {
-            toolFields += `\nTag:「始」${tags}「末」,`;
-        }
-
-        toolFields += `\nContent:「始」${content}「末」`;
-
-        const toolRequest = `<<<[TOOL_REQUEST]>>>\n${toolFields}\n<<<[END_TOOL_REQUEST]>>>`;
-
-        const res = await fetch(`${serverBaseUrl}v1/human/tool`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain;charset=UTF-8',
-                'Authorization': `Bearer ${settings.vcpApiKey}`
-            },
-            body: toolRequest
+        const res = await globalThis.vcpServerRoutes.postHumanTool(settings, 'DailyNote', {
+            command: 'create',
+            maid,
+            Date: date,
+            ...(folder ? { folder } : {}),
+            ...(fileName ? { fileName } : {}),
+            ...(tags ? { Tag: tags } : {}),
+            Content: content
         });
 
         if (!res.ok) throw new Error(await res.text());
@@ -1154,32 +1291,17 @@ async function performSemanticSearch(query) {
     const myAbortController = searchAbortController;
     try {
         const settings = await api.loadSettings();
-        if (!settings?.vcpApiKey) throw new Error('API Key 未配置');
 
         // 竞态检查：如果在 await 期间有新搜索发起，放弃当前搜索
         if (myAbortController.signal.aborted || myAbortController !== searchAbortController) return;
 
-        let serverBaseUrl = settings.vcpServerUrl.replace(/\/v1\/chat\/completions\/?$/, '');
-        if (!serverBaseUrl.endsWith('/')) serverBaseUrl += '/';
-
-        const toolRequest = `<<<[TOOL_REQUEST]>>>
-maid:「始」Memo「末」,
-tool_name:「始」LightMemo「末」,
-query:「始」${query}「末」,
-k:「始」10「末」,
-tag_boost:「始」0.6「末」,
-search_all_knowledge_bases:「始」true「末」
-<<<[END_TOOL_REQUEST]>>>`;
-
-        const res = await fetch(`${serverBaseUrl}v1/human/tool`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain;charset=UTF-8',
-                'Authorization': `Bearer ${settings.vcpApiKey}`
-            },
-            body: toolRequest,
-            signal: myAbortController.signal
-        });
+        const res = await globalThis.vcpServerRoutes.postHumanTool(settings, 'LightMemo', {
+            maid: 'Memo',
+            query,
+            k: 10,
+            tag_boost: 0.6,
+            search_all_knowledge_bases: true
+        }, { signal: myAbortController.signal });
 
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         
