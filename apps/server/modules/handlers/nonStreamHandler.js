@@ -13,7 +13,7 @@ const {
   isResidentProposalToolCall,
   residentProposalFailureCategory
 } = require('../vcpLoop/residentPresentation.js');
-const { NATIVE_CALL_ID, entriesOf, admitNativeCalls, rejectionNotice, buildNativeToolMessages } = require('../nativeToolLoop');
+const { NATIVE_CALL_ID, isMalformedFunctionCall, entriesOf, admitNativeCalls, rejectionNotice, buildNativeToolMessages } = require('../nativeToolLoop');
 
 const {
   buildClientVisibleContent,
@@ -78,7 +78,7 @@ function hasNativeToolCallPayload(message) {
 
 function isCompleteNonStreamResponse(readResult) {
   const { parsedJson, message, choice } = parseNonStreamResponse(readResult.text);
-  if (!readResult.response.ok || readResult.semanticRetryExhausted || !parsedJson || parsedJson.error || !message) {
+  if (!readResult.response.ok || readResult.semanticRetryExhausted || !parsedJson || parsedJson.error || !message || isMalformedFunctionCall(choice)) {
     return false;
   }
   if (hasNativeToolCallPayload(message) &&

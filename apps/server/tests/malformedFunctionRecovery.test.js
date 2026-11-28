@@ -321,3 +321,16 @@ test('explicit user abort after complete tool tail never executes tools', async 
   assert.equal(s.stats.fetched, 0);
   assert.equal(result.completed, false);
 });
+test('an explicit upstream error with a malformed FC terminal cannot trigger semantic retry', async () => {
+  let retries = 0;
+  const s = setup(async () => { retries++; return response(success('unexpected retry')); });
+  const upstreamError = 'data: ' + JSON.stringify({
+    error: { message: 'provider rejected the turn' },
+    choices: [{ delta: {}, finish_reason: 'stop', native_finish_reason: 'malformed_function_call' }]
+  }) + '\n\ndata: [DONE]\n\n';
+  const outcome = await s.handler.handle({}, s.res, response(upstreamError));
+  assert.equal(retries, 0);
+  assert.equal(outcome.completed, false);
+  assert.doesNotMatch(s.res.output, /unexpected retry/);
+  assert.equal((s.res.output.match(/data: \[DONE\]/g) || []).length, 1);
+});

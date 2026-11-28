@@ -6,7 +6,7 @@
 | [lioensky/VCPToolBox](https://github.com/lioensky/VCPToolBox/commit/699ed4b3a0c0b08124cb8f8cf14f7e154f00af24) | `699ed4b3a0c0b08124cb8f8cf14f7e154f00af24` | 混合来源：官方参照 `965afa8`、历史下游 fork `a6f37bfd`，按文件比对实际导入 |
 | [lioensky/VCPChat](https://github.com/lioensky/VCPChat/commit/6f77337c42d1b7fdee00fc4ac6c75b3600177c1d) | `6f77337c42d1b7fdee00fc4ac6c75b3600177c1d` | 本地宿主 fork `b4d5b558` 与官方 main 的共同祖先为 `2fc8fc98` |
 
-初次服务端导入包含官方文件和 Jenn fork 的覆盖。对照两个来源逐文件核查；仅以官方提交区间生成差异会漏掉工具尾部检测等真实执行路径。宿主历史及本地接缝分别见[桌面来源](../provenance/desktop.json)和[服务端来源](../provenance/server.json)。桌面上游 648 个变更路径中，486 个与目标 blob 相同，85 个保留集成适配，37 个保留原集成实现，35 个未在同路径引入或改放，5 个随上游删除。保留路径的主要约束是正式执行者、History 写入队列和删除墓碑。
+初次服务端导入包含官方文件和 Jenn fork 的覆盖。对照两个来源逐文件核查；仅以官方提交区间生成差异会漏掉工具尾部检测等真实执行路径。宿主历史及本地接缝分别见[桌面来源](../provenance/desktop.json)和[服务端来源](../provenance/server.json)。桌面上游 648 个变更路径中，484 个与目标 blob 相同，87 个保留集成适配，37 个保留原集成实现，35 个未在同路径引入或改放，5 个随上游删除。保留路径的主要约束是正式执行者、History 写入队列和删除墓碑。
 
 2026-11-28 启动时 GitHub 列出的开放 PR 为 ToolBox #660–667，以及 VCPChat #340、#382、#383。Chat #382 已吸收并复验 typed settings 保存；#340 的 fileKey 处理不校验协议与端口，#383 的图表修复与模型刷新留待独立渲染验收。ToolBox 的逐项判定见[开放 PR 回执](../provenance/upstream-prs.md)。
 
@@ -59,3 +59,9 @@ TopicSponsor 的已有目标投递与路由 22 项通过。上游 `mode=new_topi
 本轮 Core SQLite 所有权及 Work 表结构没有变更。适配集中在 `executeTurn`、HTTP / Core Sink 的结算语义、原生工具派发、日记授权、Desktop/Core 路由与 CDS 客户端握手。原生模型与工具循环继续归 ToolBox，正式消息仍由 Core 单写。日用配置和硬件麦克风、扬声器、Windows/macOS 安装体验均未纳入这次 Linux/Android 隔离验收。
 
 **隔离候选结论为 UPSTREAM_CONVERGENCE_PASS / READY_FOR_STABILITY_R1，范围以上述已吸收能力和明确保留项为准。** [验证摘要](evidence/upstream-convergence-r1/verification.json)
+
+## PR #5 复查
+
+1. Provider 在选择级结束原因同时给出 `stop` 与 `MALFORMED_FUNCTION_CALL` 时，非流式宿主曾执行失败响应中的结构化 FC。候选现在统一识别两个字段中的失败标记；SSE 同时带显式 Provider 错误和 malformed 标记时也停止恢复请求。隔离正式 Work 中两种格式均进入 `review_required`，助手终稿及工具派发记录均为零。
+2. 独立 VchatManager 曾按旧配置快照提交话题排序，并发删除时会重新写回已删话题并抹去删除标记。独立管理器没有持有主宿主的配置写入队列。排序、置顶、置底和重置现限于当前视图；配置仍由原宿主发布。主窗已有的群重排、TopicSponsor 删除重放及崩溃续删问题继续留给 STABILITY-R1。
+3. 远程 Core 联验在 Electron 冷读和同窗口重载后检查 A、B 两个隔离 Profile 的原生 History 均无正式消息，同时核对 Core SQLite 的终稿、Work 及删除回执。

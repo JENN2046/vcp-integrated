@@ -4,6 +4,11 @@ const NATIVE_CALL_ID = Symbol('vcpNativeCallId');
 
 const { randomUUID } = require('node:crypto');
 const record = value => value != null && typeof value === 'object' && !Array.isArray(value);
+function isMalformedFunctionCall(choice) {
+    return [choice?.native_finish_reason, choice?.finish_reason]
+        .some(reason => typeof reason === 'string' && reason.toLowerCase() === 'malformed_function_call');
+}
+
 function entriesOf(payload) {
     if (payload?.tool_calls != null && payload.function_call != null) return [{ error: 'mixed_envelopes' }];
     if (payload?.function_call != null) return [{ index: 0, function: payload.function_call }];
@@ -136,4 +141,4 @@ function buildNativeToolMessages(calls, groups) {
     });
 }
 
-module.exports = { NATIVE_CALL_ID, entriesOf, admitNativeCalls, rejectionNotice, collectStreamToolCalls, normalizeNativeVcpCalls, buildNativeToolMessages };
+module.exports = { NATIVE_CALL_ID, isMalformedFunctionCall, entriesOf, admitNativeCalls, rejectionNotice, collectStreamToolCalls, normalizeNativeVcpCalls, buildNativeToolMessages };

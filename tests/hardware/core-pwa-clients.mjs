@@ -62,24 +62,49 @@ async function connectPage(port, origin) {
         const message = JSON.parse(event.data);
         pending.get(message.id)?.(message);
     });
+    const call = (method, params = {}) => new Promise((resolve, reject) => {
+        const id = ++sequence;
+        const timer = setTimeout(() => {
+            pending.delete(id);
+            reject(Error('Chromium request timed out: ' + method));
+        }, 8000);
+        pending.set(id, message => {
+            clearTimeout(timer);
+            pending.delete(id);
+            if (message.error) reject(Error('Chromium request failed: ' + method));
+            else resolve(message.result);
+        });
+        ws.send(JSON.stringify({ id, method, params }));
+    });
     return {
-        run(fn, ...args) {
-            return new Promise((resolve, reject) => {
-                const id = ++sequence;
-                const timer = setTimeout(() => {
-                    pending.delete(id);
-                    reject(Error('Chromium evaluation timed out'));
-                }, 8000);
-                pending.set(id, message => {
-                    clearTimeout(timer);
-                    pending.delete(id);
-                    if (message.error || message.result.exceptionDetails) reject(Error('Fixture page evaluation failed'));
-                    else resolve(message.result.result.value);
-                });
-                const expression = 'location.origin === ' + JSON.stringify(origin) +
-                    ' && (' + fn + ')(' + args.map(arg => JSON.stringify(arg)).join(',') + ')';
-                ws.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression, returnByValue: true, awaitPromise: true } }));
+        async run(fn, ...args) {
+            const expression = 'location.origin === ' + JSON.stringify(origin) +
+                ' && (' + fn + ')(' + args.map(arg => JSON.stringify(arg)).join(',') + ')';
+            const evaluation = await call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+            if (evaluation.exceptionDetails) throw Error('Fixture page evaluation failed');
+            return evaluation.result.value;
+        },
+        async loadedAssets() {
+            await call('Page.enable');
+            const { frameTree } = await call('Page.getResourceTree');
+            assert.equal(new URL(frameTree.frame.url).origin, origin);
+            const resources = frameTree.resources.filter(resource => {
+                const url = new URL(resource.url);
+                return url.origin === origin && /^\/mobile\/assets\/[\w.-]+\.(?:js|css)$/.test(url.pathname);
             });
+            const assets = [];
+            for (const { url } of resources) {
+                const { content, base64Encoded } = await call('Page.getResourceContent', { frameId: frameTree.frame.id, url });
+                const bytes = Buffer.from(content, base64Encoded ? 'base64' : 'utf8');
+                const name = path.basename(new URL(url).pathname);
+                const built = fileURLToPath(new URL('../../apps/server/Plugin/NativeSync/mobile-dist/assets/' + name, import.meta.url));
+                const digest = createHash('sha256').update(bytes).digest('hex');
+                assert.equal(digest, createHash('sha256').update(await fs.readFile(built)).digest('hex'), name);
+                assets.push({ path: new URL(url).pathname, sha256: digest });
+            }
+            assert(assets.some(asset => asset.path.endsWith('.js')));
+            assert(assets.some(asset => asset.path.endsWith('.css')));
+            return assets.sort((a, b) => a.path.localeCompare(b.path));
         },
         close: () => ws.close()
     };
@@ -219,7 +244,8 @@ try {
         assert.deepEqual(final[0].works, final[1].works);
         assert.deepEqual(final[0].messages.map(m => m.id), final[1].messages.map(m => m.id));
     }
-    await fs.writeFile(path.join(out, 'pwa-proof.json'), JSON.stringify({ mode, ongoing, final }, null, 2));
+    const loadedAssets = await Promise.all(clients.map(client => client.loadedAssets()));
+    await fs.writeFile(path.join(out, 'pwa-proof.json'), JSON.stringify({ mode, ongoing, final, loadedAssets }, null, 2));
     console.log('PWA observations verified in ' + path.join(out, 'pwa-proof.json'));
 } finally {
     for (const client of clients) client.close();

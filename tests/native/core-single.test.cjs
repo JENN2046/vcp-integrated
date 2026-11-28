@@ -752,3 +752,30 @@ test('Core never commits a client-owned FC response as its Work final', async t 
     }
     assert.equal(provider.calls.length, 2);
 });
+
+test('a provider-marked malformed FC cannot dispatch a Core tool or commit a reply', async t => {
+    const previous = process.env.VCP_FC_DEBUG;
+    process.env.VCP_FC_DEBUG = 'true';
+    t.after(() => {
+        if (previous === undefined) delete process.env.VCP_FC_DEBUG;
+        else process.env.VCP_FC_DEBUG = previous;
+    });
+    const provider = await localProvider(t);
+    const { chat } = host(provider);
+    const f = await coreFixture(t, chat);
+    const phone = await f.mobile();
+    const tool = { id: 'malformed-id', type: 'function',
+        function: { name: 'vcptools', arguments: JSON.stringify({ tool_name: 'Fixture' }) } };
+    provider.setReply((_body, res) => res.end(JSON.stringify({ choices: [{
+        index: 0, message: { role: 'assistant', content: 'unfinished', tool_calls: [tool] },
+        finish_reason: 'stop', native_finish_reason: 'MALFORMED_FUNCTION_CALL'
+    }] })));
+    const { key, route } = await f.define({ config: { ...fixtureConfig, streamOutput: false } });
+    const { workId } = await phone.call(route + '/send', { requestId: 'malformed-owned-fc', text: 'fixture input' }, 202);
+    await wait(() => f.core.store.work(workId).status === 'review_required', 'malformed native tool result');
+    assert.equal(provider.calls.length, 1);
+    assert.equal(provider.calls[0].tools[0].function.name, 'vcptools');
+    assert.equal(f.core.store.work(workId).reply_message_id, null);
+    assert.equal(f.core.store.db.prepare('SELECT COUNT(*) AS n FROM work_invocations WHERE work_id=?').get(workId).n, 0);
+    assert.equal(f.core.store.db.prepare("SELECT COUNT(*) AS n FROM messages WHERE conversation_id=? AND role='assistant'").get(key).n, 0);
+});

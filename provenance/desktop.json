@@ -81,8 +81,8 @@
     "basis": "Compare official fork point 2fc8fc98 to target 6f77337, then compare those paths to the integrated baseline and candidate file bytes. Stable paths outside this delta retain the historical import provenance. Git blob equality describes packaged source, not runtime coverage.",
     "diffCounts": {
       "changedAtUpstream": 648,
-      "sameBlobAsTarget": 486,
-      "candidateDiffersFromBoth": 85,
+      "sameBlobAsTarget": 484,
+      "candidateDiffersFromBoth": 87,
       "retainedIntegratedBaseline": 37,
       "notPresentAtTargetPath": 35,
       "removedAsUpstream": 5,
@@ -205,6 +205,7 @@
       ]
     },
     "pathNotes": {
+      "standaloneManagerOrder": "VchatManager/script.js preserves local view sorting. The separate manager process cannot publish topic order through the host History/config writer; whole-file saves from its stale snapshot could restore a deleted topic and clear the owner deletion marker.",
       "blockedManifests": "Corresponding .block source is present; these plugins remain disabled by default.",
       "sharedRuleLocation": "Both the main renderer and the worker load modules/chat/historyWindow/flowlockProtocol.js.",
       "profileResources": "The import historically excludes AppData from the shipped source; the existing official test fixture pin above remains historical. This candidate did not migrate a user profile or validate installation of the newer official preset.",

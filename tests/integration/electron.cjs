@@ -186,8 +186,15 @@ input.on('line', async line => {
             const debuggerApi = win.webContents.debugger;
             if (!debuggerApi.isAttached()) debuggerApi.attach('1.3');
             const parsed = [];
+            const preloadFile = path.join(process.env.NS_HOST, 'preloads/bundled/dist/chat.cjs');
+            const preloadSource = fs.readFileSync(preloadFile, 'utf8');
+            const preloadCandidates = [];
             const report = (_event, name, details) => {
-                if (name !== 'Debugger.scriptParsed' || !details.url.startsWith('file://')) return;
+                if (name !== 'Debugger.scriptParsed') return;
+                if (details.length >= preloadSource.length && details.length < preloadSource.length + 4096) {
+                    preloadCandidates.push(details.scriptId);
+                }
+                if (!details.url.startsWith('file://')) return;
                 const file = fileURLToPath(details.url);
                 if (file.startsWith(sourceRoot + '/') && script.renderer.some(name => file.endsWith('/' + name))) {
                     parsed.push({file, id:details.scriptId, length:details.length});
@@ -196,7 +203,12 @@ input.on('line', async line => {
             debuggerApi.on('message', report);
             await debuggerApi.sendCommand('Debugger.enable');
             const renderer = [];
+            let parsedPreload = false;
             try {
+                for (const scriptId of preloadCandidates) {
+                    const { scriptSource } = await debuggerApi.sendCommand('Debugger.getScriptSource', { scriptId });
+                    if (scriptSource.includes(preloadSource)) parsedPreload = true;
+                }
                 for (const {file,id} of parsed) {
                     const {scriptSource} = await debuggerApi.sendCommand('Debugger.getScriptSource',{scriptId:id});
                     renderer.push({file:path.relative(sourceRoot,file), bytes:Buffer.byteLength(scriptSource),
@@ -206,7 +218,12 @@ input.on('line', async line => {
                 debuggerApi.off('message', report);
                 await debuggerApi.sendCommand('Debugger.disable');
             }
-            result = {url: win.webContents.getURL(), main, renderer};
+            const preloadArtifact = {
+                file: path.relative(sourceRoot, preloadFile),
+                sha256: crypto.createHash('sha256').update(preloadSource).digest('hex'),
+                matchedDebuggerSource: parsedPreload
+            };
+            result = {url: win.webContents.getURL(), main, renderer, preloadArtifact};
         }
         if (action === 'trace') detailed = true;
         if (hooks?.commands && Object.hasOwn(hooks.commands, action)) result = await hooks.commands[action](win, script);

@@ -6,7 +6,7 @@ const contextBudget = require('../contextBudget.js');
 const finalContextStore = require('../finalContextStore.js');
 const roleDivider = require('../roleDivider.js');
 const { formatToolResultBatch, projectToolBatchForUpstream, buildToolPayloadMessage } = require('../toolResultBatch.js');
-const { NATIVE_CALL_ID, collectStreamToolCalls, admitNativeCalls, rejectionNotice, buildNativeToolMessages } = require('../nativeToolLoop');
+const { NATIVE_CALL_ID, isMalformedFunctionCall, collectStreamToolCalls, admitNativeCalls, rejectionNotice, buildNativeToolMessages } = require('../nativeToolLoop');
 
 const {
   extractReasoningText,
@@ -358,8 +358,7 @@ class StreamHandler {
             hasPayloadError = true;
           }
           const choice = parsedData?.choices?.[0];
-          if ([choice?.native_finish_reason, choice?.finish_reason]
-            .some(reason => typeof reason === 'string' && reason.toLowerCase() === 'malformed_function_call')) {
+          if (isMalformedFunctionCall(choice)) {
             malformedFunctionCall = true;
             invalidPayload = true;
           }
@@ -883,7 +882,7 @@ class StreamHandler {
     // Semantic recovery is per upstream turn, separate from transport retries and tool execution.
     const processAIResponseStreamHelper = async (aiResponse, isInitialCall) => {
       let data = await readAIResponseStream(aiResponse, isInitialCall);
-      if (data.streamAborted) return { ...data, content: '', completed: false };
+      if (data.streamAborted || data.hasPayloadError) return { ...data, content: '', completed: false };
 
       if (!data.malformedFunctionCall) return data;
       if (abortController?.signal.aborted || data.streamAborted || sink.isClosed()) return data;
@@ -933,7 +932,7 @@ class StreamHandler {
           return { ...data, content: '', completed: false };
         }
         data = await readAIResponseStream(response, false);
-        if (data.streamAborted) return { ...data, content: '', completed: false };
+        if (data.streamAborted || data.hasPayloadError) return { ...data, content: '', completed: false };
         if (!data.malformedFunctionCall) return data;
         const acceptedRecovery = acceptMalformedToolTurn(data);
         if (acceptedRecovery) return acceptedRecovery;

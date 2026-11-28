@@ -196,6 +196,17 @@ exports.create = async (out, cert) => {
         await waitUntil(async () => (await evalJs(B, "document.querySelector('#chatMessages')?.innerText || ''")).includes(before[2].content),
             'reloaded renderer reads the same Core conversation');
         assert.deepEqual(await read(), before);
+        // A began with an empty native History; B began without a native topic.
+        // Remote submission, restart and cold read must leave both local histories empty.
+        const desktopNativeHistoryRows = {};
+        for (const role of ['A', 'B']) {
+            const history = path.join(out, 'profile-' + role, 'UserData', descriptor.itemId,
+                'topics', descriptor.topicId, 'history.json');
+            if (role === 'A') assert.ok(fs.existsSync(history), 'original native History must survive');
+            const rows = fs.existsSync(history) ? JSON.parse(fs.readFileSync(history, 'utf8')) : [];
+            assert.deepEqual(rows, [], 'unexpected local History in profile ' + role);
+            desktopNativeHistoryRows[role] = rows.length;
+        }
         const db = new DatabaseSync(path.join(out,'core/core.sqlite'), { readOnly: true });
         try {
             const works = db.prepare('SELECT principal,status FROM works ORDER BY rowid').all();
@@ -239,7 +250,7 @@ exports.create = async (out, cert) => {
         assert.equal(administer(context.env, ['revoke', sessionB.data.deviceId]).revoked, true);
         assert.equal((await call('/core/api/session', { token: tokens.B })).status, 401);
         result.core = { provider: provider ? model : 'synthetic', physicalAndroid: physical, browserPwa: browser, desktopExitedDuringWork: true,
-            mobileContinuation: true, mobileSseTerminal: true, deviceRevocation: true, attachmentHash: imageHash, formalMessages: before.length, authenticatedDesktopColdReadback: true, rendererReloadReadback: true,
+            mobileContinuation: true, mobileSseTerminal: true, deviceRevocation: true, attachmentHash: imageHash, formalMessages: before.length, authenticatedDesktopColdReadback: true, rendererReloadReadback: true, desktopNativeHistoryRows,
             historyAndAttachmentUnchangedAfterRestart: true, unauthenticatedRejected: true, readOnlyMutationRejected: true,
             definitionTombstoneAndReplay: true, restart, webBundle: checkPage };
     };

@@ -95,15 +95,15 @@ test('话题列表按 topics 数组的顺序显示，不按创建时间重排', 
     assert.deepEqual(topics, ['置顶的旧话题 (topic_100)', '最新话题 (topic_300)', '中间话题 (topic_200)']);
 });
 
-test('话题可以置顶、置底和拖动，保存后按新顺序写回 topics，话题对象原样保留', async t => {
+test('Agent 话题可以置顶、置底和拖动，恢复视图后保留宿主写入的配置', async t => {
     const root = await createProject(t);
     const doc = await openManager(t, root);
     const window = doc.defaultView;
     doc.querySelector('.sidebar-item[data-id="agent_nova"]').click();
     const ids = () => [...doc.querySelectorAll('.topics-list li')].map(el => el.dataset.topicId);
     const row = id => doc.querySelector(`.topics-list li[data-topic-id="${id}"]`);
-    const saveButton = doc.querySelector('.topic-order-save');
-    assert.equal(saveButton.disabled, true);
+    const resetButton = doc.querySelector('.topic-order-revert');
+    assert.equal(resetButton.disabled, true);
 
     row('topic_200').querySelector('.topic-move-top').click();
     assert.deepEqual(ids(), ['topic_200', 'topic_100', 'topic_300']);
@@ -115,26 +115,22 @@ test('话题可以置顶、置底和拖动，保存后按新顺序写回 topics�
     Object.defineProperty(drop, 'clientY', { value: -1 });
     row('topic_300').dispatchEvent(drop);
     assert.deepEqual(ids(), ['topic_200', 'topic_100', 'topic_300']);
-    assert.equal(saveButton.disabled, false);
+    assert.equal(resetButton.disabled, false);
 
-    // 本窗口打开后主程序又新建了一个话题，保存时不能丢，按新话题在前放在最前
+    // 在管理器打开后，由宿主新建一个话题并修改模型配置。
     const configPath = path.join(root, 'AppData/Agents/agent_nova/config.json');
     const config = JSON.parse(await fs.readFile(configPath, 'utf8'));
     config.topics.unshift({ id: 'topic_400', name: '刚建的话题', createdAt: 400, locked: false, unread: true, creatorSource: 'ui' });
     config.model = 'kept-model';
     await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf8');
 
-    saveButton.click();
-    await settle(80);
-    const saved = JSON.parse(await fs.readFile(configPath, 'utf8'));
-    assert.deepEqual(saved.topics.map(topic => topic.id), ['topic_400', 'topic_200', 'topic_100', 'topic_300']);
-    assert.deepEqual(saved.topics[0], { id: 'topic_400', name: '刚建的话题', createdAt: 400, locked: false, unread: true, creatorSource: 'ui' });
-    assert.equal(saved.model, 'kept-model');
-    assert.deepEqual(ids(), ['topic_400', 'topic_200', 'topic_100', 'topic_300']);
-    assert.equal(saveButton.disabled, true);
+    resetButton.click();
+    assert.equal(resetButton.disabled, true);
+    assert.deepEqual(ids(), ['topic_100', 'topic_300', 'topic_200']);
+    assert.deepEqual(JSON.parse(await fs.readFile(configPath, 'utf8')), config);
 });
 
-test('群组的话题顺序写回 AgentGroups 下的配置', async t => {
+test('群组的话题顺序可在视图中调整和恢复，磁盘上的宿主配置保持完整', async t => {
     const root = await createProject(t);
     const groupPath = path.join(root, 'AppData/AgentGroups/group_team/config.json');
     const group = JSON.parse(await fs.readFile(groupPath, 'utf8'));
@@ -144,10 +140,11 @@ test('群组的话题顺序写回 AgentGroups 下的配置', async t => {
     const doc = await openManager(t, root);
     doc.querySelector('.sidebar-item[data-id="group_team"]').click();
     doc.querySelector('.topics-list li[data-topic-id="group_topic_2"] .topic-move-top').click();
-    doc.querySelector('.topic-order-save').click();
-    await settle(80);
-    const saved = JSON.parse(await fs.readFile(groupPath, 'utf8'));
-    assert.deepEqual(saved.topics.map(topic => topic.id), ['group_topic_2', 'group_topic_1']);
+    const ids = () => [...doc.querySelectorAll('.topics-list li')].map(el => el.dataset.topicId);
+    assert.deepEqual(ids(), ['group_topic_2', 'group_topic_1']);
+    doc.querySelector('.topic-order-revert').click();
+    assert.deepEqual(ids(), ['group_topic_1', 'group_topic_2']);
+    assert.deepEqual(JSON.parse(await fs.readFile(groupPath, 'utf8')), group);
 });
 
 test('一致性检查跳过辅助对话目录，恢复的话题带上主程序的话题字段', async t => {

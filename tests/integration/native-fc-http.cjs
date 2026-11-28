@@ -18,12 +18,24 @@ async function main() {
     const name = 'client_add';
     const tools = [{ type:'function', function:{ name, parameters:{ type:'object', properties:{ a:{type:'integer'}, b:{type:'integer'} } } } }];
     const call = {id:'call_add', type:'function', function:{name, arguments:'{"a":2,"b":3}'}};
+    let malformed = false;
     const provider = http.createServer(async (req, res) => {
         try {
             const chunks = [];
             for await (const chunk of req) chunks.push(chunk);
             const request = JSON.parse(Buffer.concat(chunks));
             assert.deepEqual(request.tools, tools);
+            if (malformed) {
+                const choice = {index:0, finish_reason:'stop', native_finish_reason:'MALFORMED_FUNCTION_CALL'};
+                if (request.stream) {
+                    res.writeHead(200, {'Content-Type':'text/event-stream'});
+                    res.end('data: '+JSON.stringify({error:{message:'rejected fixture call'}, choices:[{...choice,delta:{}}]})+'\n\ndata: [DONE]\n\n');
+                } else {
+                    res.writeHead(200, {'Content-Type':'application/json'});
+                    res.end(JSON.stringify({choices:[{...choice,message:{role:'assistant',content:'unfinished',tool_calls:[call]}}]}));
+                }
+                return;
+            }
             const result = request.messages.findLast(row => row.role === 'tool');
             if (result) {
                 assert.equal(result.tool_call_id, call.id);
@@ -105,6 +117,26 @@ async function main() {
             }
         }
         assert.equal(service.calls.length,4);
+        malformed = true;
+        for (const stream of [false,true]) {
+            const response = await fetch(service.wsOrigin+'/v1/chat/completions', {
+                method:'POST', headers:{authorization:'Bearer synthetic-only','content-type':'application/json'},
+                body:JSON.stringify({model:'synthetic',tools,stream,messages:[{role:'user',content:'malformed fixture'}]}),
+                signal:AbortSignal.timeout(20000)
+            });
+            const wire = await response.text();
+            assert.equal(response.status,200,wire);
+            assert.doesNotMatch(wire,/client_add/);
+            if (stream) {
+                assert.match(wire,/STREAM_INCOMPLETE/);
+                assert.equal((wire.match(/data: \[DONE\]/g)||[]).length,1);
+            } else {
+                const message = JSON.parse(wire).choices[0].message;
+                assert.equal(message.tool_calls,undefined);
+                assert.match(message.content,/UPSTREAM_INCOMPLETE/);
+            }
+        }
+        assert.equal(service.calls.length,6, 'malformed replies did not dispatch a continuation');
         passed = true;
         console.log('PASS actual ToolBox HTTP, client-owned FC and followup in both formats, one SSE DONE per response');
     } finally {
