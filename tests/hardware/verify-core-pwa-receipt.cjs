@@ -23,12 +23,19 @@ assert.deepEqual(evidence.checkout.atStart.inputChanges, []);
 for (const input of ['apps', 'packages', 'scripts', 'tests']) {
     const tree = git('rev-parse', testedCommit + ':' + input).toString().trim();
     assert.equal(evidence.checkout.atStart.inputTrees[input], tree, input);
-    assert.equal(git('rev-parse', reviewCommit + ':' + input).toString().trim(), tree, input);
+    if (input !== 'tests') assert.equal(git('rev-parse', reviewCommit + ':' + input).toString().trim(), tree, input);
 }
+// The comparison program runs after evidence collection. All actual test and fixture
+// inputs must be identical, including the entire Electron and physical PWA drivers.
+const offlineVerifier = 'tests/hardware/verify-core-pwa-receipt.cjs';
+const changedTestPaths = git('diff', '--name-only', '-z', testedCommit, reviewCommit, '--', 'tests').toString().split('\0').filter(Boolean);
+assert.deepEqual(changedTestPaths.filter(file => file !== offlineVerifier), []);
 assert.deepEqual(evidence.backendSources, read('backend-loaded.json'));
 assert(evidence.backendSources.length > 0);
 evidence.backendSources.forEach(verifyFile);
-assert.deepEqual(evidence.desktopLoads.map(row => row.role), ['A','B','B']);
+const roles = evidence.desktopLoads.map(row => row.role);
+assert.deepEqual([...roles].sort(), ['A','B','B']); // First startup runs both profiles concurrently.
+assert.equal(roles.at(-1), 'B'); // B cold reads the official conversation after the restart.
 for (const load of evidence.desktopLoads) {
     assert(load.preloadArtifact.matchedDebuggerSource);
     for (const row of [...load.main, ...load.renderer]) verifyFile(row);
@@ -53,4 +60,4 @@ const work = read('desktop-exited.json').workId;
 for (const observer of proof.ongoing) assert(observer.works.some(row => row.id === work && row.status === 'running'));
 const rawHashes = Object.fromEntries(['evidence.json','pwa-proof.json','backend-loaded.json'].map(file => [file, hash(fs.readFileSync(path.join(run, file)))]));
 console.log(JSON.stringify({testedCommit, reviewCommit, inputTrees:evidence.checkout.atStart.inputTrees, loadedBackendFiles:evidence.backendSources.length,
-    electronLoads:evidence.desktopLoads.length, pwaAssets:proof.loadedAssets[0], workObservedRunning:work, rawHashes}, null, 2));
+    electronLoadOrder:roles, changedOfflineVerifierPaths:changedTestPaths, pwaAssets:proof.loadedAssets[0], workObservedRunning:work, rawHashes}, null, 2));

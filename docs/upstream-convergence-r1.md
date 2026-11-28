@@ -65,3 +65,5 @@ TopicSponsor 的已有目标投递与路由 22 项通过。上游 `mode=new_topi
 1. Provider 在选择级结束原因同时给出 `stop` 与 `MALFORMED_FUNCTION_CALL` 时，非流式宿主曾执行失败响应中的结构化 FC。候选现在统一识别两个字段中的失败标记；SSE 同时带显式 Provider 错误和 malformed 标记时也停止恢复请求。隔离正式 Work 中两种格式均进入 `review_required`，助手终稿及工具派发记录均为零。
 2. 独立 VchatManager 曾按旧配置快照提交话题排序，并发删除时会重新写回已删话题并抹去删除标记。独立管理器没有持有主宿主的配置写入队列。排序、置顶、置底和重置现限于当前视图；配置仍由原宿主发布。主窗已有的群重排、TopicSponsor 删除重放及崩溃续删问题继续留给 STABILITY-R1。
 3. 远程 Core 联验在 Electron 冷读和同窗口重载后检查 A、B 两个隔离 Profile 的原生 History 均无正式消息，同时核对 Core SQLite 的终稿、Work 及删除回执。
+
+三端复验固定在修复提交 `9f2ad5e5bd7c03416db6f72694ca67edaa2f6584`，启动与结束均记录为干净工作树。Core SQLite 中按顺序读取的 6 个消息 ID 与 Chromium、实体 Redmi 读到的 ID 逐一相同，3 个独立身份的 3 条 Work 均为 completed；两端 Electron Profile 的本地正式 History 行数均为 0。默认原生回归现在为 100 项通过与 1 项已知 TODO，协作 14 项通过。旧 `4263734` 的三端摘要保留为历史证据；本次复验另行记录客户端脚本、preload、PWA 实载资源和源码提交。 [PR 复查三端回执](evidence/upstream-convergence-r1/pr5-review-three-clients.json)

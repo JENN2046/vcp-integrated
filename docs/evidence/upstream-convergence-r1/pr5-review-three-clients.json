@@ -1,0 +1,327 @@
+{
+  "previousRun": {
+    "comparedGitCommit": "4263734348da9fcf78d761fcf1d1e808fae9d995",
+    "commitTime": "2026-11-28T13:40:57+08:00",
+    "time": {
+      "firstEvent": "2026-11-28T13:36:31.998+08:00",
+      "lastEvent": "2026-11-28T13:36:48.858+08:00"
+    },
+    "rawHashes": {
+      "backend-loaded.json": "2ef76ac61503a02d11e5f5574070991e570b12af0fccd7499b5158739b98cda1",
+      "events.jsonl": "7db6da6e5ea8711c09af3815365dad1fbc6356e155078efe4d4d63d12b956d34",
+      "evidence.json": "a7550302e772067d008dafc645473c8b1e8a8d975df448d097ac379957d21d5d",
+      "pwa-proof.json": "aafb1159403e5ac295ed68286f0b784973ab96a87feeae9bc980391eb92073ad"
+    },
+    "backendBlobsMatchingCommit": 16,
+    "cdsBinarySha256": "ce36c083a38f2c91a091bbf87bd15c5ce3d5d3b5727389a828fbfe01aef4cc4d",
+    "cdsSourceSha256AtComparedCommit": "b89de5b549fd848a09e6ed825b327fc1ba6d108c33200e2cdd20576d2ba001e9",
+    "pwaBuildFromComparedCommit": [
+      {
+        "requestedPath": "/mobile/assets/index-0O1KY-Y8.js",
+        "rebuiltSha256": "aa9ec2035c82ad3346b7c938e0fc82b8ea3157c44ad93a99cbded1f2492ace75"
+      },
+      {
+        "requestedPath": "/mobile/assets/index-BQsvT9bT.css",
+        "rebuiltSha256": "ede1f975123d62afcab88a1f58b17779809877011b55ce978b505a1d3edea8b3"
+      }
+    ],
+    "scope": "Run preceded commit; original evidence contains matching selected backend source hashes and running CDS binary hashes. The two requested hashed PWA filenames match a clean build from the commit; neither the response bytes nor parsed renderer or preload script bytes were recorded in that run."
+  },
+  "testedRun": {
+    "time": {
+      "firstEvent": "2026-11-28T13:50:57.302+08:00",
+      "lastEvent": "2026-11-28T13:52:33.238+08:00"
+    },
+    "testedCommit": "9f2ad5e5bd7c03416db6f72694ca67edaa2f6584",
+    "inputTrees": {
+      "apps": "0649b3cc35bc719223bdd15186241ec0ad0469b3",
+      "packages": "9d82580138bf2f1ff8726dfab94c835c38724a8b",
+      "scripts": "1d508593476f7dc81c350737d12e80e1b5c25b6c",
+      "tests": "6bd86ea025df9a0f8f8f78a501548c784d12f176"
+    },
+    "revisionAtStartAndEndIdentical": true,
+    "trackedOrUntrackedInputChanges": [],
+    "rawHashes": {
+      "backend-loaded.json": "55a2778f0e28fd435bf0c6c9c5b8a918a7cc5ff7f17cb6c18e206fba79920bd1",
+      "events.jsonl": "7d4656a1da96a2f45394a73753049d053c053c70c63afdecb33837a173135acb",
+      "evidence.json": "331ec4c877396fa9137fc6acb4130ea60d93b1be4a89acb15bf6a4c6c4e01086",
+      "pwa-proof.json": "ba03f0b56d4e500d0277f47e11b93d9ae47b04f61ded24892e4d0255f9c92eab"
+    },
+    "loadedBackendSourceHashes": [
+      {
+        "file": "apps/server/core/host.js",
+        "sha256": "ea0729192c6a7096c468bad859176a3d37a4a991d88168b2a9fc4dc6939cb358"
+      },
+      {
+        "file": "apps/server/core/localWorkspace.js",
+        "sha256": "baa71c86f308cabcd59aae96a57a6b38846c2b5487d54fc3d7ea4836b6ef740e"
+      },
+      {
+        "file": "apps/server/core/service.js",
+        "sha256": "36339beaa91a9a8f2235b8139427be089ed3e36976ea0b2611afc11f2e9dc95a"
+      },
+      {
+        "file": "apps/server/core/runner.js",
+        "sha256": "765fe05dd428b656770461b918d5592f9d13b0799b17f5d62c0f552ed465bbac"
+      },
+      {
+        "file": "apps/server/core/store.js",
+        "sha256": "03018577afaef8a734071721cc3bd7fdeea987c885dc889974ff9618e096d405"
+      },
+      {
+        "file": "apps/server/server.js",
+        "sha256": "934f418c4994c31331f9cf7121b240c792b2161f58a2265a745da2c75aba74a1"
+      },
+      {
+        "file": "apps/server/Plugin.js",
+        "sha256": "c2d1f8c0108c0791b7884e87c1d8108a5aa063e29eb85a3d9be8473d192c1635"
+      },
+      {
+        "file": "apps/server/WebSocketServer.js",
+        "sha256": "e42201275ded01de2281aad241b1f1fc45c52d7b4502e3d2743582d6d5ad1f83"
+      },
+      {
+        "file": "apps/server/modules/requestExecutionContext.js",
+        "sha256": "7e0c0a3f62b0ec18ede9c8a8db7e32efc83d2549d5ea21a45c2c9223b575c2d9"
+      },
+      {
+        "file": "apps/server/modules/chatCompletionHandler.js",
+        "sha256": "6af1731e40201a9baa498e90d3c3b1415aa2a9b930d5c5a4961ebdffa98da544"
+      },
+      {
+        "file": "apps/server/Plugin/NativeSync/mobile/effectiveContext.js",
+        "sha256": "537a2c00f7c6400324bb9f4a0ddfac09eb79c862b751b9803846342e9b0f704b"
+      },
+      {
+        "file": "apps/server/modules/vcpLoop/toolExecutor.js",
+        "sha256": "6629a7b07f4004b0a9f3b645f58ef4efc5d50177079bdad261519c474a238aca"
+      },
+      {
+        "file": "apps/server/modules/handlers/streamHandler.js",
+        "sha256": "e40b15a47f79f159936bb0cfce1096de85a5618c26217e5c3c3bdba4bcf8c767"
+      },
+      {
+        "file": "apps/server/modules/handlers/nonStreamHandler.js",
+        "sha256": "33627348846e3ff6550ba7f1dd3d2365375ea7a81d1b6848c85904ae0321d623"
+      },
+      {
+        "file": "apps/server/modules/pluginBridgeRegistry.js",
+        "sha256": "56e5ca1e84e717325d94b9930c9f8f02a051835ce647e8ca6da333cfa8bf75d0"
+      },
+      {
+        "file": "apps/server/modules/toolCallRecordStore.js",
+        "sha256": "020afec0449edeb74aae1fa771c1b89772b362be9fae98178b2bc805f717b8b1"
+      }
+    ],
+    "electron": {
+      "version": "44.9.3",
+      "sandbox": true,
+      "cdsBinarySha256": "ce36c083a38f2c91a091bbf87bd15c5ce3d5d3b5727389a828fbfe01aef4cc4d",
+      "scriptLoads": [
+        {
+          "role": "B",
+          "main": [
+            {
+              "file": "apps/desktop/main.js",
+              "sha256": "f904ef0a2286d46c70da817f7f1f30f0528b1f5755c80ae5bf5ead2cc48e45ea"
+            },
+            {
+              "file": "apps/desktop/modules/services/localCoreRuntime.js",
+              "sha256": "090f0105783fee84bfb20e4da4878e3e702c30a2fe0c876156a0424b369afe0c"
+            }
+          ],
+          "renderer": [
+            {
+              "file": "apps/desktop/renderer.js",
+              "bytes": 74609,
+              "sha256": "2379428903b9bea4e74ccc7f1232e8d59a288e1a01c6333de3b7ff6b0722ef07"
+            },
+            {
+              "file": "apps/desktop/modules/messageRenderer.js",
+              "bytes": 247538,
+              "sha256": "2c5791abfd05a6c21177b386f55d7c1717e91b1857899fd48972e845995aabed"
+            }
+          ],
+          "preloadArtifact": {
+            "file": "apps/desktop/preloads/bundled/dist/chat.cjs",
+            "sha256": "26370fcc6c616b5ea13f26c5379e0b3341ad7921f8f1bb97e6993964e7cea59b",
+            "matchedDebuggerSource": true
+          }
+        },
+        {
+          "role": "A",
+          "main": [
+            {
+              "file": "apps/desktop/main.js",
+              "sha256": "f904ef0a2286d46c70da817f7f1f30f0528b1f5755c80ae5bf5ead2cc48e45ea"
+            },
+            {
+              "file": "apps/desktop/modules/services/localCoreRuntime.js",
+              "sha256": "090f0105783fee84bfb20e4da4878e3e702c30a2fe0c876156a0424b369afe0c"
+            }
+          ],
+          "renderer": [
+            {
+              "file": "apps/desktop/renderer.js",
+              "bytes": 74609,
+              "sha256": "2379428903b9bea4e74ccc7f1232e8d59a288e1a01c6333de3b7ff6b0722ef07"
+            },
+            {
+              "file": "apps/desktop/modules/messageRenderer.js",
+              "bytes": 247538,
+              "sha256": "2c5791abfd05a6c21177b386f55d7c1717e91b1857899fd48972e845995aabed"
+            }
+          ],
+          "preloadArtifact": {
+            "file": "apps/desktop/preloads/bundled/dist/chat.cjs",
+            "sha256": "26370fcc6c616b5ea13f26c5379e0b3341ad7921f8f1bb97e6993964e7cea59b",
+            "matchedDebuggerSource": true
+          }
+        },
+        {
+          "role": "B",
+          "main": [
+            {
+              "file": "apps/desktop/main.js",
+              "sha256": "f904ef0a2286d46c70da817f7f1f30f0528b1f5755c80ae5bf5ead2cc48e45ea"
+            },
+            {
+              "file": "apps/desktop/modules/services/localCoreRuntime.js",
+              "sha256": "090f0105783fee84bfb20e4da4878e3e702c30a2fe0c876156a0424b369afe0c"
+            }
+          ],
+          "renderer": [
+            {
+              "file": "apps/desktop/renderer.js",
+              "bytes": 74609,
+              "sha256": "2379428903b9bea4e74ccc7f1232e8d59a288e1a01c6333de3b7ff6b0722ef07"
+            },
+            {
+              "file": "apps/desktop/modules/messageRenderer.js",
+              "bytes": 247538,
+              "sha256": "2c5791abfd05a6c21177b386f55d7c1717e91b1857899fd48972e845995aabed"
+            }
+          ],
+          "preloadArtifact": {
+            "file": "apps/desktop/preloads/bundled/dist/chat.cjs",
+            "sha256": "26370fcc6c616b5ea13f26c5379e0b3341ad7921f8f1bb97e6993964e7cea59b",
+            "matchedDebuggerSource": true
+          }
+        }
+      ]
+    },
+    "pwa": [
+      {
+        "agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36",
+        "secureContext": true,
+        "loadedAssets": [
+          {
+            "path": "/mobile/assets/index-0O1KY-Y8.js",
+            "sha256": "aa9ec2035c82ad3346b7c938e0fc82b8ea3157c44ad93a99cbded1f2492ace75"
+          },
+          {
+            "path": "/mobile/assets/index-BQsvT9bT.css",
+            "sha256": "ede1f975123d62afcab88a1f58b17779809877011b55ce978b505a1d3edea8b3"
+          }
+        ]
+      },
+      {
+        "agent": "Mozilla/5.0 (Linux; Android 16; 2602BRT18C Build/BP2A.250605.031.A3; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/157.0.8103.50 Mobile Safari/537.36",
+        "secureContext": true,
+        "loadedAssets": [
+          {
+            "path": "/mobile/assets/index-0O1KY-Y8.js",
+            "sha256": "aa9ec2035c82ad3346b7c938e0fc82b8ea3157c44ad93a99cbded1f2492ace75"
+          },
+          {
+            "path": "/mobile/assets/index-BQsvT9bT.css",
+            "sha256": "ede1f975123d62afcab88a1f58b17779809877011b55ce978b505a1d3edea8b3"
+          }
+        ]
+      }
+    ],
+    "functionalResults": {
+      "core": {
+        "provider": "synthetic",
+        "physicalAndroid": true,
+        "browserPwa": true,
+        "desktopExitedDuringWork": true,
+        "mobileContinuation": true,
+        "mobileSseTerminal": true,
+        "deviceRevocation": true,
+        "attachmentHash": "01f4236cd231e3935c2f3780c2288f532da550eda7333454b05402fde0d0102b",
+        "formalMessages": 6,
+        "authenticatedDesktopColdReadback": true,
+        "rendererReloadReadback": true,
+        "desktopNativeHistoryRows": {
+          "A": 0,
+          "B": 0
+        },
+        "historyAndAttachmentUnchangedAfterRestart": true,
+        "unauthenticatedRejected": true,
+        "readOnlyMutationRejected": true,
+        "definitionTombstoneAndReplay": true,
+        "restart": {
+          "code": 0,
+          "signal": null
+        },
+        "nativeSyncLoaded": false
+      },
+      "providerCalls": 3,
+      "workObservedRunningAfterElectronExit": "ff0bec95-2223-4400-9243-e057e4fb20b1",
+      "finalWorksInBothPwas": [
+        {
+          "id": "4cbb368f-6e7e-4626-98f5-db1eac315fb7",
+          "status": "completed"
+        },
+        {
+          "id": "00ee0232-a1ba-49f6-a55c-8fd7168a007e",
+          "status": "completed"
+        },
+        {
+          "id": "ff0bec95-2223-4400-9243-e057e4fb20b1",
+          "status": "completed"
+        }
+      ],
+      "formalMessageIdsInBothPwas": [
+        "ebe834e5-f3cc-4dea-9768-5ccb961fc8e0",
+        "reply_ff0bec95-2223-4400-9243-e057e4fb20b1",
+        "08d49420-2862-4c36-a612-5f074901a553",
+        "reply_00ee0232-a1ba-49f6-a55c-8fd7168a007e",
+        "5abf8b3b-88ec-4c87-95a7-98fef169dcd4",
+        "reply_4cbb368f-6e7e-4626-98f5-db1eac315fb7"
+      ],
+      "processExits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      }
+    },
+    "deviceCleanup": {
+      "testPackageAbsent": true,
+      "forwardEntriesObservedAfterCleanup": 0,
+      "reverseEntriesObservedAfterCleanup": 0
+    },
+    "measurementScope": "Git identity and status cover apps, packages, scripts and tests. Backend list samples loaded files from require.cache. Electron main modules were observed in require.cache and then hashed on disk, renderer scripts via CDP Debugger.getScriptSource. The CDP source of the parsed preload contains the complete bundled artifact. Both PWA clients independently read entry JS and CSS via Page.getResourceContent. This scope does not include service-worker source bytes or every transitive client module."
+  },
+  "recheck": "node tests/hardware/verify-core-pwa-receipt.cjs RUN_DIR 9f2ad5e5bd7c03416db6f72694ca67edaa2f6584 HEAD",
+  "headComparison": {
+    "exactTrees": [
+      "apps",
+      "packages",
+      "scripts"
+    ],
+    "testInputs": "Compare every path under tests to the tested commit. The only permitted difference is the offline comparison tool itself. It is invoked after the run, outside both the host and device fixture processes.",
+    "offlineVerifier": "tests/hardware/verify-core-pwa-receipt.cjs",
+    "offlineCorrection": "Electron A and B start concurrently; the observed load order was B, A, B. Check the role counts and the final cold-open B without forcing A to become ready before B."
+  }
+}
