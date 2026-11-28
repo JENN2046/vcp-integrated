@@ -1,6 +1,6 @@
 'use strict';
 
-const { randomUUID } = require('crypto');
+const { createHash, randomUUID } = require('crypto');
 const { formatTopicRiverQuote } = require('./nativeSync/topicRiverQuote');
 
 const DEFAULT_INVITE = '[系统提示:] 话题中有新的伙伴留言，现在请结合上下文回应。需要回信时可自行调用 TopicSponsor；无需回信时正常回复即可。';
@@ -27,7 +27,7 @@ function createTopicSponsorDelivery({ admission, resolver, findAgent, getPolicy 
         }
         return agent;
     };
-    return async function deliver(args, executionContext = {}) {
+    return async function deliver(args, executionContext = {}, submitOnce = (_proof, submit) => submit()) {
         if (typeof args.message !== 'string' || !args.message.trim()) throw new TypeError('message 不能为空');
         const senderQuery = args.sender_id || args.sender_name;
         if (typeof senderQuery !== 'string' || !senderQuery.trim()) throw new TypeError('sender_id 或 sender_name 必需');
@@ -41,7 +41,7 @@ function createTopicSponsorDelivery({ admission, resolver, findAgent, getPolicy 
         if (sourceId !== undefined && (typeof sourceId !== 'string' || !sourceId.trim())) {
             throw new TypeError('source_topic_id 无效');
         }
-        if (sourceId) await resolver.resolve({ topicId: sourceId });
+        const source = sourceId ? await resolver.resolve({ topicId: sourceId }) : null;
         const prefix = `[${speaker.name}的发言]`;
         const riverQuote = formatTopicRiverQuote(args.river_context);
         const body = riverQuote ? `${args.message.trimEnd()}\n\n${riverQuote}` : args.message;
@@ -51,6 +51,9 @@ function createTopicSponsorDelivery({ admission, resolver, findAgent, getPolicy 
         // A self-post in its own source topic may persist but never self-wake.
         const selfPost = sourceId === target.scope.topicId && target.scope.itemType === 'agent'
             && target.scope.itemId === speaker.id;
+        const scopeKey = ({ itemType, itemId, topicId }) => [itemType, itemId, topicId];
+        const requestId = executionContext.requestId || executionContext.vcpContext?.requestId;
+        if (requestId && typeof requestId !== 'string') throw new TypeError('Invalid topic reply request ID');
         const message = {
             id: `msg_${randomUUID()}`, role: 'assistant', name: speaker.name, agentId: speaker.id,
             avatarUrl: speaker.avatarUrl || null,
@@ -61,17 +64,26 @@ function createTopicSponsorDelivery({ admission, resolver, findAgent, getPolicy 
             _metadata: { createdBy: 'plugin', isPluginReply: true,
                 speaker_agent_id: speaker.id, speaker_name: speaker.name },
         };
-        const accepted = await admission.submit({
-            scope: target.scope, message,
-            requestId: executionContext.requestId || executionContext.vcpContext?.requestId,
-            triggerPolicy: policy.enabled === true && !selfPost ? 'reply' : 'none',
-            invitePrompt: policy.prompt || DEFAULT_INVITE,
+        const triggerPolicy = policy.enabled === true && !selfPost ? 'reply' : 'none';
+        const invitePrompt = policy.prompt || DEFAULT_INVITE;
+        const proof = requestId && createHash('sha256').update(JSON.stringify([
+            scopeKey(target.scope), source && scopeKey(source.scope), speaker.id, content, triggerPolicy, invitePrompt,
+        ])).digest('hex');
+        const dispatch = requestId ? {
+            key: createHash('sha256').update(JSON.stringify(['TopicSponsor', 'ReplyToTopic', requestId])).digest('hex'),
+            fingerprint: proof,
+        } : null;
+        return submitOnce(proof, async () => {
+            const accepted = await admission.submit({
+                scope: target.scope, message,
+                requestId, triggerPolicy, invitePrompt,
+            }, dispatch);
+            return {
+                ...accepted, topic_id: target.scope.topicId,
+                target_id: target.scope.itemId, target_type: target.scope.itemType,
+                message_id: accepted.messageId || message.id, sender: speaker.name, sender_id: speaker.id,
+            };
         });
-        return {
-            ...accepted, topic_id: target.scope.topicId,
-            target_id: target.scope.itemId, target_type: target.scope.itemType,
-            message_id: message.id, sender: speaker.name, sender_id: speaker.id,
-        };
     };
 }
 

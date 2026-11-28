@@ -97,7 +97,8 @@ export function createSharedSessionView(container, createObservedFrame, { api, s
                     }
                 }
                 if (views.get(execution.id)?.setText && [execution.phase, execution.state].includes('completed')) continue;
-                if (['completed','abandoned','failed','cancelled'].some(state=>execution.phase===state||execution.state===state)){retired.add(execution.id);remove(execution.id);}
+                const groupNeedsReview = execution.state === 'review_required' && views.get(execution.id)?.element.dataset.coreSpeaker;
+                if (groupNeedsReview || ['completed','abandoned','failed','cancelled'].some(state=>execution.phase===state||execution.state===state)){retired.add(execution.id);remove(execution.id);}
             }
             const sessions = change.serverSession ? [change.serverSession] : change.serverSessions || [];
             const reviewed = new Map();
@@ -162,7 +163,12 @@ export function createSharedSessionView(container, createObservedFrame, { api, s
                 const partial=session.partialResult?.kind==='length'&&session.partialResult?.committed===false;
                 view.localGroupReview = session.localGroupReview === true;
                 view.element.dataset.nativeSyncPreview=partial||view.localGroupReview?'pending-review':'live';
-                view.status.textContent = view.localGroupReview ? (session.memberName ? session.memberName+' · ' : '')+'待核对 · 部分结果未提交' : partial ? '待审部分结果：内容已截断，本次任务未完成' : `${backend?'共享后端 · ':''}${session.nativeRequestId?(session.memberName||'Agent')+(session.kind==='controlled-text'?' · 第 '+(session.nativeGeneration+1)+' 代':'')+' · ':''}${activity || labels[state] || '正在核对原任务'}${session.connection === 'offline' ? ' · 连接中断，保留最近输出' : ''}`;
+                const speaker = scope.ownerType === 'group' && session.speaker;
+                if (speaker) view.element.dataset.coreSpeaker = speaker;
+                const memberLabel = session.nativeRequestId
+                    ? (session.memberName || 'Agent') + (session.kind === 'controlled-text' ? ' · 第 ' + (session.nativeGeneration + 1) + ' 代' : '')
+                    : speaker && (session.speakerName || speaker);
+                view.status.textContent = view.localGroupReview ? (session.memberName ? session.memberName+' · ' : '')+'待核对 · 部分结果未提交' : partial ? '待审部分结果：内容已截断，本次任务未完成' : `${backend?'共享后端 · ':''}${memberLabel ? memberLabel + ' · ' : ''}${activity || labels[state] || '正在核对原任务'}${session.connection === 'offline' ? ' · 连接中断，保留最近输出' : ''}`;
                 view.gap.textContent = session.gap ? '部分实时输出暂不可恢复，完整结果以最终历史为准。' : '';
                 view.gap.hidden = !session.gap; view.text.textContent = session.text || '';
                 }

@@ -1,0 +1,116 @@
+{
+  "base": "5a0969e796778e8636bcdbc36fb039653f289216",
+  "environment": "Linux x64, Node v24.22.1",
+  "fixedDesktopComparison": {
+    "testFiles": [
+      "apps/desktop/tests/chat-context-pipeline.test.mjs",
+      "apps/desktop/tests/hosted-fc-history.test.cjs",
+      "apps/desktop/tests/hosted-fc-rendering.test.mjs",
+      "apps/desktop/tests/main-chat-stream-consumer.test.js",
+      "apps/desktop/tests/message-renderer-tool-cards.test.mjs",
+      "apps/desktop/tests/side-chat-ipc-metadata.test.mjs",
+      "apps/desktop/tests/stream-hidden-document-frames.test.mjs",
+      "apps/desktop/tests/stream-session.test.mjs",
+      "apps/desktop/tests/vcp-stream-bridge.test.mjs"
+    ],
+    "base": {
+      "tests": 90,
+      "pass": 65,
+      "fail": 25,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "candidate": {
+      "tests": 90,
+      "pass": 65,
+      "fail": 25,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "sameFailingCases": [
+      "ProjectForge streaming tool name enables the topic surface before request completion",
+      "an archived pause with an empty prefix replaces transient text without persisting again",
+      "atomic batch templates restore global ordinals without parsing collapsed receipts",
+      "cache hit projections use independent bindings for repeated blocks and overlapping snapshots",
+      "cached large result retains truncation expansion and seals executable tool data after restore",
+      "cold content is destroyed and restored with fresh tool leases on the same shell",
+      "cold message with an active text selection remains mounted until selection is released",
+      "deleting a parent topic removes only the side chats marked as its children",
+      "editing cold content revokes the tombstone and cannot restore its stale source",
+      "history batch item carries its final tool presentation before it is mounted and revealed",
+      "history worker output populates the real template cache and preserves batch isolation",
+      "hosted FC cards appear before receipts and keep the same order after reopening history",
+      "live stable highlights and request cards survive a split tool result before terminal",
+      "parse registration keeps same-shaped source tokens literal in code and lazy fields across cache hydration",
+      "pending worker is revoked on renderer dispose without synchronous fallback or tool leases",
+      "settings changed during worker compilation rebuild current history instead of dropping a bubble",
+      "short prose templates obey LRU entry bounds and explicit invalidation",
+      "side-chat create-child/delete-child keep the child out of the topic list and never delete real topics",
+      "sideChatHandlers handles metadata lifecycle and snapshot creation with isolated filesystem",
+      "smooth streaming commits an atomic role-wrapped batch without exposing control markers or payload",
+      "template byte budget includes lazy payloads and rejects oversized rendered artifacts",
+      "template cache and hydrated tool leases are isolated per renderer surface",
+      "template cache distinguishes source middle, role, depth and settings",
+      "template cache keeps short tool messages across topic clear and rehydrates released payloads",
+      "toggling tool result visibility updates the bubble in place without replacing the message DOM subtree"
+    ],
+    "newFailures": []
+  },
+  "additionalHistoryComparison": {
+    "testFiles": [
+      "apps/desktop/tests/f06-config-authority.test.cjs",
+      "apps/desktop/tests/f06-group-history-lifecycle.test.js",
+      "apps/desktop/tests/f06-history-lifecycle.test.cjs",
+      "apps/desktop/tests/history-identity.test.cjs",
+      "apps/desktop/tests/history-mutation-queue.test.cjs",
+      "apps/desktop/tests/history-authority-close.test.cjs",
+      "apps/desktop/tests/chat-history-mutation-authority.test.mjs",
+      "apps/desktop/tests/chat-history-persistence.test.mjs",
+      "apps/desktop/tests/chat-history-transaction-cas.test.mjs"
+    ],
+    "base": {
+      "tests": 106,
+      "pass": 83,
+      "fail": 23,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "candidate": {
+      "tests": 106,
+      "pass": 83,
+      "fail": 23,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "sameFailingCases": [
+      "a shared topic opened during authority recovery reads its projection after activation",
+      "existing-only mutation queued after deletion cannot resurrect the topic",
+      "existing-only mutation rechecks after asynchronous transform without creating directories",
+      "existing-only replacement queued after deletion cannot recreate history",
+      "topic activity comes from persisted conversation timestamps, including old files and deletions",
+      "不合规回执不会使已经保存的事务成为失败或泄露可变对象",
+      "作用域订阅隔离、撤销及同步和异步异常均不否定保存",
+      "入队时隔离替换目标、分类、嵌套输入及确认基线",
+      "受控填充已创建话题，删除后保存仍拒绝且不复活目录：agent",
+      "受控填充已创建话题，删除后保存仍拒绝且不复活目录：group",
+      "异步观察者等待后续事务或永不结束时，不阻塞提交和排水",
+      "显式替换保留先创建正式话题后填充短会话的路径，不隐式读基线",
+      "普通变更入队时固定目标，回调读取队列内最新基线",
+      "普通数据之外的嵌套内部可变对象在保存前拒绝",
+      "直接仓储失败对象不成为提交：{\"code\":\"DISK_FAILURE\"}",
+      "直接仓储失败对象不成为提交：{\"error\":{\"message\":\"磁盘失败\",\"code\":\"DISK_FAILURE\"}}",
+      "直接仓储失败对象不成为提交：{\"success\":false,\"error\":\"磁盘失败\",\"code\":\"DISK_FAILURE\"}",
+      "直接仓储失败对象不成为提交：{\"success\":false,\"message\":\"磁盘失败\",\"code\":\"DISK_FAILURE\"}",
+      "直接仓储失败对象不成为提交：{\"success\":true,\"error\":{\"message\":\"磁盘失败\",\"code\":\"DISK_FAILURE\"}}",
+      "读取启动后迟到可由本地提交水位识别，但水位不宣称存储修订",
+      "跨权威异步变更保留 CAS 和 IPC 冲突码，不重放、不降级：agent",
+      "跨权威异步变更保留 CAS 和 IPC 冲突码，不重放、不降级：group",
+      "销毁撤销新写入和订阅，排水已接受事务且重复调用等待同一排水"
+    ],
+    "newFailures": []
+  }
+}

@@ -254,5 +254,8 @@ exports.create = async (out, cert) => {
             historyAndAttachmentUnchangedAfterRestart: true, unauthenticatedRejected: true, readOnlyMutationRejected: true,
             definitionTombstoneAndReplay: true, restart, webBundle: checkPage };
     };
+    if (process.env.VCP_TEST_CORE_GROUP_PREVIEW === '1') {
+        require('./core-group-preview.cjs')(context, { call, cert, out });
+    }
     return context;
 };

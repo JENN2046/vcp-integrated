@@ -1,0 +1,237 @@
+{
+  "baseline": "5a0969e796778e8636bcdbc36fb039653f289216",
+  "before": {
+    "command": "npm run test:native -- -- core-group.test.cjs",
+    "nonstreamGroupPreviewSpeakers": [],
+    "expected": [
+      "memberA",
+      "memberB"
+    ],
+    "baselineWasTodo": true,
+    "transcriptSha256": "f6ac680116b562c0e6e20f7383fc73107aeaf7adc1247b182486ab3c2c1824f1"
+  },
+  "after": {
+    "nativeCommand": "npm run test:native -- -- core-group.test.cjs",
+    "nativeTests": 6,
+    "nativePassed": 6,
+    "todo": 0,
+    "nativeCases": [
+      "Nonstream sequential member identity/order",
+      "Group recovery and next member",
+      "Invitation/redo",
+      "Observer reconnect during second member with cancellation",
+      "Observer reconnect during second member with incomplete Provider stream"
+    ],
+    "transcriptSha256": "a87619024f9d557a8d2ae050204b4ad20e04d5bf4bf9e54e38898b472c34f878"
+  },
+  "clients": {
+    "electronVersion": "44.9.3",
+    "pwa": "Chromium, isolated temporary profile",
+    "transport": "actual ToolBox, same isolated remote Core; HTTP/SSE with a loopback model fixture",
+    "command": "VCP_TEST_CORE_GROUP_PREVIEW=1 npm run test:integration -- core-remote"
+  },
+  "groupPreview": {
+    "runs": [
+      {
+        "workId": "36ecced1-bb7e-415f-bc2e-9e22090ae72d",
+        "outcome": "completed",
+        "observations": [
+          {
+            "step": 0,
+            "member": "stability-a",
+            "desktop": {
+              "speaker": "stability-a",
+              "status": "共享后端 · Ada · 原生执行中",
+              "text": ""
+            },
+            "mobile": {
+              "speaker": "stability-a",
+              "name": "Ada",
+              "text": ""
+            }
+          },
+          {
+            "step": 1,
+            "member": "stability-b",
+            "desktop": {
+              "speaker": "stability-b",
+              "status": "共享后端 · Bruno · 原生执行中",
+              "text": "Bruno streaming "
+            },
+            "mobile": {
+              "speaker": "stability-b",
+              "name": "Bruno",
+              "text": "Bruno streaming "
+            }
+          }
+        ],
+        "formalReplies": [
+          {
+            "agentId": "stability-a",
+            "name": "Ada",
+            "content": "Ada final"
+          },
+          {
+            "agentId": "stability-b",
+            "name": "Bruno",
+            "content": "Bruno streaming final"
+          }
+        ]
+      },
+      {
+        "workId": "1f25b8f4-fcf4-4d02-a45f-5bc942dea665",
+        "outcome": "cancelled",
+        "observations": [
+          {
+            "step": 0,
+            "member": "stability-a",
+            "desktop": {
+              "speaker": "stability-a",
+              "status": "共享后端 · Ada · 原生执行中",
+              "text": ""
+            },
+            "mobile": {
+              "speaker": "stability-a",
+              "name": "Ada",
+              "text": ""
+            }
+          },
+          {
+            "step": 1,
+            "member": "stability-b",
+            "desktop": {
+              "speaker": "stability-b",
+              "status": "共享后端 · Bruno · 原生执行中",
+              "text": "Bruno streaming "
+            },
+            "mobile": {
+              "speaker": "stability-b",
+              "name": "Bruno",
+              "text": "Bruno streaming "
+            }
+          }
+        ],
+        "formalReplies": [
+          {
+            "agentId": "stability-a",
+            "name": "Ada",
+            "content": "Ada final"
+          }
+        ]
+      },
+      {
+        "workId": "23543444-2357-4e9f-a908-759244f3637a",
+        "outcome": "failed",
+        "observations": [
+          {
+            "step": 0,
+            "member": "stability-a",
+            "desktop": {
+              "speaker": "stability-a",
+              "status": "共享后端 · Ada · 原生执行中",
+              "text": ""
+            },
+            "mobile": {
+              "speaker": "stability-a",
+              "name": "Ada",
+              "text": ""
+            }
+          },
+          {
+            "step": 1,
+            "member": "stability-b",
+            "desktop": {
+              "speaker": "stability-b",
+              "status": "共享后端 · Bruno · 原生执行中",
+              "text": ""
+            },
+            "mobile": {
+              "speaker": "stability-b",
+              "name": "Bruno",
+              "text": ""
+            }
+          }
+        ],
+        "formalReplies": [
+          {
+            "agentId": "stability-a",
+            "name": "Ada",
+            "content": "Ada final"
+          }
+        ]
+      },
+      {
+        "workId": "f5e516cc-bd74-4b24-95fc-d4cce0b17580",
+        "outcome": "review_required",
+        "observations": [
+          {
+            "step": 0,
+            "member": "stability-a",
+            "desktop": {
+              "speaker": "stability-a",
+              "status": "共享后端 · Ada · 原生执行中",
+              "text": ""
+            },
+            "mobile": {
+              "speaker": "stability-a",
+              "name": "Ada",
+              "text": ""
+            }
+          },
+          {
+            "step": 1,
+            "member": "stability-b",
+            "desktop": {
+              "speaker": "stability-b",
+              "status": "共享后端 · Bruno · 原生执行中",
+              "text": "Bruno streaming "
+            },
+            "mobile": {
+              "speaker": "stability-b",
+              "name": "Bruno",
+              "text": "Bruno streaming "
+            }
+          }
+        ],
+        "formalReplies": [
+          {
+            "agentId": "stability-a",
+            "name": "Ada",
+            "content": "Ada final"
+          }
+        ]
+      }
+    ],
+    "providerCalls": 8
+  },
+  "processExits": {
+    "A": {
+      "code": 0,
+      "signal": null
+    },
+    "B": {
+      "code": 0,
+      "signal": null
+    },
+    "backend": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "failures": [],
+  "loadedBackendSourceHashes": [
+    {
+      "file": "apps/server/core/service.js",
+      "sha256": "5cd80e3efff9c77b120b9c12d8ce709d491f09d1c62bedf845372a386a01baf0"
+    },
+    {
+      "file": "apps/server/core/runner.js",
+      "sha256": "765fe05dd428b656770461b918d5592f9d13b0799b17f5d62c0f552ed465bbac"
+    },
+    {
+      "file": "apps/server/core/store.js",
+      "sha256": "03018577afaef8a734071721cc3bd7fdeea987c885dc889974ff9618e096d405"
+    }
+  ],
+  "transcriptSha256": "df3ce18be36540ac58cfede6831707768c5f3dd9ceeaa54a26f4aea9e3881d51"
+}

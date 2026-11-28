@@ -422,7 +422,11 @@ class CoreSingleClient {
             connection: 'online', native: { kind: 'shared_session', state: 'running' } };
         if (type === 'work_preview') {
             preview.text = data.text;
-            if (data.speaker) preview.speaker = data.speaker;
+            if (data.speaker) {
+                preview.speaker = data.speaker;
+                preview.speakerName = data.speakerName;
+                preview.step = data.step;
+            }
         }
         if (type === 'delta') preview.text = (preview.text + data.text).slice(-256 * 1024);
         if (type === 'work_state') {

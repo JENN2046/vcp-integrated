@@ -1,0 +1,110 @@
+{
+  "baseline": "5a0969e796778e8636bcdbc36fb039653f289216",
+  "before": {
+    "test": "TopicSponsor deleted request is denied in the same Service and after restart without recreation",
+    "replay": [
+      "accepted",
+      "accepted"
+    ],
+    "topicPublishedAfterReplay": true,
+    "historyExistsAfterReplay": true,
+    "settledIdenticalRepliesAcrossProcesses": {
+      "historyRows": 2,
+      "distinctMessageIds": 2
+    }
+  },
+  "after": {
+    "creationAuthority": "Existing deterministic topic and first-message IDs; existing native config request proof and deletion tombstone. A verified denial or unchanged replay returns the current config without publishing it again.",
+    "deliveryAuthority": "The existing native admission v3 journal atomically writes an accepted entry with its scoped fingerprint, entry and message IDs. Fresh resolver checks precede admission/replay; History edits/deletions do not remove the acceptance proof.",
+    "cases": [
+      "A real concurrent deletion after Flowlock initial History publication rejects the late ACK and a fresh-process replay; no directory is recreated.",
+      "Deletion during durable reservation prevents the renderer advance call and the queued success from returning as an available target.",
+      "Process is killed with SIGKILL after one renderer handoff. Cold restart retains uncertain status and original IDs, rejects a conflicting payload, never dispatches a second handoff and rejects a late terminal after deletion.",
+      "Legal duplicates return the original IDs; a different message, sender, ambiguous owner, or subsequent change of owner cannot reuse the receipt. After a normal drain and a cold start the original message can be edited or removed without a duplicate delivery.",
+      "Guarded deletion rejection leaves the primary config inode and content unchanged. Direct writes to a legitimate sibling still succeed with an active HistoryAuthority."
+    ],
+    "legacy": "Recoverable v1/v2 entries retain their original IDs and uncertain status. A matching pending reply can acquire the v3 receipt; old v3 receipts and extension fields are preserved on subsequent journal writes. Settled pre-v3 replies without any request-to-message binding cannot be attributed retrospectively. No historical data is migrated; deletion blocks replay even when old acceptance proof is absent.",
+    "notInScope": "TopicSponsor mode=new_topic independent task dispatch remains outside this fix."
+  },
+  "electron": {
+    "electron": "44.9.3",
+    "host": "isolated real Electron, registered native desktop distributed TopicSponsor, loopback WebSocket peer",
+    "registered": [
+      [
+        "TopicSponsor",
+        "internal_core_context"
+      ],
+      [
+        "TopicSponsor",
+        "internal_core_context"
+      ]
+    ],
+    "topicId": "topic_request_facbc1f900ffcb14e89527c8353bcf5b913d20023009cbaefb2adc5959113e4e",
+    "initialHistoryRows": 1,
+    "warmReplay": "HISTORY_TOPIC_DELETED",
+    "coldReplay": "HISTORY_TOPIC_DELETED",
+    "afterRestart": {
+      "topicPublished": false,
+      "historyDirectoryExists": false,
+      "persistentTombstone": true
+    },
+    "directSiblingHistoryAfterWarmRejection": [
+      "live-sibling"
+    ],
+    "directSiblingHistoryAfterColdRejection": [
+      "live-sibling",
+      "cold-sibling"
+    ],
+    "syntheticProviderRequests": 0,
+    "exits": [
+      {
+        "code": 0,
+        "signal": null
+      },
+      {
+        "code": 0,
+        "signal": null
+      }
+    ]
+  },
+  "sourceFilesComparedAgainstIsolatedHost": {
+    "apps/desktop/main.js": "f904ef0a2286d46c70da817f7f1f30f0528b1f5755c80ae5bf5ead2cc48e45ea",
+    "apps/desktop/modules/services/pluginAgentOperationService.js": "e60fadcccd8d509c157478dd2da47105dfdefaabf6ac3e02c2b9d135231f1348",
+    "apps/desktop/modules/services/topicSponsorDelivery.js": "a08514d12cafbdce685c0f7f029a4eddccc36182011a03deea3532f76230f562",
+    "apps/desktop/modules/services/topicConversationResolver.js": "2e29f7766cc1b220b7e2cf230575641e4e21b6005ee27ddd54f07d32cd7261fb",
+    "apps/desktop/modules/services/topicMessageAdmission.js": "b41ee1649eec21625fc05d3fff79947cf77c3ccd560a5f2ddd40d98b5b6b339f",
+    "apps/desktop/modules/services/topicMessageAdmissionHost.js": "e447ca91d41783ee7ebbc803c3b5920c0338bb08c26b12c255851fbbb95795d9",
+    "apps/desktop/modules/services/topicMessageAdmissionStore.js": "d705cbaa88f958e13e51bc5366c54a875464d0a8d6b15e263b90b1d8499e7b10",
+    "apps/desktop/modules/services/historyMutationQueue.js": "dfb3adb7bb5793dac10f6e257aae4c9085ca921ae4fb8da7422581712756fba4",
+    "apps/desktop/modules/ipc/chatHandlers.js": "a45a3bab507fb9ca0c3c9a39c0b47c19b4c5d5b2868d7486d41b52c4acde1de2",
+    "apps/desktop/modules/utils/agentConfigManager.js": "b57713fcf650ee509dd1bede3307d76ff2c187d59e178fc82703356c70919b1c",
+    "apps/desktop/VCPDistributedServer/VCPDistributedServer.js": "4f1551c0ccf40ab620574ce08a86b47191ec845bb629cd6b2f6b4522f11b106e",
+    "apps/desktop/VCPDistributedServer/Plugin.js": "751c3c2cd628e5d532a1c434512999fff5cbf5665e2e1ed8c27a0703d06e2da3",
+    "apps/desktop/VCPDistributedServer/Plugin/TopicSponsor/topicsponsor-service.js": "0b86f07ab23b68c09a9ac23197b703288ff716623105de7d0ec540de6a744bc2"
+  },
+  "commands": {
+    "topicSponsorDeletionDeliveryRouting": "node --test apps/desktop/tests/{topic-sponsor-deletion,topic-sponsor-delivery,topic-sponsor-service-routing}.test.cjs",
+    "nativeHostTopicSponsor": "node --test --test-name-pattern='TopicSponsor' apps/desktop/tests/f06-host-lifecycle.test.cjs"
+  },
+  "focusedResults": {
+    "topicSponsorDeletionDeliveryRouting": {
+      "tests": 29,
+      "pass": 29,
+      "fail": 0
+    },
+    "nativeHostTopicSponsor": {
+      "tests": 10,
+      "pass": 10,
+      "fail": 0
+    }
+  },
+  "localTranscriptSha256": {
+    "sponsor-before.tap": "710d185bd198962063c33b6c4c0a2ab09fdd17f07519289552ede9be01559b5d",
+    "sponsor-final.tap": "a800d9ab8003c91fd0da933596d3e1aae33a3ba389f23640c22eb1cc14e8d5bb",
+    "sponsor-f06.tap": "535728de80fa3e9d7eea2c71b9faf304615616a7d7bd5f49ee3b6734f265e6e4",
+    "sponsor-electron-sibling-before.log": "451f2c70ee2de82737d09df86c53869ee4e033948afb3eb9cec6192695f62a05",
+    "sponsor-electron-final.log": "94ef16dfae3d68a64d53a45f26b17d3d9aa92bf154fc0bfa10957f9771d4a16e",
+    "sponsor-electron.json": "eee57d633247e92f995cf60d3208c867b6758da7749018df1108a6d952c9bd0c",
+    "sponsor-settled-before.log": "6e9ffa469b5d29b9e80c99bb3122c1482b9611520b11029f594712b4907bbe18"
+  }
+}

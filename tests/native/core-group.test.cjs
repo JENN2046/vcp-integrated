@@ -39,8 +39,11 @@ test('Core regular groups share native scheduling, context and official history 
         assert.equal(snapshot.messages[1].sourceWorkId, id);
         assert.match(JSON.stringify(provider.calls[1].messages), /core reply/);
         await wait(() => events.some(row => row.type === 'work_state' && row.payload.status === 'completed'), 'group observation final');
-        await t.test('nonstream group previews carry both speaker identities', { todo: 'Known baseline group preview failure, reproduced on standalone Core' }, () => {
-            assert.deepEqual(events.filter(row => row.type === 'work_preview' && row.payload.speaker).map(row => row.payload.speaker), ids);
+        await t.test('nonstream group previews carry both speaker identities', () => {
+            const previews = events.filter(row => row.type === 'work_preview' && row.payload.speaker);
+            assert.deepEqual(previews.map(({ payload }) => [payload.step, payload.speaker, payload.speakerName, payload.text]),
+                members.map((member, step) => [step, member.id, member.name, '']));
+            assert.deepEqual(snapshot.messages.slice(1).map(row => row.name), members.map(member => member.name));
         });
         assert.deepEqual((await desktop.runtime.coreSingle.history(sequential.descriptor)).history.map(row => row.id),
             snapshot.messages.map(row => row.id));
@@ -105,3 +108,53 @@ test('an empty-topic invitation and redo use Core without placeholder messages',
     assert.equal(provider.calls.length, 2);
     assert.equal(f.core.store.changes(key, 0, 10).find(event => event.action === 'delete').messageId, original);
 });
+
+for (const action of ['cancel', 'incomplete']) {
+    test('a late group observer sees the current member and no partial final on ' + action, async t => {
+        const provider = await localProvider(t);
+        const f = await coreFixture(t, host(provider).chat);
+        const { route } = await f.define({ ownerType: 'group', ownerId: 'group-preview', config: {
+            group: { name: 'Observed group', mode: 'sequential', members: ids },
+            agents: members.map(member => ({ ...member, streamOutput: true }))
+        } });
+        let unfinished;
+        provider.setReply((_body, res) => {
+            res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+            if (provider.calls.length === 1) {
+                res.end('data: {"choices":[{"index":0,"delta":{"content":"first final"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+            } else {
+                unfinished = res;
+                res.write('data: {"choices":[{"index":0,"delta":{"content":"second partial"},"finish_reason":null}]}\n\n');
+            }
+        });
+        const phone = await f.mobile();
+        const reader = await f.mobile(['read']);
+        const { consumeSharedEvents } = await import(CHAT + '/modules/services/nativeSync/sharedEventClient.mjs');
+        const observer = new AbortController();
+        const events = [];
+        let live;
+        try {
+            const work = await phone.call(route + '/send', { requestId:'preview-' + action, text:'start' }, 202);
+            await wait(() => unfinished && [...f.core.runner.running.values()].some(turn=>turn.text==='second partial'), 'streaming second member');
+            live = consumeSharedEvents(await reader.observe(route + '/observe', observer.signal),
+                (payload, type) => events.push({ payload, type }), { signal:observer.signal, envelope:true })
+                .catch(error=>{ if (!observer.signal.aborted) throw error; });
+            await wait(() => events.some(e=>e.type==='work_preview'), 'reconnected Work preview');
+            assert.deepEqual(events.find(e=>e.type==='work_preview').payload, {
+                workId:work.id, text:'second partial', speaker:ids[1], speakerName:members[1].name, step:1
+            });
+            if (action === 'cancel') await phone.call(route + '/works/' + work.id + '/cancel', { requestId:'preview-cancel-turn' });
+            else unfinished.end('data: {"choices":[{"index":0,"delta":{},"finish_reason":"length"}]}\n\ndata: [DONE]\n\n');
+            const terminal = action === 'cancel' ? 'cancelled' : 'review_required';
+            await wait(() => events.some(e=>e.type==='work_state' && e.payload.status===terminal), 'group stopped with '+terminal);
+            const history = (await reader.call(route + '/messages')).messages;
+            assert.deepEqual(history.map(row=>row.content), ['start','first final']);
+            assert.equal(history[1].agentId, ids[0]);
+            assert.equal(provider.calls.length, 2);
+        } finally {
+            observer.abort();
+            unfinished?.destroy();
+            await live;
+        }
+    });
+}

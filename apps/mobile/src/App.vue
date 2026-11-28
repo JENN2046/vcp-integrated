@@ -173,7 +173,7 @@ function observeCore(topic) {
      if(terminalCoreWorks.has(data.workId))return;
      const prior=corePreviews.value.find(work=>work.id===data.workId);
      const next={...prior,id:data.workId};
-     if(type==='work_preview'){next.text=data.text;next.speakerName=data.speakerName;}
+     if(type==='work_preview'){next.text=data.text;next.speaker=data.speaker;next.speakerName=data.speakerName||data.speaker;}
      if(type==='delta')next.text=((next.text||'')+data.text).slice(-256*1024);
      if(type==='approval_requested')next.approval=data.toolName;
      if(type==='approval_settled')delete next.approval;
@@ -572,13 +572,13 @@ const backgroundRunLabel=job=>{
  return '';
 };
 const coreDisconnected=computed(()=>!online.value||!browserOnline.value||coreFeed.value==='paused');
-const coreReplyPreviews=computed(()=>corePreviews.value.filter(work=>work.text?.trim()||work.presentation));
+const coreReplyPreviews=computed(()=>corePreviews.value.filter(work=>work.text?.trim()||work.presentation||work.speaker));
 function checkingCoreWork(job){
  return workReplySyncing(job)||needsReview(job)||(replyInProgress.has(job.state)&&coreDisconnected.value);
 }
 function waitingForCoreReply(job){
  const preview=inlineLive.value.get(job.id);
- return replyInProgress.has(job.state)&&!checkingCoreWork(job)&&!preview?.text?.trim()&&!preview?.presentation;
+ return replyInProgress.has(job.state)&&!checkingCoreWork(job)&&!preview?.text?.trim()&&!preview?.presentation&&!preview?.speaker;
 }
 async function openInlineRun(job){
  if(job.topicKey!==selected.value)return;
@@ -1942,8 +1942,8 @@ onUnmounted(()=>{window.visualViewport?.removeEventListener('resize',fitViewport
     </article>
    </template><p v-if="!messages.length&&!historyProgress" class="empty">{{currentTopic?.historyReady===false?'正在等待电脑同步所选历史，完成后即可接续。':currentTopic?.executable===false?'还没有消息。':'还没有消息，发送一条开始会话。'}}</p>
    <section v-if="currentTopic?.coreSingle && coreReplyPreviews.length" aria-label="正在回复">
-    <article v-for="work in coreReplyPreviews" :key="work.id" class="message assistant live-message" :data-live-work-id="work.id">
-     <div class="message-author"><AgentAvatar :src="currentTopic?.avatar||activeAgent?.avatar" :name="work.speakerName||currentTopic?.agentName"/><small>{{work.speakerName||currentTopic?.agentName||'Agent'}}</small></div>
+    <article v-for="work in coreReplyPreviews" :key="work.id" class="message assistant live-message" :data-live-work-id="work.id" :data-core-speaker="work.speaker">
+     <div class="message-author"><AgentAvatar :src="work.speaker?undefined:currentTopic?.avatar||activeAgent?.avatar" :name="work.speakerName||currentTopic?.agentName"/><small>{{work.speakerName||currentTopic?.agentName||'Agent'}}</small></div>
      <div v-if="work.text" class="bubble">{{work.text}}</div>
      <div v-if="work.presentation" class="bubble"><strong>{{work.presentation.title}}</strong><p>{{work.presentation.challenge}}</p></div>
     </article>

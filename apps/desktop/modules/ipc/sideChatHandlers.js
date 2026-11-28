@@ -694,9 +694,12 @@ async function removeSideChatChildrenOfParent({ USER_DATA_DIR, agentId, parentTo
     let entries;
     try {
         const stat = await fs.lstat(topicsDir);
-        if (!stat.isDirectory() || stat.isSymbolicLink()) return 0;
+        if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('UNSAFE_HISTORY_ANCESTOR');
         entries = await fs.readdir(topicsDir, { withFileTypes: true });
-    } catch { return 0; }
+    } catch (error) {
+        if (error.code === 'ENOENT') return 0;
+        throw error;
+    }
     let removed = 0;
     for (const entry of entries) {
         if (!entry.isDirectory() || !validateSegment(entry.name)) continue;
@@ -716,7 +719,11 @@ async function removeSideChatChildrenOfParent({ USER_DATA_DIR, agentId, parentTo
             await removeChildDir(entryDir, historyMutationQueue, safeAgentId, entry.name);
             await clearTrajectoryOf({ agentId: safeAgentId, topicId: entry.name });
             removed += 1;
-        } catch {}
+        } catch (error) {
+            // A confirmed child of this parent is part of the deletion.
+            // Its marker is retained until cleanup finishes, so retry can resume.
+            if (historyMutationQueue && marker?.parentTopicId === safeParentId) throw error;
+        }
     }
     return removed;
 }

@@ -683,8 +683,8 @@ class CoreService {
                             if (name === 'delta' && mobilePreview?.workId === value.workId && text.startsWith(existing)) {
                                 if (text.length > existing.length) write('delta', { workId: value.workId, text: text.slice(existing.length) });
                             } else {
-                                write('work_preview', { workId: value.workId, text,
-                                    speakerName: name === 'work_preview' ? value.speakerName : raw.speaker?.speakerName });
+                                const { speaker, speakerName, step } = name === 'work_preview' ? value : raw.speaker || {};
+                                write('work_preview', { workId: value.workId, text, speaker, speakerName, step });
                             }
                             mobilePreview = { workId: value.workId, text };
                         }

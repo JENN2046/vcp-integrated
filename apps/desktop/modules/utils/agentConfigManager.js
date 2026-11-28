@@ -7,6 +7,9 @@ const { randomUUID } = require('node:crypto');
 const { replaceFile } = require('./atomicReplace');
 
 class AgentConfigManager extends EventEmitter {
+    // Explicit no-write result for a decision made under the current configuration lock.
+    static KEEP_CURRENT = Symbol('keep-current-agent-config');
+
     static validateId(agentId) {
         if (typeof agentId !== 'string' || !agentId || agentId === '.' || agentId === '..'
             || agentId.includes('\0') || agentId !== path.basename(agentId)
@@ -238,7 +241,8 @@ class AgentConfigManager extends EventEmitter {
             const current = direct ? null : await fs.readJson(this.getAgentPaths(agentId).configPath);
             const next = direct ? config : typeof updater === 'function'
                 ? await updater(current) : { ...current, ...updater };
-            const persisted = await this.writeAgentConfigLocked(agentId, next, token);
+            const persisted = !direct && next === AgentConfigManager.KEEP_CURRENT
+                ? current : await this.writeAgentConfigLocked(agentId, next, token);
             resolve(direct ? true : { success: true, config: persisted });
         } catch (error) {
             reject(error);

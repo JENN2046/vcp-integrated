@@ -2,6 +2,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const crypto = require('crypto');
 const { pathToFileURL } = require('url');
+const { KEEP_CURRENT } = require('../utils/agentConfigManager');
 
 const AVATAR_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
 const agentAvatarCache = new Map();
@@ -212,22 +213,24 @@ class PluginAgentOperationService {
         }
     }
 
-    runIdempotent(domain, command, requestId, operation, { cacheCompleted = true } = {}) {
+    runIdempotent(domain, command, requestId, operation, { cacheCompleted = true, requestProof } = {}) {
         if (!requestId) return operation();
         this.cleanupIdempotency();
         const key = `${domain}:${command}:${requestId}`;
-        if (cacheCompleted && this.completedRequests.has(key)) {
-            return Promise.resolve(clone(this.completedRequests.get(key).result));
+        const completed = cacheCompleted && this.completedRequests.get(key);
+        const running = this.runningRequests.get(key);
+        if (completed || running) {
+            if ((completed || running).requestProof !== requestProof) throw new Error('TOPIC_REPLY_REQUEST_CONFLICT');
+            return completed ? Promise.resolve(clone(completed.result)) : running.promise;
         }
-        if (this.runningRequests.has(key)) return this.runningRequests.get(key);
         const promise = Promise.resolve()
             .then(operation)
             .then(result => {
-                if (cacheCompleted) this.completedRequests.set(key, { completedAt: Date.now(), result: clone(result) });
+                if (cacheCompleted) this.completedRequests.set(key, { completedAt: Date.now(), result: clone(result), requestProof });
                 return result;
             })
             .finally(() => this.runningRequests.delete(key));
-        this.runningRequests.set(key, promise);
+        this.runningRequests.set(key, { promise, requestProof });
         return promise;
     }
 
@@ -300,16 +303,19 @@ class PluginAgentOperationService {
 
     async updateAgent(agentId, updater) {
         const id = validateId(agentId, 'agentId');
-        let operationResult;
+        let operationResult, rejection;
+        const deny = code => { rejection = new Error(code); return KEEP_CURRENT; };
         const update = await this.agentConfigManager.updateAgentConfig(id, current => {
-            if (current._historyDeleting) throw new Error('HISTORY_OWNER_DELETED');
-            const next = updater(clone(current));
+            if (current._historyDeleting) return deny('HISTORY_OWNER_DELETED');
+            const next = updater(clone(current), deny);
+            if (next === KEEP_CURRENT) return KEEP_CURRENT;
             if (!next || typeof next.config !== 'object') {
                 throw new Error('插件配置操作未返回有效配置。');
             }
             operationResult = next.result;
             return next.config;
         });
+        if (rejection) throw rejection; // The no-write configuration transition has released its authority.
         return { result: operationResult, config: update.config };
     }
 
@@ -728,22 +734,33 @@ class PluginAgentOperationService {
             throw new Error('SHARED_NATIVE_ROUTE_REQUIRED');
         }
         const requestId = executionContext.requestId || executionContext.vcpContext?.requestId;
-        const mutating = ['CreateTopic', 'CreateFlowlockTopic', 'ReplyToTopic'].includes(command);
         const creating = command === 'CreateTopic' || command === 'CreateFlowlockTopic';
-        const creationAgent = creating ? await this.findAgent(args.maid) : null;
-        const execute = () => command === 'ReplyToTopic' && this.topicDelivery
-            ? this.topicDelivery(args, executionContext)
-            : this.executeTopicCommand(command, args, requestId, creationAgent);
-        if (creating) {
-            // The current native configuration is the completed-creation authority.
-            // Only identical in-flight payloads share a Promise; a stale success cache
-            // must not bypass a deletion fact or accept a conflicting retry.
-            const inFlightId = requestId ? JSON.stringify([creationAgent.id, requestId, topicCreationPayloadHash(command, args)]) : null;
-            return this.runIdempotent('topic', command, inFlightId, execute, { cacheCompleted: false });
+        let receipt;
+        if (command === 'ReplyToTopic' && this.topicDelivery) {
+            // Resolve sender, source and destination on every request before coalescing the submission.
+            receipt = await this.topicDelivery(args, executionContext, (proof, submit) =>
+                this.runIdempotent('topic', command, requestId, submit, { cacheCompleted: false, requestProof: proof }));
+        } else if (creating) {
+            // The native config is authoritative for creation and survives host restarts.
+            const agent = await this.findAgent(args.maid);
+            const key = requestId ? JSON.stringify([agent.id, requestId, topicCreationPayloadHash(command, args)]) : null;
+            receipt = await this.runIdempotent('topic', command, key,
+                () => this.executeTopicCommand(command, args, requestId, agent), { cacheCompleted: false });
+        } else if (command === 'ReplyToTopic') {
+            const agent = await this.findAgent(args.maid);
+            const proof = JSON.stringify([agent.id, args.topic_id, args.sender_name, args.message]);
+            receipt = await this.runIdempotent('topic', command, requestId,
+                () => this.executeTopicCommand(command, args, requestId, agent), { requestProof: proof });
+        } else {
+            return this.executeTopicCommand(command, args, requestId);
         }
-        return mutating
-            ? this.runIdempotent('topic', command, requestId, execute)
-            : execute();
+        // A cached acceptance or delayed ACK cannot confer current access to a deleted target.
+        const scope = {
+            itemType: receipt.target_type || 'agent', itemId: receipt.target_id || receipt.agent_id, topicId: receipt.topic_id,
+        };
+        await this.assertLocalOwner?.(scope);
+        await this.historyMutationQueue.assertWritable(scope);
+        return receipt;
     }
 
     async executeTopicCommand(command, args, requestId, creationAgent = null) {
@@ -792,16 +809,16 @@ class PluginAgentOperationService {
             });
             if (requestKey) initialMessage.id = `msg_topic_request_${requestKey}`;
             try {
-                const updated = await this.updateAgent(agent.id, config => {
-                    if ((config._historyDeletedTopics || []).includes(topicId)) throw new Error('HISTORY_TOPIC_DELETED');
+                const updated = await this.updateAgent(agent.id, (config, deny) => {
+                    if ((config._historyDeletedTopics || []).includes(topicId)) return deny('HISTORY_TOPIC_DELETED');
                     const currentTopics = Array.isArray(config.topics) ? config.topics : [];
                     const existing = currentTopics.filter(entry => entry.id === topicId);
                     if (existing.length) {
                         if (existing.length !== 1 || !requestKey || existing[0]._creator?.requestKey !== requestKey || existing[0]._creator?.requestHash !== requestHash || existing[0]._creator?.command !== command) {
-                            throw new Error('TOPIC_CREATION_REQUEST_CONFLICT');
+                            return deny('TOPIC_CREATION_REQUEST_CONFLICT');
                         }
                         topic = existing[0]; flowlockRequest = topic.flowlockRequest || null;
-                        return { config, result: null };
+                        return KEEP_CURRENT;
                     }
                     return {
                         config: { ...config, topics: [topic, ...currentTopics], ...(flowlockRequest ? {} : { current_topic_id: topicId }) },

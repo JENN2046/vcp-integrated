@@ -17,8 +17,8 @@ const requested = process.argv[2] || 'all';
 if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24') {
     throw Error('Integration requires Linux x64 and Node 24');
 }
-if (!['all', 'core-local', 'core-remote', 'desktop-stream-close'].includes(requested) || process.argv.length > 3) {
-    throw Error('Usage: node tests/integration/run.cjs [core-local|core-remote|desktop-stream-close]');
+if (!['all', 'core-local', 'core-remote', 'desktop-stream-close', 'desktop-lifecycle'].includes(requested) || process.argv.length > 3) {
+    throw Error('Usage: node tests/integration/run.cjs [core-local|core-remote|desktop-stream-close|desktop-lifecycle]');
 }
 let out, cert, fingerprint, display, remoteFixture;
 const desktopRequire = createRequire(path.join(host, 'package.json'));
@@ -142,7 +142,8 @@ async function runCase(root, mode) {
     fs.mkdirSync(out, { mode: 0o700 });
     const checkoutAtStart = checkoutIdentity();
     const coreRemote = mode === 'core-remote';
-    const nativeDesktop = mode === 'desktop-stream-close' ? require('../desktop-stream-close/fixture.cjs').create() : null;
+    const lifecycle = mode === 'desktop-lifecycle';
+    const nativeDesktop = (lifecycle || mode === 'desktop-stream-close') ? require('../desktop-stream-close/fixture.cjs').create() : null;
     cert = path.join(out, 'loopback-cert.pem');
     const key = path.join(out, 'loopback-key.pem');
     execFileSync('openssl', ['req','-x509','-newkey','rsa:2048','-nodes','-days','1',
@@ -215,7 +216,7 @@ async function runCase(root, mode) {
         assert.deepEqual(result.exits[role],{code:0,signal:null});
     };
     try {
-        const roles = nativeDesktop ? ['A','B','C'] : ['A','B'];
+        const roles = lifecycle ? ['A'] : nativeDesktop ? ['A','B','C'] : ['A','B'];
         for (const role of roles) {
             const profile = profiles[role] = path.join(out, 'profile-' + role);
             const write = (rel, obj) => {
@@ -241,7 +242,7 @@ async function runCase(root, mode) {
             }
         }
         await Promise.all(roles.map(role => start(role)));
-        const runScenario = nativeDesktop ? require('../desktop-stream-close/scenario.cjs') :
+        const runScenario = lifecycle ? require('./desktop-lifecycle.cjs') : nativeDesktop ? require('../desktop-stream-close/scenario.cjs') :
             remoteFixture?.run || require('./core-rc.cjs');
         await runScenario({ clients: { ...clients }, cert, out, result, picture, click, evalJs, waitUntil, sha, trace,
             service, stop, start, profiles, desktopStreamClose: nativeDesktop });

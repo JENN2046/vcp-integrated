@@ -2,18 +2,25 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { PluginAgentOperationService } = require('../modules/services/pluginAgentOperationService');
+const { createTopicSponsorDelivery } = require('../modules/services/topicSponsorDelivery');
 const plugin = require('../VCPDistributedServer/Plugin/TopicSponsor/topicsponsor-service');
 
 test('direct plugin routes bare-topic replies through admission with trusted policy and request idempotency', async () => {
     const calls = [];
     const service = new PluginAgentOperationService({
         agentDir: 'unused', userDataDir: 'unused',
-        agentConfigManager: {}, historyMutationQueue: {},
-        topicDelivery: async (args, context) => {
-            calls.push({ args, context });
-            await new Promise(resolve => setImmediate(resolve));
-            return { success: true, queued: true, entryId: 'entry' };
-        },
+        agentConfigManager: {}, historyMutationQueue: { assertWritable: async scope => {
+            assert.deepEqual(scope, { itemType: 'agent', itemId: 'registered', topicId: 'topic' });
+        } },
+        topicDelivery: createTopicSponsorDelivery({
+            resolver: { resolve: async ({ topicId }) => ({ scope: { itemType: 'agent', itemId: 'registered', topicId } }) },
+            findAgent: async () => ({ id: 'kerr', name: 'Kerr' }),
+            admission: { submit: async request => {
+                calls.push(request);
+                await new Promise(resolve => setImmediate(resolve));
+                return { success: true, queued: true, entryId: 'entry' };
+            } },
+        }),
     });
     await plugin.initialize({
         services: { pluginAgentOperationService: service },
@@ -27,9 +34,9 @@ test('direct plugin routes bare-topic replies through admission with trusted pol
         plugin.processToolCall(args, context),
     ]);
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].context.requestId, 'same-request');
-    assert.equal(calls[0].context.topicSponsorReplyPolicy.enabled, false);
-    assert.equal(calls[0].context.topicSponsorReplyPolicy.prompt, 'configured invite');
+    assert.equal(calls[0].requestId, 'same-request');
+    assert.equal(calls[0].triggerPolicy, 'none');
+    assert.equal(calls[0].invitePrompt, 'configured invite');
     assert.equal(results[0].entryId, results[1].entryId);
     assert.equal(args.maid, undefined); // Must route before the legacy findAgent(args.maid).
 });

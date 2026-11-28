@@ -1,6 +1,7 @@
 // modules/ipc/chatHandlers.js
 const { ipcMain, dialog, BrowserWindow } = require('electron');
 const fs = require('fs-extra');
+const { replaceFile } = require('../utils/atomicReplace');
 const path = require('path');
 const crypto = require('crypto');
 const {
@@ -431,26 +432,20 @@ function initialize(mainWindow, context) {
         if (!groupId || !Array.isArray(orderedTopicIds)) {
             return { success: false, error: '无效的 groupId 或 topic IDs' };
         }
-        const groupConfigPath = path.join(APP_DATA_ROOT_IN_PROJECT, 'AgentGroups', groupId, 'config.json');
         try {
-            const groupConfig = await fs.readJson(groupConfigPath);
-            if (!Array.isArray(groupConfig.topics)) groupConfig.topics = [];
-
-            const newTopicsArray = [];
-            const topicMap = new Map(groupConfig.topics.map(topic => [topic.id, topic]));
-
-            orderedTopicIds.forEach(id => {
-                if (topicMap.has(id)) {
-                    newTopicsArray.push(topicMap.get(id));
-                    topicMap.delete(id);
+            const groupChat = require('../../Groupmodules/groupchat');
+            const result = await groupChat.mutateGroupConfig(groupId, current => {
+                const remaining = new Map(current.topics.map(topic => [topic.id, topic]));
+                const topics = [];
+                for (const id of orderedTopicIds) {
+                    if (remaining.has(id)) {
+                        topics.push(remaining.get(id));
+                        remaining.delete(id);
+                    }
                 }
+                return { ...current, topics: [...topics, ...remaining.values()] };
             });
-
-            newTopicsArray.push(...topicMap.values());
-            groupConfig.topics = newTopicsArray;
-
-            await fs.writeJson(groupConfigPath, groupConfig, { spaces: 2 });
-            return { success: true };
+            return result.success ? { success: true } : result;
         } catch (error) {
             console.error(`Error saving topic order for group ${groupId}:`, error);
             return { success: false, error: error.message };
@@ -741,85 +736,67 @@ function initialize(mainWindow, context) {
             () => createNativeAgentTopic(event, agentId, '主要对话', false, true, true));
         if (removal) return removal;
         if (options != null) return { success: false, error: 'SHARED_NATIVE_BINDING_CHANGED' };
-        let deletion;
         try {
-            deletion=await require('../services/syncWriterBoundary').beginNativeDirectoryDeletion(historyMutationQueue,{ ownerType: 'agent', ownerId: agentId, topicId: topicIdToDelete });
-            if (agentConfigManager) {
-                // 先读取当前配置进行验证
-                const currentConfig = await agentConfigManager.readAgentConfig(agentId);
-                if (!currentConfig.topics || !Array.isArray(currentConfig.topics)) {
-                    await deletion.failed?.({code:'NATIVE_DELETE_VALIDATION_FAILED'});
-                    return { error: `配置文件损坏或缺少话题列表。` };
+            if (!agentConfigManager) throw new Error('AgentConfigManager 未初始化，无法安全删除话题。');
+            const target = { itemType: 'agent', itemId: agentId, topicId: topicIdToDelete };
+            historyMutationQueue.getHistoryPath(agentId, topicIdToDelete); // Validate both path segments before admission.
+            const live = config => config.topics.some(t => t.id === topicIdToDelete);
+            const deleted = config => config._historyDeletedTopics?.includes(topicIdToDelete);
+            const missing = () => new Error(`未找到要删除的话题 ID: ${topicIdToDelete}`);
+            const backupContainsTarget = backup => {
+                if (backup !== null && !Array.isArray(backup.topics)) throw new Error('HISTORY_TOPIC_BACKUP_UNVERIFIED');
+                return backup?.topics.some(t => t?.id === topicIdToDelete);
+            };
+            // Runs under the existing Agent config lock. Re-read the optional legacy backup
+            // here so concurrent deletions cannot republish one another's stale topic list.
+            const pruneBackup = async () => {
+                const backup = await historyMutationQueue.readAgentTopicBackup(agentId);
+                if (backupContainsTarget(backup)) {
+                    backup.topics = backup.topics.filter(t => t?.id !== topicIdToDelete);
+                    await replaceFile(path.join(historyMutationQueue.ownerDirectories.agent, agentId, 'config.topic.backup.json'), JSON.stringify(backup, null, 2));
                 }
-                const targetPresent=currentConfig.topics.some(t => t.id === topicIdToDelete);
-                if (!targetPresent&&!deletion.canResumeMissingTopic) {
-                    await deletion.failed?.({code:'NATIVE_DELETE_VALIDATION_FAILED'});
-                    return { error: `未找到要删除的话题 ID: ${topicIdToDelete}` };
-                }
-
-                const replacementTimestamp = Date.now();
-                const replacementTopicId = `topic_${replacementTimestamp}`;
-                let replacementCreated = false;
-                let remainingTopics=currentConfig.topics;
-                if(targetPresent){
-                await deletion.beforeConfigUpdate?.();
-                await agentConfigManager.updateAgentConfig(agentId, existingConfig => {
-                    let filtered = (existingConfig.topics || []).filter(topic => topic.id !== topicIdToDelete);
-                    if (filtered.length === 0) {
-                        filtered = [{
-                            id: replacementTopicId,
-                            name: "主要对话",
-                            createdAt: replacementTimestamp
-                        }];
-                        replacementCreated = true;
-                    }
-                    remainingTopics = filtered;
-                    return { ...existingConfig, topics: filtered };
-                });
-
-                await deletion.changed?.();
-                }
-
-                if (replacementCreated) {
-                    const replacementTopicHistoryDir = path.join(USER_DATA_DIR, agentId, 'topics', replacementTopicId);
-                    await fs.ensureDir(replacementTopicHistoryDir);
-                    const historyPath = path.join(replacementTopicHistoryDir, 'history.json');
-                    if (!await fs.pathExists(historyPath)) {
-                        await fs.writeJson(historyPath, [], { spaces: 2 });
-                    }
-                }
-
-                await deletion.destructive?.();
-                const topicDataDir = path.join(USER_DATA_DIR, agentId, 'topics', topicIdToDelete);
-                await historyMutationQueue.run({itemId:agentId,itemType:"agent",topicId:topicIdToDelete},async()=>{if(await fs.pathExists(topicDataDir))await fs.remove(topicDataDir);});
-                const topicBackupPath = path.join(AGENT_DIR, agentId, 'config.topic.backup.json');
-                if (await fs.pathExists(topicBackupPath)) {
-                    try {
-                        const topicBackup = await fs.readJson(topicBackupPath);
-                        if (topicBackup && Array.isArray(topicBackup.topics)) {
-                            const nextTopics = topicBackup.topics.filter(topic => topic && topic.id !== topicIdToDelete);
-                            if (nextTopics.length !== topicBackup.topics.length) {
-                                topicBackup.topics = nextTopics;
-                                await fs.writeJson(topicBackupPath, topicBackup, { spaces: 2 });
-                            }
+            };
+            const initial = await historyMutationQueue.readOwnerConfiguration(target);
+            if (!live(initial) && !deleted(initial)) throw missing();
+            return await historyMutationQueue.deleteHistory(target, async lifecycle => {
+                let config = await historyMutationQueue.readOwnerConfiguration(target);
+                if (!deleted(config)) {
+                    await lifecycle.beforeConfigUpdate?.();
+                    const result = await agentConfigManager.updateAgentConfig(agentId, async current => {
+                        if (current._historyDeleting || !Array.isArray(current.topics)) throw new Error('HISTORY_OWNER_UNVERIFIED');
+                        if (deleted(current)) return current;
+                        if (!live(current)) throw missing();
+                        const topics = current.topics.filter(t => t.id !== topicIdToDelete);
+                        if (!topics.length) {
+                            topics.push({ id: `topic_${crypto.randomUUID()}`, name: '主要对话', createdAt: Date.now(),
+                                _historyReplacementFor: topicIdToDelete });
                         }
-                    } catch (backupErr) {
-                        console.warn('[delete-topic] Failed to prune config.topic.backup.json:', backupErr);
-                    }
+                        await pruneBackup();
+                        // One primary-config publication removes membership and fences this identity on restart.
+                        return { ...current, topics, _historyDeletedTopics: [...(current._historyDeletedTopics || []), topicIdToDelete] };
+                    });
+                    config = result.config;
+                    await lifecycle.changed?.();
+                } else if (backupContainsTarget(await historyMutationQueue.readAgentTopicBackup(agentId))) {
+                    // A prior version may have committed the primary tombstone before pruning this backup.
+                    const result = await agentConfigManager.updateAgentConfig(agentId, async current => {
+                        if (current._historyDeleting || !deleted(current) || live(current)) throw new Error('HISTORY_CONFIG_UNVERIFIED');
+                        await pruneBackup();
+                        return current;
+                    });
+                    config = result.config;
                 }
-                await clearTrajectoryOf({ agentId, topicId: topicIdToDelete });
-                await removeSideChatChildrenOfParent({ USER_DATA_DIR, agentId, parentTopicId: topicIdToDelete, historyMutationQueue })
-                    .catch(err => console.warn('[delete-topic] Failed to remove side chats:', err));
+                if (live(config)) throw new Error('HISTORY_CONFIG_UNVERIFIED');
+                const replacement = config.topics.find(t => t._historyReplacementFor === topicIdToDelete);
+                if (replacement) await historyMutationQueue.initializeIfMissing({ ...target, topicId: replacement.id });
 
-                await deletion.commit();
-                return { success: true, remainingTopics };
-            } else {
-                await deletion.failed?.({code:'NATIVE_DELETE_VALIDATION_FAILED'});
-                console.error(`AgentConfigManager not available, cannot safely delete topic for agent ${agentId}`);
-                return { error: 'AgentConfigManager 未初始化，无法安全删除话题。' };
-            }
+                await lifecycle.destructive?.();
+                await historyMutationQueue.removeDeletedHistory(target);
+                await clearTrajectoryOf({ agentId, topicId: topicIdToDelete });
+                await removeSideChatChildrenOfParent({ USER_DATA_DIR, agentId, parentTopicId: topicIdToDelete, historyMutationQueue });
+                return { success: true, remainingTopics: config.topics };
+            });
         } catch (error) {
-            await deletion?.failed?.(error);
             console.error(`删除Agent ${agentId} 的话题 ${topicIdToDelete} 失败:`, error);
             return { error: error.message, ...(error.code ? { code: error.code } : {}) };
         }

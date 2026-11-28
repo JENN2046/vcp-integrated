@@ -94,6 +94,7 @@ async function start({ out, candidate, cert, key, trace, waitUntil, mode, httpsP
             const row = { case: which, id: body.requestId, stream: Boolean(body.stream), at: Date.now() };
             calls.push(row);
             trace('provider', row);
+            if (coreRemote?.groupPreviewReply) return coreRemote.groupPreviewReply(body, res);
             if (which === 'coreRC') await lostGate;
             if (coreRemote?.provider) {
                 row.imageParts = body.messages.flatMap(message => Array.isArray(message.content) ? message.content : [])

@@ -5,13 +5,10 @@ const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
 const fse = require('fs-extra');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
-const { pathToFileURL } = require('node:url');
 const { HistoryMutationQueue } = require('../modules/services/historyMutationQueue');
 const AgentConfigManager = require('../modules/utils/agentConfigManager');
 const { PluginAgentOperationService } = require('../modules/services/pluginAgentOperationService');
-const project = path.resolve(__dirname, '..');
 const quiet = { log() {}, warn() {}, error() {} };
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const d = (topicId = 'old_topic', itemId = 'agent_a') => ({ itemId, itemType: 'agent', topicId });
@@ -26,85 +23,7 @@ function exitAfterConfigPublication(root, topicId) {
     });
 }
 
-// Execute actual handler source with a minimal Electron/UI shell. Persistence,
-// configuration manager, queue, IDs, filesystem and PluginAgentOperationService
-// are real. No live app, provider, config, History or IPC endpoint is contacted.
-function loadHandler(relative, dependencies) {
-    const file = path.join(project, relative), module = { exports: {} };
-    const reviewedRequire = name => {
-        if (['../modules/services/topicGenerationLease', '../modules/services/historyAuthority', '../services/historyAuthority'].includes(name)) return require('node:module').createRequire(file)(name);
-        assert.ok(dependencies.has(name), `unreviewed handler dependency: ${name}`);
-        return dependencies.get(name);
-    };
-    new Function('require', 'module', 'exports', '__dirname', '__filename', 'console',
-        fsSync.readFileSync(file, 'utf8'))(reviewedRequire, module, module.exports, path.dirname(file), file, quiet);
-    return module.exports;
-}
-
-async function fixture(t, { topics = [{ id: 'old_topic', name: 'Old topic' }], commitFault = () => {} } = {}) {
-    const root = await fs.mkdtemp(path.join(__dirname, '.f06-host-'));
-    const agentDir = path.join(root, 'Agents'), userDataDir = path.join(root, 'UserData');
-    await fs.mkdir(path.join(agentDir, 'agent_a'), { recursive: true }); await fs.mkdir(userDataDir);
-    const manager = new AgentConfigManager(agentDir);
-    await manager.writeAgentConfig('agent_a', { id: 'agent_a', name: 'Synthetic Agent', topics });
-    const queue = new HistoryMutationQueue({ userDataDir, logger: quiet, commitFault });
-    t.after(async () => { await queue.dispose(); await fs.rm(root, { recursive: true, force: true }); });
-    const handlers = new Map();
-    const frame = { url: pathToFileURL(path.join(project, 'main.html')).href, detached: false };
-    const sender = { mainFrame: frame, isDestroyed: () => false, getType: () => 'window', getURL: () => frame.url };
-    const mainWindow = { isDestroyed: () => false, webContents: sender };
-    const ipcMain = { handle(name, fn) { handlers.set(name, fn); }, removeHandler(name) { handlers.delete(name); }, on() {},
-        invoke(name, ...args) { return handlers.get(name)({ sender, senderFrame: frame }, ...args); } };
-    const hostHooks = { emitAsync: async () => {}, emit() {} };
-    const modelTrajectory = { clearTrajectoryOf: async () => {}, clearTrajectoriesOfOwner: async () => {} };
-    const shared = new Map([
-        ['electron', { ipcMain, dialog: {}, BrowserWindow: {} }], ['fs-extra', fse], ['path', path], ['crypto', crypto],
-        ['url', require('node:url')], ['../services/historyMutationQueue', { HistoryMutationQueue, conversationKey: require('../modules/services/historyMutationQueue').conversationKey }],
-        ['../utils/agentConfigManager', AgentConfigManager],
-        ['../utils/atomicReplace', require('../modules/utils/atomicReplace')],
-        ['../services/syncWriterBoundary', require('../modules/services/syncWriterBoundary')],
-        ['@vcp/core-rules/request-envelope', require('@vcp/core-rules/request-envelope')],
-        ['../modelTrajectory', modelTrajectory], ['../agentMood', { getAgentMoodStore: () => null }], ['../hostHooks', { hostHooks }],
-    ]);
-    const side = loadHandler('modules/ipc/sideChatHandlers.js', new Map([...shared,
-        ['./applicationSender', require('../modules/ipc/applicationSender')],
-    ]));
-    side.initialize({ USER_DATA_DIR: userDataDir, AGENT_DIR: agentDir, historyMutationQueue: queue, ipcMain, mainWindow });
-    const group = loadHandler('Groupmodules/groupchat.js', new Map([
-        ['@vcp/core-rules/group/streamDelta', require('@vcp/core-rules/group/streamDelta')],
-        ['@vcp/core-rules/group/speaker', require('@vcp/core-rules/group/speaker')],
-        ['@vcp/core-rules/group/modelSelection', require('@vcp/core-rules/group/modelSelection')],
-        ['electron', { ipcMain }], ['fs-extra', fse], ['node:fs/promises', fs], ['node:process', process], ['path', path], ['crypto', crypto],
-        ['../modules/utils/atomicReplace', require('../modules/utils/atomicReplace')],
-        ['../modules/utils/historyConfiguration', require('../modules/utils/historyConfiguration')],
-        ['../modules/contextSanitizer', {}], ['../modules/modelTrajectory', modelTrajectory], ['../modules/fileManager', {}],
-        ['../modules/ipc/canvasHandlers', {}], ['../modules/ipc/tavernHandlers', {}], ['../modules/tavernRulesEngine', {}],
-        ['./modes/sequentialMode', require('../Groupmodules/modes/sequentialMode')],
-        ['./modes/natureRandomMode', require('../Groupmodules/modes/natureRandomMode')],
-        ['./modes/inviteOnlyMode', require('../Groupmodules/modes/inviteOnlyMode')],
-        ['./modes/jevDecisionMode', require('../Groupmodules/modes/jevDecisionMode')],
-        ['./jevGroupSessionOrchestrator', {}], ['./groupContextWindow', require('../Groupmodules/groupContextWindow')],
-        ['./topicTitleManager', {}], ['./streamWatchdog', require('../Groupmodules/streamWatchdog')], ['./groupChatUrl', require('../Groupmodules/groupChatUrl')],
-    ]));
-    group.initializePaths({ APP_DATA_ROOT_IN_PROJECT: root, AGENT_DIR: agentDir, USER_DATA_DIR: userDataDir });
-    group.initializeRuntimeServices({ historyMutationQueue: queue });
-    const chat = loadHandler('modules/ipc/chatHandlers.js', new Map([...shared,
-        ['../contextSanitizer', {}], ['../vcpClient', {}], ['../services/senderTaskRegistry', require('../modules/services/senderTaskRegistry')],
-        ['../services/attachmentDialogState', {}], ['../../Groupmodules/topicTitleManager', {}], ['../../Groupmodules/groupchat', group], ['./workspaceHandlers', {}], ['./sideChatHandlers', side],
-    ]));
-    const context = { AGENT_DIR: agentDir, USER_DATA_DIR: userDataDir, APP_DATA_ROOT_IN_PROJECT: root,
-        SETTINGS_FILE: path.join(root, 'settings.json'), USER_AVATAR_FILE: path.join(root, 'user.png'),
-        agentConfigManager: manager, historyMutationQueue: queue };
-    chat.initialize(mainWindow, context);
-    const agent = loadHandler('modules/ipc/agentHandlers.js', new Map([...shared,
-        ['../services/agentPortraitImages', { forgetPortraitDisplayImages: async () => {} }],
-        ['../services/portraitOptimizer', { withPortraitLock: async (_dir, fn) => fn() }],
-    ]));
-    agent.initialize(context);
-    const service = new PluginAgentOperationService({ agentDir, userDataDir, agentConfigManager: manager, historyMutationQueue: queue, appDataRoot: root, logger: quiet });
-    return { root, agentDir, userDataDir, manager, queue, service, group, call: (name, ...args) => ipcMain.invoke(name, ...args),
-        config: () => fs.readFile(path.join(agentDir, 'agent_a', 'config.json'), 'utf8').then(JSON.parse) };
-}
+const { fixture } = require('./f06-host-fixture.cjs');
 
 test('T01 native topic caller preserves a legitimate message accepted between config and initialize', async t => {
     const f = await fixture(t), update = f.manager.updateAgentConfig.bind(f.manager); let accepted;
@@ -455,4 +374,54 @@ test('Agent deletion preserves owned and unknown lock/temp files until the real 
     await assert.rejects(fs.lstat(ownedLock), { code: 'ENOENT' });
     assert.equal(await fs.readFile(unknownLock, 'utf8'), unknownLockBytes);
     assert.equal(await fs.readFile(unknownTemp, 'utf8'), unknownTempBytes);
+});
+
+test('group topic order uses current members through concurrent topic deletion and stale settings save', async t => {
+    const f = await fixture(t);
+    const owner = await f.group.createAgentGroup('Group order');
+    assert.equal(owner.success, true);
+    const groupId = owner.agentGroup.id, original = owner.agentGroup.topics[0].id;
+    const second = await f.group.createNewTopicForGroup(groupId, 'second');
+    const third = await f.group.createNewTopicForGroup(groupId, 'third');
+    assert.ok(second.success && third.success);
+    const file = path.join(f.root, 'AgentGroups', groupId, 'config.json');
+    const stale = await fse.readJson(file);
+    const ids = config => config.topics.map(topic => topic.id);
+    const reorder = order => f.call('save-group-topic-order', groupId, order);
+    assert.equal((await f.group.saveGroupTopicTitle(groupId, third.topicId, 'fresh title')).success, true);
+    assert.equal((await reorder([third.topicId, third.topicId, original])).success, true);
+    assert.deepEqual(ids(await fse.readJson(file)), [third.topicId, original, second.topicId]);
+
+    const entered = deferred(), release = deferred();
+    const read = fse.readJson;
+    let intercepted = false;
+    fse.readJson = async function(filePath, ...args) {
+        const config = await read.call(this, filePath, ...args);
+        if (filePath === file && !intercepted) {
+            intercepted = true;
+            entered.resolve();
+            await release.promise;
+        }
+        return config;
+    };
+    try {
+        const ordering = reorder([original, second.topicId, third.topicId]);
+        await entered.promise;
+        const removing = f.group.deleteGroupTopic(groupId, second.topicId);
+        release.resolve();
+        assert.equal((await ordering).success, true);
+        const deleted = await removing;
+        assert.equal(deleted.success, true, JSON.stringify(deleted));
+    } finally { release.resolve(); fse.readJson = read; }
+
+    // Replay the pre-deletion order/config after the topic is physically gone.
+    assert.equal((await reorder([second.topicId, third.topicId, original])).success, true);
+    assert.equal((await f.group.saveAgentGroupConfig(groupId, stale)).success, true);
+    const current = await fse.readJson(file);
+    assert.deepEqual(ids(current), [third.topicId, original]);
+    assert.equal(current.topics[0].name, 'fresh title');
+    assert.ok(current._historyDeletedTopics.includes(second.topicId));
+    const scope = { itemId: groupId, itemType: 'group', topicId: second.topicId };
+    await assert.rejects(f.queue.write(scope, [{ id: 'late-message' }]));
+    await assert.rejects(fs.stat(path.join(f.userDataDir, groupId, 'topics', second.topicId, 'history.json')), { code: 'ENOENT' });
 });
