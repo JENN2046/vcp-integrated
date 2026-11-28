@@ -2071,6 +2071,10 @@ class PluginManager extends EventEmitter {
                 sourceNode,
                 pluginName: toolName,
                 executionOptions,
+                ...(nativeExecution.isCoreTurn() && {
+                    signal: nativeExecution.currentSignal(),
+                    dispatchTransport: invokeDirect
+                }),
                 webSocketServer: this.webSocketServer,
                 ...(['DeepMemo', 'TopicMemo'].includes(toolName) && nativeExecution.currentCoreMemory() && {
                     executeCoreMemory: args => invokeDirect(() => nativeExecution.currentCoreMemory()(
@@ -2092,9 +2096,7 @@ class PluginManager extends EventEmitter {
                 getServiceModule: name => this.getServiceModule(name),
                 getDecryptedAuthCode: () => this._getDecryptedAuthCode(),
                 executeDirectWithTimeout: (...args) => invokeDirect(() => this._executeDirectToolCallWithTimeout(...args)),
-                executeStdio: (...args) => nativeExecution.isCoreTurn()
-                    ? invokeDirect(() => this.executePlugin(...args))
-                    : this.executePlugin(...args),
+                executeStdio: (...args) => this.executePlugin(...args),
                 triggerSleepDream: (...args) => this._tryTriggerDreamForVCPSleep(...args),
                 filterFuzzyDiff,
                 getTimestamp: getFormattedLocalTimestamp
@@ -2376,6 +2378,11 @@ class PluginManager extends EventEmitter {
         if (nativeInvocation) Object.assign(additionalEnv, nativeInvocation.env);
         const finalEnv = this._buildPluginProcessEnv(plugin, pluginConfig, additionalEnv);
         if (nativeInvocation) delete finalEnv.JSO_LOCAL_AGENT_TOKEN;
+        const signal = nativeExecution.isCoreTurn() ? nativeExecution.currentSignal() : undefined;
+        if (signal?.aborted) {
+            await nativeInvocation?.close();
+            signal.throwIfAborted();
+        }
 
         if (this.debugMode && plugin.pluginType === 'asynchronous') {
             const scope = this._isExternalPluginManifest(plugin) ? 'External' : 'Core';
@@ -2403,6 +2410,14 @@ class PluginManager extends EventEmitter {
             let errorOutput = '';
             let processExited = false;
             let initialResponseSent = false; // Flag for async plugins
+            const stopBeforeHandoff = () => {
+                if (initialResponseSent || processExited) return;
+                this._killProcessTree(pluginProcess.pid, pluginName);
+                reject(signal.reason);
+            };
+            const releaseCancellation = () => signal?.removeEventListener('abort', stopBeforeHandoff);
+            signal?.addEventListener('abort', stopBeforeHandoff, { once: true });
+            pluginProcess.once('close', releaseCancellation);
             const isAsyncPlugin = plugin.pluginType === 'asynchronous';
             const isArcheryNoReply = isAsyncPlugin && executionOptions?.archeryNoReply === true;
             const noReplyGraceMs = Number.isFinite(Number(executionOptions?.archeryNoReplyGraceMs))
@@ -2430,16 +2445,28 @@ class PluginManager extends EventEmitter {
                 }
             }, timeoutDuration);
 
-            const resolveArcheryNoReplySilent = (reason) => {
+            const resolveArcheryNoReplySilent = (reason, response) => {
                 if (!isArcheryNoReply || processExited || initialResponseSent) return false;
                 initialResponseSent = true;
+                releaseCancellation();
                 if (this.debugMode) {
                     console.log(`[PluginManager executePlugin Internal] Async no-reply plugin "${pluginName}" resolved silently. reason=${reason}`);
+                }
+                // Core uses the plugin's explicit acknowledgement. Preserve the native task
+                // reference without feeding background results back into the silent Archery turn.
+                let acceptance;
+                if (signal && response) {
+                    const references = typeof response.result === 'string'
+                        ? [...response.result.matchAll(/\{\{VCP_ASYNC_RESULT::([A-Za-z0-9_.-]+)::([A-Za-z0-9_-]+)\}\}/g)]
+                        : [];
+                    const task = references.find(reference => reference[1] === pluginName);
+                    acceptance = { state: 'accepted', ...(task && { taskId: task[2] }) };
                 }
                 resolve({
                     status: "success",
                     __vcpArcheryNoReplySilent: true,
                     result: {
+                        ...(acceptance && { asyncAcceptance: acceptance }),
                         status: "success",
                         noReply: true,
                         __vcpArcheryNoReplySilent: true,
@@ -2450,7 +2477,7 @@ class PluginManager extends EventEmitter {
                 return true;
             };
 
-            const noReplyTimerId = isArcheryNoReply ? setTimeout(() => {
+            const noReplyTimerId = isArcheryNoReply && !signal ? setTimeout(() => {
                 resolveArcheryNoReplySilent(`no_response_after_${noReplyGraceMs}ms`);
             }, noReplyGraceMs) : null;
 
@@ -2477,11 +2504,12 @@ class PluginManager extends EventEmitter {
                                 if (!initialResponseSent) {
                                     if (noReplyTimerId) clearTimeout(noReplyTimerId);
                                     if (isArcheryNoReply && parsedOutput.status === "success") {
-                                        resolveArcheryNoReplySilent('initial_success_json');
+                                        resolveArcheryNoReplySilent('initial_success_json', parsedOutput);
                                         return;
                                     }
                                     if (this.debugMode) console.log(`[PluginManager executePlugin Internal] Async plugin "${pluginName}" sent initial JSON response. Resolving promise.`);
                                     initialResponseSent = true;
+                                    releaseCancellation();
                                     // For async, we resolve with the first valid JSON and let the process continue if it has non-daemon threads.
                                     // We don't clear the main timeout here for async, as the process might still need to be killed if it misbehaves badly later.
                                     // However, the primary purpose of this promise is fulfilled.

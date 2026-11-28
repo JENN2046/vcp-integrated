@@ -132,7 +132,12 @@ async function main() {
             const sent = await request('session-send', body);
             assert.equal(sent.replayed, false);
             const id = sent.workId;
-            const approval = await waitUntil(() => approvals.get(marker) || terminal(id) && { noApproval: true }, marker + ' native approval');
+            const approval = await waitUntil(() => {
+                const event = approvals.get(marker);
+                // The WebSocket notification and the shared Work's projected state are delivered separately.
+                if (event && (baselineRevision || job(id)?.state === 'waiting_approval')) return event;
+                return terminal(id) && { noApproval: true };
+            }, marker + ' native approval');
             evidence.cases[marker] = { id, inputId: requestId, approvalId: approval.requestId, beforeDecision: snapshot(id, marker), approvalExposed: !approval.noApproval };
             assert.equal(evidence.cases[marker].beforeDecision.pluginCalls, 0);
             if (!baselineRevision) {

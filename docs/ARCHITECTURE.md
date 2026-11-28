@@ -125,8 +125,12 @@ TopicMemo 和 DeepMemo 沿用执行 Agent 的正式历史权限，DeepMemo 也�
 长期架构纪律以仓库根级 [AGENTS.md](../AGENTS.md) 为准。本节描述 2026-11-28 已确定的施工顺序及基线缺口，不将目标当成已经上线或验收的能力。原生继承默认成立，新增或保留限制须以真实风险举证；禁止逐插件打洞。上游升级不作为本轮收口门槛。
 
 1. **原生记忆回归（隔离候选已验收）。** ToolBox 负责完整 RAGDiaryPlugin 的发现、依赖初始化、RiverMemo V5 联合检索、排序、注入和工具刷新。Core 提供已认证 Work 的执行身份、设备权限和取消围栏。旧专用召回支线和暂存接线已删除。桌面、PWA 和实体 Redmi 的多端回执使用合成日记以及回环模型与嵌入端点；最终收口复验覆盖插件初始化、联合召回和撤权后的派发边界。见 [原生记忆候选说明](core-native-memory-r1.md)。
-2. **原生执行回归（后续工作）。** 接通原生 ToolApprovalManager 与可信人类授权，补齐通用执行及回执边界，统一撤除 `distributed` / `asynchronous` / `archery` 类别封禁与 AA 纯文本限制，不为每个插件建新准入或恢复状态机。AA 子工具沿用独立任务、原生工具记录及取消域，不混写父 Work 的 `work_invocations`；Archery 取得明确原生受理及所有权交接后不等待后台副作用全部结束。本步同时修复已核实的 CoreTurnSink 跨轮终态残留（`committed`；`errorCode` 同属轮次状态）和纯 `reasoningDelta` 静默丢失问题，维持原生推理展示策略。
-3. **Core 瘦身（待第二步收口）。** 主线正式退出 `shared`；历史版本承担旧环境兼容和回退，已产生的新数据仍须独立保护。保留 local / remote 的共同内核，提炼实际复用的 NativeSync 通用模块，退出旧同步运行时依赖。将 `localSpeech.js` / `mandarinSpeech.py`、`nativeStickers.js`、`game.js` 的领域职责归回原生或独立领域，不以机械搬文件代替职责收敛。优化 CDS 数据接入：按话题变更序号（如 `last_change_seq`）增量生成投影，同时避免每次检索全量读取与重写 Owner 历史，继续使用原生 CDS/Tantivy。清理重复防御而保留真实安全及数据边界。
+2. **原生普通执行与审批（隔离验收通过）。** Core 的分布式 WebSocket 派发、stdio 异步受理和 Archery 使用现有 Work 调用回执。分布式断连或已派发后丢失结果仍保留待核对状态；原生异步插件明确受理后自行持有后台任务，父 Work 可独立提交。Core 的 Archery 静默分支等待插件真实回执，并记录原生格式中可用的任务引用。AgentAssistant 子轮可调用工具，派发与结算由子任务现有尝试记录及原生工具记录承接。子轮与父 Work 分开取消。群聊和 Steering 每轮重新创建 TurnSink，纯推理增量以独立字段流出，显示文字沿用原生策略。
+
+   普通审批沿用原生 ToolApprovalManager 和 VCPLog 通道。隔离 Core 实测发布审批请求、批准、拒绝、审批过期及取消 Work；拒绝、过期和取消均未派发工具，迟到响应不能恢复执行。隔离专用 UID 下的 `test:ordinary-tools` 通过，覆盖普通工具派发、真实工具账本、取消、超时、异常和重启恢复。验证同时保留分布式撤回与断线未知、固定上游 MimoDubbing 1.2.0 的异步受理及回调、AA 子工具的独立记账和归档，以及 RiverMemo V5 首次注入和刷新。模型及音频端点使用本机合成数据。群聊预览和群聊深度函数引用的两项既有失败继续留档。
+
+   可信人类高敏授权作为独立工作项。现有 `vcp_chat.c2` 保持 `PRODUCTION_DISABLED`，Core 继续拒绝缺少可信人类授权的高敏调用。所属设备的配对权限保持原有接入范围。定时执行与需要特定正式会话来源的原生衔接维持当前范围。
+3. **Core 瘦身（待另行启动）。** 主线正式退出 `shared`；历史版本承担旧环境兼容和回退，已产生的新数据仍须独立保护。保留 local / remote 的共同内核，提炼实际复用的 NativeSync 通用模块，退出旧同步运行时依赖。将 `localSpeech.js` / `mandarinSpeech.py`、`nativeStickers.js`、`game.js` 的领域职责归回原生或独立领域，不以机械搬文件代替职责收敛。优化 CDS 数据接入：按话题变更序号（如 `last_change_seq`）增量生成投影，同时避免每次检索全量读取与重写 Owner 历史，继续使用原生 CDS/Tantivy。清理重复防御而保留真实安全及数据边界。
 
 这三步是工程路线，不是部署授权。各步骤完成后更新本节状态及证据，删除已收口的临时缺口描述。
 
