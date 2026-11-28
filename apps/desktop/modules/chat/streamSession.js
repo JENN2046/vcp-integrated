@@ -4,6 +4,15 @@ import { appendAssistantSegmentText } from './hostedToolHistory.js';
 
 const TERMINALS = new Set(STREAM_TERMINAL_KINDS);
 const freeze = value => Object.freeze(value);
+// Snapshots also own the nested provider metadata used on the next request.
+function freezeCallRecord(value) {
+    if (value && typeof value === 'object') {
+        for (const field of Object.values(value)) freezeCallRecord(field);
+        Object.freeze(value);
+    }
+    return value;
+}
+
 const deferred = () => {
     let resolve;
     const promise = new Promise(done => { resolve = done; });
@@ -52,11 +61,7 @@ export function createStreamSession(request = {}) {
             const calls = chunk?.vcpHostedToolCalls;
             if (Array.isArray(calls) && calls.length) {
                 const segments = state.assistantSegments ?? (state.text ? [freeze({ content: state.text })] : []);
-                const tool_calls = freeze(calls.map(call => freeze({
-                    id: call.id,
-                    type: call.type,
-                    function: freeze({ name: call.function.name, arguments: call.function.arguments }),
-                })));
+                const tool_calls = freeze(calls.map(call => freezeCallRecord(structuredClone(call))));
                 return update({
                     status: 'streaming',
                     assistantSegments: freeze([...segments, freeze({ tool_calls })]),

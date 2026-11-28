@@ -5,6 +5,10 @@ const call = id => ({
     id, type: 'function',
     function: { name: 'vcptools', arguments: '{"tool_name":"Demo"}' },
 });
+const signed = id => ({
+    ...call(id),
+    extra_content: { vendor: { flags: [id, null] }, google: { thought_signature: '  +/=\n签' + id + ' '.repeat(1024) } },
+});
 const receipt = id => `<<<[VCP_TOOL_BATCH_START:${id}]>>>\n回执 ${id}\n<<<[VCP_TOOL_BATCH_END:${id}]>>>`;
 const batch = id => `\n<<<[ROLE_DIVIDE_USER]>>>\n${receipt(id)}\n<<<[END_ROLE_DIVIDE_USER]>>>\n`;
 const frame = (tool_calls, content) => ({ choices: [{ index: 0, delta: { content, tool_calls } }] });
@@ -67,12 +71,15 @@ async function runStream(chunks, { cancel = false } = {}) {
 }
 
 test('two hosted rounds keep batch positions and original parallel IDs through durable history', { timeout: 3000 }, async () => {
-    const first = [call('a'), call('b')], second = [call('c')];
+    const first = [signed('a'), signed('b')], second = [signed('c')];
     const { saved, appendOrder } = await runStream([
         frame(first.map((entry, index) => ({
             ...entry, index, function: { ...entry.function, arguments: '{"tool_' },
         })), 'A'),
-        frame([1, 0].map(index => ({ index, function: { arguments: 'name":"Demo"}' } }))),
+        frame([1, 0].map(index => ({
+            index, id: first[index].id, function: { arguments: 'name":"Demo"}' },
+            extra_content: { google: first[index].extra_content.google, vendor: first[index].extra_content.vendor },
+        }))),
         batch('one').slice(0, -8), batch('one').slice(-8) + 'B',
         complete(second), batch('two') + 'C',
     ]);
@@ -96,7 +103,7 @@ test('FC-only cancellation persists the partial call without injecting placehold
 
 test('request assembly sends standard messages and closes every original call ID', async () => {
     const { assembleRequestMessages } = await import('../modules/chat/chatContextPipeline.js');
-    const first = [call('a'), call('b')], second = [call('c')];
+    const first = [signed('a'), signed('b')], second = [signed('c')];
     const { saved } = await runStream([
         'A', complete(first), batch('one'), 'B',
         complete(second), receipt('two') + 'C',
@@ -124,7 +131,7 @@ test('request assembly sends standard messages and closes every original call ID
 test('editing model prose keeps flattened history and structured FC replay in sync', async () => {
     const { reconcileEditedAssistantSegments, expandHostedHistoryMessage } = await import('../modules/chat/hostedToolHistory.js');
     const original = 'before' + batch('one') + 'after';
-    const segments = [{ content: 'before' }, { tool_calls: [call('a')] },
+    const segments = [{ content: 'before' }, { tool_calls: [signed('a')] },
         { content: batch('one'), receipt: true }, { content: 'after' }];
     assert.equal(reconcileEditedAssistantSegments(segments, original), segments);
     for (const text of [original.replace('before', 'new before'), original + '!', '']) {
@@ -133,5 +140,52 @@ test('editing model prose keeps flattened history and structured FC replay in sy
         assert.equal(edited[1], segments[1]);
         const replay = expandHostedHistoryMessage(JSON.parse(JSON.stringify({ role: 'assistant', content: text, assistantSegments: edited })));
         assert.deepEqual(replay.filter(message => message.role === 'tool').map(message => message.tool_call_id), text ? ['a'] : []);
+        assert.deepEqual(replay.flatMap(message => message.tool_calls ?? []), text ? [signed('a')] : []);
     }
+});
+
+test('conflicting metadata drops only its slot, including after further matching fragments', async () => {
+    const { createNativeToolCallStream } = await import('../modules/chat/nativeToolCallStream.js');
+    const decoder = createNativeToolCallStream();
+    const bad = signed('bad'), good = signed('good');
+    decoder.push(frame([{ index: 4, ...bad }, { index: 2, ...call('good') }]));
+    decoder.push(frame([{ index: 4, extra_content: good.extra_content }, { index: 2, extra_content: good.extra_content }]));
+    decoder.push(frame([{ index: 4, extra_content: bad.extra_content }]));
+    assert.deepEqual(decoder.flush(), [{ vcpHostedToolCalls: [good] }]);
+    // After the batch, indices may be reused with fresh metadata.
+    const next = { ...call('next'), extra_content: null };
+    const full = { choices: [{ message: { tool_calls: [next] } }] };
+    assert.deepEqual(decoder.push(full), [{ vcpHostedToolCalls: [next] }]);
+});
+
+test('a different ID cannot claim a signed slot, and an unbound fragment cannot supply its signature', async () => {
+    const { createNativeToolCallStream } = await import('../modules/chat/nativeToolCallStream.js');
+    const decoder = createNativeToolCallStream();
+    const first = signed('one'), second = call('two');
+    decoder.push(complete([first, second]));
+    decoder.push(frame([{ index: 0, id: 'different', extra_content: first.extra_content }]));
+    decoder.push(frame([{ extra_content: first.extra_content }]));
+    assert.deepEqual(decoder.flush(), [{ vcpHostedToolCalls: [second] }]);
+});
+
+test('the session owns an immutable copy of the complete call record', async () => {
+    const { createStreamSession } = await import('../modules/chat/streamSession.js');
+    const session = createStreamSession({ sessionId: 'reply', conversationKey: 'topic' });
+    const input = signed('one');
+    const expected = structuredClone(input);
+    session.pushChunk({ vcpHostedToolCalls: [input] });
+    input.extra_content.google.thought_signature = 'changed outside the session';
+    const [stored] = session.snapshot.assistantSegments[0].tool_calls;
+    assert.deepEqual(stored, expected);
+    assert.ok(Object.isFrozen(stored.extra_content.google));
+    assert.ok(Object.isFrozen(stored.extra_content.vendor.flags));
+});
+
+test('legacy unsigned deltas still assemble by position', async () => {
+    const { createNativeToolCallStream } = await import('../modules/chat/nativeToolCallStream.js');
+    const decoder = createNativeToolCallStream();
+    const original = call('legacy');
+    decoder.push(frame([{ ...original, function: { name: 'vcptools', arguments: '{"tool_' } }]));
+    decoder.push(frame([{ function: { arguments: 'name":"Demo"}' } }]));
+    assert.deepEqual(decoder.flush(), [{ vcpHostedToolCalls: [original] }]);
 });
