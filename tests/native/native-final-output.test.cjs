@@ -81,3 +81,12 @@ test('Core delta frames separate provider text, reasoning, and display markup', 
     const closing = frames.find(frame => frame.displayDelta === '\n</think>\n');
     assert.deepEqual([closing.textDelta, closing.reasoningDelta], ['', '']);
 });
+
+
+test('Core observes a pure reasoning delta without changing the display text', () => {
+    const { CoreTurnSink } = require(box + '/core/turnSink');
+    const events = [];
+    const sink = new CoreTurnSink({ signal: new AbortController().signal, observe: (_type, value) => events.push(value) });
+    sink.onDelta({ reasoningDelta: 'Synthetic reasoning' });
+    assert.deepEqual(events, [{ text: '', textDelta: '', displayDelta: '', reasoningDelta: 'Synthetic reasoning' }]);
+});

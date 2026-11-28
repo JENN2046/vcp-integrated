@@ -212,9 +212,6 @@ function assertToolBatch(calls) {
     if (scope?.textOnly && scope.sharedAuthority?.kind === 'native-task' && calls.length) {
         throw toolError('CONTROLLED_TEXT_TOOLS_FORBIDDEN');
     }
-    if (scope?.core && calls.some(call => call.archery || call.archeryNoReply)) {
-        throw toolError('CORE_ASYNC_TOOL_NOT_MIGRATED');
-    }
     if (!controlledToolWork()) return;
     if (scope.delegation) {
         if (calls.length !== 1) throw toolError('CONTROLLED_TOOL_CALL_LIMIT');

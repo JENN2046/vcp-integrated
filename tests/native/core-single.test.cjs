@@ -645,6 +645,9 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
     f.shared.delegationAgents.add(name);
     pluginManager.plugins.set('AgentAssistant', { name: 'AgentAssistant', pluginType: 'hybridservice', communication: { protocol: 'direct' } });
     pluginManager.serviceModules.set('AgentAssistant', { module: assistant });
+    const childTool = 'CoreFixtureChildTool';
+    pluginManager.plugins.set(childTool, { name: childTool, pluginType: 'hybridservice', communication: { protocol: 'direct' } });
+    pluginManager.serviceModules.set(childTool, { module: { processToolCall: async () => 'callback from child tool' } });
     const { core, route } = await mountCore(f, chat);
     const block = ['<<<[TOOL_REQUEST]>>>', 'tool_name:「始」AgentAssistant「末」,',
         'agent_name:「始」' + name + '「末」,', 'task_delegation:「始」true「末」,',
@@ -652,7 +655,9 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
     const pattern = /\{\{VCP_ASYNC_RESULT::AgentAssistant::(aa-delegation-[a-zA-Z0-9-]+)\}\}/;
     provider.setReply((body, res) => {
         const content = JSON.stringify(body.messages);
-        const result = body.model === childModel ? '[[Flowlock::Complete]]\nVerified child report.' :
+        const result = body.model === childModel
+            ? (content.includes('callback from child tool') ? '[[Flowlock::Complete]]\nVerified child report.' :
+                ['<<<[TOOL_REQUEST]>>>', 'tool_name:「始」' + childTool + '「末」', '<<<[END_TOOL_REQUEST]>>>'].join('\n')) :
             content.includes('Use the report') ? 'Report received.' : content.match(pattern)?.[0] || block;
         res.end(JSON.stringify({ model: body.model, choices: [{ message: { content: result }, finish_reason: 'stop' }] }));
     });
@@ -668,7 +673,9 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
         }, 'native archive proved');
         const archive = await phone.call(route + '/works/' + accepted.id + '/tasks/' + task.id);
         assert.equal(archive.content, 'Verified child report.');
-        assert.equal(provider.calls.filter(call => call.model === childModel).length, 1);
+        assert.equal(provider.calls.filter(call => call.model === childModel).length, 2);
+        assert.equal(core.store.db.prepare("SELECT count(*) AS n FROM work_invocations WHERE plugin_name=?").get(childTool).n, 0);
+        assert.equal(core.store.db.prepare("SELECT count(*) AS n FROM core_aa_attempts WHERE task_id=? AND state='settled'").get(task.id).n, 2);
         assert.equal(f.calls(), 0, 'child and parent never entered the old handler route');
         const next = await phone.call(route + '/send', { requestId: 'core-native-aa-follow-up', text: 'Use the report.' }, 202);
         await wait(() => core.store.work(next.id)?.status === 'completed', 'report in subsequent Core context');
@@ -729,6 +736,8 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
         assistant.shutdown();
         pluginManager.plugins.delete('AgentAssistant');
         pluginManager.serviceModules.delete('AgentAssistant');
+        pluginManager.plugins.delete(childTool);
+        pluginManager.serviceModules.delete(childTool);
         await core.close();
         await fs.rm(f.root + '-core', { recursive: true, force: true });
     }

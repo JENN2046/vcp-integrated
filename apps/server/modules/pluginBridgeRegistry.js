@@ -54,12 +54,6 @@ class PluginExecutionBridgeRegistry {
         }
         for (const bridge of this.bridges) {
             if (await bridge.canHandle(plugin, context)) {
-                const coreGame = bridge.name === 'distributed' && plugin.name === 'GameController' &&
-                    typeof context.executeCoreGame === 'function';
-                if (native.isCoreTurn() && ((!coreGame && !['direct-hybrid-service', 'local-stdio', 'nativesync-topic-sponsor'].includes(bridge.name)) ||
-                    plugin.pluginType === 'asynchronous' || plugin.name === 'VCPSleep')) {
-                    throw Object.assign(Error('CORE_TOOL_NOT_MIGRATED'), { code: 'CORE_TOOL_NOT_MIGRATED' });
-                }
                 if (native.controlledToolWork() && bridge.name !== 'direct-hybrid-service') {
                     throw Object.assign(Error('CONTROLLED_TOOL_FORBIDDEN'), { code: 'CONTROLLED_TOOL_FORBIDDEN' });
                 }
@@ -255,11 +249,10 @@ function createDefaultExecutionBridgeRegistry() {
                 `Processing distributed tool call for: ${context.toolName} ` +
                 `on server ${plugin.serverId}`
             );
-            const result = await context.webSocketServer.executeDistributedTool(
-                plugin.serverId,
-                context.toolName,
-                toolArgs
+            const dispatch = () => context.webSocketServer.executeDistributedTool(
+                plugin.serverId, context.toolName, toolArgs, ...(context.signal ? [undefined, undefined, context.signal] : [])
             );
+            const result = await (context.dispatchTransport ? context.dispatchTransport(dispatch) : dispatch());
             return { result };
         }
     });
@@ -284,10 +277,8 @@ function createDefaultExecutionBridgeRegistry() {
             const forwardedArgs = { ...toolArgs };
             const command = forwardedArgs.command;
             delete forwardedArgs.command;
-            const result = await context.webSocketServer.forwardCommandToChrome(
-                command,
-                forwardedArgs
-            );
+            const dispatch = () => context.webSocketServer.forwardCommandToChrome(command, forwardedArgs);
+            const result = await (context.dispatchTransport ? context.dispatchTransport(dispatch) : dispatch());
             return { result };
         }
     });
@@ -382,24 +373,27 @@ function createDefaultExecutionBridgeRegistry() {
                 logParam
             );
 
-            if (context.toolName === 'VCPSleep') {
-                // Keep the dream parallel with sleep, but only for a duration the
-                // stdio plugin itself will accept. Invalid calls still reach the
-                // plugin so its existing error response remains authoritative.
-                try {
-                    require('../Plugin/VCPSleep/sleepDuration').getSleepDurationMs(toolArgs);
-                    context.triggerSleepDream(plugin, toolArgs);
-                } catch (_) {
-                    // The plugin reports the validation error below.
+            const dispatch = () => {
+                if (context.toolName === 'VCPSleep') {
+                    // Keep the dream parallel with sleep, but only for a duration the
+                    // stdio plugin itself will accept. Invalid calls still reach the
+                    // plugin so its existing error response remains authoritative.
+                    try {
+                        require('../Plugin/VCPSleep/sleepDuration').getSleepDurationMs(toolArgs);
+                        context.triggerSleepDream(plugin, toolArgs);
+                    } catch (_) {
+                        // The plugin reports the validation error below.
+                    }
                 }
-            }
 
-            const pluginOutput = await context.executeStdio(
-                context.toolName,
-                executionParam,
-                context.requestIp,
-                context.executionOptions
-            );
+                return context.executeStdio(
+                    context.toolName,
+                    executionParam,
+                    context.requestIp,
+                    context.executionOptions
+                );
+            };
+            const pluginOutput = await (context.dispatchTransport ? context.dispatchTransport(dispatch) : dispatch());
 
             if (pluginOutput.__vcpArcheryNoReplySilent) {
                 return { shortCircuitResult: pluginOutput.result };

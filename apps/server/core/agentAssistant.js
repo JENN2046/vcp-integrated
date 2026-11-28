@@ -113,18 +113,31 @@ class CoreAgentAssistant {
         let committed;
         const sink = new CoreTurnSink({ signal, observe: () => {}, present: () => {}, commit: value => {
             fence();
+            if (this.store.db.prepare("SELECT 1 FROM core_aa_attempts WHERE task_id=? AND id<>? AND state='dispatched'")
+                .get(taskId, id)) throw failure('NATIVE_TASK_RESULT_REQUIRES_REVIEW');
             this.store.db.prepare("UPDATE core_aa_attempts SET state='settled' WHERE id=? AND state='dispatched'").run(id);
             committed = value;
         } });
-        // Keep the native AA loop, prompts and archive, but execute child
-        // model rounds in-process with the text-only authority of shared AA.
+        // Tool and model attempts share the task receipt boundary, separate from the parent Work.
         const body = structuredClone(packet);
-        body.messages[0].content = '[[VCPToolUse=Forbidden]]\n' + body.messages[0].content;
         try {
             await native.runCoreTurn({
                 coreNativeAuthority: createWorkAuthority(this.readNativeGrants, topic.workspace,
                     'aa:' + identity.agentBaseName, fence),
-                workId: work.id, requestId: id, signal, fence, textOnly: true, observe: () => {},
+                workId: work.id, requestId: id, signal, fence, observe: () => {},
+                bridge: {
+                    onToolDispatch: ({ invocationId }) => {
+                        fence();
+                        this.store.db.prepare("INSERT INTO core_aa_attempts VALUES(?,?,'dispatched')")
+                            .run(invocationId, taskId);
+                    },
+                    onToolSettled: ({ invocationId }) => {
+                        const saved = this.store.db.prepare(
+                            "UPDATE core_aa_attempts SET state='settled' WHERE id=? AND task_id=? AND state='dispatched'"
+                        ).run(invocationId, taskId);
+                        if (saved.changes !== 1) throw failure('CORE_AA_REQUEST_UNCONFIRMED');
+                    }
+                },
                 phase: () => this.store.db.prepare("UPDATE core_aa_attempts SET state='dispatched' WHERE id=? AND state='prepared'").run(id)
             }, () => this.chat.executeTurn({ body, clientIp: null, signal }, sink));
             if (typeof committed !== 'string') throw failure(sink.errorCode || 'CORE_AA_REQUEST_UNCONFIRMED');
@@ -153,6 +166,7 @@ class CoreAgentAssistant {
         if (!link) throw failure('NATIVE_TASK_NOT_FOUND', 404);
         const state = await native.controlNativeTask(plugin, link.identity, { action: 'stop' });
         this.update(work, link.identity, state);
+        if (['cancelling', 'cancelled', 'stopped'].includes(state.state)) this.attempts.get(taskId)?.abort();
         return { id: taskId, state: this.row(taskId).state };
     }
 

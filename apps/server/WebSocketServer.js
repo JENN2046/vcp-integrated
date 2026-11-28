@@ -989,7 +989,7 @@ function sendCancelToolIfSupported(pending) {
             data: { requestId: pending.requestId }
         }));
         pending.cancelSent = true;
-        writeLog(`Sent cancel_tool for timed-out request ${pending.requestId} to server ${pending.serverId}.`);
+        writeLog(`Sent cancel_tool for request ${pending.requestId} to server ${pending.serverId}.`);
         return true;
     } catch (error) {
         console.warn(`[WebSocketServer] Failed to send cancel_tool for ${pending.requestId}:`, error.message);
@@ -1030,7 +1030,8 @@ function bindDistributedTool(toolName, routeHash) {
         server === registered && server.ws === socket && currentRecipient()?.[0] === id);
 }
 
-async function executeDistributedTool(serverIdOrName, toolName, toolArgs, timeout, acceptsServer) {
+async function executeDistributedTool(serverIdOrName, toolName, toolArgs, timeout, acceptsServer, signal) {
+    signal?.throwIfAborted();
     // 优先从插件 manifest 获取超时设置
     const plugin = pluginManager.getPlugin(toolName);
     const defaultTimeout = plugin?.communication?.timeout || 60000;
@@ -1068,12 +1069,19 @@ async function executeDistributedTool(serverIdOrName, toolName, toolArgs, timeou
     };
 
     return new Promise((resolve, reject) => {
+        const cleanup = () => signal?.removeEventListener('abort', abort);
+        const abort = () => {
+            clearTimeout(pending.timeout);
+            pendingToolRequests.delete(requestId);
+            sendCancelToolIfSupported(pending);
+            pending.reject(signal.reason);
+        };
         const pending = {
             requestId,
             serverId: targetServerId,
             server,
-            resolve,
-            reject,
+            resolve(value) { cleanup(); resolve(value); },
+            reject(error) { cleanup(); reject(error); },
             timeout: null,
             cancelSent: false,
             privateResult: toolName === 'internal_core_context'
@@ -1081,10 +1089,11 @@ async function executeDistributedTool(serverIdOrName, toolName, toolArgs, timeou
         pending.timeout = setTimeout(() => {
             pendingToolRequests.delete(requestId);
             sendCancelToolIfSupported(pending);
-            reject(new Error(`Request to distributed tool ${toolName} on server ${serverIdOrName} timed out after ${effectiveTimeout / 1000}s.`));
+            pending.reject(new Error(`Request to distributed tool ${toolName} on server ${serverIdOrName} timed out after ${effectiveTimeout / 1000}s.`));
         }, effectiveTimeout);
 
         pendingToolRequests.set(requestId, pending);
+        signal?.addEventListener('abort', abort, { once: true });
 
         try {
             server.ws.send(JSON.stringify(payload));
@@ -1092,7 +1101,7 @@ async function executeDistributedTool(serverIdOrName, toolName, toolArgs, timeou
         } catch (error) {
             clearTimeout(pending.timeout);
             pendingToolRequests.delete(requestId);
-            reject(error);
+            pending.reject(error);
         }
     });
 }

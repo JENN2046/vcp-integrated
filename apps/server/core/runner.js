@@ -122,7 +122,7 @@ class CoreRunner {
         let includedCount;
         let step = work;
         const group = work.group_ordinal !== null;
-        const sink = new CoreTurnSink({
+        const createSink = () => new CoreTurnSink({
             signal, observe,
             present: (type, presentation) => {
                 if (config.game) return;
@@ -149,6 +149,12 @@ class CoreRunner {
                 observe('work_state', result);
             }
         });
+        let sink;
+        let errorCode;
+        const runTurn = (body) => {
+            sink = createSink();
+            return this.chat.executeTurn({ body, signal, clientIp: null }, sink);
+        };
         observe('work_state', { status: 'running' });
         try {
             const topic = this.resolveAcceptedTopic(work);
@@ -204,7 +210,7 @@ class CoreRunner {
                     observe('work_preview', { text: '', ...runtime.speaker });
                     const packet = await buildGroupPacket(topic, step, config, member, this.store.history(work), this.attachments, this.desktopContext);
                     fence();
-                    await execute(member, () => this.chat.executeTurn({ body: packet.body, signal, clientIp: null }, sink));
+                    await execute(member, () => runTurn(packet.body));
                     if (this.store.work(id).group_step === step.group_step) break;
                 }
             } else await execute(config, async () => {
@@ -213,7 +219,7 @@ class CoreRunner {
                     includedCount = this.store.work(id).steering_count;
                     const packet = await this.buildPacket(topic, work, config, previousTurn);
                     fence();
-                    await this.chat.executeTurn({ body: packet, signal, clientIp: null }, sink);
+                    await runTurn(packet);
                     if (continuation) {
                         previousTurn = continuation;
                         runtime.text = '';
@@ -222,8 +228,9 @@ class CoreRunner {
                 } while (continuation);
             });
         } catch (error) {
-            sink.errorCode = error.code || 'TURN_FAILED';
+            errorCode = error.code || 'TURN_FAILED';
         }
+        errorCode ??= sink?.errorCode;
         const state = this.store.work(id);
         if (state.status === 'completed') return;
         if (state.pending_final_json && state.status === 'running') {
@@ -233,10 +240,10 @@ class CoreRunner {
         const result = this.store.transaction(() => {
             if (!group) this.flowlock.endWork(work);
             if (this.store.unresolved(id)) return this.store.review(id, 'TOOL_EXECUTION_UNCONFIRMED');
-            if (['CORE_PROVIDER_OUTCOME_UNKNOWN', 'CORE_COMPACTION_OUTCOME_UNKNOWN'].includes(sink.errorCode)) return this.store.review(id, sink.errorCode);
+            if (['CORE_PROVIDER_OUTCOME_UNKNOWN', 'CORE_COMPACTION_OUTCOME_UNKNOWN'].includes(errorCode)) return this.store.review(id, errorCode);
             if (state.status === 'cancelling' || signal.aborted) return this.store.setState(id, 'cancelled');
-            if (state.dispatched && !sink.errorCode) return this.store.review(id, 'UPSTREAM_INCOMPLETE');
-            return this.store.setState(id, 'failed', sink.errorCode || 'TURN_FAILED');
+            if (state.dispatched && !errorCode) return this.store.review(id, 'UPSTREAM_INCOMPLETE');
+            return this.store.setState(id, 'failed', errorCode || 'TURN_FAILED');
         });
         this.publish(key, 'flowlock_state', {});
         observe('work_state', result);
