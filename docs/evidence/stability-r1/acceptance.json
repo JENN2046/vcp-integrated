@@ -1,0 +1,393 @@
+{
+  "status": "STABILITY_R1_PASS / READY_FOR_PILOT_PREPARATION",
+  "base": "5a0969e796778e8636bcdbc36fb039653f289216",
+  "testedCommit": "71de323c91dbb424da2ab7c3600e51fea9b0cf21",
+  "inputTrees": {
+    "apps": "f76333080fa9516838fc82d95c6616b95ee94417",
+    "packages": "9d82580138bf2f1ff8726dfab94c835c38724a8b",
+    "tests": "8906603fc20cb46583416451e8195225d31b1c49",
+    "scripts": "1d508593476f7dc81c350737d12e80e1b5c25b6c"
+  },
+  "platform": "Linux x64, Electron 44.9.3, Node 24.22.1; Chromium and fresh synthetic profiles",
+  "build": {
+    "command": "npm run build",
+    "exit": 0,
+    "logSha256": "18092dbd408ca2a4284f109da658ca1894264734ef3eae1c0b5d5a96129aa2f9"
+  },
+  "before": {
+    "nativeLifecycleFailures": {
+      "tests": 3,
+      "pass": 0,
+      "fail": 3,
+      "skipped": 0,
+      "todo": 0
+    },
+    "groupPreviewSpeakerIds": [],
+    "groupPreviewExpected": [
+      "memberA",
+      "memberB"
+    ]
+  },
+  "passedSuites": {
+    "defaultNative": {
+      "tests": 103,
+      "pass": 103,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "defaultCollaboration": {
+      "tests": 14,
+      "pass": 14,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "nativeDeletionAndTopicSponsor": {
+      "tests": 74,
+      "pass": 74,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "desktopGroupAndContext": {
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "serverFcAndMedia": {
+      "tests": 86,
+      "pass": 86,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "desktopFcAndContext": {
+      "tests": 44,
+      "pass": 44,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  },
+  "frozenIntegrations": {
+    "nativeDesktop": {
+      "rawEvidenceSha256": "b695b01da0fee32c1a8a83c4f4ddda111a67d76421b335c7eed8f4259398692c",
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "observed": {
+        "coldOrder": [
+          "group_topic_a86b9d58-9192-4dfa-8d16-a9175bdf7c28",
+          "group_topic_06ad35da-b979-4127-aa1d-4be74b3c722d",
+          "group_topic_18e7b383-785f-484f-b417-9eb37cca2b02"
+        ],
+        "deletedTopic": "group_topic_a86b9d58-9192-4dfa-8d16-a9175bdf7c28",
+        "agentTopicDeletionReplayedAfterRestart": true,
+        "ownerTombstoneAfterRestart": true,
+        "staleOrderRejected": true,
+        "lateHistoriesRejected": 3
+      }
+    },
+    "coreLocal": {
+      "rawEvidenceSha256": "2c3bcb40e1d124d538bd60cf5ea8adf853e0b07a5714382a1b9ece05033db06d",
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "observed": {
+        "id": "e4d203ba-8717-4c9e-a78b-73311cd6307d",
+        "completedWithoutDesktop": true,
+        "legacyDatabaseCreated": false,
+        "nativeHistoryWrites": 0
+      }
+    },
+    "coreGroupElectronPwa": {
+      "rawEvidenceSha256": "7a6f9fcfcc00ab50c2aaf8aff05f009be8ce5a1e6b3ddf22799255911c6fbb17",
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "observed": {
+        "runs": [
+          {
+            "workId": "aacbd359-4f1b-449d-8b59-d1b592a9134d",
+            "outcome": "completed",
+            "observations": [
+              {
+                "step": 0,
+                "member": "stability-a",
+                "desktop": {
+                  "speaker": "stability-a",
+                  "status": "共享后端 · Ada · 原生执行中",
+                  "text": ""
+                },
+                "mobile": {
+                  "speaker": "stability-a",
+                  "name": "Ada",
+                  "text": ""
+                }
+              },
+              {
+                "step": 1,
+                "member": "stability-b",
+                "desktop": {
+                  "speaker": "stability-b",
+                  "status": "共享后端 · Bruno · 原生执行中",
+                  "text": "Bruno streaming "
+                },
+                "mobile": {
+                  "speaker": "stability-b",
+                  "name": "Bruno",
+                  "text": "Bruno streaming "
+                }
+              }
+            ],
+            "formalReplies": [
+              {
+                "agentId": "stability-a",
+                "name": "Ada",
+                "content": "Ada final"
+              },
+              {
+                "agentId": "stability-b",
+                "name": "Bruno",
+                "content": "Bruno streaming final"
+              }
+            ]
+          },
+          {
+            "workId": "e5b147b9-ecbc-4041-a770-9d8a360a65b0",
+            "outcome": "cancelled",
+            "observations": [
+              {
+                "step": 0,
+                "member": "stability-a",
+                "desktop": {
+                  "speaker": "stability-a",
+                  "status": "共享后端 · Ada · 原生执行中",
+                  "text": ""
+                },
+                "mobile": {
+                  "speaker": "stability-a",
+                  "name": "Ada",
+                  "text": ""
+                }
+              },
+              {
+                "step": 1,
+                "member": "stability-b",
+                "desktop": {
+                  "speaker": "stability-b",
+                  "status": "共享后端 · Bruno · 原生执行中",
+                  "text": "Bruno streaming "
+                },
+                "mobile": {
+                  "speaker": "stability-b",
+                  "name": "Bruno",
+                  "text": "Bruno streaming "
+                }
+              }
+            ],
+            "formalReplies": [
+              {
+                "agentId": "stability-a",
+                "name": "Ada",
+                "content": "Ada final"
+              }
+            ]
+          },
+          {
+            "workId": "30cf7f46-7c05-4c35-a06f-30070b18fbfa",
+            "outcome": "failed",
+            "observations": [
+              {
+                "step": 0,
+                "member": "stability-a",
+                "desktop": {
+                  "speaker": "stability-a",
+                  "status": "共享后端 · Ada · 原生执行中",
+                  "text": ""
+                },
+                "mobile": {
+                  "speaker": "stability-a",
+                  "name": "Ada",
+                  "text": ""
+                }
+              },
+              {
+                "step": 1,
+                "member": "stability-b",
+                "desktop": {
+                  "speaker": "stability-b",
+                  "status": "共享后端 · Bruno · 原生执行中",
+                  "text": ""
+                },
+                "mobile": {
+                  "speaker": "stability-b",
+                  "name": "Bruno",
+                  "text": ""
+                }
+              }
+            ],
+            "formalReplies": [
+              {
+                "agentId": "stability-a",
+                "name": "Ada",
+                "content": "Ada final"
+              }
+            ]
+          },
+          {
+            "workId": "98c2c6be-a04e-4923-ab41-e974bfe4efac",
+            "outcome": "review_required",
+            "observations": [
+              {
+                "step": 0,
+                "member": "stability-a",
+                "desktop": {
+                  "speaker": "stability-a",
+                  "status": "共享后端 · Ada · 原生执行中",
+                  "text": ""
+                },
+                "mobile": {
+                  "speaker": "stability-a",
+                  "name": "Ada",
+                  "text": ""
+                }
+              },
+              {
+                "step": 1,
+                "member": "stability-b",
+                "desktop": {
+                  "speaker": "stability-b",
+                  "status": "共享后端 · Bruno · 原生执行中",
+                  "text": "Bruno streaming "
+                },
+                "mobile": {
+                  "speaker": "stability-b",
+                  "name": "Bruno",
+                  "text": "Bruno streaming "
+                }
+              }
+            ],
+            "formalReplies": [
+              {
+                "agentId": "stability-a",
+                "name": "Ada",
+                "content": "Ada final"
+              }
+            ]
+          }
+        ],
+        "providerCalls": 8
+      }
+    },
+    "coreRemoteRisk": {
+      "rawEvidenceSha256": "7e9b699e4a28e2b1f24fee453cde6d2be1de9d5d7fd796beb1179e2027038962",
+      "exits": {
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "backend": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "observed": {
+        "nativeDesktopDeletion": true,
+        "memoAndAttachmentsRespectTombstone": true,
+        "nativeAliasPaths": 3,
+        "acceptedPromptFrozen": true,
+        "refusedDifferentStorageAtSameOrigin": true,
+        "restoredSameIdentity": true,
+        "browserIdentityVerified": false,
+        "coldDesktopReadback": true,
+        "durableMessages": 8,
+        "durableWorks": 4,
+        "tombstones": 2,
+        "attachmentHash": "01f4236cd231e3935c2f3780c2288f532da550eda7333454b05402fde0d0102b"
+      }
+    },
+    "desktopColdFcReplay": {
+      "rawEvidenceSha256": "c0eb6f78b1aa2a8c2581f01668602afc4139814299beb5e58f0580bd3b324c32",
+      "exits": {
+        "B": {
+          "code": 0,
+          "signal": null
+        },
+        "C": {
+          "code": 0,
+          "signal": null
+        },
+        "A": {
+          "code": 0,
+          "signal": null
+        },
+        "A-reopened": {
+          "code": 0,
+          "signal": null
+        }
+      },
+      "observed": {
+        "requests": 2,
+        "groupSizes": [
+          2,
+          1
+        ],
+        "durableIds": [
+          "fixture-call-one",
+          "fixture-call-two",
+          "fixture-call-three"
+        ],
+        "replayedIds": [
+          "fixture-call-one",
+          "fixture-call-two",
+          "fixture-call-three"
+        ],
+        "exactSignaturesMatch": true
+      }
+    }
+  },
+  "knownSuiteComparisons": "baseline-comparison.json",
+  "highSensitivityProfile": "vcp_chat.c2 / PRODUCTION_DISABLED / DEFERRED_FAIL_CLOSED",
+  "otherEvidence": [
+    "native-delete-recovery.json",
+    "topic-sponsor.json",
+    "group-preview.json"
+  ],
+  "validationNotes": [
+    "The optional new_topic dispatch suite still has five expected capability-gap failures. The existing standalone VchatManager order and native group structured-FC scope did not change.",
+    "One Chromium ordinary-image retention run exceeded its viewport wait; its isolated repeat and the clean default suite passed unchanged. One standalone Electron signature run timed out before its second persisted assistant; an unchanged clean rerun passed, preserving all expected IDs and signatures. Long-term load and private daily data were not tested."
+  ]
+}

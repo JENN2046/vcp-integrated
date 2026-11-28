@@ -49,3 +49,7 @@ CoreRunner 原已在轮次开始时产生稳定成员 ID、显示名与步号。
 - 正式 Core 与客户端预览：`VCP_TEST_CORE_GROUP_PREVIEW=1 npm run test:integration -- core-remote`。[群聊预览回执](evidence/stability-r1/group-preview.json)
 - 仓库默认入口为 `npm run build`、`npm run test:native`、`npm run test:collaboration`；远程恢复、权限、附件及同址换库通过 `VCP_TEST_CORE_RISK=1 npm run test:integration -- core-remote` 复验。图形联验使用 Xvfb 与 Chromium。
 - 在相同 Node 版本、隔离夹具和相同用例集合下重跑已知的 25 项桌面失败。另对照原生 History 的旧套件，其用例与其他专项有交叉，分别列出分母、用例名及基线结果。[桌面及 History 基线对照](evidence/stability-r1/baseline-comparison.json)
+
+**隔离验收结果为 `STABILITY_R1_PASS / READY_FOR_PILOT_PREPARATION`。** 实测产品提交为 [`71de323`](https://github.com/JENN2046/vcp-integrated/commit/71de323c91dbb424da2ab7c3600e51fea9b0cf21)，回退基线为 `5a0969e`。独立 Electron、Core local、Core remote 数据风险、群聊双端观察以及独立桌面 FC 冷重放均在该干净提交完成，运行开始与结束的输入树一致。 [统一验收回执](evidence/stability-r1/acceptance.json)
+
+默认原生 **103/103**、默认协作 **14/14**、原生删除与 TopicSponsor 联合专项 **74/74**、群聊与上下文 **18/18** 均通过。桌面已知对照为两版相同的 25 项失败；额外 106 项历史合同对照中，两版均为 83 过、23 失败。后者包括直接移除仍登记话题的物理目录，以及依赖旧仓储 API 的场景。上述旧失败没有通过放宽断言消除。一次 PWA 图片视口等待以及一次 Electron 冷启动后第二条助手回复等待曾超时，分别在原断言下复跑通过，保留为试用时的观察项。独立 TopicSponsor 新话题派工的五项用例继续作为已知能力差异保留。
