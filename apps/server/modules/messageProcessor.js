@@ -1127,6 +1127,10 @@ async function replaceOtherVariables(text, model, role, context) {
         const placeholder = asyncMatch[0];
         const pluginName = asyncMatch[1] || asyncMatch[3] || asyncMatch[5];
         const requestId = asyncMatch[2] || asyncMatch[4] || asyncMatch[6];
+        if (pluginName === 'AgentAssistant' && require('./requestExecutionContext').isCoreTurn()) {
+            tempAsyncProcessedText = tempAsyncProcessedText.replace(placeholder, '[AgentAssistant 报告不可用]');
+            continue;
+        }
 
         promises.push(
             (async () => {

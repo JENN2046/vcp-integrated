@@ -706,6 +706,25 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
         assert.equal(finishedChild.content, 'Child finished after parent cancellation.');
         assert.equal(childRounds, 2);
         assert.equal(core.store.work(interrupted.id).reply_message_id, null);
+
+        let activeChild;
+        const beforeRevoke = provider.calls.filter(call => call.model === childModel).length;
+        provider.setReply((body, res) => {
+            if (body.model === childModel) activeChild = { body, res };
+            else complete(body, res, body.messages.some(message => String(message.content).includes('VCP_TOOL_PAYLOAD'))
+                ? 'Parent reply settled.' : block);
+        });
+        const revoking = await phone.call(route + '/send', {
+            requestId: 'core-native-aa-revoked', text: 'Start a revocable delegation.'
+        }, 202);
+        await wait(() => activeChild, 'authorized child round reached the provider');
+        f.shared.delegationAgents.delete(name);
+        complete(activeChild.body, activeChild.res, '[[Flowlock::Start]]\n[[Flowlock::NextHeartbeat::1]]');
+        await wait(async () => {
+            const { tasks } = await phone.call(route + '/works/' + revoking.id + '/tasks');
+            return tasks[0] && ['failed','unknown','stopped'].includes(tasks[0].state);
+        }, 'revocation fences the accepted child before another model round');
+        assert.equal(provider.calls.filter(call => call.model === childModel).length, beforeRevoke + 1);
     } finally {
         assistant.shutdown();
         pluginManager.plugins.delete('AgentAssistant');
@@ -758,6 +777,18 @@ test('Core TopicSponsor delivers a canonical peer message without a desktop reci
         assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM shared_topic_sponsor_grants').get().n, 0);
         assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM journal').get().n, 0);
         assert.equal(f.calls(), 0);
+
+        provider.setReply((_body, response) => response.end(JSON.stringify({
+            choices: [{ message: { role: 'assistant',
+                content: block.replace(desktop.descriptor.topicId, 'other-source-topic') }, finish_reason: 'stop' }]
+        })));
+        const reopened = await f.desktop('A');
+        const rejected = await reopened.runtime.prepareSharedSend({ descriptor: reopened.descriptor, serverSession: true,
+            message: { id: 'core-sponsor-spoof', role: 'user', content: 'Attempt delivery with an unrelated source.', attachments: [] } });
+        await wait(() => ['failed', 'review_required'].includes(core.store.work(rejected.serverSession.executionId)?.status),
+            'mismatched source cannot deliver');
+        assert.equal(core.store.db.prepare('SELECT count(*) AS n FROM works WHERE conversation_id=?').get(destination.id).n, 1);
+        await reopened.close();
     } finally {
         await core.close();
         await fs.rm(f.root + '-core', { recursive: true, force: true });

@@ -1,17 +1,19 @@
 'use strict';
 
+const { createWorkAuthority } = require('./nativeCapabilityGrants');
+
 const native = require('../modules/requestExecutionContext');
 const { CoreTurnSink } = require('./turnSink');
 const { failure } = require('./store');
 const { planGroup, buildGroupPacket } = require('./group');
 
 class CoreRunner {
-    constructor({ store, chat, resolveAcceptedTopic, buildPacket, allowedAgents, sponsor, send, automaticCompaction, isCompacting, attachments, desktopContext, memoryTool, diaryRecall }) {
+    constructor({ store, chat, resolveAcceptedTopic, buildPacket, allowedAgents, sponsor, send, automaticCompaction, isCompacting, attachments, desktopContext, memoryTool, readNativeGrants }) {
         this.store = store;
         this.chat = chat;
         this.attachments = attachments;
         this.desktopContext = desktopContext;
-        this.diaryRecall = diaryRecall;
+        this.readNativeGrants = readNativeGrants;
         this.memoryTool = memoryTool;
         this.resolveAcceptedTopic = resolveAcceptedTopic;
         this.buildPacket = buildPacket;
@@ -21,7 +23,7 @@ class CoreRunner {
         this.observers = new Map();
         const { CoreAgentAssistant } = require('./agentAssistant');
         const publish = (key, type, value) => this.publish(key, type, value);
-        this.agentAssistant = new CoreAgentAssistant({ store, chat, resolveAcceptedTopic, allowedAgents, publish });
+        this.agentAssistant = new CoreAgentAssistant({ store, chat, resolveAcceptedTopic, allowedAgents, publish, readNativeGrants });
         const { CoreFlowlock } = require('./flowlock');
         this.flowlock = new CoreFlowlock({ store, resolveTopic: resolveAcceptedTopic, send, publish, isCompacting });
     }
@@ -155,14 +157,12 @@ class CoreRunner {
             if (!group) await this.automaticCompaction(topic, work, config, signal, fence);
             const execute = (agent, turn) => native.runCoreTurn({
                 workId: id, signal, fence, observe,
+                coreNativeAuthority: createWorkAuthority(this.readNativeGrants, topic.workspace, group ? agent.id : topic.ownerId, fence),
                 ...(this.sponsor && !group && topic.actor?.kind === 'desktop' && !config.sponsoredByWorkId && { coreSponsor: (invocation, args) => this.sponsor(work, invocation, args) }),
-                ...(!group && !config.game && !config.sponsoredByWorkId && this.diaryRecall && {
-                    coreDiaryRecall: (messages, requestSignal) => this.diaryRecall(topic, messages, requestSignal, fence)
-                }),
                 coreMemory: (name, args, pluginConfig) => this.memoryTool(topic, name, args, pluginConfig),
                 ...(config.game && { coreGame: args => this.desktopContext.gameTool(topic, config.game, agent.name, args) }),
                 coreAA: {
-                    assertAllowed: (args, indirect) => this.agentAssistant.assertAllowed(work, args, indirect),
+                    assertAllowed: (args, baseName) => this.agentAssistant.assertAllowed(work, args, baseName),
                     link: (plugin, taskId) => this.agentAssistant.link(work, plugin, taskId),
                     accept: identity => this.agentAssistant.accept(work, identity)
                 },

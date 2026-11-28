@@ -3,14 +3,15 @@
 const native = require('../modules/requestExecutionContext');
 const { CoreTurnSink } = require('./turnSink');
 const { failure } = require('./store');
+const { createWorkAuthority } = require('./nativeCapabilityGrants');
 
 const plugin = 'AgentAssistant';
 const active = new Set(['accepted', 'waiting', 'running', 'cancelling']);
 const terminal = new Set(['completed', 'failed', 'cancelled', 'stopped']);
 
 class CoreAgentAssistant {
-    constructor({ store, chat, allowedAgents, resolveAcceptedTopic, publish }) {
-        Object.assign(this, { store, chat, allowedAgents, resolveAcceptedTopic, publish });
+    constructor({ store, chat, allowedAgents, resolveAcceptedTopic, publish, readNativeGrants }) {
+        Object.assign(this, { store, chat, allowedAgents, resolveAcceptedTopic, publish, readNativeGrants });
         this.attempts = new Map();
         this.closed = false;
         store.db.exec(`
@@ -26,17 +27,18 @@ class CoreAgentAssistant {
         `);
     }
 
-    assertAllowed(work, args, indirect) {
-        if (indirect || !args || args.timely_contact !== undefined || args.inject_tools !== undefined ||
+    assertAllowed(work, args, baseName) {
+        if (!args || args.timely_contact !== undefined || args.inject_tools !== undefined ||
             args.cancel_delegation !== undefined || args.temporary_contact !== undefined || args.__vcp_timed_call !== undefined) {
             throw failure('CORE_AA_DELEGATION_REQUIRED');
         }
         if (args.query_delegation) {
-            if (!this.link(work, plugin, args.query_delegation)) throw failure('CORE_AA_TASK_SCOPE_REQUIRED', 403);
+            const link = this.link(work, plugin, args.query_delegation);
+            if (!link) throw failure('CORE_AA_TASK_SCOPE_REQUIRED', 403);
             return;
         }
         if (String(args.task_delegation).toLowerCase() !== 'true' || !this.allowedAgents.has(args.agent_name) ||
-            !native.hasNativeTaskProvider(plugin)) throw failure('CORE_AA_DELEGATION_REQUIRED');
+            !baseName || !native.hasNativeTaskProvider(plugin)) throw failure('CORE_AA_DELEGATION_REQUIRED');
     }
 
     row(id) {
@@ -51,7 +53,8 @@ class CoreAgentAssistant {
 
     accept(work, identity) {
         if (this.closed || identity.pluginName !== plugin || identity.requestId !== work.id ||
-            typeof identity.nativeTaskId !== 'string' || typeof identity.agentBaseName !== 'string') {
+            typeof identity.nativeTaskId !== 'string' || typeof identity.agentBaseName !== 'string' ||
+            typeof identity.agentName !== 'string') {
             throw failure('CORE_AA_TASK_IDENTITY_INVALID');
         }
         const invocation = this.store.db.prepare("SELECT 1 FROM work_invocations WHERE id=? AND work_id=? AND plugin_name=? AND status='dispatched'")
@@ -89,10 +92,13 @@ class CoreAgentAssistant {
         if (typeof id !== 'string' || !id.startsWith(taskId + '-round-')) throw failure('CORE_AA_REQUEST_IDENTITY_INVALID');
         const controller = new AbortController();
         const { signal } = controller;
+        let topic;
         const fence = () => {
             signal.throwIfAborted();
             // Once accepted, the native task has its own lifecycle and stop command.
-            if (this.closed || !this.resolveAcceptedTopic(work) || !active.has(this.row(taskId)?.state)) {
+            topic = this.resolveAcceptedTopic(work);
+            if (this.closed || !topic || !active.has(this.row(taskId)?.state) ||
+                !this.allowedAgents.has(identity.agentName)) {
                 throw failure('CORE_AA_REQUEST_FENCED');
             }
         };
@@ -116,6 +122,8 @@ class CoreAgentAssistant {
         body.messages[0].content = '[[VCPToolUse=Forbidden]]\n' + body.messages[0].content;
         try {
             await native.runCoreTurn({
+                coreNativeAuthority: createWorkAuthority(this.readNativeGrants, topic.workspace,
+                    'aa:' + identity.agentBaseName, fence),
                 workId: work.id, requestId: id, signal, fence, textOnly: true, observe: () => {},
                 phase: () => this.store.db.prepare("UPDATE core_aa_attempts SET state='dispatched' WHERE id=? AND state='prepared'").run(id)
             }, () => this.chat.executeTurn({ body, clientIp: null, signal }, sink));

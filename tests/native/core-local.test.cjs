@@ -73,15 +73,21 @@ test('ToolBox starts local Core without loading the sync runtime and a native to
     assert.equal(core.store.db.prepare('SELECT count(*) n FROM core_topics WHERE id=?').get(mapTopic(descriptor).sharedId).n, 1);
     const actor = { ...core.local.actor };
     const memory = { key: mapTopic(descriptor).sharedId, workspace: 'personal', actor };
-    const listed = await core.memoryTool(memory, 'TopicMemo', { maid: agent.name, command: 'ListTopics' });
+    const { createWorkAuthority } = require(BOX + '/core/nativeCapabilityGrants');
+    const native = require(BOX + '/modules/requestExecutionContext');
+    const memo = args => native.runCoreTurn({
+        workId, signal: new AbortController().signal, fence() {},
+        coreNativeAuthority: createWorkAuthority(core.readNativeGrants, 'personal', 'Agent', () => {})
+    }, () => core.memoryTool(memory, 'TopicMemo', args));
+    const listed = await memo({ maid: agent.name, command: 'ListTopics' });
     assert.match(listed, /Local topic/);
     const targetKey = require(BOX + '/core/localWorkspace').localTopicKey('agent', 'Agent', 'Disposable');
     await core.local.define(targetKey, { ownerType: 'agent', ownerId: 'Agent', topicId: 'Disposable',
         name: 'Deleted memo marker', config: { name: agent.name, model: 'fixture', systemPrompt: 'Disposable' } }, () => true);
-    assert.match(await core.memoryTool(memory, 'TopicMemo', { maid: agent.name }), /Deleted memo marker/);
+    assert.match(await memo({ maid: agent.name }), /Deleted memo marker/);
     core.local.remove('agent', 'Agent', targetKey, core.local.actor, 'delete_disposable', () => {});
-    assert.doesNotMatch(await core.memoryTool(memory, 'TopicMemo', { maid: agent.name }), /Deleted memo marker/);
-    await assert.rejects(core.memoryTool(memory, 'TopicMemo', {
+    assert.doesNotMatch(await memo({ maid: agent.name }), /Deleted memo marker/);
+    await assert.rejects(memo({
         maid: agent.name, command: 'GetTopicContent', topicId: targetKey
     }), /未找到 ID/);
 

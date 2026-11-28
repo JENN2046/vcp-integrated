@@ -1,3 +1,4 @@
+const diaryAuthority = require('../../modules/nativeDiaryAuthority');
 const crypto = require('crypto');
 const fs = require('fs').promises;
 const http = require('http');
@@ -305,6 +306,13 @@ async function initialize(config = {}) {
 }
 
 async function processToolCall(args) {
+    if (diaryAuthority.isCoreTurn()) {
+        const root = path.resolve(process.env.KNOWLEDGEBASE_ROOT_PATH || path.join(__dirname, '../../dailynote'));
+        if (!diaryAuthority.allowsPath(root, args?.folder, args?.folder)) {
+            throw Object.assign(Error('CORE_NATIVE_CAPABILITY_DENIED'), { code: 'CORE_NATIVE_CAPABILITY_DENIED' });
+        }
+        args = { ...args, root_path: root };
+    }
     await ensureServiceStarted();
     const result = await postJson(args || {});
     return result;

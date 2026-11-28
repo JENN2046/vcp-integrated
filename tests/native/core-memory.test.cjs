@@ -12,7 +12,9 @@ test('authorized Core memory reads project inserts, edits and deletes into the n
     const f = await fixture(t, { attachments: true });
     const provider = await localProvider(t);
     const { chat } = host(provider);
-    const { core, route } = await mountCore(f, chat);
+    const { core, route, options } = await mountCore(f, chat);
+    await require('node:fs/promises').writeFile(path.join(options.directory, 'native-capability-grants.json'),
+        JSON.stringify({ version: 1, workspace: 'sharedAB', agents: { [f.owner.id]: { TopicMemo: [f.owner.id] } } }), { mode: 0o600 });
     t.after(() => core.close());
     const desktop = await f.desktop('A');
     const mobile = await f.phone({ permissions: ['read'] });

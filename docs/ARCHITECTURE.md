@@ -104,6 +104,8 @@ Core 使用 Node 24 的 `node:sqlite`，SQLite WAL 与正式消息表配合轻�
 
 [core/cdsIndex.js](../apps/server/core/cdsIndex.js) 在检索前将授权范围内的正式消息生成独立可重建索引输入，再使用原生 CDS/Tantivy reconcile。DeepMemo 复用原生带权、排除及相邻窗口语义，TopicMemo 从授权的 Core 正式历史读取。删除墓碑阻止已删除对象重新进入正式目录、历史与附件读取。当前不是持续推送索引架构，真实大规模索引成本仍需日用测量。
 
+TopicMemo 和 DeepMemo 沿用执行 Agent 的正式历史权限，DeepMemo 也可读取当前群会话的正式历史，并逐一校验目标话题。显式跨 Agent 读取和日记本访问只补充原生入口缺少的资源授权；同步检索共享同一份授权快照，在工具刷新或模型派发前复核。日记目录没有可信的 Agent 所有权绑定，显示名和占位符均不能授予日记访问。TopicSponsor 沿用现有来源、目标、工作区及设备校验，AgentAssistant 沿用已有委托许可、原生目标和审批。
+
 [core/importHistory.js](../apps/server/core/importHistory.js) 负责离线历史导入。支持范围以实际格式验证为准，保留可定位附件、原有顺序及删除事实。跨话题重复 ID、非文本内联部件和缺失附件仍明确拒绝，不静默丢弃。新旧工作空间不能共同写入；完整真实日用历史尚需单独迁移验收。
 
 备份需正常停机后保护完整 Core 数据目录（含数据库、附件和设备会话），并单独保护必要 ToolBox 配置及 Agent 文件。保留旧安装包不是新数据的回退机制。
@@ -122,8 +124,8 @@ Core 使用 Node 24 的 `node:sqlite`，SQLite WAL 与正式消息表配合轻�
 
 长期架构纪律以仓库根级 [AGENTS.md](../AGENTS.md) 为准。本节描述 2026-11-28 已确定的施工顺序及基线缺口，不将目标当成已经上线或验收的能力。原生继承默认成立，新增或保留限制须以真实风险举证；禁止逐插件打洞。上游升级不作为本轮收口门槛。
 
-1. **原生记忆回归（当前施工，待最终交付验收）。** 基线的专用 `core/nativeDiaryRecall.js`、`core/nativeDiarySource.json` 及相关暂存接线是过渡实现，不作为长期记忆管线。隔离验证已表明原生 RAGDiaryPlugin 可经同一 Core 向桌面、PWA、实体 Redmi 提供召回（合成日记、回环模型与嵌入夹具）；基线联合检索缺失 `modelSig` 而回退 legacy，原生 Agent 日记授权能力与预期范围尚有差距。审查实际交付时区分必要的原生接线与重复治理，验收原生路径后物理删除专用召回支线及接线；不宣称已验证真实模型质量、生产数据或全部原生记忆领域。
-2. **原生执行回归（待第一步收口）。** 接通原生 ToolApprovalManager 与可信人类授权，补齐通用执行及回执边界，统一撤除 `distributed` / `asynchronous` / `archery` 类别封禁与 AA 纯文本限制，不为每个插件建新准入或恢复状态机。AA 子工具沿用独立任务、原生工具记录及取消域，不混写父 Work 的 `work_invocations`；Archery 取得明确原生受理及所有权交接后不等待后台副作用全部结束。本步同时修复已核实的 CoreTurnSink 跨轮终态残留（`committed`；`errorCode` 同属轮次状态）和纯 `reasoningDelta` 静默丢失问题，维持原生推理展示策略。
+1. **原生记忆回归（隔离候选已验收）。** ToolBox 负责完整 RAGDiaryPlugin 的发现、依赖初始化、RiverMemo V5 联合检索、排序、注入和工具刷新。Core 提供已认证 Work 的执行身份、设备权限和取消围栏。旧专用召回支线和暂存接线已删除。桌面、PWA 和实体 Redmi 的多端回执使用合成日记以及回环模型与嵌入端点；最终收口复验覆盖插件初始化、联合召回和撤权后的派发边界。见 [原生记忆候选说明](core-native-memory-r1.md)。
+2. **原生执行回归（后续工作）。** 接通原生 ToolApprovalManager 与可信人类授权，补齐通用执行及回执边界，统一撤除 `distributed` / `asynchronous` / `archery` 类别封禁与 AA 纯文本限制，不为每个插件建新准入或恢复状态机。AA 子工具沿用独立任务、原生工具记录及取消域，不混写父 Work 的 `work_invocations`；Archery 取得明确原生受理及所有权交接后不等待后台副作用全部结束。本步同时修复已核实的 CoreTurnSink 跨轮终态残留（`committed`；`errorCode` 同属轮次状态）和纯 `reasoningDelta` 静默丢失问题，维持原生推理展示策略。
 3. **Core 瘦身（待第二步收口）。** 主线正式退出 `shared`；历史版本承担旧环境兼容和回退，已产生的新数据仍须独立保护。保留 local / remote 的共同内核，提炼实际复用的 NativeSync 通用模块，退出旧同步运行时依赖。将 `localSpeech.js` / `mandarinSpeech.py`、`nativeStickers.js`、`game.js` 的领域职责归回原生或独立领域，不以机械搬文件代替职责收敛。优化 CDS 数据接入：按话题变更序号（如 `last_change_seq`）增量生成投影，同时避免每次检索全量读取与重写 Owner 历史，继续使用原生 CDS/Tantivy。清理重复防御而保留真实安全及数据边界。
 
 这三步是工程路线，不是部署授权。各步骤完成后更新本节状态及证据，删除已收口的临时缺口描述。

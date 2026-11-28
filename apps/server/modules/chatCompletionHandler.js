@@ -5,6 +5,7 @@ const contextManager = require('./contextManager.js');
 const roleDivider = require('./roleDivider.js');
 const { projectToolBatchForUpstream } = require('./toolResultBatch.js');
 const nativeContext = require('./requestExecutionContext');
+const diaryAuthority = require('./nativeDiaryAuthority');
 const fs = require('fs').promises;
 const path = require('path');
 const http = require('http');
@@ -488,6 +489,10 @@ async function fetchWithRetry(
     // Every model turn, including a tool follow-up, uses the original Work fence.
     try { nativeContext.assertDispatch(); }
     catch (error) { cleanup(); throw error; }
+    if (diaryAuthority.isCoreTurn() && typeof attemptOptions.body === 'string' && attemptOptions.body.includes('VCP_RAG_BLOCK_START')) {
+      const payload = JSON.parse(attemptOptions.body);
+      attemptOptions.body = JSON.stringify({ ...payload, messages: diaryAuthority.stripOldBlocks(payload.messages, { keepCurrent: true }) });
+    }
     if (attemptController.signal.aborted) {
       cleanup();
       throw Object.assign(new Error('The operation was aborted.'), {
@@ -629,6 +634,7 @@ async function _refreshRagBlocksIfNeeded(messages, newContext, pluginManager, de
     return messages;
   }
 
+  diaryAuthority.assertCurrent();
   // 创建消息数组的深拷贝以安全地进行修改
   const newMessages = JSON.parse(JSON.stringify(messages));
   let hasRefreshed = false;
@@ -662,6 +668,11 @@ async function _refreshRagBlocksIfNeeded(messages, newContext, pluginManager, de
         for (const match of matches) {
           const fullMatchString = match[0]; // 完整的 ... const metadataJson = match[1];    // 第一个捕获组：元数据 JSON
           const metadataJson = match[1];
+          if (!diaryAuthority.canRefresh(fullMatchString)) {
+            messageContent = messageContent.replace(fullMatchString, '');
+            hasRefreshed = true;
+            continue;
+          }
 
           try {
             const metadata = safeParseRagBlockMetadata(metadataJson, debugMode);
@@ -849,6 +860,12 @@ class ChatCompletionHandler {
 
     const id = body.requestId || body.messageId;
     let originalBody = nativeContext.prepareContinuationBody(body);
+    if (diaryAuthority.isCoreTurn()) {
+      const authority = nativeContext.currentCoreNativeAuthority();
+      authority?.beginResourceRead();
+      authority?.blocks.clear();
+      originalBody = { ...originalBody, messages: diaryAuthority.stripOldBlocks(originalBody.messages) };
+    }
     const presence = residentPresence.takeIntent(originalBody);
     const vcpchatExtensions = originalBody && typeof originalBody === 'object'
       ? originalBody.vcpchatExtensions
@@ -1108,6 +1125,7 @@ class ChatCompletionHandler {
         ? pluginManager.preprocessorOrder
         : Array.from(pluginManager.messagePreprocessors.keys());
 
+      let beforeDiaryMessages;
       for (const name of orderedPipeline) {
         if (name === 'VCPTavern') continue;
         if (presence?.handles(name)) continue;
@@ -1149,6 +1167,10 @@ class ChatCompletionHandler {
 
         if (DEBUG_MODE) console.log(`[Server] Calling message preprocessor: ${name}`);
         try {
+          if (name === 'RAGDiaryPlugin' && diaryAuthority.isCoreTurn()) {
+            processedMessages = diaryAuthority.stripOldBlocks(processedMessages);
+            beforeDiaryMessages = structuredClone(processedMessages);
+          }
           const messagesBeforeProcessor = processedMessages;
           processedMessages = copyArrayMetadata(
             messagesBeforeProcessor,
@@ -1262,7 +1284,8 @@ class ChatCompletionHandler {
       const willStreamResponse = isOriginalRequestStreaming;
       const finalUpstreamBody = projectToolBatchForUpstream({ ...originalBody, stream: willStreamResponse });
 
-      finalContextStore.setLastFinalContext(finalUpstreamBody, {
+      const inspectBody = beforeDiaryMessages ? { ...finalUpstreamBody, messages: beforeDiaryMessages } : finalUpstreamBody;
+      finalContextStore.setLastFinalContext(inspectBody, {
         requestId: body.requestId || null,
         messageId: body.messageId || null,
         clientIp,
@@ -1270,15 +1293,8 @@ class ChatCompletionHandler {
         capturedStage: 'before_upstream_fetch'
       });
 
-      await writeDebugLog('LogOutputAfterProcessing', finalUpstreamBody);
+      await writeDebugLog('LogOutputAfterProcessing', inspectBody);
 
-      // Keep request-local diary excerpts out of the conversation and context inspection store.
-      const diaryRecall = nativeContext.currentCoreDiaryRecall();
-      const diaryNote = diaryRecall && await diaryRecall(finalUpstreamBody.messages, abortController.signal);
-      const providerBody = diaryNote ? {
-        ...finalUpstreamBody,
-        messages: [finalUpstreamBody.messages[0], { role: 'system', content: diaryNote }, ...finalUpstreamBody.messages.slice(1)]
-      } : finalUpstreamBody;
       const requestFetchWithRetry = presence?.wrapFetch(fetchWithRetry) || fetchWithRetry;
 
       let firstAiAPIResponse = await requestFetchWithRetry(
@@ -1291,7 +1307,7 @@ class ChatCompletionHandler {
             ...(userAgent && { 'User-Agent': userAgent }),
             Accept: willStreamResponse ? 'text/event-stream' : acceptHeader || 'application/json',
           },
-          body: JSON.stringify(providerBody),
+          body: JSON.stringify(finalUpstreamBody),
           signal: abortController.signal,
         },
         {

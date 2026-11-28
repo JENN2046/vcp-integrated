@@ -1,3 +1,4 @@
+const diaryAuthority = require('../nativeDiaryAuthority');
 'use strict';
 
 const path = require('path');
@@ -83,7 +84,7 @@ class SearchService {
             ? request.names
             : await owner.listDistinctDiaries();
         const { vector, k, options } = request;
-        if (!vector || names.length === 0) return [];
+        if (!vector || names.length === 0 || !diaryAuthority.allows(names)) return [];
         if (vector.length !== owner.config.dimension) {
             throw new RangeError(`KNN query dimension must be ${owner.config.dimension}, got ${vector.length}`);
         }

@@ -211,6 +211,11 @@ class LocalWorkspace {
     }
 
     findAgent(query, historyDeleted) {
+        return this.findAgents(query, historyDeleted)[0] ?? null;
+    }
+
+    findAgents(query, historyDeleted) {
+        const matches = [];
         const ids = this.db.prepare(`SELECT id FROM core_owners WHERE owner_type='agent' AND deleted=0
             UNION SELECT owner_id FROM core_topics WHERE owner_type='agent' AND deleted=0 ORDER BY 1`).all();
         for (const { id } of ids) {
@@ -218,10 +223,10 @@ class LocalWorkspace {
             if (owner?.deleted) continue;
             const topics = this.topicRows('agent', id).filter(row => !historyDeleted?.get(row.id));
             const name = owner ? JSON.parse(owner.configuration).name : topics[0] && this.definition(topics[0]).config.name;
-            if (!name?.includes(query)) continue;
-            return { name, uuid: id, topics: topics.map(row => ({ id: row.id, name: this.definition(row).name })) };
+            if (!name || id !== query && !name.includes(query)) continue;
+            matches.push({ name, uuid: id, topics: topics.map(row => ({ id: row.id, name: this.definition(row).name })) });
         }
-        return null;
+        return matches;
     }
 
     resolveSponsor(source, sourceName, args) {
