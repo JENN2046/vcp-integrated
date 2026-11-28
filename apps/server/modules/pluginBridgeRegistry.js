@@ -16,6 +16,16 @@ class PluginDependencyBridgeRegistry {
 
     async buildDependencies(manifest, baseDependencies, context) {
         const dependencies = { ...baseDependencies };
+        const native = require('./requestExecutionContext');
+        if (native.isCoreTurn()) {
+            if (['TopicMemo', 'DeepMemo'].includes(plugin.name)) {
+                if (!context.executeCoreMemory) throw Error('CORE_NATIVE_CAPABILITY_DENIED');
+                return { result: await context.executeCoreMemory(toolArgs) };
+            }
+            if (plugin.name === 'TopicSponsor') {
+                return require('../Plugin/NativeSync/sync/sponsorExecutionBridge').executeCore(toolArgs, context);
+            }
+        }
         for (const bridge of this.bridges) {
             if (await bridge.canHandle(manifest, context)) {
                 await bridge.inject(manifest, dependencies, context);
@@ -42,14 +52,21 @@ class PluginExecutionBridgeRegistry {
     }
 
     async execute(plugin, toolArgs, context) {
+        const native = require('./requestExecutionContext');
+        if (native.isCoreTurn()) {
+            if (['TopicMemo', 'DeepMemo'].includes(plugin.name)) {
+                if (!context.executeCoreMemory) throw Error('CORE_NATIVE_CAPABILITY_DENIED');
+                return { result: await context.executeCoreMemory(toolArgs) };
+            }
+            if (plugin.name === 'TopicSponsor') {
+                return require('../Plugin/NativeSync/sync/sponsorExecutionBridge').executeCore(toolArgs, context);
+            }
+        }
         for (const bridge of this.bridges) {
             if (await bridge.canHandle(plugin, context)) {
-                const native = require('./requestExecutionContext');
                 const coreGame = bridge.name === 'distributed' && plugin.name === 'GameController' &&
                     typeof context.executeCoreGame === 'function';
-                const coreMemory = bridge.name === 'distributed' && ['DeepMemo','TopicMemo'].includes(plugin.name) &&
-                    typeof context.executeCoreMemory === 'function';
-                if (native.isCoreTurn() && ((!coreGame && !coreMemory && !['direct-hybrid-service', 'local-stdio', 'nativesync-topic-sponsor'].includes(bridge.name)) ||
+                if (native.isCoreTurn() && ((!coreGame && !['direct-hybrid-service', 'local-stdio', 'nativesync-topic-sponsor'].includes(bridge.name)) ||
                     plugin.pluginType === 'asynchronous' || plugin.name === 'VCPSleep')) {
                     throw Object.assign(Error('CORE_TOOL_NOT_MIGRATED'), { code: 'CORE_TOOL_NOT_MIGRATED' });
                 }

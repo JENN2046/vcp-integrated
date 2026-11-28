@@ -1,3 +1,4 @@
+const diaryAuthority = require('./modules/nativeDiaryAuthority');
 // KnowledgeBaseManager.js
 // 🌟 架构重构修复版：多路独立索引 + 稳健的 Buffer 处理 + 同步缓存回退 + TagMemo 逻辑回归
 
@@ -382,7 +383,8 @@ class KnowledgeBaseManager {
                 'index.cosine-score.v1',
                 'watcher.runtime-owned.v1',
                 'memo.native-artifact.v1',
-                'river.native-query.v1'
+                'river.native-query.v1',
+                'river.warped-production.v1'
             ];
             const missingCapabilities = requiredCapabilities.filter(
                 capability => !Array.isArray(capabilities?.capabilities)
@@ -489,7 +491,8 @@ class KnowledgeBaseManager {
                 dbPath,
                 path.join(this.config.storePath, 'index_global_tags_a.vec'),
                 this.config.modelSig,
-                tagCapacity
+                tagCapacity,
+                true
             );
             const parsed = typeof restored === 'string'
                 ? JSON.parse(restored)
@@ -1573,7 +1576,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
                 .map(name => String(name || '').trim())
                 .filter(Boolean)
         )];
-        if (names.length === 0) return [];
+        if (names.length === 0 || !diaryAuthority.allows(names)) return [];
         const raw = await this.nativeKnowledgeRuntime.getFileIdsByDiaries(
             this.dbPath,
             names,
@@ -1645,7 +1648,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
             ids
         );
         const rows = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        return (Array.isArray(rows) ? rows : []).map(row => {
+        return (Array.isArray(rows) ? rows : []).filter(row => diaryAuthority.allows(row.diaryName)).map(row => {
             let vector = null;
             if (typeof row?.vector === 'string' && row.vector) {
                 const bytes = Buffer.from(row.vector, 'base64');
@@ -1690,7 +1693,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
             paths
         );
         const rows = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        return (Array.isArray(rows) ? rows : []).map(row => {
+        return (Array.isArray(rows) ? rows : []).filter(row => diaryAuthority.allows(row.diaryName)).map(row => {
             let vector = null;
             if (typeof row?.vector === 'string' && row.vector) {
                 const bytes = Buffer.from(row.vector, 'base64');
@@ -1728,7 +1731,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
         );
         const result = typeof raw === 'string' ? JSON.parse(raw) : raw;
         return Array.isArray(result)
-            ? result.map(name => String(name)).filter(Boolean)
+            ? diaryAuthority.allowedNames(result.map(name => String(name)).filter(Boolean))
             : [];
     }
 
@@ -1775,6 +1778,18 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
     // =========================================================================
 
     async executeLightMemoQuery(query, options = {}) {
+        if (diaryAuthority.isCoreTurn()) {
+            const scope = options.scope || {};
+            const names = scope.exactDiaryNames?.length ? scope.exactDiaryNames : await this.listDistinctDiaries();
+            const permitted = await this.getFileIdsByDiaries(names);
+            let ids = permitted;
+            if (Array.isArray(scope.allowedFileIds)) {
+                const requested = new Set(scope.allowedFileIds.map(Number));
+                ids = permitted.filter(id => requested.has(id));
+            }
+            if (!ids.length) return { results: [], diagnostics: { reason: 'empty-permission-scope' } };
+            options = { ...options, scope: { ...scope, exactDiaryNames: names, allowedFileIds: ids } };
+        }
         const runtime = this.nativeKnowledgeRuntime;
         if (typeof runtime?.executeLightMemoQuery !== 'function') {
             const error = new Error('LIGHTMEMO_NATIVE_QUERY_UNAVAILABLE: rebuild rust-vexus-lite');
@@ -2280,6 +2295,9 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
                 coreTags: stringCoreTags,
                 ghostTags: ghostMetadata,
                 config: {
+                    tagRoutingMode: options.tagRoutingMode ?? 'warped_ags',
+                    warpedPreset: options.warpedPreset ?? 'locked_2',
+                    warpedRadiusStrategy: options.warpedRadiusStrategy ?? 'epa_guided',
                     baseTagBoost: Math.max(
                         0,
                         Number(sourceObservationConfig.baseTagBoost ?? 0.6)
@@ -2699,10 +2717,10 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
             (Array.isArray(options.diaryNames) ? options.diaryNames : [options.diaryNames])
                 .map(name => String(name || '').trim()).filter(Boolean)
         )];
+        if (diaryAuthority.isCoreTurn() && !diaryAuthority.allows(diaryNames)) return { results: [] };
         if (!diaryNames.length) throw new Error('NATIVE_PARALLEL_RERANK_EMPTY_SCOPE');
-        await Promise.all(diaryNames.map(name => this._getOrLoadDiaryIndex(name)));
         const raw = await runtime.executeExternalRerank(JSON.stringify({
-            externalOnly: true, diaryNames,
+            externalOnly: true, diaryNames, modelSig: this.config.modelSig,
             queryText: String(query.text || ''),
             topK: options.topK, candidateK: options.candidateK,
             annSearch: options.annSearch,
@@ -2734,13 +2752,20 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
             (Array.isArray(options.diaryNames) ? options.diaryNames : [options.diaryNames])
                 .map(name => String(name || '').trim()).filter(Boolean)
         )];
+        if (diaryAuthority.isCoreTurn() && !diaryAuthority.allows(diaryNames)) return { results: [] };
         if (!diaryNames.length) throw new Error('NATIVE_PARALLEL_RERANK_EMPTY_SCOPE');
-        const [prepared] = await Promise.all([
-            this.prepareUnifiedMemoObservation(query, { ...options, nativePlanOnly: true }),
-            Promise.all(diaryNames.map(name => this._getOrLoadDiaryIndex(name)))
-        ]);
+        let prepared;
+        try {
+            prepared = await this.prepareUnifiedMemoObservation(query, {
+                ...options, tagRoutingMode: 'warped_ags', nativePlanOnly: true
+            });
+        } catch (error) {
+            if (!/MEMO_ARTIFACT_UNAVAILABLE|TAGMEMO_ARTIFACT_UNAVAILABLE|MEMO_RUNTIME_UNAVAILABLE/.test(
+                String(error.code || '') + ' ' + String(error.message || ''))) throw error;
+            return this.executeNativeRiverQuery(query, options);
+        }
         const raw = await runtime.executeParallelRerank(JSON.stringify({
-            diaryNames, artifactSig: prepared.artifact.artifactSig,
+            diaryNames, modelSig: this.config.modelSig, artifactSig: prepared.artifact.artifactSig,
             pipeline: prepared.pipeline,
             riverConfig: this.riverMemoEngine._nativeConfig(prepared.artifact, options),
             queryText: String(query.text || ''), topK: options.topK,
@@ -2754,7 +2779,12 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
             })),
             configPath: path.join(__dirname, 'Plugin', 'RAGDiaryPlugin', 'config.env'),
             excludedPrefixes: [...(options.contextDiaryPrefixes || [])]
-        }), prepared.queryVector, prepared.ghostVectors);
+        }), prepared.queryVector, prepared.ghostVectors).catch(async error => {
+            if (/CRC|digest mismatch|INVALID_VECTOR|invalid asset|corrupt|SQLITE_|EACCES|EPERM|I\/O/i.test(
+                String(error.code || '') + ' ' + String(error.message || ''))) throw error;
+            console.warn(`[KnowledgeBase][RiverMemoV5] parallel ranking failed: ${error.message}`);
+            return this.executeNativeRiverQuery(query, options);
+        });
         const result = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (!Array.isArray(result?.results)) throw new Error('NATIVE_PARALLEL_RERANK_INVALID_RESULT');
         return result;
@@ -2778,6 +2808,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
                 : [options.diaryNames]
             ).map(name => String(name || '').trim()).filter(Boolean)
         )];
+        if (diaryAuthority.isCoreTurn() && !diaryAuthority.allows(diaryNames)) return { results: [] };
         if (diaryNames.length === 0) {
             const error = new Error(
                 'Native River query requires an explicit diary scope'
@@ -2786,16 +2817,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
             throw error;
         }
 
-        await Promise.all(
-            diaryNames.map(name => this._getOrLoadDiaryIndex(name))
-        );
-
-        let allowedFileIds = await this.getFileIdsByDiaries(diaryNames);
-        // A caller may narrow, but never widen, the native SQL-derived diary scope.
-        if (Array.isArray(options.fileIdFilter)) {
-            const requestedIds = new Set(options.fileIdFilter.filter(Number.isSafeInteger));
-            allowedFileIds = allowedFileIds.filter(id => requestedIds.has(id));
-        }
+        const allowedFileIds = await this.getFileIdsByDiaries(diaryNames);
         if (allowedFileIds.length === 0) {
             return {
                 results: [],
@@ -2917,7 +2939,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
         const degradedKnn = async () => ({
             results: nativeHybridPlan
                 ? (await collectCandidates.call(this)).slice(0, finalK).map(result => ({
-                    ...result, retrievalEngine: 'knn'
+                    ...result, retrievalEngine: 'warped_ann'
                 }))
                 : await this.searchKnn(diaryNames, queryVector, finalK, {
                 ...options,
@@ -2926,22 +2948,24 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
                     : allowedFileIds,
                 globalK: finalK
             }),
-            diagnostics: { reason: 'memo-artifact-unavailable', retrievalEngine: 'knn', degraded: true }
+            diagnostics: { reason: 'memo-unavailable', retrievalEngine: 'warped_ann', degraded: true }
         });
-        const isStaleMemo = error => /(?:MEMO_ARTIFACT_UNAVAILABLE|TAGMEMO_ARTIFACT_UNAVAILABLE|KNOWLEDGE_STORE_DERIVED_DEPENDENCY_CONFLICT|observation.*(?:not found|expired|unavailable|mismatch))/i
+        const isStaleMemo = error => /(?:MEMO_ARTIFACT_UNAVAILABLE|MEMO_RUNTIME_UNAVAILABLE|TAGMEMO_ARTIFACT_UNAVAILABLE|KNOWLEDGE_STORE_DERIVED_DEPENDENCY_CONFLICT|observation.*(?:not found|expired|unavailable|mismatch))/i
             .test(String(error.code || '') + ' ' + String(error.message || ''));
         let prepared;
         try {
             prepared = options.preparedMemoObservation
                 || await this.prepareUnifiedMemoObservation(
                     { text: String(query?.text || ''), vector: queryVector },
-                    { ...options, queryText: String(query?.text || ''), vector: queryVector }
+                    { ...options, tagRoutingMode: 'warped_ags', queryText: String(query?.text || ''), vector: queryVector }
                 );
         } catch (error) {
             if (!isStaleMemo(error)) throw error;
             return degradedKnn();
         }
         try {
+        const tagRouting = prepared.sourceObservationResult?.diagnostics?.nativePipeline?.tagRouting;
+        if (tagRouting && tagRouting.used !== 'warped_ags') return degradedKnn();
         const agentContext = {
             agentId: options.agentId || null,
             diaryNames,
@@ -2975,6 +2999,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
                     {
                         ...options,
                         artifact: prepared.artifact,
+                        modelSig: this.config.modelSig,
                         dbPath: this.dbPath,
                         hydrateChunksByIds: ids => this.hydrateChunksByIds(ids),
                         nativePreparedQuery: prepared.nativePreparedQuery,
@@ -3002,16 +3027,14 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
                 );
             } catch (error) {
                 if (isStaleMemo(error)) return degradedKnn();
-                if (!fallbackEnabled) throw error;
-                console.warn(
-                    `[KnowledgeBase][NativeRiverQuery] joint execution failed; ` +
-                    `running complete legacy fallback: ${error.message}`
-                );
+                if (!fallbackEnabled || /CRC|digest mismatch|INVALID_VECTOR|invalid asset|corrupt|SQLITE_|EACCES|EPERM|I\/O/i.test(
+                    String(error.code || '') + ' ' + String(error.message || ''))) throw error;
+                console.warn(`[KnowledgeBase][RiverMemoV5] readout failed; warped ANN fallback: ${error.message}`);
+                return degradedKnn();
             }
         }
-// 完整旧链路回退：复刻 Query Plan V2 的当前 ANN、历史多向量、
-// BM25/Time 文件展开和 Time 双重限流，再交给原生 Topology V3。
-// 此路径只在联合 ABI 不可用/失败时执行，保留正确性优先于性能。
+        // 显式禁用联合执行时仍使用双曲候选与双曲观测，不恢复 TDB/V4。
+        // 保留历史多向量、BM25/Time 展开和时间配额。
         const candidates = await collectCandidates.call(this);
         return await this.riverMemoEngine.rerank(
             { text: String(query?.text || ''), vector: queryVector },
@@ -3019,6 +3042,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
             agentContext,
             {
                 ...options,
+                modelSig: this.config.modelSig,
                 artifact: prepared.artifact,
                 dbPath: this.dbPath,
                 hydrateChunksByIds: ids => this.hydrateChunksByIds(ids),
@@ -3080,8 +3104,8 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
                     );
                     return results.map(result => ({
                         ...result,
-                        score: (Number(result.score) || 0) * entry.weight,
-                        vectorScore: Number(result.score) || 0,
+                        score: (Number(result.vectorScore ?? result.score) || 0) * entry.weight,
+                        vectorScore: Number(result.vectorScore ?? result.score) || 0,
                         source: 'history'
                     }));
                 }
@@ -3094,7 +3118,8 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
             let candidates = [
                 ...currentCandidates.map(result => ({
                     ...result,
-                    vectorScore: Number(result.score) || 0,
+                    score: Number(result.vectorScore ?? result.score) || 0,
+                    vectorScore: Number(result.vectorScore ?? result.score) || 0,
                     source: result.source || 'rag'
                 })),
                 ...supplementalCandidates.flat()
@@ -3257,59 +3282,8 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
      * 不触发二次 JS search，也不需要 observationHandle。
      */
     async searchNativeDiaryCandidates(diaryName, queryVector, options = {}) {
-        const names = [...new Set(
-            (Array.isArray(diaryName) ? diaryName : [diaryName])
-                .map(name => String(name || '').trim())
-                .filter(Boolean)
-        )];
-        const vector = queryVector instanceof Float32Array
-            ? queryVector
-            : new Float32Array(queryVector || []);
-        if (
-            names.length === 0
-            || vector.length !== this.config.dimension
-            || !this.nativeKnowledgeRuntime
-            || typeof this.nativeKnowledgeRuntime.searchDiaryIndices !== 'function'
-        ) {
-            return [];
-        }
-
-        await Promise.all(names.map(name => this._getOrLoadDiaryIndex(name)));
-        const perIndexK = Math.max(
-            1,
-            Math.min(1000, Math.floor(Number(options.perIndexK) || 64))
-        );
-        const globalK = Math.max(
-            1,
-            Math.min(2000, Math.floor(Number(options.globalK) || perIndexK))
-        );
-        const payload = await this.nativeKnowledgeRuntime.searchDiaryIndices(
-            names,
-            vector,
-            perIndexK,
-            globalK
-        );
-        const parsed = typeof payload === 'string' ? JSON.parse(payload) : payload;
-        const ids = (Array.isArray(parsed?.results) ? parsed.results : [])
-            .map(item => Number(item?.id))
-            .filter(id => Number.isSafeInteger(id) && id > 0);
-        if (ids.length === 0) return [];
-
-        const rows = await this.hydrateChunksByIds(ids);
-        const byId = new Map(rows.map(row => [Number(row.id), row]));
-        return ids.map(id => {
-            const row = byId.get(id);
-            const native = parsed.results.find(item => Number(item?.id) === id) || {};
-            return row ? {
-                ...row,
-                id,
-                chunkId: id,
-                fullPath: row.sourceFile,
-                score: Number(native.score) || 0,
-                vectorScore: Number(native.vectorScore) || Number(native.score) || 0,
-                source: 'native_ann'
-            } : null;
-        }).filter(Boolean);
+        const k = Math.min(1000, Math.max(1, Number(options.globalK ?? options.perIndexK) || 64));
+        return this.searchKnn(diaryName, queryVector, k, options);
     }
 
     /**
@@ -3405,8 +3379,8 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
         const bundle = this.riverMemoEngine.getArtifactSnapshot(options);
         return {
             bundle,
-            requestedVersion: 'rivermemo_v1',
-            effectiveVersion: 'rivermemo_v1',
+            requestedVersion: 'rivermemo_v5',
+            effectiveVersion: 'rivermemo_v5',
             fallbackUsed: false,
             fallbackReason: null
         };
@@ -3522,6 +3496,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
     }
 
     async getDiaryDateIndex(diaryName) {
+        if (!diaryAuthority.allows(diaryName)) return [];
         return await this.diaryMetadataCache.getDateIndex(diaryName);
     }
 
@@ -3535,6 +3510,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
 
     // 🛠️ 修复 3: 同步回退 + 缓存预热
     async getDiaryNameVector(diaryName) {
+        if (!diaryAuthority.allows(diaryName)) return null;
         return this.diaryMetadataCache.getNameVector(diaryName);
     }
 
@@ -3619,6 +3595,7 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
 
     // 兼容性 API: getVectorByText
     async getVectorByText(diaryName, text) {
+        if (!diaryAuthority.allows(diaryName)) return null;
         if (
             !this.nativeKnowledgeRuntime
             || typeof this.nativeKnowledgeRuntime.getChunkVectorByText !== 'function'
@@ -3706,6 +3683,10 @@ this.tagMemoV10Engine = new TagMemoV10Engine(
     }
 
     async getVectorByChunkId(chunkId) {
+        if (diaryAuthority.isCoreTurn()) {
+            const [row] = await this.hydrateChunksByIds([chunkId]);
+            return row?.vector ?? null;
+        }
         const numericChunkId = Number(chunkId);
         if (!Number.isSafeInteger(numericChunkId) || numericChunkId <= 0) {
             return null;

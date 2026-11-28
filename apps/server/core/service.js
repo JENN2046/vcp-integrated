@@ -9,6 +9,8 @@ const { nativeGamePrompts, isCoreGame, gameDecision } = require('./game');
 const { CoreJev, configuredJev } = require('./jev');
 const { CoreCdsIndex } = require('./cdsIndex');
 const { CoreRunner } = require('./runner');
+const { createGrantReader, createWorkAuthority, denied } = require('./nativeCapabilityGrants');
+const native = require('../modules/requestExecutionContext');
 const { isCoreGroupMode } = require('./group');
 const { DesktopContext } = require('./desktopContext');
 const { CoreCompaction } = require('./compaction');
@@ -36,7 +38,7 @@ const integer = (value, defaultValue, min, max) => {
 };
 
 class CoreService {
-    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, agentManager, remoteConfig, modelCatalog, defaultAgentModel, nativeStickers, diaryRecall, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
+    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, agentManager, remoteConfig, modelCatalog, defaultAgentModel, nativeStickers, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
         if (shared && (!shared.grants.has(workspace) || shared.readOnly || !mobile || shared.coreWorkspace && shared.coreWorkspace !== workspace)) throw failure('CORE_WORKSPACE_UNAVAILABLE');
         if (!path.isAbsolute(directory) || directory === path.parse(directory).root) throw failure('CORE_DATA_DIRECTORY_REQUIRED');
         fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -89,8 +91,9 @@ class CoreService {
             projectMessage: row => this.store.message(row)
         };
         this.attachments = new AttachmentStore({ store: attachmentsStore, root: directory, topics: [] });
+        this.readNativeGrants = createGrantReader(directory);
         this.runner = new CoreRunner({
-            store: this.store, chat, diaryRecall, memoryTool: (...args) => this.memoryTool(...args), attachments: this.attachments, desktopContext: this.desktopContext, allowedAgents: this.shared.delegationAgents,
+            store: this.store, chat, readNativeGrants: this.readNativeGrants, memoryTool: (...args) => this.memoryTool(...args), attachments: this.attachments, desktopContext: this.desktopContext, allowedAgents: this.shared.delegationAgents,
             resolveAcceptedTopic: work => this.resolveAcceptedTopic(work),
             buildPacket: (...args) => this.buildPacket(...args),
             sponsor: (...args) => this.deliverSponsoredMessage(...args),
@@ -206,7 +209,13 @@ class CoreService {
     resolveAcceptedTopic(work) {
         try {
             const actor = this.liveActor(work.principal);
-            return { ...this.topic(actor, this.workspace, work.conversation_id, 'execute'), actor };
+            const topic = this.topic(actor, this.workspace, work.conversation_id, 'execute');
+            const config = work.frozen_config_json ? JSON.parse(work.frozen_config_json) : {};
+            if (config.sponsoredByWorkId) {
+                const grant = createWorkAuthority(this.readNativeGrants, this.workspace, config.sponsorAgentId, () => {});
+                if (!grant.allows('TopicSponsor', topic.key, { track: false })) return null;
+            }
+            return { ...topic, actor };
         } catch (error) {
             if (error.status >= 400 && error.status < 500) return null;
             throw error;
@@ -384,14 +393,18 @@ class CoreService {
             }
             return topic;
         };
+        const authority = native.currentCoreNativeAuthority();
+        if (!authority) throw denied();
         const source = liveSource(), senderName = JSON.parse(work.frozen_config_json).name;
         const resolve = topic => this.local ? this.local.resolveSponsor(topic, senderName, args) : resolveDelivery(this.shared, topic.actor,
             this.shared.row(this.workspace, topic.key), senderName, args);
         const initial = resolve(source);
         const target = this.topic(source.actor, this.workspace, initial.target.id, 'execute');
+        authority.assert('TopicSponsor', target.key, { track: false });
         const config = await this.configuration(target);
         const verified = resolve(liveSource());
         if (!config || target.key !== verified.target.id) throw failure('TOPIC_SPONSOR_TARGET_CHANGED');
+        authority.assert('TopicSponsor', target.key, { track: false });
         const quote = formatTopicRiverQuote(args.river_context);
         const prefix = '[' + senderName + '的发言]';
         const message = quote ? args.message.trimEnd() : args.message;
@@ -399,7 +412,7 @@ class CoreService {
             args.source_topic_id && '[该发言发送自' + args.source_topic_id + '话题]'].filter(Boolean).join('\n\n');
         const operationId = 'sponsor_' + invocation.invocationId.replaceAll('-', '');
         const result = this.store.admit(target, work.principal, operationId, { text, source: work.id }, () => ({
-            config: { ...config, sponsoredByWorkId: work.id }, attachments: [], senderName, senderRole: 'assistant'
+            config: { ...config, sponsoredByWorkId: work.id, sponsorAgentId: authority.agentId }, attachments: [], senderName, senderRole: 'assistant'
         }));
         this.runner.publish(target.key, 'change_seq', { seq: result.seq });
         this.runner.wake();
@@ -423,45 +436,74 @@ class CoreService {
         return createHash('sha256').update(JSON.stringify([principal, topic.workspace, topic.key, id, head, hash])).digest('hex');
     }
 
-    async memoryTool(topic, name, args, config) {
+    memoryAgent(topic, query, authority, capability) {
+        if (typeof query !== 'string' || !query.trim() || query.length > 200) throw failure('INVALID_MEMORY_QUERY', 400);
         const actor = this.liveActor(topic.actor.principal);
+        const agents = this.local
+            ? this.local.findAgents(query, this.historyDeleted)
+            : this.shared.db.prepare(`SELECT * FROM shared_objects
+                WHERE space_id=? AND kind='agent' AND deleted=0 ORDER BY id`).all(topic.workspace)
+                .map(row => ({ uuid: row.id, name: this.shared.object(row).config.name }))
+                .filter(agent => agent.uuid === query || agent.name.includes(query));
+        const matches = agents.filter(agent => authority.allows(capability, agent.uuid, { track: false }));
+        const exact = matches.find(agent => agent.uuid === query);
+        if (!exact && matches.length !== 1) {
+            throw matches.length ? failure('CORE_MEMORY_TARGET_AMBIGUOUS', 403) : denied();
+        }
+        const agent = exact || matches[0];
+        authority.assert(capability, agent.uuid);
+        let topics = agent.topics;
+        if (!topics) {
+            topics = this.shared.db.prepare(`SELECT * FROM shared_objects
+                WHERE parent_id=? AND space_id=? AND kind='topic' AND deleted=0 ORDER BY id`).all(agent.uuid, topic.workspace)
+                .filter(row => this.manages(row) && !this.historyDeleted?.get(row.id))
+                .map(row => {
+                    this.topic(actor, topic.workspace, row.id, 'read');
+                    const config = this.shared.object(row).config;
+                    return { id: row.id, name: config.name, createdAt: config.createdAt };
+                });
+        }
+        return { ...agent, topics };
+    }
+
+    async memoryTool(topic, name, args, config) {
+        const authority = native.currentCoreNativeAuthority();
+        if (!authority) throw denied();
+        const caller = () => this.liveActor(topic.actor.principal);
+        const actor = caller();
         const authorized = this.topic(actor, topic.workspace, topic.key, 'read');
         const desktop = path.resolve(path.dirname(require.resolve('@vcp/native-history-window')), '../../..');
         const plugins = path.join(desktop, 'VCPDistributedServer', 'Plugin');
         if (name === 'DeepMemo') {
             const { processToolCall } = require(path.join(plugins, 'DeepMemo/DeepMemoService'));
+            const query = args?.owner?.id ?? args?.owner?.ownerId ?? args?.agentId ?? args?.maid;
+            const selected = query === undefined ? authorized : {
+                ...authorized, ownerType: 'agent', ownerId: this.memoryAgent(topic, query, authority, name).uuid
+            };
+            authority.assert(name, selected.ownerId);
             const result = await processToolCall(args, { vcpContext: {
-                agentId: topic.ownerId, ownerType: topic.ownerType, topicId: topic.key
-            } }, { config, search: request => this.searchMemories(authorized, actor, request) });
-            this.topic(this.liveActor(topic.actor.principal), topic.workspace, topic.key, 'read');
+                agentId: selected.ownerId, ownerType: selected.ownerType, topicId: topic.key
+            } }, { config, search: request => {
+                authority.assert(name, selected.ownerId);
+                return this.searchMemories(selected, caller(), request);
+            } });
+            this.topic(caller(), topic.workspace, topic.key, 'read');
+            authority.assert(name, selected.ownerId);
             return result;
         }
         const { processToolCall } = require(path.join(plugins, 'TopicMemo/TopicMemo'));
-        return processToolCall(args, null, {
+        const result = await processToolCall(args, null, {
             userName: '用户',
-            findAgent: query => {
-                if (typeof query !== 'string') throw failure('INVALID_MEMORY_QUERY', 400);
-                if (this.local) return this.local.findAgent(query, this.historyDeleted);
-                const row = this.shared.db.prepare(`SELECT * FROM shared_objects
-                    WHERE space_id=? AND kind='agent' AND deleted=0 ORDER BY id`).all(topic.workspace)
-                    .find(item => this.shared.object(item).config.name.includes(query));
-                if (!row) return null;
-                const topics = this.shared.db.prepare(`SELECT * FROM shared_objects
-                    WHERE parent_id=? AND space_id=? AND kind='topic' AND deleted=0 ORDER BY id`).all(row.id, topic.workspace)
-                    .filter(value => this.manages(value) && !this.historyDeleted?.get(value.id))
-                    .map(value => {
-                        this.topic(actor, topic.workspace, value.id, 'read');
-                        const config = this.shared.object(value).config;
-                        return { id: value.id, name: config.name, createdAt: config.createdAt };
-                    });
-                return { name: this.shared.object(row).config.name, uuid: row.id, topics };
-            },
+            findAgent: query => this.memoryAgent(topic, query, authority, name),
             history: ({ agentId, topicId }) => {
-                const owner = this.topic(actor, topic.workspace, topicId, 'read');
+                authority.assert(name, agentId);
+                const owner = this.topic(caller(), topic.workspace, topicId, 'read');
                 if (owner.ownerId !== agentId) throw failure('CORE_TOPIC_OWNER_MISMATCH', 403);
                 return this.store.compactionHistory(topicId);
             }
         });
+        authority.assertCurrent();
+        return result;
     }
 
     searchMemories(topic, actor, request) {

@@ -704,6 +704,8 @@ async function processToolCall(args) {
 
     // A model-supplied ID does not carry authority over a shared child task.
     const targetId = cancel_delegation || query_delegation;
+    if (targetId) nativeExecution.assertCoreAssistant(args);
+
     if (targetId) {
         const workId = nativeExecution.currentWork();
         const target = nativeExecution.sharedTaskLink('AgentAssistant', targetId);
@@ -777,6 +779,10 @@ async function processToolCall(args) {
         if (DEBUG_MODE) console.error(`[AgentAssistant Service] Failed to find agent: '${agent_name}'.`);
         throwToolError(errorMessage);
     }
+
+    // A display alias selects the native target. Only the stable configured ID grants authority.
+    const uniqueBase = Object.values(AGENTS).filter(agent => agent.baseName === agentConfig.baseName).length === 1;
+    nativeExecution.assertCoreAssistant(args, uniqueBase ? agentConfig.baseName : null);
 
     const senderName = maid || "系统助手";
     const promptWithRiverAttachment = buildUserPromptContentWithRiverAttachment(prompt, river_context, senderName);

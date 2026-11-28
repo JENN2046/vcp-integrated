@@ -1,0 +1,9 @@
+*.db
+*.db-shm
+*.db-wal
+*.json
+!plugin-manifest.json
+!config.env.example
+!plugin-manifest.json.block
+!meta_thinking_chains.json
+!MoreAIMemoPresets/PresetName01.json

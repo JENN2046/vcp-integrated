@@ -29,11 +29,18 @@ function executionContext() {
     return require(filename);
 }
 
+async function executeCore(toolArgs, context) {
+    const { _nativeSyncTopicSponsor: ignored, ...args } = toolArgs;
+    if (typeof context.deliverCoreTopic !== 'function' || !isExistingReply(args)) {
+        throw Object.assign(Error('CORE_TOPIC_SPONSOR_REPLY_REQUIRED'), { code: 'CORE_TOPIC_SPONSOR_REPLY_REQUIRED' });
+    }
+    return { result: await context.deliverCoreTopic(args) };
+}
+
 async function execute(host, prepared, plugin, toolArgs, context) {
     const { _nativeSyncTopicSponsor: ignored, ...args } = toolArgs;
     if (typeof context.deliverCoreTopic === 'function') {
-        if (!isExistingReply(args)) throw Object.assign(Error('CORE_TOPIC_SPONSOR_REPLY_REQUIRED'), { code: 'CORE_TOPIC_SPONSOR_REPLY_REQUIRED' });
-        return { result: await context.deliverCoreTopic(args) };
+        return executeCore(args, context);
     }
     const toolHost = context.webSocketServer;
     if (!toolHost) throw new Error('[PluginManager] WebSocketServer is not initialized. Cannot call distributed tool.');
@@ -103,4 +110,4 @@ function register(registry) {
     }
 }
 
-module.exports = { register };
+module.exports = { register, executeCore };

@@ -3,14 +3,15 @@
 const native = require('../modules/requestExecutionContext');
 const { CoreTurnSink } = require('./turnSink');
 const { failure } = require('./store');
+const { createWorkAuthority } = require('./nativeCapabilityGrants');
 
 const plugin = 'AgentAssistant';
 const active = new Set(['accepted', 'waiting', 'running', 'cancelling']);
 const terminal = new Set(['completed', 'failed', 'cancelled', 'stopped']);
 
 class CoreAgentAssistant {
-    constructor({ store, chat, allowedAgents, resolveAcceptedTopic, publish }) {
-        Object.assign(this, { store, chat, allowedAgents, resolveAcceptedTopic, publish });
+    constructor({ store, chat, allowedAgents, resolveAcceptedTopic, publish, readNativeGrants }) {
+        Object.assign(this, { store, chat, allowedAgents, resolveAcceptedTopic, publish, readNativeGrants });
         this.attempts = new Map();
         this.closed = false;
         store.db.exec(`
@@ -26,17 +27,22 @@ class CoreAgentAssistant {
         `);
     }
 
-    assertAllowed(work, args, indirect) {
-        if (indirect || !args || args.timely_contact !== undefined || args.inject_tools !== undefined ||
+    assertAllowed(work, args, baseName) {
+        if (!args || args.timely_contact !== undefined || args.inject_tools !== undefined ||
             args.cancel_delegation !== undefined || args.temporary_contact !== undefined || args.__vcp_timed_call !== undefined) {
             throw failure('CORE_AA_DELEGATION_REQUIRED');
         }
+        const authority = native.currentCoreNativeAuthority();
+        if (!authority) throw failure('CORE_NATIVE_CAPABILITY_DENIED', 403);
         if (args.query_delegation) {
-            if (!this.link(work, plugin, args.query_delegation)) throw failure('CORE_AA_TASK_SCOPE_REQUIRED', 403);
+            const link = this.link(work, plugin, args.query_delegation);
+            if (!link) throw failure('CORE_AA_TASK_SCOPE_REQUIRED', 403);
+            authority.assert('AgentAssistant', link.identity.agentBaseName);
             return;
         }
         if (String(args.task_delegation).toLowerCase() !== 'true' || !this.allowedAgents.has(args.agent_name) ||
             !native.hasNativeTaskProvider(plugin)) throw failure('CORE_AA_DELEGATION_REQUIRED');
+        authority.assert('AgentAssistant', baseName);
     }
 
     row(id) {
@@ -54,6 +60,11 @@ class CoreAgentAssistant {
             typeof identity.nativeTaskId !== 'string' || typeof identity.agentBaseName !== 'string') {
             throw failure('CORE_AA_TASK_IDENTITY_INVALID');
         }
+        const authority = native.currentCoreNativeAuthority();
+        if (!authority) throw failure('CORE_NATIVE_CAPABILITY_DENIED', 403);
+        authority.assert('AgentAssistant', identity.agentBaseName);
+        // Persist the source Agent for child-round revocation checks after the parent Work completes.
+        identity = Object.freeze({ ...identity, sourceAgentId: authority.agentId });
         const invocation = this.store.db.prepare("SELECT 1 FROM work_invocations WHERE id=? AND work_id=? AND plugin_name=? AND status='dispatched'")
             .get(identity.invocationId, work.id, plugin);
         if (!invocation) throw failure('CORE_AA_INVOCATION_REQUIRED');
@@ -95,6 +106,10 @@ class CoreAgentAssistant {
             if (this.closed || !this.resolveAcceptedTopic(work) || !active.has(this.row(taskId)?.state)) {
                 throw failure('CORE_AA_REQUEST_FENCED');
             }
+            const topic = this.resolveAcceptedTopic(work);
+            const authority = createWorkAuthority(this.readNativeGrants, topic.workspace,
+                identity.sourceAgentId, () => {});
+            authority.assert('AgentAssistant', identity.agentBaseName, { track: false });
         };
         try {
             fence();
@@ -114,8 +129,11 @@ class CoreAgentAssistant {
         // model rounds in-process with the text-only authority of shared AA.
         const body = structuredClone(packet);
         body.messages[0].content = '[[VCPToolUse=Forbidden]]\n' + body.messages[0].content;
+        const topic = this.resolveAcceptedTopic(work);
         try {
             await native.runCoreTurn({
+                coreNativeAuthority: createWorkAuthority(this.readNativeGrants, topic.workspace,
+                    'aa:' + identity.agentBaseName, fence),
                 workId: work.id, requestId: id, signal, fence, textOnly: true, observe: () => {},
                 phase: () => this.store.db.prepare("UPDATE core_aa_attempts SET state='dispatched' WHERE id=? AND state='prepared'").run(id)
             }, () => this.chat.executeTurn({ body, clientIp: null, signal }, sink));
@@ -164,6 +182,10 @@ class CoreAgentAssistant {
                     const task = this.row(taskId);
                     if (!task || this.store.work(task.work_id)?.conversation_id !== key) return '[AgentAssistant 报告不可用]';
                     try {
+                        const authority = native.currentCoreNativeAuthority();
+                        if (!authority?.allows('AgentAssistant', JSON.parse(task.identity_json).agentBaseName)) {
+                            return '[AgentAssistant 报告不可用]';
+                        }
                         const result = this.result(this.store.work(task.work_id), taskId);
                         return '[AgentAssistant 原生报告]\n' + result.content + '\n[/AgentAssistant 原生报告]';
                     } catch {

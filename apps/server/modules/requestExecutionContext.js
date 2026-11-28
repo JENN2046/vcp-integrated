@@ -79,6 +79,7 @@ function assertDispatch() {
         throw Object.assign(new Error('SHARED_REQUEST_FENCED'), { code: 'SHARED_REQUEST_FENCED' });
     }
     scope.fence();
+    scope.coreNativeAuthority?.assertCurrent();
     scope.applied?.();
     scope.phase?.('provider_attempt');
 }
@@ -292,7 +293,8 @@ async function trackToolInvocation({ pluginName, recordId = null }, process, isU
             catch (error) {
                 // A direct plugin can throw or time out after its action took
                 // effect. A specialised transport can identify a lost receipt.
-                unconfirmed = isUnconfirmed(error);
+                unconfirmed = !(context.core && require('../core/nativeCapabilityGrants').isDeniedBeforeEffect(error))
+                    && isUnconfirmed(error);
                 if (unconfirmed) {
                     const code = 'NATIVE_TOOL_RESULT_UNCONFIRMED';
                     context.toolRun.unconfirmed = Object.assign(Error(code), { code });
@@ -460,7 +462,13 @@ module.exports = {
     assertToolsAllowed, controlledToolWork, assertToolBatch, assertToolBoundary, executeControlledToolBatch, trackToolInvocation,
     settleToolPause: () => local.getStore()?.settleToolPause?.(),
     currentTopicSponsorCall, approvalOwner,
-    currentCoreDiaryRecall: () => local.getStore()?.coreDiaryRecall,
+    assertCoreAssistant(args, baseName) {
+        const scope = local.getStore();
+        if (!scope?.core) return;
+        if (!scope.coreAA) throw toolError('CORE_NATIVE_CAPABILITY_DENIED');
+        scope.coreAA.assertAllowed(args, baseName);
+    },
+    currentCoreNativeAuthority: () => local.getStore()?.coreNativeAuthority,
     currentCoreMemory: () => local.getStore()?.coreMemory,
     currentCoreGame: () => local.getStore()?.coreGame,
     currentCoreSponsor: () => local.getStore()?.coreSponsor,

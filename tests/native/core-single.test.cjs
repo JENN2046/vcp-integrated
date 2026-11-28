@@ -645,7 +645,10 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
     f.shared.delegationAgents.add(name);
     pluginManager.plugins.set('AgentAssistant', { name: 'AgentAssistant', pluginType: 'hybridservice', communication: { protocol: 'direct' } });
     pluginManager.serviceModules.set('AgentAssistant', { module: assistant });
-    const { core, route } = await mountCore(f, chat);
+    const { core, route, options } = await mountCore(f, chat);
+    const grantFile = path.join(options.directory, 'native-capability-grants.json');
+    await fs.writeFile(grantFile, JSON.stringify({ version: 1, workspace: 'sharedAB',
+        agents: { [f.owner.id]: { AgentAssistant: ['COREFIXTURE'] } } }), { mode: 0o600 });
     const block = ['<<<[TOOL_REQUEST]>>>', 'tool_name:「始」AgentAssistant「末」,',
         'agent_name:「始」' + name + '「末」,', 'task_delegation:「始」true「末」,',
         'prompt:「始」Prepare the bounded report.「末」', '<<<[END_TOOL_REQUEST]>>>'].join('\n');
@@ -706,6 +709,25 @@ test('Core associates the actual AgentAssistant child and reads its verified nat
         assert.equal(finishedChild.content, 'Child finished after parent cancellation.');
         assert.equal(childRounds, 2);
         assert.equal(core.store.work(interrupted.id).reply_message_id, null);
+
+        let activeChild;
+        const beforeRevoke = provider.calls.filter(call => call.model === childModel).length;
+        provider.setReply((body, res) => {
+            if (body.model === childModel) activeChild = { body, res };
+            else complete(body, res, body.messages.some(message => String(message.content).includes('VCP_TOOL_PAYLOAD'))
+                ? 'Parent reply settled.' : block);
+        });
+        const revoking = await phone.call(route + '/send', {
+            requestId: 'core-native-aa-revoked', text: 'Start a revocable delegation.'
+        }, 202);
+        await wait(() => activeChild, 'authorized child round reached the provider');
+        await fs.writeFile(grantFile, JSON.stringify({ version: 1, workspace: 'sharedAB', agents: {} }));
+        complete(activeChild.body, activeChild.res, '[[Flowlock::Start]]\n[[Flowlock::NextHeartbeat::1]]');
+        await wait(async () => {
+            const { tasks } = await phone.call(route + '/works/' + revoking.id + '/tasks');
+            return tasks[0] && ['failed','unknown','stopped'].includes(tasks[0].state);
+        }, 'revocation fences the accepted child before another model round');
+        assert.equal(provider.calls.filter(call => call.model === childModel).length, beforeRevoke + 1);
     } finally {
         assistant.shutdown();
         pluginManager.plugins.delete('AgentAssistant');
@@ -725,7 +747,10 @@ test('Core TopicSponsor delivers a canonical peer message without a desktop reci
     const destination = f.shared.create(f.actor('A'), { sharedSpaceId: 'sharedAB', opId: 'core-sponsor-peer-topic',
         kind: 'topic', localId: 'peer-topic', localParent: 'peer-agent', parentId: peer.id,
         config: { name: 'Peer destination' } }).object;
-    const { core } = await mountCore(f, chat);
+    const { core, options } = await mountCore(f, chat);
+    const grantFile = path.join(options.directory, 'native-capability-grants.json');
+    await fs.writeFile(grantFile, JSON.stringify({ version: 1, workspace: 'sharedAB',
+        agents: { [f.owner.id]: { TopicSponsor: [destination.id] } } }), { mode: 0o600 });
     try {
         const desktop = await f.desktop('A');
         const phone = await f.phone();
@@ -758,6 +783,18 @@ test('Core TopicSponsor delivers a canonical peer message without a desktop reci
         assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM shared_topic_sponsor_grants').get().n, 0);
         assert.equal(f.store.db.prepare('SELECT count(*) AS n FROM journal').get().n, 0);
         assert.equal(f.calls(), 0);
+
+        await fs.writeFile(grantFile, JSON.stringify({ version: 1, workspace: 'sharedAB', agents: {} }));
+        const reopened = await f.desktop('A');
+        const rejected = await reopened.runtime.prepareSharedSend({ descriptor: reopened.descriptor, serverSession: true,
+            message: { id: 'core-sponsor-revoked', role: 'user', content: 'Do not deliver after revocation.', attachments: [] } });
+        await wait(() => {
+            const row = core.store.db.prepare("SELECT status FROM work_invocations WHERE work_id=? AND plugin_name='TopicSponsor'")
+                .get(rejected.serverSession.executionId);
+            return row && row.status !== 'dispatched';
+        }, 'revoked sponsor settles its attempted tool call');
+        assert.equal(core.store.db.prepare('SELECT count(*) AS n FROM works WHERE conversation_id=?').get(destination.id).n, 1);
+        await reopened.close();
     } finally {
         await core.close();
         await fs.rm(f.root + '-core', { recursive: true, force: true });
