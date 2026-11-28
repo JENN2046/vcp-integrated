@@ -12,7 +12,7 @@ VCP Integrated 基于 [VCPToolBox](https://github.com/lioensky/VCPToolBox) 与 [
 
 ## 文档
 
-[文档导航](docs/README.md) · [现行架构](docs/ARCHITECTURE.md) · [部署与配对](docs/core-pilot-01-r.md) · [历史档案与证据索引](docs/archive/README.md)
+[产品愿景与终局](docs/VISION.md) · [施工总纲](AGENTS.md) · [现行架构](docs/ARCHITECTURE.md) · [文档导航](docs/README.md) · [部署与配对](docs/core-pilot-01-r.md) · [历史档案与证据索引](docs/archive/README.md)
 
 ## 架构
 
@@ -117,7 +117,7 @@ Pilot 01-R 已完成以下验证：
 
 NativeSync 是本项目早期跨端集成与执行连续性研究的基础。VCP Core 吸收了其中成熟的设备接入、请求身份、工具回执、附件及恢复能力，将正式会话权威和执行生命周期收归服务端。
 
-新本机与远程模式均不需要加载 NativeSync 同步服务，也不依靠旧客户端双向 History 同步、执行接管或终稿补交。旧插件和 VCPMobileSync wire 接口因仍有兼容消费者而保留，不应理解为新 Core 的客户端执行协议。
+新本机与远程模式均不需要加载 NativeSync 同步服务，也不依靠旧客户端双向 History 同步、执行接管或终稿补交。旧插件和 VCPMobileSync wire 接口在当前基线仍作为过渡兼容保留，不应理解为新 Core 的客户端执行协议。主线已确定退出旧 shared 模式；具体收口状态见[现行架构](docs/ARCHITECTURE.md)。
 
 已有历史须通过离线迁移导入，不会自动接管。跨话题重复消息 ID、无法定位的附件及非文本内联部件仍有明确导入限制。旧版与新 Core 不应同时写入同一正式工作空间。
 
