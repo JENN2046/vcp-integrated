@@ -59,25 +59,134 @@ function host(provider) {
     return { chat, events, pluginManager };
 }
 
-async function mountCore(f, chat, extensions = {}) {
-    const directory = f.root + '-core';
-    await fs.mkdir(f.root + '/files', { recursive: true });
+async function coreFixture(t, chat, { root, origin, proxyCertificate, ...extensions } = {}) {
+    const assert = require('node:assert/strict');
+    const { execFileSync } = require('node:child_process');
+    const { once } = require('node:events');
+    const { createServer } = require('node:https');
+    const tls = require('node:tls');
+    const express = require(BOX + '/node_modules/express');
     const { CoreService } = require(BOX + '/core/service');
-    const options = { directory, legacyDirectory: f.root, workspace: 'sharedAB', shared: f.shared, mobile: f.portal, chat, ...extensions };
-    const core = new CoreService(options);
-    f.shared.core = core;
-    f.app.use(['/api/plugins/NativeSync/source/core', '/api/plugins/NativeSync/core'], core.router(req => f.shared.desktop({
-        sourceId: req.headers['x-nativesync-source'], deviceId: req.headers['x-nativesync-device'],
-        spaceId: req.headers['x-nativesync-space']
-    }, req.headers['x-nativesync-capabilities'])));
-    f.portal.coreRouter = core.router((req, workspace, permission) => f.shared.mobile(req.mobileSession, workspace, permission));
-    return { core, options, route: '/core/sharedAB/' + f.topic.id };
-}
-
-function setStream(f, enabled) {
-    const owner = f.shared.get(f.actor('A'), 'sharedAB', f.owner.id);
-    f.shared.saveConfig(f.actor('A'), { sharedSpaceId: 'sharedAB', sharedId: owner.id, opId: 'core-config',
-        expectedVersion: owner.version, config: { ...owner.config, streamOutput: enabled } });
+    const { localTopicKey } = require(BOX + '/core/localWorkspace');
+    root ||= await fs.mkdtemp(path.join(require('node:os').tmpdir(), 'core-remote-test-'));
+    const directory = path.join(root, 'core');
+    const certFile = path.join(root, 'fixture-cert.pem');
+    const keyFile = path.join(root, 'fixture-key.pem');
+    execFileSync('openssl', ['req','-x509','-newkey','rsa:2048','-nodes','-keyout',keyFile,'-out',certFile,
+        '-days','1','-subj','/CN=localhost','-addext','subjectAltName=IP:127.0.0.1'], { stdio: 'ignore' });
+    const certificate = await fs.readFile(certFile);
+    const trusted = tls.getCACertificates('default');
+    tls.setDefaultCACertificates([...trusted, certificate.toString(), ...(proxyCertificate ? [proxyCertificate.toString()] : [])]);
+    const app = express();
+    const server = createServer({ key: await fs.readFile(keyFile), cert: certificate }, app);
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const endpoint = 'https://127.0.0.1:' + server.address().port;
+    const workspace = 'personal';
+    const options = { directory, workspace, chat, remoteConfig: { origin: origin || endpoint, hours: 1 }, ...extensions };
+    let core;
+    const clients = new Set();
+    t.after(async () => {
+        tls.setDefaultCACertificates(trusted);
+        await Promise.all([...clients].map(client => client.close()));
+        server.closeAllConnections();
+        await new Promise(resolve => server.close(resolve));
+        await core?.close();
+        await fs.rm(root, { recursive: true, force: true });
+    });
+    core = new CoreService(options);
+    app.use('/core/api', (req, res, next) => core.remoteDesktopRouter(req, res, next));
+    app.use('/mobile', (req, res, next) => core.remoteMobileRouter(req, res, next));
+    function bindRouters() {
+        core.remoteDesktopRouter = core.remote.router('desktop');
+        core.remoteMobileRouter = core.remote.router('mobile');
+    }
+    bindRouters();
+    app.post('/v1/chat/completions', express.json(), (req, res) => chat.handle(req, res));
+    const request = (route, { body, headers, method, signal } = {}) => fetch((origin || endpoint) + route, {
+        method: method || (body === undefined ? 'GET' : 'POST'), signal,
+        headers: { ...(origin && { 'x-fixture-command': '1' }), ...(body !== undefined && { 'content-type': 'application/json', origin: options.remoteConfig.origin }), ...headers },
+        ...(body !== undefined && { body: JSON.stringify(body) })
+    });
+    async function pair(kind, permissions, proof) {
+        const scopes = permissions.map(permission => 'shared:' + workspace + ':' + permission);
+        if (kind === 'desktop') scopes.push('desktop');
+        const grant = core.remote.sessions.createCode(scopes);
+        const isDesktop = kind === 'desktop';
+        const response = await request(isDesktop ? '/core/api/pair' : '/mobile/api/pair',
+            { body: { code: grant.pairingCode, ...proof } });
+        assert.equal(response.status, 200);
+        if (isDesktop) return response.json();
+        const cookie = response.headers.get('set-cookie').split(';')[0];
+        const session = await request('/mobile/api/session', { headers: { cookie } });
+        const identity = (await session.json()).recovery;
+        return { cookie, identity };
+    }
+    async function mobile(permissions = ['read','execute']) {
+        const { cookie, identity } = await pair('mobile', permissions);
+        const headers = { cookie, 'x-nativesync-entry-id': identity.entryId, 'x-nativesync-session-marker': identity.sessionMarker };
+        const observe = (route, signal) => request('/mobile/api' + route, { headers, signal });
+        return {
+            cookie, identity, observe,
+            async call(route, body, expected = 200) {
+                const response = await request('/mobile/api' + route, { body, headers });
+                const data = await response.json();
+                assert.equal(response.status, expected, JSON.stringify(data));
+                return data;
+            },
+            async download(route) {
+                const response = await observe(route);
+                assert.equal(response.status, 200);
+                return Buffer.from(await response.arrayBuffer());
+            }
+        };
+    }
+    async function define({ ownerType = 'agent', ownerId = 'fixture', topicId = 'default', name = 'One history', config, actor }) {
+        const key = localTopicKey(ownerType, ownerId, topicId);
+        if (!config) config = { name: 'Fixture', model: 'synthetic', systemPrompt: 'Isolated fixture.' };
+        await core.local.define(key, { ownerType, ownerId, topicId, name, config }, value => core.supportsGroup(value), actor);
+        return { key, route: '/core/' + workspace + '/' + key, descriptor: { itemType: ownerType, itemId: ownerId, topicId } };
+    }
+    const desktopCredentials = new Map();
+    async function desktop(profile = 'A', enrollment) {
+        const { HistoryMutationQueue } = require(CHAT + '/modules/services/historyMutationQueue');
+        const { openLocalCore } = require(CHAT + '/modules/services/localCoreRuntime');
+        const data = path.join(root, 'desktop-' + profile);
+        const queue = new HistoryMutationQueue({ userDataDir: path.join(data, 'UserData') });
+        const ownerFile = (kind, id) => path.join(data, kind === 'group' ? 'AgentGroups' : 'Agents', id, 'config.json');
+        const readOwner = async (kind, id) => JSON.parse(await fs.readFile(ownerFile(kind, id), 'utf8'));
+        const writeOwner = async (kind, id, config) => {
+            const file = ownerFile(kind, id);
+            await fs.mkdir(path.dirname(file), { recursive: true });
+            await fs.writeFile(file, JSON.stringify(config));
+        };
+        const grant = enrollment || desktopCredentials.get(profile) || await pair('desktop', ['read','execute','config']);
+        desktopCredentials.set(profile, grant);
+        const { token } = grant;
+        const runtime = await openLocalCore({ queue, appDataRoot: data, workspace, readSettings: async () => ({}),
+            remoteOrigin: endpoint, remoteToken: token, writeOwner,
+            notify() {}, notifyExecutionStatus() {}, notifyGroupEvent() {},
+            readAgent: id => readOwner('agent', id), readGroup: id => readOwner('group', id), readRules: async () => [],
+            storeAttachment: async (bytes, name, id, topic) => {
+                const file = path.join(data, 'UserData', id, 'topics', topic, 'files', name);
+                await fs.mkdir(path.dirname(file), { recursive: true });
+                await fs.writeFile(file, bytes);
+                return { internalPath: require('node:url').pathToFileURL(file).href };
+            }
+        });
+        const client = { data, queue, runtime, async close() {
+            if (clients.delete(client)) await runtime.close();
+        } };
+        clients.add(client);
+        return client;
+    }
+    return { root, directory, workspace, endpoint, certificate, certFile, keyFile, request, options,
+        get core() { return core; }, pair, mobile, define, desktop, async restart() {
+            await core.close();
+            core = new CoreService(options);
+            bindRouters();
+            return core;
+        } };
 }
 
 async function wait(predicate, label) {
@@ -88,4 +197,4 @@ async function wait(predicate, label) {
     throw Error('TIMEOUT ' + label);
 }
 
-module.exports = { BOX, CHAT, wait, localProvider, host, mountCore, setStream };
+module.exports = { BOX, CHAT, wait, localProvider, host, coreFixture };

@@ -35,6 +35,6 @@ NS_FIXTURE_POLL_WATCHERS=1 node tests/config-freeze/run.cjs --candidate
 
 终端会打印每轮隔离输出目录，完整证据位于其 `mobile-config-freeze/evidence.json`。
 
-补充用隔离 Chromium 打开缺少可选规则字段的合法 Agent 配置。改前只编辑提示词，保存时还会创建空的正则列表、酒馆规则列表和覆盖对象；改后只保存提示词。实际新增、再编辑三类规则也通过，已有规则 ID 保留。[可选字段前后对照](editor-regression.json) · [复跑脚本](../../../tests/config-freeze/editor-regression.cjs)
+补充用隔离 Chromium 打开缺少可选规则字段的合法 Agent 配置。改前只编辑提示词，保存时还会创建空的正则列表、酒馆规则列表和覆盖对象；改后只保存提示词。实际新增、再编辑三类规则也通过，已有规则 ID 保留。[可选字段前后对照](editor-regression.json) · [复跑脚本](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/config-freeze/editor-regression.cjs)
 
 回归结果为原生宿主 309 项通过、6 项需要外部历史压缩夹具而跳过，协作套件 60 项通过。复跑改前端到端用例时，把本批 `tests/config-freeze` 复制到已构建的固定基线检出再运行。

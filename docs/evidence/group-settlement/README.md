@@ -11,4 +11,4 @@
 
 **旧库验证。** 取复审原库的一致备份，连同原 AA 报告和原生工具记录放入隔离实例。先启动旧代码复现故障，再替换程序，沿用同一个隔离数据库文件。两条历史 Work 均恢复为 completed，原 Work、请求、成员回复、AA 与工具调用 ID、History 和 Journal 内容逐项一致。重开可读取原报告，哈希与历史回执一致。从升级启动到显式发起新一轮，模型和工具调用均新增 **0 次**。两份库随后各自成功接纳并完成一轮新群聊。[备份方法及复跑](upgrade/README.md) · [早到旧库](upgrade/early.json) · [晚到旧库](upgrade/late.json)
 
-**回归。** 原生宿主测试 218/218，协作测试 53/53。专项用例覆盖 AA 子工具仍在派发时保留最后一条成员回复的持久写入意图，收到终态回执后只提交该原回复一次；也覆盖成员计划不一致、缺少 Journal 行、AA 终态证据不全、人工放弃及后继 Work 已占用话题。[实时用例与复跑](live/README.md) · [安全边界用例](../../../tests/native/group-settlement-safety.test.cjs)
+**回归。** 原生宿主测试 218/218，协作测试 53/53。专项用例覆盖 AA 子工具仍在派发时保留最后一条成员回复的持久写入意图，收到终态回执后只提交该原回复一次；也覆盖成员计划不一致、缺少 Journal 行、AA 终态证据不全、人工放弃及后继 Work 已占用话题。[实时用例与复跑](live/README.md) · [安全边界用例](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/native/group-settlement-safety.test.cjs)

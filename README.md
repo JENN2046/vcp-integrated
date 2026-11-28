@@ -102,13 +102,12 @@ npm run build
 
 | 命令 | 用途 |
 | --- | --- |
-| `node tests/integration/run.cjs core-local` | 独立本机 Core 与真实桌面联验 |
-| `node tests/integration/run.cjs core-remote` | 独立远程 Core 与设备接入联验 |
-| `VCP_TEST_CORE_RISK=1 node tests/integration/run.cjs core-remote` | 删除、数据库身份及备份恢复专项 |
-| `node tests/run-host-suite.cjs native -- core-local.test.cjs core-native-execution.test.cjs` | 独立 Core 与原生流式、工具审批、分布式及后台交接回归 |
-| `CHROME_BIN=/path/to/chrome node tests/run-host-suite.cjs collaboration -- core-single-pwa.test.cjs core-ordinary-image-retention.test.cjs core-native-stickers.test.cjs` | Chromium 中的 Steering、断线回执、附件与表情 |
+| `npm run test:native` | 默认原生回归，覆盖独立 Core、ToolBox 及桌面共用逻辑 |
+| `CHROME_BIN=/path/to/chrome npm run test:collaboration` | 默认协作回归，使用 Chromium 验证原生执行、设备接入与 PWA |
+| `npm run test:integration` | Linux 上独立本机与远程 Core 的 Electron 联验 |
+| `VCP_TEST_CORE_RISK=1 npm run test:integration -- core-remote` | 远程删除、数据库身份及备份恢复专项 |
 
-可通过 `XVFB_BIN` 和 `CHROME_BIN` 指定测试可执行文件。依赖旧 Shared 夹具的完整历史套件及旧 VCPMobileSync wire 验证使用归档基线 `032ad5f`。可从[历史档案](docs/archive/README.md)查看阶段记录。
+原生与协作套件可通过 `--test-name-pattern` 筛选，也可用 `npm run test:native -- -- core-group.test.cjs` 指定单个文件。集成测试可用 `XVFB_BIN` 指定 Xvfb。旧 Shared、VCPMobileSync wire 和旧普通工具组装场景在归档基线 `032ad5f` 复现，历史文档中的命令对应其原版本。见[历史档案](docs/archive/README.md)。
 
 ## 从 NativeSync 到 VCP Core
 

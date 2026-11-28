@@ -5,8 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { BOX, fixture } = require('./fixtures/sharedSingleHarness.cjs');
-const { host, localProvider, mountCore } = require('./fixtures/coreSingleHarness.cjs');
+const { BOX, coreFixture, host, localProvider } = require('./fixtures/coreSingleHarness.cjs');
 const { createGrantReader, createWorkAuthority } = require(BOX + '/core/nativeCapabilityGrants');
 const native = require(BOX + '/modules/requestExecutionContext');
 const diary = require(BOX + '/modules/nativeDiaryAuthority');
@@ -58,37 +57,34 @@ test('native text diary reads honor identity, roots and live revocation while st
 });
 
 test('Core memory tools permit an explicitly granted peer and deny fallback after revocation', async t => {
-    const f = await fixture(t);
     const provider = await localProvider(t);
-    const { chat } = host(provider);
-    const peer = f.shared.create(f.actor('A'), { sharedSpaceId: 'sharedAB', opId: 'native-scope-peer-agent',
-        kind: 'agent', localId: 'peer-agent', config: { name: 'Peer fixture', model: 'peer-model', systemPrompt: 'Fixture only' } }).object;
-    const destination = f.shared.create(f.actor('A'), { sharedSpaceId: 'sharedAB', opId: 'native-scope-peer-topic',
-        kind: 'topic', localId: 'peer-topic', localParent: 'peer-agent', parentId: peer.id,
-        config: { name: 'Peer archive' } }).object;
-    const { core, options } = await mountCore(f, chat);
-    t.after(async () => { await core.close(); await fs.rm(options.directory, { recursive: true, force: true }); });
-    const actor = f.actor('A');
-    const origin = { ...core.topic(actor, 'sharedAB', f.topic.id, 'execute'), actor };
-    const target = core.topic(actor, 'sharedAB', destination.id, 'read');
+    const f = await coreFixture(t, host(provider).chat);
+    const { core, workspace, directory } = f;
+    const source = await f.define({});
+    const peer = 'peer-agent';
+    const destination = await f.define({ ownerId: peer, topicId: 'peer-topic', name: 'Peer archive',
+        config: { name: 'Peer fixture', model: 'peer-model', systemPrompt: 'Fixture only' } });
+    const actor = core.local.actor;
+    const origin = { ...core.topic(actor, workspace, source.key, 'execute'), actor };
+    const target = core.topic(actor, workspace, destination.key, 'read');
     core.store.ensureConversation(target);
     core.store.insertMessage({ id: 'peer_history', key: target.key, role: 'user', content: 'Peer archive marker' });
-    const authority = () => createWorkAuthority(core.readNativeGrants, 'sharedAB', origin.ownerId, () => {});
+    const authority = () => createWorkAuthority(core.readNativeGrants, workspace, origin.ownerId, () => {});
     const run = (fn) => native.runCoreTurn({ workId: 'peer-read-work',
         coreNativeAuthority: authority(), signal: new AbortController().signal, fence() {} }, fn);
-    const args = { maid: 'Peer fixture', command: 'GetTopicContent', topic_id: destination.id };
+    const args = { maid: 'Peer fixture', command: 'GetTopicContent', topic_id: destination.key };
     await assert.rejects(run(() => core.memoryTool(origin, 'TopicMemo', args)), { code: 'CORE_NATIVE_CAPABILITY_DENIED' });
-    await grants(options.directory, 'sharedAB', { [origin.ownerId]: { TopicMemo: [peer.id], DeepMemo: [peer.id] } });
+    await grants(directory, workspace, { [origin.ownerId]: { TopicMemo: [peer], DeepMemo: [peer] } });
     assert.match(await run(() => core.memoryTool(origin, 'TopicMemo', args)), /Peer archive marker/);
     if (process.env.VCP_CORE_CDS_BINARY) {
-        const result = await run(() => core.memoryTool(origin, 'DeepMemo', { agentId: peer.id, keyword: 'Peer archive marker' }));
+        const result = await run(() => core.memoryTool(origin, 'DeepMemo', { agentId: peer, keyword: 'Peer archive marker' }));
         assert.match(JSON.stringify(result), /Peer archive marker/);
     }
-    await grants(options.directory, 'sharedAB', { [origin.ownerId]: { TopicMemo: [f.owner.id] } });
+    await grants(directory, workspace, { [origin.ownerId]: { TopicMemo: [origin.ownerId] } });
     await assert.rejects(run(() => core.memoryTool(origin, 'TopicMemo', args)), { code: 'CORE_NATIVE_CAPABILITY_DENIED' });
-    await assert.rejects(run(() => core.memoryTool(origin, 'DeepMemo', { agentId: peer.id, keyword: 'marker' })),
+    await assert.rejects(run(() => core.memoryTool(origin, 'DeepMemo', { agentId: peer, keyword: 'marker' })),
         { code: 'CORE_NATIVE_CAPABILITY_DENIED' });
-    assert.equal(f.calls(), 0);
+    assert.equal(provider.calls.length, 0);
 });
 
 

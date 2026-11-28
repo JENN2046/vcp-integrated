@@ -15,10 +15,10 @@
 
 ## 输入、重放和恢复
 
-使用固定的三条种子 History、群聊系统后缀、用户后缀、深度规则和文本附件。共享发言计划取自已接纳 Work 的持久记录，按同一成员映射写入桌面群的顺序配置并读回。真实 Electron 通过原生群聊发送 IPC 执行，两组模型请求都由本地回环 Provider 应答。各自生成的 Work、成员请求和助手消息 ID 保留在回执里。[合成输入](../../../tests/group-context/input.json) · [基线桌面截图](before-desktop.png) · [候选桌面截图](after-desktop.png)
+使用固定的三条种子 History、群聊系统后缀、用户后缀、深度规则和文本附件。共享发言计划取自已接纳 Work 的持久记录，按同一成员映射写入桌面群的顺序配置并读回。真实 Electron 通过原生群聊发送 IPC 执行，两组模型请求都由本地回环 Provider 应答。各自生成的 Work、成员请求和助手消息 ID 保留在回执里。[合成输入](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/group-context/input.json) · [基线桌面截图](before-desktop.png) · [候选桌面截图](after-desktop.png)
 
 在正常完成的双成员用例中，重交原请求找回同一 Work；A、B 各派发一次，Journal 保持六条记录（三条种子、一次输入、两次回复）。另在三成员用例中，让 A 提交、B 输出首段、C 等待，直接强停 ToolBox。重启并重交同一请求后，原 Work 保持待核查，B 的原生请求为 `unknown`，A/B/C 累计请求数为 1/1/0；History 和 Journal 保有 A 的回复，B 没有虚假终稿。[故障回执](recovery.json)
 
 本次在隔离 Linux 环境运行，覆盖本机 Electron、ToolBox，以及共享入口的独立 Chromium 会话。原生宿主回归 208/208、协作回归 53/53、桌面群聊及酒馆定向回归 36/36。
 
-[复跑步骤](../../../tests/group-context/README.md)。前后报告的 revision 标识测量起点，候选实际加载的源码由文件哈希和宿主差异核对。
+[复跑步骤](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/group-context/README.md)。前后报告的 revision 标识测量起点，候选实际加载的源码由文件哈希和宿主差异核对。

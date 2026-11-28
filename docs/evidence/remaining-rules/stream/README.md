@@ -10,7 +10,7 @@ ToolBox 在 `streamHandler` 内从标准 delta 收集工具循环输入并裁决
 
 另重跑普通共享单聊终稿恢复的 16 个 ToolBox 强停案例。JSON/SSE 在可信终稿封存后均可恢复原回复，封存前和损坏终稿进入待核对。所有案例二次重启并重放，工具调用次数、原 Work 和回复身份按原断言验证。[恢复回归摘要](comparison.json)
 
-在已构建的集成仓根目录使用 Node 24，按[群聊夹具说明](../../../../tests/group-context/README.md)准备基线桌面，再用同一输入运行：
+在已构建的集成仓根目录使用 Node 24，按[群聊夹具说明](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/group-context/README.md)准备基线桌面，再用同一输入运行：
 
 ```sh
 export NS_GROUP_FIXTURE="$PWD/docs/evidence/remaining-rules/stream/input.json"

@@ -82,7 +82,7 @@ node --input-type=commonjs -e "const { DatabaseSync } = require('node:sqlite'); 
 
 ## 复跑
 
-`node tests/integration/run.cjs core-remote` 运行隔离 HTTPS 场景。加上 `VCP_TEST_CORE_RISK=1` 可复跑桌面删除和备份恢复。可设置 `VCP_TEST_CORE_MODEL_URL` 为独立回环模型端点，并用 `VCP_TEST_CORE_MODEL` 指定模型。实体 Android 验收可另设 `VCP_TEST_CORE_PHONE=1` 和 `VCP_TEST_CORE_PORT`。在测试输出目录读取 `phone-prepare.json` 中的公有证书、入口和话题，复用仓库的临时 Android WebView 驱动。手机完成配对后写入 `phone-ready`，在手机验证 `desktop-exited.json` 中的 Work 后写入 `phone-observed`。出现 `first-completed` 后从手机提交追问。这些标记仅用于夹具协调。
+`npm run test:integration -- core-remote` 运行隔离 HTTPS 场景。加上 `VCP_TEST_CORE_RISK=1` 可复跑桌面删除和备份恢复。可设置 `VCP_TEST_CORE_MODEL_URL` 为独立回环模型端点，并用 `VCP_TEST_CORE_MODEL` 指定模型。实体 Android 验收可另设 `VCP_TEST_CORE_PHONE=1` 和 `VCP_TEST_CORE_PORT`。在测试输出目录读取 `phone-prepare.json` 中的公有证书、入口和话题，复用仓库的临时 Android WebView 驱动。手机完成配对后写入 `phone-ready`，在手机验证 `desktop-exited.json` 中的 Work 后写入 `phone-observed`。出现 `first-completed` 后从手机提交追问。这些标记仅用于夹具协调。
 
 ## 验收证据与范围
 

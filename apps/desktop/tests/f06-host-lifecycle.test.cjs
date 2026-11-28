@@ -32,7 +32,7 @@ function exitAfterConfigPublication(root, topicId) {
 function loadHandler(relative, dependencies) {
     const file = path.join(project, relative), module = { exports: {} };
     const reviewedRequire = name => {
-        if (['../modules/services/topicGenerationLease', '../modules/services/nativeSync/sharedGroup', '../modules/services/historyAuthority', '../services/historyAuthority', '../services/nativeSync/sharedHost'].includes(name)) return require('node:module').createRequire(file)(name);
+        if (['../modules/services/topicGenerationLease', '../modules/services/historyAuthority', '../services/historyAuthority'].includes(name)) return require('node:module').createRequire(file)(name);
         assert.ok(dependencies.has(name), `unreviewed handler dependency: ${name}`);
         return dependencies.get(name);
     };

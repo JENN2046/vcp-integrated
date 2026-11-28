@@ -6,7 +6,6 @@ net.Server.prototype.listen = function(port, ...args) {
     return typeof args[0]==='function' ? listen.call(this,Number(port),'127.0.0.1',...args) : listen.call(this,Number(port),...args);
 };
 require('./restrict-network.cjs').restrictNodeNetwork();
-if (process.env.NS_METER_PREFIX) require('./meter.cjs');
 if (process.env.NS_FIXTURE_POLL_WATCHERS === '1') {
     // The isolated fixture never edits RAG parameters. Skip its recursive watcher on hosts near their per-user limit.
     require(require('node:path').resolve('KnowledgeBaseManager.js'))._startRagParamsWatcher = () => {};
@@ -16,11 +15,10 @@ if (report) process.on('exit',()=>{
     const fs=require('node:fs');
     const path=require('node:path');
     const {createHash}=require('node:crypto');
-    const roots=['core/host.js','core/localWorkspace.js','server.js','Plugin.js','WebSocketServer.js','modules/requestExecutionContext.js','modules/chatCompletionHandler.js','Plugin/NativeSync/sync/sharedNative.js','Plugin/NativeSync/sync/sharedSteering.js','Plugin/NativeSync/mobile/sharedSingle.js','Plugin/NativeSync/mobile/nativeTasks.js','Plugin/NativeSync/sync/sharedSession.js',
-        'Plugin/NativeSync/sync/sharedHttp.js','Plugin/NativeSync/sync/httpService.js','Plugin/NativeSync/sync/sharedWait.js','Plugin/NativeSync/sync/sharedSpace.js','Plugin/NativeSync/sync/sharedControlledText.js','Plugin/NativeSync/sync/sharedCompaction.js','Plugin/NativeSync/sync/sharedDelegation.js','Plugin/NativeSync/mobile/effectiveContext.js','Plugin/NativeSync/sync/sharedTaskRequests.js','Plugin/NativeSync/sync/sharedTaskControls.js',
-        'Plugin/AgentAssistant/AgentAssistant.js','Plugin/AgentAssistant/delegationContinuity.js','Plugin/AgentAssistant/delegationControl.js',
-        'modules/vcpLoop/toolExecutor.js','modules/nativeContinuationStore.cjs','modules/handlers/streamHandler.js','modules/handlers/nonStreamHandler.js','modules/pluginBridgeRegistry.js','modules/toolCallRecordStore.js',
-        'Plugin/NativeSync/sync/sharedTopicSponsor.js','Plugin/NativeSync/mobile/execution.js','Plugin/NativeSync/mobile/groupTurn.js','Plugin/NativeSync/mobile/sharedGroups.js','Plugin/NativeSync/mobile/portal.js','Plugin/NativeSync/sync/sharedTurns.js','Plugin/NativeSync/sync/sharedEvents.js','Plugin/NativeSync/native-sync.js','Plugin/NativeSync/sync/sponsorExecutionBridge.js'];
+    const roots = ['core/host.js','core/localWorkspace.js','core/service.js','core/runner.js','core/store.js',
+        'server.js','Plugin.js','WebSocketServer.js','modules/requestExecutionContext.js','modules/chatCompletionHandler.js',
+        'Plugin/NativeSync/mobile/effectiveContext.js','modules/vcpLoop/toolExecutor.js',
+        'modules/handlers/streamHandler.js','modules/handlers/nonStreamHandler.js','modules/pluginBridgeRegistry.js','modules/toolCallRecordStore.js'];
     const ok=roots.filter(rel=>require.cache[path.resolve(rel)]?.loaded).map(file=>({file:'apps/server/'+file,
         sha256:createHash('sha256').update(fs.readFileSync(file)).digest('hex')}));
     fs.writeFileSync(report,JSON.stringify(ok,null,2)+'\n');

@@ -33,7 +33,6 @@ test('shared reads and ordinary IPC use the same version-3 official/user store',
         assert.equal(stored.version, 3);
         assert.deepEqual(stored.rules.map(rule => rule.id), [id]);
     }
-    await assertSharedRuleAdmission(t);
 });
 test('shared replacement and concurrent ordinary mutation serialize on the original queue', async t => {
     const x = await fixture(t);
@@ -86,74 +85,6 @@ test('failed write reports failure and does not poison subsequent queued changes
     assert.deepEqual(official.rules.map(rule => rule.id), ['two-official'], 'a late write must never overwrite a later save');
     assert.equal(releasedEarly, false, 'the failed write must wait for the other store to settle');
 });
-
-async function assertSharedRuleAdmission(t) {
-    const x = await fixture(t);
-    const { createSharedHost, runtimeForRoot } = handlerRequire('../services/nativeSync/sharedHost');
-    const { SharedRuntime } = handlerRequire('../services/nativeSync/sharedRuntime');
-    const host = createSharedHost({
-        appDataRoot: x.root,
-        tavernHandlers: x.api,
-        agentConfigManager: {
-            readAgentConfig: assert.fail,
-            updateAgentConfig: assert.fail,
-            writeAgentConfig: assert.fail,
-        },
-    });
-    const read = x.handlers.get('tavern:get-rules');
-    const save = x.handlers.get('tavern:save-rules');
-    const toggle = x.handlers.get('tavern:toggle-rule-enabled');
-    const setEnabled = x.handlers.get('tavern:set-rule-enabled');
-    assert.equal((await save(null, { version: 3, rules: [rule('official', 'official'), rule('user')] })).success, true);
-    const files = ['VCPChatTarven.json', 'VCPChatTarven.official.json'].map(name => path.join(x.root, name));
-    const readFiles = () => Promise.all(files.map(file => fs.readFile(file, 'utf8')));
-    const before = await readFiles();
-
-    const published = [];
-    const config = { name: 'Synthetic rules', tavernRules: await host.readRules(), executionPolicy: {} };
-    const rules = { id: 'rules', kind: 'rules', version: 1, config };
-    // Use the real admission methods with a controlled transport and replica.
-    const runtime = Object.assign(Object.create(SharedRuntime.prototype), {
-        host, readOnly: true, connection: { sharedSpaceId: 'space' },
-        state: { objects: { rules } },
-        async send(url) {
-            assert.equal(url, '/api/v1/sync/shared/config?sharedSpaceId=space&sharedId=rules');
-            published.push('read');
-            return { object: rules };
-        },
-        configs: {
-            state: { objects: { rules } },
-            serial: action => action(),
-            async submit(id, kind, value, { expectedVersion }) {
-                assert.equal(id, 'rules');
-                assert.equal(kind, 'rules');
-                assert.equal(expectedVersion, rules.version);
-                published.push('submit');
-                await host.writeRules(value.tavernRules);
-                rules.version++;
-            },
-        },
-    });
-    t.after(host.activate(runtime));
-    assert.equal(runtimeForRoot(x.root), runtime);
-    const { __nativeSyncSharedBase: base } = (await read()).store;
-    assert.deepEqual(base, { sharedId: 'rules', version: 1 });
-    assert.equal((await toggle(null, 'official:official', { __nativeSyncSharedBase: base })).error, 'SHARED_READ_ONLY');
-    runtime.readOnly = false;
-    assert.equal((await setEnabled(null, 'user', false)).error, 'SHARED_CONFIG_BASE_REQUIRED');
-    assert.equal((await setEnabled(null, 'missing', false, { __nativeSyncSharedBase: base })).error, 'Rule not found.');
-    assert.deepEqual(published, []);
-    assert.deepEqual(await readFiles(), before);
-
-    const result = await toggle(null, 'official:official', { __nativeSyncSharedBase: base });
-    assert.equal(result.success, true, result.error);
-    assert.deepEqual(published, ['read', 'submit']);
-    assert.deepEqual(result.store.__nativeSyncSharedBase, { sharedId: 'rules', version: 2 });
-    const [user, official] = await readFiles();
-    assert.deepEqual(JSON.parse(user), JSON.parse(before[0]));
-    assert.equal(JSON.parse(official).rules[0].enabled, false);
-    assert.equal((await host.readRules()).find(rule => rule.source === 'official').enabled, false);
-}
 
 test('a provider write-back waits for an older local write and never publishes itself', { timeout: 3000 }, async t => {
     const entered = Promise.withResolvers(), finish = Promise.withResolvers();

@@ -8,7 +8,7 @@
 | 删除这条回复 | Journal 已写入墓碑，旧正文仍以合成 ID 出现一次 | 该回复在压缩输入中出现零次 |
 | 两个不同回复 ID 写入相同正文 | 两条正式消息都在 | 两条都在。只编辑第一条，第二条保持原 ID 和正文；再删除第一条，只剩第二条 |
 
-两组使用相同的合成输入、步骤和 Provider；ID、版本、墓碑序号和归档证明分别核对。发起准备后如果来源变化，会拒绝发布旧摘要；旧版按正文拼接而准备的原生证据输入也须重新准备。[改前回执](pair/baseline.json) · [改后回执](pair/candidate.json) · [并发与旧凭证回归](../../../tests/native/shared-compaction-input.test.cjs)
+两组使用相同的合成输入、步骤和 Provider；ID、版本、墓碑序号和归档证明分别核对。发起准备后如果来源变化，会拒绝发布旧摘要；旧版按正文拼接而准备的原生证据输入也须重新准备。[改前回执](pair/baseline.json) · [改后回执](pair/candidate.json) · [并发与旧凭证回归](https://github.com/JENN2046/vcp-integrated/blob/032ad5fc27536c323eb5bd075e43282b9badf50e/tests/native/shared-compaction-input.test.cjs)
 
 ## 压缩、重开与下一次发送
 

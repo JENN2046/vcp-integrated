@@ -97,11 +97,13 @@
 ### 常用验证命令
 
 ```sh
-node tests/run-host-suite.cjs native --test-name-pattern='^Core '
-npm run test:collaboration -- --test-name-pattern='Core '
-node tests/integration/run.cjs core-local
-node tests/integration/run.cjs core-remote
+npm run test:native
+CHROME_BIN=/path/to/chrome npm run test:collaboration
+npm run test:integration
+VCP_TEST_CORE_RISK=1 npm run test:integration -- core-remote
 ```
+
+旧 Shared 测试和命令在归档基线 `032ad5f` 复现。默认套件测试当前入口，已知基线断言如实显示结果。
 
 ### 每次提交 / 交付必须附带「三句话回执」
 
