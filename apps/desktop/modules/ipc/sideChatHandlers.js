@@ -527,7 +527,7 @@ function initialize(paths) {
             } else if (historyMutationQueue && typeof historyMutationQueue.read === 'function') {
                 try {
                     const descriptor = { itemId: agentId, itemType: 'agent', topicId: parentTopicId };
-                    const core = historyMutationQueue.coreClient || historyMutationQueue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
+                    const core = historyMutationQueue.coreClient;
                     const parentIsSideChat = await fs.pathExists(path.join(parentDir, 'sidechat-child.json'));
                     rawHistory = !parentIsSideChat && core?.owns(descriptor)
                         ? (await core.history(descriptor)).history : await historyMutationQueue.read(descriptor);

@@ -113,4 +113,17 @@ function formatPublicEvent({ event, seats }) {
         event.emoteUrl ? `表情URL：${JSON.stringify(event.emoteUrl)}` : '',
     ].filter(Boolean).join('\n');
 }
-module.exports = { GAME_SYSTEM_PROMPT, DOUDIZHU_SYSTEM_PROMPT, formatInvite, formatPublicEvent };
+function isSupportedGame(config) {
+    return config?.mode === 'game' && config.modeSettings?.game?.gameTypeId === 'doudizhu';
+}
+
+function gameDecision(observation) {
+    if (!observation || typeof observation.matchId !== 'string' || !/^[A-Za-z0-9_-]{1,120}$/.test(observation.matchId) ||
+        !Number.isSafeInteger(observation.revision) || observation.revision < 0 ||
+        observation.decisionId !== observation.matchId + ':' + observation.revision ||
+        ![0, 1, 2].includes(observation.seat) || !['bidding','playing'].includes(observation.phase) ||
+        !Array.isArray(observation.hand) || observation.hand.length > 20) throw Object.assign(Error('INVALID_CORE_GAME_DECISION'), { code: 'INVALID_CORE_GAME_DECISION', status: 400 });
+    return { matchId: observation.matchId, decisionId: observation.decisionId, revision: observation.revision };
+}
+
+module.exports = { isSupportedGame, gameDecision, GAME_SYSTEM_PROMPT, DOUDIZHU_SYSTEM_PROMPT, formatInvite, formatPublicEvent };

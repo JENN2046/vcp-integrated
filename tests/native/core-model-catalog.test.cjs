@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { BOX, wait } = require('./fixtures/sharedSingleHarness.cjs');
+const { BOX, wait } = require('./fixtures/coreSingleHarness.cjs');
 const { localProvider, host } = require('./fixtures/coreSingleHarness.cjs');
 
 function catalog(fetchImpl, virtual = [{ id: 'VCPModelAuto' }]) {

@@ -33,4 +33,4 @@ async function publishExecutionConfigs({topics,send,...readers}){
  if(batch.length||!batches.length)batches.push(batch);
  const result={topics:[]};for(const topics of batches){const response=await send('/api/plugins/NativeSync/mobile/execution-configs',{body:{topics}});result.topics.push(...response.topics);}return result;
 }
-module.exports={publishExecutionConfigs,executionConfigFor};
+module.exports={publishExecutionConfigs,executionConfigFor,projectRules};

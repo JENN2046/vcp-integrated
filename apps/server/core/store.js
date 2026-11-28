@@ -11,8 +11,27 @@ const parse = JSON.parse;
 const digest = value => createHash('sha256').update(stable(value)).digest('hex');
 
 class CoreStore {
-    constructor(filename) {
+    constructor(filename, workspace) {
         this.db = new DatabaseSync(filename);
+        if (workspace !== undefined) {
+            try {
+                const tables = new Set(this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all().map(row => row.name));
+                const metadata = tables.has('core_metadata') ? this.db.prepare('SELECT value FROM core_metadata WHERE key=?') : null;
+                const authority = metadata?.get('authority')?.value;
+                if ((authority && authority !== 'local') || (!metadata && tables.size) ||
+                    (!authority && tables.has('conversations') && this.db.prepare('SELECT 1 FROM conversations LIMIT 1').get())) {
+                    throw failure('CORE_EXISTING_AUTHORITY_REQUIRED');
+                }
+                const bound = metadata?.get('local_workspace')?.value;
+                if (bound && bound !== workspace || tables.has('conversations') &&
+                    this.db.prepare('SELECT 1 FROM conversations WHERE workspace IS NOT ? LIMIT 1').get(workspace)) {
+                    throw failure('CORE_DATABASE_WORKSPACE_MISMATCH');
+                }
+            } catch (error) {
+                this.db.close();
+                throw error;
+            }
+        }
         this.db.exec(`
             PRAGMA busy_timeout = 5000;
             PRAGMA journal_mode = WAL;
@@ -248,6 +267,15 @@ class CoreStore {
     compactionHistory(key) {
         return this.db.prepare('SELECT * FROM messages WHERE conversation_id=? AND deleted=0 ORDER BY ordinal')
             .all(key).map(row => this.message(row, true));
+    }
+
+    cdsHistory(key) {
+        return this.db.prepare(`SELECT id, role, content, created_at AS timestamp, sender_name, history_metadata_json
+            FROM messages WHERE conversation_id=? AND deleted=0 ORDER BY ordinal`).all(key)
+            .map(({ id, role, content, timestamp, sender_name, history_metadata_json }) => {
+                const agentId = history_metadata_json && parse(history_metadata_json).agentId;
+                return { id, role, content, timestamp, ...(sender_name && { name: sender_name }), ...(agentId && { agentId }) };
+            });
     }
 
     snapshot(key, before, limit) {

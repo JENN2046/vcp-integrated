@@ -22,4 +22,15 @@ async function inspectShared(connection,state,send,{allowReadOnly=false}={}){
  if(info.capability!=='shared-space-v1'||info.schemaVersion!==1||info.readOnly&&!allowReadOnly||!info.spaces?.some(s=>s.id===connection.sharedSpaceId))throw fail('SHARED_SPACE_NOT_APPROVED');
  return info;
 }
-module.exports={ownedJson,readSettledSource,settled,inspectShared};
+async function belongsToSharedRoot(root) {
+ const data = path.join(root, '.native-sync');
+ const connection = await ownedJson(root, path.join(data, 'connection.json'), { optional: true });
+ if (connection?.sharedSpaceId || connection?.sharedJoinOpId) return true;
+ const state = await ownedJson(root, path.join(data, 'state.json'), { optional: true });
+ if (state?.sharedSpaceId) return true;
+ const shared = path.join(data, 'shared');
+ await assertHistoryPath(root, path.join(shared, '_authority'));
+ try { return (await fs.readdir(shared)).length > 0; }
+ catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+}
+module.exports={ownedJson,readSettledSource,settled,inspectShared,belongsToSharedRoot};

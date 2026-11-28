@@ -4,7 +4,6 @@ const path = require('path');
 const fs = require('fs-extra');
 const { pathToFileURL } = require('url');
 const groupChat = require('../../Groupmodules/groupchat');
-const { mainWindowSender } = require('../services/nativeSync/queries');
 const { HistoryMutationQueue } = require('../services/historyMutationQueue');
 const { clearTrajectoryOf, clearTrajectoriesOfOwner } = require('../modelTrajectory');
 
@@ -94,7 +93,7 @@ function initialize(mainWindow, context) {
             gameService, groupChat, loadAgent: getAgentConfigById,
             getCoreGame: ({ groupId, topicId }) => {
                 const descriptor = { itemType: 'group', itemId: groupId, topicId };
-                const client = historyMutationQueue.coreClient || historyMutationQueue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
+                const client = historyMutationQueue.coreClient;
                 return client?.owns(descriptor) ? { client, descriptor } : null;
             },
             listAgents: async () => {
@@ -159,12 +158,11 @@ function initialize(mainWindow, context) {
     });
 
     ipcMain.handle('get-agent-groups', async () => {
-        const groups=await groupChat.getAgentGroups(),shared=historyMutationQueue.syncPolicy?.sharedExecution?.runtime;return shared?groups.filter(g=>shared.isLocalOwnerVisible('group',g.id)):groups;
+        return groupChat.getAgentGroups();
     });
 
     ipcMain.handle('get-agent-group-config', async (event, groupId) => {
-        const value=await groupChat.getAgentGroupConfig(groupId),shared=historyMutationQueue?.syncPolicy?.sharedExecution?.runtime;
-        return shared?shared.decorateNativeConfig('group',groupId,value):value;
+        return groupChat.getAgentGroupConfig(groupId);
     });
 
     ipcMain.handle('save-agent-group-config', async (event, groupId, configData) => {
@@ -211,7 +209,6 @@ function initialize(mainWindow, context) {
     });
 
     ipcMain.handle('create-new-topic-for-group', async (event, groupId, topicName) => {
-        historyMutationQueue?.syncPolicy?.sharedExecution?.runtime?.assertNativeMutation('group',groupId,undefined);
         const core = historyMutationQueue?.coreClient;
         try {
             core?.assertCanConfigure();
@@ -233,9 +230,6 @@ function initialize(mainWindow, context) {
     });
 
     ipcMain.handle('save-group-topic-title', async (event, groupId, topicId, newTitle, options) => {
-        const shared=historyMutationQueue?.syncPolicy?.sharedExecution?.runtime;
-        shared?.assertNativeMutation('group',groupId,topicId);
-        if(shared?.nativeObject('group',groupId)){try{return await shared.renameNativeTopic({itemType:'group',itemId:groupId,topicId},newTitle,options);}catch(e){return {success:false,error:e.code||'SHARED_CONFIG_CONFLICT'};}}
         const core = historyMutationQueue?.coreClient;
         try {
             core?.assertCanConfigure();
@@ -246,13 +240,12 @@ function initialize(mainWindow, context) {
     });
 
     ipcMain.handle('regenerate-group-topic-title', async (event, groupId, topicId) => {
-        historyMutationQueue?.syncPolicy?.sharedExecution?.runtime?.assertNativeMutation('group',groupId,topicId);
         return await groupChat.regenerateGroupTopicTitle(groupId, topicId);
     });
 
     const coreGroup = (groupId, topicId) => {
         const descriptor = { itemType: 'group', itemId: groupId, topicId };
-        const client = historyMutationQueue.coreClient || historyMutationQueue.syncPolicy?.sharedExecution?.runtime?.coreSingle;
+        const client = historyMutationQueue.coreClient;
         return { descriptor, client: client?.owns(descriptor) ? client : null };
     };
 
@@ -265,10 +258,8 @@ function initialize(mainWindow, context) {
                 return result.history;
             } catch (error) { return { error: error.code || error.message }; }
         }
-        const { CoreSingleClient } = require('../services/nativeSync/coreSingleClient');
         try {
-            const cached = await CoreSingleClient.offlineHistory(historyMutationQueue, descriptor);
-            return cached?.history || await groupChat.getGroupChatHistory(groupId, topicId);
+            return await groupChat.getGroupChatHistory(groupId, topicId);
         } catch (error) { return { error: error.code || error.message }; }
     });
 
@@ -292,17 +283,6 @@ function initialize(mainWindow, context) {
         }
     });
 
-    const trustedGroupHandoff = mainWindowSender(() => mainWindow);
-    ipcMain.handle('group-member-handoff', async (event, payload) => {
-        if (!trustedGroupHandoff(event)) return { success: false, error: 'FORBIDDEN' };
-        try {
-            return await require('../services/quitAdmission.cjs').run(() =>
-                groupChat.groupMemberHandoff(payload, createStreamSender(), getAgentConfigById));
-        } catch (error) {
-            return { success: false, error: error.code || 'SHARED_GROUP_HANDOFF_FAILED' };
-        }
-    });
-
     ipcMain.handle('send-group-chat-message', async (event, groupId, topicId, userMessage) => {
         if (event.sender !== mainWindow?.webContents) return { success: false, code: 'FORBIDDEN' };
         if (!topicAdmission) return { success: false, error: '中央消息入场服务不可用' };
@@ -315,12 +295,6 @@ function initialize(mainWindow, context) {
             if (client) {
                 return await client.send(descriptor, { id: userMessage.id, role: 'user', attachments: userMessage.attachments || [],
                     content: userMessage.originalUserText ?? userMessage.content.text });
-            }
-            const execution = historyMutationQueue.syncPolicy?.sharedExecution;
-            if (execution?.runtime.nativeObject('group', groupId)) {
-                // The native group runner resumes the shared admission using the original message ID.
-                await groupChat.handleGroupChatMessage(groupId, topicId, userMessage, createStreamSender(), getAgentConfigById);
-                return { success: true };
             }
             const originalText = typeof userMessage.originalUserText === 'string'
                 ? userMessage.originalUserText : userMessage.content.text;

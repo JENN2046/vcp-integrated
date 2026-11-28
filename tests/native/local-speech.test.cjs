@@ -14,7 +14,7 @@ const express = require(BOX + '/node_modules/express');
 const WebSocket = require(BOX + '/node_modules/ws');
 const { RemoteAccess } = require(BOX + '/core/remoteAccess');
 const { CoreStore } = require(BOX + '/core/store');
-const { localSpeechConfig } = require(BOX + '/core/localSpeech');
+const { localSpeechConfig } = require(BOX + '/modules/speech/localSpeech');
 
 test('local speech requires HTTPS, same origin, and a paired device; supports cancel and disconnect', { timeout:10000 }, async t => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(),'local-speech-'));

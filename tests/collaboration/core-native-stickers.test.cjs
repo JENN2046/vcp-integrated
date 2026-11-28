@@ -9,9 +9,9 @@ const https = require('node:https');
 const {createHash,X509Certificate} = require('node:crypto');
 const {setTimeout: delay} = require('node:timers/promises');
 const {execFileSync} = require('node:child_process');
-const {BOX,wait} = require('../native/fixtures/sharedSingleHarness.cjs');
+const {BOX,wait} = require('../native/fixtures/coreSingleHarness.cjs');
 const {localProvider,host} = require('../native/fixtures/coreSingleHarness.cjs');
-const {projectPreview} = require(BOX+'/core/nativeStickers');
+const {projectPreview} = require(BOX+'/modules/nativeStickers');
 
 test('Core mobile only displays scoped native sticker assets from the original message', {timeout:35000}, async t => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(),'core-stickers-'));

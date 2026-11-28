@@ -268,7 +268,7 @@ ipcMain.on('native-sync:composer-scope', event => {
 // 应用功能模块：停用的不加载；它们声明的自定义协议必须在 app ready 之前登记
 const appFeatures = createAppFeatures({
     projectRoot: PROJECT_ROOT, appDataRoot: APP_DATA_ROOT_IN_PROJECT,
-    bundledFeatureFolders: ['nativeSyncDesktopRuntime', 'nativeSyncSettings'],
+    bundledFeatureFolders: ['nativeSyncDesktopRuntime'],
 });
 appFeatures.registerSchemes(protocol);
 appFeatures.installIpc(ipcMain);
@@ -308,7 +308,6 @@ let startupTeardownStarted = false;
 let topicAdmissionHost = null;
 let topicConversationResolver = null;
 let historyAuthority = null;
-let localHistoryAuthority = null;
 let pluginAgentOperationService = null;
 let chartService = null;
 let gameService = null;
@@ -510,7 +509,7 @@ function startDistributedServerAfterRenderer() {
                 configPath: app.isPackaged ? path.join(app.getPath('userData'), 'VCPDistributedServer', 'config.env') : undefined,
                 mainServerUrl: settings.vcpLogUrl,
                 nativeConversationWebSocket,
-                nativeSyncRouteId: require('./modules/services/nativeSync/sharedTopicSponsor').nativeSyncRouteId,
+                nativeSyncRouteId: require('./modules/services/topicSponsorDelivery').nativeSyncRouteId,
                 vcpKey: settings.vcpLogKey,
                 serverName: 'VCPChat-Desktop-Client-Distributed-Server',
                 debugMode: true,
@@ -1257,7 +1256,7 @@ if (!gotTheLock) {
             logger: console
         });
         const authorityModule = require('./modules/services/nativeSync/historyAuthority');
-        localHistoryAuthority = await authorityModule.prepareLocalHistoryAuthority({ queue: historyMutationQueue, appDataRoot: APP_DATA_ROOT_IN_PROJECT });
+        await authorityModule.prepareLocalHistoryAuthority({ queue: historyMutationQueue, appDataRoot: APP_DATA_ROOT_IN_PROJECT });
         historyAuthority = new (require('./modules/services/historyAuthority').HistoryAuthority)({
             queue: historyMutationQueue,
             singleInstance: gotTheLock && !process.argv.includes('--allow-multiple-instances'),
@@ -1288,14 +1287,8 @@ if (!gotTheLock) {
             resolver: {resolve:async value=>{const target=await topicConversationResolver.resolve(value);await topicAuthority.assertLocal(target.scope);return target;}},
             findAgent: query => pluginAgentOperationService.findAgent(query),
         });
-        const { createSharedTopicSponsorDelivery } = require('./modules/services/nativeSync/sharedTopicSponsor');
-        const sharedTopicDelivery = createSharedTopicSponsorDelivery({
-            authority: topicAuthority,
-            getRuntime: () => require('./modules/services/nativeSync/sharedHost').runtimeForRoot(APP_DATA_ROOT_IN_PROJECT),
-        });
         pluginAgentOperationService = new PluginAgentOperationService({
             topicDelivery,
-            sharedTopicDelivery,
             assertLocalOwner: scope => topicAuthority.assertLocal(scope, { ownerOnly: true }),
             agentDir: AGENT_DIR,
             userDataDir: USER_DATA_DIR,
@@ -1686,7 +1679,7 @@ if (!gotTheLock) {
         // ⚠️ agentHandlers 必须在 assistantHandlers 之前初始化
         // 因为 assistantHandlers 依赖 getAgentConfigById 函数，该函数需要 AGENT_DIR_CACHE 已被初始化
         const { saveNativeOwnerConfig, saveNativeOwnerAvatar } = require('./modules/services/nativeSync/nativeConfigSave');
-        const legacyOwnerDelete = require('./modules/services/nativeSync/nativeOwnerDeletion').createOwnerDeletion({ root: APP_DATA_ROOT_IN_PROJECT });
+        const verifyLocalOwnerDeletion = require('./modules/services/nativeSync/nativeOwnerDeletion').createOwnerDeletion({ root: APP_DATA_ROOT_IN_PROJECT });
         const coreOwnerRuntime = async () => {
             const core = nativeSyncLifecycle?.getRuntime();
             if (core?.removeDefinition) return core;
@@ -1696,10 +1689,10 @@ if (!gotTheLock) {
                 throw Object.assign(Error('CORE_STARTUP_PENDING'), { code: 'CORE_STARTUP_PENDING' });
             }
         };
-        const beforeOwnerDelete = async (scope, options, createDefaultTopic) => {
+        const beforeOwnerDelete = async (scope, options) => {
             try {
                 const core = await coreOwnerRuntime();
-                if (!core) return legacyOwnerDelete(scope, options, createDefaultTopic);
+                if (!core) return verifyLocalOwnerDeletion(scope, options);
                 if (options != null) return { success: false, error: 'CORE_DELETE_SCOPE_CHANGED' };
                 return await core.removeDefinition(scope);
             } catch (error) {
@@ -2044,7 +2037,7 @@ if (!gotTheLock) {
         const runtimeServices = {
             ipcMain, getMainWindow: () => mainWindow, BrowserWindow, nativeImage: require('electron').nativeImage,
             agentConfigManager, groupChat, tavernHandlers, fileManager, settingsManager: appSettingsManager,
-            historyAuthority, localHistoryAuthority, waitForHistory: () => chatDataServiceStartPromise,
+            historyAuthority, waitForHistory: () => chatDataServiceStartPromise,
             isolated: Boolean(isolatedAppDataRoot),
             invalidateAgentCaches: () => require('./modules/ipc/agentHandlers').invalidateCaches(),
         };

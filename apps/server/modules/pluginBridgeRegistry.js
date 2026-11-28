@@ -49,7 +49,12 @@ class PluginExecutionBridgeRegistry {
                 return { result: await context.executeCoreMemory(toolArgs) };
             }
             if (plugin.name === 'TopicSponsor') {
-                return require('../Plugin/NativeSync/sync/sponsorExecutionBridge').executeCore(toolArgs, context);
+                const { _nativeSyncTopicSponsor: ignored, ...args } = toolArgs;
+                if (typeof context.deliverCoreTopic !== 'function' ||
+                    (args.command || args.tool_name) !== 'ReplyToTopic' || args.mode === 'new_topic') {
+                    throw Object.assign(Error('CORE_TOPIC_SPONSOR_REPLY_REQUIRED'), { code: 'CORE_TOPIC_SPONSOR_REPLY_REQUIRED' });
+                }
+                return { result: await context.deliverCoreTopic(args) };
             }
         }
         for (const bridge of this.bridges) {

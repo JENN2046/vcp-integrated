@@ -5,7 +5,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { conversationKey } = require('./historyMutationQueue');
 const failure = code => Object.assign(new Error(code), { code });
-function createTopicExecutionAuthority({ appDataRoot, getQueue, getRuntime = () => require('./nativeSync/sharedHost').runtimeForRoot(appDataRoot) }) {
+function createTopicExecutionAuthority({ appDataRoot, getQueue }) {
     const root = path.resolve(appDataRoot);
     async function nativeOwner(scope, topicRequired) {
         const kind = scope?.itemType || 'agent';
@@ -42,46 +42,8 @@ function createTopicExecutionAuthority({ appDataRoot, getQueue, getRuntime = () 
             if (process.env.VCPCHAT_LOCAL_CORE_WORKSPACE || process.env.VCPCHAT_CORE_REMOTE_ORIGIN || await fs.access(path.join(root, '.vcp-core/profile.json')).then(
                 () => true, error => { if (error.code === 'ENOENT') return false; throw error; }
             )) throw failure('CORE_LOCAL_AUTHORITY_UNAVAILABLE');
-            const policy = queue.syncPolicy;
-            if (policy?.isRecoveryFence) throw failure('SHARED_STARTUP_RECOVERY_REQUIRED');
-            const runtime = getRuntime() || policy?.sharedExecution?.runtime;
-            if (!runtime) {
-                const sourceOnly = Boolean(policy?.source && policy?.state?.source && !policy.sharedSpaceId && !policy.startupError);
-                if (policy?.sharedSpaceId || (!sourceOnly && await configured()) || config.__nativeSyncSharedBase) throw failure('SHARED_AUTHORITY_UNAVAILABLE');
-                return await localClassification();
-            }
-            if (!runtime.ready || runtime.closed || runtime.directoryPaused || !runtime.state?.locals || !runtime.state?.objects) throw failure('SHARED_STARTUP_PENDING');
-            const locals = Object.entries(runtime.state.locals);
-            const ownerRows = locals.filter(([, local]) => local.kind === kind && local.localId === scope.itemId);
-            if (runtime.state.retiredOwners?.[kind + ':' + scope.itemId]) throw failure('SHARED_OBJECT_MERGED');
-            if (!ownerRows.length) {
-                // A validated shared connection covers the full source. A newly
-                // created owner may still be awaiting the existing directory scan;
-                // absence from its registry is not permission for local execution.
-                if (runtime.connection?.sharedSpaceId || config.__nativeSyncSharedBase || locals.some(([, local]) => local.localParent === scope.itemId)) throw failure('SHARED_LOCAL_MAPPING_PENDING');
-                return await localClassification();
-            }
-            const active = ownerRows.filter(([id, local]) => !local.aliasOf && runtime.state.objects[id] && !runtime.state.objects[id].deleted);
-            if (active.length !== 1) throw failure('SHARED_LOCAL_MAPPING_PENDING');
-            const ownerId = active[0][0];
-            runtime.matching.assert([ownerId]);
-            if (!runtime.isLocalVisible(ownerId)) throw failure('SHARED_LOCAL_REMOVED');
-            if (ownerOnly) return { success: true, kind: 'shared', sharedId: ownerId };
-            const topicRows = locals.filter(([, local]) => local.kind === 'topic' && local.localParent === scope.itemId && local.localId === scope.topicId);
-            if (topicRows.length !== 1 || topicRows[0][1].aliasOf) throw failure('SHARED_LOCAL_MAPPING_PENDING');
-            const topicId = topicRows[0][0], topic = runtime.state.objects[topicId];
-            if (!topic || topic.deleted || topic.parentId !== ownerId || !runtime.isLocalVisible(topicId)) throw failure('SHARED_LOCAL_MAPPING_PENDING');
-            runtime.matching.assert([ownerId, topicId]);
-            if (runtime.coreSingle?.owns(normalized)) {
-                if (runtime.coreSingle.mapping(normalized).sharedId !== topicId) throw failure('SHARED_LOCAL_MAPPING_PENDING');
-                return { success: true, kind: 'shared', core: true, sharedId: topicId };
-            }
-            const mapping = runtime.execution.mapping(normalized);
-            if (mapping.sharedId !== topicId) throw failure('SHARED_LOCAL_MAPPING_PENDING');
-            // Only a fully validated shared binding may use Queue's guarded
-            // empty snapshot. Never create History or weaken local existence.
-            await queue.readSnapshot(normalized);
-            return { success: true, kind: 'shared', sharedId: topicId };
+            if (await configured() || config.__nativeSyncSharedBase) throw failure('SHARED_AUTHORITY_UNAVAILABLE');
+            return await localClassification();
         } catch (error) {
             return { success: false, kind: 'unknown', code: error.code || 'TOPIC_AUTHORITY_UNAVAILABLE', error: error.code || 'TOPIC_AUTHORITY_UNAVAILABLE' };
         }
@@ -97,19 +59,17 @@ function createTopicExecutionAuthority({ appDataRoot, getQueue, getRuntime = () 
         if(context?.agentId && !context.topicId) return classify({itemType:context.ownerType||'agent',itemId:context.agentId},{ownerOnly:true});
         try {
             const queue=getQueue();
-            if(!queue || queue.disposed || queue.syncPolicy?.isRecoveryFence || getRuntime() || queue.syncPolicy?.sharedSpaceId || await configured()) throw failure('TOPIC_AUTHORITY_REQUIRED');
+            if(!queue || queue.disposed || queue.syncPolicy?.isRecoveryFence || queue.syncPolicy?.sharedSpaceId || await configured()) throw failure('TOPIC_AUTHORITY_REQUIRED');
             return {success:true,kind:'local',auxiliary:true};
         } catch(error) { return {success:false,kind:'unknown',code:error.code||'TOPIC_AUTHORITY_UNAVAILABLE',error:error.code||'TOPIC_AUTHORITY_UNAVAILABLE'}; }
     }
     return { classify, assertLocal, classifyNativeRequest };
 }
-async function prepareNativeRequest({authority,queue,context,body}) {
+async function prepareNativeRequest({authority,context}) {
     if(!authority?.classifyNativeRequest) throw failure('TOPIC_AUTHORITY_UNAVAILABLE');
     const owner=await authority.classifyNativeRequest(context);
     if(!owner?.success || !['local','shared'].includes(owner.kind)) throw failure(owner?.code||'TOPIC_AUTHORITY_UNAVAILABLE');
     if(owner.kind==='local') return null;
-    if(owner.core)throw failure('CORE_ROUTE_REQUIRED');
-    if(!queue?.syncPolicy?.sharedExecution) throw failure('SHARED_AUTHORITY_UNAVAILABLE');
-    return queue.syncPolicy.sharedExecution.prepareNative(context,body);
+    throw failure('CORE_ROUTE_REQUIRED');
 }
 module.exports = { createTopicExecutionAuthority, prepareNativeRequest };

@@ -564,9 +564,7 @@ app.use('/core/api', (req, res, next) => {
 });
 app.use('/mobile', (req, res, next) => {
     if (coreHost?.remoteMobileRouter) return coreHost.remoteMobileRouter(req, res, next);
-    const mobile = pluginManager.getServiceModule('NativeSync');
-    if (!mobile?.handleMobile) return res.status(503).json({ error: { code: 'MOBILE_DISABLED' } });
-    return mobile.handleMobile(req, res);
+    return res.status(503).json({ error: { code: 'MOBILE_DISABLED' } });
 });
 app.use(cors({ origin: '*' })); // 启用 CORS，允许所有来源的跨域请求，方便本地文件调试
 
@@ -1340,16 +1338,15 @@ async function initialize() {
     pluginManager.setWebSocketServer(webSocketServer);
 
     await pluginManager.initializeServices(app, adminPanelRoutes, __dirname);
-    if (process.env.VCP_CORE_DATA_DIR || process.env.VCP_CORE_WORKSPACE) {
+    if (process.env.VCP_CORE_DATA_DIR || process.env.VCP_CORE_WORKSPACE || process.env.VCP_CORE_MODE) {
         coreHost = require('./core/host').startCoreHost({
             app, chat: chatCompletionHandler, serverKey, modelCatalog: queryModelCatalog,
             nativeStickers: {
                 root: path.join(__dirname, 'image'),
-                origin: require('./core/nativeStickers').originForNativeImages(process.env),
+                origin: require('./modules/nativeStickers').originForNativeImages(process.env),
                 imageKey: () => pluginManager.getResolvedPluginConfigValue('ImageServer', 'Image_Key'),
             },
-            listenHost: process.env.VCP_LOCAL_LISTEN_HOST || process.env.HOST || '127.0.0.1',
-            legacy: pluginManager.getServiceModule('NativeSync')
+            listenHost: process.env.VCP_LOCAL_LISTEN_HOST || process.env.HOST || '127.0.0.1'
         });
     }
     // 在所有服务插件都注册完路由后，再将 adminApiRouter 挂载到主 app 上
@@ -1489,7 +1486,6 @@ async function startServer() {
     const listenHost = process.env.VCP_LOCAL_LISTEN_HOST || process.env.HOST || '127.0.0.1';
     const listenArgs = require('./modules/localListenOptions').localListenArguments(port, listenHost);
     server = app.listen(...listenArgs, () => {
-        pluginManager.getServiceModule('NativeSync')?.setExecutionEndpoint?.({ url: `http://${listenHost === '::1' ? '[::1]' : listenHost}:${server.address().port}/v1/chat/completions`, key: serverKey });
         console.log(`中间层服务器正在监听端口 ${port}`);
         console.log(`API 服务器地址: ${apiUrl}`);
 
@@ -1554,7 +1550,6 @@ async function gracefulShutdown(exitCode = 0, reason = 'signal') {
     shutdownStartedAt = Date.now();
     serverLifecycleState = SERVER_LIFECYCLE.DRAINING;
     coreHost?.beginDrain();
-    pluginManager.getServiceModule('NativeSync')?.beginDrain?.();
 
     console.log(`[Server] Initiating graceful shutdown. reason=${reason}, exitCode=${exitCode}`);
     console.log(`[Server][ShutdownTrace] Phase 0/10 - shutdown requested. activeRequests=${activeRequests.size}`);

@@ -182,8 +182,7 @@ async function getAgentConfigById(agentId) {
         config.id = agentId;
         // 注入正确的用户数据目录路径，而不是Agent定义目录
         config.agentDataPath = path.join(AGENT_DIR_CACHE.replace('Agents', 'UserData'), agentId);
-        const shared=require('../services/nativeSync/sharedHost').runtimeForRoot(path.dirname(AGENT_DIR_CACHE));
-        return shared?shared.decorateNativeConfig('agent',agentId,config):config;
+        return config;
     }
     return { error: `Agent config for ${agentId} not found.` };
 }
@@ -297,14 +296,10 @@ function initialize(context) {
 
                 agentData.avatarUrl = await findAvatarUrl(agentPath);
 
-                const shared=require('../services/nativeSync/sharedHost').runtimeForRoot(path.dirname(AGENT_DIR));
-                if(shared)agentData.config=shared.decorateNativeConfig('agent',folderName,agentData.config);
                 return agentData;
             }));
 
-            const shared=require('../services/nativeSync/sharedHost').runtimeForRoot(path.dirname(AGENT_DIR));
-            let agents = agentResults.filter(a=>a&&(!shared||shared.isLocalOwnerVisible('agent',a.id)));
-            for(const a of agents)if(shared)a.topics=a.config?.topics||a.topics;
+            let agents = agentResults.filter(Boolean);
 
             let settings = {};
             try {
@@ -589,11 +584,6 @@ function initialize(context) {
             const agentDir = path.join(AGENT_DIR, agentId);
 
             if (!historyMutationQueue) throw new Error('HISTORY_QUEUE_REQUIRED');
-            const shared = historyMutationQueue.syncPolicy?.sharedExecution?.runtime;
-            if (shared) {
-                if (!shared.ready || shared.closed) throw new Error('SHARED_STARTUP_PENDING');
-                shared.assertNativeMutation('agent', agentId);
-            }
             await fs.mkdir(agentDir); // Exclusive owner identity; never adopt an existing directory.
 
             const defaultConfig = {
@@ -627,7 +617,6 @@ function initialize(context) {
             }
 
             // Discovery reads the saved owner and binds all initial topics before History opens them.
-            if (shared) await shared.tick({ forceLocal: true, skipExecution: true, skipAttachments: true });
             for (const topic of configToSave.topics) {
                 await historyMutationQueue.initializeIfMissing({ itemId: agentId, itemType: 'agent', topicId: topic.id });
             }

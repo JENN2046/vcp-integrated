@@ -5,7 +5,7 @@ const path = require('node:path');
 const { createHash } = require('node:crypto');
 const express = require('express');
 const { CoreStore, failure } = require('./store');
-const { nativeGamePrompts, isCoreGame, gameDecision } = require('./game');
+const { nativeGamePrompts } = require('../modules/nativeGamePrompts');
 const { CoreJev, configuredJev } = require('./jev');
 const { CoreCdsIndex } = require('./cdsIndex');
 const { CoreRunner } = require('./runner');
@@ -18,8 +18,7 @@ const { fieldsFrom } = require('../Plugin/NativeSync/sync/metadata');
 const { filterChatModels } = require('../Plugin/NativeSync/sync/contracts.generated.cjs');
 const { AttachmentStore } = require('../Plugin/NativeSync/mobile/attachments');
 const { attachmentRoutes } = require('../Plugin/NativeSync/mobile/attachmentRoutes');
-const { projectMessage, projectPreview, readSticker } = require('./nativeStickers');
-const { prepareSharedConfiguration } = require('../Plugin/NativeSync/mobile/sharedConfiguration');
+const { projectMessage, projectPreview, readSticker } = require('../modules/nativeStickers');
 const { effectiveRequest } = require('../Plugin/NativeSync/mobile/effectiveContext');
 const { sanitize, assertPortableContext } = require('../Plugin/NativeSync/mobile/groupRequest');
 const { payloadHash, sessionMarker } = require('../Plugin/NativeSync/mobile/submissionRecovery');
@@ -38,19 +37,13 @@ const integer = (value, defaultValue, min, max) => {
 };
 
 class CoreService {
-    constructor({ directory, legacyDirectory, workspace, shared, mobile, chat, agentManager, remoteConfig, modelCatalog, defaultAgentModel, nativeStickers, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
-        if (shared && (!shared.grants.has(workspace) || shared.readOnly || !mobile || shared.coreWorkspace && shared.coreWorkspace !== workspace)) throw failure('CORE_WORKSPACE_UNAVAILABLE');
+    constructor({ directory, workspace, chat, agentManager, remoteConfig, modelCatalog, defaultAgentModel, nativeStickers, cdsBinary = process.env.VCP_CORE_CDS_BINARY, jevService = configuredJev(), gameEnabled = process.env.VCP_CORE_ENABLE_GAME === '1' }) {
         if (!path.isAbsolute(directory) || directory === path.parse(directory).root) throw failure('CORE_DATA_DIRECTORY_REQUIRED');
         fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
         directory = fs.realpathSync(directory);
-        if (legacyDirectory) {
-            legacyDirectory = fs.realpathSync(legacyDirectory);
-            if (directory === legacyDirectory || directory.startsWith(legacyDirectory + path.sep) ||
-                legacyDirectory.startsWith(directory + path.sep)) throw failure('CORE_DATA_DIRECTORY_OVERLAP');
-        }
         const filename = path.join(directory, 'core.sqlite');
-        if (shared?.coreStorageId && !fs.existsSync(filename)) throw failure('CORE_DATABASE_IDENTITY_REQUIRED');
-        if (fs.existsSync(filename) && (fs.lstatSync(filename).isSymbolicLink() || fs.statSync(filename).nlink !== 1)) {
+        const existing = fs.lstatSync(filename, { throwIfNoEntry: false });
+        if (existing && (!existing.isFile() || existing.nlink !== 1)) {
             throw failure('CORE_DATA_FILE_ALIAS');
         }
         this.workspace = workspace;
@@ -59,10 +52,9 @@ class CoreService {
         this.nativeStickers = nativeStickers;
         this.defaultAgentModel = defaultAgentModel?.trim() || null;
         this.observers = new Set();
-        this.mobile = mobile;
-        this.store = new CoreStore(filename);
+        this.store = new CoreStore(filename, workspace);
         try {
-            this.local = shared ? null : new (require('./localWorkspace').LocalWorkspace)(this.store, workspace, agentManager);
+            this.local = new (require('./localWorkspace').LocalWorkspace)(this.store, workspace, agentManager);
             if (remoteConfig) {
                 const bound = this.store.db.prepare("SELECT value FROM core_metadata WHERE key='remote_origin'").get();
                 if (bound && bound.value !== remoteConfig.origin) throw failure('CORE_REMOTE_ORIGIN_CHANGED');
@@ -74,14 +66,9 @@ class CoreService {
             this.store.db.close();
             throw error;
         }
-        this.shared = shared || this.local;
-        this.desktopContext = new DesktopContext(this.shared, workspace, chat.config?.webSocketServer);
+        this.desktopContext = new DesktopContext(this.local, workspace, chat.config?.webSocketServer);
         this.cds = new CoreCdsIndex(directory, cdsBinary);
         const { db } = this.store;
-        if (shared?.coreStorageId && shared.coreStorageId !== this.store.storageId) {
-            db.close();
-            throw failure('CORE_DATABASE_IDENTITY_MISMATCH');
-        }
         const attachmentsStore = {
             db,
             findMessage: db.prepare(`SELECT m.* FROM messages m JOIN conversations c ON c.id=m.conversation_id
@@ -93,7 +80,7 @@ class CoreService {
         this.attachments = new AttachmentStore({ store: attachmentsStore, root: directory, topics: [] });
         this.readNativeGrants = createGrantReader(directory);
         this.runner = new CoreRunner({
-            store: this.store, chat, readNativeGrants: this.readNativeGrants, memoryTool: (...args) => this.memoryTool(...args), attachments: this.attachments, desktopContext: this.desktopContext, allowedAgents: this.shared.delegationAgents,
+            store: this.store, chat, readNativeGrants: this.readNativeGrants, memoryTool: (...args) => this.memoryTool(...args), attachments: this.attachments, desktopContext: this.desktopContext, allowedAgents: this.local.delegationAgents,
             resolveAcceptedTopic: work => this.resolveAcceptedTopic(work),
             buildPacket: (...args) => this.buildPacket(...args),
             sponsor: (...args) => this.deliverSponsoredMessage(...args),
@@ -101,12 +88,8 @@ class CoreService {
             automaticCompaction: (...args) => this.compaction.automatic(...args),
             isCompacting: key => this.compaction.running.has(key)
         });
-        for (const row of db.prepare('SELECT * FROM conversations').all()) {
-            if (row.workspace !== workspace) throw failure('CORE_DATABASE_WORKSPACE_MISMATCH');
-        }
         this.jev = jevService && new CoreJev(this, jevService, topic => this.configuration(topic));
-        if (shared) this.activateHistory();
-        else if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='history_import_deletions'").get()) {
+        if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='history_import_deletions'").get()) {
             this.historyDeleted = db.prepare(`SELECT 1 FROM history_import_deletions
                 WHERE conversation_id=? AND kind IN ('owner','topic') LIMIT 1`);
         }
@@ -117,66 +100,22 @@ class CoreService {
         this.runner.recover();
     }
 
-    activateHistory() {
-        const { db } = this.store;
-        const { shared } = this;
-        const imported = db.prepare("SELECT 1 FROM sqlite_master WHERE name='history_import_topics' AND type='table'").get();
-        const proofs = imported ? db.prepare('SELECT * FROM history_import_topics').all() : [];
-        const byId = new Map(proofs.map(proof => [proof.conversation_id, proof]));
-        const topics = shared.db.prepare("SELECT * FROM shared_objects WHERE space_id=? AND kind='topic' AND deleted=0").all(this.workspace);
-        const newGroups = [];
-        for (const row of topics) {
-            const proof = byId.get(row.id);
-            if (!this.manages(row) && !proof) continue;
-            const head = shared.head(row);
-            if (proof && (proof.owner_type !== row.owner_type || proof.owner_id !== row.owner_id ||
-                proof.topic_id !== row.topic_id || proof.central_head !== head)) {
-                throw failure('CORE_HISTORY_SOURCE_CHANGED');
-            }
-            if (!proof && (head || shared.active(row.id))) throw failure('CORE_DEVELOPMENT_WORKSPACE_NOT_EMPTY');
-            if (!proof) continue;
-            const legacyJob = shared.db.prepare(`SELECT 1 FROM mobile_executions WHERE topic_key=?
-                AND state NOT IN ('completed','failed','cancelled','review_released') LIMIT 1`).get(row.id);
-            if (shared.active(row.id) || legacyJob) throw failure('CORE_HISTORY_LEGACY_WORK_UNSETTLED');
-            shared.assertNotPrepared([row.id, row.parent_id]);
-            if (row.owner_type === 'group' && !this.manages(row)) {
-                if (!this.supportsGroup(shared.object(shared.row(this.workspace, row.parent_id)).config)) {
-                    throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
-                }
-                newGroups.push(row);
-            }
-        }
-        if (newGroups.length) shared.atomic(() => {
-            for (const row of newGroups) {
-                shared.db.prepare('INSERT OR IGNORE INTO shared_core_group_topics VALUES(?)').run(row.id);
-                shared.changed(row, 'config');
-            }
-        });
-        if (imported) this.historyDeleted = db.prepare(`SELECT 1 FROM history_import_deletions
-            WHERE conversation_id=? AND kind IN ('owner','topic') LIMIT 1`);
-    }
-
     configuration(topic) {
-        if (this.local) return this.local.configuration(topic);
-        return prepareSharedConfiguration(this.mobile.engine.configs, topic, { persist: false, desktopContext: true });
+        return this.local.configuration(topic);
     }
 
     groupMode(row) {
-        if (row.owner_type !== 'group') return undefined;
-        return this.local ? this.local.groupMode(row) : this.shared.object(this.shared.row(this.workspace, row.parent_id)).config.mode;
+        return row.owner_type === 'group' ? this.local.groupMode(row) : undefined;
     }
 
     supportsGroup(config) {
         const mode = config?.mode;
-        return isCoreGroupMode(mode) || mode === 'jev' && Boolean(this.jev) || this.gameEnabled && isCoreGame(config);
+        return isCoreGroupMode(mode) || mode === 'jev' && Boolean(this.jev) || this.gameEnabled && nativeGamePrompts().isSupportedGame(config);
     }
-
-    manages(row) { return row?.space_id === this.workspace && (row.owner_type === 'agent' || this.shared.requiresCore(row)); }
 
     topic(actor, workspace, key, permission) {
         if (workspace !== this.workspace) throw failure('CORE_WORKSPACE_NOT_ENABLED', 404);
-        const row = this.shared.topic(actor, workspace, key, permission);
-        if (!this.manages(row)) throw failure('CORE_CONVERSATION_NOT_MIGRATED', 409);
+        const row = this.local.topic(actor, workspace, key, permission);
         if (row.id !== key) throw failure('CORE_CONVERSATION_MOVED');
         const topicGame = this.groupMode(row) === 'game';
         if (topicGame && (actor.kind !== 'desktop' || actor.sourceId !== row.origin_source)) {
@@ -189,20 +128,8 @@ class CoreService {
     }
 
     liveActor(principal) {
-        if (this.local) {
-            if (principal === this.local.actor.principal) return this.local.actor;
-            if (this.remote) return this.remote.live(principal, 'execute');
-            throw failure('WORK_AUTHORITY_REVOKED', 403);
-        }
-        const [kind, id] = principal.split(':');
-        if (kind === 'desktop') {
-            const member = this.shared.db.prepare('SELECT source_id FROM shared_members WHERE space_id=? AND device_id=?')
-                .get(this.workspace, id);
-            if (member) return { kind, principal, deviceId: id, sourceId: member.source_id };
-        } else if (kind === 'mobile') {
-            const session = this.shared.db.prepare('SELECT * FROM mobile_sessions WHERE id=? AND expires>?').get(id, Date.now());
-            if (session) return this.shared.mobile({ id, scopes: JSON.parse(session.scopes) }, this.workspace, 'execute');
-        }
+        if (principal === this.local.actor.principal) return this.local.actor;
+        if (this.remote) return this.remote.live(principal, 'execute');
         throw failure('WORK_AUTHORITY_REVOKED', 403);
     }
 
@@ -371,13 +298,13 @@ class CoreService {
         const { requestId, agentId, observation, reminder = false, model } = body;
         if (typeof reminder !== 'boolean' || model !== undefined && (typeof model !== 'string' || !model.trim() || model.length > 200) ||
             Buffer.byteLength(JSON.stringify(body)) > 64 * 1024) throw failure('INVALID_CORE_GAME_DECISION', 400);
+        const { gameDecision, formatInvite } = nativeGamePrompts();
         const game = { ...gameDecision(observation), reminder, ...(model && { model }),
-            invitePrompt: nativeGamePrompts().formatInvite({ observation, reminder }) };
+            invitePrompt: formatInvite({ observation, reminder }) };
         return this.invite(topic, actor, { requestId, agentId }, authorize, null, { internal: true, game });
     }
 
     async deliverSponsoredMessage(work, invocation, args) {
-        const { resolveDelivery } = require('../Plugin/NativeSync/sync/sharedTopicSponsor');
         const { formatTopicRiverQuote } = require('../Plugin/NativeSync/sync/topicRiverQuote');
         const liveSource = () => {
             const topic = this.resolveAcceptedTopic(work);
@@ -389,8 +316,7 @@ class CoreService {
             return topic;
         };
         const source = liveSource(), senderName = JSON.parse(work.frozen_config_json).name;
-        const resolve = topic => this.local ? this.local.resolveSponsor(topic, senderName, args) : resolveDelivery(this.shared, topic.actor,
-            this.shared.row(this.workspace, topic.key), senderName, args);
+        const resolve = topic => this.local.resolveSponsor(topic, senderName, args);
         const initial = resolve(source);
         const target = this.topic(source.actor, this.workspace, initial.target.id, 'execute');
         const config = await this.configuration(target);
@@ -423,18 +349,13 @@ class CoreService {
 
     compactionSource(topic, principal, id) {
         const head = this.store.head(topic.key);
-        const { hash } = this.shared.freeze(this.shared.row(topic.workspace, topic.key));
+        const { hash } = this.local.freeze(this.local.row(topic.workspace, topic.key));
         return createHash('sha256').update(JSON.stringify([principal, topic.workspace, topic.key, id, head, hash])).digest('hex');
     }
 
-    memoryAgent(topic, actor, query, authority, capability) {
+    memoryAgent(query, authority, capability) {
         if (typeof query !== 'string' || !query.trim() || query.length > 200) throw failure('INVALID_MEMORY_QUERY', 400);
-        const agents = this.local
-            ? this.local.findAgents(query, this.historyDeleted)
-            : this.shared.db.prepare(`SELECT * FROM shared_objects
-                WHERE space_id=? AND kind='agent' AND deleted=0 ORDER BY id`).all(topic.workspace)
-                .map(row => ({ uuid: row.id, name: this.shared.object(row).config.name }))
-                .filter(agent => agent.uuid === query || agent.name.includes(query));
+        const agents = this.local.findAgents(query, this.historyDeleted);
         const matches = agents.filter(agent => authority.allows(capability, agent.uuid, { track: false }));
         const exact = matches.find(agent => agent.uuid === query);
         if (!exact && matches.length !== 1) {
@@ -442,18 +363,7 @@ class CoreService {
         }
         const agent = exact || matches[0];
         authority.assert(capability, agent.uuid);
-        let topics = agent.topics;
-        if (!topics) {
-            topics = this.shared.db.prepare(`SELECT * FROM shared_objects
-                WHERE parent_id=? AND space_id=? AND kind='topic' AND deleted=0 ORDER BY id`).all(agent.uuid, topic.workspace)
-                .filter(row => this.manages(row) && !this.historyDeleted?.get(row.id))
-                .map(row => {
-                    this.topic(actor, topic.workspace, row.id, 'read');
-                    const config = this.shared.object(row).config;
-                    return { id: row.id, name: config.name, createdAt: config.createdAt };
-                });
-        }
-        return { ...agent, topics };
+        return agent;
     }
 
     async memoryTool(topic, name, args, config) {
@@ -469,7 +379,7 @@ class CoreService {
             const { processToolCall } = require(path.join(plugins, 'DeepMemo/DeepMemoService'));
             const query = args?.owner?.id ?? args?.owner?.ownerId ?? args?.agentId ?? args?.maid;
             const selected = query === undefined ? authorized : {
-                ...authorized, ownerType: 'agent', ownerId: this.memoryAgent(topic, actor, query, authority, name).uuid
+                ...authorized, ownerType: 'agent', ownerId: this.memoryAgent(query, authority, name).uuid
             };
             if (selected.ownerType !== 'group') authority.assert(name, selected.ownerId);
             const result = await processToolCall(args, { vcpContext: {
@@ -486,7 +396,7 @@ class CoreService {
         const { processToolCall } = require(path.join(plugins, 'TopicMemo/TopicMemo'));
         const result = await processToolCall(args, null, {
             userName: '用户',
-            findAgent: query => this.memoryAgent(topic, actor, query, authority, name),
+            findAgent: query => this.memoryAgent(query, authority, name),
             history: ({ agentId, topicId }) => {
                 authority.assert(name, agentId);
                 const owner = this.topic(caller(), topic.workspace, topicId, 'read');
@@ -501,15 +411,13 @@ class CoreService {
     searchMemories(topic, actor, request) {
         const query = request?.query;
         if (typeof query !== 'string' || !query.trim() || query.length > 4096) throw failure('INVALID_MEMORY_QUERY', 400);
-        const objectRows = this.local ? this.local.topicRows(topic.ownerType, topic.ownerId) : this.shared.db.prepare(`SELECT * FROM shared_objects
-            WHERE space_id=? AND owner_type=? AND owner_id=? AND kind='topic' AND deleted=0 ORDER BY id`)
-            .all(topic.workspace, topic.ownerType, topic.ownerId);
-        const rows = objectRows.filter(row => this.manages(row) && !this.historyDeleted?.get(row.id)).map(row => {
-            this.shared.topic(actor, topic.workspace, row.id, 'read');
-            const messages = this.store.compactionHistory(row.id).map(({ id, role, content, timestamp, name, agentId }) =>
-                ({ id, role, content, timestamp, ...(name && { name }), ...(agentId && { agentId }) }));
-            return { id: row.id, name: this.local ? this.local.definition(row).name : this.shared.object(row).config.name, messages };
-        });
+        const readTopics = () => {
+            this.local.authorize(actor, topic.workspace, 'read');
+            return this.local.topicRows(topic.ownerType, topic.ownerId).filter(row => !this.historyDeleted?.get(row.id)).map(row => {
+                return { id: row.id, name: this.local.definition(row).name,
+                    sequence: this.store.head(row.id), readMessages: () => this.store.cdsHistory(row.id) };
+            });
+        };
         const params = {
             query,
             excludeCurrentTopic: request.excludeCurrentTopic === true,
@@ -519,7 +427,7 @@ class CoreService {
             resultLimit: integer(request.resultLimit, 8, 1, 100),
             maxChars: integer(request.maxChars, 60000, 1, 1000000)
         };
-        return this.cds.search(topic, rows, params);
+        return this.cds.search(topic, readTopics, params);
     }
 
     async availableChatModelIds() {
@@ -559,8 +467,7 @@ class CoreService {
         }
         const config = await this.local.configValidator.normalize(
             { ownerType: 'agent', imageModels: this.local.imageModels },
-            { name: input.name, systemPrompt: input.instructions || `你是 ${input.name}。`, model: input.model, streamOutput: true },
-            { localOwner: true }
+            { name: input.name, systemPrompt: input.instructions || `你是 ${input.name}。`, model: input.model, streamOutput: true }
         );
         reauthorize();
         return this.local.createMobileAgent(actor, requestId, input, config);
@@ -588,75 +495,73 @@ class CoreService {
             this.desktopContext.announce(actor, req.body?.routeHash);
             res.json({ success: true });
         }));
-        if (this.local) {
-            router.get('/:workspace/identity', route((req, res) => {
-                const actor = resolveActor(req, req.params.workspace, 'read');
-                this.local.authorize(actor, req.params.workspace);
-                res.set('Cache-Control', 'no-store').json({ workspace: this.workspace, storageId: this.store.storageId });
-            }));
-            router.get('/:workspace/models', route(async (req, res) => {
-                const actor = resolveActor(req, req.params.workspace, 'read');
-                this.local.authorize(actor, req.params.workspace, 'read');
-                if (actor.kind !== 'desktop') throw failure('CORE_DESKTOP_REQUIRED', 403);
-                const ids = await this.availableChatModelIds();
-                this.local.authorize(actor, req.params.workspace, 'read');
-                res.set('Cache-Control', 'no-store').json({ object: 'list', purpose: 'chat', data: ids.map(id => ({ id })) });
-            }));
-            router.get('/:workspace/memo-agent', route((req, res) => {
-                const actor = resolveActor(req, req.params.workspace, 'read');
-                this.local.authorize(actor, req.params.workspace);
-                if (typeof req.query.name !== 'string' || !req.query.name.trim() || req.query.name.length > 200) throw failure('INVALID_MEMORY_QUERY', 400);
-                res.json({ agent: this.local.findAgent(req.query.name, this.historyDeleted) });
-            }));
-            const mutationActor = req => {
-                if (this.runner.draining) throw failure('HOST_DRAINING', 503);
-                const actor = resolveActor(req, req.params.workspace, 'config');
-                this.local.authorize(actor, req.params.workspace, 'config');
-                return actor;
-            };
-            router.put('/:workspace/:key/definition', route(async (req, res) => {
-                const actor = mutationActor(req);
-                res.json(await this.local.define(req.params.key, req.body, config => this.supportsGroup(config), actor, () => mutationActor(req)));
-            }));
-            router.put('/:workspace/agents/:id', route(async (req, res) => {
-                mutationActor(req);
-                res.json(await this.local.defineAgent(req.params.id, req.body, () => mutationActor(req)));
-            }));
-            router.post('/:workspace/remove-definition', route((req, res) => {
-                const actor = mutationActor(req);
-                const { kind, id, topicId, requestId } = req.body || {};
-                if (topicId !== undefined && (typeof topicId !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(topicId))) throw failure('INVALID_CORE_TOPIC', 400);
-                const key = topicId === undefined ? null : require('./localWorkspace').localTopicKey(kind, id, topicId);
-                const result = this.local.remove(kind, id, key, actor, requestId, topicKey => {
-                    const work = this.store.db.prepare(`SELECT 1 FROM works WHERE conversation_id=? AND
-                        status IN ('queued','running','waiting_approval','cancelling','review_required') LIMIT 1`).get(topicKey);
-                    if (work || this.compaction.running.has(topicKey)) throw failure('CORE_TOPIC_BUSY');
-                });
-                for (const topic of result.removed) {
-                    this.runner.publish(topic.id, 'change_seq', { seq: this.store.head(topic.id) });
-                    this.attachments.topics.delete(topic.id);
-                }
-                this.runner.flowlock.schedule();
-                res.json(result);
-            }));
-            router.get('/:workspace/desktop-directory', route((req, res) => {
-                const actor = resolveActor(req, req.params.workspace, 'read');
-                this.local.authorize(actor, req.params.workspace, 'read');
-                if (actor.kind !== 'desktop') throw failure('CORE_DESKTOP_REQUIRED', 403);
-                let canConfigure = true;
-                try { this.local.authorize(actor, req.params.workspace, 'config'); }
-                catch (error) {
-                    if (error.status !== 403) throw error;
-                    canConfigure = false;
-                }
-                res.json(this.local.desktopDirectory(this.historyDeleted, canConfigure));
-            }));
-        }
+        router.get('/:workspace/identity', route((req, res) => {
+            const actor = resolveActor(req, req.params.workspace, 'read');
+            this.local.authorize(actor, req.params.workspace);
+            res.set('Cache-Control', 'no-store').json({ workspace: this.workspace, storageId: this.store.storageId });
+        }));
+        router.get('/:workspace/models', route(async (req, res) => {
+            const actor = resolveActor(req, req.params.workspace, 'read');
+            this.local.authorize(actor, req.params.workspace, 'read');
+            if (actor.kind !== 'desktop') throw failure('CORE_DESKTOP_REQUIRED', 403);
+            const ids = await this.availableChatModelIds();
+            this.local.authorize(actor, req.params.workspace, 'read');
+            res.set('Cache-Control', 'no-store').json({ object: 'list', purpose: 'chat', data: ids.map(id => ({ id })) });
+        }));
+        router.get('/:workspace/memo-agent', route((req, res) => {
+            const actor = resolveActor(req, req.params.workspace, 'read');
+            this.local.authorize(actor, req.params.workspace);
+            if (typeof req.query.name !== 'string' || !req.query.name.trim() || req.query.name.length > 200) throw failure('INVALID_MEMORY_QUERY', 400);
+            res.json({ agent: this.local.findAgent(req.query.name, this.historyDeleted) });
+        }));
+        const mutationActor = req => {
+            if (this.runner.draining) throw failure('HOST_DRAINING', 503);
+            const actor = resolveActor(req, req.params.workspace, 'config');
+            this.local.authorize(actor, req.params.workspace, 'config');
+            return actor;
+        };
+        router.put('/:workspace/:key/definition', route(async (req, res) => {
+            const actor = mutationActor(req);
+            res.json(await this.local.define(req.params.key, req.body, config => this.supportsGroup(config), actor, () => mutationActor(req)));
+        }));
+        router.put('/:workspace/agents/:id', route(async (req, res) => {
+            mutationActor(req);
+            res.json(await this.local.defineAgent(req.params.id, req.body, () => mutationActor(req)));
+        }));
+        router.post('/:workspace/remove-definition', route((req, res) => {
+            const actor = mutationActor(req);
+            const { kind, id, topicId, requestId } = req.body || {};
+            if (topicId !== undefined && (typeof topicId !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(topicId))) throw failure('INVALID_CORE_TOPIC', 400);
+            const key = topicId === undefined ? null : require('./localWorkspace').localTopicKey(kind, id, topicId);
+            const result = this.local.remove(kind, id, key, actor, requestId, topicKey => {
+                const work = this.store.db.prepare(`SELECT 1 FROM works WHERE conversation_id=? AND
+                    status IN ('queued','running','waiting_approval','cancelling','review_required') LIMIT 1`).get(topicKey);
+                if (work || this.compaction.running.has(topicKey)) throw failure('CORE_TOPIC_BUSY');
+            });
+            for (const topic of result.removed) {
+                this.runner.publish(topic.id, 'change_seq', { seq: this.store.head(topic.id) });
+                this.attachments.topics.delete(topic.id);
+            }
+            this.runner.flowlock.schedule();
+            res.json(result);
+        }));
+        router.get('/:workspace/desktop-directory', route((req, res) => {
+            const actor = resolveActor(req, req.params.workspace, 'read');
+            this.local.authorize(actor, req.params.workspace, 'read');
+            if (actor.kind !== 'desktop') throw failure('CORE_DESKTOP_REQUIRED', 403);
+            let canConfigure = true;
+            try { this.local.authorize(actor, req.params.workspace, 'config'); }
+            catch (error) {
+                if (error.status !== 403) throw error;
+                canConfigure = false;
+            }
+            res.json(this.local.desktopDirectory(this.historyDeleted, canConfigure));
+        }));
         router.get('/:workspace/directory', route((req, res) => {
             const { workspace } = req.params;
             if (workspace !== this.workspace) throw failure('CORE_WORKSPACE_NOT_ENABLED', 404);
             const actor = resolveActor(req, workspace, 'read');
-            const directory = this.shared.directory(actor, { sharedSpaceId: workspace, after: req.query.after, limit: 128 });
+            const directory = this.local.directory(actor, { sharedSpaceId: workspace, after: req.query.after, limit: 128 });
             res.json({ ...directory, objects: directory.objects.filter(object => !this.historyDeleted?.get(object.id) &&
                 (object.kind === 'agent' || object.topic?.ownerType === 'agent' || object.coreGroup))
                 .map(({ id, kind, parentId, deleted, config, name }) => ({ id, kind, parentId, deleted, name: name ?? config?.name })) });
@@ -665,7 +570,7 @@ class CoreService {
             const value = scope(req, 'execute');
             if (value.topic.ownerType !== 'agent') throw failure('CORE_GROUP_COMPACTION_NOT_MIGRATED');
             if (value.actor.kind !== 'desktop') throw failure('CORE_COMPACTION_DESKTOP_REQUIRED', 403);
-            this.shared.authorize(value.actor, value.topic.workspace, 'config');
+            this.local.authorize(value.actor, value.topic.workspace, 'config');
             return value;
         };
         router.get('/:workspace/:key/compact', route((req, _res) => {
@@ -813,7 +718,7 @@ class CoreService {
             // An empty result used to release a rejected submission must be
             // read under the original Cookie binding, even across tab changes.
             if (actor.kind === 'mobile' && (req.get('x-nativesync-entry-id') !== undefined || req.get('x-nativesync-session-marker') !== undefined)) {
-                (this.mobile || this.remote).requireSubmissionContext(req);
+                this.remote.requireSubmissionContext(req);
             }
             if (typeof req.query.requestId !== 'string') throw failure('INVALID_REQUEST_ID', 400);
             const receipt = this.receipt(topic, actor.principal, req.query.requestId);
@@ -823,14 +728,14 @@ class CoreService {
             const { actor, topic } = scope(req, 'execute');
             // Configuration resolution may await native prompt templates. Recheck
             // before admitting if the session or its binding changed meanwhile.
-            if (actor.kind === 'mobile') (this.mobile || this.remote).requireSubmissionContext(req);
+            if (actor.kind === 'mobile') this.remote.requireSubmissionContext(req);
             await this.send(topic, actor.principal, req.body || {}, () => scope(req, 'execute'), actor);
             res.status(202).json(this.receipt(topic, actor.principal, req.body.requestId));
         }));
         const jevScope = (req, permission) => {
             const { actor, topic } = scope(req, permission);
             if (!this.jev || topic.ownerType !== 'group' ||
-                this.groupMode(this.shared.row(topic.workspace, topic.key)) !== 'jev') {
+                this.groupMode(this.local.row(topic.workspace, topic.key)) !== 'jev') {
                 throw failure('CORE_JEV_TOPIC_REQUIRED');
             }
             return { actor, topic };
@@ -846,7 +751,7 @@ class CoreService {
         }));
         router.post('/:workspace/:key/invitations', route(async (req, res) => {
             const { actor, topic } = scope(req, 'execute');
-            if (actor.kind === 'mobile') (this.mobile || this.remote).requireSubmissionContext(req);
+            if (actor.kind === 'mobile') this.remote.requireSubmissionContext(req);
             await this.invite(topic, actor, req.body || {}, () => scope(req, 'execute'));
             res.status(202).json(this.receipt(topic, actor.principal, req.body.requestId));
         }));
@@ -882,7 +787,7 @@ class CoreService {
                 const text = requireText(req.body?.text);
                 if (!text.trim()) throw failure('INVALID_MESSAGE_TEXT', 400);
                 if (actor.kind === 'mobile' && (req.get('x-nativesync-entry-id') || req.get('x-nativesync-session-marker'))) {
-                    (this.mobile || this.remote).requireSubmissionContext(req);
+                    this.remote.requireSubmissionContext(req);
                 }
                 const result = this.store.steer(topic.key, actor.principal, req.body?.requestId, id, text);
                 this.runner.publish(topic.key, 'change_seq', { seq: result.seq });

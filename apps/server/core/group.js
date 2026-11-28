@@ -27,7 +27,7 @@ function buildGroupPacket(topic, work, config, member, history, attachments, des
     if (config.game) {
         member = { ...member, ...(config.game.model && { model: config.game.model }),
             maxOutputTokens: Math.min(member.maxOutputTokens || 16384, 16384) };
-        const { nativeGamePrompts } = require('./game');
+        const { nativeGamePrompts } = require('../modules/nativeGamePrompts');
         const { GAME_SYSTEM_PROMPT, DOUDIZHU_SYSTEM_PROMPT } = nativeGamePrompts();
         const groupPrompt = [config.group.groupPrompt, GAME_SYSTEM_PROMPT, DOUDIZHU_SYSTEM_PROMPT].filter(Boolean).join('\n\n');
         config = { ...config, group: { ...config.group, groupPrompt, useUnifiedModel: false, invitePrompt: config.game.invitePrompt } };

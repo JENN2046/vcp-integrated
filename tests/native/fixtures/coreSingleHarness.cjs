@@ -2,7 +2,9 @@
 
 const { createServer } = require('node:http');
 const fs = require('node:fs/promises');
-const { BOX } = require('./sharedSingleHarness.cjs');
+const path = require('node:path');
+const CHAT = path.resolve(__dirname, "../../../apps/desktop");
+const BOX = process.env.VCP_TEST_SERVER || path.resolve(__dirname, '../../../apps/server');
 
 async function localProvider(t) {
     const calls = [];
@@ -78,4 +80,12 @@ function setStream(f, enabled) {
         expectedVersion: owner.version, config: { ...owner.config, streamOutput: enabled } });
 }
 
-module.exports = { localProvider, host, mountCore, setStream };
+async function wait(predicate, label) {
+    for (let i = 0; i < 250; i++) {
+        if (await predicate()) return;
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    throw Error('TIMEOUT ' + label);
+}
+
+module.exports = { BOX, CHAT, wait, localProvider, host, mountCore, setStream };

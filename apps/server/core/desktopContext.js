@@ -6,8 +6,8 @@ const workspacePattern = /\{\{VCPChatWorkSpace(?::[^{}\r\n]{1,200})?\}\}/g;
 const canvasPlaceholder = '{{VCPChatCanvas}}';
 
 class DesktopContext {
-    constructor(shared, workspace, toolHost) {
-        this.shared = shared;
+    constructor(directory, workspace, toolHost) {
+        this.directory = directory;
         this.workspace = workspace;
         this.toolHost = toolHost;
         this.routes = new Map();
@@ -15,7 +15,7 @@ class DesktopContext {
 
     announce(actor, routeHash) {
         if (actor?.kind !== 'desktop') throw failure('CORE_RESOURCE_DESKTOP_REQUIRED', 403);
-        this.shared.authorize(actor, this.workspace, 'execute');
+        this.directory.authorize(actor, this.workspace, 'execute');
         if (typeof routeHash !== 'string' || !/^[a-f0-9]{64}$/.test(routeHash)) throw failure('INVALID_CORE_RESOURCE_ROUTE', 400);
         const prior = this.routes.get(actor.sourceId);
         if (prior?.routeHash !== routeHash || prior.actor.principal !== actor.principal) {
@@ -26,7 +26,7 @@ class DesktopContext {
     async read(source, request) {
         const route = this.routes.get(source);
         if (!route) throw failure('CORE_RESOURCE_NODE_OFFLINE', 503);
-        this.shared.authorize(route.actor, this.workspace, 'execute');
+        this.directory.authorize(route.actor, this.workspace, 'execute');
         const sender = this.toolHost?.bindDistributedTool?.('internal_core_context', route.routeHash);
         if (!sender) throw failure('CORE_RESOURCE_NODE_OFFLINE', 503);
         let result;
@@ -36,7 +36,7 @@ class DesktopContext {
             throw failure('CORE_RESOURCE_NODE_OFFLINE', 503);
         }
         if (this.routes.get(source) !== route) throw failure('CORE_RESOURCE_NODE_OFFLINE', 503);
-        this.shared.authorize(route.actor, this.workspace, 'execute');
+        this.directory.authorize(route.actor, this.workspace, 'execute');
         if (!Array.isArray(result?.references) || result.references.length !== request.references.length ||
             !Array.isArray(result.workspaces) || result.workspaces.length !== request.workspaces.length ||
             [...result.references, ...result.workspaces].some(value => typeof value !== 'string') ||
@@ -61,7 +61,7 @@ class DesktopContext {
     gameNode(topic) {
         const route = this.routes.get(topic.originSource);
         if (!route) throw failure('CORE_RESOURCE_NODE_OFFLINE', 503);
-        this.shared.authorize(route.actor, this.workspace, 'execute');
+        this.directory.authorize(route.actor, this.workspace, 'execute');
         const send = this.toolHost?.bindDistributedTool?.('GameController', route.routeHash);
         if (!send) throw failure('CORE_RESOURCE_NODE_OFFLINE', 503);
         return send;
@@ -75,12 +75,7 @@ class DesktopContext {
             const workspaces = [...new Set(message.content.match(workspacePattern) || [])];
             const canvases = message.content.includes(canvasPlaceholder);
             if (!workspaces.length && !canvases) continue;
-            const binding = this.shared.resourceBinding ? this.shared.resourceBinding(topic) : this.shared.db.prepare(`SELECT t.local_id AS topicId, t.local_parent AS itemId
-                FROM shared_local_bindings t JOIN shared_local_bindings a
-                  ON a.source_id=t.source_id AND a.space_id=t.space_id AND a.kind=?
-                  AND a.local_id=t.local_parent AND a.object_id=?
-                WHERE t.space_id=? AND t.source_id=? AND t.object_id=? AND t.kind='topic'
-                  AND t.hidden=0 AND a.hidden=0`).all(topic.ownerType, topic.ownerId, this.workspace, topic.originSource, topic.key);
+            const binding = this.directory.resourceBinding(topic);
             if (!binding.length || binding.length > 8) throw failure('CORE_RESOURCE_UNAVAILABLE', 409);
             const result = await this.read(topic.originSource, { canvases, workspaces, references: [], topics: topic.ownerType === 'group' ? binding.map(item => ({ ...item, itemType: 'group' })) : binding });
             const values = new Map(workspaces.map((name, index) => [name, result.workspaces[index]]));

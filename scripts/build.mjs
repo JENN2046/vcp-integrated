@@ -32,7 +32,7 @@ const bundle = await rolldown({ cwd: root, input, platform: 'neutral' });
 try {
     for (const [format, files] of [
         ['cjs', [path.join(desktop,'modules/services/nativeSync/contracts.generated.cjs'), path.join(server,'Plugin/NativeSync/sync/contracts.generated.cjs')]],
-        ['es', [path.join(desktop,'modules/nativeSyncSettings/contracts.generated.js'), path.join(mobile,'src/contracts.generated.js')]],
+        ['es', [path.join(mobile,'src/contracts.generated.js')]],
     ]) {
         const { output } = await bundle.generate({format, file:'contracts.'+(format==='cjs'?'cjs':'js'), sourcemap:false, minify:false});
         if (output.length !== 1 || output[0].type !== 'chunk' || output[0].imports.length || output[0].dynamicImports.length) throw Error('Contract must be standalone');

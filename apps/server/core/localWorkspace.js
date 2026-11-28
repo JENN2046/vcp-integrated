@@ -13,11 +13,6 @@ const signature = value => createHash('sha256').update(stable(value)).digest('he
 class LocalWorkspace {
     constructor(store, workspace, agentManager) {
         const { db } = store;
-        const authority = db.prepare("SELECT value FROM core_metadata WHERE key='authority'").get();
-        if (authority && authority.value !== 'local' ||
-            !authority && db.prepare('SELECT 1 FROM conversations LIMIT 1').get()) throw failure('CORE_EXISTING_AUTHORITY_REQUIRED');
-        const bound = db.prepare("SELECT value FROM core_metadata WHERE key='local_workspace'").get();
-        if (bound && bound.value !== workspace) throw failure('CORE_DATABASE_WORKSPACE_MISMATCH');
         this.db = db;
         this.workspace = workspace;
         this.actor = actor;
@@ -46,8 +41,9 @@ class LocalWorkspace {
 
     authorize(subject, workspace, permission = 'read') {
         if (workspace !== this.workspace) throw failure('CORE_WORKSPACE_FORBIDDEN', 403);
-        if (subject !== actor) this.remote?.live(subject?.principal || '', permission);
-        if (subject !== actor && !this.remote) throw failure('CORE_WORKSPACE_FORBIDDEN', 403);
+        if (subject === actor) return;
+        if (!this.remote) throw failure('CORE_WORKSPACE_FORBIDDEN', 403);
+        this.remote.live(subject?.principal || '', permission);
     }
 
     async define(key, body, supportsGroup, subject = actor, reauthorize = () => {}) {
@@ -56,8 +52,7 @@ class LocalWorkspace {
             key !== localTopicKey(ownerType, ownerId, topicId) ||
             typeof name !== 'string' || !name.trim() || name.length > 200) throw failure('INVALID_CORE_TOPIC', 400);
         if (ownerType === 'group' && !supportsGroup(config?.group)) throw failure('CORE_GROUP_MODE_NOT_MIGRATED');
-        const value = await this.configValidator.normalize({ ownerType, imageModels: this.imageModels }, config,
-            { desktopContext: true, localOwner: true });
+        const value = await this.configValidator.normalize({ ownerType, imageModels: this.imageModels }, config);
         reauthorize();
         if (this.ownerRecord(ownerType, ownerId)?.deleted) throw failure('CORE_OWNER_DELETED', 404);
         const previous = this.db.prepare('SELECT * FROM core_topics WHERE id=?').get(key);
@@ -84,8 +79,6 @@ class LocalWorkspace {
         this.authorize(subject, workspace, permission);
         return this.row(workspace, key);
     }
-
-    requiresCore(row) { return row?.space_id === this.workspace && row.kind === 'topic'; }
 
     definition(row) { return JSON.parse(row.configuration); }
     configuration(topic) {
@@ -128,8 +121,7 @@ class LocalWorkspace {
 
     async defineAgent(id, body, reauthorize) {
         if (!localId(id)) throw failure('INVALID_CORE_OWNER', 400);
-        const config = await this.configValidator.normalize({ ownerType: 'agent', imageModels: this.imageModels }, body?.config,
-            { desktopContext: true, localOwner: true });
+        const config = await this.configValidator.normalize({ ownerType: 'agent', imageModels: this.imageModels }, body?.config);
         const { tavernRules, executionPolicy, ...agent } = config;
         reauthorize();
         const prior = this.ownerRecord('agent', id);

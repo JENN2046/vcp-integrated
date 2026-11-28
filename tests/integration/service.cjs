@@ -6,7 +6,6 @@ const http = require('node:http');
 const https = require('node:https');
 const net = require('node:net');
 const { spawn, execFileSync } = require('node:child_process');
-const { fixture } = require('./seedFixture.cjs');
 
 const contract=require('./seed-contract.json');
 const auth='synthetic-only';
@@ -96,6 +95,7 @@ async function start({out, candidate, cert, key, ca = cert, trace, waitUntil, mo
         source = { id: mapTopic(descriptor).sharedId };
         for (const role of ['A', 'B']) descriptors[role] = { preSubmit: descriptor };
     } else try {
+        const { fixture } = require('./seedFixture.cjs');
         const f = await fixture({ after: fn => cleanup.push(fn) }, { syntheticRoot: seed, agentConfig: toolHandoff?.agentConfig });
         source = f.topic;
         const actor = f.actor('C');
